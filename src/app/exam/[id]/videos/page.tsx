@@ -43,6 +43,7 @@ export default function VideoPlayerPage() {
   useEffect(() => {
     if (videosData.length > 0 && currentVideoIdx === -1) {
       const firstIncomplete = videosData.findIndex((v) => !v.completed);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentVideoIdx(firstIncomplete >= 0 ? firstIncomplete : 0);
     }
   }, [videosData, currentVideoIdx]);

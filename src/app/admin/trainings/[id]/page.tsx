@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFetch } from '@/hooks/use-fetch';
+import { AssignStaffModal } from './assign-staff-modal';
 
 interface TrainingDetail {
   title: string;
@@ -48,8 +49,9 @@ export default function TrainingDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = typeof params?.id === 'string' ? params.id : null;
-  const { data: training, isLoading, error } = useFetch<TrainingDetail>(id ? `/api/admin/trainings/${id}` : null);
+  const { data: training, isLoading, error, mutate } = useFetch<TrainingDetail>(id ? `/api/admin/trainings/${id}` : null);
   const [activeTab, setActiveTab] = useState('staff');
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
 
   if (!id) {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitim bulunamadı</div></div>;
@@ -111,11 +113,21 @@ export default function TrainingDetailPage() {
           <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
             <Edit className="h-4 w-4" /> Düzenle
           </Button>
-          <Button className="gap-2 rounded-xl font-semibold text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)', boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)' }}>
+          <Button onClick={() => setAssignModalOpen(true)} className="gap-2 rounded-xl font-semibold text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)', boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)' }}>
             <Users className="h-4 w-4" /> Personel Ata
           </Button>
         </div>
       </div>
+
+      <AssignStaffModal
+        trainingId={id as string}
+        maxAttemptsAllowed={training.maxAttempts}
+        open={assignModalOpen}
+        onOpenChange={setAssignModalOpen}
+        onSuccess={() => {
+          mutate(); // refresh data
+        }}
+      />
 
       {/* Description */}
       <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>

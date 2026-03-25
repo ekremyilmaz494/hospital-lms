@@ -192,3 +192,13 @@ export interface AuditLog {
   userAgent: string | null;
   createdAt: string;
 }
+
+export interface Certificate {
+  id: string
+  userId: string
+  trainingId: string
+  attemptId: string
+  certificateCode: string
+  issuedAt: string
+  expiresAt: string | null
+}

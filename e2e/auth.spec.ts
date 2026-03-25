@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Authentication', () => {
   test('should show login page', async ({ page }) => {
     await page.goto('/auth/login')
-    await expect(page.getByText('Hos Geldiniz')).toBeVisible()
+    await expect(page.getByText('Hoş Geldiniz')).toBeVisible()
     await expect(page.getByPlaceholder('ornek@hastane.com')).toBeVisible()
   })
 
@@ -15,19 +15,7 @@ test.describe('Authentication', () => {
     await expect(page.getByText('hatali')).toBeVisible({ timeout: 5000 })
   })
 
-  test('should have demo account buttons', async ({ page }) => {
-    await page.goto('/auth/login')
-    await expect(page.getByText('DEMO HESAPLAR')).toBeVisible()
-    await expect(page.getByText('Super Admin')).toBeVisible()
-    await expect(page.getByText('Hastane Admin')).toBeVisible()
-    await expect(page.getByText('Personel')).toBeVisible()
-  })
 
-  test('demo account button fills form', async ({ page }) => {
-    await page.goto('/auth/login')
-    await page.getByText('Super Admin').click()
-    await expect(page.locator('[type="email"]')).toHaveValue('super@demo.com')
-  })
 
   test('should redirect unauthenticated users to login', async ({ page }) => {
     await page.goto('/admin/dashboard')

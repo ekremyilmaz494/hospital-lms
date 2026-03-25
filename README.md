@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hastane LMS
 
-## Getting Started
+Çoklu hastane (organization) desteğine sahip, Next.js, Prisma, Supabase ve Tailwind CSS ile geliştirilmiş Profesyonel Personel Eğitim ve Sınav Yönetim Sistemi.
 
-First, run the development server:
+## İçindekiler
+- [Teknoloji Yığını](#teknoloji-yığını)
+- [Kurulum Adımları](#kurulum-adımları)
+- [Veritabanı ve Supabase Yapılandırması](#veritabanı-ve-supabase-yapılandırması)
+- [RLS ve Güvenlik](#rls-ve-güvenlik)
+- [Demo Verileri](#demo-verileri)
 
+## Teknoloji Yığını
+- **Frontend Framework:** Next.js 15 (App Router, Turbopack)
+- **Styling:** Tailwind CSS v4, Base UI, Shadcn/ui
+- **Veritabanı & Auth:** Supabase (PostgreSQL), Prisma ORM
+- **Durum Yönetimi:** Zustand, React Hook Form + Zod
+- **Grafik & UI Bileşenleri:** Recharts, Framer Motion
+
+## Kurulum Adımları
+
+### 1. Gereksinimler
+- Node.js `v20+`
+- Pnpm (Önerilen) veya npm/yarn
+
+### 2. Projeyi Klonlama ve Kurulum
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repository-url>
+cd hospital-lms
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Çevresel Değişkenleri Hazırlama
+`.env.example` dosyasını kopyalayarak `.env` oluşturun:
+```bash
+cp .env.example .env
+```
+Ardından aşağıdaki değişkenleri kendi Supabase projenizden alıp doldurun:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (Sadece admin/sunucu işlemleri için)
+- `DATABASE_URL` (Transaction pooler adresi `pgbouncer=true` ile önerilir)
+- `DIRECT_URL` (Session pooler adresi)
+- `DEMO_PASSWORD` (İsteğe bağlı, varsayılan: demo123456)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Prisma Setup
+```bash
+pnpm run db:generate
+pnpm run db:migrate
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Veritabanı ve Supabase Yapılandırması
+Supabase'de projenizi kurarken Auth (Kimlik Doğrulama) şemasını etkinleştirmelisiniz.
+Prisma Schema veritabanının yapısını belirler. Ortak (multi-tenant) veri yapısı `organizationId` baz alınarak ayrılmıştır.
 
-## Learn More
+## RLS ve Güvenlik (Önemli)
+Supabase veritabanındaki her tabloya RLS (Row Level Security) politikaları uygulanmalıdır. Uygulanmadığı takdirde farklı kurumların verileri birbirine karışabilir.
 
-To learn more about Next.js, take a look at the following resources:
+RLS politikalarını Supabase'e uygulamak için:
+```bash
+node scripts/apply-rls.js
+```
+> **Not:** RLS uygulandıysa veritabanına Dashboard'dan doğrudan müdahale etmek yerine `service_role_key` kullanmanız gerekebilir.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Demo Verileri
+Eğitim sisteminin özelliklerini test etmek ve hızlı bir ortam kurmak için sahte (seed) verilerini çalıştırabilirsiniz:
+```bash
+node scripts/seed-demo.js
+```
+**Demo Giriş Bilgileri:**
+- Super Admin: `super@demo.com` / `demo123456`
+- Hastane Admin: `admin@demo.com` / `demo123456`
+- Personel: `staff@demo.com` / `demo123456`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Projeyi Çalıştırma
+```bash
+pnpm run dev
+```
+Uygulama yayına `http://localhost:3000` adresinde başlayacaktır.

@@ -10,6 +10,7 @@ const plusJakarta = Plus_Jakarta_Sans({
   weight: ["500", "600", "700", "800"],
   variable: "--font-display",
   display: "swap",
+  adjustFontFallback: false,
 });
 
 const inter = Inter({
@@ -17,6 +18,7 @@ const inter = Inter({
   weight: ["400", "500", "600", "700"],
   variable: "--font-body",
   display: "swap",
+  adjustFontFallback: false,
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -24,6 +26,7 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500"],
   variable: "--font-mono",
   display: "swap",
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {

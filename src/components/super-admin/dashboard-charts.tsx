@@ -34,7 +34,19 @@ interface ChartsData {
   subscriptionData: SubscriptionEntry[];
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface TooltipPayload {
+  color: string;
+  name: string;
+  value: number;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload?.length) return null;
   return (
     <div
@@ -47,7 +59,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       }}
     >
       <p className="mb-1 font-semibold" style={{ color: 'var(--color-text-primary)' }}>{label}</p>
-      {payload.map((entry: any, idx: number) => (
+      {payload.map((entry, idx) => (
         <p key={idx} style={{ color: entry.color }}>
           {entry.name}: <strong>{entry.value.toLocaleString('tr-TR')}</strong>
         </p>

@@ -1,9 +1,17 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+require('dotenv').config({ path: '.env' });
 const { createClient } = require('@supabase/supabase-js');
 const { Client } = require('pg');
 
-const SUPABASE_URL = 'https://bzvunibntyewobkdsoow.supabase.co';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6dnVuaWJudHlld29ia2Rzb293Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDQxMjM4NSwiZXhwIjoyMDg5OTg4Mzg1fQ.GG90DdXWBait2uIx_X9fWVrR4KyHkVHZHsnQNyC-b9g';
-const DB_URL = 'postgresql://postgres:14521452Aa.14521452@db.bzvunibntyewobkdsoow.supabase.co:5432/postgres';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const DB_URL = process.env.DATABASE_URL;
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'demo123456';
+
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !DB_URL) {
+  console.error("Missing required environment variables.");
+  process.exit(1);
+}
 
 async function run() {
   // Supabase admin client for auth user creation
@@ -46,9 +54,9 @@ async function run() {
 
   // 4. Create auth users
   const users = [
-    { email: 'super@demo.com', password: 'demo123456', firstName: 'Super', lastName: 'Admin', role: 'super_admin', orgId: null },
-    { email: 'admin@demo.com', password: 'demo123456', firstName: 'Hastane', lastName: 'Admin', role: 'admin', orgId: orgId },
-    { email: 'staff@demo.com', password: 'demo123456', firstName: 'Personel', lastName: 'Test', role: 'staff', orgId: orgId },
+    { email: 'super@demo.com', password: DEMO_PASSWORD, firstName: 'Super', lastName: 'Admin', role: 'super_admin', orgId: null },
+    { email: 'admin@demo.com', password: DEMO_PASSWORD, firstName: 'Hastane', lastName: 'Admin', role: 'admin', orgId: orgId },
+    { email: 'staff@demo.com', password: DEMO_PASSWORD, firstName: 'Personel', lastName: 'Test', role: 'staff', orgId: orgId },
   ];
 
   for (const u of users) {

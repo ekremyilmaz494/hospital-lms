@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Building2, Calendar, ExternalLink, Clock, AlertTriangle } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -80,13 +81,13 @@ export function DashboardLists() {
               Son Kayıt Olan Hastaneler
             </h3>
           </div>
-          <a
+          <Link
             href="/super-admin/hospitals"
             className="flex items-center gap-1 text-xs font-semibold"
             style={{ color: 'var(--color-primary)', transition: 'opacity var(--transition-fast)' }}
           >
             Tümünü Gör <ExternalLink className="h-3 w-3" />
-          </a>
+          </Link>
         </div>
 
         {recentHospitals.length === 0 ? (

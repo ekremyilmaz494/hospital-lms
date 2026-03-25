@@ -119,7 +119,16 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
       const res = await fetch('/api/admin/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          firstName: form.ad,
+          lastName: form.soyad,
+          email: form.email,
+          tcNo: form.tc || undefined,
+          phone: form.telefon || undefined,
+          departmentId: form.departman || undefined,
+          title: form.unvan || undefined,
+          password: 'Hastane123!', // Varsayılan geçici şifre
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -243,6 +252,7 @@ export default function StaffPage() {
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [showAddDept, setShowAddDept] = useState(false);
   const [showAddStaff, setShowAddStaff] = useState(false);
+  const [isSavingDept, setIsSavingDept] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptColor, setNewDeptColor] = useState(DEPARTMENT_COLORS[0]);
 
@@ -409,7 +419,25 @@ export default function StaffPage() {
                           <DropdownMenuItem className="gap-2"><Edit className="h-4 w-4" /> Düzenle</DropdownMenuItem>
                           <DropdownMenuItem className="gap-2"><UserPlus className="h-4 w-4" /> Personel Ekle</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2 text-red-500"><Trash2 className="h-4 w-4" /> Departmanı Sil</DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="gap-2 text-red-500"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm('Bu departmanı silmek istediğinize emin misiniz? (İçindeki personeller boşa düşecektir)')) {
+                                try {
+                                  const res = await fetch(`/api/admin/departments/${dept.id}`, { method: 'DELETE' });
+                                  if (!res.ok) throw new Error('Silinemedi');
+                                  toast('Departman silindi', 'success');
+                                  if (selectedDept === dept.id) setSelectedDept(null);
+                                  refetch();
+                                } catch (err) {
+                                  toast('Departman silinemedi', 'error');
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" /> Departmanı Sil
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -503,8 +531,9 @@ export default function StaffPage() {
                     <Button
                       className="w-full gap-2 rounded-xl font-semibold text-white"
                       style={{ background: newDeptColor }}
-                      disabled={!newDeptName.trim()}
+                      disabled={!newDeptName.trim() || isSavingDept}
                       onClick={async () => {
+                        setIsSavingDept(true);
                         try {
                           const res = await fetch('/api/admin/departments', {
                             method: 'POST',
@@ -517,10 +546,13 @@ export default function StaffPage() {
                           refetch();
                         } catch (err) {
                           toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
+                        } finally {
+                          setIsSavingDept(false);
                         }
                       }}
                     >
-                      <Plus className="h-4 w-4" /> Departman Oluştur
+                      {isSavingDept ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Plus className="h-4 w-4" />}
+                      {isSavingDept ? 'Oluşturuluyor...' : 'Departman Oluştur'}
                     </Button>
                   </div>
                 )}

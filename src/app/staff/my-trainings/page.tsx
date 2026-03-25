@@ -87,7 +87,7 @@ export default function MyTrainingsPage() {
           const catColor = categoryColors[t.category] || '#0d9668';
           const isActive = t.status === 'assigned' || t.status === 'in_progress';
 
-          const CardWrapper = isActive ? MagicCard : 'div' as any;
+          const CardWrapper = isActive ? MagicCard : ('div' as React.ElementType);
           const cardProps = isActive
             ? { gradientColor: `${catColor}15`, gradientOpacity: 0.5, className: 'rounded-2xl border overflow-hidden', style: { background: 'var(--color-surface)', borderColor: 'var(--color-border)' } }
             : { className: 'rounded-2xl border overflow-hidden transition-all duration-200 hover:-translate-y-1', style: { background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' } };

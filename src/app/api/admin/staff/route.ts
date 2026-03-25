@@ -31,7 +31,7 @@ export async function GET(request: Request) {
   if (department) where.department = department
   if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 
-  const [staff, total] = await Promise.all([
+  const [staff, total, rawDepartments] = await Promise.all([
     prisma.user.findMany({
       where,
       include: {
@@ -42,9 +42,47 @@ export async function GET(request: Request) {
       take: limit,
     }),
     prisma.user.count({ where }),
+    prisma.department.findMany({
+      where: { organizationId: dbUser!.organizationId! },
+      include: { _count: { select: { users: true } } },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    }),
   ])
 
-  return jsonResponse({ staff, total, page, limit, totalPages: Math.ceil(total / limit) })
+  const departments = rawDepartments.map(d => ({
+    id: d.id,
+    name: d.name,
+    color: d.color,
+    description: d.description || '',
+    staffCount: d._count.users
+  }))
+
+  const activeStaff = staff.filter(s => s.isActive).length
+  // Varsayılan temsili stats
+  const stats = {
+    totalStaff: total,
+    activeStaff,
+    departmentCount: rawDepartments.length,
+    avgScore: 0
+  }
+
+  // Frontend'e uyması için staff verisini map'liyoruz
+  const formattedStaff = staff.map(s => ({
+    id: s.id,
+    name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+    email: s.email,
+    tcNo: s.tcNo || '',
+    department: departments.find(d => d.id === s.department)?.name || s.department || '',
+    departmentId: s.department,
+    title: s.title || '',
+    assignedTrainings: s._count.assignments || 0,
+    completedTrainings: 0,
+    avgScore: 0,
+    status: s.isActive ? 'Aktif' : 'Pasif',
+    initials: `${s.firstName?.[0] || ''}${s.lastName?.[0] || ''}`.toUpperCase()
+  }))
+
+  return jsonResponse({ staff: formattedStaff, departments, stats, total, page, limit, totalPages: Math.ceil(total / limit) })
 }
 
 export async function POST(request: Request) {
@@ -91,7 +129,10 @@ export async function POST(request: Request) {
         organizationId: dbUser!.organizationId,
         tcNo: parsed.data.tcNo,
         phone: parsed.data.phone,
-        department: parsed.data.department,
+        departmentId: parsed.data.departmentId,
+        department: parsed.data.departmentId 
+          ? (await prisma.department.findUnique({ where: { id: parsed.data.departmentId } }))?.name || undefined
+          : parsed.data.department,
         title: parsed.data.title,
       },
     })

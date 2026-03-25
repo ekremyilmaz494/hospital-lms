@@ -45,9 +45,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId } })
   if (!existing) return errorResponse('Staff not found', 404)
 
+  const dataToUpdate = { ...parsed.data }
+  if (dataToUpdate.departmentId) {
+    const dept = await prisma.department.findUnique({ where: { id: dataToUpdate.departmentId } })
+    if (dept) {
+      dataToUpdate.department = dept.name
+    }
+  }
+
   const staff = await prisma.user.update({
     where: { id },
-    data: parsed.data,
+    data: dataToUpdate,
   })
 
   await createAuditLog({

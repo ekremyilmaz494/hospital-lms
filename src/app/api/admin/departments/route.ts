@@ -14,12 +14,30 @@ export async function GET() {
   const departments = await prisma.department.findMany({
     where: { organizationId: dbUser!.organizationId! },
     include: {
+      users: {
+        where: { isActive: true },
+        select: { id: true, firstName: true, lastName: true, title: true }
+      },
       _count: { select: { users: true } },
     },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
   })
 
-  return jsonResponse(departments)
+  const formatted = departments.map(d => ({
+    id: d.id,
+    name: d.name,
+    description: d.description,
+    color: d.color,
+    count: d._count.users,
+    staff: d.users.map(u => ({
+      id: u.id,
+      name: `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+      title: u.title || '',
+      initials: `${u.firstName?.[0] || ''}${u.lastName?.[0] || ''}`.toUpperCase(),
+    }))
+  }))
+
+  return jsonResponse(formatted)
 }
 
 // POST /api/admin/departments — Yeni departman oluştur

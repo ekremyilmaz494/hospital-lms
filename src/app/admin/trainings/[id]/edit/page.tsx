@@ -18,7 +18,7 @@ interface TrainingEditData {
   description: string;
   passingScore: number;
   maxAttempts: number;
-  examDuration: number;
+  examDurationMinutes: number;
   startDate: string;
   endDate: string;
 }
@@ -45,7 +45,18 @@ export default function EditTrainingPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (data) setFormData(data);
+    if (data) {
+      setFormData({
+        title: data.title || '',
+        category: data.category || '',
+        description: data.description || '',
+        passingScore: data.passingScore || 70,
+        maxAttempts: data.maxAttempts || 3,
+        examDurationMinutes: data.examDurationMinutes || 30,
+        startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
+        endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
+      });
+    }
   }, [data]);
 
   if (isLoading) {
@@ -63,10 +74,16 @@ export default function EditTrainingPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const payload = {
+        ...formData,
+        startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
+        endDate: formData.endDate ? new Date(formData.endDate).toISOString() : undefined,
+      };
+
       const res = await fetch(`/api/admin/trainings/${id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -154,7 +171,7 @@ export default function EditTrainingPage() {
               <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
                 <Clock className="h-3.5 w-3.5" style={{ color: 'var(--color-error)' }} /> Süre (dk)
               </Label>
-              <Input type="number" value={formData.examDuration} onChange={(e) => setFormData({ ...formData, examDuration: Number(e.target.value) })} className="h-10 rounded-xl font-mono" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
+              <Input type="number" value={formData.examDurationMinutes} onChange={(e) => setFormData({ ...formData, examDurationMinutes: Number(e.target.value) })} className="h-10 rounded-xl font-mono" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
             </div>
             <div>
               <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>

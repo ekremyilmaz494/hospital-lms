@@ -123,6 +123,7 @@ model User {
   videoProgress   VideoProgress[]
   notifications   Notification[]
   auditLogs       AuditLog[]
+  certificates    Certificate[]
 
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
@@ -155,6 +156,7 @@ model Training {
   assignments         TrainingAssignment[]
   examAttempts        ExamAttempt[]
   notifications       Notification[]
+  certificates        Certificate[]
 
   @@index([organizationId], map: "idx_trainings_org")
   @@index([startDate, endDate], map: "idx_trainings_dates")
@@ -257,6 +259,7 @@ model ExamAttempt {
   training              Training           @relation(fields: [trainingId], references: [id])
   examAnswers           ExamAnswer[]
   videoProgress         VideoProgress[]
+  certificates          Certificate[]
 
   @@index([assignmentId], map: "idx_attempts_assignment")
   @@index([userId], map: "idx_attempts_user")
@@ -358,4 +361,22 @@ model DbBackup {
   organization    Organization? @relation(fields: [organizationId], references: [id])
 
   @@map("db_backups")
+}
+
+// ── SERTİFİKALAR ──
+model Certificate {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @db.Uuid @map("user_id")
+  trainingId      String    @db.Uuid @map("training_id")
+  attemptId       String    @unique @db.Uuid @map("attempt_id")
+  certificateCode String    @unique @db.VarChar(50) @map("certificate_code")
+  issuedAt        DateTime  @default(now()) @map("issued_at") @db.Timestamptz
+  expiresAt       DateTime? @map("expires_at") @db.Timestamptz
+
+  user            User         @relation(fields: [userId], references: [id])
+  training        Training     @relation(fields: [trainingId], references: [id])
+  attempt         ExamAttempt  @relation(fields: [attemptId], references: [id])
+
+  @@index([userId], map: "idx_certificates_user")
+  @@map("certificates")
 }

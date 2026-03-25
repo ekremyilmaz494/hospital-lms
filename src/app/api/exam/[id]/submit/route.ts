@@ -137,5 +137,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
   })
 
+  // Auto-generate certificate
+  if (isPassed) {
+    const code = `CERT-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`
+    await prisma.certificate.create({
+      data: {
+        userId: dbUser!.id,
+        trainingId: attempt.trainingId,
+        attemptId,
+        certificateCode: code,
+      },
+    })
+  }
+
   return jsonResponse({ phase: 'post', score, isPassed, passingScore: attempt.training.passingScore })
 }

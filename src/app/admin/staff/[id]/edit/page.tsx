@@ -20,11 +20,16 @@ interface StaffEditData {
   email: string;
   phone: string;
   tcNo: string;
-  department: string;
+  department: string | null;
+  departmentId: string | null;
   title: string;
   initials: string;
   isActive: boolean;
-  departments: string[];
+}
+
+interface Dept {
+  id: string;
+  name: string;
 }
 
 export default function EditStaffPage() {
@@ -33,12 +38,13 @@ export default function EditStaffPage() {
   const params = useParams();
   const id = typeof params?.id === 'string' ? params.id : null;
   const { data, isLoading, error } = useFetch<StaffEditData>(id ? `/api/admin/staff/${id}` : null);
+  const { data: deptsData } = useFetch<Dept[]>('/api/admin/departments');
   const [formData, setFormData] = useState<StaffEditData | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (data) setFormData(data);
+    if (data) setFormData({ ...data });
   }, [data]);
 
   if (isLoading) {
@@ -57,9 +63,9 @@ export default function EditStaffPage() {
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/staff/${id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, departmentId: formData.departmentId || undefined, department: formData.department || undefined }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -74,11 +80,11 @@ export default function EditStaffPage() {
     }
   };
 
-  const update = (field: string, value: string | boolean) => {
+  const update = (field: string, value: string | boolean | null) => {
     setFormData(prev => prev ? { ...prev, [field]: value } : prev);
   };
 
-  const departments = formData.departments ?? ['Hemşirelik', 'Acil Servis', 'Radyoloji', 'Laboratuvar', 'Eczane', 'Temizlik', 'İdari', 'Güvenlik'];
+  const departments = deptsData ?? [];
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -169,12 +175,17 @@ export default function EditStaffPage() {
                   <Building2 className="h-3.5 w-3.5" /> Departman
                 </Label>
                 <select
-                  value={formData.department}
-                  onChange={(e) => update('department', e.target.value)}
+                  value={formData.departmentId || formData.department || ''}
+                  onChange={(e) => {
+                    update('departmentId', e.target.value);
+                    const selectedName = departments.find(d => d.id === e.target.value)?.name;
+                    if (selectedName) update('department', selectedName);
+                  }}
                   className="h-11 w-full rounded-xl border px-3 text-sm"
                   style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
                 >
-                  {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                  <option value="">Seçin...</option>
+                  {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               </div>
               <div>

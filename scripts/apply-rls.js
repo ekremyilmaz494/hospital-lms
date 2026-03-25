@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+require('dotenv').config({ path: '.env' });
 const { Client } = require('pg');
 
 async function run() {
   const client = new Client({
-    connectionString: process.env.DATABASE_URL || 'postgresql://postgres:14521452Aa.14521452@db.bzvunibntyewobkdsoow.supabase.co:5432/postgres',
+    connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
   });
   await client.connect();

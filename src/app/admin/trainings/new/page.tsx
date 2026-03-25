@@ -37,12 +37,19 @@ export default function NewTrainingPage() {
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [excludedStaff, setExcludedStaff] = useState<string[]>([]);
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
-  const [videos, setVideos] = useState([
+  const [videos, setVideos] = useState<{ id: number; title: string; url: string; file?: File }[]>([
     { id: 1, title: '', url: '' },
   ]);
   const [questions, setQuestions] = useState([
     { id: 1, text: '', points: 10, options: ['', '', '', ''], correct: -1 },
   ]);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [passingScore, setPassingScore] = useState(70);
+  const [maxAttempts, setMaxAttempts] = useState(3);
+  const [examDurationMinutes, setExamDurationMinutes] = useState(30);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
   const totalSelectedStaff = departments
     .filter(d => selectedDepts.includes(d.name))
@@ -209,6 +216,8 @@ export default function NewTrainingPage() {
                 <div>
                   <Label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Eğitim Adı *</Label>
                   <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
                     placeholder="örn. Enfeksiyon Kontrol Eğitimi"
                     className="mt-2 h-12 text-base"
                     style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', borderRadius: 'var(--radius-lg)' }}
@@ -245,6 +254,8 @@ export default function NewTrainingPage() {
                 <div>
                   <Label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Açıklama</Label>
                   <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
                     rows={3}
                     placeholder="Eğitim hakkında kısa bir açıklama yazın..."
                     className="mt-2 w-full rounded-xl border px-4 py-3 text-sm"
@@ -257,34 +268,41 @@ export default function NewTrainingPage() {
                   style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
                 >
                   <p className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>Sınav Ayarları</p>
-                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
                         <Target className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
                         <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Baraj Puanı</Label>
                       </div>
-                      <Input type="number" defaultValue={70} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
+                      <Input type="number" value={passingScore} onChange={(e) => setPassingScore(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
                         <Award className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
                         <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Deneme Hakkı</Label>
                       </div>
-                      <Input type="number" defaultValue={3} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
+                      <Input type="number" value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
                         <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-info)' }} />
                         <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Başlangıç</Label>
                       </div>
-                      <Input type="date" className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
+                      <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
-                        <Clock className="h-3.5 w-3.5" style={{ color: 'var(--color-error)' }} />
+                        <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-error)' }} />
+                        <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Bitiş</Label>
+                      </div>
+                      <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Clock className="h-3.5 w-3.5" style={{ color: 'var(--color-primary-dark)' }} />
                         <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Süre (dk)</Label>
                       </div>
-                      <Input type="number" defaultValue={30} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
+                      <Input type="number" value={examDurationMinutes} onChange={(e) => setExamDurationMinutes(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
                     </div>
                   </div>
                 </div>
@@ -351,30 +369,64 @@ export default function NewTrainingPage() {
                     </div>
                     {/* Upload area per video */}
                     <div
-                      className="flex items-center gap-4 px-5 py-5 cursor-pointer"
+                      className="flex items-center gap-4 px-5 py-5 relative"
                       style={{ background: 'var(--color-surface)' }}
                     >
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 500 * 1024 * 1024) {
+                              toast('Dosya boyutu 500MB sınırını aşıyor', 'error');
+                              return;
+                            }
+                            setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: URL.createObjectURL(file), file } : v));
+                          }
+                        }}
+                      />
                       <div
                         className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-                        style={{ background: 'var(--color-primary-light)' }}
+                        style={{ background: video.file ? 'var(--color-success-bg)' : 'var(--color-primary-light)' }}
                       >
-                        <Upload className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+                        {video.file ? (
+                          <Video className="h-5 w-5" style={{ color: 'var(--color-success)' }} />
+                        ) : (
+                          <Upload className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+                        )}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                          Video dosyasını sürükleyin veya tıklayıp seçin
-                        </p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                          MP4, WebM — Maks. 500MB
-                        </p>
+                        {video.file ? (
+                          <>
+                            <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                              {video.file.name}
+                            </p>
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                              {(video.file.size / (1024 * 1024)).toFixed(2)} MB • Hazır
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                              Video dosyasını sürükleyin veya tıklayıp seçin
+                            </p>
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                              MP4, WebM — Maks. 500MB
+                            </p>
+                          </>
+                        )}
                       </div>
                       <Button
-                        variant="outline"
+                        variant={video.file ? 'default' : 'outline'}
                         size="sm"
-                        className="rounded-lg text-xs gap-1.5"
-                        style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                        type="button"
+                        className="rounded-lg text-xs gap-1.5 pointer-events-none"
+                        style={video.file ? { background: 'var(--color-surface-hover)', color: 'var(--color-text-primary)' } : { borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
                       >
-                        <Upload className="h-3.5 w-3.5" /> Dosya Seç
+                        {video.file ? <Check className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
+                        {video.file ? 'Değiştir' : 'Dosya Seç'}
                       </Button>
                     </div>
                   </div>
@@ -426,6 +478,8 @@ export default function NewTrainingPage() {
                         {qIdx + 1}
                       </div>
                       <Input
+                        value={q.text}
+                        onChange={(e) => setQuestions(prev => prev.map(pq => pq.id === q.id ? { ...pq, text: e.target.value } : pq))}
                         placeholder="Soruyu yazın..."
                         className="flex-1 h-9 border-0 bg-transparent text-sm font-medium focus-visible:ring-0 px-0"
                         style={{ color: 'var(--color-text-primary)' }}
@@ -433,7 +487,8 @@ export default function NewTrainingPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         <Input
                           type="number"
-                          defaultValue={q.points}
+                          value={q.points}
+                          onChange={(e) => setQuestions(prev => prev.map(pq => pq.id === q.id ? { ...pq, points: Number(e.target.value) } : pq))}
                           className="w-16 h-8 text-center text-xs"
                           style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }}
                         />
@@ -480,6 +535,15 @@ export default function NewTrainingPage() {
                             {opt}
                           </span>
                           <Input
+                            value={q.options[optIdx]}
+                            onChange={(e) => setQuestions(prev => prev.map(pq => {
+                              if (pq.id === q.id) {
+                                const newOptions = [...pq.options];
+                                newOptions[optIdx] = e.target.value;
+                                return { ...pq, options: newOptions };
+                              }
+                              return pq;
+                            }))}
                             placeholder={`Şık ${opt}`}
                             className="flex-1 h-8 border-0 bg-transparent text-sm focus-visible:ring-0 px-0"
                             style={{ color: 'var(--color-text-primary)' }}
@@ -723,19 +787,36 @@ export default function NewTrainingPage() {
                 const res = await fetch('/api/admin/trainings', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    selectedCategory,
-                    videos,
-                    questions,
-                    selectedDepts,
-                    excludedStaff,
-                  }),
-                });
-                if (!res.ok) {
-                  const body = await res.json().catch(() => ({}));
-                  throw new Error(body.error || 'Eğitim oluşturulamadı');
-                }
-                router.push('/admin/trainings');
+                    body: JSON.stringify({
+                      title,
+                      description,
+                      category: selectedCategory,
+                      passingScore: Number(passingScore),
+                      maxAttempts: Number(maxAttempts),
+                      examDurationMinutes: Number(examDurationMinutes),
+                      startDate: new Date(startDate).toISOString(),
+                      endDate: new Date(endDate).toISOString(),
+                      videos: videos.map(v => ({ title: v.title, url: v.url })),
+                      questions,
+                      selectedDepts,
+                      excludedStaff,
+                    }),
+                  });
+                  if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    if (body.error && typeof body.error === 'string') {
+                      // Attempt to safely display zod validation errors if they look like JSON
+                      try {
+                        const parsedErrors = JSON.parse(body.error);
+                        if (Array.isArray(parsedErrors)) {
+                          throw new Error(`Eksik alan: ${parsedErrors.map((e: { path: string[] }) => e.path.join('.')).join(', ')}`);
+                        }
+                      } catch { } // ignore JSON error if it wasn't valid 
+                    }
+                    throw new Error(body.error || 'Eğitim oluşturulamadı');
+                  }
+                  toast('Eğitim başarıyla yayınlandı!', 'success');
+                  router.push('/admin/trainings');
               } catch (err) {
                 toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
                 setPublishing(false);
