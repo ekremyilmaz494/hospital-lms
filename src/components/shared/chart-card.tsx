@@ -33,7 +33,6 @@ export function ChartCard({ title, icon, action, children, className }: ChartCar
           )}
           <h3
             className="text-[15px] font-bold tracking-tight"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}
           >
             {title}
           </h3>

@@ -1,16 +1,23 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Play, Pause, Volume2, VolumeX, CheckCircle, Lock, ArrowRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useFetch } from '@/hooks/use-fetch';
+import { PageLoading } from '@/components/shared/page-loading';
 
-const videosData = [
-  { id: '1', title: 'İSG Temel Kavramlar', duration: 900, completed: true },
-  { id: '2', title: 'Risk Değerlendirme', duration: 1200, completed: true },
-  { id: '3', title: 'Kişisel Koruyucu Donanım', duration: 720, completed: false },
-  { id: '4', title: 'Acil Durum Prosedürleri', duration: 1080, completed: false },
-];
+interface VideoItem {
+  id: string;
+  title: string;
+  duration: number;
+  completed: boolean;
+}
+
+interface VideosResponse {
+  trainingTitle?: string;
+  videos: VideoItem[];
+}
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -20,21 +27,33 @@ function formatTime(seconds: number): string {
 
 export default function VideoPlayerPage() {
   const router = useRouter();
-  const [currentVideoIdx, setCurrentVideoIdx] = useState(
-    videosData.findIndex((v) => !v.completed)
-  );
+  const { id } = useParams<{ id: string }>();
+  const { data, isLoading, error } = useFetch<VideosResponse>(`/api/exam/${id}/videos`);
+
+  const videosData = data?.videos ?? [];
+  const trainingTitle = data?.trainingTitle ?? '';
+
+  const [currentVideoIdx, setCurrentVideoIdx] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [watchedTime, setWatchedTime] = useState(0);
 
+  // Set initial video index when data loads
+  useEffect(() => {
+    if (videosData.length > 0 && currentVideoIdx === -1) {
+      const firstIncomplete = videosData.findIndex((v) => !v.completed);
+      setCurrentVideoIdx(firstIncomplete >= 0 ? firstIncomplete : 0);
+    }
+  }, [videosData, currentVideoIdx]);
+
   const currentVideo = videosData[currentVideoIdx >= 0 ? currentVideoIdx : 0];
-  const allCompleted = videosData.every((v) => v.completed);
+  const allCompleted = videosData.length > 0 && videosData.every((v) => v.completed);
   const progress = currentVideo ? (currentTime / currentVideo.duration) * 100 : 0;
 
   // Simulate video playback
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || !currentVideo) return;
     const interval = setInterval(() => {
       setCurrentTime((prev) => {
         if (prev >= currentVideo.duration) {
@@ -46,26 +65,52 @@ export default function VideoPlayerPage() {
       setWatchedTime((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [isPlaying, currentVideo.duration]);
+  }, [isPlaying, currentVideo?.duration]);
 
   // Simulated heartbeat every 10 seconds
+  const [heartbeatErrors, setHeartbeatErrors] = useState(0);
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || !currentVideo) return;
     const heartbeat = setInterval(() => {
-      console.log(`[Heartbeat] Video: ${currentVideo.id}, watched: ${watchedTime}s, position: ${currentTime}s`);
+      fetch(`/api/exam/${id}/videos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId: currentVideo.id, watchedTime, position: currentTime }),
+      }).catch(() => {
+        setHeartbeatErrors(prev => prev + 1);
+      });
     }, 10000);
     return () => clearInterval(heartbeat);
-  }, [isPlaying, currentVideo.id, watchedTime, currentTime]);
+  }, [isPlaying, currentVideo?.id, watchedTime, currentTime, id]);
+
+  if (isLoading) {
+    return <PageLoading />;
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  }
+
+  if (videosData.length === 0) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>;
+  }
+
+  if (!currentVideo) return null;
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
+      {heartbeatErrors >= 3 && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-3 text-sm font-medium text-white" style={{ background: 'var(--color-error)', boxShadow: 'var(--shadow-lg)' }}>
+          Bağlantı sorunu: İlerlemeniz kaydedilemeyebilir. İnternet bağlantınızı kontrol edin.
+        </div>
+      )}
       {/* Header */}
       <div className="border-b px-6 py-3" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => router.back()} style={{ color: 'var(--color-text-secondary)' }}><ArrowLeft className="h-5 w-5" /></Button>
             <div>
-              <h3 className="text-sm font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>İş Güvenliği Temel Eğitim</h3>
+              <h3 className="text-sm font-bold">{trainingTitle}</h3>
               <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Video {currentVideoIdx + 1} / {videosData.length}</p>
             </div>
           </div>
@@ -90,7 +135,7 @@ export default function VideoPlayerPage() {
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <Play className="mx-auto h-16 w-16 mb-4" style={{ color: 'rgba(255,255,255,0.3)' }} />
-                  <p className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>{currentVideo.title}</p>
+                  <p className="text-lg font-bold text-white font-heading">{currentVideo.title}</p>
                   <p className="text-sm mt-2" style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-mono)' }}>
                     {formatTime(currentTime)} / {formatTime(currentVideo.duration)}
                   </p>
@@ -135,7 +180,7 @@ export default function VideoPlayerPage() {
 
           {/* Video List Sidebar */}
           <div className="rounded-xl border p-4" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <h4 className="mb-3 text-sm font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>Video Listesi</h4>
+            <h4 className="mb-3 text-sm font-bold">Video Listesi</h4>
             <div className="space-y-2">
               {videosData.map((v, i) => {
                 const isCurrent = i === currentVideoIdx;
@@ -168,7 +213,7 @@ export default function VideoPlayerPage() {
             {/* Next Action */}
             <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
               {allCompleted ? (
-                <Button onClick={() => router.push('/exam/1/post-exam')} className="w-full gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)', transition: 'background var(--transition-fast)' }}>
+                <Button onClick={() => router.push(`/exam/${id}/post-exam`)} className="w-full gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)', transition: 'background var(--transition-fast)' }}>
                   Son Sınava Git <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : (

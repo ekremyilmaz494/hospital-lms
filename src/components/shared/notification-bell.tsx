@@ -61,7 +61,7 @@ export function NotificationBell({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-xl)' }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--color-border)' }}>
-          <h4 className="text-sm font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>Bildirimler</h4>
+          <h4 className="text-sm font-bold">Bildirimler</h4>
           {count > 0 && (
             <span className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: 'var(--color-error)' }}>
               {count} yeni

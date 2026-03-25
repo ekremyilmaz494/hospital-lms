@@ -14,29 +14,25 @@ import {
 } from 'recharts';
 import { TrendingUp, BarChart3 } from 'lucide-react';
 import { ChartCard } from '@/components/shared/chart-card';
+import { useFetch } from '@/hooks/use-fetch';
 
-// Mock data — Monthly registrations
-const monthlyData = [
-  { month: 'Oca', hastane: 2, personel: 320 },
-  { month: 'Şub', hastane: 1, personel: 280 },
-  { month: 'Mar', hastane: 3, personel: 450 },
-  { month: 'Nis', hastane: 2, personel: 380 },
-  { month: 'May', hastane: 4, personel: 520 },
-  { month: 'Haz', hastane: 3, personel: 490 },
-  { month: 'Tem', hastane: 2, personel: 410 },
-  { month: 'Ağu', hastane: 5, personel: 680 },
-  { month: 'Eyl', hastane: 3, personel: 540 },
-  { month: 'Eki', hastane: 4, personel: 620 },
-  { month: 'Kas', hastane: 2, personel: 380 },
-  { month: 'Ara', hastane: 3, personel: 450 },
-];
+interface MonthlyEntry {
+  month: string;
+  hastane: number;
+  personel: number;
+}
 
-// Mock data — Subscription breakdown
-const subscriptionData = [
-  { plan: 'Başlangıç', aktif: 8, trial: 3, suresiDoldu: 1 },
-  { plan: 'Profesyonel', aktif: 6, trial: 1, suresiDoldu: 0 },
-  { plan: 'Kurumsal', aktif: 4, trial: 0, suresiDoldu: 0 },
-];
+interface SubscriptionEntry {
+  plan: string;
+  aktif: number;
+  trial: number;
+  suresiDoldu: number;
+}
+
+interface ChartsData {
+  monthlyData: MonthlyEntry[];
+  subscriptionData: SubscriptionEntry[];
+}
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -61,6 +57,19 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function DashboardCharts() {
+  const { data, isLoading, error } = useFetch<ChartsData>('/api/super-admin/dashboard');
+
+  const monthlyData = data?.monthlyData ?? [];
+  const subscriptionData = data?.subscriptionData ?? [];
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Yükleniyor...</div></div>;
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
       {/* Monthly Registrations — wider */}
@@ -70,40 +79,44 @@ export function DashboardCharts() {
         className="lg:col-span-4"
       >
         <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={monthlyData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gradientPersonel" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }}
-                axisLine={{ stroke: 'var(--color-border)' }}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 12, fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend
-                wrapperStyle={{ fontSize: '12px', fontFamily: 'var(--font-body)' }}
-              />
-              <Area
-                type="monotone"
-                dataKey="personel"
-                name="Yeni Personel"
-                stroke="var(--color-primary)"
-                strokeWidth={2.5}
-                fill="url(#gradientPersonel)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {monthlyData.length === 0 ? (
+            <div className="flex items-center justify-center h-full"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <AreaChart data={monthlyData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradientPersonel" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }}
+                  axisLine={{ stroke: 'var(--color-border)' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 12, fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend
+                  wrapperStyle={{ fontSize: '12px', fontFamily: 'var(--font-body)' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="personel"
+                  name="Yeni Personel"
+                  stroke="var(--color-primary)"
+                  strokeWidth={2.5}
+                  fill="url(#gradientPersonel)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </ChartCard>
 
@@ -114,27 +127,31 @@ export function DashboardCharts() {
         className="lg:col-span-3"
       >
         <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={subscriptionData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-              <XAxis
-                dataKey="plan"
-                tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }}
-                axisLine={{ stroke: 'var(--color-border)' }}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 12, fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: '12px', fontFamily: 'var(--font-body)' }} />
-              <Bar dataKey="aktif" name="Aktif" fill="var(--color-success)" radius={[4, 4, 0, 0]} barSize={28} />
-              <Bar dataKey="trial" name="Deneme" fill="var(--color-info)" radius={[4, 4, 0, 0]} barSize={28} />
-              <Bar dataKey="suresiDoldu" name="Süresi Doldu" fill="var(--color-error)" radius={[4, 4, 0, 0]} barSize={28} />
-            </BarChart>
-          </ResponsiveContainer>
+          {subscriptionData.length === 0 ? (
+            <div className="flex items-center justify-center h-full"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <BarChart data={subscriptionData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                <XAxis
+                  dataKey="plan"
+                  tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }}
+                  axisLine={{ stroke: 'var(--color-border)' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 12, fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: '12px', fontFamily: 'var(--font-body)' }} />
+                <Bar dataKey="aktif" name="Aktif" fill="var(--color-success)" radius={[4, 4, 0, 0]} barSize={28} />
+                <Bar dataKey="trial" name="Deneme" fill="var(--color-info)" radius={[4, 4, 0, 0]} barSize={28} />
+                <Bar dataKey="suresiDoldu" name="Süresi Doldu" fill="var(--color-error)" radius={[4, 4, 0, 0]} barSize={28} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </ChartCard>
     </div>

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useTheme } from 'next-themes';
-import { Bell, Menu, Moon, Search, Sun, X } from 'lucide-react';
+import { Menu, Moon, Search, Sun, X } from 'lucide-react';
+import { NotificationBell } from '@/components/shared/notification-bell';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +12,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -138,23 +140,7 @@ export function AppTopbar({
         </Tooltip>
 
         {/* Notifications */}
-        <Tooltip >
-          <TooltipTrigger
-            render={<Button variant="ghost" size="icon" className="relative h-9 w-9" />}
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
-            <Bell className="h-4.5 w-4.5" />
-            {unreadNotifications > 0 && (
-              <span
-                className="absolute -top-0.5 -right-0.5 flex h-4.5 min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
-                style={{ background: 'var(--color-error)' }}
-              >
-                {unreadNotifications > 99 ? '99+' : unreadNotifications}
-              </span>
-            )}
-          </TooltipTrigger>
-          <TooltipContent>Bildirimler</TooltipContent>
-        </Tooltip>
+        <NotificationBell unreadCount={unreadNotifications} />
 
         {/* User Avatar Dropdown */}
         <DropdownMenu>
@@ -184,12 +170,14 @@ export function AppTopbar({
               </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <p className="text-sm font-semibold">{userName}</p>
-              <p className="text-xs font-normal" style={{ color: 'var(--color-text-muted)' }}>
-                {userRole}
-              </p>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                <p className="text-sm font-semibold">{userName}</p>
+                <p className="text-xs font-normal" style={{ color: 'var(--color-text-muted)' }}>
+                  {userRole}
+                </p>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem>Profilim</DropdownMenuItem>
             <DropdownMenuItem>Bildirimler</DropdownMenuItem>

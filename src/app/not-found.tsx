@@ -9,7 +9,6 @@ export default function NotFound() {
         <h1
           className="text-8xl font-bold mb-4"
           style={{
-            fontFamily: 'var(--font-display)',
             background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
@@ -17,7 +16,7 @@ export default function NotFound() {
         >
           404
         </h1>
-        <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>
+        <h2 className="text-2xl font-bold mb-2">
           Sayfa Bulunamad&#305;
         </h2>
         <p className="text-sm mb-8 max-w-md mx-auto" style={{ color: 'var(--color-text-secondary)' }}>

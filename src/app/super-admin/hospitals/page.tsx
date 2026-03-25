@@ -3,15 +3,16 @@
 import { type ColumnDef } from '@tanstack/react-table';
 import { Building2, Plus, MoreHorizontal, Eye, Edit, Ban, CheckCircle } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PageLoading } from '@/components/shared/page-loading';
 import { PageHeader } from '@/components/shared/page-header';
 import { DataTable } from '@/components/shared/data-table';
+import { useFetch } from '@/hooks/use-fetch';
 
 interface Hospital {
   id: string;
@@ -36,22 +37,6 @@ const statusColors: Record<string, { bg: string; text: string }> = {
   'Askıda': { bg: 'var(--color-warning-bg)', text: 'var(--color-warning)' },
   'Süresi Doldu': { bg: 'var(--color-error-bg)', text: 'var(--color-error)' },
 };
-
-// Mock data — 12 hospitals
-const mockHospitals: Hospital[] = [
-  { id: '1', name: 'Devakent Hastanesi', code: 'DEV001', staffCount: 245, trainingCount: 32, plan: 'Kurumsal', status: 'Aktif', createdAt: '22.03.2026' },
-  { id: '2', name: 'Anadolu Sağlık', code: 'ANA002', staffCount: 120, trainingCount: 18, plan: 'Profesyonel', status: 'Aktif', createdAt: '18.03.2026' },
-  { id: '3', name: 'Başkent Tıp Merkezi', code: 'BAS003', staffCount: 89, trainingCount: 12, plan: 'Başlangıç', status: 'Trial', createdAt: '15.03.2026' },
-  { id: '4', name: 'Marmara Üniversitesi H.', code: 'MAR004', staffCount: 312, trainingCount: 45, plan: 'Kurumsal', status: 'Aktif', createdAt: '10.03.2026' },
-  { id: '5', name: 'Ege Şifa Hastanesi', code: 'EGE005', staffCount: 67, trainingCount: 8, plan: 'Profesyonel', status: 'Aktif', createdAt: '08.03.2026' },
-  { id: '6', name: 'Çukurova Devlet H.', code: 'CUK006', staffCount: 198, trainingCount: 24, plan: 'Profesyonel', status: 'Askıda', createdAt: '01.03.2026' },
-  { id: '7', name: 'Akdeniz Hastanesi', code: 'AKD007', staffCount: 156, trainingCount: 20, plan: 'Başlangıç', status: 'Süresi Doldu', createdAt: '25.02.2026' },
-  { id: '8', name: 'Karadeniz Tıp Merkezi', code: 'KAR008', staffCount: 278, trainingCount: 35, plan: 'Kurumsal', status: 'Aktif', createdAt: '20.02.2026' },
-  { id: '9', name: 'İç Anadolu Sağlık', code: 'ICA009', staffCount: 134, trainingCount: 15, plan: 'Profesyonel', status: 'Aktif', createdAt: '15.02.2026' },
-  { id: '10', name: 'Trakya Hastanesi', code: 'TRA010', staffCount: 91, trainingCount: 11, plan: 'Başlangıç', status: 'Trial', createdAt: '10.02.2026' },
-  { id: '11', name: 'Güneydoğu Şifa H.', code: 'GUN011', staffCount: 176, trainingCount: 22, plan: 'Profesyonel', status: 'Aktif', createdAt: '05.02.2026' },
-  { id: '12', name: 'Doğu Anadolu Tıp M.', code: 'DOG012', staffCount: 203, trainingCount: 28, plan: 'Kurumsal', status: 'Aktif', createdAt: '01.02.2026' },
-];
 
 const columns: ColumnDef<Hospital>[] = [
   {
@@ -145,10 +130,8 @@ const columns: ColumnDef<Hospital>[] = [
     header: '',
     cell: ({ row }) => (
       <DropdownMenu>
-        <DropdownMenuTrigger>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+        <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md hover:bg-accent hover:text-accent-foreground">
             <MoreHorizontal className="h-4 w-4" />
-          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem className="gap-2">
@@ -167,6 +150,16 @@ const columns: ColumnDef<Hospital>[] = [
 ];
 
 export default function HospitalsPage() {
+  const { data: hospitals, isLoading, error } = useFetch<Hospital[]>('/api/super-admin/hospitals');
+
+  if (isLoading) {
+    return <PageLoading />;
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -187,12 +180,16 @@ export default function HospitalsPage() {
           boxShadow: 'var(--shadow-sm)',
         }}
       >
-        <DataTable
-          columns={columns}
-          data={mockHospitals}
-          searchKey="name"
-          searchPlaceholder="Hastane ara (isim veya kod)..."
-        />
+        {(hospitals ?? []).length === 0 ? (
+          <div className="flex items-center justify-center h-32"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={hospitals ?? []}
+            searchKey="name"
+            searchPlaceholder="Hastane ara (isim veya kod)..."
+          />
+        )}
       </div>
     </div>
   );

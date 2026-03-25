@@ -3,23 +3,31 @@
 import { Building2, Calendar, ExternalLink, Clock, AlertTriangle } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useFetch } from '@/hooks/use-fetch';
 
-// Mock data
-const recentHospitals = [
-  { id: '1', name: 'Devakent Hastanesi', code: 'DEV001', registeredAt: '22 Mar 2026', staffCount: 245, plan: 'Kurumsal' },
-  { id: '2', name: 'Anadolu Sağlık', code: 'ANA002', registeredAt: '18 Mar 2026', staffCount: 120, plan: 'Profesyonel' },
-  { id: '3', name: 'Başkent Tıp Merkezi', code: 'BAS003', registeredAt: '15 Mar 2026', staffCount: 89, plan: 'Başlangıç' },
-  { id: '4', name: 'Marmara Üniversitesi H.', code: 'MAR004', registeredAt: '10 Mar 2026', staffCount: 312, plan: 'Kurumsal' },
-  { id: '5', name: 'Ege Şifa Hastanesi', code: 'EGE005', registeredAt: '08 Mar 2026', staffCount: 67, plan: 'Profesyonel' },
-];
+interface RecentHospital {
+  id: string;
+  name: string;
+  code: string;
+  registeredAt: string;
+  staffCount: number;
+  plan: string;
+}
 
-const expiringSubscriptions = [
-  { id: '1', name: 'Çukurova Devlet H.', code: 'CUK010', plan: 'Profesyonel', expiresAt: '26 Mar 2026', daysLeft: 2, status: 'critical' },
-  { id: '2', name: 'Akdeniz Hastanesi', code: 'AKD011', plan: 'Başlangıç', expiresAt: '28 Mar 2026', daysLeft: 4, status: 'warning' },
-  { id: '3', name: 'Karadeniz Tıp M.', code: 'KAR012', plan: 'Kurumsal', expiresAt: '30 Mar 2026', daysLeft: 6, status: 'warning' },
-  { id: '4', name: 'İç Anadolu Sağlık', code: 'ICA013', plan: 'Profesyonel', expiresAt: '02 Nis 2026', daysLeft: 9, status: 'info' },
-  { id: '5', name: 'Trakya Hastanesi', code: 'TRA014', plan: 'Başlangıç', expiresAt: '05 Nis 2026', daysLeft: 12, status: 'info' },
-];
+interface ExpiringSubscription {
+  id: string;
+  name: string;
+  code: string;
+  plan: string;
+  expiresAt: string;
+  daysLeft: number;
+  status: string;
+}
+
+interface DashboardListsData {
+  recentHospitals: RecentHospital[];
+  expiringSubscriptions: ExpiringSubscription[];
+}
 
 const planColors: Record<string, string> = {
   'Başlangıç': 'var(--color-info)',
@@ -34,6 +42,19 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 };
 
 export function DashboardLists() {
+  const { data, isLoading, error } = useFetch<DashboardListsData>('/api/super-admin/dashboard');
+
+  const recentHospitals = data?.recentHospitals ?? [];
+  const expiringSubscriptions = data?.expiringSubscriptions ?? [];
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-32"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Yükleniyor...</div></div>;
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center h-32"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {/* Recent Hospitals */}
@@ -55,7 +76,6 @@ export function DashboardLists() {
             </div>
             <h3
               className="text-base font-bold"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}
             >
               Son Kayıt Olan Hastaneler
             </h3>
@@ -69,54 +89,58 @@ export function DashboardLists() {
           </a>
         </div>
 
-        <div className="space-y-3">
-          {recentHospitals.map((hospital, idx) => (
-            <div
-              key={hospital.id}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5"
-              style={{
-                transition: 'background var(--transition-fast)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              {/* Rank Badge */}
+        {recentHospitals.length === 0 ? (
+          <div className="flex items-center justify-center h-24"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>
+        ) : (
+          <div className="space-y-3">
+            {recentHospitals.map((hospital, idx) => (
               <div
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                key={hospital.id}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5"
                 style={{
-                  background: idx === 0 ? 'var(--color-accent)' : idx === 1 ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                  transition: 'background var(--transition-fast)',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
-                {idx + 1}
-              </div>
-
-              <Avatar className="h-9 w-9 shrink-0">
-                <AvatarFallback
-                  className="text-xs font-semibold text-white"
-                  style={{ background: planColors[hospital.plan] || 'var(--color-primary)' }}
+                {/* Rank Badge */}
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                  style={{
+                    background: idx === 0 ? 'var(--color-accent)' : idx === 1 ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                  }}
                 >
-                  {hospital.name.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+                  {idx + 1}
+                </div>
 
-              <div className="flex-1 min-w-0">
-                <p className="truncate text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                  {hospital.name}
-                </p>
-                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  {hospital.code}
-                </p>
-              </div>
+                <Avatar className="h-9 w-9 shrink-0">
+                  <AvatarFallback
+                    className="text-xs font-semibold text-white"
+                    style={{ background: planColors[hospital.plan] || 'var(--color-primary)' }}
+                  >
+                    {hospital.name?.slice(0, 2).toUpperCase() ?? ''}
+                  </AvatarFallback>
+                </Avatar>
 
-              <div className="text-right">
-                <p className="text-sm font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>
-                  {hospital.staffCount}
-                </p>
-                <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>personel</p>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                    {hospital.name}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    {hospital.code}
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-sm font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>
+                    {hospital.staffCount ?? 0}
+                  </p>
+                  <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>personel</p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Expiring Subscriptions */}
@@ -138,67 +162,69 @@ export function DashboardLists() {
             </div>
             <h3
               className="text-base font-bold"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}
             >
               Aboneliği Sona Yaklaşan
             </h3>
           </div>
         </div>
 
-        {/* Mini Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Hastane</th>
-                <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Plan</th>
-                <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Bitiş</th>
-                <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Kalan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {expiringSubscriptions.map((sub) => {
-                const colors = statusColors[sub.status];
-                return (
-                  <tr
-                    key={sub.id}
-                    style={{ borderBottom: '1px solid var(--color-border)' }}
-                  >
-                    <td className="py-2.5">
-                      <p className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{sub.name}</p>
-                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{sub.code}</p>
-                    </td>
-                    <td className="py-2.5">
-                      <span
-                        className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                        style={{ background: `${planColors[sub.plan]}15`, color: planColors[sub.plan] }}
-                      >
-                        {sub.plan}
-                      </span>
-                    </td>
-                    <td className="py-2.5">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" style={{ color: 'var(--color-text-muted)' }} />
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                          {sub.expiresAt}
+        {expiringSubscriptions.length === 0 ? (
+          <div className="flex items-center justify-center h-24"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Hastane</th>
+                  <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Plan</th>
+                  <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Bitiş</th>
+                  <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Kalan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expiringSubscriptions.map((sub) => {
+                  const colors = statusColors[sub.status] ?? statusColors.info;
+                  return (
+                    <tr
+                      key={sub.id}
+                      style={{ borderBottom: '1px solid var(--color-border)' }}
+                    >
+                      <td className="py-2.5">
+                        <p className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{sub.name}</p>
+                        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{sub.code}</p>
+                      </td>
+                      <td className="py-2.5">
+                        <span
+                          className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          style={{ background: `${planColors[sub.plan] ?? 'var(--color-info)'}15`, color: planColors[sub.plan] ?? 'var(--color-info)' }}
+                        >
+                          {sub.plan}
                         </span>
-                      </div>
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
-                        style={{ background: colors.bg, color: colors.text }}
-                      >
-                        <Clock className="h-3 w-3" />
-                        {sub.daysLeft} gün
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="py-2.5">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" style={{ color: 'var(--color-text-muted)' }} />
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                            {sub.expiresAt}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
+                          style={{ background: colors.bg, color: colors.text }}
+                        >
+                          <Clock className="h-3 w-3" />
+                          {sub.daysLeft ?? 0} gün
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

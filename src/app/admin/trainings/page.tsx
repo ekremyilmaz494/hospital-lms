@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
-import { GraduationCap, Plus, MoreHorizontal, Eye, Edit, Trash2, Calendar, Users, Filter, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { GraduationCap, Plus, MoreHorizontal, Eye, Edit, Trash2, Calendar, Users, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { PageHeader } from '@/components/shared/page-header';
 import { DataTable } from '@/components/shared/data-table';
 import Link from 'next/link';
+import { useFetch } from '@/hooks/use-fetch';
+import { PageLoading } from '@/components/shared/page-loading';
+import { useToast } from '@/components/shared/toast';
 
 interface Training {
   id: string;
@@ -43,29 +45,42 @@ const categoryColors: Record<string, string> = {
 const allCategories = Object.keys(categoryColors);
 const allStatuses = Object.keys(statusColors);
 
-const mockTrainings: Training[] = [
-  { id: '1', title: 'Enfeksiyon Kontrol Eğitimi', category: 'Enfeksiyon', assignedCount: 120, completedCount: 98, completionRate: 82, passingScore: 70, status: 'Aktif', startDate: '01.03.2026', endDate: '31.03.2026', createdBy: 'Dr. Ahmet Yılmaz' },
-  { id: '2', title: 'İş Güvenliği Temel Eğitim', category: 'İş Güvenliği', assignedCount: 245, completedCount: 210, completionRate: 86, passingScore: 70, status: 'Aktif', startDate: '15.02.2026', endDate: '15.04.2026', createdBy: 'Dr. Ahmet Yılmaz' },
-  { id: '3', title: 'Hasta Hakları ve İletişim', category: 'Hasta Hakları', assignedCount: 80, completedCount: 80, completionRate: 100, passingScore: 60, status: 'Tamamlandı', startDate: '01.01.2026', endDate: '28.02.2026', createdBy: 'Fatma Demir' },
-  { id: '4', title: 'Radyoloji Güvenlik Protokolleri', category: 'Radyoloji', assignedCount: 35, completedCount: 28, completionRate: 80, passingScore: 75, status: 'Aktif', startDate: '10.03.2026', endDate: '10.04.2026', createdBy: 'Dr. Ahmet Yılmaz' },
-  { id: '5', title: 'Laboratuvar Biyogüvenlik', category: 'Laboratuvar', assignedCount: 42, completedCount: 0, completionRate: 0, passingScore: 70, status: 'Taslak', startDate: '01.04.2026', endDate: '30.04.2026', createdBy: 'Fatma Demir' },
-  { id: '6', title: 'İlaç Yönetimi ve Güvenliği', category: 'Eczane', assignedCount: 55, completedCount: 48, completionRate: 87, passingScore: 80, status: 'Aktif', startDate: '01.03.2026', endDate: '31.03.2026', createdBy: 'Dr. Ahmet Yılmaz' },
-  { id: '7', title: 'Acil Durum Tahliye Eğitimi', category: 'İş Güvenliği', assignedCount: 245, completedCount: 0, completionRate: 0, passingScore: 70, status: 'Taslak', startDate: '15.04.2026', endDate: '15.05.2026', createdBy: 'Dr. Ahmet Yılmaz' },
-  { id: '8', title: 'El Hijyeni Eğitimi', category: 'Enfeksiyon', assignedCount: 200, completedCount: 185, completionRate: 93, passingScore: 70, status: 'Tamamlandı', startDate: '01.01.2026', endDate: '15.02.2026', createdBy: 'Fatma Demir' },
-];
-
 export default function TrainingsPage() {
   const router = useRouter();
+  const { toast } = useToast();
+  const { data, isLoading, error, refetch } = useFetch<{ trainings: Training[]; total: number }>('/api/admin/trainings');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
-  const filteredTrainings = mockTrainings.filter((t) => {
+  if (isLoading) {
+    return <PageLoading />;
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  }
+
+  const allTrainings = data?.trainings ?? [];
+
+  const filteredTrainings = allTrainings.filter((t) => {
     if (statusFilter && t.status !== statusFilter) return false;
     if (categoryFilter && t.category !== categoryFilter) return false;
     return true;
   });
 
   const activeFilters = [statusFilter, categoryFilter].filter(Boolean).length;
+
+  const handleDelete = async (training: Training) => {
+    if (window.confirm(`"${training.title}" eğitimini silmek istediğinize emin misiniz?`)) {
+      try {
+        const res = await fetch(`/api/admin/trainings/${training.id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Silme başarısız');
+        refetch();
+      } catch {
+        toast('Eğitim silinirken hata oluştu', 'error');
+      }
+    }
+  };
 
   const columns: ColumnDef<Training>[] = [
     {
@@ -145,10 +160,7 @@ export default function TrainingsPage() {
         const status = row.getValue('status') as string;
         const colors = statusColors[status] || { bg: 'var(--color-info-bg)', text: 'var(--color-info)' };
         return (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold"
-            style={{ background: colors.bg, color: colors.text }}
-          >
+          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold" style={{ background: colors.bg, color: colors.text }}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: colors.text }} />
             {status}
           </span>
@@ -170,10 +182,8 @@ export default function TrainingsPage() {
       header: '',
       cell: ({ row }) => (
         <DropdownMenu>
-          <DropdownMenuTrigger>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+          <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md hover:bg-accent hover:text-accent-foreground">
               <MoreHorizontal className="h-4 w-4" />
-            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/trainings/${row.original.id}`)}>
@@ -182,7 +192,7 @@ export default function TrainingsPage() {
             <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/trainings/${row.original.id}/edit`)}>
               <Edit className="h-4 w-4" /> Düzenle
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 text-red-500">
+            <DropdownMenuItem className="gap-2 text-red-500" onClick={() => handleDelete(row.original)}>
               <Trash2 className="h-4 w-4" /> Sil
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -202,10 +212,10 @@ export default function TrainingsPage() {
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: 'Toplam', value: mockTrainings.length, color: 'var(--color-primary)' },
-          { label: 'Aktif', value: mockTrainings.filter(t => t.status === 'Aktif').length, color: 'var(--color-success)' },
-          { label: 'Taslak', value: mockTrainings.filter(t => t.status === 'Taslak').length, color: 'var(--color-warning)' },
-          { label: 'Tamamlandı', value: mockTrainings.filter(t => t.status === 'Tamamlandı').length, color: 'var(--color-info)' },
+          { label: 'Toplam', value: allTrainings.length, color: 'var(--color-primary)' },
+          { label: 'Aktif', value: allTrainings.filter(t => t.status === 'Aktif').length, color: 'var(--color-success)' },
+          { label: 'Taslak', value: allTrainings.filter(t => t.status === 'Taslak').length, color: 'var(--color-warning)' },
+          { label: 'Tamamlandı', value: allTrainings.filter(t => t.status === 'Tamamlandı').length, color: 'var(--color-info)' },
         ].map((s) => (
           <div
             key={s.label}
@@ -214,7 +224,7 @@ export default function TrainingsPage() {
           >
             <div className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
             <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{s.label}</span>
-            <span className="ml-auto text-lg font-bold" style={{ fontFamily: 'var(--font-display)', color: s.color }}>{s.value}</span>
+            <span className="ml-auto text-lg font-bold font-heading" style={{ color: s.color }}>{s.value}</span>
           </div>
         ))}
       </div>
@@ -223,7 +233,6 @@ export default function TrainingsPage() {
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Filtreler:</span>
 
-        {/* Status Filter */}
         <div className="flex gap-1.5">
           {allStatuses.map((status) => {
             const isActive = statusFilter === status;
@@ -248,7 +257,6 @@ export default function TrainingsPage() {
 
         <div className="h-4 w-px" style={{ background: 'var(--color-border)' }} />
 
-        {/* Category Filter */}
         <div className="flex flex-wrap gap-1.5">
           {allCategories.map((cat) => {
             const isActive = categoryFilter === cat;
@@ -287,7 +295,11 @@ export default function TrainingsPage() {
         className="rounded-2xl border p-6"
         style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
       >
-        <DataTable columns={columns} data={filteredTrainings} searchKey="title" searchPlaceholder="Eğitim adı veya kategori ara..." />
+        {filteredTrainings.length > 0 ? (
+          <DataTable columns={columns} data={filteredTrainings} searchKey="title" searchPlaceholder="Eğitim adı veya kategori ara..." />
+        ) : (
+          <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+        )}
       </div>
     </div>
   );

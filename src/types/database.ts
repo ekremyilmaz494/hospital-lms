@@ -12,6 +12,19 @@ export type BackupType = 'auto' | 'manual';
 
 export type BillingCycle = 'monthly' | 'annual';
 
+export interface Department {
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string | null;
+  color: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { users: number };
+}
+
 export interface User {
   id: string;
   organizationId: string | null;
@@ -21,12 +34,14 @@ export interface User {
   tcNo: string | null;
   phone: string | null;
   department: string | null;
+  departmentId: string | null;
   title: string | null;
   role: UserRole;
   avatarUrl: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  departmentRel?: Department | null;
 }
 
 export interface Organization {

@@ -8,59 +8,47 @@ import {
   TrendingUp,
   AlertTriangle,
 } from 'lucide-react';
+import { PageLoading } from '@/components/shared/page-loading';
 import { StatCard } from '@/components/shared/stat-card';
 import { PageHeader } from '@/components/shared/page-header';
 import { AlertBanner } from '@/components/layouts/topbar/alert-banner';
 import { DashboardCharts } from '@/components/super-admin/dashboard-charts';
 import { DashboardLists } from '@/components/super-admin/dashboard-lists';
+import { useFetch } from '@/hooks/use-fetch';
 
-// Mock data
-const stats = [
-  {
-    title: 'Toplam Hastane',
-    value: 24,
-    icon: Building2,
-    accentColor: 'var(--color-primary)',
-    trend: { value: 12, label: 'vs geçen ay', isPositive: true },
-  },
-  {
-    title: 'Aktif Abonelik',
-    value: 18,
-    icon: CreditCard,
-    accentColor: 'var(--color-info)',
-    trend: { value: 8, label: 'vs geçen ay', isPositive: true },
-  },
-  {
-    title: 'Toplam Personel',
-    value: 3842,
-    icon: Users,
-    accentColor: 'var(--color-accent)',
-    trend: { value: 528, label: 'yeni kayıt', isPositive: true },
-  },
-  {
-    title: 'Aktif Eğitim',
-    value: 156,
-    icon: GraduationCap,
-    accentColor: 'var(--color-success)',
-    trend: { value: 23, label: 'vs geçen ay', isPositive: true },
-  },
-  {
-    title: 'Tamamlanma Oranı',
-    value: '87.3%',
-    icon: TrendingUp,
-    accentColor: 'var(--color-primary)',
-    trend: { value: 2.1, label: 'vs geçen ay', isPositive: true },
-  },
-  {
-    title: 'Askıya Alınan',
-    value: 3,
-    icon: AlertTriangle,
-    accentColor: 'var(--color-error)',
-    trend: { value: -1, label: 'vs geçen ay', isPositive: true },
-  },
-];
+interface DashboardStat {
+  title: string;
+  value: number | string;
+  icon: string;
+  accentColor: string;
+  trend?: { value: number; label: string; isPositive: boolean };
+}
+
+interface DashboardData {
+  stats: DashboardStat[];
+  alert?: { message: string; actionLabel: string; actionHref: string; variant: string };
+}
+
+import type { LucideIcon } from 'lucide-react';
+
+const iconMap: Record<string, LucideIcon> = {
+  Building2, CreditCard, Users, GraduationCap, TrendingUp, AlertTriangle,
+};
 
 export default function SuperAdminDashboard() {
+  const { data, isLoading, error } = useFetch<DashboardData>('/api/super-admin/dashboard');
+
+  if (isLoading) {
+    return <PageLoading />;
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  }
+
+  const stats = data?.stats ?? [];
+  const alert = data?.alert;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -69,26 +57,35 @@ export default function SuperAdminDashboard() {
       />
 
       {/* Alert Banner */}
-      <AlertBanner
-        message="3 hastanenin abonelik süresi bu hafta doluyor. Yenileme bildirimlerini kontrol edin."
-        actionLabel="Abonelikleri Gör"
-        actionHref="/super-admin/subscriptions"
-        variant="warning"
-      />
+      {alert && (
+        <AlertBanner
+          message={alert.message}
+          actionLabel={alert.actionLabel}
+          actionHref={alert.actionHref}
+          variant={alert.variant as 'warning' | 'info' | 'error'}
+        />
+      )}
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {stats.map((stat) => (
-          <StatCard
-            key={stat.title}
-            title={stat.title}
-            value={stat.value}
-            icon={stat.icon}
-            accentColor={stat.accentColor}
-            trend={stat.trend}
-          />
-        ))}
-      </div>
+      {stats.length === 0 ? (
+        <div className="flex items-center justify-center h-32"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {stats.map((stat) => {
+            const Icon = iconMap[stat.icon] ?? Building2;
+            return (
+              <StatCard
+                key={stat.title}
+                title={stat.title}
+                value={stat.value}
+                icon={Icon}
+                accentColor={stat.accentColor}
+                trend={stat.trend}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {/* Charts */}
       <DashboardCharts />

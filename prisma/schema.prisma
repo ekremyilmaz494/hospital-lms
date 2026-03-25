@@ -45,6 +45,7 @@ model Organization {
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   users           User[]
+  departments     Department[]
   trainings       Training[]
   notifications   Notification[]
   auditLogs       AuditLog[]
@@ -75,6 +76,26 @@ model OrganizationSubscription {
   @@map("organization_subscriptions")
 }
 
+// ── DEPARTMANLAR ──
+model Department {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @db.Uuid @map("organization_id")
+  name            String   @db.VarChar(100)
+  description     String?  @db.Text
+  color           String   @default("#0d9668") @db.VarChar(7)
+  sortOrder       Int      @default(0) @map("sort_order")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users           User[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId], map: "idx_departments_org")
+  @@map("departments")
+}
+
 // ── KULLANICILAR ──
 model User {
   id              String   @id @db.Uuid
@@ -85,6 +106,7 @@ model User {
   tcNo            String?  @unique @db.VarChar(11) @map("tc_no")
   phone           String?  @db.VarChar(20)
   department      String?  @db.VarChar(100)
+  departmentId    String?  @db.Uuid @map("department_id")
   title           String?  @db.VarChar(100)
   role            String   @db.VarChar(20)
   avatarUrl       String?  @db.Text @map("avatar_url")
@@ -93,6 +115,7 @@ model User {
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization    Organization? @relation(fields: [organizationId], references: [id])
+  departmentRel   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   createdTrainings Training[]   @relation("TrainingCreator")
   assignments     TrainingAssignment[] @relation("AssignedUser")
   assignedBy      TrainingAssignment[] @relation("AssignedByUser")
@@ -103,6 +126,7 @@ model User {
 
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
+  @@index([departmentId], map: "idx_users_department")
   @@map("users")
 }
 

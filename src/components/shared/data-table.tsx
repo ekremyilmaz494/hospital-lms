@@ -129,12 +129,8 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  style={{
-                    borderColor: 'var(--color-border)',
-                    transition: 'background var(--transition-fast)',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-hover)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  className="clickable-row"
+                  style={{ borderColor: 'var(--color-border)' }}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
@@ -185,71 +181,75 @@ export function DataTable<TData, TValue>({
           </span>{' '}
           arası
         </p>
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.setPageIndex(0)}
-            disabled={!table.getCanPreviousPage()}
-            className="h-8 w-8 p-0"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)', borderRadius: '8px' }}
-          >
-            <ChevronsLeft className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-            className="h-8 w-8 p-0"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)', borderRadius: '8px' }}
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </Button>
+        {table.getPageCount() > 1 && (
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+              className="h-8 w-8 p-0 rounded-lg"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            >
+              <ChevronsLeft className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="h-8 w-8 p-0 rounded-lg"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
 
-          {/* Page numbers */}
-          {Array.from({ length: Math.min(table.getPageCount(), 5) }, (_, i) => {
-            const pageIdx = table.getState().pagination.pageIndex;
-            let pageNum = i;
-            if (pageIdx > 2) pageNum = pageIdx - 2 + i;
-            if (pageNum >= table.getPageCount()) return null;
-            return (
-              <button
-                key={pageNum}
-                onClick={() => table.setPageIndex(pageNum)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold"
-                style={{
-                  background: pageNum === pageIdx ? 'var(--color-primary)' : 'transparent',
-                  color: pageNum === pageIdx ? 'white' : 'var(--color-text-secondary)',
-                  transition: 'background var(--transition-fast), color var(--transition-fast)',
-                }}
-              >
-                {pageNum + 1}
-              </button>
-            );
-          })}
+            {/* Page numbers */}
+            {Array.from({ length: Math.min(table.getPageCount(), 5) }, (_, i) => {
+              const pageIdx = table.getState().pagination.pageIndex;
+              let pageNum = i;
+              if (pageIdx > 2) pageNum = pageIdx - 2 + i;
+              if (pageNum >= table.getPageCount()) return null;
+              const isActive = pageNum === pageIdx;
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => table.setPageIndex(pageNum)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold cursor-pointer transition-[background,color,transform] duration-150 active:scale-90 active:duration-75"
+                  style={{
+                    background: isActive ? 'var(--color-primary)' : 'var(--color-surface)',
+                    color: isActive ? 'white' : 'var(--color-text-secondary)',
+                    border: isActive ? 'none' : '1px solid var(--color-border)',
+                    boxShadow: isActive ? '0 2px 8px rgba(var(--color-primary-rgb), 0.3)' : 'none',
+                  }}
+                >
+                  {pageNum + 1}
+                </button>
+              );
+            })}
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-            className="h-8 w-8 p-0"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)', borderRadius: '8px' }}
-          >
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-            disabled={!table.getCanNextPage()}
-            className="h-8 w-8 p-0"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)', borderRadius: '8px' }}
-          >
-            <ChevronsRight className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="h-8 w-8 p-0 rounded-lg"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              disabled={!table.getCanNextPage()}
+              className="h-8 w-8 p-0 rounded-lg"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            >
+              <ChevronsRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

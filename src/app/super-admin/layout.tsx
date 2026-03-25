@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
 import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
 import { superAdminNav } from '@/components/layouts/sidebar/sidebar-config';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function SuperAdminLayout({
   children,
@@ -12,6 +13,7 @@ export default function SuperAdminLayout({
   children: React.ReactNode;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { fullName, initials } = useAuth();
 
   return (
     <TooltipProvider>
@@ -21,24 +23,20 @@ export default function SuperAdminLayout({
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           orgName="Hastane LMS"
-          userName="Süper Admin"
+          userName={fullName}
           userRole="Platform Yöneticisi"
-          userInitials="SA"
+          userInitials={initials}
         />
         <main
           className="min-h-screen"
-          style={{
-            marginLeft: sidebarCollapsed ? '72px' : '280px',
-            transition: 'margin-left 250ms cubic-bezier(0.16, 1, 0.3, 1)',
-          }}
+          style={{ marginLeft: 72 }}
         >
           <AppTopbar
             title=""
             onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-            userName="Süper Admin"
+            userName={fullName}
             userRole="Platform Yöneticisi"
-            userInitials="SA"
-            unreadNotifications={3}
+            userInitials={initials}
           />
           <div className="p-8">{children}</div>
         </main>

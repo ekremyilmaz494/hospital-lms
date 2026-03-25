@@ -1,50 +1,59 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft, Building2, Users, GraduationCap, TrendingUp,
   Edit, Ban, CheckCircle, CreditCard, Calendar, Activity
 } from 'lucide-react';
+import { PageLoading } from '@/components/shared/page-loading';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
 import { PageHeader } from '@/components/shared/page-header';
+import { useFetch } from '@/hooks/use-fetch';
 
-// Mock data
-const hospital = {
-  id: '1',
-  name: 'Devakent Hastanesi',
-  code: 'DEV001',
-  address: 'Devakent Mah. Sağlık Cad. No: 42, Ankara',
-  phone: '+90 (312) 555 12 34',
-  email: 'info@devakent.com',
-  logoUrl: null,
-  isActive: true,
-  isSuspended: false,
-  createdAt: '22.03.2026',
-  plan: 'Kurumsal',
-  planStatus: 'active',
-  expiresAt: '22.03.2027',
-  staffCount: 245,
-  trainingCount: 32,
-  completionRate: 87.3,
-};
-
-const admins = [
-  { id: '1', name: 'Dr. Ahmet Yılmaz', email: 'ahmet@devakent.com', lastLogin: '24.03.2026' },
-  { id: '2', name: 'Fatma Demir', email: 'fatma@devakent.com', lastLogin: '23.03.2026' },
-];
-
-const recentActivity = [
-  { action: 'Yeni eğitim oluşturuldu', detail: 'Enfeksiyon Kontrol Eğitimi', time: '2 saat önce', user: 'Dr. Ahmet Yılmaz' },
-  { action: '15 personele eğitim atandı', detail: 'İş Güvenliği Eğitimi', time: '5 saat önce', user: 'Fatma Demir' },
-  { action: 'Personel eklendi', detail: 'Mehmet Kara', time: '1 gün önce', user: 'Dr. Ahmet Yılmaz' },
-  { action: 'Sınav tamamlandı', detail: '12 personel başarılı', time: '2 gün önce', user: 'Sistem' },
-];
+interface HospitalDetail {
+  id: string;
+  name: string;
+  code: string;
+  address: string;
+  phone: string;
+  email: string;
+  logoUrl: string | null;
+  isActive: boolean;
+  isSuspended: boolean;
+  createdAt: string;
+  plan: string;
+  planStatus: string;
+  expiresAt: string;
+  staffCount: number;
+  trainingCount: number;
+  completionRate: number;
+  admins?: { id: string; name: string; email: string; lastLogin: string }[];
+  recentActivity?: { action: string; detail: string; time: string; user: string }[];
+}
 
 export default function HospitalDetailPage() {
   const router = useRouter();
+  const { id } = useParams<{ id: string }>();
+  const { data, isLoading, error } = useFetch<HospitalDetail>(`/api/super-admin/hospitals/${id}`);
+
+  if (isLoading) {
+    return <PageLoading />;
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  }
+
+  if (!data) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>;
+  }
+
+  const hospital = data;
+  const admins = data.admins ?? [];
+  const recentActivity = data.recentActivity ?? [];
 
   return (
     <div className="space-y-6">
@@ -56,11 +65,11 @@ export default function HospitalDetailPage() {
           </Button>
           <Avatar className="h-14 w-14 shrink-0">
             <AvatarFallback className="text-lg font-bold text-white" style={{ background: 'var(--color-primary)' }}>
-              DE
+              {hospital.name?.slice(0, 2).toUpperCase() ?? ''}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <h2 className="text-2xl font-bold truncate" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>
+            <h2 className="text-2xl font-bold truncate">
               {hospital.name}
             </h2>
             <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -99,7 +108,7 @@ export default function HospitalDetailPage() {
         {/* Hospital Info + Subscription */}
         <div className="lg:col-span-1 space-y-4">
           <div className="rounded-xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <h3 className="mb-4 text-sm font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>İletişim Bilgileri</h3>
+            <h3 className="mb-4 text-sm font-bold">İletişim Bilgileri</h3>
             <div className="space-y-3 text-sm">
               <div><span style={{ color: 'var(--color-text-muted)' }}>Adres:</span><p style={{ color: 'var(--color-text-primary)' }}>{hospital.address}</p></div>
               <div><span style={{ color: 'var(--color-text-muted)' }}>Telefon:</span><p style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>{hospital.phone}</p></div>
@@ -110,7 +119,7 @@ export default function HospitalDetailPage() {
 
           {/* Admin Users */}
           <div className="rounded-xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <h3 className="mb-4 text-sm font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>Admin Kullanıcılar</h3>
+            <h3 className="mb-4 text-sm font-bold">Admin Kullanıcılar</h3>
             <div className="space-y-3">
               {admins.map((admin) => (
                 <div key={admin.id} className="flex items-center gap-3 rounded-lg px-2 py-2">
@@ -137,7 +146,7 @@ export default function HospitalDetailPage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--color-primary-light)' }}>
                 <Activity className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
               </div>
-              <h3 className="text-base font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>
+              <h3 className="text-base font-bold">
                 Son Aktiviteler
               </h3>
             </div>

@@ -1,128 +1,281 @@
 'use client';
-import { BookOpen, Clock, CheckCircle, XCircle, Calendar, Bell, ArrowRight } from 'lucide-react';
+
+import Link from 'next/link';
+import { BookOpen, Clock, CheckCircle, XCircle, Calendar, Bell, ArrowRight, AlertTriangle, Play } from 'lucide-react';
 import { StatCard } from '@/components/shared/stat-card';
-import { PageHeader } from '@/components/shared/page-header';
-import { AlertBanner } from '@/components/layouts/topbar/alert-banner';
+import { BlurFade } from '@/components/ui/blur-fade';
+import { MagicCard } from '@/components/ui/magic-card';
+import { BorderBeam } from '@/components/ui/border-beam';
+import { AnimatedShinyText } from '@/components/ui/animated-shiny-text';
+import { useFetch } from '@/hooks/use-fetch';
+import { useAuth } from '@/hooks/use-auth';
+import { PageLoading } from '@/components/shared/page-loading';
 
-const stats = [
-  { title: 'Atanan Eğitim', value: 5, icon: BookOpen, accentColor: 'var(--color-info)' },
-  { title: 'Devam Eden', value: 2, icon: Clock, accentColor: 'var(--color-warning)' },
-  { title: 'Tamamlanan', value: 2, icon: CheckCircle, accentColor: 'var(--color-success)' },
-  { title: 'Başarısız', value: 1, icon: XCircle, accentColor: 'var(--color-error)' },
-];
+interface Training {
+  id: string;
+  title: string;
+  deadline: string;
+  status: string;
+  daysLeft: number;
+  progress: number;
+}
 
-const upcomingTrainings = [
-  { title: 'İş Güvenliği Temel Eğitim', deadline: '26.03.2026', status: 'in_progress', daysLeft: 2 },
-  { title: 'Enfeksiyon Kontrol', deadline: '31.03.2026', status: 'assigned', daysLeft: 7 },
-  { title: 'Acil Durum Tahliye', deadline: '15.04.2026', status: 'assigned', daysLeft: 22 },
-  { title: 'Laboratuvar Biyogüvenlik', deadline: '30.04.2026', status: 'assigned', daysLeft: 37 },
-];
+interface Activity {
+  text: string;
+  time: string;
+  type: string;
+}
 
-const recentActivity = [
-  { text: 'El Hijyeni eğitimini başarıyla tamamladınız', time: '2 gün önce', type: 'success' },
-  { text: 'Hasta Hakları son sınavında 95% aldınız', time: '5 gün önce', type: 'success' },
-  { text: 'İş Güvenliği ön sınavını tamamladınız: 65%', time: '1 hafta önce', type: 'info' },
-  { text: 'Radyoloji Güvenlik 2. deneme hakkınız açıldı', time: '2 hafta önce', type: 'warning' },
-];
+interface Notification {
+  title: string;
+  time: string;
+  isRead: boolean;
+}
 
-const notifications = [
-  { title: 'İş Güvenliği bitiş tarihi yaklaşıyor', time: '1 saat önce', isRead: false },
-  { title: 'Enfeksiyon Kontrol eğitimi atandı', time: '3 saat önce', isRead: false },
-  { title: 'El Hijyeni sertifikanız hazır', time: '2 gün önce', isRead: true },
-];
+interface DashboardData {
+  stats: { assigned: number; inProgress: number; completed: number; failed: number; overallProgress: number };
+  upcomingTrainings: Training[];
+  recentActivity: Activity[];
+  notifications: Notification[];
+  urgentTraining?: { id: string; title: string; daysLeft: number } | null;
+}
 
 const statusMap: Record<string, { label: string; bg: string; text: string }> = {
   in_progress: { label: 'Devam Ediyor', bg: 'var(--color-warning-bg)', text: 'var(--color-warning)' },
   assigned: { label: 'Atandı', bg: 'var(--color-info-bg)', text: 'var(--color-info)' },
-  passed: { label: 'Başarılı', bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
-  failed: { label: 'Başarısız', bg: 'var(--color-error-bg)', text: 'var(--color-error)' },
 };
 
 const typeColors: Record<string, string> = { success: 'var(--color-success)', info: 'var(--color-info)', warning: 'var(--color-warning)', error: 'var(--color-error)' };
 
 export default function StaffDashboard() {
+  const { user } = useAuth();
+  const { data, isLoading, error } = useFetch<DashboardData>('/api/staff/dashboard');
+
+  if (isLoading) {
+    return <PageLoading />;
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  }
+
+  const stats = [
+    { title: 'Atanan Eğitim', value: data?.stats?.assigned ?? 0, icon: BookOpen, accentColor: 'var(--color-info)' },
+    { title: 'Devam Eden', value: data?.stats?.inProgress ?? 0, icon: Clock, accentColor: 'var(--color-warning)' },
+    { title: 'Tamamlanan', value: data?.stats?.completed ?? 0, icon: CheckCircle, accentColor: 'var(--color-success)' },
+    { title: 'Başarısız', value: data?.stats?.failed ?? 0, icon: XCircle, accentColor: 'var(--color-error)' },
+  ];
+
+  const upcomingTrainings = data?.upcomingTrainings ?? [];
+  const recentActivity = data?.recentActivity ?? [];
+  const notifications = data?.notifications ?? [];
+  const overallProgress = data?.stats?.overallProgress ?? 0;
+  const urgentTraining = data?.urgentTraining;
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Dashboard" subtitle="Eğitim durumunuza genel bakış" />
-      <AlertBanner message="İş Güvenliği Temel Eğitim bitiş tarihi 2 gün sonra! Eğitimi tamamlayın." actionLabel="Eğitime Git" actionHref="/staff/my-trainings/1" variant="error" />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => <StatCard key={s.title} {...s} />)}
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Upcoming Trainings */}
-        <div className="lg:col-span-2 rounded-xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--color-primary-light)' }}>
-                <Calendar className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
-              </div>
-              <h3 className="text-base font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>Yaklaşan Eğitimler</h3>
+      {/* Greeting Banner */}
+      <BlurFade delay={0}>
+        <div
+          className="relative overflow-hidden rounded-2xl p-6"
+          style={{
+            background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f4a35 60%, #071f18 100%)',
+            boxShadow: '0 8px 30px rgba(13, 150, 104, 0.2)',
+          }}
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, white 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
+          <div className="relative z-10 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(209, 250, 229, 0.7)' }}>
+                {new Date().getHours() < 12 ? 'Günaydın' : new Date().getHours() < 18 ? 'İyi günler' : 'İyi akşamlar'}
+              </p>
+              <h2 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: 'var(--font-display)' }}>
+                Hoş geldin, {user?.firstName ?? 'Kullanıcı'}
+              </h2>
+              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                Güncel eğitim ve sınav durumuna genel bakış
+              </p>
             </div>
-            <a href="/staff/my-trainings" className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>Tümünü Gör <ArrowRight className="h-3 w-3" /></a>
-          </div>
-          <div className="space-y-3">
-            {upcomingTrainings.map((t, i) => {
-              const st = statusMap[t.status] || statusMap.assigned;
-              return (
-                <div key={i} className="flex items-center gap-4 rounded-lg border p-3" style={{ borderColor: 'var(--color-border)', transition: 'background var(--transition-fast)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                  <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg" style={{ background: t.daysLeft <= 3 ? 'var(--color-error-bg)' : 'var(--color-surface-hover)' }}>
-                    <span className="text-[10px] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>{t.deadline.split('.')[1] === '03' ? 'MAR' : 'NİS'}</span>
-                    <span className="text-lg font-bold leading-none" style={{ fontFamily: 'var(--font-mono)', color: t.daysLeft <= 3 ? 'var(--color-error)' : 'var(--color-text-primary)' }}>{t.deadline.split('.')[0]}</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>{t.title}</p>
-                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Son tarih: {t.deadline}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: st.bg, color: st.text }}>{st.label}</span>
-                    {t.daysLeft <= 7 && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: t.daysLeft <= 3 ? 'var(--color-error-bg)' : 'var(--color-warning-bg)', color: t.daysLeft <= 3 ? 'var(--color-error)' : 'var(--color-warning)' }}>{t.daysLeft} gün</span>}
-                  </div>
-                </div>
-              );
-            })}
+            <div className="hidden sm:flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-mono)' }}>%{overallProgress}</p>
+                <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>Genel İlerleme</p>
+              </div>
+              <div className="h-12 w-12 relative">
+                <svg viewBox="0 0 36 36" className="h-12 w-12 -rotate-90">
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="#34d399" strokeWidth="3" strokeDasharray="97.4" strokeDashoffset={97.4 - (97.4 * overallProgress / 100)} strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
+      </BlurFade>
 
-        {/* Right column: Notifications + Activity */}
-        <div className="space-y-4">
-          {/* Notifications */}
-          <div className="rounded-xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <div className="mb-3 flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--color-accent-light)' }}>
-                <Bell className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
-              </div>
-              <h3 className="text-sm font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>Bildirimler</h3>
+      {/* Urgent Alert */}
+      {urgentTraining && (
+        <BlurFade delay={0.05}>
+          <div
+            className="relative overflow-hidden flex items-center gap-4 rounded-2xl px-6 py-4"
+            style={{ background: 'linear-gradient(135deg, var(--color-error), #991b1b)', boxShadow: '0 4px 20px rgba(220, 38, 38, 0.2)' }}
+          >
+            <BorderBeam size={100} duration={6} colorFrom="#fca5a5" colorTo="#f59e0b" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
+              <AlertTriangle className="h-5 w-5 text-white" />
             </div>
-            <div className="space-y-2">
-              {notifications.map((n, i) => (
-                <div key={i} className="flex items-start gap-2 rounded-md px-2 py-1.5" style={{ background: !n.isRead ? 'var(--color-primary-light)' : 'transparent' }}>
-                  {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--color-primary)' }} />}
-                  <div className={!n.isRead ? '' : 'ml-4'}>
-                    <p className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>{n.title}</p>
-                    <p className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>{n.time}</p>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-white">{urgentTraining.title} bitiş tarihi {urgentTraining.daysLeft} gün sonra!</p>
+              <p className="text-xs text-white/60">Eğitimi tamamlamanız gerekmektedir.</p>
+            </div>
+            <Link
+              href={`/staff/my-trainings/${urgentTraining.id}`}
+              className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:scale-105"
+              style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}
+            >
+              <Play className="h-4 w-4" /> Devam Et
+            </Link>
+          </div>
+        </BlurFade>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((s, i) => (
+          <BlurFade key={s.title} delay={0.1 + i * 0.05}>
+            <StatCard {...s} />
+          </BlurFade>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Upcoming Trainings */}
+        <BlurFade delay={0.3} className="lg:col-span-2">
+          <MagicCard gradientColor="rgba(13, 150, 104, 0.05)" gradientOpacity={0.4} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+            <div className="p-6">
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
+                    <Calendar className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold">Yaklaşan Eğitimler</h3>
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{upcomingTrainings.length} eğitim bekliyor</p>
                   </div>
                 </div>
-              ))}
+                <Link href="/staff/my-trainings" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors duration-150" style={{ color: 'var(--color-primary)', background: 'var(--color-primary-light)' }}>
+                  Tümünü Gör <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+              <div className="space-y-3">
+                {upcomingTrainings.length === 0 && (
+                  <p className="text-sm text-center py-4" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>
+                )}
+                {upcomingTrainings.map((t) => {
+                  const st = statusMap[t.status] || statusMap.assigned;
+                  return (
+                    <Link
+                      key={t.id}
+                      href={`/staff/my-trainings/${t.id}`}
+                      className="flex items-center gap-4 rounded-xl p-3.5 transition-all duration-200 group"
+                      style={{ border: '1px solid var(--color-border)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-hover)'; e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                    >
+                      <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl" style={{ background: (t.daysLeft ?? 99) <= 3 ? 'var(--color-error-bg)' : 'var(--color-bg)' }}>
+                        <span className="text-[10px] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>{t.deadline?.split('.')?.[1] === '03' ? 'MAR' : 'NİS'}</span>
+                        <span className="text-base font-bold leading-none font-mono" style={{ color: (t.daysLeft ?? 99) <= 3 ? 'var(--color-error)' : 'var(--color-text-primary)' }}>{t.deadline?.split('.')?.[0]}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{t.title}</p>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="h-1.5 w-20 rounded-full" style={{ background: 'var(--color-border)' }}>
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${t.progress ?? 0}%`, background: st.text }} />
+                          </div>
+                          <span className="text-[11px] font-mono font-medium" style={{ color: 'var(--color-text-muted)' }}>{t.progress ?? 0}%</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: st.bg, color: st.text }}>
+                          <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.text }} />
+                          {st.label}
+                        </span>
+                        {(t.daysLeft ?? 99) <= 7 && (
+                          <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: (t.daysLeft ?? 99) <= 3 ? 'var(--color-error-bg)' : 'var(--color-warning-bg)', color: (t.daysLeft ?? 99) <= 3 ? 'var(--color-error)' : 'var(--color-warning)' }}>
+                            {t.daysLeft} gün
+                          </span>
+                        )}
+                        <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{ color: 'var(--color-text-muted)' }} />
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </MagicCard>
+        </BlurFade>
+
+        {/* Right column */}
+        <div className="space-y-6">
+          {/* Notifications */}
+          <BlurFade delay={0.35}>
+            <MagicCard gradientColor="rgba(245, 158, 11, 0.05)" gradientOpacity={0.4} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <div className="p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--color-accent-light)' }}>
+                      <Bell className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
+                    </div>
+                    <h3 className="text-sm font-bold">Bildirimler</h3>
+                    {notifications.filter(n => !n.isRead).length > 0 && (
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: 'var(--color-error)' }}>
+                        {notifications.filter(n => !n.isRead).length}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2.5">
+                  {notifications.length === 0 && (
+                    <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>
+                  )}
+                  {notifications.map((n, i) => (
+                    <div key={i} className="flex items-start gap-2.5 rounded-xl px-3 py-2.5 transition-colors duration-150" style={{ background: !n.isRead ? 'var(--color-primary-light)' : 'transparent' }}>
+                      {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full animate-pulse" style={{ background: 'var(--color-primary)' }} />}
+                      <div className={!n.isRead ? '' : 'ml-4'}>
+                        <p className="text-xs font-medium">{n.title}</p>
+                        <p className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{n.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Link href="/staff/notifications" className="mt-3 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors duration-150 hover:bg-[var(--color-surface-hover)]" style={{ color: 'var(--color-primary)' }}>
+                  Tümünü Gör <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </MagicCard>
+          </BlurFade>
 
           {/* Recent Activity */}
-          <div className="rounded-xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <h3 className="mb-3 text-sm font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>Son Aktivitelerim</h3>
-            <div className="space-y-3">
-              {recentActivity.map((a, i) => (
-                <div key={i} className="flex gap-2">
-                  <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: typeColors[a.type] }} />
-                  <div>
-                    <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{a.text}</p>
-                    <p className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>{a.time}</p>
+          <BlurFade delay={0.4}>
+            <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+              <h3 className="mb-4 text-sm font-bold">Son Aktivitelerim</h3>
+              <div className="space-y-3.5">
+                {recentActivity.length === 0 && (
+                  <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>
+                )}
+                {recentActivity.map((a, i) => (
+                  <div key={i} className="flex gap-3">
+                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: `${typeColors[a.type] ?? 'var(--color-info)'}15` }}>
+                      <div className="h-2 w-2 rounded-full" style={{ background: typeColors[a.type] ?? 'var(--color-info)' }} />
+                    </div>
+                    <div>
+                      <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>{a.text}</p>
+                      <p className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{a.time}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          </BlurFade>
         </div>
       </div>
     </div>

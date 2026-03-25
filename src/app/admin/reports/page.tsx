@@ -3,313 +3,316 @@
 import { useState } from 'react';
 import {
   BarChart3, Download, FileText, Users, GraduationCap, Building2, AlertTriangle, Clock, Printer,
+  TrendingDown, Target, Award,
 } from 'lucide-react';
+import { exportExcel, exportPDF, printPage } from '@/lib/export';
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatCard } from '@/components/shared/stat-card';
 import { ChartCard } from '@/components/shared/chart-card';
+import { BlurFade } from '@/components/ui/blur-fade';
+import { useFetch } from '@/hooks/use-fetch';
+import { PageLoading } from '@/components/shared/page-loading';
+import { useToast } from '@/components/shared/toast';
 
-// ── MOCK DATA ──
-
-const overviewData = {
-  stats: [
-    { title: 'Toplam Eğitim', value: 32, icon: GraduationCap, accentColor: 'var(--color-primary)' },
-    { title: 'Toplam Personel', value: 245, icon: Users, accentColor: 'var(--color-info)' },
-    { title: 'Tamamlanma Oranı', value: '89.2%', icon: BarChart3, accentColor: 'var(--color-success)' },
-    { title: 'Ort. Başarı Puanı', value: '78.5', icon: BarChart3, accentColor: 'var(--color-accent)' },
-  ],
-  monthly: [
-    { month: 'Oca', tamamlanan: 45, basarisiz: 5 },
-    { month: 'Şub', tamamlanan: 62, basarisiz: 8 },
-    { month: 'Mar', tamamlanan: 78, basarisiz: 6 },
-    { month: 'Nis', tamamlanan: 55, basarisiz: 4 },
-    { month: 'May', tamamlanan: 90, basarisiz: 7 },
-    { month: 'Haz', tamamlanan: 85, basarisiz: 3 },
-  ],
-};
-
-const trainingData = [
-  { name: 'Enfeksiyon Kontrol', atanan: 120, tamamlayan: 98, basarili: 92, basarisiz: 6, ort: 78.5 },
-  { name: 'İş Güvenliği', atanan: 245, tamamlayan: 210, basarili: 195, basarisiz: 15, ort: 75.2 },
-  { name: 'Hasta Hakları', atanan: 80, tamamlayan: 80, basarili: 78, basarisiz: 2, ort: 85.1 },
-  { name: 'Radyoloji Güvenlik', atanan: 35, tamamlayan: 28, basarili: 25, basarisiz: 3, ort: 72.8 },
-  { name: 'El Hijyeni', atanan: 200, tamamlayan: 185, basarili: 180, basarisiz: 5, ort: 82.3 },
-  { name: 'İlaç Yönetimi', atanan: 55, tamamlayan: 48, basarili: 45, basarisiz: 3, ort: 79.6 },
-];
-
-const staffPerformance = [
-  { name: 'Elif Kaya', dept: 'Hemşirelik', completed: 8, avgScore: 97, status: 'Yıldız' },
-  { name: 'Hasan Kılıç', dept: 'Laboratuvar', completed: 8, avgScore: 91, status: 'Yıldız' },
-  { name: 'Zeynep Arslan', dept: 'Eczane', completed: 5, avgScore: 93, status: 'Yıldız' },
-  { name: 'Mehmet Demir', dept: 'Acil Servis', completed: 7, avgScore: 95, status: 'Yıldız' },
-  { name: 'Ali Veli', dept: 'Temizlik', completed: 2, avgScore: 55, status: 'Risk' },
-  { name: 'Osman Yurt', dept: 'Güvenlik', completed: 1, avgScore: 45, status: 'Risk' },
-];
-
-const departmentData = [
-  { dept: 'Hemşirelik', personel: 45, tamamlanma: 94, ortPuan: 88, basarisiz: 1 },
-  { dept: 'Acil Servis', personel: 28, tamamlanma: 89, ortPuan: 82, basarisiz: 2 },
-  { dept: 'Radyoloji', personel: 12, tamamlanma: 85, ortPuan: 78, basarisiz: 1 },
-  { dept: 'Laboratuvar', personel: 18, tamamlanma: 92, ortPuan: 85, basarisiz: 0 },
-  { dept: 'Eczane', personel: 15, tamamlanma: 96, ortPuan: 90, basarisiz: 0 },
-  { dept: 'Temizlik', personel: 22, tamamlanma: 65, ortPuan: 62, basarisiz: 5 },
-  { dept: 'İdari', personel: 20, tamamlanma: 80, ortPuan: 75, basarisiz: 2 },
-  { dept: 'Güvenlik', personel: 10, tamamlanma: 55, ortPuan: 58, basarisiz: 3 },
-];
-
-const failureData = [
-  { name: 'Ali Veli', dept: 'Temizlik', training: 'İş Güvenliği', attempts: 3, lastScore: 55, status: 'locked' },
-  { name: 'Osman Yurt', dept: 'Güvenlik', training: 'Enfeksiyon Kontrol', attempts: 3, lastScore: 48, status: 'locked' },
-  { name: 'Cemile Tan', dept: 'İdari', training: 'Radyoloji Güvenlik', attempts: 2, lastScore: 62, status: 'failed' },
-  { name: 'Hüseyin Ak', dept: 'Temizlik', training: 'Hasta Hakları', attempts: 3, lastScore: 50, status: 'locked' },
-];
-
-const durationData = [
-  { training: 'Enfeksiyon Kontrol', avgVideoMin: 42, avgExamMin: 22, avgTotalMin: 64 },
-  { training: 'İş Güvenliği', avgVideoMin: 55, avgExamMin: 25, avgTotalMin: 80 },
-  { training: 'Hasta Hakları', avgVideoMin: 30, avgExamMin: 18, avgTotalMin: 48 },
-  { training: 'Radyoloji Güvenlik', avgVideoMin: 38, avgExamMin: 20, avgTotalMin: 58 },
-  { training: 'El Hijyeni', avgVideoMin: 25, avgExamMin: 15, avgTotalMin: 40 },
-  { training: 'İlaç Yönetimi', avgVideoMin: 35, avgExamMin: 22, avgTotalMin: 57 },
-];
-
-const pieColors = ['var(--color-primary)', 'var(--color-accent)', 'var(--color-info)', 'var(--color-success)', 'var(--color-warning)', 'var(--color-error)'];
-
-const statusColors: Record<string, { bg: string; text: string }> = {
-  'Yıldız': { bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
-  'Risk': { bg: 'var(--color-error-bg)', text: 'var(--color-error)' },
-  'locked': { bg: 'var(--color-error-bg)', text: 'var(--color-error)' },
-  'failed': { bg: 'var(--color-warning-bg)', text: 'var(--color-warning)' },
-};
-
-function ExportButtons() {
-  return (
-    <div className="flex items-center gap-2">
-      <Button variant="outline" size="sm" className="gap-1.5 text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-        <Download className="h-3.5 w-3.5" /> Excel
-      </Button>
-      <Button variant="outline" size="sm" className="gap-1.5 text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-        <FileText className="h-3.5 w-3.5" /> PDF
-      </Button>
-      <Button variant="outline" size="sm" className="gap-1.5 text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-        <Printer className="h-3.5 w-3.5" /> Yazdır
-      </Button>
-    </div>
-  );
+interface ReportsData {
+  overviewStats: { title: string; value: number | string; icon: string; accentColor: string; trend?: { value: number; label: string; isPositive: boolean } }[];
+  monthlyData: { month: string; tamamlanan: number; basarisiz: number }[];
+  trainingData: { name: string; atanan: number; tamamlayan: number; basarili: number; basarisiz: number; ort: number }[];
+  staffPerformance: { name: string; dept: string; completed: number; avgScore: number; status: string; color: string }[];
+  departmentData: { dept: string; personel: number; tamamlanma: number; ortPuan: number; basarisiz: number; color: string }[];
+  failureData: { name: string; dept: string; training: string; attempts: number; lastScore: number; status: string }[];
+  durationData: { training: string; video: number; sinav: number }[];
 }
 
-function TableWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-      <div className="overflow-x-auto">{children}</div>
-    </div>
-  );
-}
+const iconMap: Record<string, typeof Users> = { GraduationCap, Users, Target, Award };
 
-function TH({ children }: { children: React.ReactNode }) {
-  return <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{children}</th>;
-}
+const tabs = [
+  { id: 'overview', label: 'Genel Özet', icon: BarChart3 },
+  { id: 'training', label: 'Eğitim Bazlı', icon: GraduationCap },
+  { id: 'staff', label: 'Personel', icon: Users },
+  { id: 'department', label: 'Departman', icon: Building2 },
+  { id: 'failure', label: 'Başarısızlık', icon: AlertTriangle },
+  { id: 'duration', label: 'Süre Analizi', icon: Clock },
+];
 
-function TD({ children, mono, color }: { children: React.ReactNode; mono?: boolean; color?: string }) {
-  return <td className="px-4 py-3 text-sm" style={{ fontFamily: mono ? 'var(--font-mono)' : undefined, color: color || 'var(--color-text-primary)' }}>{children}</td>;
-}
+const chartTooltipStyle = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', fontSize: '12px', boxShadow: 'var(--shadow-md)' };
 
 export default function ReportsPage() {
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState('overview');
+  const { data, isLoading, error } = useFetch<ReportsData>('/api/admin/reports');
+
+  if (isLoading) {
+    return <PageLoading />;
+  }
+  if (error) {
+    return <div className="flex items-center justify-center py-20"><div className="rounded-2xl border p-8 text-center" style={{ background: 'var(--color-error-bg)', borderColor: 'var(--color-error)' }}><p className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>Raporlar yüklenemedi</p><p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{error}</p></div></div>;
+  }
+
+  const overviewStats = data?.overviewStats ?? [];
+  const monthlyData = data?.monthlyData ?? [];
+  const trainingData = data?.trainingData ?? [];
+  const staffPerformance = data?.staffPerformance ?? [];
+  const departmentData = data?.departmentData ?? [];
+  const failureData = data?.failureData ?? [];
+  const durationData = data?.durationData ?? [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <PageHeader title="Raporlar" subtitle="Eğitim performansını analiz edin" />
-        <ExportButtons />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={exportExcel}><Download className="h-3.5 w-3.5" /> Excel</Button>
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={exportPDF}><FileText className="h-3.5 w-3.5" /> PDF</Button>
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={printPage}><Printer className="h-3.5 w-3.5" /> Yazdır</Button>
+        </div>
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList style={{ background: 'var(--color-surface-hover)' }}>
-          <TabsTrigger value="overview">Genel Özet</TabsTrigger>
-          <TabsTrigger value="training">Eğitim Bazlı</TabsTrigger>
-          <TabsTrigger value="staff">Personel Bazlı</TabsTrigger>
-          <TabsTrigger value="department">Departman</TabsTrigger>
-          <TabsTrigger value="failure">Başarısızlık</TabsTrigger>
-          <TabsTrigger value="duration">Süre Analizi</TabsTrigger>
-        </TabsList>
+      <div className="flex items-center gap-1 overflow-x-auto rounded-2xl p-1.5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          const Icon = tab.icon;
+          return (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200" style={{ background: isActive ? 'var(--color-primary)' : 'transparent', color: isActive ? 'white' : 'var(--color-text-muted)', boxShadow: isActive ? '0 2px 8px rgba(var(--color-primary-rgb), 0.3)' : 'none' }}>
+              <Icon className="h-4 w-4" />
+              {tab.label}
+              {tab.id === 'failure' && failureData.length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--color-error-bg)', color: isActive ? 'white' : 'var(--color-error)' }}>{failureData.length}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-        {/* 1. Genel Özet */}
-        <TabsContent value="overview" className="mt-6 space-y-6">
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {overviewData.stats.map((s) => <StatCard key={s.title} {...s} />)}
+            {overviewStats.map((s, i) => {
+              const Icon = iconMap[s.icon] || Users;
+              return <BlurFade key={s.title} delay={i * 0.05}><StatCard title={s.title} value={s.value} icon={Icon} accentColor={s.accentColor} trend={s.trend} /></BlurFade>;
+            })}
           </div>
-          <ChartCard title="Aylık Tamamlanma Trendi" icon={<BarChart3 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={overviewData.monthly} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px', fontFamily: 'var(--font-mono)', fontSize: '12px' }} />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="tamamlanan" name="Tamamlanan" fill="var(--color-success)" radius={[4, 4, 0, 0]} barSize={28} />
-                  <Bar dataKey="basarisiz" name="Başarısız" fill="var(--color-error)" radius={[4, 4, 0, 0]} barSize={28} />
-                </BarChart>
-              </ResponsiveContainer>
+          {monthlyData.length > 0 && (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <BlurFade delay={0.15} className="lg:col-span-2">
+                <ChartCard title="Aylık Tamamlanma Trendi" icon={<BarChart3 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
+                  <div className="h-[320px]">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                      <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                        <defs><linearGradient id="colorTamamlanan" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--color-success)" stopOpacity={0.2} /><stop offset="95%" stopColor="var(--color-success)" stopOpacity={0} /></linearGradient></defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                        <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={chartTooltipStyle} />
+                        <Area type="monotone" dataKey="tamamlanan" name="Tamamlanan" stroke="var(--color-success)" fill="url(#colorTamamlanan)" strokeWidth={2.5} dot={{ r: 4, fill: 'var(--color-success)', strokeWidth: 2, stroke: 'var(--color-surface)' }} />
+                        <Bar dataKey="basarisiz" name="Başarısız" fill="var(--color-error)" radius={[4, 4, 0, 0]} barSize={20} opacity={0.8} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </ChartCard>
+              </BlurFade>
+              <BlurFade delay={0.2}>
+                <div className="rounded-2xl border p-6 h-full" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+                  <h3 className="text-sm font-bold mb-4">En İyi Performans</h3>
+                  <div className="space-y-3">
+                    {staffPerformance.filter(s => s.status === 'star').slice(0, 4).map((s, i) => (
+                      <div key={s.name} className="flex items-center gap-3">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: i === 0 ? 'var(--color-accent)' : 'var(--color-border)' }}>{i + 1}</span>
+                        <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">{s.name}</p><p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{s.dept}</p></div>
+                        <span className="text-sm font-bold font-mono" style={{ color: 'var(--color-success)' }}>{s.avgScore}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="my-4 h-px" style={{ background: 'var(--color-border)' }} />
+                  <h3 className="text-sm font-bold mb-4 flex items-center gap-2"><AlertTriangle className="h-3.5 w-3.5" style={{ color: 'var(--color-error)' }} />Risk Altında</h3>
+                  <div className="space-y-3">
+                    {staffPerformance.filter(s => s.status === 'risk').length > 0 ? staffPerformance.filter(s => s.status === 'risk').map((s) => (
+                      <div key={s.name} className="flex items-center gap-3">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'var(--color-error-bg)' }}><TrendingDown className="h-3 w-3" style={{ color: 'var(--color-error)' }} /></div>
+                        <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">{s.name}</p><p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{s.dept}</p></div>
+                        <span className="text-sm font-bold font-mono" style={{ color: 'var(--color-error)' }}>{s.avgScore}%</span>
+                      </div>
+                    )) : <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Risk altında personel yok</p>}
+                  </div>
+                </div>
+              </BlurFade>
             </div>
-          </ChartCard>
-        </TabsContent>
+          )}
+        </div>
+      )}
 
-        {/* 2. Eğitim Bazlı */}
-        <TabsContent value="training" className="mt-6 space-y-6">
-          <TableWrapper>
-            <table className="w-full text-sm">
-              <thead><tr style={{ borderBottom: '1px solid var(--color-border)' }}><TH>Eğitim</TH><TH>Atanan</TH><TH>Tamamlayan</TH><TH>Başarılı</TH><TH>Başarısız</TH><TH>Ort. Puan</TH><TH>Oran</TH></tr></thead>
-              <tbody>
-                {trainingData.map((t) => {
-                  const rate = Math.round((t.tamamlayan / t.atanan) * 100);
-                  const rateColor = rate >= 80 ? 'var(--color-success)' : rate >= 60 ? 'var(--color-warning)' : 'var(--color-error)';
-                  return (
-                    <tr key={t.name} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <TD><span className="font-medium">{t.name}</span></TD>
-                      <TD mono>{t.atanan}</TD><TD mono>{t.tamamlayan}</TD>
-                      <TD mono color="var(--color-success)">{t.basarili}</TD>
-                      <TD mono color="var(--color-error)">{t.basarisiz}</TD>
-                      <TD mono>{t.ort}%</TD>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-16 rounded-full" style={{ background: 'var(--color-border)' }}>
-                            <div className="h-full rounded-full" style={{ width: `${rate}%`, background: rateColor }} />
-                          </div>
-                          <span className="text-xs font-semibold" style={{ fontFamily: 'var(--font-mono)', color: rateColor }}>{rate}%</span>
+      {activeTab === 'training' && (
+        <BlurFade delay={0.05}>
+          <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+            {trainingData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr style={{ background: 'var(--color-bg)' }}><th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Eğitim</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Atanan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tamamlayan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Başarılı</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Ort. Puan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tamamlanma</th></tr></thead>
+                  <tbody>
+                    {trainingData.map((t) => {
+                      const rate = t.atanan > 0 ? Math.round((t.tamamlayan / t.atanan) * 100) : 0;
+                      const rateColor = rate >= 80 ? 'var(--color-success)' : rate >= 60 ? 'var(--color-warning)' : 'var(--color-error)';
+                      return (
+                        <tr key={t.name} className="group transition-colors duration-100 hover:bg-[var(--color-surface-hover)]" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                          <td className="px-5 py-4"><span className="text-sm font-semibold">{t.name}</span></td>
+                          <td className="px-4 py-4 text-sm font-mono">{t.atanan}</td>
+                          <td className="px-4 py-4 text-sm font-mono">{t.tamamlayan}</td>
+                          <td className="px-4 py-4"><span className="text-sm font-mono font-semibold" style={{ color: 'var(--color-success)' }}>{t.basarili}</span>{t.basarisiz > 0 && <span className="text-xs ml-1.5" style={{ color: 'var(--color-error)' }}>(-{t.basarisiz})</span>}</td>
+                          <td className="px-4 py-4 text-sm font-mono font-semibold">{t.ort}%</td>
+                          <td className="px-4 py-4"><div className="flex items-center gap-3"><div className="h-2 w-20 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}><div className="h-full rounded-full transition-all duration-500" style={{ width: `${rate}%`, background: rateColor }} /></div><span className="text-xs font-bold font-mono" style={{ color: rateColor }}>{rate}%</span></div></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>}
+          </div>
+        </BlurFade>
+      )}
+
+      {activeTab === 'staff' && (
+        <BlurFade delay={0.05}>
+          <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+            {staffPerformance.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr style={{ background: 'var(--color-bg)' }}><th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Personel</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Departman</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tamamlanan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Ort. Puan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Durum</th></tr></thead>
+                  <tbody>
+                    {staffPerformance.map((s) => (
+                      <tr key={s.name} className="group transition-colors duration-100 hover:bg-[var(--color-surface-hover)]" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td className="px-5 py-4"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: s.color }}>{s.name.split(' ').map(n => n[0]).join('')}</div><span className="text-sm font-semibold">{s.name}</span></div></td>
+                        <td className="px-4 py-4"><span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: `${s.color}15`, color: s.color }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />{s.dept}</span></td>
+                        <td className="px-4 py-4 text-sm font-mono font-semibold">{s.completed}</td>
+                        <td className="px-4 py-4"><span className="text-sm font-mono font-bold" style={{ color: s.avgScore >= 70 ? 'var(--color-success)' : 'var(--color-error)' }}>{s.avgScore}%</span></td>
+                        <td className="px-4 py-4">
+                          {s.status === 'star' && <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}><Award className="h-3 w-3" /> Yıldız</span>}
+                          {s.status === 'risk' && <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}><AlertTriangle className="h-3 w-3" /> Risk</span>}
+                          {s.status === 'normal' && <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-muted)' }}>Normal</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>}
+          </div>
+        </BlurFade>
+      )}
+
+      {activeTab === 'department' && (
+        <div className="space-y-6">
+          {departmentData.length > 0 ? (
+            <>
+              <BlurFade delay={0.05}>
+                <ChartCard title="Departman Karşılaştırması" icon={<Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
+                  <div className="h-[320px]">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                      <BarChart data={departmentData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                        <XAxis dataKey="dept" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={chartTooltipStyle} />
+                        <Legend wrapperStyle={{ fontSize: '12px' }} />
+                        <Bar dataKey="tamamlanma" name="Tamamlanma %" fill="var(--color-primary)" radius={[6, 6, 0, 0]} barSize={24} />
+                        <Bar dataKey="ortPuan" name="Ort. Puan" fill="var(--color-accent)" radius={[6, 6, 0, 0]} barSize={24} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </ChartCard>
+              </BlurFade>
+              <BlurFade delay={0.1}>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {departmentData.map((d) => {
+                    const isGood = d.tamamlanma >= 80;
+                    return (
+                      <div key={d.dept} className="rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-1" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+                        <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full" style={{ background: d.color }} /><span className="text-sm font-bold">{d.dept}</span></div><span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>{d.personel} kişi</span></div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between"><span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Tamamlanma</span><span className="text-sm font-bold font-mono" style={{ color: isGood ? 'var(--color-success)' : 'var(--color-warning)' }}>{d.tamamlanma}%</span></div>
+                          <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}><div className="h-full rounded-full transition-all duration-700" style={{ width: `${d.tamamlanma}%`, background: isGood ? 'var(--color-success)' : 'var(--color-warning)' }} /></div>
+                          <div className="flex items-center justify-between pt-1"><span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Ort. Puan</span><span className="text-xs font-semibold font-mono">{d.ortPuan}%</span></div>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </TableWrapper>
-        </TabsContent>
+                        {d.basarisiz > 0 && <div className="mt-3 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={{ background: 'var(--color-error-bg)' }}><AlertTriangle className="h-3 w-3" style={{ color: 'var(--color-error)' }} /><span className="text-[11px] font-semibold" style={{ color: 'var(--color-error)' }}>{d.basarisiz} başarısız</span></div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </BlurFade>
+            </>
+          ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>}
+        </div>
+      )}
 
-        {/* 3. Personel Bazlı */}
-        <TabsContent value="staff" className="mt-6 space-y-6">
-          <TableWrapper>
-            <table className="w-full text-sm">
-              <thead><tr style={{ borderBottom: '1px solid var(--color-border)' }}><TH>Personel</TH><TH>Departman</TH><TH>Tamamlanan</TH><TH>Ort. Puan</TH><TH>Durum</TH></tr></thead>
-              <tbody>
-                {staffPerformance.map((s) => {
-                  const sc = statusColors[s.status];
-                  return (
-                    <tr key={s.name} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <TD><span className="font-medium">{s.name}</span></TD>
-                      <TD>{s.dept}</TD><TD mono>{s.completed}</TD>
-                      <TD mono color={s.avgScore >= 70 ? 'var(--color-success)' : 'var(--color-error)'}>{s.avgScore}%</TD>
-                      <td className="px-4 py-3"><span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: sc.bg, color: sc.text }}>{s.status}</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </TableWrapper>
-        </TabsContent>
-
-        {/* 4. Departman */}
-        <TabsContent value="department" className="mt-6 space-y-6">
-          <ChartCard title="Departman Karşılaştırması" icon={<Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={departmentData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                  <XAxis dataKey="dept" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px', fontFamily: 'var(--font-mono)', fontSize: '12px' }} />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="tamamlanma" name="Tamamlanma %" fill="var(--color-primary)" radius={[4, 4, 0, 0]} barSize={20} />
-                  <Bar dataKey="ortPuan" name="Ort. Puan" fill="var(--color-accent)" radius={[4, 4, 0, 0]} barSize={20} />
-                </BarChart>
-              </ResponsiveContainer>
+      {activeTab === 'failure' && (
+        <div className="space-y-6">
+          {failureData.filter(f => f.status === 'locked').length > 0 && (
+            <BlurFade delay={0.05}>
+              <div className="flex items-center gap-4 rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, var(--color-error), #991b1b)', boxShadow: '0 4px 20px rgba(220, 38, 38, 0.2)' }}>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}><AlertTriangle className="h-6 w-6 text-white" /></div>
+                <div><p className="text-lg font-bold text-white">{failureData.filter(f => f.status === 'locked').length} personel kilitlendi</p><p className="text-sm text-white/70">3 deneme hakkını tüketen personeller yeni hak bekliyor</p></div>
+              </div>
+            </BlurFade>
+          )}
+          <BlurFade delay={0.1}>
+            <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+              {failureData.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead><tr style={{ background: 'var(--color-bg)' }}><th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Personel</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Departman</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Eğitim</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Deneme</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Son Puan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>İşlem</th></tr></thead>
+                    <tbody>
+                      {failureData.map((f, i) => (
+                        <tr key={i} className="transition-colors duration-100 hover:bg-[var(--color-surface-hover)]" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                          <td className="px-5 py-4 text-sm font-semibold">{f.name}</td>
+                          <td className="px-4 py-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>{f.dept}</td>
+                          <td className="px-4 py-4 text-sm">{f.training}</td>
+                          <td className="px-4 py-4 text-sm font-mono font-semibold" style={{ color: 'var(--color-error)' }}>{f.attempts}/3</td>
+                          <td className="px-4 py-4 text-sm font-mono font-bold" style={{ color: 'var(--color-error)' }}>{f.lastScore}%</td>
+                          <td className="px-4 py-4">
+                            <Button size="sm" className="gap-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: 'var(--color-primary)' }} onClick={async () => {
+                              if (window.confirm(`${f.name} için "${f.training}" eğitiminde yeni deneme hakkı verilsin mi?`)) {
+                                try { await fetch('/api/admin/trainings/reset-attempt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ staffName: f.name, training: f.training }) }); toast(`${f.name} için yeni deneme hakkı verildi.`, 'success'); } catch { toast('İşlem başarısız', 'error'); }
+                              }
+                            }}>Yeni Hak Ver</Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Başarısız personel yok</p>}
             </div>
-          </ChartCard>
-          <TableWrapper>
-            <table className="w-full text-sm">
-              <thead><tr style={{ borderBottom: '1px solid var(--color-border)' }}><TH>Departman</TH><TH>Personel</TH><TH>Tamamlanma</TH><TH>Ort. Puan</TH><TH>Başarısız</TH></tr></thead>
-              <tbody>
-                {departmentData.map((d) => (
-                  <tr key={d.dept} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <TD><span className="font-medium">{d.dept}</span></TD>
-                    <TD mono>{d.personel}</TD>
-                    <TD mono color={d.tamamlanma >= 80 ? 'var(--color-success)' : d.tamamlanma >= 60 ? 'var(--color-warning)' : 'var(--color-error)'}>{d.tamamlanma}%</TD>
-                    <TD mono>{d.ortPuan}%</TD>
-                    <TD mono color={d.basarisiz > 0 ? 'var(--color-error)' : 'var(--color-success)'}>{d.basarisiz}</TD>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableWrapper>
-        </TabsContent>
+          </BlurFade>
+        </div>
+      )}
 
-        {/* 5. Başarısızlık */}
-        <TabsContent value="failure" className="mt-6 space-y-6">
-          <div className="rounded-lg p-4" style={{ background: 'var(--color-error-bg)', borderLeft: '4px solid var(--color-error)' }}>
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" style={{ color: 'var(--color-error)' }} />
-              <p className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>{failureData.length} personel 3 deneme hakkını tüketmiş durumda</p>
-            </div>
-          </div>
-          <TableWrapper>
-            <table className="w-full text-sm">
-              <thead><tr style={{ borderBottom: '1px solid var(--color-border)' }}><TH>Personel</TH><TH>Departman</TH><TH>Eğitim</TH><TH>Deneme</TH><TH>Son Puan</TH><TH>Durum</TH></tr></thead>
-              <tbody>
-                {failureData.map((f, i) => {
-                  const sc = statusColors[f.status];
-                  return (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <TD><span className="font-medium">{f.name}</span></TD>
-                      <TD>{f.dept}</TD><TD>{f.training}</TD>
-                      <TD mono>{f.attempts}/3</TD>
-                      <TD mono color="var(--color-error)">{f.lastScore}%</TD>
-                      <td className="px-4 py-3"><span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: sc.bg, color: sc.text }}>{f.status === 'locked' ? 'Kilitli' : 'Başarısız'}</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </TableWrapper>
-        </TabsContent>
-
-        {/* 6. Süre Analizi */}
-        <TabsContent value="duration" className="mt-6 space-y-6">
-          <ChartCard title="Ortalama Süre Karşılaştırması (dakika)" icon={<Clock className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />}>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={durationData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} unit=" dk" />
-                  <YAxis dataKey="training" type="category" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} width={120} />
-                  <Tooltip contentStyle={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px', fontFamily: 'var(--font-mono)', fontSize: '12px' }} />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="avgVideoMin" name="Video Süresi" fill="var(--color-primary)" radius={[0, 4, 4, 0]} barSize={16} />
-                  <Bar dataKey="avgExamMin" name="Sınav Süresi" fill="var(--color-accent)" radius={[0, 4, 4, 0]} barSize={16} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </ChartCard>
-          <TableWrapper>
-            <table className="w-full text-sm">
-              <thead><tr style={{ borderBottom: '1px solid var(--color-border)' }}><TH>Eğitim</TH><TH>Ort. Video (dk)</TH><TH>Ort. Sınav (dk)</TH><TH>Ort. Toplam (dk)</TH></tr></thead>
-              <tbody>
-                {durationData.map((d) => (
-                  <tr key={d.training} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <TD><span className="font-medium">{d.training}</span></TD>
-                    <TD mono>{d.avgVideoMin}</TD><TD mono>{d.avgExamMin}</TD>
-                    <TD mono><strong>{d.avgTotalMin}</strong></TD>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableWrapper>
-        </TabsContent>
-      </Tabs>
+      {activeTab === 'duration' && (
+        <div className="space-y-6">
+          {durationData.length > 0 ? (
+            <BlurFade delay={0.05}>
+              <ChartCard title="Ortalama Süre Karşılaştırması (dakika)" icon={<Clock className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />}>
+                <div className="h-[320px]">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <BarChart data={durationData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} unit=" dk" />
+                      <YAxis dataKey="training" type="category" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} width={100} />
+                      <Tooltip contentStyle={chartTooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      <Bar dataKey="video" name="Video Süresi" fill="var(--color-primary)" radius={[0, 6, 6, 0]} barSize={18} />
+                      <Bar dataKey="sinav" name="Sınav Süresi" fill="var(--color-accent)" radius={[0, 6, 6, 0]} barSize={18} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </ChartCard>
+            </BlurFade>
+          ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz süre verisi yok</p>}
+        </div>
+      )}
     </div>
   );
 }

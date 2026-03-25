@@ -11,7 +11,7 @@ export function useAuth() {
 
   const fullName = user ? `${user.firstName} ${user.lastName}` : '';
   const initials = user
-    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
     : '';
 
   return {
