@@ -19,7 +19,6 @@ export async function GET(request: Request) {
     include: {
       training: {
         include: {
-          videos: { select: { id: true, title: true, durationSeconds: true, sortOrder: true }, orderBy: { sortOrder: 'asc' } },
           _count: { select: { questions: true, videos: true } },
         },
       },
@@ -28,5 +27,46 @@ export async function GET(request: Request) {
     orderBy: { assignedAt: 'desc' },
   })
 
-  return jsonResponse(assignments)
+  const now = new Date()
+
+  const result = assignments.map(a => {
+    const t = a.training
+    const latestAttempt = a.examAttempts[0]
+
+    // Calculate progress: 3 steps (pre-exam, videos, post-exam)
+    let completedSteps = 0
+    const preExamDone = a.examAttempts.some(att => att.preExamCompletedAt !== null)
+    const videosDone = a.examAttempts.some(att => att.videosCompletedAt !== null)
+    const postExamDone = a.examAttempts.some(att => att.postExamCompletedAt !== null)
+    if (preExamDone) completedSteps++
+    if (videosDone) completedSteps++
+    if (postExamDone) completedSteps++
+    const progress = Math.round((completedSteps / 3) * 100)
+
+    // Days left until deadline
+    const deadline = t.endDate
+    let daysLeft: number | undefined
+    if (deadline) {
+      const diff = deadline.getTime() - now.getTime()
+      daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+    }
+
+    // Score from latest completed attempt
+    const score = latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : undefined
+
+    return {
+      id: a.id,
+      title: t.title,
+      category: t.category ?? '',
+      status: a.status,
+      attempt: a.examAttempts.length,
+      maxAttempts: t.maxAttempts,
+      deadline: deadline ? deadline.toLocaleDateString('tr-TR') : '',
+      progress,
+      daysLeft,
+      score,
+    }
+  })
+
+  return jsonResponse(result)
 }

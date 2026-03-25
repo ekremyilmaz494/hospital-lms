@@ -23,7 +23,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const video = await prisma.trainingVideo.findUnique({ where: { id: body.videoId } })
   if (!video) return errorResponse('Video not found', 404)
 
-  const isCompleted = parsed.data.watchedSeconds >= video.durationSeconds
+  // watchedSeconds & lastPositionSeconds: video suresiyle sinirla
+  const safeWatchedSeconds = Math.min(parsed.data.watchedSeconds, video.durationSeconds)
+  const safeLastPosition = Math.min(Math.max(parsed.data.lastPositionSeconds, 0), video.durationSeconds)
+
+  // Onceki ilerlemeyi kontrol et (geri sarma engelleme)
+  const existing = await prisma.videoProgress.findUnique({
+    where: { attemptId_videoId: { attemptId, videoId: body.videoId } },
+  })
+  const finalWatchedSeconds = existing
+    ? Math.max(safeWatchedSeconds, existing.watchedSeconds)
+    : safeWatchedSeconds
+
+  const isCompleted = finalWatchedSeconds >= video.durationSeconds
 
   const progress = await prisma.videoProgress.upsert({
     where: { attemptId_videoId: { attemptId, videoId: body.videoId } },
@@ -31,15 +43,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       attemptId,
       videoId: body.videoId,
       userId: dbUser!.id,
-      watchedSeconds: parsed.data.watchedSeconds,
+      watchedSeconds: finalWatchedSeconds,
       totalSeconds: video.durationSeconds,
-      lastPositionSeconds: parsed.data.lastPositionSeconds,
+      lastPositionSeconds: safeLastPosition,
       isCompleted,
       ...(isCompleted && { completedAt: new Date() }),
     },
     update: {
-      watchedSeconds: parsed.data.watchedSeconds,
-      lastPositionSeconds: parsed.data.lastPositionSeconds,
+      watchedSeconds: finalWatchedSeconds,
+      lastPositionSeconds: safeLastPosition,
       isCompleted,
       ...(isCompleted && { completedAt: new Date() }),
     },

@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { submitExamSchema } from '@/lib/validations'
-import { checkRateLimit } from '@/lib/redis'
+import { checkRateLimit, isExamExpired } from '@/lib/redis'
 
 /** Submit pre-exam or post-exam answers */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,6 +25,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   })
 
   if (!attempt) return errorResponse('Attempt not found', 404)
+
+  // Post-exam fazinda timer kontrolu
+  if (attempt.status === 'post_exam') {
+    const expired = await isExamExpired(attemptId)
+    if (expired) return errorResponse('Sinav suresi doldu. Cevaplar kabul edilemiyor.', 403)
+  }
 
   const phase = attempt.status === 'pre_exam' ? 'pre' : 'post'
 

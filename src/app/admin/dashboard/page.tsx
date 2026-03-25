@@ -4,21 +4,7 @@ import {
   Users, GraduationCap, TrendingUp, AlertTriangle, Trophy, Activity, Clock, ArrowRight,
   Plus, Send, Download, Shield, Building2, CalendarClock, UserPlus,
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
-
-const AreaChart = dynamic(() => import('recharts').then(m => m.AreaChart), { ssr: false }) as typeof import('recharts').AreaChart;
-const Area = dynamic(() => import('recharts').then(m => m.Area), { ssr: false }) as typeof import('recharts').Area;
-const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false }) as typeof import('recharts').BarChart;
-const Bar = dynamic(() => import('recharts').then(m => m.Bar), { ssr: false }) as typeof import('recharts').Bar;
-const PieChart = dynamic(() => import('recharts').then(m => m.PieChart), { ssr: false }) as typeof import('recharts').PieChart;
-const Pie = dynamic(() => import('recharts').then(m => m.Pie), { ssr: false }) as typeof import('recharts').Pie;
-const Cell = dynamic(() => import('recharts').then(m => m.Cell), { ssr: false }) as typeof import('recharts').Cell;
-const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false }) as typeof import('recharts').XAxis;
-const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false }) as typeof import('recharts').YAxis;
-const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false }) as typeof import('recharts').CartesianGrid;
-const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false }) as typeof import('recharts').Tooltip;
-const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false }) as typeof import('recharts').ResponsiveContainer;
-const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: false }) as typeof import('recharts').Legend;
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from '@/components/shared/recharts';
 import Link from 'next/link';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
@@ -93,7 +79,7 @@ export default function AdminDashboard() {
             <Link
               key={a.label}
               href={a.href}
-              className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 active:scale-95 active:duration-75"
+              className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 active:scale-95 active:duration-75"
               style={{ background: `${a.color}10`, color: a.color, border: `1px solid ${a.color}20` }}
             >
               <a.icon className="h-4 w-4" />
@@ -115,7 +101,7 @@ export default function AdminDashboard() {
               <p className="text-sm font-semibold text-white">{overdueTrainings.length} personelin eğitimi gecikmiş, {expiringCerts.filter(c => c.daysLeft <= 7).length} sertifika süresi dolmak üzere!</p>
               <p className="text-xs text-white/60">Acil müdahale gerekiyor.</p>
             </div>
-            <Link href="/admin/reports" className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:scale-105" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
+            <Link href="/admin/reports" className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-transform duration-200 hover:scale-105" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
               Detayları Gör <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -170,7 +156,7 @@ export default function AdminDashboard() {
                           <Cell key={i} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={chartTooltipStyle} formatter={(value: number, name: string) => [`${value} (${totalAssignments > 0 ? Math.round(value / totalAssignments * 100) : 0}%)`, name]} />
+                      <Tooltip contentStyle={chartTooltipStyle} formatter={(value: unknown, name: unknown) => [`${Number(value)} (${totalAssignments > 0 ? Math.round(Number(value) / totalAssignments * 100) : 0}%)`, String(name)]} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>

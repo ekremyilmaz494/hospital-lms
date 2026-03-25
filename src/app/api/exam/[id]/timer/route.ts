@@ -42,10 +42,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   // Auto-complete if expired (only if not already completed)
   if (expired) {
-    await prisma.examAttempt.updateMany({
+    const expiredAttempts = await prisma.examAttempt.findMany({
       where: { id: attemptId, userId: dbUser!.id, status: { in: ['pre_exam', 'post_exam'] } },
-      data: { status: 'completed', postExamCompletedAt: new Date() },
+      select: { id: true, assignmentId: true, assignment: { select: { currentAttempt: true, maxAttempts: true } } },
     })
+
+    if (expiredAttempts.length > 0) {
+      await prisma.examAttempt.updateMany({
+        where: { id: { in: expiredAttempts.map(a => a.id) } },
+        data: { status: 'completed', postExamCompletedAt: new Date(), isPassed: false },
+      })
+
+      // Assignment durumunu guncelle
+      for (const att of expiredAttempts) {
+        const newStatus = att.assignment.currentAttempt >= att.assignment.maxAttempts ? 'failed' : 'assigned'
+        await prisma.trainingAssignment.update({
+          where: { id: att.assignmentId },
+          data: { status: newStatus },
+        })
+      }
+    }
   }
 
   return jsonResponse({ remainingSeconds: remaining ?? 0, expired })

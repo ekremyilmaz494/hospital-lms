@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const { page, limit, skip } = safePagination(searchParams)
 
-  const where = { organizationId: dbUser!.organizationId }
+  const where = { organizationId: dbUser!.organizationId! }
 
   const [notifications, total] = await Promise.all([
     prisma.notification.findMany({
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   const notification = await prisma.notification.create({
     data: {
       ...parsed.data,
-      organizationId: dbUser!.organizationId,
+      organizationId: dbUser!.organizationId!,
     },
   })
 
@@ -63,14 +63,14 @@ export async function PUT(request: Request) {
   if (!body?.title || !body?.message) return errorResponse('Title and message required')
 
   const staffUsers = await prisma.user.findMany({
-    where: { organizationId: dbUser!.organizationId, role: 'staff', isActive: true },
+    where: { organizationId: dbUser!.organizationId!, role: 'staff', isActive: true },
     select: { id: true },
   })
 
   const result = await prisma.notification.createMany({
     data: staffUsers.map(u => ({
       userId: u.id,
-      organizationId: dbUser!.organizationId,
+      organizationId: dbUser!.organizationId!,
       title: body.title,
       message: body.message,
       type: body.type ?? 'announcement',

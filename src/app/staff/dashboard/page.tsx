@@ -129,7 +129,7 @@ export default function StaffDashboard() {
             </div>
             <Link
               href={`/staff/my-trainings/${urgentTraining.id}`}
-              className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:scale-105"
+              className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-transform duration-200 hover:scale-105"
               style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}
             >
               <Play className="h-4 w-4" /> Devam Et
@@ -176,7 +176,7 @@ export default function StaffDashboard() {
                     <Link
                       key={t.id}
                       href={`/staff/my-trainings/${t.id}`}
-                      className="flex items-center gap-4 rounded-xl p-3.5 transition-all duration-200 group"
+                      className="flex items-center gap-4 rounded-xl p-3.5 transition-[transform,opacity,background-color] duration-200 group"
                       style={{ border: '1px solid var(--color-border)' }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-hover)'; e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}
@@ -189,7 +189,7 @@ export default function StaffDashboard() {
                         <p className="text-sm font-semibold truncate">{t.title}</p>
                         <div className="mt-1.5 flex items-center gap-2">
                           <div className="h-1.5 w-20 rounded-full" style={{ background: 'var(--color-border)' }}>
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${t.progress ?? 0}%`, background: st.text }} />
+                            <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${t.progress ?? 0}%`, background: st.text }} />
                           </div>
                           <span className="text-[11px] font-mono font-medium" style={{ color: 'var(--color-text-muted)' }}>{t.progress ?? 0}%</span>
                         </div>

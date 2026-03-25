@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const limit = Number(searchParams.get('limit') ?? '50')
   const entityType = searchParams.get('entityType')
 
-  const where: Record<string, unknown> = { organizationId: dbUser!.organizationId }
+  const where: Record<string, unknown> = { organizationId: dbUser!.organizationId! }
   if (entityType) where.entityType = entityType
 
   const [logs, total] = await Promise.all([

@@ -90,7 +90,7 @@ export default function MyTrainingsPage() {
           const CardWrapper = isActive ? MagicCard : ('div' as React.ElementType);
           const cardProps = isActive
             ? { gradientColor: `${catColor}15`, gradientOpacity: 0.5, className: 'rounded-2xl border overflow-hidden', style: { background: 'var(--color-surface)', borderColor: 'var(--color-border)' } }
-            : { className: 'rounded-2xl border overflow-hidden transition-all duration-200 hover:-translate-y-1', style: { background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' } };
+            : { className: 'rounded-2xl border overflow-hidden transition-[transform,box-shadow] duration-200 hover:-translate-y-1', style: { background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' } };
 
           return (
             <BlurFade key={t.id} delay={0.1 + idx * 0.06}>
@@ -135,7 +135,7 @@ export default function MyTrainingsPage() {
                       </div>
                       <div className="h-2.5 w-full rounded-full" style={{ background: 'var(--color-border)' }}>
                         <div
-                          className="h-full rounded-full transition-all duration-700"
+                          className="h-full rounded-full transition-[width] duration-700"
                           style={{ width: `${t.progress ?? 0}%`, background: `linear-gradient(90deg, ${catColor}, ${sc.text})` }}
                         />
                       </div>

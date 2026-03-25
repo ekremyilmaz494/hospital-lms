@@ -11,7 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (roleError) return roleError
 
   const training = await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId },
+    where: { id, organizationId: dbUser!.organizationId! },
     include: {
       videos: { orderBy: { sortOrder: 'asc' } },
       questions: { include: { options: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } },
@@ -44,7 +44,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const parsed = updateTrainingSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const existing = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId } })
+  const existing = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!existing) return errorResponse('Training not found', 404)
 
   const data: Record<string, unknown> = { ...parsed.data }
@@ -55,7 +55,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+    organizationId: dbUser!.organizationId!,
     action: 'update',
     entityType: 'training',
     entityId: id,
@@ -75,15 +75,22 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  const existing = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId } })
+  const existing = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!existing) return errorResponse('Training not found', 404)
 
-  await prisma.training.delete({ where: { id } })
+  // Soft delete: isActive false yap, cascade silme yerine veri korunur
+  await prisma.training.update({ where: { id }, data: { isActive: false } })
+
+  // Aktif atamalari iptal et (assigned/in_progress → locked)
+  await prisma.trainingAssignment.updateMany({
+    where: { trainingId: id, status: { in: ['assigned', 'in_progress'] } },
+    data: { status: 'locked' },
+  })
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
-    action: 'delete',
+    organizationId: dbUser!.organizationId!,
+    action: 'deactivate',
     entityType: 'training',
     entityId: id,
     oldData: existing,

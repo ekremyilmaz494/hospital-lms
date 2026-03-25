@@ -73,7 +73,7 @@ export function PageHeader({ title, subtitle, badge, action, secondaryAction }: 
             {action && (
               <button
                 onClick={action.onClick}
-                className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+                className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
                 style={{
                   background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
                   boxShadow: '0 4px 14px rgba(var(--color-primary-rgb), 0.3)',

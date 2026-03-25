@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (roleError) return roleError
 
   // Verify training belongs to org
-  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId } })
+  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!training) return errorResponse('Training not found', 404)
 
   const body = await parseBody(request)

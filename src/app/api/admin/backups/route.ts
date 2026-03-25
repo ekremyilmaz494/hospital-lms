@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   if (roleError) return roleError
 
   const backups = await prisma.dbBackup.findMany({
-    where: { organizationId: dbUser!.organizationId },
+    where: { organizationId: dbUser!.organizationId! },
     orderBy: { createdAt: 'desc' },
   })
 

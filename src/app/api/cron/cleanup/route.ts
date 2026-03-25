@@ -28,10 +28,10 @@ export async function GET(request: Request) {
   })
 
   if (staleAttemptsList.length > 0) {
-    // Mark attempts as expired
+    // Mark attempts as expired with explicit score=0 to avoid null confusion in reports
     await prisma.examAttempt.updateMany({
       where: { id: { in: staleAttemptsList.map(a => a.id) } },
-      data: { status: 'completed' },
+      data: { status: 'expired', isPassed: false, postExamScore: 0, postExamCompletedAt: new Date() },
     })
 
     // Update related TrainingAssignment statuses

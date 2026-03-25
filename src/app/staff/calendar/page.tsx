@@ -80,7 +80,7 @@ export default function CalendarPage() {
               return (
                 <div
                   key={day}
-                  className="relative min-h-24 rounded-xl border p-2.5 transition-all duration-150 cursor-default"
+                  className="relative min-h-24 rounded-xl border p-2.5 transition-colors duration-150 cursor-default"
                   style={{
                     borderColor: isToday ? 'var(--color-primary)' : 'var(--color-border)',
                     background: isToday ? 'var(--color-primary-light)' : 'transparent',

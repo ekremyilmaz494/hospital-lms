@@ -42,6 +42,9 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# Uploaded files (dev only)
+/public/uploads/
+
 # Screenshots (dev only)
 /screenshots/
 

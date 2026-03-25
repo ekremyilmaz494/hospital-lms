@@ -49,7 +49,7 @@ export default function TrainingDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = typeof params?.id === 'string' ? params.id : null;
-  const { data: training, isLoading, error, mutate } = useFetch<TrainingDetail>(id ? `/api/admin/trainings/${id}` : null);
+  const { data: training, isLoading, error, refetch } = useFetch<TrainingDetail>(id ? `/api/admin/trainings/${id}` : null);
   const [activeTab, setActiveTab] = useState('staff');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
 
@@ -125,7 +125,7 @@ export default function TrainingDetailPage() {
         open={assignModalOpen}
         onOpenChange={setAssignModalOpen}
         onSuccess={() => {
-          mutate(); // refresh data
+          refetch(); // refresh data
         }}
       />
 

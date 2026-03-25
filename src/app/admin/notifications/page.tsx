@@ -36,7 +36,7 @@ export default function NotificationsPage() {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
   }
 
-  const notifications = Array.isArray(data) ? data : (data as Record<string, unknown>)?.notifications as typeof data ?? [];
+  const notifications = Array.isArray(data) ? data : ((data as unknown as Record<string, unknown>)?.notifications as typeof data) ?? [];
   const unreadCount = Array.isArray(notifications) ? notifications.filter(n => !n.isRead).length : 0;
 
   const markAllRead = async () => {
@@ -85,7 +85,7 @@ export default function NotificationsPage() {
             const Icon = cfg.icon;
             return (
               <BlurFade key={n.id} delay={0.1 + i * 0.05}>
-                <div className="group flex items-start gap-4 rounded-2xl border p-5 transition-all duration-200" style={{ background: n.isRead ? 'var(--color-surface)' : cfg.bg, borderColor: 'var(--color-border)', boxShadow: n.isRead ? 'none' : 'var(--shadow-sm)' }}>
+                <div className="group flex items-start gap-4 rounded-2xl border p-5 transition-colors duration-200" style={{ background: n.isRead ? 'var(--color-surface)' : cfg.bg, borderColor: 'var(--color-border)', boxShadow: n.isRead ? 'none' : 'var(--shadow-sm)' }}>
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: `${cfg.color}15` }}>
                     <Icon className="h-5 w-5" style={{ color: cfg.color }} />
                   </div>

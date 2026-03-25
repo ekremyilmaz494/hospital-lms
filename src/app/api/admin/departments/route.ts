@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+    organizationId: dbUser!.organizationId!,
     action: 'department.create',
     entityType: 'department',
     entityId: department.id,

@@ -64,7 +64,8 @@ export async function deleteObject(key: string) {
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
 }
 
-/** Generate video storage key */
+/** Generate video storage key (filename sanitized against path traversal) */
 export function videoKey(orgId: string, trainingId: string, filename: string) {
-  return `videos/${orgId}/${trainingId}/${Date.now()}-${filename}`
+  const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.{2,}/g, '_')
+  return `videos/${orgId}/${trainingId}/${Date.now()}-${safe}`
 }

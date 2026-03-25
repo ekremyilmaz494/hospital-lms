@@ -376,14 +376,27 @@ export default function NewTrainingPage() {
                         type="file"
                         accept="video/mp4,video/webm"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
                             if (file.size > 500 * 1024 * 1024) {
                               toast('Dosya boyutu 500MB sınırını aşıyor', 'error');
                               return;
                             }
-                            setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: URL.createObjectURL(file), file } : v));
+                            // Show uploading state
+                            setVideos(prev => prev.map(v => v.id === video.id ? { ...v, file, url: '' } : v));
+                            try {
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              const res = await fetch('/api/upload/video', { method: 'POST', body: formData });
+                              if (!res.ok) throw new Error('Upload failed');
+                              const data = await res.json();
+                              setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: data.url, file } : v));
+                              toast('Video yüklendi', 'success');
+                            } catch {
+                              toast('Video yüklenemedi', 'error');
+                              setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
+                            }
                           }
                         }}
                       />
@@ -404,7 +417,7 @@ export default function NewTrainingPage() {
                               {video.file.name}
                             </p>
                             <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                              {(video.file.size / (1024 * 1024)).toFixed(2)} MB • Hazır
+                              {(video.file.size / (1024 * 1024)).toFixed(2)} MB • {video.url ? 'Yüklendi ✓' : 'Yükleniyor...'}
                             </p>
                           </>
                         ) : (

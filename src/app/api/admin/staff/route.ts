@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const isActive = searchParams.get('isActive')
 
   const where: Record<string, unknown> = {
-    organizationId: dbUser!.organizationId,
+    organizationId: dbUser!.organizationId!,
     role: 'staff',
   }
 
@@ -49,12 +49,43 @@ export async function GET(request: Request) {
     }),
   ])
 
+  // Auto-fix: department alanında UUID olan ama departmentId null olan kullanıcıları düzelt
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const deptMap = new Map(rawDepartments.map(d => [d.id, d.name]))
+  const fixPromises = staff
+    .filter(s => !s.departmentId && s.department && uuidRegex.test(s.department) && deptMap.has(s.department))
+    .map(s => prisma.user.update({
+      where: { id: s.id },
+      data: { departmentId: s.department!, department: deptMap.get(s.department!) },
+    }))
+  if (fixPromises.length > 0) {
+    await Promise.all(fixPromises)
+    // Update staff objects in-place with fixed data
+    for (const s of staff) {
+      if (!s.departmentId && s.department && uuidRegex.test(s.department) && deptMap.has(s.department)) {
+        s.departmentId = s.department
+        s.department = deptMap.get(s.department) ?? s.department
+      }
+    }
+  }
+
+  // Count staff per department (including those fixed above)
+  const deptStaffCount = new Map<string, number>()
+  const allOrgStaff = await prisma.user.findMany({
+    where: { organizationId: dbUser!.organizationId!, role: 'staff' },
+    select: { departmentId: true, department: true },
+  })
+  for (const s of allOrgStaff) {
+    const dId = s.departmentId || (s.department && uuidRegex.test(s.department) ? s.department : null)
+    if (dId) deptStaffCount.set(dId, (deptStaffCount.get(dId) || 0) + 1)
+  }
+
   const departments = rawDepartments.map(d => ({
     id: d.id,
     name: d.name,
     color: d.color,
     description: d.description || '',
-    staffCount: d._count.users
+    staffCount: deptStaffCount.get(d.id) || 0,
   }))
 
   const activeStaff = staff.filter(s => s.isActive).length
@@ -72,8 +103,8 @@ export async function GET(request: Request) {
     name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
     email: s.email,
     tcNo: s.tcNo || '',
-    department: departments.find(d => d.id === s.department)?.name || s.department || '',
-    departmentId: s.department,
+    department: departments.find(d => d.id === s.departmentId)?.name || s.department || '',
+    departmentId: s.departmentId,
     title: s.title || '',
     assignedTrainings: s._count.assignments || 0,
     completedTrainings: 0,
@@ -99,7 +130,7 @@ export async function POST(request: Request) {
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')
 
-  const parsed = createUserSchema.safeParse({ ...body as object, role: 'staff', organizationId: dbUser!.organizationId })
+  const parsed = createUserSchema.safeParse({ ...body as object, role: 'staff', organizationId: dbUser!.organizationId! })
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const supabase = await createServiceClient()
@@ -111,7 +142,7 @@ export async function POST(request: Request) {
       first_name: parsed.data.firstName,
       last_name: parsed.data.lastName,
       role: 'staff',
-      organization_id: dbUser!.organizationId,
+      organization_id: dbUser!.organizationId!,
     },
   })
 
@@ -126,7 +157,7 @@ export async function POST(request: Request) {
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
         role: 'staff',
-        organizationId: dbUser!.organizationId,
+        organizationId: dbUser!.organizationId!,
         tcNo: parsed.data.tcNo,
         phone: parsed.data.phone,
         departmentId: parsed.data.departmentId,
@@ -144,7 +175,7 @@ export async function POST(request: Request) {
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+    organizationId: dbUser!.organizationId!,
     action: 'create',
     entityType: 'user',
     entityId: user.id,

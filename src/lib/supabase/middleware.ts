@@ -64,6 +64,9 @@ export async function updateSession(request: NextRequest) {
   if (pathname.startsWith('/staff') && role !== 'staff') {
     return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
   }
+  if (pathname.startsWith('/exam') && role !== 'staff') {
+    return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+  }
 
   return supabaseResponse
   } catch {

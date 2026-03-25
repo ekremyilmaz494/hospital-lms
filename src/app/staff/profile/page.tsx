@@ -115,7 +115,7 @@ export default function ProfilePage() {
             duration={10}
           >
             <div className="relative mx-auto mb-5 h-28 w-28">
-              <Avatar className="h-28 w-28 ring-4" style={{ ringColor: 'var(--color-primary-light)' }}>
+              <Avatar className="h-28 w-28 ring-4" style={{ '--tw-ring-color': 'var(--color-primary-light)' } as React.CSSProperties}>
                 <AvatarFallback className="text-3xl font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}>
                   {displayInitials}
                 </AvatarFallback>

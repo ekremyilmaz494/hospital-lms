@@ -42,7 +42,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     await createAuditLog({
       userId: dbUser!.id,
-      organizationId: dbUser!.organizationId,
+      organizationId: dbUser!.organizationId!,
       action: 'department.members.add',
       entityType: 'department',
       entityId: departmentId,
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     await createAuditLog({
       userId: dbUser!.id,
-      organizationId: dbUser!.organizationId,
+      organizationId: dbUser!.organizationId!,
       action: 'department.members.remove',
       entityType: 'department',
       entityId: departmentId,

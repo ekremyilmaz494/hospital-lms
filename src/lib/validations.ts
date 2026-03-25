@@ -40,7 +40,7 @@ export const createUserSchema = z.object({
 export const updateUserSchema = createUserSchema.omit({ password: true, email: true }).partial()
 
 // ── Training ──
-export const createTrainingSchema = z.object({
+const trainingBaseSchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().optional(),
   category: z.string().max(100).optional(),
@@ -52,7 +52,53 @@ export const createTrainingSchema = z.object({
   endDate: z.string().datetime(),
 })
 
-export const updateTrainingSchema = createTrainingSchema.partial()
+export const createTrainingSchema = trainingBaseSchema.refine(
+  data => new Date(data.endDate) > new Date(data.startDate),
+  { message: 'Bitis tarihi baslangic tarihinden sonra olmali', path: ['endDate'] }
+)
+
+export const updateTrainingSchema = trainingBaseSchema.partial().refine(
+  data => {
+    if (data.startDate && data.endDate) {
+      return new Date(data.endDate) > new Date(data.startDate)
+    }
+    return true
+  },
+  { message: 'Bitis tarihi baslangic tarihinden sonra olmali', path: ['endDate'] }
+)
+
+// ── Training Wizard Body (videos, questions, assignments) ──
+const trainingVideoInputSchema = z.object({
+  title: z.string().max(500).optional(),
+  url: z.string().optional(),
+  durationSeconds: z.number().int().positive().optional(),
+})
+
+const trainingQuestionInputSchema = z.object({
+  text: z.string().min(1),
+  points: z.coerce.number().int().min(1).default(10),
+  correct: z.coerce.number().int().min(0),
+  options: z.array(z.string().min(1)).min(2).max(6),
+})
+
+export const createTrainingBodySchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().optional(),
+  category: z.string().max(100).optional(),
+  thumbnailUrl: z.string().url().optional(),
+  passingScore: z.number().int().min(0).max(100).default(70),
+  maxAttempts: z.number().int().min(1).max(10).default(3),
+  examDurationMinutes: z.number().int().min(5).max(180).default(30),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  videos: z.array(trainingVideoInputSchema).optional(),
+  questions: z.array(trainingQuestionInputSchema).optional(),
+  selectedDepts: z.array(z.string()).optional(),
+  excludedStaff: z.array(z.string().uuid()).optional(),
+}).refine(
+  data => new Date(data.endDate) > new Date(data.startDate),
+  { message: 'Bitis tarihi baslangic tarihinden sonra olmali', path: ['endDate'] }
+)
 
 // ── Question ──
 export const createQuestionSchema = z.object({

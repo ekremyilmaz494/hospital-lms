@@ -56,16 +56,16 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
     s.department.toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleStaff = (id: string, checked: boolean) => {
-    if (checked) {
+  const toggleStaff = (id: string, newChecked: boolean) => {
+    if (newChecked) {
       setSelectedStaff(prev => [...prev, id]);
     } else {
       setSelectedStaff(prev => prev.filter(s => s !== id));
     }
   };
 
-  const toggleAll = (checked: boolean) => {
-    if (checked) {
+  const toggleAll = (newChecked: boolean) => {
+    if (newChecked) {
       setSelectedStaff(filteredStaff.map(s => s.id));
     } else {
       setSelectedStaff([]);
@@ -114,7 +114,7 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4 min-h-[300px]">
+        <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4 min-h-75">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
@@ -134,24 +134,41 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
               <div className="text-center p-8 text-sm" style={{ color: 'var(--color-text-muted)' }}>Personel bulunamadı</div>
             ) : (
               <div className="divide-y relative" style={{ borderColor: 'var(--color-border)' }}>
-                <div className="sticky top-0 z-10 p-3 flex items-center gap-3 backdrop-blur-md" style={{ background: 'var(--color-surface)99', borderBottom: '1px solid var(--color-border)' }}>
-                  <Checkbox 
-                    checked={selectedStaff.length === filteredStaff.length && filteredStaff.length > 0} 
-                    onCheckedChange={(checked) => toggleAll(checked as boolean)}
+                <div
+                  className="sticky top-0 z-10 p-3 flex items-center gap-3 backdrop-blur-md cursor-pointer select-none"
+                  style={{ background: 'var(--color-surface)99', borderBottom: '1px solid var(--color-border)' }}
+                >
+                  <Checkbox
+                    checked={filteredStaff.length > 0 && filteredStaff.every(s => selectedStaff.includes(s.id))}
+                    onCheckedChange={(newChecked) => toggleAll(!!newChecked)}
                   />
-                  <span className="text-sm font-semibold">Tümünü Seç ({filteredStaff.length})</span>
+                  <span
+                    className="text-sm font-semibold flex-1"
+                    onClick={() => {
+                      const allSelected = filteredStaff.length > 0 && filteredStaff.every(s => selectedStaff.includes(s.id));
+                      toggleAll(!allSelected);
+                    }}
+                  >
+                    Tümünü Seç ({filteredStaff.length})
+                  </span>
                 </div>
                 {filteredStaff.map(s => (
-                  <label key={s.id} className="flex items-center gap-3 p-3 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-                    <Checkbox 
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-3 p-3 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                  >
+                    <Checkbox
                       checked={selectedStaff.includes(s.id)}
-                      onCheckedChange={(checked) => toggleStaff(s.id, checked as boolean)}
+                      onCheckedChange={(newChecked) => toggleStaff(s.id, !!newChecked)}
                     />
-                    <div>
+                    <div
+                      className="flex-1"
+                      onClick={() => toggleStaff(s.id, !selectedStaff.includes(s.id))}
+                    >
                       <p className="text-sm font-medium">{s.name}</p>
                       <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{s.department}</p>
                     </div>
-                  </label>
+                  </div>
                 ))}
               </div>
             )}

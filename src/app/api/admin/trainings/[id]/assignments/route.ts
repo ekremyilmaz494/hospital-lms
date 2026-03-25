@@ -36,7 +36,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = createAssignmentSchema.safeParse({ ...body as object, trainingId: id })
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId } })
+  if (!dbUser!.organizationId) return errorResponse('Organization not found', 403)
+  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!training) return errorResponse('Training not found', 404)
 
   // Create assignments for all users (skip existing)
@@ -62,7 +63,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await prisma.notification.createMany({
     data: newUserIds.map(userId => ({
       userId,
-      organizationId: dbUser!.organizationId,
+      organizationId: dbUser!.organizationId!,
       title: 'Yeni Eğitim Atandı',
       message: `"${training.title}" eğitimi size atandı.`,
       type: 'assignment',
@@ -72,7 +73,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+    organizationId: dbUser!.organizationId!,
     action: 'assign',
     entityType: 'training_assignment',
     entityId: id,

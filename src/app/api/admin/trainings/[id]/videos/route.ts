@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId } })
+  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!training) return errorResponse('Training not found', 404)
 
   const body = await parseBody<{
@@ -61,7 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+    organizationId: dbUser!.organizationId!,
     action: 'upload',
     entityType: 'training_video',
     entityId: video.id,
@@ -86,7 +86,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!videoId) return errorResponse('videoId required')
 
   // Verify training belongs to admin's organization
-  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId } })
+  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!training) return errorResponse('Training not found', 404)
 
   const video = await prisma.trainingVideo.findFirst({

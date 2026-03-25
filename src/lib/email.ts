@@ -72,7 +72,7 @@ export function examResultEmail(staffName: string, trainingTitle: string, score:
   `
 }
 
-export function welcomeEmail(name: string, email: string, tempPassword: string) {
+export function welcomeEmail(name: string, email: string, resetLink: string) {
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
@@ -84,13 +84,13 @@ export function welcomeEmail(name: string, email: string, tempPassword: string) 
         <p style="color: #64748b;">Hastane LMS hesabiniz olusturulmustur.</p>
         <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
           <p style="margin: 4px 0; color: #475569;"><strong>E-posta:</strong> ${email}</p>
-          <p style="margin: 4px 0; color: #475569;"><strong>Gecici Sifre:</strong> ${tempPassword}</p>
         </div>
-        <p style="color: #64748b; font-size: 13px;">Ilk girisinde sifrenizi degistirmeniz onemle tavsiye edilir.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/auth/login"
+        <p style="color: #64748b;">Hesabiniza erisim icin asagidaki butona tiklayarak sifrenizi belirleyin:</p>
+        <a href="${resetLink}"
            style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Giris Yap
+          Sifremi Belirle
         </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu link 24 saat icerisinde gecerliliginizi yitirecektir.</p>
       </div>
     </div>
   `

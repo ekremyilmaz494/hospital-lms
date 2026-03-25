@@ -96,7 +96,7 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [form, setForm] = useState({ ad: '', soyad: '', email: '', tc: '', telefon: '', departman: '', unvan: '' });
+  const [form, setForm] = useState({ ad: '', soyad: '', email: '', sifre: '', tc: '', telefon: '', departman: '', unvan: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
@@ -105,6 +105,8 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
     if (!form.soyad.trim()) e.soyad = 'Soyad zorunludur';
     if (!form.email.trim()) e.email = 'E-posta zorunludur';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Geçerli bir e-posta girin';
+    if (!form.sifre.trim()) e.sifre = 'Şifre zorunludur';
+    else if (form.sifre.length < 8) e.sifre = 'Şifre en az 8 karakter olmalıdır';
     if (form.tc && !/^\d{11}$/.test(form.tc)) e.tc = 'TC Kimlik No 11 haneli olmalıdır';
     if (form.telefon && !/^0\d{10}$/.test(form.telefon.replace(/\s/g, ''))) e.telefon = 'Geçerli telefon formatı: 05XX XXX XX XX';
     if (!form.departman) e.departman = 'Departman seçiniz';
@@ -127,7 +129,7 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
           phone: form.telefon || undefined,
           departmentId: form.departman || undefined,
           title: form.unvan || undefined,
-          password: 'Hastane123!', // Varsayılan geçici şifre
+          password: form.sifre,
         }),
       });
       if (!res.ok) {
@@ -187,10 +189,17 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
                 {errors.soyad && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.soyad}</p>}
               </div>
             </div>
-            <div>
-              <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>E-posta *</Label>
-              <Input type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} style={fieldStyle('email')} />
-              {errors.email && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.email}</p>}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>E-posta *</Label>
+                <Input type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} style={fieldStyle('email')} />
+                {errors.email && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.email}</p>}
+              </div>
+              <div>
+                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Şifre *</Label>
+                <Input type="password" placeholder="En az 8 karakter" className="h-10" value={form.sifre} onChange={(e) => setForm(f => ({ ...f, sifre: e.target.value }))} style={fieldStyle('sifre')} />
+                {errors.sifre && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.sifre}</p>}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -260,9 +269,7 @@ export default function StaffPage() {
     return <PageLoading />;
   }
 
-  if (error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
-  }
+  // API hatası olsa bile sayfayı boş veri ile render et (backend henüz yapılandırılmamış olabilir)
 
   const allStaff = data?.staff ?? [];
   const allDepartments = data?.departments ?? [];
@@ -374,7 +381,7 @@ export default function StaffPage() {
             <button
               key={v.key}
               onClick={() => { setActiveView(v.key); setSelectedDept(null); }}
-              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150"
+              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150"
               style={{
                 background: activeView === v.key ? 'var(--color-primary)' : 'transparent',
                 color: activeView === v.key ? 'white' : 'var(--color-text-muted)',
@@ -477,7 +484,7 @@ export default function StaffPage() {
                 {!showAddDept ? (
                   <button
                     onClick={() => setShowAddDept(true)}
-                    className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 transition-all duration-200 hover:border-solid"
+                    className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 transition-colors duration-200 hover:border-solid"
                     style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.color = 'var(--color-primary)'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}

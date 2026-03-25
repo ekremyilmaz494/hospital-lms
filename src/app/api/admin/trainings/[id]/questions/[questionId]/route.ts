@@ -15,7 +15,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   // Verify training belongs to admin's organization
   const training = await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId },
+    where: { id, organizationId: dbUser!.organizationId! },
   })
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
@@ -54,7 +54,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   // Verify training belongs to admin's organization
   const training = await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId },
+    where: { id, organizationId: dbUser!.organizationId! },
   })
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 

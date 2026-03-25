@@ -108,7 +108,7 @@ export default function StaffNotificationsPage() {
           return (
             <BlurFade key={n.id} delay={0.1 + i * 0.05}>
               <div
-                className="group flex items-start gap-4 rounded-2xl border p-5 transition-all duration-200"
+                className="group flex items-start gap-4 rounded-2xl border p-5 transition-colors duration-200"
                 style={{
                   background: n.isRead ? 'var(--color-surface)' : cfg.bg,
                   borderColor: n.isRead ? 'var(--color-border)' : 'var(--color-border)',

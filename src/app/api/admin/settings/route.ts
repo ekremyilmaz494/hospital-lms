@@ -11,9 +11,9 @@ export async function GET() {
 
   // Organizasyon adını DB'den çek
   let hospitalName = ''
-  if (dbUser!.organizationId) {
+  if (dbUser!.organizationId!) {
     const org = await prisma.organization.findUnique({
-      where: { id: dbUser!.organizationId },
+      where: { id: dbUser!.organizationId! },
       select: { name: true, logoUrl: true },
     })
     hospitalName = org?.name ?? ''

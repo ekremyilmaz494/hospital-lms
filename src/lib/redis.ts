@@ -37,13 +37,13 @@ export async function clearExamTimer(attemptId: string) {
 
 export async function checkRateLimit(key: string, maxRequests: number, windowSeconds: number): Promise<boolean> {
   try {
-    const current = await redis.incr(`ratelimit:${key}`)
-    if (current === 1) {
-      await redis.expire(`ratelimit:${key}`, windowSeconds)
-    }
+    const k = `ratelimit:${key}`
+    // SET NX+EX atomik: key yoksa olustur ve TTL ata (tek cagrida)
+    await redis.set(k, 0, { nx: true, ex: windowSeconds })
+    const current = await redis.incr(k)
     return current <= maxRequests
   } catch {
-    // Redis bağlantısı yoksa rate limit bypass (fail-open)
+    // Redis baglantisi yoksa rate limit bypass (fail-open)
     return true
   }
 }

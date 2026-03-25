@@ -85,7 +85,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+    organizationId: dbUser!.organizationId!,
     action: 'department.update',
     entityType: 'department',
     entityId: id,
@@ -123,7 +123,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+    organizationId: dbUser!.organizationId!,
     action: 'department.delete',
     entityType: 'department',
     entityId: id,

@@ -70,7 +70,7 @@ export default function StaffDetailPage() {
             <button onClick={() => router.back()} className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-150" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <Avatar className="h-14 w-14 ring-4" style={{ ringColor: 'var(--color-primary-light)' }}>
+            <Avatar className="h-14 w-14 ring-4" style={{ '--tw-ring-color': 'var(--color-primary-light)' } as React.CSSProperties}>
               <AvatarFallback className="text-lg font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}>{staff.initials}</AvatarFallback>
             </Avatar>
             <div>

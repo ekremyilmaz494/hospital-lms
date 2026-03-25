@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pnpm dev          # Start dev server (Next.js 16, webpack mode)
+pnpm dev          # Start dev server (Next.js 16, Turbopack)
 pnpm build        # Production build
 pnpm lint         # ESLint (flat config, next core-web-vitals + typescript)
 pnpm start        # Serve production build
@@ -24,10 +24,14 @@ pnpm db:generate  # Generate client (outputs to src/generated/prisma)
 pnpm db:migrate   # Run migrations (prisma/migrations/)
 pnpm db:studio    # Open DB GUI
 
-# Seed scripts
+# Seed & DB scripts
 node scripts/seed-demo.js        # Seed demo data
 npx tsx scripts/seed-users.ts    # Seed users
+node scripts/apply-rls.js        # Apply RLS policies to Supabase
 ```
+
+## Pre-commit hooks
+Husky + lint-staged runs `scripts/secret-scanner.js` on all staged files before every commit. If it detects secrets (API keys, tokens), the commit is blocked.
 
 ## Architecture
 

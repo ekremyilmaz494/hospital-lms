@@ -77,7 +77,7 @@ export default function ReportsPage() {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
           return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200" style={{ background: isActive ? 'var(--color-primary)' : 'transparent', color: isActive ? 'white' : 'var(--color-text-muted)', boxShadow: isActive ? '0 2px 8px rgba(var(--color-primary-rgb), 0.3)' : 'none' }}>
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-200" style={{ background: isActive ? 'var(--color-primary)' : 'transparent', color: isActive ? 'white' : 'var(--color-text-muted)', boxShadow: isActive ? '0 2px 8px rgba(var(--color-primary-rgb), 0.3)' : 'none' }}>
               <Icon className="h-4 w-4" />
               {tab.label}
               {tab.id === 'failure' && failureData.length > 0 && (
@@ -163,7 +163,7 @@ export default function ReportsPage() {
                           <td className="px-4 py-4 text-sm font-mono">{t.tamamlayan}</td>
                           <td className="px-4 py-4"><span className="text-sm font-mono font-semibold" style={{ color: 'var(--color-success)' }}>{t.basarili}</span>{t.basarisiz > 0 && <span className="text-xs ml-1.5" style={{ color: 'var(--color-error)' }}>(-{t.basarisiz})</span>}</td>
                           <td className="px-4 py-4 text-sm font-mono font-semibold">{t.ort}%</td>
-                          <td className="px-4 py-4"><div className="flex items-center gap-3"><div className="h-2 w-20 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}><div className="h-full rounded-full transition-all duration-500" style={{ width: `${rate}%`, background: rateColor }} /></div><span className="text-xs font-bold font-mono" style={{ color: rateColor }}>{rate}%</span></div></td>
+                          <td className="px-4 py-4"><div className="flex items-center gap-3"><div className="h-2 w-20 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}><div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${rate}%`, background: rateColor }} /></div><span className="text-xs font-bold font-mono" style={{ color: rateColor }}>{rate}%</span></div></td>
                         </tr>
                       );
                     })}
@@ -230,11 +230,11 @@ export default function ReportsPage() {
                   {departmentData.map((d) => {
                     const isGood = d.tamamlanma >= 80;
                     return (
-                      <div key={d.dept} className="rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-1" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+                      <div key={d.dept} className="rounded-2xl border p-5 transition-[transform,box-shadow] duration-200 hover:-translate-y-1" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
                         <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full" style={{ background: d.color }} /><span className="text-sm font-bold">{d.dept}</span></div><span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>{d.personel} kişi</span></div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between"><span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Tamamlanma</span><span className="text-sm font-bold font-mono" style={{ color: isGood ? 'var(--color-success)' : 'var(--color-warning)' }}>{d.tamamlanma}%</span></div>
-                          <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}><div className="h-full rounded-full transition-all duration-700" style={{ width: `${d.tamamlanma}%`, background: isGood ? 'var(--color-success)' : 'var(--color-warning)' }} /></div>
+                          <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}><div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${d.tamamlanma}%`, background: isGood ? 'var(--color-success)' : 'var(--color-warning)' }} /></div>
                           <div className="flex items-center justify-between pt-1"><span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Ort. Puan</span><span className="text-xs font-semibold font-mono">{d.ortPuan}%</span></div>
                         </div>
                         {d.basarisiz > 0 && <div className="mt-3 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={{ background: 'var(--color-error-bg)' }}><AlertTriangle className="h-3 w-3" style={{ color: 'var(--color-error)' }} /><span className="text-[11px] font-semibold" style={{ color: 'var(--color-error)' }}>{d.basarisiz} başarısız</span></div>}
