@@ -1,0 +1,337 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── ABONELIK PLANLARI ──
+model SubscriptionPlan {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @db.VarChar(100)
+  slug            String   @unique @db.VarChar(50)
+  description     String?  @db.Text
+  maxStaff        Int?     @map("max_staff")
+  maxTrainings    Int?     @map("max_trainings")
+  maxStorageGb    Int      @default(10) @map("max_storage_gb")
+  priceMonthly    Decimal? @db.Decimal(10, 2) @map("price_monthly")
+  priceAnnual     Decimal? @db.Decimal(10, 2) @map("price_annual")
+  features        Json     @default("[]")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  subscriptions   OrganizationSubscription[]
+
+  @@map("subscription_plans")
+}
+
+// ── HASTANELER ──
+model Organization {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @db.VarChar(255)
+  code            String   @unique @db.VarChar(50)
+  address         String?  @db.Text
+  phone           String?  @db.VarChar(20)
+  email           String?  @db.VarChar(255)
+  logoUrl         String?  @db.Text @map("logo_url")
+  isActive        Boolean  @default(true) @map("is_active")
+  isSuspended     Boolean  @default(false) @map("is_suspended")
+  suspendedReason String?  @db.Text @map("suspended_reason")
+  suspendedAt     DateTime? @map("suspended_at") @db.Timestamptz
+  createdBy       String?  @db.Uuid @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  users           User[]
+  trainings       Training[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  dbBackups       DbBackup[]
+  subscription    OrganizationSubscription?
+
+  @@map("organizations")
+}
+
+// ── HASTANE ABONELİKLERİ ──
+model OrganizationSubscription {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @unique @db.Uuid @map("organization_id")
+  planId          String   @db.Uuid @map("plan_id")
+  status          String   @default("trial") @db.VarChar(20)
+  billingCycle    String?  @db.VarChar(10) @map("billing_cycle")
+  trialEndsAt     DateTime? @map("trial_ends_at") @db.Timestamptz
+  startedAt       DateTime @default(now()) @map("started_at") @db.Timestamptz
+  expiresAt       DateTime? @map("expires_at") @db.Timestamptz
+  notes           String?  @db.Text
+  createdBy       String?  @db.Uuid @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan            SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@map("organization_subscriptions")
+}
+
+// ── KULLANICILAR ──
+model User {
+  id              String   @id @db.Uuid
+  organizationId  String?  @db.Uuid @map("organization_id")
+  email           String   @unique @db.VarChar(255)
+  firstName       String   @db.VarChar(100) @map("first_name")
+  lastName        String   @db.VarChar(100) @map("last_name")
+  tcNo            String?  @unique @db.VarChar(11) @map("tc_no")
+  phone           String?  @db.VarChar(20)
+  department      String?  @db.VarChar(100)
+  title           String?  @db.VarChar(100)
+  role            String   @db.VarChar(20)
+  avatarUrl       String?  @db.Text @map("avatar_url")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  createdTrainings Training[]   @relation("TrainingCreator")
+  assignments     TrainingAssignment[] @relation("AssignedUser")
+  assignedBy      TrainingAssignment[] @relation("AssignedByUser")
+  examAttempts    ExamAttempt[]
+  videoProgress   VideoProgress[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+
+  @@index([organizationId], map: "idx_users_org")
+  @@index([role], map: "idx_users_role")
+  @@map("users")
+}
+
+// ── EĞİTİMLER ──
+model Training {
+  id                  String   @id @default(uuid()) @db.Uuid
+  organizationId      String   @db.Uuid @map("organization_id")
+  title               String   @db.VarChar(500)
+  description         String?  @db.Text
+  category            String?  @db.VarChar(100)
+  thumbnailUrl        String?  @db.Text @map("thumbnail_url")
+  passingScore        Int      @default(70) @map("passing_score")
+  maxAttempts         Int      @default(3) @map("max_attempts")
+  examDurationMinutes Int      @default(30) @map("exam_duration_minutes")
+  startDate           DateTime @map("start_date") @db.Timestamptz
+  endDate             DateTime @map("end_date") @db.Timestamptz
+  isActive            Boolean  @default(true) @map("is_active")
+  createdById         String?  @db.Uuid @map("created_by")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  createdBy           User?        @relation("TrainingCreator", fields: [createdById], references: [id])
+  videos              TrainingVideo[]
+  questions           Question[]
+  assignments         TrainingAssignment[]
+  examAttempts        ExamAttempt[]
+  notifications       Notification[]
+
+  @@index([organizationId], map: "idx_trainings_org")
+  @@index([startDate, endDate], map: "idx_trainings_dates")
+  @@map("trainings")
+}
+
+// ── EĞİTİM VİDEOLARI ──
+model TrainingVideo {
+  id              String   @id @default(uuid()) @db.Uuid
+  trainingId      String   @db.Uuid @map("training_id")
+  title           String   @db.VarChar(500)
+  description     String?  @db.Text
+  videoUrl        String   @db.Text @map("video_url")
+  videoKey        String   @db.Text @map("video_key")
+  durationSeconds Int      @map("duration_seconds")
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  training        Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  videoProgress   VideoProgress[]
+
+  @@map("training_videos")
+}
+
+// ── SORULAR ──
+model Question {
+  id              String   @id @default(uuid()) @db.Uuid
+  trainingId      String   @db.Uuid @map("training_id")
+  questionText    String   @db.Text @map("question_text")
+  questionType    String   @default("multiple_choice") @db.VarChar(20) @map("question_type")
+  points          Int      @default(10)
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  training        Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  options         QuestionOption[]
+  examAnswers     ExamAnswer[]
+
+  @@map("questions")
+}
+
+// ── ŞIKLAR ──
+model QuestionOption {
+  id              String   @id @default(uuid()) @db.Uuid
+  questionId      String   @db.Uuid @map("question_id")
+  optionText      String   @db.Text @map("option_text")
+  isCorrect       Boolean  @default(false) @map("is_correct")
+  sortOrder       Int      @default(0) @map("sort_order")
+
+  question        Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  examAnswers     ExamAnswer[]
+
+  @@map("question_options")
+}
+
+// ── EĞİTİM ATAMALARI ──
+model TrainingAssignment {
+  id              String    @id @default(uuid()) @db.Uuid
+  trainingId      String    @db.Uuid @map("training_id")
+  userId          String    @db.Uuid @map("user_id")
+  status          String    @default("assigned") @db.VarChar(30)
+  currentAttempt  Int       @default(0) @map("current_attempt")
+  maxAttempts     Int       @default(3) @map("max_attempts")
+  assignedById    String?   @db.Uuid @map("assigned_by")
+  assignedAt      DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz
+
+  training        Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  user            User     @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy      User?    @relation("AssignedByUser", fields: [assignedById], references: [id])
+  examAttempts    ExamAttempt[]
+
+  @@unique([trainingId, userId])
+  @@index([userId], map: "idx_assignments_user")
+  @@index([trainingId], map: "idx_assignments_training")
+  @@index([status], map: "idx_assignments_status")
+  @@map("training_assignments")
+}
+
+// ── SINAV DENEMELERİ ──
+model ExamAttempt {
+  id                    String    @id @default(uuid()) @db.Uuid
+  assignmentId          String    @db.Uuid @map("assignment_id")
+  userId                String    @db.Uuid @map("user_id")
+  trainingId            String    @db.Uuid @map("training_id")
+  attemptNumber         Int       @map("attempt_number")
+  preExamScore          Decimal?  @db.Decimal(5, 2) @map("pre_exam_score")
+  postExamScore         Decimal?  @db.Decimal(5, 2) @map("post_exam_score")
+  preExamStartedAt      DateTime? @map("pre_exam_started_at") @db.Timestamptz
+  preExamCompletedAt    DateTime? @map("pre_exam_completed_at") @db.Timestamptz
+  postExamStartedAt     DateTime? @map("post_exam_started_at") @db.Timestamptz
+  postExamCompletedAt   DateTime? @map("post_exam_completed_at") @db.Timestamptz
+  videosCompletedAt     DateTime? @map("videos_completed_at") @db.Timestamptz
+  isPassed              Boolean   @default(false) @map("is_passed")
+  status                String    @default("pre_exam") @db.VarChar(30)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  assignment            TrainingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user                  User               @relation(fields: [userId], references: [id])
+  training              Training           @relation(fields: [trainingId], references: [id])
+  examAnswers           ExamAnswer[]
+  videoProgress         VideoProgress[]
+
+  @@index([assignmentId], map: "idx_attempts_assignment")
+  @@index([userId], map: "idx_attempts_user")
+  @@map("exam_attempts")
+}
+
+// ── SINAV CEVAPLARI ──
+model ExamAnswer {
+  id               String   @id @default(uuid()) @db.Uuid
+  attemptId        String   @db.Uuid @map("attempt_id")
+  questionId       String   @db.Uuid @map("question_id")
+  selectedOptionId String?  @db.Uuid @map("selected_option_id")
+  isCorrect        Boolean? @map("is_correct")
+  examPhase        String   @db.VarChar(10) @map("exam_phase")
+  answeredAt       DateTime @default(now()) @map("answered_at") @db.Timestamptz
+
+  attempt          ExamAttempt    @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question         Question       @relation(fields: [questionId], references: [id])
+  selectedOption   QuestionOption? @relation(fields: [selectedOptionId], references: [id])
+
+  @@map("exam_answers")
+}
+
+// ── VİDEO İZLEME TAKİBİ ──
+model VideoProgress {
+  id                  String    @id @default(uuid()) @db.Uuid
+  attemptId           String    @db.Uuid @map("attempt_id")
+  videoId             String    @db.Uuid @map("video_id")
+  userId              String    @db.Uuid @map("user_id")
+  watchedSeconds      Int       @default(0) @map("watched_seconds")
+  totalSeconds        Int       @map("total_seconds")
+  isCompleted         Boolean   @default(false) @map("is_completed")
+  lastPositionSeconds Int       @default(0) @map("last_position_seconds")
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  attempt             ExamAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  video               TrainingVideo @relation(fields: [videoId], references: [id])
+  user                User          @relation(fields: [userId], references: [id])
+
+  @@unique([attemptId, videoId])
+  @@map("video_progress")
+}
+
+// ── BİLDİRİMLER ──
+model Notification {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @db.Uuid @map("user_id")
+  organizationId    String?  @db.Uuid @map("organization_id")
+  title             String   @db.VarChar(500)
+  message           String   @db.Text
+  type              String   @db.VarChar(50)
+  relatedTrainingId String?  @db.Uuid @map("related_training_id")
+  isRead            Boolean  @default(false) @map("is_read")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization      Organization? @relation(fields: [organizationId], references: [id])
+  relatedTraining   Training?     @relation(fields: [relatedTrainingId], references: [id])
+
+  @@index([userId, isRead], map: "idx_notifications_user")
+  @@map("notifications")
+}
+
+// ── DENETİM KAYITLARI ──
+model AuditLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String?  @db.Uuid @map("user_id")
+  organizationId  String?  @db.Uuid @map("organization_id")
+  action          String   @db.VarChar(100)
+  entityType      String   @db.VarChar(50) @map("entity_type")
+  entityId        String?  @db.Uuid @map("entity_id")
+  oldData         Json?    @map("old_data")
+  newData         Json?    @map("new_data")
+  ipAddress       String?  @db.VarChar(45) @map("ip_address")
+  userAgent       String?  @db.Text @map("user_agent")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user            User?         @relation(fields: [userId], references: [id])
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+
+  @@index([userId], map: "idx_audit_logs_user")
+  @@index([entityType, entityId], map: "idx_audit_logs_entity")
+  @@index([createdAt], map: "idx_audit_logs_date")
+  @@map("audit_logs")
+}
+
+// ── VERİTABANI YEDEKLERİ ──
+model DbBackup {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String?  @db.Uuid @map("organization_id")
+  backupType      String   @db.VarChar(20) @map("backup_type")
+  fileUrl         String   @db.Text @map("file_url")
+  fileSizeMb      Decimal? @db.Decimal(10, 2) @map("file_size_mb")
+  status          String   @default("completed") @db.VarChar(20)
+  createdById     String?  @db.Uuid @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+
+  @@map("db_backups")
+}
