@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 
-export async function GET(request: Request) {
+export async function GET() {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
@@ -9,11 +9,9 @@ export async function GET(request: Request) {
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId!
-  const { searchParams } = new URL(request.url)
-  const tab = searchParams.get('tab') ?? 'overview'
 
-  if (tab === 'overview') {
-    const [staffCount, trainingCount, assignmentStats, avgScore] = await Promise.all([
+  try {
+    const [staffCount, trainingCount, assignmentStatusGroups, avgScoreResult, trainings, staff, departments] = await Promise.all([
       prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
       prisma.training.count({ where: { organizationId: orgId, isActive: true } }),
       prisma.trainingAssignment.groupBy({
@@ -25,70 +23,159 @@ export async function GET(request: Request) {
         where: { training: { organizationId: orgId }, postExamScore: { not: null } },
         _avg: { postExamScore: true },
       }),
+      // Training-based report
+      prisma.training.findMany({
+        where: { organizationId: orgId },
+        include: {
+          assignments: {
+            include: { examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true } } },
+          },
+          videos: { select: { durationSeconds: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      // Staff-based report
+      prisma.user.findMany({
+        where: { organizationId: orgId, role: 'staff' },
+        include: {
+          assignments: {
+            include: { examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true, status: true } } },
+          },
+          departmentRel: { select: { name: true } },
+        },
+      }),
+      // Departments
+      prisma.department.findMany({
+        where: { organizationId: orgId },
+        include: {
+          users: {
+            where: { role: 'staff', isActive: true },
+            include: {
+              assignments: { select: { status: true } },
+            },
+          },
+        },
+      }),
     ])
 
+    const statusMap = Object.fromEntries(assignmentStatusGroups.map(s => [s.status, s._count]))
+    const totalAssignments = assignmentStatusGroups.reduce((sum, s) => sum + s._count, 0)
+    const passedCount = statusMap['passed'] ?? 0
+    const failedCount = statusMap['failed'] ?? 0
+    const avgScore = avgScoreResult._avg.postExamScore ? Math.round(Number(avgScoreResult._avg.postExamScore)) : 0
+    const completionRate = totalAssignments > 0 ? Math.round((passedCount / totalAssignments) * 100) : 0
+
+    // Overview stats
+    const overviewStats = [
+      { title: 'Aktif Eğitim', value: trainingCount, icon: 'GraduationCap', accentColor: 'var(--color-primary)', trend: { value: totalAssignments, label: 'atama', isPositive: true } },
+      { title: 'Aktif Personel', value: staffCount, icon: 'Users', accentColor: 'var(--color-info)' },
+      { title: 'Başarı Oranı', value: `%${completionRate}`, icon: 'Target', accentColor: 'var(--color-success)', trend: { value: passedCount, label: 'başarılı', isPositive: true } },
+      { title: 'Ortalama Puan', value: avgScore, icon: 'Award', accentColor: 'var(--color-accent)', trend: { value: failedCount, label: 'başarısız', isPositive: false } },
+    ]
+
+    // Monthly data (last 6 months from assignments)
+    const now = new Date()
+    const allAssignments = trainings.flatMap(t => t.assignments)
+    const monthlyData = []
+    for (let i = 5; i >= 0; i--) {
+      const start = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
+      const monthAssigns = allAssignments.filter(a => {
+        const d = new Date(a.assignedAt)
+        return d >= start && d < end
+      })
+      monthlyData.push({
+        month: start.toLocaleDateString('tr-TR', { month: 'short' }),
+        tamamlanan: monthAssigns.filter(a => a.status === 'passed').length,
+        basarisiz: monthAssigns.filter(a => a.status === 'failed').length,
+      })
+    }
+
+    // Training-based data
+    const trainingData = trainings.map(t => {
+      const scores = t.assignments
+        .map(a => a.examAttempts[0]?.postExamScore)
+        .filter(s => s != null)
+        .map(Number)
+      return {
+        name: t.title,
+        atanan: t.assignments.length,
+        tamamlayan: t.assignments.filter(a => a.status === 'passed').length,
+        basarili: t.assignments.filter(a => a.status === 'passed').length,
+        basarisiz: t.assignments.filter(a => a.status === 'failed').length,
+        ort: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
+      }
+    })
+
+    // Staff performance
+    const staffPerformance = staff.map(s => {
+      const completed = s.assignments.filter(a => a.status === 'passed').length
+      const scores = s.assignments
+        .map(a => a.examAttempts[0]?.postExamScore)
+        .filter(sc => sc != null)
+        .map(Number)
+      const avg = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+      const statusLabel = avg >= 80 ? 'Yıldız' : avg >= 50 ? 'Normal' : s.assignments.length > 0 ? 'Risk' : 'Yeni'
+      return {
+        name: `${s.firstName} ${s.lastName}`,
+        dept: s.departmentRel?.name ?? s.department ?? '',
+        completed,
+        avgScore: avg,
+        status: statusLabel,
+        color: statusLabel === 'Yıldız' ? 'var(--color-success)' : statusLabel === 'Risk' ? 'var(--color-error)' : 'var(--color-info)',
+      }
+    })
+
+    // Department data
+    const departmentData = departments.map(d => {
+      const totalDeptAssignments = d.users.flatMap(u => u.assignments)
+      const passedDept = totalDeptAssignments.filter(a => a.status === 'passed').length
+      const failedDept = totalDeptAssignments.filter(a => a.status === 'failed').length
+      return {
+        dept: d.name,
+        personel: d.users.length,
+        tamamlanma: totalDeptAssignments.length > 0 ? Math.round((passedDept / totalDeptAssignments.length) * 100) : 0,
+        ortPuan: 0, // Would need exam scores — simplified
+        basarisiz: failedDept,
+        color: d.color || 'var(--color-primary)',
+      }
+    })
+
+    // Failure data
+    const failureData = staff.flatMap(s =>
+      s.assignments
+        .filter(a => a.status === 'failed')
+        .map(a => {
+          const lastScore = a.examAttempts[0]?.postExamScore ? Number(a.examAttempts[0].postExamScore) : 0
+          return {
+            name: `${s.firstName} ${s.lastName}`,
+            dept: s.departmentRel?.name ?? s.department ?? '',
+            training: '', // Would need training join
+            attempts: a.examAttempts.length,
+            lastScore,
+            status: 'failed',
+          }
+        })
+    )
+
+    // Duration data
+    const durationData = trainings.map(t => ({
+      training: t.title,
+      video: t.videos.reduce((sum, v) => sum + v.durationSeconds, 0),
+      sinav: (t.examDurationMinutes ?? 30) * 60,
+    }))
+
     return jsonResponse({
-      staffCount,
-      trainingCount,
-      assignmentStats: Object.fromEntries(assignmentStats.map(s => [s.status, s._count])),
-      avgScore: avgScore._avg.postExamScore ? Number(avgScore._avg.postExamScore) : 0,
+      overviewStats,
+      monthlyData,
+      trainingData,
+      staffPerformance,
+      departmentData,
+      failureData,
+      durationData,
     })
+  } catch (err) {
+    console.error('[Reports API Error]', err)
+    return errorResponse('Rapor verileri alınamadı', 503)
   }
-
-  if (tab === 'trainings') {
-    const trainings = await prisma.training.findMany({
-      where: { organizationId: orgId },
-      include: {
-        _count: { select: { assignments: true } },
-        assignments: {
-          select: { status: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    return jsonResponse(trainings.map(t => ({
-      ...t,
-      completionRate: t.assignments.length > 0
-        ? Math.round((t.assignments.filter(a => a.status === 'passed').length / t.assignments.length) * 100)
-        : 0,
-      assignments: undefined,
-    })))
-  }
-
-  if (tab === 'staff') {
-    const staff = await prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff' },
-      include: {
-        assignments: { include: { examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1 } } },
-      },
-    })
-
-    return jsonResponse(staff.map(s => ({
-      id: s.id,
-      firstName: s.firstName,
-      lastName: s.lastName,
-      department: s.department,
-      totalAssignments: s.assignments.length,
-      completed: s.assignments.filter(a => a.status === 'passed').length,
-      failed: s.assignments.filter(a => a.status === 'failed').length,
-      inProgress: s.assignments.filter(a => ['assigned', 'in_progress'].includes(a.status)).length,
-    })))
-  }
-
-  if (tab === 'exams') {
-    const attempts = await prisma.examAttempt.findMany({
-      where: { training: { organizationId: orgId } },
-      include: {
-        user: { select: { firstName: true, lastName: true } },
-        training: { select: { title: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    })
-
-    return jsonResponse(attempts)
-  }
-
-  return jsonResponse([])
 }

@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { submitExamSchema } from '@/lib/validations'
-import { checkRateLimit, isExamExpired } from '@/lib/redis'
+import { checkRateLimit, clearExamTimer } from '@/lib/redis'
+
 
 /** Submit pre-exam or post-exam answers */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -17,19 +18,36 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!body) return errorResponse('Invalid body')
 
   const parsed = submitExamSchema.safeParse(body)
-  if (!parsed.success) return errorResponse(parsed.error.message)
+  if (!parsed.success) {
+    console.error('[Submit Validation Error]', JSON.stringify(parsed.error.issues), 'Body keys:', Object.keys(body as object))
+    return errorResponse(parsed.error.message)
+  }
 
-  const attempt = await prisma.examAttempt.findFirst({
+  // Try as attemptId first, then as assignmentId
+  let attempt = await prisma.examAttempt.findFirst({
     where: { id: attemptId, userId: dbUser!.id },
     include: { training: true, assignment: true },
   })
+  if (!attempt) {
+    attempt = await prisma.examAttempt.findFirst({
+      where: { assignmentId: attemptId, userId: dbUser!.id, status: { not: 'completed' } },
+      include: { training: true, assignment: true },
+      orderBy: { attemptNumber: 'desc' },
+    })
+  }
 
-  if (!attempt) return errorResponse('Attempt not found', 404)
+  if (!attempt) return errorResponse('Aktif sınav denemesi bulunamadı. Sınavı yeniden başlatın.', 404)
+  if (attempt.status === 'completed') return errorResponse('Bu deneme zaten tamamlanmış', 400)
 
-  // Post-exam fazinda timer kontrolu
-  if (attempt.status === 'post_exam') {
-    const expired = await isExamExpired(attemptId)
-    if (expired) return errorResponse('Sinav suresi doldu. Cevaplar kabul edilemiyor.', 403)
+  // Server-side timer check — reject submissions more than 5 minutes past exam duration
+  const phaseStartedAt = attempt.status === 'pre_exam' ? attempt.preExamStartedAt : attempt.postExamStartedAt
+  if (phaseStartedAt && attempt.training.examDurationMinutes) {
+    const allowedMs = (attempt.training.examDurationMinutes + 5) * 60 * 1000 // +5 min grace
+    const elapsed = Date.now() - new Date(phaseStartedAt).getTime()
+    if (elapsed > allowedMs) {
+      console.warn(`[Submit] Late submission rejected: attempt=${attempt.id}, elapsed=${Math.round(elapsed / 60000)}min`)
+      return errorResponse('Sınav süresi çoktan dolmuş. Bu gönderim kabul edilemez.', 403)
+    }
   }
 
   const phase = attempt.status === 'pre_exam' ? 'pre' : 'post'
@@ -42,64 +60,65 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const questionMap = new Map(questions.map(q => [q.id, q]))
 
-  // Validate all questions are answered
-  const answeredIds = new Set(parsed.data.answers.map(a => a.questionId))
-  const unanswered = questions.filter(q => !answeredIds.has(q.id))
-  if (unanswered.length > 0) {
-    return errorResponse(`${unanswered.length} soru cevaplanmamış. Tüm soruları cevaplayınız.`)
-  }
-
-  // Validate all questionIds are real
-  const invalidIds = parsed.data.answers.filter(a => !questionMap.has(a.questionId))
-  if (invalidIds.length > 0) {
-    return errorResponse('Geçersiz soru ID\'si gönderildi.')
-  }
-
-  // Calculate score
+  // Calculate score — cevaplanmamış sorular yanlış sayılır (submit engellenmez)
   let totalPoints = 0
   let earnedPoints = 0
 
-  const answers = parsed.data.answers.map(a => {
-    const question = questionMap.get(a.questionId)
-    if (!question) return null
+  const validAnswers = parsed.data.answers
+    .filter(a => questionMap.has(a.questionId))
+    .map(a => {
+      const question = questionMap.get(a.questionId)!
+      totalPoints += question.points
+      const correctOption = question.options.find(o => o.isCorrect)
+      const isCorrect = correctOption?.id === a.selectedOptionId
+      if (isCorrect) earnedPoints += question.points
+      return {
+        attemptId: attempt.id,
+        questionId: a.questionId,
+        selectedOptionId: a.selectedOptionId,
+        isCorrect,
+        examPhase: phase,
+      }
+    })
 
-    totalPoints += question.points
-    const correctOption = question.options.find(o => o.isCorrect)
-    const isCorrect = correctOption?.id === a.selectedOptionId
-
-    if (isCorrect) earnedPoints += question.points
-
-    return {
-      attemptId,
-      questionId: a.questionId,
-      selectedOptionId: a.selectedOptionId,
-      isCorrect,
-      examPhase: phase,
+  // Cevaplanmamış soruları da toplam puana ekle (yanlış sayılır)
+  const answeredIds = new Set(parsed.data.answers.map(a => a.questionId))
+  for (const q of questions) {
+    if (!answeredIds.has(q.id)) {
+      totalPoints += q.points
     }
-  }).filter(Boolean) as {
-    attemptId: string
-    questionId: string
-    selectedOptionId: string
-    isCorrect: boolean
-    examPhase: string
-  }[]
+  }
 
   const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0
 
+  // Idempotency: check if answers already exist for this attempt+phase
+  const existingAnswers = await prisma.examAnswer.count({
+    where: { attemptId: attempt.id, examPhase: phase }
+  })
+  if (existingAnswers > 0) {
+    // Already submitted — return existing data without creating duplicates
+    if (phase === 'pre') {
+      return jsonResponse({ phase: 'pre', score: attempt.preExamScore ? Number(attempt.preExamScore) : score, nextStep: 'videos' })
+    }
+    return jsonResponse({ phase: 'post', score: attempt.postExamScore ? Number(attempt.postExamScore) : score, isPassed: attempt.isPassed, passingScore: attempt.training.passingScore })
+  }
+
   // Save answers
-  await prisma.examAnswer.createMany({ data: answers })
+  if (validAnswers.length > 0) {
+    await prisma.examAnswer.createMany({ data: validAnswers })
+  }
 
   // Update attempt based on phase
   if (phase === 'pre') {
     await prisma.examAttempt.update({
-      where: { id: attemptId },
+      where: { id: attempt.id },
       data: {
         preExamScore: score,
         preExamCompletedAt: new Date(),
         status: 'watching_videos',
       },
     })
-
+    await clearExamTimer(attempt.id)
     return jsonResponse({ phase: 'pre', score, nextStep: 'videos' })
   }
 
@@ -107,7 +126,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const isPassed = score >= attempt.training.passingScore
 
   await prisma.examAttempt.update({
-    where: { id: attemptId },
+    where: { id: attempt.id },
     data: {
       postExamScore: score,
       postExamCompletedAt: new Date(),
@@ -116,9 +135,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
   })
 
+  // Timer temizle
+  await clearExamTimer(attempt.id)
+
   // Update assignment status
   const newStatus = isPassed ? 'passed' : (
-    attempt.assignment.currentAttempt >= attempt.assignment.maxAttempts ? 'failed' : 'assigned'
+    attempt.assignment.currentAttempt >= attempt.assignment.maxAttempts ? 'failed' : 'in_progress'
   )
 
   await prisma.trainingAssignment.update({
@@ -150,7 +172,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       data: {
         userId: dbUser!.id,
         trainingId: attempt.trainingId,
-        attemptId,
+        attemptId: attempt.id,
         certificateCode: code,
       },
     })

@@ -233,7 +233,7 @@ export default function AdminDashboard() {
               {expiringCerts.length > 0 ? (
                 <div className="space-y-3">
                   {expiringCerts.map((c) => (
-                    <div key={c.name} className="flex items-center gap-3 rounded-xl p-3 transition-colors duration-150 hover:bg-[var(--color-surface-hover)]" style={{ border: '1px solid var(--color-border)' }}>
+                    <div key={c.name} className="flex items-center gap-3 rounded-xl p-3 transition-colors duration-150 hover:bg-(--color-surface-hover)" style={{ border: '1px solid var(--color-border)' }}>
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: c.status === 'critical' ? 'var(--color-error-bg)' : c.status === 'warning' ? 'var(--color-warning-bg)' : 'var(--color-success-bg)' }}>
                         <CalendarClock className="h-5 w-5" style={{ color: c.status === 'critical' ? 'var(--color-error)' : c.status === 'warning' ? 'var(--color-warning)' : 'var(--color-success)' }} />
                       </div>

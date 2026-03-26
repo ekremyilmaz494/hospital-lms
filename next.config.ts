@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 const nextConfig: NextConfig = {
+  experimental: {
+    proxyClientMaxBodySize: '512mb',
+  },
   headers: async () => [
     {
       source: '/(.*)',

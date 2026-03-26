@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Clock, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Clock, ChevronRight, AlertTriangle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -28,13 +28,126 @@ interface ExamData {
 export default function PostExamPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const { data: examData, isLoading, error } = useFetch<ExamData>(`/api/exam/${id}/questions`);
+  const { data: examData, isLoading, error } = useFetch<ExamData>(`/api/exam/${id}/questions?phase=post`);
   const [currentQ, setCurrentQ] = useState(0);
+  const [maxReachedQ, setMaxReachedQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [timeLeft] = useState(1800);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [phaseChecked, setPhaseChecked] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  if (isLoading) {
+  // Phase guard — redirect if attempt is not in post_exam status
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/exam/${id}/start`, { method: 'POST' })
+      .then(res => res.json())
+      .then(attempt => {
+        if (cancelled) return;
+        if (attempt.status !== 'post_exam') {
+          if (attempt.status === 'pre_exam') router.replace(`/exam/${id}/pre-exam`);
+          else if (attempt.status === 'watching_videos') router.replace(`/exam/${id}/videos`);
+          else if (attempt.status === 'completed') router.replace('/staff/my-trainings');
+          return;
+        }
+        setAttemptId(attempt.id);
+        setPhaseChecked(true);
+      })
+      .catch(() => setPhaseChecked(true));
+    return () => { cancelled = true; };
+  }, [id, router]);
+
+  // Server-synced timer — fetch remaining seconds from Redis-backed endpoint
+  useEffect(() => {
+    if (!attemptId) return;
+    let cancelled = false;
+    fetch(`/api/exam/${attemptId}/timer`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled) setTimeLeft(data.remainingSeconds ?? examData?.totalTime ?? 1800);
+      })
+      .catch(() => { if (!cancelled) setTimeLeft(examData?.totalTime ?? 1800); });
+    return () => { cancelled = true; };
+  }, [attemptId]);
+
+  // Countdown interval
+  useEffect(() => {
+    if (timeLeft === null) return;
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev === null || prev <= 0) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [timeLeft !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-submit when timer hits zero
+  const handleFinishRef = useRef<() => void>(undefined);
+  useEffect(() => {
+    if (timeLeft === 0 && handleFinishRef.current) handleFinishRef.current();
+  }, [timeLeft]);
+
+  // One-way navigation helpers
+  const goNext = useCallback(() => {
+    setCurrentQ(prev => {
+      const next = prev + 1;
+      setMaxReachedQ(m => Math.max(m, next));
+      return next;
+    });
+  }, []);
+
+  const handleFinish = useCallback(async () => {
+    setSubmitting(true);
+    if (timerRef.current) clearInterval(timerRef.current);
+    try {
+      const qs = examData?.questions ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const formattedAnswers = qs.map((q: any) => {
+        const questionId = q.questionId ?? q.id ?? '';
+        const options = q.options ?? [];
+        const selectedLetter = answers[q.id];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const selectedOption = options.find((o: any) => o.id === selectedLetter);
+        return selectedOption ? { questionId: String(questionId), selectedOptionId: selectedOption.optionId ?? selectedOption.id } : null;
+      }).filter(Boolean);
+
+      const res = await fetch(`/api/exam/${id}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers: formattedAnswers, phase: 'post' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Retry once on failure (timer auto-submit may race)
+        const retry = await fetch(`/api/exam/${id}/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: formattedAnswers, phase: 'post' }),
+        });
+        const retryData = await retry.json().catch(() => ({}));
+        if (retry.ok) {
+          router.push(`/exam/${id}/transition?from=post-exam&score=${retryData.score ?? 0}&passed=${retryData.isPassed ?? false}&passingScore=${retryData.passingScore ?? 70}`);
+          return;
+        }
+        alert(`Sınav gönderilemedi: ${data.error || retryData.error || 'Bilinmeyen hata'}. Cevaplarınız kaydedilmemiş olabilir.`);
+        router.push('/staff/my-trainings');
+        return;
+      }
+      router.push(`/exam/${id}/transition?from=post-exam&score=${data.score ?? 0}&passed=${data.isPassed ?? false}&passingScore=${data.passingScore ?? 70}`);
+    } catch (err) {
+      alert('Sınav gönderilemedi — internet bağlantınızı kontrol edin. Sayfayı yenileyip tekrar deneyin.');
+      router.push('/staff/my-trainings');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [id, answers, examData, router]);
+
+  // Keep ref in sync for auto-submit on timer expiry
+  handleFinishRef.current = handleFinish;
+
+  if (isLoading || !phaseChecked) {
     return <PageLoading />;
   }
 
@@ -47,27 +160,12 @@ export default function PostExamPage() {
   }
 
   const questions = examData.questions ?? [];
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
+  const displayTime = timeLeft ?? 0;
+  const minutes = Math.floor(displayTime / 60);
+  const seconds = displayTime % 60;
   const progress = ((currentQ + 1) / questions.length) * 100;
   const q = questions[currentQ];
   const answeredCount = Object.keys(answers).length;
-
-  const handleFinish = async () => {
-    setSubmitting(true);
-    try {
-      await fetch(`/api/exam/${id}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ examType: 'post', answers }),
-      });
-    } catch {
-      // Continue navigation even if submit fails
-    } finally {
-      setSubmitting(false);
-      router.push('/staff/my-trainings');
-    }
-  };
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
@@ -105,12 +203,18 @@ export default function PostExamPage() {
                 );
               })}
             </div>
-            <div className="mt-6 flex items-center justify-between">
-              <Button variant="outline" onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0} className="gap-2" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}><ChevronLeft className="h-4 w-4" /> Önceki</Button>
+            <div className="mt-6 flex items-center justify-end">
               {currentQ < questions.length - 1 ? (
-                <Button onClick={() => setCurrentQ(currentQ + 1)} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)', transition: 'background var(--transition-fast)' }}>Sonraki <ChevronRight className="h-4 w-4" /></Button>
+                <Button onClick={goNext} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)', transition: 'background var(--transition-fast)' }}>Sonraki <ChevronRight className="h-4 w-4" /></Button>
               ) : (
-                <Button onClick={handleFinish} disabled={submitting} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-success)', transition: 'background var(--transition-fast)' }}><AlertTriangle className="h-4 w-4" /> {submitting ? 'Gönderiliyor...' : `Sınavı Bitir (${answeredCount}/${questions.length})`}</Button>
+                <div className="flex flex-col items-end gap-1">
+                  {answeredCount < questions.length && (
+                    <p className="text-[11px] font-medium" style={{ color: 'var(--color-warning)' }}>
+                      {questions.length - answeredCount} soru cevaplanmadı (yanlış sayılacak)
+                    </p>
+                  )}
+                  <Button onClick={handleFinish} disabled={submitting} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-success)', transition: 'background var(--transition-fast)' }}><AlertTriangle className="h-4 w-4" /> {submitting ? 'Gönderiliyor...' : `Sınavı Bitir (${answeredCount}/${questions.length})`}</Button>
+                </div>
               )}
             </div>
           </div>
@@ -121,9 +225,12 @@ export default function PostExamPage() {
               {questions.map((_, i) => {
                 const isAnswered = answers[questions[i]?.id ?? 0] !== undefined;
                 const isCurrent = i === currentQ;
+                const isLocked = i < currentQ;
+                const isFuture = i > maxReachedQ;
+                const isDisabled = isLocked || isFuture;
                 return (
-                  <button key={i} onClick={() => setCurrentQ(i)} className="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold" style={{ background: isCurrent ? 'var(--color-accent)' : isAnswered ? 'var(--color-success-bg)' : 'var(--color-surface-hover)', color: isCurrent ? 'white' : isAnswered ? 'var(--color-success)' : 'var(--color-text-muted)', border: `1.5px solid ${isCurrent ? 'var(--color-accent)' : isAnswered ? 'var(--color-success)' : 'var(--color-border)'}`, transition: 'background var(--transition-fast), border-color var(--transition-fast)' }}>
-                    {i + 1}
+                  <button key={i} onClick={() => { if (!isDisabled) setCurrentQ(i); }} disabled={isDisabled} className="relative flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold" style={{ background: isCurrent ? 'var(--color-accent)' : isLocked ? 'var(--color-surface-hover)' : isAnswered ? 'var(--color-success-bg)' : 'var(--color-surface-hover)', color: isCurrent ? 'white' : isLocked ? 'var(--color-text-muted)' : isAnswered ? 'var(--color-success)' : 'var(--color-text-muted)', border: `1.5px solid ${isCurrent ? 'var(--color-accent)' : isLocked ? 'var(--color-border)' : isAnswered ? 'var(--color-success)' : 'var(--color-border)'}`, opacity: isDisabled && !isCurrent ? 0.5 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer', transition: 'background var(--transition-fast), border-color var(--transition-fast)' }}>
+                    {isLocked ? <Lock className="h-3 w-3" /> : i + 1}
                   </button>
                 );
               })}

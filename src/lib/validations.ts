@@ -10,7 +10,11 @@ export const createOrganizationSchema = z.object({
   logoUrl: z.string().url().optional(),
 })
 
-export const updateOrganizationSchema = createOrganizationSchema.partial()
+export const updateOrganizationSchema = createOrganizationSchema.partial().extend({
+  isActive: z.boolean().optional(),
+  isSuspended: z.boolean().optional(),
+  suspendedReason: z.string().max(500).optional(),
+})
 
 // ── Department ──
 export const createDepartmentSchema = z.object({
@@ -24,7 +28,7 @@ export const updateDepartmentSchema = createDepartmentSchema.partial()
 
 // ── User ──
 export const createUserSchema = z.object({
-  email: z.email(),
+  email: z.string().min(1).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   password: z.string().min(8),
@@ -45,9 +49,9 @@ const trainingBaseSchema = z.object({
   description: z.string().optional(),
   category: z.string().max(100).optional(),
   thumbnailUrl: z.string().url().optional(),
-  passingScore: z.number().int().min(0).max(100).default(70),
-  maxAttempts: z.number().int().min(1).max(10).default(3),
-  examDurationMinutes: z.number().int().min(5).max(180).default(30),
+  passingScore: z.coerce.number().int().min(0).max(100).default(70),
+  maxAttempts: z.coerce.number().int().min(1).max(10).default(3),
+  examDurationMinutes: z.coerce.number().int().max(180).default(30).transform(v => v < 5 ? 30 : v),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
 })
@@ -77,7 +81,7 @@ const trainingVideoInputSchema = z.object({
 const trainingQuestionInputSchema = z.object({
   text: z.string().min(1),
   points: z.coerce.number().int().min(1).default(10),
-  correct: z.coerce.number().int().min(0),
+  correct: z.coerce.number().int().min(-1).transform(v => v < 0 ? 0 : v),
   options: z.array(z.string().min(1)).min(2).max(6),
 })
 
@@ -86,14 +90,14 @@ export const createTrainingBodySchema = z.object({
   description: z.string().optional(),
   category: z.string().max(100).optional(),
   thumbnailUrl: z.string().url().optional(),
-  passingScore: z.number().int().min(0).max(100).default(70),
-  maxAttempts: z.number().int().min(1).max(10).default(3),
-  examDurationMinutes: z.number().int().min(5).max(180).default(30),
+  passingScore: z.coerce.number().int().min(0).max(100).default(70),
+  maxAttempts: z.coerce.number().int().min(1).max(10).default(3),
+  examDurationMinutes: z.coerce.number().int().max(180).default(30).transform(v => v < 5 ? 30 : v),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   videos: z.array(trainingVideoInputSchema).optional(),
   questions: z.array(trainingQuestionInputSchema).optional(),
-  selectedDepts: z.array(z.string()).optional(),
+  selectedDepts: z.array(z.string().uuid()).optional(),
   excludedStaff: z.array(z.string().uuid()).optional(),
 }).refine(
   data => new Date(data.endDate) > new Date(data.startDate),
@@ -126,6 +130,7 @@ export const submitExamSchema = z.object({
     questionId: z.string().uuid(),
     selectedOptionId: z.string().uuid(),
   })),
+  phase: z.enum(['pre', 'post']).optional(),
 })
 
 // ── Subscription Plan ──

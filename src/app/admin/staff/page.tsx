@@ -65,7 +65,7 @@ function StaffActions({ staff }: { staff: Staff }) {
   const router = useRouter();
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg transition-colors duration-150 hover:bg-[var(--color-surface-hover)]">
+      <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg transition-colors duration-150 hover:bg-(--color-surface-hover)">
         <MoreHorizontal className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -298,7 +298,7 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-100 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} />
       <div
         className="relative w-full max-w-md rounded-2xl p-6 flex flex-col gap-4"
@@ -310,7 +310,7 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
             <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Personel Ekle</h3>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{deptName} departmanına personel ata</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-[var(--color-surface-hover)]">
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-(--color-surface-hover)">
             <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
           </button>
         </div>
@@ -560,7 +560,7 @@ export default function StaffPage() {
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger
-                          className="flex h-7 w-7 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-[var(--color-surface-hover)]"
+                          className="flex h-7 w-7 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-(--color-surface-hover)"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
@@ -644,7 +644,7 @@ export default function StaffPage() {
                   >
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-bold">Yeni Departman</h4>
-                      <button onClick={() => setShowAddDept(false)} className="rounded-md p-1 hover:bg-[var(--color-surface-hover)]">
+                      <button onClick={() => setShowAddDept(false)} className="rounded-md p-1 hover:bg-(--color-surface-hover)">
                         <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
                       </button>
                     </div>
@@ -793,7 +793,7 @@ export default function StaffPage() {
           >
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Departman Düzenle</h3>
-              <button onClick={() => setEditingDept(null)} className="rounded-lg p-2 hover:bg-[var(--color-surface-hover)]">
+              <button onClick={() => setEditingDept(null)} className="rounded-lg p-2 hover:bg-(--color-surface-hover)">
                 <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
               </button>
             </div>

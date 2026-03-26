@@ -10,6 +10,7 @@ import {
   Bell,
   History,
   Database,
+  Award,
   Calendar,
   UserCircle,
   BookOpen,
@@ -76,6 +77,7 @@ export const adminNav: NavGroup[] = [
           { title: 'Personel Listesi', href: '/admin/staff' },
         ],
       },
+      { title: 'Sertifikalar', href: '/admin/certificates', icon: Award },
       { title: 'Raporlar', href: '/admin/reports', icon: BarChart3 },
       { title: 'Bildirimler', href: '/admin/notifications', icon: Bell },
       { title: 'İşlem Geçmişi', href: '/admin/audit-logs', icon: History },
@@ -95,6 +97,7 @@ export const staffNav: NavGroup[] = [
     items: [
       { title: 'Dashboard', href: '/staff/dashboard', icon: LayoutDashboard },
       { title: 'Eğitimlerim', href: '/staff/my-trainings', icon: BookOpen },
+      { title: 'Sertifikalarım', href: '/staff/certificates', icon: Award },
       { title: 'Takvim', href: '/staff/calendar', icon: Calendar },
       { title: 'Bildirimler', href: '/staff/notifications', icon: Bell },
     ],

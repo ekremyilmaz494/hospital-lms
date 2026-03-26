@@ -13,11 +13,13 @@ interface VideoItem {
   url: string;
   duration: number;
   completed: boolean;
+  lastPosition?: number;
 }
 
 interface VideosResponse {
   trainingTitle?: string;
   videos: VideoItem[];
+  attemptStatus?: string;
 }
 
 function formatTime(seconds: number): string {
@@ -29,10 +31,31 @@ function formatTime(seconds: number): string {
 export default function VideoPlayerPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const { data, isLoading, error, refetch } = useFetch<VideosResponse>(`/api/exam/${id}/videos`);
 
-  const videosData = data?.videos ?? [];
+  // Ensure an active exam attempt exists BEFORE fetching videos (prevents race condition
+  // where GET /videos resolves before POST /start, finding a completed attempt and redirecting away)
+  const [startReady, setStartReady] = useState(false);
+  const startCalled = useRef(false);
+  useEffect(() => {
+    if (!id || startCalled.current) return;
+    startCalled.current = true;
+    fetch(`/api/exam/${id}/start`, { method: 'POST' })
+      .then(() => setStartReady(true))
+      .catch(() => setStartReady(true));
+  }, [id]);
+
+  const { data, isLoading, error, refetch } = useFetch<VideosResponse>(startReady ? `/api/exam/${id}/videos` : null);
+
+  const rawVideos = data?.videos ?? [];
   const trainingTitle = data?.trainingTitle ?? '';
+
+  // Local completed tracking — so UI updates without refetch
+  const [localCompleted, setLocalCompleted] = useState<Set<string>>(new Set());
+  const videosData = rawVideos.map(v => ({
+    ...v,
+    completed: v.completed || localCompleted.has(v.id),
+  }));
+  const videosRef = useRef(videosData);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentVideoIdx, setCurrentVideoIdx] = useState(-1);
@@ -52,6 +75,9 @@ export default function VideoPlayerPage() {
     setIsPlaying(false);
     setVideoError(false);
   }, []);
+
+  // Keep videosRef in sync
+  useEffect(() => { videosRef.current = videosData; }, [videosData]);
 
   // Set initial video index when data loads (render-time derived state)
   if (videosData.length > 0 && currentVideoIdx === -1) {
@@ -102,25 +128,42 @@ export default function VideoPlayerPage() {
     }
   }, [currentVideoIdx, videosData.length, changeVideo]);
 
-  // When video ends, mark as completed via heartbeat
+  // When video ends, mark as completed
   const [showPostExamPrompt, setShowPostExamPrompt] = useState(false);
-  const handleVideoEnded = useCallback(() => {
+  const handleVideoEnded = useCallback(() => { // eslint-disable-line
     setIsPlaying(false);
     if (!currentVideo) return;
+
+    // Use ref for fresh data (avoids stale closure)
+    const vids = videosRef.current;
+    const isLastVideo = currentVideoIdx >= vids.length - 1;
+    const remainingIncomplete = vids.filter(v => !v.completed && v.id !== currentVideo.id).length;
+
+    // Optimistic update first for instant UI feedback
+    setLocalCompleted(prev => new Set(prev).add(currentVideo.id));
+    videosRef.current = vids.map(v => v.id === currentVideo.id ? { ...v, completed: true } : v);
+
+    // Mark video as completed on server — rollback on failure
     fetch(`/api/exam/${id}/videos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ videoId: currentVideo.id, watchedTime: duration, position: duration, completed: true }),
-    }).then(() => {
-      refetch();
-      const remainingIncomplete = videosData.filter(v => !v.completed && v.id !== currentVideo.id).length;
-      if (remainingIncomplete === 0) {
-        setShowPostExamPrompt(true);
-      } else if (currentVideoIdx < videosData.length - 1) {
-        setTimeout(() => goToNextVideo(), 1500);
-      }
-    }).catch(() => {});
-  }, [currentVideo, id, duration, refetch, videosData, currentVideoIdx, goToNextVideo]);
+    }).then(res => {
+      if (!res.ok) throw new Error('Server error');
+    }).catch(() => {
+      // Rollback optimistic update
+      setLocalCompleted(prev => { const next = new Set(prev); next.delete(currentVideo.id); return next; });
+      videosRef.current = vids;
+      setHeartbeatErrors(prev => prev + 1);
+    });
+
+    // Last incomplete video → redirect to transition page (60s countdown)
+    if (remainingIncomplete === 0 || (isLastVideo && vids.filter(v => !v.completed).length <= 1)) {
+      setTimeout(() => router.push(`/exam/${id}/transition?from=videos`), 800);
+    } else if (!isLastVideo) {
+      setTimeout(() => goToNextVideo(), 1500);
+    }
+  }, [currentVideo, id, duration, currentVideoIdx, goToNextVideo, router]);
 
   // Heartbeat every 15 seconds
   const [heartbeatErrors, setHeartbeatErrors] = useState(0);
@@ -138,13 +181,16 @@ export default function VideoPlayerPage() {
     return () => clearInterval(heartbeat);
   }, [isPlaying, currentVideo?.id, currentTime, id]);
 
-  if (isLoading) {
-    return <PageLoading />;
-  }
+  // Phase guard: redirect based on attempt status (must be before early returns but after all hooks)
+  useEffect(() => {
+    if (data?.attemptStatus === 'pre_exam') router.replace(`/exam/${id}/pre-exam`);
+    else if (data?.attemptStatus === 'completed') router.replace('/staff/my-trainings');
+  }, [data?.attemptStatus, id, router]);
 
-  if (error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
-  }
+  // Show loading while start is pending OR video data is loading
+  if (!startReady || isLoading) return <PageLoading />;
+  if (error) return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  if (data?.attemptStatus === 'pre_exam' || data?.attemptStatus === 'completed') return <PageLoading />;
 
   if (videosData.length === 0) {
     return (
@@ -161,7 +207,7 @@ export default function VideoPlayerPage() {
             <Button variant="outline" onClick={() => router.back()} className="gap-2" style={{ borderColor: 'var(--color-border)' }}>
               <ArrowLeft className="h-4 w-4" /> Geri Dön
             </Button>
-            <Button onClick={() => router.push(`/exam/${id}/post-exam`)} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-primary)' }}>
+            <Button onClick={() => router.push(`/exam/${id}/transition?from=videos`)} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-primary)' }}>
               Son Sınava Geç <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
@@ -187,7 +233,7 @@ export default function VideoPlayerPage() {
             </p>
             <div className="flex flex-col gap-3">
               <Button
-                onClick={() => router.push(`/exam/${id}/post-exam`)}
+                onClick={() => router.push(`/exam/${id}/transition?from=videos`)}
                 className="w-full gap-2 py-3 font-semibold text-white rounded-xl"
                 style={{ background: 'var(--color-primary)' }}
               >
@@ -267,7 +313,14 @@ export default function VideoPlayerPage() {
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={() => {
                     const video = videoRef.current;
-                    if (video) setDuration(video.duration);
+                    if (video) {
+                      setDuration(video.duration);
+                      // Resume from last saved position
+                      if (currentVideo.lastPosition && currentVideo.lastPosition > 0) {
+                        video.currentTime = currentVideo.lastPosition;
+                        lastAllowedTime.current = currentVideo.lastPosition;
+                      }
+                    }
                   }}
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
@@ -362,7 +415,7 @@ export default function VideoPlayerPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-xs font-medium" style={{ color: isCurrent ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>{v.title}</p>
-                      <p className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>{formatTime(v.duration)}</p>
+                      <p className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>{isCurrent && duration > 0 ? formatTime(duration) : formatTime(v.duration)}</p>
                     </div>
                   </button>
                 );
@@ -372,7 +425,7 @@ export default function VideoPlayerPage() {
             {/* Next Action */}
             <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
               {allCompleted ? (
-                <Button onClick={() => router.push(`/exam/${id}/post-exam`)} className="w-full gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)' }}>
+                <Button onClick={() => router.push(`/exam/${id}/transition?from=videos`)} className="w-full gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)' }}>
                   Son Sınava Git <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : (

@@ -6,7 +6,7 @@ import {
   GraduationCap, Clock, Target, RotateCcw, Bell, BellRing, CalendarClock,
   Shield, Key, Monitor, HardDrive, Users, BookOpen, Award, Info,
   CheckCircle2, ChevronRight, Database, Cloud, Lock, Fingerprint,
-  Zap, Activity,
+  Zap, Activity, Timer,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,6 +29,7 @@ interface SettingsData {
   reminderDaysBefore: number;
   notifyOnComplete: boolean;
   notifyOnFail: boolean;
+  sessionTimeout: number;
 }
 
 interface SystemStats {
@@ -59,7 +60,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   return (
     <button
       onClick={() => onChange(!checked)}
-      className="relative h-[26px] w-[48px] shrink-0 rounded-full transition-all duration-300"
+      className="relative h-6.5 w-12 shrink-0 rounded-full transition-all duration-300"
       style={{
         background: checked
           ? 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))'
@@ -68,7 +69,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       }}
     >
       <span
-        className="absolute top-[3px] h-[20px] w-[20px] rounded-full transition-all duration-300"
+        className="absolute top-0.75 h-5 w-5 rounded-full transition-all duration-300"
         style={{
           transform: checked ? 'translateX(24px)' : 'translateX(3px)',
           background: 'white',
@@ -654,6 +655,75 @@ export default function AdminSettingsPage() {
                         <p className="text-[13px] font-bold font-mono">{item.value}</p>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Session Timeout */}
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Timer className="h-4 w-4" style={{ color: 'var(--color-warning)' }} />
+                    <h3 className="text-[13px] font-bold">Oturum Sonlandırma</h3>
+                  </div>
+                  <div
+                    className="rounded-xl p-5 space-y-4"
+                    style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                        style={{ background: 'var(--color-warning-bg)' }}
+                      >
+                        <Timer className="h-5 w-5" style={{ color: 'var(--color-warning)' }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold mb-1">İnaktivite Süresi</p>
+                        <p className="text-[11px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                          Personel belirtilen süre boyunca işlem yapmadığında oturum otomatik olarak sonlandırılır.
+                          Hastane ortamında paylaşılan bilgisayarlar için güvenlik açısından önemlidir.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 pt-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+                      <div className="relative w-48">
+                        <Input
+                          type="number"
+                          min={5}
+                          max={480}
+                          value={activeData.sessionTimeout}
+                          onChange={(e) => update({ sessionTimeout: Number(e.target.value) })}
+                          className={`${inputClass} font-mono text-lg font-bold pr-24`}
+                          style={inputStyle}
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>dakika</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[15, 30, 60, 120].map((v) => (
+                          <button
+                            key={v}
+                            onClick={() => update({ sessionTimeout: v })}
+                            className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150"
+                            style={{
+                              background: activeData.sessionTimeout === v ? 'var(--color-primary)' : 'var(--color-surface)',
+                              color: activeData.sessionTimeout === v ? 'white' : 'var(--color-text-muted)',
+                              border: `1px solid ${activeData.sessionTimeout === v ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                            }}
+                          >
+                            {v} dk
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div
+                      className="flex items-start gap-2.5 rounded-lg p-3"
+                      style={{ background: 'var(--color-warning-bg)', border: '1px solid rgba(245, 158, 11, 0.1)' }}
+                    >
+                      <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: 'var(--color-warning)' }} />
+                      <p className="text-[11px] leading-relaxed" style={{ color: 'var(--color-warning)' }}>
+                        Çok kısa süre (5-10 dk) eğitim izlerken oturum kapanmasına neden olabilir.
+                        Çok uzun süre (&gt;120 dk) paylaşılan cihazlarda güvenlik riski oluşturabilir.
+                        Önerilen: <strong>30 dakika</strong>.
+                      </p>
+                    </div>
                   </div>
                 </div>
 

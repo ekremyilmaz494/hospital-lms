@@ -4,25 +4,33 @@ import { startExamTimer, getExamTimeRemaining, isExamExpired } from '@/lib/redis
 
 /** Start or get exam timer */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id: attemptId } = await params
+  const { id } = await params
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser!.id },
+  // Search by attempt ID first, then assignmentId
+  let attempt = await prisma.examAttempt.findFirst({
+    where: { id, userId: dbUser!.id, status: { in: ['pre_exam', 'post_exam'] } },
     include: { training: { select: { examDurationMinutes: true } } },
   })
+  if (!attempt) {
+    attempt = await prisma.examAttempt.findFirst({
+      where: { assignmentId: id, userId: dbUser!.id, status: { in: ['pre_exam', 'post_exam'] } },
+      include: { training: { select: { examDurationMinutes: true } } },
+      orderBy: { attemptNumber: 'desc' },
+    })
+  }
 
   if (!attempt) return errorResponse('Attempt not found', 404)
 
-  // Check if timer already exists
-  const remaining = await getExamTimeRemaining(attemptId)
+  // Check if timer already exists (always use attempt.id as timer key)
+  const remaining = await getExamTimeRemaining(attempt.id)
   if (remaining !== null) {
     return jsonResponse({ remainingSeconds: remaining, expired: remaining <= 0 })
   }
 
   // Start new timer
-  const expiresAt = await startExamTimer(attemptId, attempt.training.examDurationMinutes)
+  const expiresAt = await startExamTimer(attempt.id, attempt.training.examDurationMinutes)
 
   return jsonResponse({
     remainingSeconds: attempt.training.examDurationMinutes * 60,
@@ -55,7 +63,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
       // Assignment durumunu guncelle
       for (const att of expiredAttempts) {
-        const newStatus = att.assignment.currentAttempt >= att.assignment.maxAttempts ? 'failed' : 'assigned'
+        // BUG #5 FIX: Hakkı varsa 'in_progress' olmalı
+        const newStatus = att.assignment.currentAttempt >= att.assignment.maxAttempts ? 'failed' : 'in_progress'
         await prisma.trainingAssignment.update({
           where: { id: att.assignmentId },
           data: { status: newStatus },

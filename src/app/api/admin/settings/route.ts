@@ -14,7 +14,7 @@ export async function GET() {
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { name: true, logoUrl: true, email: true, phone: true, address: true },
+    select: { name: true, logoUrl: true, email: true, phone: true, address: true, sessionTimeout: true },
   })
 
   return jsonResponse({
@@ -26,6 +26,7 @@ export async function GET() {
     email: org?.email ?? '',
     phone: org?.phone ?? '',
     address: org?.address ?? '',
+    sessionTimeout: org?.sessionTimeout ?? 30,
   })
 }
 
@@ -43,7 +44,7 @@ export async function PUT(request: Request) {
   const body = await request.json().catch(() => null)
   if (!body) return errorResponse('Invalid body')
 
-  const { hospitalName, logoUrl, email, phone, address } = body
+  const { hospitalName, logoUrl, email, phone, address, sessionTimeout } = body
 
   const oldOrg = await prisma.organization.findUnique({ where: { id: orgId } })
 
@@ -55,6 +56,7 @@ export async function PUT(request: Request) {
       ...(email !== undefined && { email }),
       ...(phone !== undefined && { phone }),
       ...(address !== undefined && { address }),
+      ...(sessionTimeout !== undefined && { sessionTimeout: Math.min(Math.max(Number(sessionTimeout), 5), 480) }),
     },
   })
 
@@ -74,5 +76,6 @@ export async function PUT(request: Request) {
     email: updated.email ?? '',
     phone: updated.phone ?? '',
     address: updated.address ?? '',
+    sessionTimeout: updated.sessionTimeout,
   })
 }

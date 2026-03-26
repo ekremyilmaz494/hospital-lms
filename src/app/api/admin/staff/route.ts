@@ -37,6 +37,15 @@ export async function GET(request: Request) {
       where,
       include: {
         _count: { select: { assignments: true, examAttempts: true } },
+        assignments: {
+          select: {
+            status: true,
+            examAttempts: {
+              where: { isPassed: true },
+              select: { postExamScore: true },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -90,29 +99,51 @@ export async function GET(request: Request) {
   }))
 
   const activeStaff = staff.filter(s => s.isActive).length
-  // Varsayılan temsili stats
+
+  // Calculate overall avgScore from all passed exam attempts in the org
+  const allPassedScores = staff
+    .flatMap(s => s.assignments)
+    .flatMap(a => a.examAttempts)
+    .map(e => Number(e.postExamScore))
+    .filter(score => !isNaN(score) && score > 0)
+  const overallAvgScore = allPassedScores.length > 0
+    ? Math.round(allPassedScores.reduce((sum, sc) => sum + sc, 0) / allPassedScores.length)
+    : 0
+
   const stats = {
     totalStaff: total,
     activeStaff,
     departmentCount: rawDepartments.length,
-    avgScore: 0
+    avgScore: overallAvgScore
   }
 
   // Frontend'e uyması için staff verisini map'liyoruz
-  const formattedStaff = staff.map(s => ({
-    id: s.id,
-    name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
-    email: s.email,
-    tcNo: s.tcNo || '',
-    department: departments.find(d => d.id === s.departmentId)?.name || s.department || '',
-    departmentId: s.departmentId,
-    title: s.title || '',
-    assignedTrainings: s._count.assignments || 0,
-    completedTrainings: 0,
-    avgScore: 0,
-    status: s.isActive ? 'Aktif' : 'Pasif',
-    initials: `${s.firstName?.[0] || ''}${s.lastName?.[0] || ''}`.toUpperCase()
-  }))
+  const formattedStaff = staff.map(s => {
+    const completedTrainings = s.assignments.filter(a => a.status === 'passed').length
+    const passedScores = s.assignments
+      .flatMap(a => a.examAttempts)
+      .map(e => Number(e.postExamScore))
+      .filter(score => !isNaN(score) && score > 0)
+    const avgScore = passedScores.length > 0
+      ? Math.round(passedScores.reduce((sum, sc) => sum + sc, 0) / passedScores.length)
+      : 0
+
+    return {
+      id: s.id,
+      name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+      email: s.email,
+      // KVKK: TC No maskeleme — sadece son 4 hane göster
+      tcNo: s.tcNo ? `*******${s.tcNo.slice(-4)}` : '',
+      department: departments.find(d => d.id === s.departmentId)?.name || s.department || '',
+      departmentId: s.departmentId,
+      title: s.title || '',
+      assignedTrainings: s._count.assignments || 0,
+      completedTrainings,
+      avgScore,
+      status: s.isActive ? 'Aktif' : 'Pasif',
+      initials: `${s.firstName?.[0] || ''}${s.lastName?.[0] || ''}`.toUpperCase()
+    }
+  })
 
   return jsonResponse({ staff: formattedStaff, departments, stats, total, page, limit, totalPages: Math.ceil(total / limit) })
 }
@@ -132,7 +163,17 @@ export async function POST(request: Request) {
   if (!body) return errorResponse('Invalid body')
 
   const parsed = createUserSchema.safeParse({ ...body as object, role: 'staff', organizationId: dbUser!.organizationId! })
-  if (!parsed.success) return errorResponse(parsed.error.message)
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map(i => {
+      const field = i.path.join('.')
+      if (field === 'email') return 'Geçerli bir e-posta adresi girin'
+      if (field === 'password') return 'Şifre en az 8 karakter olmalıdır'
+      if (field === 'firstName') return 'Ad zorunludur'
+      if (field === 'lastName') return 'Soyad zorunludur'
+      return i.message
+    }).join(', ')
+    return errorResponse(msg)
+  }
 
   const supabase = await createServiceClient()
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
@@ -149,9 +190,10 @@ export async function POST(request: Request) {
 
   if (authError) {
     console.error('[Staff Create Auth Error]', authError.message)
-    const safeMsg = authError.message?.includes('already registered')
-      ? 'Bu e-posta adresi zaten kayıtlı'
-      : 'Kullanıcı oluşturulamadı'
+    let safeMsg = 'Kullanıcı oluşturulamadı'
+    if (authError.message?.includes('already registered')) safeMsg = 'Bu e-posta adresi zaten kayıtlı'
+    else if (authError.message?.includes('invalid format') || authError.message?.includes('validate email')) safeMsg = 'Geçersiz e-posta adresi. Türkçe karakter (ş, ç, ğ, ü, ö, ı) kullanmayın.'
+    else if (authError.message?.includes('password')) safeMsg = 'Şifre gereksinimleri karşılanmıyor'
     return errorResponse(safeMsg)
   }
 
@@ -176,7 +218,17 @@ export async function POST(request: Request) {
     })
   } catch (dbError) {
     // Rollback: delete Supabase auth user if DB insert fails
-    await supabase.auth.admin.deleteUser(authUser.user.id)
+    try {
+      await supabase.auth.admin.deleteUser(authUser.user.id)
+    } catch (rollbackError) {
+      console.error('[Staff Create Rollback Failed] Orphan auth user:', authUser.user.id, rollbackError)
+      // Retry once
+      try {
+        await supabase.auth.admin.deleteUser(authUser.user.id)
+      } catch {
+        console.error('[Staff Create Rollback Retry Failed] Manual cleanup needed for auth user:', authUser.user.id)
+      }
+    }
     return errorResponse(`Veritabanı hatası: ${dbError instanceof Error ? dbError.message : 'Bilinmeyen hata'}`)
   }
 

@@ -93,7 +93,23 @@ export default function BackupsPage() {
                       </span>
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <Button variant="ghost" size="sm" className="gap-1.5 rounded-lg" style={{ color: 'var(--color-primary)' }} onClick={() => toast(`${b.date} tarihli yedek indiriliyor...`, 'info')}>
+                      <Button variant="ghost" size="sm" className="gap-1.5 rounded-lg" style={{ color: 'var(--color-primary)' }} onClick={async () => {
+                        toast(`${b.date} tarihli yedek indiriliyor...`, 'info');
+                        try {
+                          const res = await fetch(`/api/admin/backups/${b.id}/download`);
+                          if (!res.ok) throw new Error('İndirme başarısız');
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `yedek-${b.date}.json`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                          toast('Yedek indirildi', 'success');
+                        } catch {
+                          toast('Yedek indirilemedi — henüz aktif yedekleme sistemi yapılandırılmamış', 'error');
+                        }
+                      }}>
                         <Download className="h-3.5 w-3.5" /> İndir
                       </Button>
                     </td>

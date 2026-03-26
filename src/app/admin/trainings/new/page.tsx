@@ -24,7 +24,7 @@ import { TRAINING_CATEGORIES } from '@/lib/training-categories';
 const categories = TRAINING_CATEGORIES;
 
 interface DeptStaff { id: string; name: string; title: string; initials: string; }
-interface Dept { name: string; count: number; color: string; staff: DeptStaff[]; }
+interface Dept { id: string; name: string; count: number; color: string; staff: DeptStaff[]; }
 
 export default function NewTrainingPage() {
   const router = useRouter();
@@ -52,7 +52,7 @@ export default function NewTrainingPage() {
   const [endDate, setEndDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
   const totalSelectedStaff = departments
-    .filter(d => selectedDepts.includes(d.name))
+    .filter(d => selectedDepts.includes(d.id))
     .reduce((sum, d) => sum + d.staff.filter(s => !excludedStaff.includes(s.id)).length, 0);
 
   const toggleStaffExclusion = (staffId: string) => {
@@ -61,9 +61,9 @@ export default function NewTrainingPage() {
     );
   };
 
-  const toggleDept = (name: string) => {
+  const toggleDept = (id: string) => {
     setSelectedDepts(prev =>
-      prev.includes(name) ? prev.filter(d => d !== name) : [...prev, name]
+      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
     );
   };
 
@@ -595,7 +595,7 @@ export default function NewTrainingPage() {
                 />
                 <Button
                   variant="outline"
-                  onClick={() => setSelectedDepts(selectedDepts.length === departments.length ? [] : departments.map(d => d.name))}
+                  onClick={() => setSelectedDepts(selectedDepts.length === departments.length ? [] : departments.map(d => d.id))}
                   className="h-11 rounded-xl"
                   style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
                 >
@@ -605,14 +605,14 @@ export default function NewTrainingPage() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {departments.map((dept) => {
-                  const isSelected = selectedDepts.includes(dept.name);
+                  const isSelected = selectedDepts.includes(dept.id);
                   const activeStaff = dept.staff.filter(s => !excludedStaff.includes(s.id));
-                  const isExpanded = expandedDept === dept.name;
+                  const isExpanded = expandedDept === dept.id;
                   return (
-                    <div key={dept.name} className="relative">
+                    <div key={dept.id} className="relative">
                       <button
                         type="button"
-                        onClick={() => toggleDept(dept.name)}
+                        onClick={() => toggleDept(dept.id)}
                         className="relative flex w-full flex-col items-start gap-2 rounded-xl border p-4 text-left"
                         style={{
                           borderColor: isSelected ? dept.color : 'var(--color-border)',
@@ -638,7 +638,7 @@ export default function NewTrainingPage() {
                       {isSelected && (
                         <button
                           type="button"
-                          onClick={() => setExpandedDept(isExpanded ? null : dept.name)}
+                          onClick={() => setExpandedDept(isExpanded ? null : dept.id)}
                           className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-[11px] font-medium transition-colors duration-150"
                           style={{ color: dept.color, background: isExpanded ? `${dept.color}10` : 'transparent' }}
                         >
@@ -652,7 +652,7 @@ export default function NewTrainingPage() {
 
               {/* Expanded Staff List */}
               {expandedDept && selectedDepts.includes(expandedDept) && (() => {
-                const dept = departments.find(d => d.name === expandedDept);
+                const dept = departments.find(d => d.id === expandedDept);
                 if (!dept) return null;
                 return (
                   <div
@@ -804,9 +804,9 @@ export default function NewTrainingPage() {
                       title,
                       description,
                       category: selectedCategory,
-                      passingScore: Number(passingScore),
-                      maxAttempts: Number(maxAttempts),
-                      examDurationMinutes: Number(examDurationMinutes),
+                      passingScore: Number(passingScore) || 70,
+                      maxAttempts: Number(maxAttempts) || 3,
+                      examDurationMinutes: Number(examDurationMinutes) || 30,
                       startDate: new Date(startDate).toISOString(),
                       endDate: new Date(endDate).toISOString(),
                       videos: videos.map(v => ({ title: v.title, url: v.url })),

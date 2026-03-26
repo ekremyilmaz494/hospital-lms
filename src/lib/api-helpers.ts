@@ -32,6 +32,17 @@ export async function getAuthUser() {
     return { user: null, dbUser: null, error: errorResponse('User not found or inactive', 403) }
   }
 
+  // Organization active check — super_admin is exempt
+  if (dbUser.role !== 'super_admin' && dbUser.organizationId) {
+    const org = await prisma.organization.findUnique({
+      where: { id: dbUser.organizationId },
+      select: { isActive: true, isSuspended: true },
+    })
+    if (!org || !org.isActive || org.isSuspended) {
+      return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
+    }
+  }
+
   return { user, dbUser, error: null }
 }
 

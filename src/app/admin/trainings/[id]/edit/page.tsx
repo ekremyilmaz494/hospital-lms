@@ -23,16 +23,8 @@ interface TrainingEditData {
   endDate: string;
 }
 
-const categories = [
-  { value: 'enfeksiyon', label: 'Enfeksiyon' },
-  { value: 'is-guvenligi', label: 'İş Güvenliği' },
-  { value: 'hasta-haklari', label: 'Hasta Hakları' },
-  { value: 'radyoloji', label: 'Radyoloji' },
-  { value: 'laboratuvar', label: 'Laboratuvar' },
-  { value: 'eczane', label: 'Eczane' },
-  { value: 'acil', label: 'Acil Servis' },
-  { value: 'genel', label: 'Genel Eğitim' },
-];
+import { TRAINING_CATEGORIES } from '@/lib/training-categories';
+const categories = TRAINING_CATEGORIES;
 
 export default function EditTrainingPage() {
   const router = useRouter();

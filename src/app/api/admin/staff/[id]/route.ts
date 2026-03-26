@@ -68,8 +68,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime()
       )[0]
       return {
+        trainingId: a.trainingId,
         title: a.training.title,
         attempt: a.examAttempts.length,
+        maxAttempts: a.maxAttempts,
         preScore: lastAttempt?.preExamScore ? Number(lastAttempt.preExamScore) : null,
         postScore: lastAttempt?.postExamScore ? Number(lastAttempt.postExamScore) : null,
         status: a.status,

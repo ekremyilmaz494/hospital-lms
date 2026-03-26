@@ -44,6 +44,8 @@ export async function GET(request: Request) {
         ...s,
         // KVKK: TC No maskeleme — sadece son 4 hane göster
         tcNo: s.tcNo ? `*******${s.tcNo.slice(-4)}` : '',
+        // KVKK: Telefon maskeleme — sadece son 3 hane göster
+        phone: s.phone ? `***${s.phone.slice(-3)}` : '',
         isActive: s.isActive ? 'Aktif' : 'Pasif',
         assignmentCount: s._count.assignments,
         createdAt: s.createdAt.toLocaleDateString('tr-TR'),

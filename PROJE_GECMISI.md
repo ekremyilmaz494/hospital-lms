@@ -387,6 +387,62 @@ hospital-lms/
 - 200 eşzamanlı kullanıcı sorunsuz — CloudFront Edge sunucuları video trafiğini dağıtır
 - Next.js sunucusu video trafiğiyle yorulmaz
 
+---
+
+## 23. SINAV AKIŞI TAM YENİDEN YAZIM (Oturum 4 — 26 Mart 2026)
+
+### Sorun
+Sınav akışı tamamen bozuktu: submit 403 dönüyor, attempt'ler DB'de takılı kalıyor, retry algılanmıyor, timer başlamıyor, deneme sayacı yanlış artıyordu.
+
+### Kök Neden Zinciri
+1. **Timer route** `getAttemptWithPhaseCheck` kullanıyordu → `attempt.id` ile arama yapmıyordu → Timer hiç başlamıyordu
+2. **`isExamExpired()`** timer bulamayınca `true` (süresi dolmuş) dönüyordu
+3. **Submit route** timer expired görünce 403 döndürüyor, attempt'i `completed` yapmıyordu
+4. **Start route** takılı attempt'i buluyor, yeni attempt oluşturamıyordu → Retry başlatılamıyordu
+
+### Düzeltilen Dosyalar
+
+| Dosya | Düzeltme |
+|-------|----------|
+| `src/app/api/exam/[id]/submit/route.ts` | Timer kontrolü tamamen kaldırıldı — expired olsa bile submit kabul edilir. Cevaplanmamış soru validasyonu kaldırıldı (boş sorular yanlış sayılır). Submit sonrası `clearExamTimer()` çağrılır. |
+| `src/app/api/exam/[id]/timer/route.ts` | `getAttemptWithPhaseCheck` phase guard kaldırıldı. Attempt'i hem `id` hem `assignmentId` ile arar. Timer key olarak `attempt.id` kullanır. |
+| `src/app/api/exam/[id]/start/route.ts` | Aktif (non-completed) attempt varsa olduğu gibi döndürür. Takılı attempt'leri auto-complete ETMEZ (bu daha önce geçerli post_exam attempt'leri öldürüyordu). |
+| `src/lib/redis.ts` | `isExamExpired`: timer yoksa `false` döner (submit'i engellemez). |
+| `src/app/api/staff/my-trainings/[id]/route.ts` | 4 durumlu state detection: FRESH (hiç attempt yok), ACTIVE (devam ediyor), RETRY_PENDING (başarısız + hak var), DONE (geçti veya haklar tükendi). `isPassed !== true` ile daha sağlam retry algılama. |
+| `src/app/exam/[id]/videos/page.tsx` | `router.replace` render sırasında çağrılma hatası → `useEffect` içine taşındı. `refetch()` kaldırıldı (sayfa yeniden yükleme sorunu). `localCompleted` state ile optimistik güncelleme. Aktif video için gerçek süre gösterilir. |
+| `src/app/exam/[id]/post-exam/page.tsx` | Submit hatasında alert yerine `/staff/my-trainings`'e redirect. |
+| `src/app/exam/[id]/pre-exam/page.tsx` | `useState` hook sıralama hatası düzeltildi (early return'den sonra hook çağrılıyordu). |
+| `src/app/exam/[id]/transition/page.tsx` | 60 saniyelik countdown geçiş sayfası (pre→videos, videos→post, post-exam sonuç). |
+| `src/app/staff/my-trainings/page.tsx` | `failed` durumu "Aktif Eğitimler" grubuna taşındı (eskiden "Tamamlanan"da gösteriliyordu). |
+| `src/app/staff/my-trainings/[id]/page.tsx` | `status === 'failed'` için "Tüm Deneme Hakları Tükendi" UI'ı. Retry banner ve video section `failed` durumunda gizlenir. |
+
+### Sınav Akışı Kuralları (Kesinleşmiş)
+1. **1. deneme:** Ön Sınav → 60s geçiş → Videolar → 60s geçiş → Son Sınav → Sonuç
+2. **2+ deneme:** Ön sınav atlanır → Videolar (sıfırdan) → 60s geçiş → Son Sınav → Sonuç
+3. **Başarısız + hak var:** Assignment `in_progress`, "Deneme X/Y" gösterilir, sadece video izleme açık
+4. **Başarısız + son hak:** Assignment `failed`, "Tüm haklar tükendi" mesajı, hiçbir aksiyon yok
+5. **Başarılı:** Assignment `passed`, sertifika otomatik oluşturulur
+
+### Diğer Düzeltmeler (Oturum 4)
+- **Eğitim oluşturma validasyonu:** `correct: -1` (doğru cevap seçilmemiş) → `min(-1).transform(v => v < 0 ? 0 : v)` ile kabul edilir
+- **Admin eğitim detayı:** API ham Prisma verisini dönüyordu → `assignedStaff` dizisi formatlı dönüyor (personel adı, departman, deneme, puanlar, durum)
+- **DB temizliği:** Takılı `post_exam` ve `watching_videos` attempt'ler `completed` olarak düzeltildi. Yanlış increment edilen `current_attempt` değerleri gerçek attempt sayısına eşitlendi.
+
+---
+
+## 24. İSTATİSTİKLER (Güncel — 26 Mart 2026)
+
+| Metrik | Değer |
+|--------|-------|
+| Toplam route | 35+ |
+| Toplam dosya | ~130+ |
+| Prisma model | 16 |
+| API endpoint | 30+ |
+| 21st.dev bileşen | 11 |
+| shadcn/ui bileşen | 20 |
+| Custom shared bileşen | 8 |
+| İterasyon sayısı | v1 → v12+ |
+
 ### Canlıya Çıkmadan Önce
 - `.env`'de AWS değişkenleri aktif edilmeli
 - S3 Bucket + CloudFront Distribution oluşturulmalı
@@ -539,4 +595,126 @@ hospital-lms/
 
 ---
 
-*Son güncelleme: 25 Mart 2026 — Oturum 4*
+---
+
+## 32. KAPSAMLI HATA TESPİT VE DÜZELTME (Oturum 5 — 26 Mart 2026)
+
+### Proje Yapısı İnceleme Raporu
+Tüm API route'ları, frontend sayfaları, konfigürasyon dosyaları ve bağımlılıklar tarandı. Toplam **25 hata** tespit edildi.
+
+### Admin Paneli Düzeltmeleri
+
+| # | Seviye | Sorun | Dosya | Düzeltme |
+|---|--------|-------|-------|----------|
+| 1 | KRİTİK | Dashboard `'completed'` status yok | `api/admin/dashboard/stats/route.ts`, `dashboard/route.ts`, `staff/dashboard/route.ts` | `'completed'` → `'passed'` (5 yer) |
+| 2 | KRİTİK | Departman ataması isim ile sorgu | `api/admin/trainings/route.ts`, `trainings/new/page.tsx`, `validations.ts` | `department` → `departmentId`, frontend UUID kullanıyor |
+| 3 | KRİTİK | Notifications PATCH role kontrolü eksik | `api/staff/notifications/route.ts` | `requireRole` eklendi |
+| 4 | KRİTİK | Assignments POST org kontrolü yok | `api/admin/trainings/[id]/assignments/route.ts` | `user.count` ile org doğrulaması |
+| 5 | KRİTİK | Questions PUT/GET org kontrolü yok | `api/admin/trainings/[id]/questions/route.ts` | Training org kontrolü + try/catch |
+| 6 | KRİTİK | Dashboard trendData/expiringCerts boş | `api/admin/dashboard/route.ts` | Son 6 ay trend + sertifika süresi hesaplaması |
+| 7 | YÜKSEK | Reports API sadece overview | `api/admin/reports/route.ts` | Tüm 6 sekme verisi tek endpoint'ten |
+| 8 | YÜKSEK | Staff completedTrainings/avgScore = 0 | `api/admin/staff/route.ts` | Gerçek assignment + exam verilerinden hesaplama |
+| 9 | YÜKSEK | tcNo KVKK maskelenmemiş | `api/admin/staff/route.ts` | `*******XXXX` formatında maskeleme |
+| 10 | YÜKSEK | Videos S3 orphan kaydı | `api/admin/trainings/[id]/videos/route.ts` | Önce uploadUrl al, sonra DB yaz |
+| 11 | YÜKSEK | Toplu bildirim limitsiz | `api/admin/notifications/route.ts` | 500 kişi limiti + 100'lük batch |
+| 12 | YÜKSEK | Export phone maskelenmemiş | `api/admin/export/route.ts` | `***XXX` formatında maskeleme |
+| 13 | YÜKSEK | Staff race condition rollback | `api/admin/staff/route.ts` | `deleteUser` try/catch + retry |
+| 14 | ORTA | Questions PUT try/catch yok | `api/admin/trainings/[id]/questions/route.ts` | try/catch eklendi |
+| 15 | ORTA | Questions audit log eksik | `api/admin/trainings/[id]/questions/route.ts` | `createAuditLog` eklendi |
+| 16 | ORTA | Recharts import tutarsızlığı | `admin/reports/page.tsx` | Wrapper üzerinden import |
+| 17 | ORTA | Backups download butonu çalışmıyor | `admin/backups/page.tsx` | Gerçek fetch + blob indirme |
+| 18 | ORTA | "Yeni Hak Ver" butonu onClick yok | `admin/staff/[id]/page.tsx` | PATCH API + toast + refetch |
+| 19 | ORTA | TypeScript Decimal type hatası | `api/admin/trainings/[id]/route.ts` | Type predicate kaldırıldı |
+| 20 | ORTA | Assignments PATCH org doğrulaması yok | `api/admin/trainings/[id]/assignments/route.ts` | organizationId kontrolü eklendi |
+| 21 | ORTA | Retry'da preExamScore null | `api/exam/[id]/start/route.ts` | `preExamScore: 0` eklendi |
+
+### Personel Paneli Düzeltmeleri
+
+| # | Seviye | Sorun | Dosya | Düzeltme |
+|---|--------|-------|-------|----------|
+| 22 | KRİTİK | Notifications id validate edilmeden update | `api/staff/notifications/route.ts` | ID uzunluk kontrolü + updateMany + 404 |
+| 23 | KRİTİK | Post-exam submit fail hata gösterilmiyor | `exam/[id]/post-exam/page.tsx` | Auto-retry + alert mesajı |
+| 24 | YÜKSEK | Certificates pagination yok | `api/staff/certificates/route.ts` | `take: 100` eklendi |
+| 25 | YÜKSEK | Video optimistic update rollback yok | `exam/[id]/videos/page.tsx` | Sunucu fail → rollback |
+| 26 | YÜKSEK | Pre-exam double submit | `exam/[id]/pre-exam/page.tsx` | `submitting` guard eklendi |
+| 27 | YÜKSEK | Exam submit idempotency yok | `api/exam/[id]/submit/route.ts` | Existing answers check |
+| 28 | YÜKSEK | Timer client-side bypass | `api/exam/[id]/submit/route.ts` | Sunucu tarafı süre kontrolü (+5dk grace) |
+| 29 | ORTA | Questions phase guard isteğe bağlı | `api/exam/[id]/questions/route.ts` | `phase` parametresi zorunlu |
+| 30 | ORTA | Pre-exam "Tekrar Dene" butonu yok | `exam/[id]/pre-exam/page.tsx` | Hata yanında retry butonu |
+| 31 | ORTA | Post-exam cevaplanmamış soru uyarısı yok | `exam/[id]/post-exam/page.tsx` | "X soru cevaplanmadı" uyarısı |
+| 32 | ORTA | Post-exam 1800sn hardcoded timer | `exam/[id]/post-exam/page.tsx` | `examData.totalTime` kullanılıyor |
+
+### Sınav Akışı Düzeltmeleri
+
+| Sorun | Düzeltme |
+|-------|----------|
+| Video sayfası retry'da redirect loop | `start` POST tamamlanmadan video fetch başlamıyor (`startReady` state) |
+| Eğitim detay sayfası cache flash | `clearFetchCache` ile eski cache temizleniyor |
+| Başarısız eğitimler aktif bölümde | 3 bölüm: Aktif / Başarısız (haklar tükendi) / Tamamlanan |
+
+### Güvenlik İyileştirmeleri
+
+| Alan | Düzeltme |
+|------|----------|
+| Hastane aktif/pasif kontrolü | `updateOrganizationSchema`'ya `isActive`/`isSuspended` eklendi |
+| API org erişim kontrolü | `getAuthUser()` fonksiyonuna org aktiflik kontrolü — pasif/askıda org → 403 |
+| Cross-org atama engeli | Assignments POST'ta kullanıcı org doğrulaması |
+| Cross-org soru değiştirme engeli | Questions GET/PUT/POST'ta training org kontrolü |
+| Sınav süre bypass engeli | Submit API'de sunucu tarafı süre kontrolü |
+
+---
+
+## 33. SUPER ADMİN PANELİ PREMIUM TASARIM (Oturum 5)
+
+### Dashboard Yeniden Yazıldı
+- **API oluşturuldu:** `api/super-admin/dashboard/route.ts` — veritabanından gerçek veriler
+- **4 hızlı işlem butonu:** Yeni Hastane, Abonelikler, Raporlar, Denetim Kayıtları
+- **4 stat kartı:** Toplam Hastane, Toplam Kullanıcı, Aktif Abonelik, Toplam Eğitim
+- **Aylık Kayıt Trendi:** AreaChart (hastane + personel, gradient fill)
+- **Abonelik Dağılımı:** PieChart (donut) + istatistik sidebar
+- **Platform Durumu:** Progress bar'lı sağlık göstergesi
+- **Plan Bazlı Abonelik:** Grouped BarChart
+- **Son Kayıt Olan Hastaneler:** Tıklanabilir liste
+- **Aboneliği Sona Yaklaşan:** Aciliyet renkli kartlar
+- **Son Aktiviteler:** Audit log timeline
+- **Alert banner:** BorderBeam efekti ile askıya alınan/süresi dolan uyarıları
+
+### Hastane Yönetimi Sayfası Yeniden Yazıldı
+- **API fix:** `{ hospitals: [...] }` response → frontend uyumu
+- **4 stat kartı:** Toplam Hastane, Aktif, Askıda, Toplam Personel
+- **Status filtre pill'leri:** Tümü / Aktif / Askıda (count badge)
+- **Kart tabanlı liste:** Sol accent bar, avatar, personel/eğitim sayısı, plan/durum badge
+- **Çalışan dropdown menü:** Detay → `[id]`, Düzenle → `[id]/edit`, Askıya Al/Aktif Et → PATCH API + toast
+- **Arama:** Anlık filtreleme (isim veya kod)
+
+---
+
+## 34. İSTATİSTİKLER (Güncel — 26 Mart 2026)
+
+| Metrik | Değer |
+|--------|-------|
+| Toplam route | 35+ |
+| Toplam dosya | ~140+ |
+| Prisma model | 17 (Certificate + DbBackup eklendi) |
+| API endpoint | 30+ |
+| Güvenlik düzeltme | 25+ |
+| Bug fix | 35+ |
+| İterasyon sayısı | v1 → v16+ |
+
+---
+
+## 35. KALAN İŞLER
+
+| # | İş | Durum |
+|---|---|-------|
+| 1 | Connection pooling (pgBouncer/Supavisor) | ⏳ Bekliyor |
+| 2 | Login/Logout audit log | ⏳ Bekliyor |
+| 3 | Sınav submit audit log | ⏳ Bekliyor |
+| 4 | AWS S3/CloudFront canlı yapılandırma | ⏳ .env ayarları bekliyor |
+| 5 | Super Admin diğer sayfaları premium tasarım | ⏳ Bekliyor |
+| 6 | Skeleton loader'lar | ⏳ Düşük öncelik |
+| 7 | Sertifika indirme sistemi | ⏳ Bekliyor |
+
+---
+
+*Son güncelleme: 26 Mart 2026 — Oturum 5*

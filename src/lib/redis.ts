@@ -47,7 +47,9 @@ export async function getExamTimeRemaining(attemptId: string): Promise<number | 
 
 export async function isExamExpired(attemptId: string): Promise<boolean> {
   const remaining = await getExamTimeRemaining(attemptId)
-  return remaining === null || remaining <= 0
+  // Timer yoksa (hiç başlatılmamışsa) expired DEĞİL — submit'i engellemesin
+  if (remaining === null) return false
+  return remaining <= 0
 }
 
 export async function clearExamTimer(attemptId: string) {

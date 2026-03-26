@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
@@ -36,6 +36,7 @@ function LoginForm() {
   const rawRedirect = searchParams.get('redirectTo');
   // Prevent open redirect — only allow relative paths starting with /
   const redirectTo = rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : null;
+  const isTimeout = searchParams.get('reason') === 'timeout';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,7 +146,7 @@ function LoginForm() {
 
       {/* ── Right Panel: Login Form ── */}
       <div className="flex flex-1 items-center justify-center p-6 sm:p-8" style={{ background: 'var(--color-bg)' }}>
-        <div className="w-full max-w-[420px]">
+        <div className="w-full max-w-105">
           {/* Mobile logo */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white font-heading" style={{ background: 'var(--color-primary)' }}>H</div>
@@ -161,6 +162,18 @@ function LoginForm() {
               Devam etmek için hesabınıza giriş yapın
             </p>
           </BlurFade>
+
+          {isTimeout && !error && (
+            <BlurFade delay={0}>
+              <div
+                className="mb-5 flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium"
+                style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)', border: '1px solid color-mix(in srgb, var(--color-warning) 20%, transparent)' }}
+              >
+                <Clock className="h-5 w-5 shrink-0" />
+                Uzun süre işlem yapmadığınız için oturumunuz sonlandırıldı.
+              </div>
+            </BlurFade>
+          )}
 
           {error && (
             <BlurFade delay={0}>

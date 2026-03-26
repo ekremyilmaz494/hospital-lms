@@ -1,10 +1,21 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAttemptWithPhaseCheck } from '@/lib/exam-helpers'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { dbUser, error } = await getAuthUser()
   if (error) return error
+
+  // Phase guard: verify attempt is in correct exam status
+  const { searchParams } = new URL(request.url)
+  const phase = searchParams.get('phase')
+  if (!phase || !['pre', 'post'].includes(phase)) {
+    return errorResponse('phase parametresi zorunludur (pre veya post)', 400)
+  }
+  const requiredStatus = phase === 'pre' ? 'pre_exam' : 'post_exam'
+  const { error: phaseError } = await getAttemptWithPhaseCheck(id, dbUser!.id, [requiredStatus])
+  if (phaseError) return phaseError
 
   // id can be trainingId or assignmentId — find the training
   const assignment = await prisma.trainingAssignment.findFirst({

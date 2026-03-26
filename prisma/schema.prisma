@@ -40,6 +40,7 @@ model Organization {
   isSuspended     Boolean  @default(false) @map("is_suspended")
   suspendedReason String?  @db.Text @map("suspended_reason")
   suspendedAt     DateTime? @map("suspended_at") @db.Timestamptz
+  sessionTimeout  Int      @default(30) @map("session_timeout")
   createdBy       String?  @db.Uuid @map("created_by")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz

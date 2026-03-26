@@ -44,9 +44,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const key = videoKey(dbUser!.organizationId!, id, body.filename)
-  const uploadUrl = await getUploadUrl(key, body.contentType)
 
-  // Create video record
+  // Get upload URL first — if S3 fails, no orphan DB record
+  let uploadUrl: string
+  try {
+    uploadUrl = await getUploadUrl(key, body.contentType)
+  } catch {
+    return errorResponse('Video yükleme URL\'si alınamadı. S3 yapılandırmasını kontrol edin.', 503)
+  }
+
+  // Create video record only after successful upload URL
   const video = await prisma.trainingVideo.create({
     data: {
       trainingId: id,

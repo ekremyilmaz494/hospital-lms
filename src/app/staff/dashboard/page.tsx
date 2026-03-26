@@ -4,9 +4,7 @@ import Link from 'next/link';
 import { BookOpen, Clock, CheckCircle, XCircle, Calendar, Bell, ArrowRight, AlertTriangle, Play } from 'lucide-react';
 import { StatCard } from '@/components/shared/stat-card';
 import { BlurFade } from '@/components/ui/blur-fade';
-import { MagicCard } from '@/components/ui/magic-card';
 import { BorderBeam } from '@/components/ui/border-beam';
-import { AnimatedShinyText } from '@/components/ui/animated-shiny-text';
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -150,7 +148,7 @@ export default function StaffDashboard() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Upcoming Trainings */}
         <BlurFade delay={0.3} className="lg:col-span-2">
-          <MagicCard gradientColor="rgba(13, 150, 104, 0.05)" gradientOpacity={0.4} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+          <div className="rounded-2xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div className="p-6">
               <div className="mb-5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -211,14 +209,14 @@ export default function StaffDashboard() {
                 })}
               </div>
             </div>
-          </MagicCard>
+          </div>
         </BlurFade>
 
         {/* Right column */}
         <div className="space-y-6">
           {/* Notifications */}
           <BlurFade delay={0.35}>
-            <MagicCard gradientColor="rgba(245, 158, 11, 0.05)" gradientOpacity={0.4} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+            <div className="rounded-2xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
               <div className="p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -247,11 +245,11 @@ export default function StaffDashboard() {
                     </div>
                   ))}
                 </div>
-                <Link href="/staff/notifications" className="mt-3 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors duration-150 hover:bg-[var(--color-surface-hover)]" style={{ color: 'var(--color-primary)' }}>
+                <Link href="/staff/notifications" className="mt-3 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors duration-150 hover:bg-(--color-surface-hover)" style={{ color: 'var(--color-primary)' }}>
                   Tümünü Gör <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
-            </MagicCard>
+            </div>
           </BlurFade>
 
           {/* Recent Activity */}

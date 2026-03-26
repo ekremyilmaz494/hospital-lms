@@ -43,7 +43,7 @@ export async function GET() {
   ])
 
   // Calculate stats from assignments
-  const completedCount = assignments.filter(a => a.status === 'completed').length
+  const completedCount = assignments.filter(a => a.status === 'passed').length
   const failedCount = assignments.filter(a => a.status === 'failed').length
   const inProgressCount = assignments.filter(a => a.status === 'in_progress').length
   const totalAssignments = assignments.length
@@ -52,7 +52,7 @@ export async function GET() {
   // Overdue trainings (training endDate passed but assignment not completed)
   const now = new Date()
   const overdueTrainings = assignments
-    .filter(a => a.status !== 'completed' && a.training && a.training.endDate && new Date(a.training.endDate) < now)
+    .filter(a => a.status !== 'passed' && a.training && a.training.endDate && new Date(a.training.endDate) < now)
     .slice(0, 5)
     .map(a => ({
       name: `${a.user.firstName} ${a.user.lastName}`,
@@ -66,7 +66,7 @@ export async function GET() {
   // Top performers (highest scores)
   const performerMap = new Map<string, { name: string; department: string; scores: number[]; courses: number; initials: string }>()
   for (const a of assignments) {
-    if (a.status !== 'completed') continue
+    if (a.status !== 'passed') continue
     const key = a.userId
     const existing = performerMap.get(key)
     const score = Number(a.examAttempts[0]?.postExamScore ?? a.examAttempts[0]?.preExamScore ?? 0)
@@ -96,7 +96,7 @@ export async function GET() {
     const dept = a.user.department ?? 'Diğer'
     const existing = deptMap.get(dept) ?? { total: 0, completed: 0, scores: [] }
     existing.total++
-    if (a.status === 'completed') {
+    if (a.status === 'passed') {
       existing.completed++
       const score = Number(a.examAttempts[0]?.postExamScore ?? a.examAttempts[0]?.preExamScore ?? 0)
       existing.scores.push(score)
@@ -124,7 +124,25 @@ export async function GET() {
       { title: 'Tamamlanma Oranı', value: `%${completionRate}`, icon: 'TrendingUp', accentColor: 'var(--color-success)', trend: { value: completedCount, label: 'tamamlanan', isPositive: true } },
       { title: 'Geciken Eğitim', value: overdueTrainings.length, icon: 'AlertTriangle', accentColor: 'var(--color-error)', trend: { value: failedCount, label: 'başarısız', isPositive: false } },
     ],
-    trendData: [],
+    trendData: await (async () => {
+      const now = new Date()
+      const result = []
+      for (let i = 5; i >= 0; i--) {
+        const start = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
+        const monthAssignments = assignments.filter(a => {
+          const d = new Date(a.assignedAt)
+          return d >= start && d < end
+        })
+        result.push({
+          month: start.toLocaleDateString('tr-TR', { month: 'short' }),
+          atanan: monthAssignments.length,
+          tamamlanan: monthAssignments.filter(a => a.status === 'passed').length,
+          basarisiz: monthAssignments.filter(a => a.status === 'failed').length,
+        })
+      }
+      return result
+    })(),
     statusDistribution: [
       { name: 'Tamamlanan', value: completedCount, color: 'var(--color-success)' },
       { name: 'Devam Eden', value: inProgressCount, color: 'var(--color-info)' },
@@ -133,7 +151,32 @@ export async function GET() {
     ],
     departmentComparison,
     overdueTrainings,
-    expiringCerts: [],
+    expiringCerts: await (async () => {
+      const now = new Date()
+      const sixtyDays = new Date(now.getTime() + 60 * 86400000)
+      const certs = await prisma.certificate.findMany({
+        where: {
+          training: { organizationId: orgId },
+          expiresAt: { gte: now, lte: sixtyDays },
+        },
+        include: {
+          user: { select: { firstName: true, lastName: true } },
+          training: { select: { title: true } },
+        },
+        orderBy: { expiresAt: 'asc' },
+        take: 10,
+      })
+      return certs.map(c => {
+        const daysLeft = Math.ceil((new Date(c.expiresAt!).getTime() - now.getTime()) / 86400000)
+        return {
+          name: `${c.user.firstName} ${c.user.lastName}`,
+          cert: c.training.title,
+          expiryDate: new Date(c.expiresAt!).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+          daysLeft,
+          status: daysLeft <= 7 ? 'critical' : daysLeft <= 30 ? 'warning' : 'ok',
+        }
+      })
+    })(),
     topPerformers,
     recentActivity,
   })

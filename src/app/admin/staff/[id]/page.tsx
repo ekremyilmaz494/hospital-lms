@@ -11,6 +11,7 @@ import { MagicCard } from '@/components/ui/magic-card';
 import { ShineBorder } from '@/components/ui/shine-border';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
+import { useToast } from '@/components/shared/toast';
 
 interface StaffDetail {
   id: string;
@@ -22,7 +23,7 @@ interface StaffDetail {
   phone: string;
   initials: string;
   stats: { assignedTrainings: number; completedTrainings: number; successRate: string; avgScore: string };
-  trainingHistory: { title: string; attempt: number; preScore: number | null; postScore: number | null; status: string; date: string }[];
+  trainingHistory: { trainingId: string; title: string; attempt: number; maxAttempts: number; preScore: number | null; postScore: number | null; status: string; date: string }[];
 }
 
 const statusMap: Record<string, { label: string; bg: string; text: string }> = {
@@ -37,7 +38,8 @@ export default function StaffDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = typeof params?.id === 'string' ? params.id : null;
-  const { data: staff, isLoading, error } = useFetch<StaffDetail>(id ? `/api/admin/staff/${id}` : null);
+  const { toast } = useToast();
+  const { data: staff, isLoading, error, refetch } = useFetch<StaffDetail>(id ? `/api/admin/staff/${id}` : null);
 
   if (isLoading) {
     return <PageLoading />;
@@ -162,7 +164,27 @@ export default function StaffDetailPage() {
                             <td className="px-3 py-3 font-mono text-xs" style={{ color: 'var(--color-text-muted)' }}>{t.date}</td>
                             <td className="px-3 py-3">
                               {(t.status === 'failed' || t.status === 'locked') && (
-                                <Button variant="ghost" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ color: 'var(--color-primary)' }}>
+                                <Button variant="ghost" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ color: 'var(--color-primary)' }}
+                                  onClick={async () => {
+                                    const confirmed = window.confirm(`"${t.title}" eğitimi için ${staff!.name} adlı personele 1 ek deneme hakkı verilecek. Onaylıyor musunuz?`);
+                                    if (!confirmed) return;
+                                    try {
+                                      const res = await fetch(`/api/admin/trainings/${t.trainingId}/assignments`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ userId: id, additionalAttempts: 1 }),
+                                      });
+                                      if (!res.ok) {
+                                        const body = await res.json().catch(() => ({}));
+                                        throw new Error(body.error || 'İşlem başarısız');
+                                      }
+                                      toast('Ek deneme hakkı verildi', 'success');
+                                      refetch();
+                                    } catch (err) {
+                                      toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
+                                    }
+                                  }}
+                                >
                                   <RotateCcw className="h-3 w-3" /> Yeni Hak
                                 </Button>
                               )}

@@ -50,6 +50,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (newUserIds.length === 0) return errorResponse('Tüm kullanıcılar zaten atanmış')
 
+  // Org kontrolü: atanacak kullanıcılar admin'in organizasyonuna ait mi?
+  const orgUsers = await prisma.user.count({
+    where: { id: { in: newUserIds }, organizationId: dbUser!.organizationId! },
+  })
+  if (orgUsers !== newUserIds.length) return errorResponse('Bazı kullanıcılar kurumunuza ait değil', 403)
+
   const assignments = await prisma.trainingAssignment.createMany({
     data: newUserIds.map(userId => ({
       trainingId: id,
@@ -82,4 +88,60 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   })
 
   return jsonResponse({ created: assignments.count, skipped: existingUserIds.size }, 201)
+}
+
+/** PATCH — Yönetici: başarısız eğitimi yeniden aç + ek deneme hakkı ver */
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: trainingId } = await params
+  const { dbUser, error } = await getAuthUser()
+  if (error) return error
+
+  const roleError = requireRole(dbUser!.role, ['admin'])
+  if (roleError) return roleError
+
+  const body = await parseBody<{ userId: string; additionalAttempts?: number }>(request)
+  if (!body?.userId) return errorResponse('userId zorunludur')
+
+  const assignment = await prisma.trainingAssignment.findFirst({
+    where: { trainingId, userId: body.userId },
+    include: { training: { select: { title: true, organizationId: true } } },
+  })
+
+  if (!assignment) return errorResponse('Atama bulunamadı', 404)
+  if (assignment.training.organizationId !== dbUser!.organizationId) return errorResponse('Yetkisiz erişim', 403)
+  if (assignment.status === 'passed') return errorResponse('Bu personel zaten başarılı olmuş')
+
+  const additionalAttempts = Math.min(Math.max(body.additionalAttempts ?? 1, 1), 10)
+  const newMaxAttempts = assignment.maxAttempts + additionalAttempts
+
+  await prisma.trainingAssignment.update({
+    where: { id: assignment.id },
+    data: {
+      status: 'assigned',
+      maxAttempts: newMaxAttempts,
+    },
+  })
+
+  await prisma.notification.create({
+    data: {
+      userId: body.userId,
+      organizationId: dbUser!.organizationId!,
+      title: 'Eğitim Yeniden Açıldı',
+      message: `"${assignment.training.title}" eğitimi için ${additionalAttempts} ek deneme hakkı verildi.`,
+      type: 'assignment',
+      relatedTrainingId: trainingId,
+    },
+  })
+
+  await createAuditLog({
+    userId: dbUser!.id,
+    organizationId: dbUser!.organizationId!,
+    action: 'reopen_assignment',
+    entityType: 'training_assignment',
+    entityId: assignment.id,
+    newData: { userId: body.userId, additionalAttempts, newMaxAttempts },
+    request,
+  })
+
+  return jsonResponse({ success: true, newMaxAttempts })
 }

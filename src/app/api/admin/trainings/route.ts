@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     try {
       const issues = JSON.parse(parsed.error.message);
-      return errorResponse(`Eksik veya hatalı bilgi: ${issues.map((i: { path: string[] }) => i.path.join('.')).join(', ')}`, 400)
+      return errorResponse(`Eksik veya hatalı bilgi: ${issues.map((i: { path: string[]; message?: string }) => `${i.path.join('.')}${i.message ? ` (${i.message})` : ''}`).join(', ')}`, 400)
     } catch {
       return errorResponse(parsed.error.message, 400)
     }
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
           where: {
             organizationId: dbUser!.organizationId!,
             isActive: true,
-            department: { in: selectedDepts },
+            departmentId: { in: selectedDepts },
           }
         })
 

@@ -28,7 +28,59 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (!training) return errorResponse('Training not found', 404)
 
-  return jsonResponse(training)
+  // Transform for frontend
+  const assignedStaff = training.assignments.map(a => {
+    const latestAttempt = a.examAttempts[0] // desc order, take 1
+    return {
+      name: `${a.user.firstName ?? ''} ${a.user.lastName ?? ''}`.trim() || a.user.email,
+      department: a.user.department ?? '',
+      attempt: a.currentAttempt,
+      preScore: latestAttempt?.preExamScore ? Number(latestAttempt.preExamScore) : null,
+      postScore: latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : null,
+      status: a.status,
+      completedAt: a.completedAt ? a.completedAt.toISOString() : '',
+    }
+  })
+
+  const completedCount = training.assignments.filter(a => a.status === 'passed' || a.status === 'failed').length
+  const passedCount = training.assignments.filter(a => a.status === 'passed').length
+  const failedCount = training.assignments.filter(a => a.status === 'failed').length
+  const scores = training.assignments
+    .map(a => a.examAttempts[0]?.postExamScore)
+    .filter(s => s !== null && s !== undefined)
+    .map(Number)
+  const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+
+  return jsonResponse({
+    id: training.id,
+    title: training.title,
+    description: training.description,
+    category: training.category,
+    passingScore: training.passingScore,
+    maxAttempts: training.maxAttempts,
+    examDurationMinutes: training.examDurationMinutes,
+    startDate: training.startDate,
+    endDate: training.endDate,
+    isActive: training.isActive,
+    status: training.isActive ? 'active' : 'inactive',
+    assignedCount: training._count.assignments,
+    completedCount,
+    passedCount,
+    failedCount,
+    avgScore,
+    videoCount: training._count.videos,
+    questionCount: training._count.questions,
+    assignedStaff,
+    videos: training.videos.map(v => ({
+      title: v.title,
+      duration: `${Math.floor(v.durationSeconds / 60)}:${String(v.durationSeconds % 60).padStart(2, '0')}`,
+      order: v.sortOrder,
+    })),
+    questions: training.questions.map(q => ({
+      text: q.questionText,
+      points: q.points,
+    })),
+  })
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

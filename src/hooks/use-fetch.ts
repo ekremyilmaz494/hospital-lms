@@ -13,6 +13,11 @@ interface UseFetchResult<T> {
 const cache = new Map<string, { data: unknown; ts: number }>();
 const STALE_TIME = 30_000; // 30 saniye — bu süre içinde cache'den anında göster
 
+/** Clear cached data for a specific URL (use before useFetch to prevent stale flash) */
+export function clearFetchCache(url: string) {
+  cache.delete(url);
+}
+
 export function useFetch<T>(url: string | null): UseFetchResult<T> {
   const cached = url ? cache.get(url) : null;
   const [data, setData] = useState<T | null>((cached?.data as T) ?? null);

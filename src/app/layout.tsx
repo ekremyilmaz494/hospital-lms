@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ToastProvider } from "@/components/shared/toast";
+import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -54,9 +55,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <ToastProvider>
-              {children}
-            </ToastProvider>
+            <SessionTimeoutProvider>
+              <ToastProvider>
+                {children}
+              </ToastProvider>
+            </SessionTimeoutProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

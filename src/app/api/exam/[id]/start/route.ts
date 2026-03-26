@@ -25,7 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (assignment.status === 'passed') return errorResponse('Zaten başarıyla tamamladınız')
   if (assignment.status === 'locked') return errorResponse('Eğitim kilitlenmiş')
-  if (assignment.currentAttempt >= assignment.maxAttempts) {
+  if (assignment.status === 'failed' && assignment.currentAttempt >= assignment.maxAttempts) {
     return errorResponse('Maksimum deneme sayısına ulaştınız')
   }
 
@@ -46,14 +46,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // Create new attempt
     const newAttemptNumber = assignment.currentAttempt + 1
 
+    // BUG #4 FIX: maxAttempts kontrolü — transaction içinde throw
+    if (newAttemptNumber > assignment.maxAttempts) {
+      throw new Error('MAX_ATTEMPTS_EXCEEDED')
+    }
+
+    // 2. ve sonraki denemelerde ön sınav atlanır → doğrudan watching_videos
+    const isRetry = newAttemptNumber > 1
+    const initialStatus = isRetry ? 'watching_videos' : 'pre_exam'
+
     const created = await tx.examAttempt.create({
       data: {
         assignmentId,
         userId: dbUser!.id,
         trainingId: assignment.trainingId,
         attemptNumber: newAttemptNumber,
-        status: 'pre_exam',
-        preExamStartedAt: new Date(),
+        status: initialStatus,
+        ...(isRetry
+          ? { preExamCompletedAt: new Date(), preExamScore: 0 }
+          : { preExamStartedAt: new Date() }
+        ),
       },
       include: { videoProgress: true },
     })
@@ -64,7 +76,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
 
     return created
+  }).catch((err: Error) => {
+    if (err.message === 'MAX_ATTEMPTS_EXCEEDED') return null
+    throw err
   })
+
+  if (!attempt) return errorResponse('Maksimum deneme sayısına ulaştınız', 403)
 
   return jsonResponse(attempt)
 }

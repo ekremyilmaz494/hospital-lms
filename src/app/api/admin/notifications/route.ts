@@ -71,15 +71,26 @@ export async function PUT(request: Request) {
     select: { id: true },
   })
 
-  const result = await prisma.notification.createMany({
-    data: staffUsers.map(u => ({
-      userId: u.id,
-      organizationId: dbUser!.organizationId!,
-      title: body.title,
-      message: body.message,
-      type: body.type ?? 'announcement',
-    })),
-  })
+  // Rate limit: max 500 kullanıcıya toplu bildirim
+  if (staffUsers.length > 500) {
+    return errorResponse(`Toplu bildirim en fazla 500 kişiye gönderilebilir. Mevcut personel: ${staffUsers.length}`, 400)
+  }
 
-  return jsonResponse({ sent: result.count })
+  // Batch gönderim (100'erli gruplarla)
+  let totalSent = 0
+  for (let i = 0; i < staffUsers.length; i += 100) {
+    const batch = staffUsers.slice(i, i + 100)
+    const result = await prisma.notification.createMany({
+      data: batch.map(u => ({
+        userId: u.id,
+        organizationId: dbUser!.organizationId!,
+        title: body.title,
+        message: body.message,
+        type: body.type ?? 'announcement',
+      })),
+    })
+    totalSent += result.count
+  }
+
+  return jsonResponse({ sent: totalSent })
 }

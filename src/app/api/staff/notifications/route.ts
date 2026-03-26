@@ -30,11 +30,19 @@ export async function PATCH(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
+  const roleError = requireRole(dbUser!.role, ['staff'])
+  if (roleError) return roleError
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
   if (id) {
-    await prisma.notification.update({ where: { id, userId: dbUser!.id }, data: { isRead: true } })
+    if (id.length < 10) return jsonResponse({ error: 'Geçersiz bildirim ID' }, 400)
+    const result = await prisma.notification.updateMany({
+      where: { id, userId: dbUser!.id },
+      data: { isRead: true },
+    })
+    if (result.count === 0) return jsonResponse({ error: 'Bildirim bulunamadı' }, 404)
   } else {
     await prisma.notification.updateMany({ where: { userId: dbUser!.id, isRead: false }, data: { isRead: true } })
   }

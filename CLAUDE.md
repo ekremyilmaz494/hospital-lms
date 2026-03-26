@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 pnpm dev          # Start dev server (Next.js 16, Turbopack)
-pnpm build        # Production build
+pnpm build        # Production build (runs prisma generate first)
 pnpm lint         # ESLint (flat config, next core-web-vitals + typescript)
 pnpm start        # Serve production build
 
@@ -39,8 +39,8 @@ Husky + lint-staged runs `scripts/secret-scanner.js` on all staged files before 
 
 ### Three role-based panels + exam module
 - **Super Admin** (`/super-admin/*`) — Manages hospitals, subscription plans, platform-wide reports, audit logs
-- **Hospital Admin** (`/admin/*`) — Manages trainings (4-step wizard), staff, reports (6-tab), backups, notifications, export (Excel/PDF)
-- **Staff** (`/staff/*`) — Views assigned trainings, calendar, profile, notifications
+- **Hospital Admin** (`/admin/*`) — Manages trainings (4-step wizard), staff, reports (6-tab), certificates, backups, notifications, export (Excel/PDF)
+- **Staff** (`/staff/*`) — Views assigned trainings, certificates, calendar, profile, notifications
 - **Exam** (`/exam/[id]/*`) — Fullscreen routes (no sidebar): pre-exam → video player → post-exam
 
 ### Training flow
@@ -49,7 +49,7 @@ Assignment → Pre-exam → Watch videos (no fast-forward) → Post-exam → Pas
 ### Key tech stack
 - **Next.js 16** (App Router, RSC), **React 19**, **TypeScript**, **Tailwind CSS 4**
 - **Supabase Auth** (JWT, role-based middleware, RLS), **Supabase Realtime** (notifications)
-- **Prisma 7** with PostgreSQL (15 models, `@map` snake_case table/column names)
+- **Prisma 7** with PostgreSQL (17 models, `@map` snake_case table/column names)
 - **AWS S3 + CloudFront** for video storage/streaming (presigned uploads, signed URLs)
 - **Upstash Redis** for exam timers and rate limiting
 - **Nodemailer** for transactional emails (SMTP)
@@ -66,10 +66,22 @@ Assignment → Pre-exam → Watch videos (no fast-forward) → Post-exam → Pas
 ### Backend structure (API routes)
 - `src/app/api/auth/` — Login, logout, callback, me
 - `src/app/api/super-admin/` — Hospitals CRUD, subscriptions, reports, audit-logs, user creation
-- `src/app/api/admin/` — Staff CRUD, trainings CRUD (videos, questions, assignments), reports, notifications, audit-logs, backups, export (Excel/PDF)
-- `src/app/api/staff/` — My trainings, notifications, profile, calendar
+- `src/app/api/admin/` — Staff CRUD, trainings CRUD (videos, questions, assignments), reports, notifications, audit-logs, backups, export (Excel/PDF), certificates, dashboard stats
+- `src/app/api/staff/` — My trainings, notifications, profile, calendar, certificates, dashboard
 - `src/app/api/exam/[id]/` — Start attempt, submit answers, video progress, streaming URLs, timer
 - `src/app/api/cron/cleanup/` — Daily cleanup at 03:00 UTC (Vercel Cron)
+
+### API route pattern
+All API routes follow a consistent pattern using helpers from `src/lib/api-helpers.ts`:
+```typescript
+const { user, profile } = await getAuthUser();       // Auth check + DB profile
+requireRole(profile.role, ['admin']);                  // Role guard
+const body = await parseBody<Schema>(request);         // Zod-validated body parsing
+createAuditLog({ ... });                               // Audit trail
+return jsonResponse(data);                             // Consistent responses
+```
+- `safePagination(searchParams)` — Parses page/limit with bounds (1-100 items, default 20)
+- `errorResponse(message, status)` — Standardized error format
 
 ### Auth & security
 - Supabase Auth with JWT tokens stored in cookies (`@supabase/ssr`)
@@ -77,30 +89,45 @@ Assignment → Pre-exam → Watch videos (no fast-forward) → Post-exam → Pas
   - `client.ts` — Browser client (`createBrowserClient`)
   - `server.ts` — Server client (`createClient()`) + service role client (`createServiceClient()`)
   - `middleware.ts` — Session refresh + role-based route guards
-- `src/lib/api-helpers.ts` — `getAuthUser()`, `requireRole()`, `createAuditLog()`, `parseBody()`
-- `supabase-rls.sql` — Complete RLS policies for all 15 tables (run in Supabase SQL Editor after migrations)
+- Public routes: `/auth/login`, `/auth/callback`, `/auth/forgot-password`
+- Role-based redirects enforce panel access (e.g., staff can't access `/admin/*`)
 - API routes use `service_role` key only for admin user creation; all other operations use user JWT
 - Roles stored in `user.user_metadata.role`: `super_admin`, `admin`, `staff`
+- `supabase-rls.sql` — Complete RLS policies for all tables (run in Supabase SQL Editor after migrations)
+- Session timeout is configurable per organization (default 30 min)
+
+### Next.js config
+- `proxyClientMaxBodySize: '512mb'` — Required for video uploads
+- Security headers on all routes (HSTS, X-Frame-Options DENY, CSP, XSS protection)
+- CORS configured for `/api/*` routes scoped to `NEXT_PUBLIC_APP_URL`
 
 ### Prisma conventions
 - Generated client at `src/generated/prisma` (import from `@/generated/prisma/client`)
 - Singleton instance in `src/lib/prisma.ts` using `PrismaPg` adapter
 - Models use camelCase fields with `@map("snake_case")` for DB columns and `@@map("table_name")` for tables
 - All IDs are UUIDs (`@db.Uuid`)
+- Multi-tenant: most models have `organizationId` for tenant isolation
+
+### Vitest config
+- Environment: `node`, globals enabled
+- Test files: `src/**/*.test.ts` and `src/**/*.test.tsx`
+- Coverage: `src/lib/**` and `src/app/api/**`
 
 ### Project structure
-- `src/components/shared/` — Reusable: stat-card, page-header, chart-card, data-table, notification-bell
-- `src/components/layouts/` — App sidebar (role-aware config) and topbar
-- `src/components/providers/` — ThemeProvider (next-themes), AuthProvider (Supabase session listener)
+- `src/components/shared/` — Reusable: stat-card, page-header, chart-card, data-table, notification-bell, toast
+- `src/components/layouts/` — App sidebar (role-aware config in `sidebar-config.ts`) and topbar
+- `src/components/providers/` — ThemeProvider, AuthProvider, SessionTimeoutProvider, ToastProvider
 - `src/types/database.ts` — TypeScript types for all entities
 - `src/lib/validations.ts` — Zod v4 schemas for all API inputs
 - `src/lib/s3.ts` — S3 upload/download/stream/delete helpers
 - `src/lib/redis.ts` — Exam timer, rate limiting
 - `src/lib/email.ts` — SMTP transporter + Turkish HTML email templates
+- `src/lib/exam-helpers.ts` — Shared exam logic (attempt validation, scoring)
 - `src/hooks/use-realtime-notifications.ts` — Supabase Realtime postgres_changes listener
+- `src/hooks/use-session-timeout.ts` — Auto-logout on inactivity
 
 ### Design system
-- Fonts: Syne (`--font-display`, headings), DM Sans (`--font-body`), JetBrains Mono (`--font-mono`)
+- Fonts: Plus Jakarta Sans (`--font-display`, headings), Inter (`--font-body`), JetBrains Mono (`--font-mono`)
 - Primary: `#0d9668`, Accent: `#f59e0b`, BG: `#f1f5f9`
 - CSS variables for theming (light/dark), never use raw Tailwind color classes
 - Cards: `rounded-2xl` with hover lift. Badges: `rounded-full` with dot indicators

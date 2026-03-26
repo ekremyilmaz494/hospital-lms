@@ -28,12 +28,13 @@ interface ExamData {
 export default function PreExamPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const { data: examData, isLoading, error } = useFetch<ExamData>(`/api/exam/${id}/questions`);
+  const { data: examData, isLoading, error } = useFetch<ExamData>(`/api/exam/${id}/questions?phase=pre`);
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [started, setStarted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Initialize timer when data loads
   useEffect(() => {
@@ -46,17 +47,33 @@ export default function PreExamPage() {
   const startExam = useCallback(async () => {
     if (started) return;
     try {
-      await fetch(`/api/exam/${id}/start`, {
+      const res = await fetch(`/api/exam/${id}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ examType: 'pre' }),
       });
+      const attempt = await res.json();
+
+      // Phase guard: redirect if attempt is past pre-exam
+      if (attempt?.status === 'watching_videos') {
+        router.replace(`/exam/${id}/videos`);
+        return;
+      }
+      if (attempt?.status === 'post_exam') {
+        router.replace(`/exam/${id}/post-exam`);
+        return;
+      }
+      if (attempt?.status === 'completed') {
+        router.replace('/staff/my-trainings');
+        return;
+      }
+
       setStarted(true);
     } catch {
       // Continue even if start fails
       setStarted(true);
     }
-  }, [id, started]);
+  }, [id, started, router]);
 
   useEffect(() => {
     if (examData && !started) {
@@ -94,18 +111,39 @@ export default function PreExamPage() {
   const answeredCount = Object.keys(answers).length;
 
   const handleFinish = async () => {
+    if (submitting) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
-      await fetch(`/api/exam/${id}/submit`, {
+      // BUG #1 FIX: answers key'leri q.id ile saklanıyor, idx değil
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const formattedAnswers = questions.map((q: any) => {
+        const questionId = q.questionId ?? q.id ?? '';
+        const options = q.options ?? [];
+        const selectedAnswer = answers[q.id];  // ✅ q.id ile oku
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const selectedOption = options.find((o: any) => o.id === selectedAnswer);
+        return selectedOption ? { questionId: String(questionId), selectedOptionId: selectedOption.optionId ?? selectedOption.id } : null;
+      }).filter(Boolean);
+
+      const res = await fetch(`/api/exam/${id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ examType: 'pre', answers }),
+        body: JSON.stringify({ answers: formattedAnswers, phase: 'pre' }),
       });
+
+      // BUG #2 FIX: response.ok kontrolü
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSubmitError(data.error ?? 'Gönderim başarısız. Tekrar deneyin.');
+        return;
+      }
+
+      router.push(`/exam/${id}/transition?from=pre&score=${data.score ?? 0}`);
     } catch {
-      // Continue navigation even if submit fails
+      setSubmitError('Bir hata oluştu. Tekrar deneyin.');
     } finally {
       setSubmitting(false);
-      router.push(`/exam/${id}/videos`);
     }
   };
 
@@ -177,9 +215,17 @@ export default function PreExamPage() {
                   Sonraki <ChevronRight className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button onClick={handleFinish} disabled={submitting} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)', transition: 'background var(--transition-fast)' }}>
-                  <AlertTriangle className="h-4 w-4" /> {submitting ? 'Gönderiliyor...' : `Sınavı Bitir (${answeredCount}/${questions.length})`}
-                </Button>
+                <div>
+                  <Button onClick={handleFinish} disabled={submitting} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)', transition: 'background var(--transition-fast)' }}>
+                    <AlertTriangle className="h-4 w-4" /> {submitting ? 'Gönderiliyor...' : `Sınavı Bitir (${answeredCount}/${questions.length})`}
+                  </Button>
+                  {submitError && (
+                    <div className="mt-2 flex items-center justify-end gap-2">
+                      <p className="text-xs font-medium" style={{ color: 'var(--color-error)' }}>{submitError}</p>
+                      <button onClick={() => { setSubmitError(null); handleFinish(); }} className="text-xs font-semibold underline" style={{ color: 'var(--color-primary)' }}>Tekrar Dene</button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>

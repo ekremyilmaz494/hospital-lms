@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { createQuestionSchema } from '@/lib/validations'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -9,6 +9,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
+
+  // Verify training belongs to org
+  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  if (!training) return errorResponse('Training not found', 404)
 
   const questions = await prisma.question.findMany({
     where: { trainingId: id },
@@ -48,6 +52,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     include: { options: true },
   })
 
+  await createAuditLog({
+    userId: dbUser!.id,
+    organizationId: dbUser!.organizationId!,
+    action: 'create',
+    entityType: 'question',
+    entityId: question.id,
+    newData: { questionText: question.questionText, trainingId: id },
+    request,
+  })
+
   return jsonResponse(question, 201)
 }
 
@@ -59,15 +73,26 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
+  // Verify training belongs to org
+  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  if (!training) return errorResponse('Training not found', 404)
+
   // Bulk update sort order
   const body = await parseBody<{ questions: { id: string; sortOrder: number }[] }>(request)
   if (!body?.questions) return errorResponse('Invalid body')
 
-  await prisma.$transaction(
-    body.questions.map(q =>
-      prisma.question.update({ where: { id: q.id }, data: { sortOrder: q.sortOrder } })
+  try {
+    await prisma.$transaction(
+      body.questions.map(q =>
+        prisma.question.update({
+          where: { id: q.id },
+          data: { sortOrder: q.sortOrder },
+        })
+      )
     )
-  )
+  } catch {
+    return errorResponse('Sıralama güncellenirken hata oluştu', 500)
+  }
 
   return jsonResponse({ success: true })
 }

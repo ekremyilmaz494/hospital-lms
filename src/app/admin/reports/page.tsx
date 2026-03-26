@@ -8,7 +8,7 @@ import {
 import { exportExcel, exportPDF, printPage } from '@/lib/export';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart,
-} from 'recharts';
+} from '@/components/shared/recharts';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatCard } from '@/components/shared/stat-card';
@@ -100,7 +100,7 @@ export default function ReportsPage() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <BlurFade delay={0.15} className="lg:col-span-2">
                 <ChartCard title="Aylık Tamamlanma Trendi" icon={<BarChart3 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
-                  <div className="h-[320px]">
+                  <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                         <defs><linearGradient id="colorTamamlanan" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--color-success)" stopOpacity={0.2} /><stop offset="95%" stopColor="var(--color-success)" stopOpacity={0} /></linearGradient></defs>
@@ -157,7 +157,7 @@ export default function ReportsPage() {
                       const rate = t.atanan > 0 ? Math.round((t.tamamlayan / t.atanan) * 100) : 0;
                       const rateColor = rate >= 80 ? 'var(--color-success)' : rate >= 60 ? 'var(--color-warning)' : 'var(--color-error)';
                       return (
-                        <tr key={t.name} className="group transition-colors duration-100 hover:bg-[var(--color-surface-hover)]" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <tr key={t.name} className="group transition-colors duration-100 hover:bg-(--color-surface-hover)" style={{ borderBottom: '1px solid var(--color-border)' }}>
                           <td className="px-5 py-4"><span className="text-sm font-semibold">{t.name}</span></td>
                           <td className="px-4 py-4 text-sm font-mono">{t.atanan}</td>
                           <td className="px-4 py-4 text-sm font-mono">{t.tamamlayan}</td>
@@ -184,7 +184,7 @@ export default function ReportsPage() {
                   <thead><tr style={{ background: 'var(--color-bg)' }}><th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Personel</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Departman</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tamamlanan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Ort. Puan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Durum</th></tr></thead>
                   <tbody>
                     {staffPerformance.map((s) => (
-                      <tr key={s.name} className="group transition-colors duration-100 hover:bg-[var(--color-surface-hover)]" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <tr key={s.name} className="group transition-colors duration-100 hover:bg-(--color-surface-hover)" style={{ borderBottom: '1px solid var(--color-border)' }}>
                         <td className="px-5 py-4"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: s.color }}>{s.name.split(' ').map(n => n[0]).join('')}</div><span className="text-sm font-semibold">{s.name}</span></div></td>
                         <td className="px-4 py-4"><span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: `${s.color}15`, color: s.color }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />{s.dept}</span></td>
                         <td className="px-4 py-4 text-sm font-mono font-semibold">{s.completed}</td>
@@ -210,7 +210,7 @@ export default function ReportsPage() {
             <>
               <BlurFade delay={0.05}>
                 <ChartCard title="Departman Karşılaştırması" icon={<Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
-                  <div className="h-[320px]">
+                  <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <BarChart data={departmentData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
@@ -266,7 +266,7 @@ export default function ReportsPage() {
                     <thead><tr style={{ background: 'var(--color-bg)' }}><th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Personel</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Departman</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Eğitim</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Deneme</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Son Puan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>İşlem</th></tr></thead>
                     <tbody>
                       {failureData.map((f, i) => (
-                        <tr key={i} className="transition-colors duration-100 hover:bg-[var(--color-surface-hover)]" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <tr key={i} className="transition-colors duration-100 hover:bg-(--color-surface-hover)" style={{ borderBottom: '1px solid var(--color-border)' }}>
                           <td className="px-5 py-4 text-sm font-semibold">{f.name}</td>
                           <td className="px-4 py-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>{f.dept}</td>
                           <td className="px-4 py-4 text-sm">{f.training}</td>
@@ -295,7 +295,7 @@ export default function ReportsPage() {
           {durationData.length > 0 ? (
             <BlurFade delay={0.05}>
               <ChartCard title="Ortalama Süre Karşılaştırması (dakika)" icon={<Clock className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />}>
-                <div className="h-[320px]">
+                <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <BarChart data={durationData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
