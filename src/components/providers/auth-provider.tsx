@@ -1,13 +1,47 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 
+const DB_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 dakika
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setLoading } = useAuthStore();
   const router = useRouter();
+
+  // DB'den guncel role/isActive verisi al (JWT stale olabilir)
+  const refreshFromDB = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        const currentUser = useAuthStore.getState().user;
+        if (data.user && currentUser) {
+          // Deaktive edilmis kullaniciyi zorla cikis yap
+          if (data.user.isActive === false) {
+            const supabase = createClient();
+            await supabase.auth.signOut();
+            setUser(null);
+            router.push('/auth/login');
+            return;
+          }
+
+          setUser({
+            ...currentUser,
+            role: data.user.role ?? currentUser.role,
+            isActive: data.user.isActive ?? currentUser.isActive,
+            department: data.user.department ?? currentUser.department,
+            departmentId: data.user.departmentId ?? currentUser.departmentId,
+            title: data.user.title ?? currentUser.title,
+          });
+        }
+      }
+    } catch {
+      // Sessizce devam et — JWT verileri fallback olarak kullanilir
+    }
+  }, [setUser, router]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -33,12 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           createdAt: user.created_at,
           updatedAt: user.updated_at ?? user.created_at,
         });
+        // Hemen DB'den guncel veri al
+        refreshFromDB();
       } else {
         setUser(null);
       }
     }).finally(() => {
       setLoading(false);
     });
+
+    // Periyodik DB kontrolu (deaktive edilmis kullaniciyi yakala)
+    const interval = setInterval(refreshFromDB, DB_REFRESH_INTERVAL);
 
     // Listen for auth state changes
     const {
@@ -69,8 +108,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [setUser, setLoading, router]);
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(interval);
+    };
+  }, [setUser, setLoading, router, refreshFromDB]);
 
   return <>{children}</>;
 }
