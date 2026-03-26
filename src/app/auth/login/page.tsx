@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,7 @@ const features = [
   { icon: Shield, title: 'Güvenli Altyapı', desc: 'Rol tabanlı erişim ve denetim kayıtları' },
 ];
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
@@ -244,5 +244,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
