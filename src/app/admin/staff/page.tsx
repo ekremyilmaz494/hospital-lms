@@ -253,6 +253,145 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
   );
 }
 
+// ── Assign Existing Staff Modal ──
+function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
+  deptId: string; deptName: string; allStaff: Staff[]; onClose: () => void; onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+
+  const available = allStaff.filter(s =>
+    s.departmentId !== deptId &&
+    (search === '' ||
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.email.toLowerCase().includes(search.toLowerCase()) ||
+      (s.department || '').toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const toggle = (id: string) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const handleAssign = async () => {
+    if (selected.size === 0) return;
+    setSaving(true);
+    try {
+      await Promise.all([...selected].map(id =>
+        fetch(`/api/admin/staff/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ departmentId: deptId }),
+        })
+      ));
+      toast(`${selected.size} personel departmana eklendi`, 'success');
+      onSaved();
+      onClose();
+    } catch {
+      toast('Bir hata oluştu', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} />
+      <div
+        className="relative w-full max-w-md rounded-2xl p-6 flex flex-col gap-4"
+        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-lg)', maxHeight: '80vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Personel Ekle</h3>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{deptName} departmanına personel ata</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-[var(--color-surface-hover)]">
+            <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+          </button>
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+          <input
+            className="w-full h-10 rounded-xl border pl-9 pr-4 text-sm outline-none"
+            style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            placeholder="İsim veya e-posta ile ara..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            autoFocus
+          />
+        </div>
+
+        <div className="overflow-y-auto flex-1 space-y-1.5 min-h-0" style={{ maxHeight: '340px' }}>
+          {available.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10">
+              <Users className="h-8 w-8" style={{ color: 'var(--color-text-muted)' }} />
+              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                {search ? 'Sonuç bulunamadı' : 'Eklenebilecek personel yok'}
+              </p>
+            </div>
+          ) : available.map(s => {
+            const isSelected = selected.has(s.id);
+            return (
+              <button
+                key={s.id}
+                onClick={() => toggle(s.id)}
+                className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150"
+                style={{
+                  background: isSelected ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                  border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                }}
+              >
+                <Avatar className="h-9 w-9 shrink-0">
+                  <AvatarFallback className="text-xs font-semibold text-white" style={{ background: 'var(--color-primary)' }}>{s.initials}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{s.name}</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
+                    {s.email}{s.department ? ` · ${s.department}` : ' · Departmansız'}
+                  </p>
+                </div>
+                <div
+                  className="h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center"
+                  style={{
+                    borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                    background: isSelected ? 'var(--color-primary)' : 'transparent',
+                  }}
+                >
+                  {isSelected && <span className="text-[10px] text-white font-bold">✓</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            {selected.size > 0 ? `${selected.size} personel seçildi` : 'Personel seçin'}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} className="rounded-lg" style={{ borderColor: 'var(--color-border)' }}>İptal</Button>
+            <Button
+              onClick={handleAssign}
+              disabled={selected.size === 0 || saving}
+              className="gap-2 rounded-lg font-semibold text-white"
+              style={{ background: 'var(--color-primary)' }}
+            >
+              {saving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <UserPlus className="h-4 w-4" />}
+              {saving ? 'Ekleniyor...' : 'Ekle'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──
 export default function StaffPage() {
   const router = useRouter();
@@ -262,6 +401,7 @@ export default function StaffPage() {
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [showAddDept, setShowAddDept] = useState(false);
   const [showAddStaff, setShowAddStaff] = useState(false);
+  const [showAssignStaff, setShowAssignStaff] = useState(false);
   const [isSavingDept, setIsSavingDept] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptColor, setNewDeptColor] = useState(DEPARTMENT_COLORS[0]);
@@ -427,7 +567,7 @@ export default function StaffPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); setEditingDept({ id: dept.id, name: dept.name, color: dept.color }); }}><Edit className="h-4 w-4" /> Düzenle</DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); setSelectedDept(dept.id); setShowAddStaff(true); }}><UserPlus className="h-4 w-4" /> Personel Ekle</DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); setSelectedDept(dept.id); setShowAssignStaff(true); }}><UserPlus className="h-4 w-4" /> Personel Ekle</DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             className="gap-2 text-red-500"
@@ -597,7 +737,7 @@ export default function StaffPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)' }} onClick={() => setShowAddStaff(true)}>
+                <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)' }} onClick={() => setShowAssignStaff(true)}>
                   <UserPlus className="h-4 w-4" /> Personel Ekle
                 </Button>
                 <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)' }} onClick={() => setEditingDept({ id: selectedDeptData.id, name: selectedDeptData.name, color: selectedDeptData.color })}>
@@ -713,6 +853,18 @@ export default function StaffPage() {
       )}
 
       {showAddStaff && <NewStaffModal onClose={() => setShowAddStaff(false)} departments={allDepartments} onSaved={refetch} />}
+      {showAssignStaff && selectedDept && (() => {
+        const dept = allDepartments.find(d => d.id === selectedDept);
+        return dept ? (
+          <AssignStaffModal
+            deptId={selectedDept}
+            deptName={dept.name}
+            allStaff={allStaff}
+            onClose={() => setShowAssignStaff(false)}
+            onSaved={refetch}
+          />
+        ) : null;
+      })()}
       <input
         id="excel-import"
         type="file"
