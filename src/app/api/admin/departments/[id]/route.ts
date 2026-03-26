@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
@@ -93,6 +94,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     newData: parsed.data,
   })
 
+  revalidatePath('/admin/departments')
+
   return jsonResponse(department)
 }
 
@@ -129,6 +132,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     entityId: id,
     oldData: { name: department.name, staffCount: department._count.users },
   })
+
+  revalidatePath('/admin/departments')
 
   return jsonResponse({ success: true })
 }

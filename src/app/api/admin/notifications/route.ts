@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
 import { createNotificationSchema } from '@/lib/validations'
@@ -47,6 +48,9 @@ export async function POST(request: Request) {
       organizationId: dbUser!.organizationId!,
     },
   })
+
+  revalidatePath('/staff/notifications')
+  revalidatePath('/admin/notifications')
 
   return jsonResponse(notification, 201)
 }

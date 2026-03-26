@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { updateUserSchema } from '@/lib/validations'
@@ -35,9 +36,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Transform raw Prisma data to frontend format
   const completedAssignments = staff.assignments.filter(a => a.status === 'passed')
   const allAttempts = staff.assignments.flatMap(a => a.examAttempts)
-  const scoredAttempts = allAttempts.filter(a => a.score !== null && a.score !== undefined)
+  const scoredAttempts = allAttempts.filter(a => a.postExamScore !== null)
   const avgScore = scoredAttempts.length > 0
-    ? (scoredAttempts.reduce((sum, a) => sum + (a.score ?? 0), 0) / scoredAttempts.length).toFixed(0)
+    ? (scoredAttempts.reduce((sum, a) => sum + Number(a.postExamScore ?? 0), 0) / scoredAttempts.length).toFixed(0)
     : '0'
   const successRate = staff.assignments.length > 0
     ? ((completedAssignments.length / staff.assignments.length) * 100).toFixed(0)
@@ -64,13 +65,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     },
     trainingHistory: staff.assignments.map(a => {
       const lastAttempt = a.examAttempts.sort((x, y) =>
-        new Date(y.startedAt).getTime() - new Date(x.startedAt).getTime()
+        new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime()
       )[0]
       return {
         title: a.training.title,
         attempt: a.examAttempts.length,
-        preScore: null,
-        postScore: lastAttempt?.score ?? null,
+        preScore: lastAttempt?.preExamScore ? Number(lastAttempt.preExamScore) : null,
+        postScore: lastAttempt?.postExamScore ? Number(lastAttempt.postExamScore) : null,
         status: a.status,
         date: a.assignedAt?.toISOString?.() ?? new Date().toISOString(),
       }
@@ -123,6 +124,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     request,
   })
 
+  revalidatePath('/admin/staff')
+
   return jsonResponse(staff)
 }
 
@@ -148,6 +151,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     entityId: id,
     request,
   })
+
+  revalidatePath('/admin/staff')
 
   return jsonResponse({ success: true })
 }

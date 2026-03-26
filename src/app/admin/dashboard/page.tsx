@@ -45,14 +45,27 @@ const chartTooltipStyle = { background: 'var(--color-surface)', border: '1px sol
 export default function AdminDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { data, isLoading, error } = useFetch<DashboardData>('/api/admin/dashboard');
+  const { data, isLoading, error, refetch } = useFetch<DashboardData>('/api/admin/dashboard');
 
   if (isLoading) {
     return <PageLoading />;
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="w-full max-w-sm rounded-2xl border p-8 text-center" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-md)' }}>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: 'var(--color-error-bg)' }}>
+            <AlertTriangle className="h-6 w-6" style={{ color: 'var(--color-error)' }} />
+          </div>
+          <p className="mb-1 text-sm font-semibold">Veriler yüklenemedi</p>
+          <p className="mb-5 text-xs" style={{ color: 'var(--color-text-muted)' }}>{error}</p>
+          <Button onClick={refetch} variant="outline" className="gap-2 rounded-xl text-sm" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
+            <TrendingUp className="h-4 w-4" /> Tekrar Dene
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   const stats = (data?.stats ?? []).map(s => ({ ...s, icon: iconMap[s.icon] || Users }));

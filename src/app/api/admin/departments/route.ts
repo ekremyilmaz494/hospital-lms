@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
@@ -93,6 +94,8 @@ export async function POST(request: NextRequest) {
     entityId: department.id,
     newData: { name, color },
   })
+
+  revalidatePath('/admin/departments')
 
   return jsonResponse(department, 201)
 }

@@ -30,7 +30,13 @@ export async function POST(request: Request) {
     },
   })
 
-  if (authError) return errorResponse(authError.message)
+  if (authError) {
+    console.error('[User Create Auth Error]', authError.message)
+    const safeMsg = authError.message?.includes('already registered')
+      ? 'Bu e-posta adresi zaten kayıtlı'
+      : 'Kullanıcı oluşturulamadı'
+    return errorResponse(safeMsg)
+  }
 
   // Create DB user record — rollback auth user if DB fails
   let user

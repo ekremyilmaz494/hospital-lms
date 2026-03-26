@@ -11,7 +11,5 @@ function createPrismaClient() {
   return new PrismaClient({ adapter })
 }
 
-// Force new client after schema changes
-globalForPrisma.prisma = undefined
-export const prisma = createPrismaClient()
+export const prisma = globalForPrisma.prisma ?? createPrismaClient()
 globalForPrisma.prisma = prisma

@@ -29,21 +29,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return errorResponse('Maksimum deneme sayısına ulaştınız')
   }
 
-  // Check for active (incomplete) attempt
-  let attempt = await prisma.examAttempt.findFirst({
-    where: {
-      assignmentId,
-      userId: dbUser!.id,
-      status: { not: 'completed' },
-    },
-    include: { videoProgress: true },
-  })
+  // Atomic: check for active attempt OR create new one inside a transaction
+  const attempt = await prisma.$transaction(async (tx) => {
+    // Check for active (incomplete) attempt
+    const existing = await tx.examAttempt.findFirst({
+      where: {
+        assignmentId,
+        userId: dbUser!.id,
+        status: { not: 'completed' },
+      },
+      include: { videoProgress: true },
+    })
 
-  if (!attempt) {
+    if (existing) return existing
+
     // Create new attempt
     const newAttemptNumber = assignment.currentAttempt + 1
 
-    attempt = await prisma.examAttempt.create({
+    const created = await tx.examAttempt.create({
       data: {
         assignmentId,
         userId: dbUser!.id,
@@ -55,11 +58,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       include: { videoProgress: true },
     })
 
-    await prisma.trainingAssignment.update({
+    await tx.trainingAssignment.update({
       where: { id: assignmentId },
       data: { currentAttempt: newAttemptNumber, status: 'in_progress' },
     })
-  }
+
+    return created
+  })
 
   return jsonResponse(attempt)
 }

@@ -255,6 +255,7 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
 
 // ── Main Page ──
 export default function StaffPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const { data, isLoading, error, refetch } = useFetch<StaffPageData>('/api/admin/staff');
   const [activeView, setActiveView] = useState<'all' | 'departments'>('departments');
@@ -264,6 +265,8 @@ export default function StaffPage() {
   const [isSavingDept, setIsSavingDept] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptColor, setNewDeptColor] = useState(DEPARTMENT_COLORS[0]);
+  const [editingDept, setEditingDept] = useState<{ id: string; name: string; color: string } | null>(null);
+  const [editDeptSaving, setEditDeptSaving] = useState(false);
 
   if (isLoading) {
     return <PageLoading />;
@@ -423,8 +426,8 @@ export default function StaffPage() {
                           <MoreHorizontal className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="gap-2"><Edit className="h-4 w-4" /> Düzenle</DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2"><UserPlus className="h-4 w-4" /> Personel Ekle</DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); setEditingDept({ id: dept.id, name: dept.name, color: dept.color }); }}><Edit className="h-4 w-4" /> Düzenle</DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); setSelectedDept(dept.id); setShowAddStaff(true); }}><UserPlus className="h-4 w-4" /> Personel Ekle</DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             className="gap-2 text-red-500"
@@ -594,13 +597,30 @@ export default function StaffPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)' }}>
+                <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)' }} onClick={() => setShowAddStaff(true)}>
                   <UserPlus className="h-4 w-4" /> Personel Ekle
                 </Button>
-                <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)' }}>
+                <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)' }} onClick={() => setEditingDept({ id: selectedDeptData.id, name: selectedDeptData.name, color: selectedDeptData.color })}>
                   <Edit className="h-4 w-4" /> Düzenle
                 </Button>
-                <Button variant="outline" className="gap-2 rounded-xl text-red-500" style={{ borderColor: 'var(--color-error)' }}>
+                <Button
+                  variant="outline"
+                  className="gap-2 rounded-xl text-red-500"
+                  style={{ borderColor: 'var(--color-error)' }}
+                  onClick={async () => {
+                    if (confirm(`"${selectedDeptData.name}" departmanını silmek istediğinize emin misiniz?`)) {
+                      try {
+                        const res = await fetch(`/api/admin/departments/${selectedDept}`, { method: 'DELETE' });
+                        if (!res.ok) throw new Error('Silinemedi');
+                        toast('Departman silindi', 'success');
+                        setSelectedDept(null);
+                        refetch();
+                      } catch {
+                        toast('Departman silinemedi', 'error');
+                      }
+                    }
+                  }}
+                >
                   <Trash2 className="h-4 w-4" /> Sil
                 </Button>
               </div>
@@ -620,6 +640,76 @@ export default function StaffPage() {
             <DataTable columns={columns} data={allStaff} searchKey="name" searchPlaceholder="Personel ara (isim, TC, e-posta)..." />
           </div>
         </BlurFade>
+      )}
+
+      {/* Edit Department Modal */}
+      {editingDept && (
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-4" onClick={() => setEditingDept(null)}>
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} />
+          <div
+            className="relative w-full max-w-sm rounded-2xl p-6 space-y-5"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-lg)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Departman Düzenle</h3>
+              <button onClick={() => setEditingDept(null)} className="rounded-lg p-2 hover:bg-[var(--color-surface-hover)]">
+                <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+              </button>
+            </div>
+            <div>
+              <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Departman Adı</Label>
+              <Input
+                value={editingDept.name}
+                onChange={(e) => setEditingDept({ ...editingDept, name: e.target.value })}
+                className="h-10"
+                style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
+              />
+            </div>
+            <div>
+              <Label className="text-xs font-medium mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>Renk</Label>
+              <div className="flex flex-wrap gap-2">
+                {DEPARTMENT_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setEditingDept({ ...editingDept, color: c })}
+                    className="h-7 w-7 rounded-full transition-transform duration-150 hover:scale-110"
+                    style={{ background: c, outline: editingDept.color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setEditingDept(null)} className="rounded-lg" style={{ borderColor: 'var(--color-border)' }}>İptal</Button>
+              <Button
+                disabled={!editingDept.name.trim() || editDeptSaving}
+                className="gap-2 rounded-lg font-semibold text-white"
+                style={{ background: editingDept.color }}
+                onClick={async () => {
+                  setEditDeptSaving(true);
+                  try {
+                    const res = await fetch(`/api/admin/departments/${editingDept.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name: editingDept.name, color: editingDept.color }),
+                    });
+                    if (!res.ok) throw new Error('Güncellenemedi');
+                    toast('Departman güncellendi', 'success');
+                    setEditingDept(null);
+                    refetch();
+                  } catch {
+                    toast('Departman güncellenemedi', 'error');
+                  } finally {
+                    setEditDeptSaving(false);
+                  }
+                }}
+              >
+                {editDeptSaving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Save className="h-4 w-4" />}
+                {editDeptSaving ? 'Kaydediliyor...' : 'Kaydet'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showAddStaff && <NewStaffModal onClose={() => setShowAddStaff(false)} departments={allDepartments} onSaved={refetch} />}

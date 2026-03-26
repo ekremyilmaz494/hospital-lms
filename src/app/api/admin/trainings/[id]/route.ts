@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { updateTrainingSchema } from '@/lib/validations'
@@ -64,6 +65,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     request,
   })
 
+  revalidatePath('/staff/my-trainings')
+  revalidatePath('/admin/trainings')
+
   return jsonResponse(training)
 }
 
@@ -96,6 +100,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     oldData: existing,
     request,
   })
+
+  revalidatePath('/staff/my-trainings')
+  revalidatePath('/admin/trainings')
 
   return jsonResponse({ success: true })
 }

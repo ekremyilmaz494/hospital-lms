@@ -11,6 +11,8 @@ export async function GET() {
   const orgId = dbUser!.organizationId
   if (!orgId) return errorResponse('Organization not found', 403)
 
+  try {
+
   // Parallel queries for dashboard data
   const [
     staffCount,
@@ -135,4 +137,9 @@ export async function GET() {
     topPerformers,
     recentActivity,
   })
+
+  } catch (err) {
+    console.error('[Dashboard API Error]', err)
+    return errorResponse('Dashboard verileri alınamadı, lütfen sayfayı yenileyin', 503)
+  }
 }

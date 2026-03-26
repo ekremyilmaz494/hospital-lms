@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createUserSchema } from '@/lib/validations'
@@ -146,7 +147,13 @@ export async function POST(request: Request) {
     },
   })
 
-  if (authError) return errorResponse(authError.message)
+  if (authError) {
+    console.error('[Staff Create Auth Error]', authError.message)
+    const safeMsg = authError.message?.includes('already registered')
+      ? 'Bu e-posta adresi zaten kayıtlı'
+      : 'Kullanıcı oluşturulamadı'
+    return errorResponse(safeMsg)
+  }
 
   let user
   try {
@@ -182,6 +189,8 @@ export async function POST(request: Request) {
     newData: user,
     request,
   })
+
+  revalidatePath('/admin/staff')
 
   return jsonResponse(user, 201)
 }

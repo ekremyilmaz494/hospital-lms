@@ -261,6 +261,7 @@ model ExamAttempt {
   videoProgress         VideoProgress[]
   certificates          Certificate[]
 
+  @@unique([assignmentId, attemptNumber])
   @@index([assignmentId], map: "idx_attempts_assignment")
   @@index([userId], map: "idx_attempts_user")
   @@map("exam_attempts")

@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createTrainingBodySchema } from '@/lib/validations'
@@ -160,6 +161,9 @@ export async function POST(request: Request) {
       entityId: training.id,
       newData: { title: training.title },
     })
+
+    revalidatePath('/staff/my-trainings')
+    revalidatePath('/admin/trainings')
 
     return jsonResponse(training, 201)
   } catch (err: unknown) {

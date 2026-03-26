@@ -43,14 +43,21 @@ export default function VideoPlayerPage() {
   const [videoError, setVideoError] = useState(false);
   const lastAllowedTime = useRef(0);
 
-  // Set initial video index when data loads
-  useEffect(() => {
-    if (videosData.length > 0 && currentVideoIdx === -1) {
-      const firstIncomplete = videosData.findIndex((v) => !v.completed);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCurrentVideoIdx(firstIncomplete >= 0 ? firstIncomplete : 0);
-    }
-  }, [videosData, currentVideoIdx]);
+  // All video switches go through this — resets playback state in one place
+  const changeVideo = useCallback((idx: number) => {
+    setCurrentVideoIdx(idx);
+    lastAllowedTime.current = 0;
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+    setVideoError(false);
+  }, []);
+
+  // Set initial video index when data loads (render-time derived state)
+  if (videosData.length > 0 && currentVideoIdx === -1) {
+    const firstIncomplete = videosData.findIndex((v) => !v.completed);
+    setCurrentVideoIdx(firstIncomplete >= 0 ? firstIncomplete : 0);
+  }
 
   const currentVideo = videosData[currentVideoIdx >= 0 ? currentVideoIdx : 0];
   const allCompleted = videosData.length > 0 && videosData.every((v) => v.completed);
@@ -91,13 +98,9 @@ export default function VideoPlayerPage() {
   // Auto-advance to next video
   const goToNextVideo = useCallback(() => {
     if (currentVideoIdx < videosData.length - 1) {
-      setCurrentVideoIdx(currentVideoIdx + 1);
-      lastAllowedTime.current = 0;
-      setCurrentTime(0);
-      setDuration(0);
-      setVideoError(false);
+      changeVideo(currentVideoIdx + 1);
     }
-  }, [currentVideoIdx, videosData.length]);
+  }, [currentVideoIdx, videosData.length, changeVideo]);
 
   // When video ends, mark as completed via heartbeat
   const [showPostExamPrompt, setShowPostExamPrompt] = useState(false);
@@ -118,15 +121,6 @@ export default function VideoPlayerPage() {
       }
     }).catch(() => {});
   }, [currentVideo, id, duration, refetch, videosData, currentVideoIdx, goToNextVideo]);
-
-  // Reset state when video changes
-  useEffect(() => {
-    lastAllowedTime.current = 0;
-    setCurrentTime(0);
-    setDuration(0);
-    setIsPlaying(false);
-    setVideoError(false);
-  }, [currentVideoIdx]);
 
   // Heartbeat every 15 seconds
   const [heartbeatErrors, setHeartbeatErrors] = useState(0);
@@ -351,8 +345,7 @@ export default function VideoPlayerPage() {
                     key={v.id}
                     onClick={() => {
                       if (!isLocked) {
-                        setCurrentVideoIdx(i);
-                        lastAllowedTime.current = 0;
+                        changeVideo(i);
                       }
                     }}
                     disabled={isLocked}
