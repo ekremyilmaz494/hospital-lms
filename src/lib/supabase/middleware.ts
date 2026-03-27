@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes
-  const publicRoutes = ['/auth/login', '/auth/callback', '/auth/forgot-password']
+  const publicRoutes = ['/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password']
   if (publicRoutes.some((route) => pathname.startsWith(route))) {
     // Authenticated users on login page → redirect to dashboard
     if (user && pathname === '/auth/login') {
@@ -72,7 +72,7 @@ export async function updateSession(request: NextRequest) {
   } catch {
     // Supabase unreachable — only allow public routes, block protected ones
     const { pathname } = request.nextUrl
-    const publicRoutes = ['/auth/login', '/auth/callback', '/auth/forgot-password']
+    const publicRoutes = ['/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password']
     if (publicRoutes.some((route) => pathname.startsWith(route))) {
       return NextResponse.next({ request })
     }

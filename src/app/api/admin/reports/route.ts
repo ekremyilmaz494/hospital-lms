@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
-export async function GET() {
+export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
@@ -10,17 +11,36 @@ export async function GET() {
 
   const orgId = dbUser!.organizationId!
 
+  // Filtre parametreleri
+  const { searchParams } = new URL(request.url)
+  const fromParam = searchParams.get('from')
+  const toParam = searchParams.get('to')
+  const departmentId = searchParams.get('departmentId')
+  const dateFrom = fromParam ? new Date(fromParam) : undefined
+  const dateTo = toParam ? new Date(toParam) : undefined
+
+  // Atama filtresi
+  const assignmentDateFilter = dateFrom || dateTo ? {
+    assignedAt: {
+      ...(dateFrom ? { gte: dateFrom } : {}),
+      ...(dateTo ? { lte: dateTo } : {}),
+    },
+  } : {}
+
+  // Departman filtresi
+  const userDeptFilter = departmentId ? { departmentId } : {}
+
   try {
     const [staffCount, trainingCount, assignmentStatusGroups, avgScoreResult, trainings, staff, departments] = await Promise.all([
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
+      prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true, ...userDeptFilter } }),
       prisma.training.count({ where: { organizationId: orgId, isActive: true } }),
       prisma.trainingAssignment.groupBy({
         by: ['status'],
-        where: { training: { organizationId: orgId } },
+        where: { training: { organizationId: orgId }, user: { ...userDeptFilter }, ...assignmentDateFilter },
         _count: true,
       }),
       prisma.examAttempt.aggregate({
-        where: { training: { organizationId: orgId }, postExamScore: { not: null } },
+        where: { training: { organizationId: orgId }, postExamScore: { not: null }, user: { ...userDeptFilter }, ...(dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}) },
         _avg: { postExamScore: true },
       }),
       // Training-based report
@@ -28,6 +48,7 @@ export async function GET() {
         where: { organizationId: orgId },
         include: {
           assignments: {
+            where: { user: { ...userDeptFilter }, ...assignmentDateFilter },
             include: { examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true } } },
           },
           videos: { select: { durationSeconds: true } },
@@ -36,9 +57,10 @@ export async function GET() {
       }),
       // Staff-based report
       prisma.user.findMany({
-        where: { organizationId: orgId, role: 'staff' },
+        where: { organizationId: orgId, role: 'staff', ...userDeptFilter },
         include: {
           assignments: {
+            where: { ...assignmentDateFilter },
             include: { examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true, status: true } } },
           },
           departmentRel: { select: { name: true } },
@@ -46,12 +68,12 @@ export async function GET() {
       }),
       // Departments
       prisma.department.findMany({
-        where: { organizationId: orgId },
+        where: { organizationId: orgId, ...(departmentId ? { id: departmentId } : {}) },
         include: {
           users: {
             where: { role: 'staff', isActive: true },
             include: {
-              assignments: { select: { status: true } },
+              assignments: { where: { ...assignmentDateFilter }, select: { status: true } },
             },
           },
         },
@@ -148,9 +170,10 @@ export async function GET() {
         .map(a => {
           const lastScore = a.examAttempts[0]?.postExamScore ? Number(a.examAttempts[0].postExamScore) : 0
           return {
+            assignmentId: a.id,
             name: `${s.firstName} ${s.lastName}`,
             dept: s.departmentRel?.name ?? s.department ?? '',
-            training: '', // Would need training join
+            training: a.training?.title ?? '',
             attempts: a.examAttempts.length,
             lastScore,
             status: 'failed',
@@ -175,7 +198,7 @@ export async function GET() {
       durationData,
     })
   } catch (err) {
-    console.error('[Reports API Error]', err)
+    logger.error('Admin Reports', 'Rapor verileri alınamadı', err)
     return errorResponse('Rapor verileri alınamadı', 503)
   }
 }

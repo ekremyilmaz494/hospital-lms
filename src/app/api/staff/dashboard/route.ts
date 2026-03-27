@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 // GET /api/staff/dashboard — Personel dashboard verileri
 export async function GET() {
@@ -162,7 +163,7 @@ export async function GET() {
       recentActivity,
     })
   } catch (err) {
-    console.error('Staff dashboard error:', err)
+    logger.error('Staff Dashboard', 'Dashboard verileri yüklenemedi', err)
     return errorResponse('Dashboard verileri yüklenemedi', 500)
   }
 }

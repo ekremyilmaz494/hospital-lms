@@ -140,12 +140,16 @@ export default function CertificatesPage() {
               background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
               boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)',
             }}
-            onClick={() => {
-              const link = document.createElement('a');
-              link.href = '/api/admin/export?type=results&format=xlsx';
-              link.download = 'sertifikalar.xlsx';
-              link.click();
-              toast('Sertifika listesi indiriliyor...', 'success');
+            onClick={async () => {
+              const res = await fetch('/api/admin/export/pdf?type=certificates');
+              if (!res.ok) { toast('PDF oluşturulamadı', 'error'); return; }
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'sertifikalar.pdf';
+              a.click();
+              URL.revokeObjectURL(url);
             }}
           >
             <Download className="h-4 w-4" />

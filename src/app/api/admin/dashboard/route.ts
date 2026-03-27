@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 export async function GET() {
   const { dbUser, error } = await getAuthUser()
@@ -13,6 +14,8 @@ export async function GET() {
 
   try {
 
+  const now = new Date()
+
   // Parallel queries for dashboard data
   const [
     staffCount,
@@ -21,6 +24,7 @@ export async function GET() {
     activeTrainingCount,
     assignments,
     recentLogs,
+    compulsoryTrainings,
   ] = await Promise.all([
     prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
     prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
@@ -30,7 +34,7 @@ export async function GET() {
       where: { training: { organizationId: orgId } },
       include: {
         user: { select: { firstName: true, lastName: true, department: true } },
-        training: { select: { title: true, category: true, endDate: true } },
+        training: { select: { title: true, category: true, endDate: true, isCompulsory: true, complianceDeadline: true, regulatoryBody: true } },
         examAttempts: { select: { postExamScore: true, preExamScore: true, isPassed: true, status: true }, orderBy: { attemptNumber: 'desc' }, take: 1 },
       },
     }),
@@ -39,6 +43,10 @@ export async function GET() {
       include: { user: { select: { firstName: true, lastName: true } } },
       orderBy: { createdAt: 'desc' },
       take: 5,
+    }),
+    prisma.training.findMany({
+      where: { organizationId: orgId, isCompulsory: true, isActive: true },
+      select: { id: true, title: true, complianceDeadline: true, regulatoryBody: true, assignments: { select: { status: true } } },
     }),
   ])
 
@@ -49,12 +57,38 @@ export async function GET() {
   const totalAssignments = assignments.length
   const completionRate = totalAssignments > 0 ? Math.round((completedCount / totalAssignments) * 100) : 0
 
+  // Compliance stats (zorunlu eğitimler için uyum oranı)
+  const compulsoryAssignments = assignments.filter(a => a.training?.isCompulsory)
+  const compulsoryCompleted = compulsoryAssignments.filter(a => a.status === 'passed').length
+  const complianceRate = compulsoryAssignments.length > 0
+    ? Math.round((compulsoryCompleted / compulsoryAssignments.length) * 100)
+    : 100
+
+  // Compliance deadline alarmları (zorunlu eğitim son tarihi yaklaşanlar)
+  const complianceAlerts = compulsoryTrainings
+    .filter(t => t.complianceDeadline && new Date(t.complianceDeadline) > now)
+    .map(t => {
+      const daysLeft = Math.ceil((new Date(t.complianceDeadline!).getTime() - now.getTime()) / 86400000)
+      const totalAssigned = t.assignments.length
+      const passed = t.assignments.filter(a => a.status === 'passed').length
+      return {
+        training: t.title,
+        regulatoryBody: t.regulatoryBody ?? '',
+        daysLeft,
+        complianceRate: totalAssigned > 0 ? Math.round((passed / totalAssigned) * 100) : 0,
+        status: daysLeft <= 7 ? 'critical' : daysLeft <= 30 ? 'warning' : 'ok',
+      }
+    })
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, 5)
+
   // Overdue trainings (training endDate passed but assignment not completed)
-  const now = new Date()
   const overdueTrainings = assignments
     .filter(a => a.status !== 'passed' && a.training && a.training.endDate && new Date(a.training.endDate) < now)
     .slice(0, 5)
     .map(a => ({
+      assignmentId: a.id,
+      trainingId: a.trainingId,
       name: `${a.user.firstName} ${a.user.lastName}`,
       dept: a.user.department ?? '',
       training: a.training.title,
@@ -123,9 +157,10 @@ export async function GET() {
       { title: 'Aktif Eğitim', value: activeTrainingCount, icon: 'GraduationCap', accentColor: 'var(--color-info)', trend: { value: trainingCount, label: 'toplam', isPositive: true } },
       { title: 'Tamamlanma Oranı', value: `%${completionRate}`, icon: 'TrendingUp', accentColor: 'var(--color-success)', trend: { value: completedCount, label: 'tamamlanan', isPositive: true } },
       { title: 'Geciken Eğitim', value: overdueTrainings.length, icon: 'AlertTriangle', accentColor: 'var(--color-error)', trend: { value: failedCount, label: 'başarısız', isPositive: false } },
+      { title: 'Uyum Oranı', value: `%${complianceRate}`, icon: 'ShieldCheck', accentColor: complianceRate >= 80 ? 'var(--color-success)' : complianceRate >= 60 ? 'var(--color-warning)' : 'var(--color-error)', trend: { value: compulsoryTrainings.length, label: 'zorunlu eğitim', isPositive: complianceRate >= 80 } },
     ],
+    complianceAlerts,
     trendData: await (async () => {
-      const now = new Date()
       const result = []
       for (let i = 5; i >= 0; i--) {
         const start = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -152,7 +187,6 @@ export async function GET() {
     departmentComparison,
     overdueTrainings,
     expiringCerts: await (async () => {
-      const now = new Date()
       const sixtyDays = new Date(now.getTime() + 60 * 86400000)
       const certs = await prisma.certificate.findMany({
         where: {
@@ -182,7 +216,7 @@ export async function GET() {
   })
 
   } catch (err) {
-    console.error('[Dashboard API Error]', err)
+    logger.error('Admin Dashboard', 'Dashboard verileri alınamadı', err)
     return errorResponse('Dashboard verileri alınamadı, lütfen sayfayı yenileyin', 503)
   }
 }

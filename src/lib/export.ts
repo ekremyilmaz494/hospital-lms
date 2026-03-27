@@ -2,10 +2,19 @@
  * Client-side export helpers — instant download without API calls
  */
 
-export function exportExcel() {
-  // Mock data — gerçek uygulamada sayfa state'inden alınır
-  const headers = ['Ad Soyad', 'E-posta', 'Departman', 'Unvan', 'Durum', 'Ort. Puan', 'Eğitim'];
-  const rows = [
+export interface ReportRow {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
+export interface ReportData {
+  headers?: string[];
+  rows?: (string | number | boolean | null | undefined)[][];
+}
+
+export function exportExcel(reportData?: ReportData) {
+  // reportData varsa kullan, yoksa mevcut mock veri
+  const headers = reportData?.headers ?? ['Ad Soyad', 'E-posta', 'Departman', 'Unvan', 'Durum', 'Ort. Puan', 'Eğitim'];
+  const rows = reportData?.rows ?? [
     ['Elif Kaya', 'elif@hastane.com', 'Hemşirelik', 'Hemşire', 'Aktif', '92%', '5/6'],
     ['Mehmet Demir', 'mehmet@hastane.com', 'Acil Servis', 'Dr.', 'Aktif', '85%', '4/5'],
     ['Ayşe Yıldız', 'ayse@hastane.com', 'Radyoloji', 'Teknisyen', 'Aktif', '78%', '3/4'],
@@ -21,7 +30,7 @@ export function exportExcel() {
 
   const csvContent = [
     headers.join(','),
-    ...rows.map(r => r.map(c => `"${c}"`).join(',')),
+    ...rows.map(r => r.map(c => `"${c ?? ''}"`).join(',')),
   ].join('\n');
 
   const BOM = '\uFEFF';

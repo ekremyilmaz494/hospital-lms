@@ -159,7 +159,7 @@ export default function StaffCertificatesPage() {
                         variant="outline"
                         className="flex-1 gap-1.5 rounded-xl text-[12px] h-9"
                         style={{ borderColor: 'var(--color-border)' }}
-                        onClick={() => toast('PDF indirme yakında eklenecek', 'info')}
+                        onClick={() => toast('Yakında eklenecek', 'info')}
                       >
                         <Download className="h-3.5 w-3.5" /> İndir
                       </Button>
@@ -258,7 +258,7 @@ export default function StaffCertificatesPage() {
                 <button
                   className="flex-1 flex items-center justify-center gap-2 rounded-xl h-11 text-[13px] font-semibold text-white"
                   style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
-                  onClick={() => toast('PDF indirme yakında eklenecek', 'info')}
+                  onClick={() => toast('Yakında eklenecek', 'info')}
                 >
                   <Download className="h-4 w-4" /> PDF İndir
                 </button>

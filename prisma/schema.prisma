@@ -134,21 +134,26 @@ model User {
 
 // ── EĞİTİMLER ──
 model Training {
-  id                  String   @id @default(uuid()) @db.Uuid
-  organizationId      String   @db.Uuid @map("organization_id")
-  title               String   @db.VarChar(500)
-  description         String?  @db.Text
-  category            String?  @db.VarChar(100)
-  thumbnailUrl        String?  @db.Text @map("thumbnail_url")
-  passingScore        Int      @default(70) @map("passing_score")
-  maxAttempts         Int      @default(3) @map("max_attempts")
-  examDurationMinutes Int      @default(30) @map("exam_duration_minutes")
-  startDate           DateTime @map("start_date") @db.Timestamptz
-  endDate             DateTime @map("end_date") @db.Timestamptz
-  isActive            Boolean  @default(true) @map("is_active")
-  createdById         String?  @db.Uuid @map("created_by")
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id                   String    @id @default(uuid()) @db.Uuid
+  organizationId       String    @db.Uuid @map("organization_id")
+  title                String    @db.VarChar(500)
+  description          String?   @db.Text
+  category             String?   @db.VarChar(100)
+  thumbnailUrl         String?   @db.Text @map("thumbnail_url")
+  passingScore         Int       @default(70) @map("passing_score")
+  maxAttempts          Int       @default(3) @map("max_attempts")
+  examDurationMinutes  Int       @default(30) @map("exam_duration_minutes")
+  startDate            DateTime  @map("start_date") @db.Timestamptz
+  endDate              DateTime  @map("end_date") @db.Timestamptz
+  isActive             Boolean   @default(true) @map("is_active")
+  // Compliance / Uyum Alanları
+  isCompulsory         Boolean   @default(false) @map("is_compulsory")
+  complianceDeadline   DateTime? @map("compliance_deadline") @db.Timestamptz
+  regulatoryBody       String?   @db.VarChar(200) @map("regulatory_body")
+  renewalPeriodMonths  Int?      @map("renewal_period_months")
+  createdById          String?   @db.Uuid @map("created_by")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization        Organization @relation(fields: [organizationId], references: [id])
   createdBy           User?        @relation("TrainingCreator", fields: [createdById], references: [id])

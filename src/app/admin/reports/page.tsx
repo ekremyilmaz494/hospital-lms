@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import {
   BarChart3, Download, FileText, Users, GraduationCap, Building2, AlertTriangle, Clock, Printer,
-  TrendingDown, Target, Award,
+  TrendingDown, Target, Award, Filter, X,
 } from 'lucide-react';
-import { exportExcel, exportPDF, printPage } from '@/lib/export';
+import { exportExcel, printPage } from '@/lib/export';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart,
 } from '@/components/shared/recharts';
@@ -44,7 +44,29 @@ const chartTooltipStyle = { background: 'var(--color-surface)', border: '1px sol
 export default function ReportsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
-  const { data, isLoading, error } = useFetch<ReportsData>('/api/admin/reports');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const filterParams = new URLSearchParams();
+  if (dateFrom) filterParams.set('from', new Date(dateFrom).toISOString());
+  if (dateTo) filterParams.set('to', new Date(dateTo + 'T23:59:59').toISOString());
+  const filterQuery = filterParams.toString() ? `?${filterParams.toString()}` : '';
+  const hasFilters = !!(dateFrom || dateTo);
+
+  const { data, isLoading, error } = useFetch<ReportsData>(`/api/admin/reports${filterQuery}`);
+
+  const handlePDFExport = async () => {
+    const res = await fetch('/api/admin/export/pdf?type=training-report');
+    if (!res.ok) { toast('PDF oluşturulamadı', 'error'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'rapor.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (isLoading) {
     return <PageLoading />;
@@ -66,11 +88,46 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between">
         <PageHeader title="Raporlar" subtitle="Eğitim performansını analiz edin" />
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={exportExcel}><Download className="h-3.5 w-3.5" /> Excel</Button>
-          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={exportPDF}><FileText className="h-3.5 w-3.5" /> PDF</Button>
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => exportExcel(data ? { headers: ['Eğitim', 'Atanan', 'Tamamlayan', 'Başarılı', 'Başarısız', 'Ort. Puan'], rows: data.trainingData.map(t => [t.name, t.atanan, t.tamamlayan, t.basarili, t.basarisiz, t.ort]) } : undefined)}><Download className="h-3.5 w-3.5" /> Excel</Button>
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={handlePDFExport}><FileText className="h-3.5 w-3.5" /> PDF</Button>
           <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={printPage}><Printer className="h-3.5 w-3.5" /> Yazdır</Button>
         </div>
       </div>
+
+      {/* Filtre Paneli */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setShowFilters(v => !v)}
+          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium"
+          style={{ background: hasFilters ? 'var(--color-primary-light)' : 'var(--color-surface)', border: `1px solid ${hasFilters ? 'var(--color-primary)' : 'var(--color-border)'}`, color: hasFilters ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}
+        >
+          <Filter className="h-4 w-4" />
+          Filtrele
+          {hasFilters && <span className="rounded-full bg-current/20 px-1.5 py-0.5 text-xs">aktif</span>}
+        </button>
+        {hasFilters && (
+          <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }} className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            <X className="h-3 w-3" /> Filtreleri Temizle
+          </button>
+        )}
+      </div>
+      {showFilters && (
+        <div className="flex items-center gap-4 rounded-xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Başlangıç:</label>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              className="h-9 rounded-lg border px-3 text-sm"
+              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }} />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Bitiş:</label>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              className="h-9 rounded-lg border px-3 text-sm"
+              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }} />
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-1 overflow-x-auto rounded-2xl p-1.5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
         {tabs.map((tab) => {
@@ -275,7 +332,7 @@ export default function ReportsPage() {
                           <td className="px-4 py-4">
                             <Button size="sm" className="gap-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: 'var(--color-primary)' }} onClick={async () => {
                               if (window.confirm(`${f.name} için "${f.training}" eğitiminde yeni deneme hakkı verilsin mi?`)) {
-                                try { await fetch('/api/admin/trainings/reset-attempt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ staffName: f.name, training: f.training }) }); toast(`${f.name} için yeni deneme hakkı verildi.`, 'success'); } catch { toast('İşlem başarısız', 'error'); }
+                                try { const res = await fetch('/api/admin/trainings/reset-attempt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assignmentId: f.assignmentId }) }); if (!res.ok) { const d = await res.json(); throw new Error(d.error); } toast(`${f.name} için yeni deneme hakkı verildi.`, 'success'); } catch (err) { toast(err instanceof Error ? err.message : 'İşlem başarısız', 'error'); }
                               }
                             }}>Yeni Hak Ver</Button>
                           </td>

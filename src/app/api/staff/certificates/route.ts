@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 export async function GET() {
   const { dbUser, error } = await getAuthUser()
@@ -37,7 +38,7 @@ export async function GET() {
       }))
     )
   } catch (err) {
-    console.error('[Staff Certificates Error]', err)
+    logger.error('Staff Certificates', 'Sertifikalar yüklenemedi', err)
     return errorResponse('Sertifikalar yüklenemedi', 503)
   }
 }

@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, Save, Info, Video, FileQuestion, Users, Check, Plus, Trash2,
-  GripVertical, Upload, Clock, Award, Calendar, Target, Sparkles, BookOpen, CheckCircle2
+  GripVertical, Upload, Clock, Award, Calendar, Target, Sparkles, BookOpen, CheckCircle2,
+  ShieldCheck, RefreshCw, Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +51,11 @@ export default function NewTrainingPage() {
   const [examDurationMinutes, setExamDurationMinutes] = useState(30);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  // Compliance alanları
+  const [isCompulsory, setIsCompulsory] = useState(false);
+  const [complianceDeadline, setComplianceDeadline] = useState('');
+  const [regulatoryBody, setRegulatoryBody] = useState('');
+  const [renewalPeriodMonths, setRenewalPeriodMonths] = useState<number | ''>('');
 
   const totalSelectedStaff = departments
     .filter(d => selectedDepts.includes(d.id))
@@ -305,6 +311,85 @@ export default function NewTrainingPage() {
                       <Input type="number" value={examDurationMinutes} onChange={(e) => setExamDurationMinutes(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
                     </div>
                   </div>
+                </div>
+
+                {/* Compliance / Uyum Ayarları */}
+                <div
+                  className="rounded-xl p-5"
+                  style={{ background: isCompulsory ? 'var(--color-warning-bg, #fffbeb)' : 'var(--color-bg)', border: `1px solid ${isCompulsory ? 'var(--color-warning, #f59e0b)' : 'var(--color-border)'}`, transition: 'all var(--transition-fast)' }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4" style={{ color: isCompulsory ? 'var(--color-warning, #f59e0b)' : 'var(--color-text-muted)' }} />
+                      <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Zorunlu Eğitim (Uyum)</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsCompulsory(v => !v)}
+                      className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent"
+                      style={{
+                        background: isCompulsory ? 'var(--color-warning, #f59e0b)' : 'var(--color-border)',
+                        transition: 'background var(--transition-fast)',
+                      }}
+                    >
+                      <span
+                        className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow"
+                        style={{
+                          transform: isCompulsory ? 'translateX(20px)' : 'translateX(0)',
+                          transition: 'transform var(--transition-fast)',
+                        }}
+                      />
+                    </button>
+                  </div>
+                  {isCompulsory && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-warning, #f59e0b)' }} />
+                          <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Uyum Son Tarihi</Label>
+                        </div>
+                        <Input
+                          type="date"
+                          value={complianceDeadline}
+                          onChange={(e) => setComplianceDeadline(e.target.value)}
+                          className="h-10"
+                          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Building2 className="h-3.5 w-3.5" style={{ color: 'var(--color-warning, #f59e0b)' }} />
+                          <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Düzenleyici Kurum</Label>
+                        </div>
+                        <Input
+                          value={regulatoryBody}
+                          onChange={(e) => setRegulatoryBody(e.target.value)}
+                          placeholder="örn. Sağlık Bakanlığı, JCI"
+                          className="h-10"
+                          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: 'var(--radius-lg)' }}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <RefreshCw className="h-3.5 w-3.5" style={{ color: 'var(--color-warning, #f59e0b)' }} />
+                          <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Yenileme (Ay)</Label>
+                        </div>
+                        <Input
+                          type="number"
+                          value={renewalPeriodMonths}
+                          onChange={(e) => setRenewalPeriodMonths(e.target.value ? Number(e.target.value) : '')}
+                          placeholder="örn. 12"
+                          className="h-10"
+                          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {!isCompulsory && (
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      Bu eğitim zorunlu değil. Zorunlu olarak işaretlerseniz uyum takibi yapılır.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -809,6 +894,10 @@ export default function NewTrainingPage() {
                       examDurationMinutes: Number(examDurationMinutes) || 30,
                       startDate: new Date(startDate).toISOString(),
                       endDate: new Date(endDate).toISOString(),
+                      isCompulsory,
+                      complianceDeadline: isCompulsory && complianceDeadline ? new Date(complianceDeadline).toISOString() : null,
+                      regulatoryBody: isCompulsory && regulatoryBody ? regulatoryBody : null,
+                      renewalPeriodMonths: isCompulsory && renewalPeriodMonths !== '' ? Number(renewalPeriodMonths) : null,
                       videos: videos.map(v => ({ title: v.title, url: v.url })),
                       questions,
                       selectedDepts,

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { createUserSchema } from '@/lib/validations'
 import { createServiceClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
   })
 
   if (authError) {
-    console.error('[User Create Auth Error]', authError.message)
+    logger.error('SuperAdmin Users', 'Supabase auth kullanıcı oluşturulamadı', authError.message)
     const safeMsg = authError.message?.includes('already registered')
       ? 'Bu e-posta adresi zaten kayıtlı'
       : 'Kullanıcı oluşturulamadı'

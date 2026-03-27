@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -206,7 +207,7 @@ function LoginForm() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Şifre</Label>
-                  <a href="#" className="text-xs font-semibold transition-colors duration-150 hover:underline" style={{ color: 'var(--color-primary)' }}>Şifremi Unuttum</a>
+                  <Link href="/auth/forgot-password" className="text-xs font-semibold transition-colors duration-150 hover:underline" style={{ color: 'var(--color-primary)' }}>Şifremi Unuttum</Link>
                 </div>
                 <div className="relative">
                   <Input

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 export async function GET() {
   const { dbUser, error } = await getAuthUser()
@@ -165,7 +166,7 @@ export async function GET() {
       },
     })
   } catch (err) {
-    console.error('[Super Admin Dashboard Error]', err)
+    logger.error('SuperAdmin Dashboard', 'Dashboard verileri alınamadı', err)
     return errorResponse('Dashboard verileri alınamadı', 503)
   }
 }

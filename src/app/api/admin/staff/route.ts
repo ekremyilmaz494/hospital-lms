@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createUserSchema } from '@/lib/validations'
 import { createServiceClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
 
 export async function GET(request: Request) {
@@ -189,7 +190,7 @@ export async function POST(request: Request) {
   })
 
   if (authError) {
-    console.error('[Staff Create Auth Error]', authError.message)
+    logger.error('Admin Staff', 'Supabase auth kullanıcı oluşturulamadı', authError.message)
     let safeMsg = 'Kullanıcı oluşturulamadı'
     if (authError.message?.includes('already registered')) safeMsg = 'Bu e-posta adresi zaten kayıtlı'
     else if (authError.message?.includes('invalid format') || authError.message?.includes('validate email')) safeMsg = 'Geçersiz e-posta adresi. Türkçe karakter (ş, ç, ğ, ü, ö, ı) kullanmayın.'
@@ -221,12 +222,12 @@ export async function POST(request: Request) {
     try {
       await supabase.auth.admin.deleteUser(authUser.user.id)
     } catch (rollbackError) {
-      console.error('[Staff Create Rollback Failed] Orphan auth user:', authUser.user.id, rollbackError)
+      logger.error('Admin Staff', 'Rollback başarısız — orphan auth user', { userId: authUser.user.id, rollbackError })
       // Retry once
       try {
         await supabase.auth.admin.deleteUser(authUser.user.id)
       } catch {
-        console.error('[Staff Create Rollback Retry Failed] Manual cleanup needed for auth user:', authUser.user.id)
+        logger.error('Admin Staff', 'Rollback yeniden deneme başarısız — manuel temizlik gerekli', { userId: authUser.user.id })
       }
     }
     return errorResponse(`Veritabanı hatası: ${dbError instanceof Error ? dbError.message : 'Bilinmeyen hata'}`)

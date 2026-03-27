@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 // Next.js App Router — body size limit for this route
 export const maxDuration = 120 // seconds
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
 
     return jsonResponse({ url, filename, size: file.size })
   } catch (err) {
-    console.error('[Video Upload Error]', err)
+    logger.error('Video Upload', 'Video yüklenirken hata', err)
     return errorResponse('Video yüklenirken bir hata oluştu', 500)
   }
 }

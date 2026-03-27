@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { submitExamSchema } from '@/lib/validations'
 import { checkRateLimit, clearExamTimer } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 
 
 /** Submit pre-exam or post-exam answers */
@@ -19,7 +20,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const parsed = submitExamSchema.safeParse(body)
   if (!parsed.success) {
-    console.error('[Submit Validation Error]', JSON.stringify(parsed.error.issues), 'Body keys:', Object.keys(body as object))
+    logger.error('Exam Submit', 'Validasyon hatası', { issues: parsed.error.issues, bodyKeys: Object.keys(body as object) })
     return errorResponse(parsed.error.message)
   }
 
@@ -45,7 +46,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const allowedMs = (attempt.training.examDurationMinutes + 5) * 60 * 1000 // +5 min grace
     const elapsed = Date.now() - new Date(phaseStartedAt).getTime()
     if (elapsed > allowedMs) {
-      console.warn(`[Submit] Late submission rejected: attempt=${attempt.id}, elapsed=${Math.round(elapsed / 60000)}min`)
+      logger.warn('Exam Submit', 'Geç gönderim reddedildi', { attemptId: attempt.id, elapsedMin: Math.round(elapsed / 60000) })
       return errorResponse('Sınav süresi çoktan dolmuş. Bu gönderim kabul edilemez.', 403)
     }
   }
@@ -179,6 +180,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       },
     })
   }
+
+  await createAuditLog({
+    userId: dbUser!.id,
+    organizationId: attempt.training.organizationId,
+    action: isPassed ? 'exam.passed' : 'exam.failed',
+    entityType: 'exam_attempt',
+    entityId: attempt.id,
+    newData: { score, isPassed, trainingId: attempt.trainingId },
+  })
 
   return jsonResponse({ phase: 'post', score, isPassed, passingScore: attempt.training.passingScore })
 }

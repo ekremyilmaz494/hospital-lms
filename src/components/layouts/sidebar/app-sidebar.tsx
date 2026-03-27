@@ -114,7 +114,7 @@ export function AppSidebar({
         <div className="py-2 shrink-0">
           <Tooltip>
             <TooltipTrigger
-              render={<Link href="#" />}
+              render={<Link href="/help" />}
               className="flex h-10 w-10 items-center justify-center rounded-xl icon-btn"
               style={{ color: 'var(--color-text-secondary)' }}
             >
@@ -307,7 +307,7 @@ export function AppSidebar({
 
         {/* Help */}
         <div className="px-3 py-1.5 shrink-0">
-          <Link href="#" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium nav-item" style={{ color: 'var(--color-text-secondary)' }}>
+          <Link href="/help" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium nav-item" style={{ color: 'var(--color-text-secondary)' }}>
             <HelpCircle className="h-5 w-5" />
             <span>Yardım & Destek</span>
           </Link>

@@ -98,6 +98,27 @@ export async function GET(request: Request) {
     })
   }
 
+  if (type === 'certificates') {
+    const certificates = await prisma.certificate.findMany({
+      where: { organizationId: orgId },
+      include: { user: { select: { firstName: true, lastName: true } }, training: { select: { title: true } } },
+      orderBy: { issuedAt: 'desc' },
+      take: 200,
+    });
+
+    doc.setFontSize(16)
+    doc.setTextColor(30)
+    doc.text('Sertifika Listesi', 20, 55)
+
+    doc.setFontSize(10)
+    doc.setTextColor(60)
+    certificates.forEach((cert, i) => {
+      const y = 70 + i * 8;
+      if (y > 280) return; // sayfa sınırı
+      doc.text(`${cert.user.firstName} ${cert.user.lastName} — ${cert.training.title} — ${new Date(cert.issuedAt).toLocaleDateString('tr-TR')}`, 14, y);
+    });
+  }
+
   if (type === 'exam-report') {
     const attempts = await prisma.examAttempt.findMany({
       where: { training: { organizationId: orgId }, status: 'completed' },

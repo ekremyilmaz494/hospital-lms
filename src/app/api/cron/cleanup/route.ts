@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { sendEmail, certificateExpiryReminderEmail, overdueTrainingReminderEmail } from '@/lib/email'
 
 /** Daily cleanup cron job (Vercel Cron) */
 export async function GET(request: Request) {
@@ -51,11 +52,80 @@ export async function GET(request: Request) {
     },
   })
 
+  // 4. Sertifika sona erme hatırlatmaları (7 ve 30 gün kala)
+  const now30 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+  const now7 = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const expiringCerts = await prisma.certificate.findMany({
+    where: {
+      expiresAt: { gte: new Date(), lte: now30 },
+    },
+    include: {
+      user: { select: { firstName: true, lastName: true, email: true } },
+      training: { select: { title: true } },
+    },
+  })
+
+  let certRemindersSent = 0
+  for (const cert of expiringCerts) {
+    if (!cert.expiresAt) continue
+    const daysLeft = Math.ceil((new Date(cert.expiresAt).getTime() - Date.now()) / 86400000)
+    // Sadece tam 30 veya 7 gün kalanlar için gönder (günlük cron, tekrar göndermeyi önler)
+    if (daysLeft !== 30 && daysLeft !== 7) continue
+    try {
+      await sendEmail({
+        to: cert.user.email,
+        subject: `Sertifika Yenileme Hatırlatması: "${cert.training.title}" — ${daysLeft} gün kaldı`,
+        html: certificateExpiryReminderEmail(
+          `${cert.user.firstName} ${cert.user.lastName}`,
+          cert.training.title,
+          new Date(cert.expiresAt).toLocaleDateString('tr-TR'),
+          daysLeft,
+          `${process.env.NEXT_PUBLIC_APP_URL}/staff/my-trainings`,
+        ),
+      })
+      certRemindersSent++
+    } catch { /* email hatası cron'u durdurmasın */ }
+  }
+
+  // 5. Gecikmiş eğitim hatırlatmaları (ilk gecikme günü)
+  const overdueAssignments = await prisma.trainingAssignment.findMany({
+    where: {
+      status: { in: ['assigned', 'in_progress', 'failed'] },
+      training: { endDate: { lt: new Date(), gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+    },
+    include: {
+      user: { select: { firstName: true, lastName: true, email: true } },
+      training: { select: { title: true, endDate: true } },
+    },
+    take: 200,
+  })
+
+  let overdueRemindersSent = 0
+  for (const a of overdueAssignments) {
+    if (!a.training.endDate) continue
+    const daysOverdue = Math.floor((Date.now() - new Date(a.training.endDate).getTime()) / 86400000)
+    try {
+      await sendEmail({
+        to: a.user.email,
+        subject: `Gecikmiş Eğitim: "${a.training.title}"`,
+        html: overdueTrainingReminderEmail(
+          `${a.user.firstName} ${a.user.lastName}`,
+          a.training.title,
+          new Date(a.training.endDate).toLocaleDateString('tr-TR'),
+          daysOverdue,
+        ),
+      })
+      overdueRemindersSent++
+    } catch { /* email hatası cron'u durdurmasın */ }
+  }
+
   return NextResponse.json({
     success: true,
     deletedNotifications: deletedNotifications.count,
     staleAttemptsClosed: staleAttempts.count,
     deletedLogs: deletedLogs.count,
+    certRemindersSent,
+    overdueRemindersSent,
     timestamp: new Date().toISOString(),
   })
 }

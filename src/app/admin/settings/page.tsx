@@ -39,11 +39,20 @@ interface SystemStats {
   completedAssignments: number;
 }
 
-const defaultNotifSettings = {
+const defaultSettings: SettingsData = {
+  defaultPassingScore: 70,
+  defaultMaxAttempts: 3,
+  defaultExamDuration: 30,
+  hospitalName: '',
+  logoUrl: '',
+  email: '',
+  phone: '',
+  address: '',
   emailNotifications: true,
   reminderDaysBefore: 3,
   notifyOnComplete: true,
   notifyOnFail: true,
+  sessionTimeout: 30,
 };
 
 const tabs = [
@@ -169,35 +178,23 @@ export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>('hospital');
 
   useEffect(() => {
-    if (data) setFormData({ ...defaultNotifSettings, ...data });
+    if (data) setFormData({ ...defaultSettings, ...data });
   }, [data]);
 
-  const activeData = formData ?? (data ? { ...defaultNotifSettings, ...data } : null);
+  // API başarısız olsa bile defaultSettings ile sayfayı göster
+  const activeData: SettingsData = formData ?? (data ? { ...defaultSettings, ...data } : defaultSettings);
 
   const update = useCallback(
     (patch: Partial<SettingsData>) => {
-      if (activeData) setFormData({ ...activeData, ...patch });
+      setFormData({ ...activeData, ...patch });
     },
     [activeData],
   );
 
   if (isLoading) return <PageLoading />;
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</div>
-      </div>
-    );
-  }
-
-  if (!activeData) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Ayarlar yüklenemedi</div>
-      </div>
-    );
-  }
+  // error var ama API'den veri gelmemişse bile sayfayı göster (default değerlerle)
+  // (useFetch 401/500 hatalarını sessizce yuttuğu için error genellikle null gelir)
 
   const handleSave = async () => {
     setSaving(true);

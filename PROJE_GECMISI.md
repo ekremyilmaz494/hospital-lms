@@ -717,4 +717,134 @@ Tüm API route'ları, frontend sayfaları, konfigürasyon dosyaları ve bağıml
 
 ---
 
-*Son güncelleme: 26 Mart 2026 — Oturum 5*
+---
+
+## 36. PROJE İYİLEŞTİRME VE GELİŞTİRME (Oturum 6 — 27 Mart 2026)
+
+### CLAUDE.md Analizi ve İyileştirme Planı
+- CLAUDE.md incelendi, proje durumu değerlendirildi
+- Codebase taraması yapıldı: mock data yok ✓, `any` tipi yok ✓, TODO/FIXME yok ✓
+- 4 ana iyileştirme alanı belirlendi ve uygulandı
+
+### 1. Logger Altyapısı
+- **Yeni dosya:** `src/lib/logger.ts` — sıfır bağımlılık, ortam-duyarlı logger
+  - Development: okunabilir `[LEVEL] [tag] message` formatı
+  - Production: Vercel Log Explorer uyumlu yapılı JSON çıktı
+- **11 API route dosyasında** 15 adet `console.error`/`console.warn` → `logger.error`/`logger.warn` dönüşümü
+- Etkilenen dosyalar: certificates, dashboard, reports, staff, exam/submit, upload/video, super-admin/dashboard, super-admin/users, staff/dashboard, staff/certificates, admin/dashboard/stats
+
+### 2. Eksik Route Dosyaları (error.tsx / loading.tsx / not-found.tsx)
+- **22 yeni dosya** oluşturuldu (11 segment × error + loading)
+- **4 not-found.tsx** oluşturuldu: `/admin`, `/staff`, `/super-admin`, `/exam`
+- Her error.tsx Türkçe hata mesajı + "Tekrar Dene" butonu
+- Her loading.tsx mevcut `PageLoading` bileşenini kullanıyor
+- Exam route'ları `min-h-screen` (fullscreen), diğerleri `min-h-[60vh]`
+
+### 3. Test Coverage
+- **3 yeni test dosyası** oluşturuldu:
+  - `src/lib/__tests__/utils.test.ts` — 8 fonksiyon, 20+ test case (formatDate, formatDuration, getStatusColor, getStatusLabel, calculatePercentage, truncateText, cn)
+  - `src/lib/__tests__/api-helpers.test.ts` — requireRole, safePagination, errorResponse, jsonResponse, parseBody testleri + Supabase/Prisma mock
+  - `src/lib/__tests__/exam-helpers.test.ts` — getAttemptWithPhaseCheck, getAttemptStatus testleri + Prisma mock
+
+### 4. Forgot Password / Reset Password Akışı
+- **Yeni sayfa:** `src/app/auth/forgot-password/page.tsx`
+  - E-posta giriş formu, Supabase `resetPasswordForEmail()` çağrısı
+  - Başarı durumunda e-posta gönderildi mesajı
+  - Client-side rate limiting (1 dk cooldown, localStorage)
+  - Login sayfası tasarım pattern'i ile uyumlu
+- **Yeni sayfa:** `src/app/auth/reset-password/page.tsx`
+  - Yeni şifre + şifre tekrarı formu
+  - Supabase `updateUser({ password })` ile şifre güncelleme
+  - Başarı sonrası 3 sn'de login'e yönlendirme
+  - Min 8 karakter, eşleşme kontrolü, aynı şifre algılama
+- **Login sayfası güncellendi:** "Şifremi Unuttum" `href="#"` → `<Link href="/auth/forgot-password">`
+- **Middleware güncellendi:** `/auth/reset-password` public route olarak eklendi (2 yerde)
+- **Email template:** `forgotPasswordEmail()` fonksiyonu `src/lib/email.ts`'ye eklendi
+
+### 5. Eksik API Route'ları ve Buton Düzeltmeleri
+
+#### Codebase Link/Buton Taraması
+Tüm frontend sayfaları sistematik olarak tarandı — 4 sorun tespit edildi:
+
+| Sorun | Çözüm |
+|-------|-------|
+| `/api/admin/notifications/mark-all-read` eksik | Yeni route: toplu okundu işaretleme (organizationId filtreli) |
+| `/api/admin/notifications/[id]/read` eksik | Yeni route: tekli okundu işaretleme (org kontrolü + 404) |
+| `/api/admin/trainings/reset-attempt` eksik | Yeni route: deneme hakkı sıfırlama (assignment reset + audit log) |
+| Reports API `failureData`'da `assignmentId` eksik | API response'a `assignmentId` + `training.title` eklendi |
+| Reports "Yeni Hak Ver" butonu `staffName` bazlı | `assignmentId` bazlı hale getirildi |
+| Sidebar "Yardım & Destek" `href="#"` | `/help` sayfası oluşturuldu (4 bölüm Türkçe rehber + iletişim) |
+
+### 6. Dashboard Quick Actions Yeniden Tasarım
+- Düz pill linkler → kompakt kart grid'e dönüştürüldü
+- Her kart: ikon container + başlık + açıklama metni
+- Hover'da border rengi aksiyon rengine dönüşüyor
+- Responsive: 2 kolon mobilde, 4 kolon desktop'ta
+
+### 7. Eksik Admin Sayfaları
+3 sidebar linki boş sayfalara yönlendiriyordu — API route'ları vardı ama page.tsx dosyaları kırıktı:
+
+| Sayfa | İçerik |
+|-------|--------|
+| `/admin/competency-matrix` | Personel × Eğitim matrisi, departman filtresi, durum ikonları, tamamlanma oranı |
+| `/admin/effectiveness` | Eğitim etkinlik analizi, ön/son sınav karşılaştırma, kazanım, kategori bazlı, aylık trend grafiği |
+| `/admin/compliance` | Zorunlu eğitim uyum raporu, deadline durumları, departman uyum grafiği, acil uyarılar |
+
+### 8. Gelişmiş Bildirim Sistemi
+- **"Bildirim Gönder" butonu** artık çalışan bir modal açıyor
+- **2 gönderim modu:**
+  - **Departman Bazlı:** Departman seç → tüm personel listelenir → istemediğin kişileri "Çıkar" butonuyla hariç tut → "Dahil Et" ile geri al
+  - **Kişi Bazlı:** Tüm personelden arama + çoklu checkbox seçimi
+- **Bildirim içeriği:** Tip seçimi (Bilgi/Uyarı/Acil/Başarılı), başlık, mesaj
+- **Alıcı sayacı:** Modal footer'da kaç kişiye gönderileceği gösteriliyor
+- **API entegrasyonu:** Her alıcıya ayrı bildirim oluşturma (Promise.all ile paralel)
+
+### 9. Supabase Güvenlik Düzeltmeleri
+- `departments` tablosuna RLS + 2 policy eklendi (view own org + admin manage)
+- `certificates` tablosuna RLS + 2 policy eklendi (view own + admin manage org)
+- `_prisma_migrations` tablosuna RLS + USING(false) policy (Supabase uyarısını susturmak için)
+- `get_user_role()` ve `get_user_org_id()` fonksiyonlarına `SET search_path = public` eklendi
+
+### 10. Proje Ayağa Kaldırma
+- **Node.js v24.14.1** winget ile kuruldu
+- **pnpm v10.33.0** npm ile kuruldu
+- **1033 paket** pnpm install ile yüklendi
+- **Prisma Client** generate edildi
+- **dotenv** paketi eklendi (prisma.config.ts için)
+- **`.env.local`** oluşturuldu — Supabase URL, anon key, service role key, database URL
+- **Dev server** `http://localhost:3000` ayağa kaldırıldı (Next.js 16.2.1 + Turbopack)
+- Veritabanı zaten hazırdı (18 tablo, 6 kullanıcı, demo veriler mevcut)
+
+---
+
+## 37. İSTATİSTİKLER (Güncel — 27 Mart 2026)
+
+| Metrik | Değer |
+|--------|-------|
+| Toplam route | 40+ |
+| Toplam dosya | ~175+ |
+| Prisma model | 18 |
+| API endpoint | 35+ |
+| Test dosyası | 4 (validations, utils, api-helpers, exam-helpers) |
+| Güvenlik düzeltme | 30+ |
+| Bug fix | 40+ |
+| İterasyon sayısı | v1 → v18+ |
+
+---
+
+## 38. KALAN İŞLER
+
+| # | İş | Durum |
+|---|---|-------|
+| 1 | Connection pooling (pgBouncer/Supavisor) | ⏳ Bekliyor |
+| 2 | Login/Logout audit log | ⏳ Bekliyor |
+| 3 | AWS S3/CloudFront canlı yapılandırma | ⏳ .env ayarları bekliyor |
+| 4 | Skeleton loader'lar | ⏳ Düşük öncelik |
+| 5 | Sertifika PDF indirme sistemi | ⏳ Bekliyor |
+| 6 | Leaked Password Protection etkinleştirme | ⏳ Supabase Dashboard'dan manuel |
+| 7 | SMTP yapılandırması (gerçek e-posta gönderimi) | ⏳ .env ayarları bekliyor |
+| 8 | Upstash Redis yapılandırması (sınav timer) | ⏳ .env ayarları bekliyor |
+
+---
+
+*Son güncelleme: 27 Mart 2026 — Oturum 6*

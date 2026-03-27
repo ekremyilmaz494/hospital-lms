@@ -102,6 +102,10 @@ export interface Training {
   startDate: string;
   endDate: string;
   isActive: boolean;
+  isCompulsory: boolean;
+  complianceDeadline: string | null;
+  regulatoryBody: string | null;
+  renewalPeriodMonths: number | null;
   createdById: string | null;
   createdAt: string;
   updatedAt: string;

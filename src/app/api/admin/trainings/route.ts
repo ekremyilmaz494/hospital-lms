@@ -75,6 +75,7 @@ export async function POST(request: Request) {
           ...trainingData,
           startDate: new Date(trainingData.startDate),
           endDate: new Date(trainingData.endDate),
+          complianceDeadline: trainingData.complianceDeadline ? new Date(trainingData.complianceDeadline) : null,
           organizationId: dbUser!.organizationId!,
           createdById: dbUser!.id,
         },

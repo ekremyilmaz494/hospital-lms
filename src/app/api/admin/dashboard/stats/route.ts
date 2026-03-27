@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 export async function GET() {
   const { dbUser, error } = await getAuthUser()
@@ -21,7 +22,7 @@ export async function GET() {
 
     return jsonResponse({ staffCount, trainingCount, departmentCount, completedAssignments })
   } catch (err) {
-    console.error('[Dashboard Stats Error]', err)
+    logger.error('Admin Dashboard Stats', 'İstatistikler alınamadı', err)
     return errorResponse('İstatistikler alınamadı', 503)
   }
 }

@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
-import { GraduationCap, Plus, MoreHorizontal, Eye, Edit, Trash2, Calendar, Users, X } from 'lucide-react';
+import { GraduationCap, Plus, MoreHorizontal, Eye, Edit, Trash2, Calendar, Users, X, Layers, Copy } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { PageHeader } from '@/components/shared/page-header';
 import { DataTable } from '@/components/shared/data-table';
+import { BulkAssignModal } from '@/components/shared/bulk-assign-modal';
 import Link from 'next/link';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -49,8 +50,10 @@ export default function TrainingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { data, isLoading, error, refetch } = useFetch<{ trainings: Training[]; total: number }>('/api/admin/trainings');
+  const { data: staffData } = useFetch<{ staff: { id: string; name: string; department: string }[] }>('/api/admin/staff');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
 
   if (isLoading) {
     return <PageLoading />;
@@ -69,6 +72,18 @@ export default function TrainingsPage() {
   });
 
   const activeFilters = [statusFilter, categoryFilter].filter(Boolean).length;
+
+  const handleDuplicate = async (training: Training) => {
+    try {
+      const res = await fetch(`/api/admin/trainings/${training.id}/duplicate`, { method: 'POST' });
+      if (!res.ok) throw new Error('Kopyalama başarısız');
+      const data = await res.json();
+      toast(`"${training.title}" kopyalandı. Taslak olarak kaydedildi.`, 'success');
+      router.push(`/admin/trainings/${data.id}/edit`);
+    } catch {
+      toast('Eğitim kopyalanırken hata oluştu', 'error');
+    }
+  };
 
   const handleDelete = async (training: Training) => {
     if (window.confirm(`"${training.title}" eğitimini silmek istediğinize emin misiniz?`)) {
@@ -192,6 +207,9 @@ export default function TrainingsPage() {
             <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/trainings/${row.original.id}/edit`)}>
               <Edit className="h-4 w-4" /> Düzenle
             </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2" onClick={() => handleDuplicate(row.original)}>
+              <Copy className="h-4 w-4" /> Kopyala
+            </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 text-red-500" onClick={() => handleDelete(row.original)}>
               <Trash2 className="h-4 w-4" /> Sil
             </DropdownMenuItem>
@@ -208,6 +226,26 @@ export default function TrainingsPage() {
         subtitle={`${filteredTrainings.length} eğitim listeleniyor`}
         action={{ label: 'Yeni Eğitim', icon: Plus, onClick: () => router.push('/admin/trainings/new') }}
       />
+      {/* Toplu Atama Butonu */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setShowBulkAssign(true)}
+          className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', transition: 'opacity var(--transition-fast)' }}
+        >
+          <Layers className="h-4 w-4" />
+          Toplu Eğitim Ata
+        </button>
+      </div>
+      {showBulkAssign && (
+        <BulkAssignModal
+          trainings={allTrainings.map(t => ({ id: t.id, title: t.title, category: t.category }))}
+          staff={(staffData?.staff ?? []).map(s => ({ id: s.id, name: s.name, department: s.department ?? '' }))}
+          onClose={() => setShowBulkAssign(false)}
+          onSuccess={() => refetch()}
+        />
+      )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

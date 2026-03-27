@@ -1,6 +1,7 @@
 'use client';
 
-import { Shield, Search, Filter, Download } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -17,6 +18,10 @@ interface AuditLog {
   time: string;
   initials: string;
   color: string;
+  createdAt: string;
+  userId: string;
+  entityType: string;
+  entityId: string;
 }
 
 const typeColors: Record<string, { bg: string; text: string; label: string }> = {
@@ -27,7 +32,39 @@ const typeColors: Record<string, { bg: string; text: string; label: string }> = 
 };
 
 export default function AdminAuditLogsPage() {
-  const { data, isLoading, error } = useFetch<AuditLog[]>('/api/admin/audit-logs');
+  const [search, setSearch] = useState('');
+  const [entityTypeFilter, setEntityTypeFilter] = useState('');
+
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (entityTypeFilter) params.set('entityType', entityTypeFilter);
+  const queryUrl = `/api/admin/audit-logs${params.toString() ? '?' + params.toString() : ''}`;
+
+  const { data, isLoading, error } = useFetch<AuditLog[]>(queryUrl);
+
+  const handleExportCSV = async () => {
+    const res = await fetch('/api/admin/audit-logs?limit=1000');
+    if (!res.ok) return;
+    const { logs } = await res.json();
+    if (!logs?.length) return;
+
+    const headers = ['Tarih', 'Kullanıcı', 'İşlem', 'Varlık Tipi', 'Varlık ID'];
+    const rows = logs.map((log: { createdAt: string; userId: string; action: string; entityType: string; entityId: string }) => [
+      new Date(log.createdAt).toLocaleString('tr-TR'),
+      log.userId,
+      log.action,
+      log.entityType,
+      log.entityId,
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (isLoading) {
     return <PageLoading />;
@@ -43,7 +80,7 @@ export default function AdminAuditLogsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <PageHeader title="İşlem Geçmişi" subtitle="Tüm sistem işlemlerini görüntüle" />
-        <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
+        <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={handleExportCSV}>
           <Download className="h-4 w-4" /> Dışa Aktar
         </Button>
       </div>
@@ -52,11 +89,27 @@ export default function AdminAuditLogsPage() {
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
-            <Input placeholder="İşlem veya kullanıcı ara..." className="pl-9 h-10 rounded-xl" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+            <Input
+              placeholder="İşlem veya kullanıcı ara..."
+              className="pl-9 h-10 rounded-xl"
+              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-          <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-            <Filter className="h-4 w-4" /> Filtrele
-          </Button>
+          <select
+            value={entityTypeFilter}
+            onChange={(e) => setEntityTypeFilter(e.target.value)}
+            className="rounded-lg border px-3 py-2 text-sm"
+            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+          >
+            <option value="">Tüm Tipler</option>
+            <option value="training">Eğitim</option>
+            <option value="staff">Personel</option>
+            <option value="certificate">Sertifika</option>
+            <option value="exam_attempt">Sınav</option>
+            <option value="export">Dışa Aktarım</option>
+          </select>
         </div>
       </BlurFade>
 

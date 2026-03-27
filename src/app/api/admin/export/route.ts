@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
 import ExcelJS from 'exceljs'
 
 export async function GET(request: Request) {
@@ -15,6 +16,9 @@ export async function GET(request: Request) {
 
   const orgId = dbUser!.organizationId
   if (!orgId) return errorResponse('Organization not found', 403)
+
+  const allowed = await checkRateLimit(`export:${orgId}`, 10, 60)
+  if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
   if (type === 'staff') {
     const staff = await prisma.user.findMany({
@@ -53,6 +57,15 @@ export async function GET(request: Request) {
     })
 
     styleHeader(ws)
+
+    await createAuditLog({
+      userId: dbUser!.id,
+      organizationId: orgId,
+      action: 'data.export',
+      entityType: 'export',
+      entityId: orgId,
+      newData: { type, format, rowCount: staff.length },
+    })
 
     if (format === 'csv') {
       const csv = await wb.csv.writeBuffer()
@@ -109,6 +122,15 @@ export async function GET(request: Request) {
 
     styleHeader(ws)
 
+    await createAuditLog({
+      userId: dbUser!.id,
+      organizationId: orgId,
+      action: 'data.export',
+      entityType: 'export',
+      entityId: orgId,
+      newData: { type, format, rowCount: trainings.length },
+    })
+
     const buffer = await wb.xlsx.writeBuffer()
     return new Response(buffer, {
       headers: {
@@ -158,6 +180,15 @@ export async function GET(request: Request) {
     })
 
     styleHeader(ws)
+
+    await createAuditLog({
+      userId: dbUser!.id,
+      organizationId: orgId,
+      action: 'data.export',
+      entityType: 'export',
+      entityId: orgId,
+      newData: { type, format, rowCount: attempts.length },
+    })
 
     const buffer = await wb.xlsx.writeBuffer()
     return new Response(buffer, {

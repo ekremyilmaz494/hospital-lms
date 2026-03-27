@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -88,7 +89,7 @@ export async function GET(request: Request) {
       trainings,
     })
   } catch (err) {
-    console.error('[Certificates API Error]', err)
+    logger.error('Admin Certificates', 'Sertifikalar yüklenemedi', err)
     return errorResponse('Sertifikalar yüklenemedi', 503)
   }
 }
@@ -109,10 +110,21 @@ export async function POST(request: Request) {
     return errorResponse('userId, trainingId ve attemptId zorunludur')
   }
 
+  const organizationId = dbUser!.organizationId!
+
   try {
+    // Cross-tenant validation
+    const [targetUser, targetTraining] = await Promise.all([
+      prisma.user.findFirst({ where: { id: userId, organizationId } }),
+      prisma.training.findFirst({ where: { id: trainingId, organizationId } }),
+    ])
+    if (!targetUser || !targetTraining) {
+      return errorResponse('Geçersiz kullanıcı veya eğitim', 403)
+    }
+
     // Verify attempt belongs to org
     const attempt = await prisma.examAttempt.findFirst({
-      where: { id: attemptId, training: { organizationId: dbUser!.organizationId! } },
+      where: { id: attemptId, training: { organizationId } },
     })
     if (!attempt) return errorResponse('Sınav denemesi bulunamadı', 404)
 
@@ -132,9 +144,18 @@ export async function POST(request: Request) {
       },
     })
 
+    await createAuditLog({
+      userId: dbUser!.id,
+      organizationId,
+      action: 'certificate.created_manual',
+      entityType: 'certificate',
+      entityId: cert.id,
+      newData: { userId, trainingId },
+    })
+
     return jsonResponse(cert, 201)
   } catch (err) {
-    console.error('[Certificate Create Error]', err)
+    logger.error('Admin Certificates', 'Sertifika oluşturulamadı', err)
     return errorResponse('Sertifika oluşturulamadı', 500)
   }
 }

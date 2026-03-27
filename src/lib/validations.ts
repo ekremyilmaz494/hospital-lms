@@ -95,6 +95,11 @@ export const createTrainingBodySchema = z.object({
   examDurationMinutes: z.coerce.number().int().max(180).default(30).transform(v => v < 5 ? 30 : v),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
+  // Compliance alanları
+  isCompulsory: z.boolean().default(false),
+  complianceDeadline: z.string().datetime().nullable().optional(),
+  regulatoryBody: z.string().max(200).nullable().optional(),
+  renewalPeriodMonths: z.coerce.number().int().min(1).max(120).nullable().optional(),
   videos: z.array(trainingVideoInputSchema).optional(),
   questions: z.array(trainingQuestionInputSchema).optional(),
   selectedDepts: z.array(z.string().uuid()).optional(),

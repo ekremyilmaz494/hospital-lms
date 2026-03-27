@@ -14,6 +14,9 @@ import {
   Calendar,
   UserCircle,
   BookOpen,
+  ShieldCheck,
+  Grid3x3,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -78,6 +81,9 @@ export const adminNav: NavGroup[] = [
         ],
       },
       { title: 'Sertifikalar', href: '/admin/certificates', icon: Award },
+      { title: 'Uyum Raporu', href: '/admin/compliance', icon: ShieldCheck },
+      { title: 'Yetkinlik Matrisi', href: '/admin/competency-matrix', icon: Grid3x3 },
+      { title: 'Etkinlik Analizi', href: '/admin/effectiveness', icon: TrendingUp },
       { title: 'Raporlar', href: '/admin/reports', icon: BarChart3 },
       { title: 'Bildirimler', href: '/admin/notifications', icon: Bell },
       { title: 'İşlem Geçmişi', href: '/admin/audit-logs', icon: History },

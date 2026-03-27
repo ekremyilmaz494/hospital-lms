@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Users, GraduationCap, TrendingUp, AlertTriangle, Trophy, Activity, Clock, ArrowRight,
-  Plus, Send, Download, Shield, Building2, CalendarClock, UserPlus,
+  Plus, Send, Download, Shield, Building2, CalendarClock, UserPlus, ShieldCheck,
 } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from '@/components/shared/recharts';
 import Link from 'next/link';
@@ -24,20 +25,21 @@ interface DashboardData {
   trendData: { month: string; tamamlanan: number; atanan: number; basarisiz: number }[];
   statusDistribution: { name: string; value: number; color: string }[];
   departmentComparison: { dept: string; oran: number; puan: number }[];
-  overdueTrainings: { name: string; dept: string; training: string; dueDate: string; daysOverdue: number; color: string }[];
+  overdueTrainings: { assignmentId: string; trainingId: string; name: string; dept: string; training: string; dueDate: string; daysOverdue: number; color: string }[];
+  complianceAlerts: { training: string; regulatoryBody: string; daysLeft: number; complianceRate: number; status: string }[];
   expiringCerts: { name: string; cert: string; expiryDate: string; daysLeft: number; status: string }[];
   topPerformers: { name: string; department: string; score: number; courses: number; initials: string; color: string }[];
   recentActivity: { action: string; user: string; time: string; type: string }[];
 }
 
-const iconMap: Record<string, typeof Users> = { Users, GraduationCap, TrendingUp, AlertTriangle };
+const iconMap: Record<string, typeof Users> = { Users, GraduationCap, TrendingUp, AlertTriangle, ShieldCheck };
 const typeColors: Record<string, string> = { success: 'var(--color-success)', error: 'var(--color-error)', info: 'var(--color-info)', warning: 'var(--color-warning)' };
 
 const quickActions = [
-  { label: 'Yeni Eğitim', icon: Plus, href: '/admin/trainings/new', color: 'var(--color-primary)' },
-  { label: 'Personel Ekle', icon: UserPlus, href: '/admin/staff', color: 'var(--color-info)' },
-  { label: 'Hatırlatma Gönder', icon: Send, href: '/admin/notifications', color: 'var(--color-accent)' },
-  { label: 'Rapor İndir', icon: Download, href: '/admin/reports', color: 'var(--color-success)' },
+  { label: 'Yeni Eğitim', desc: 'Video tabanlı eğitim oluştur', icon: Plus, href: '/admin/trainings/new', color: 'var(--color-primary)', gradient: 'linear-gradient(135deg, rgba(13,150,104,0.08) 0%, rgba(13,150,104,0.02) 100%)', glowColor: 'rgba(13,150,104,0.06)' },
+  { label: 'Personel Ekle', desc: 'Yeni personel kaydı', icon: UserPlus, href: '/admin/staff', color: 'var(--color-info)', gradient: 'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.02) 100%)', glowColor: 'rgba(59,130,246,0.06)' },
+  { label: 'Hatırlatma Gönder', desc: 'Toplu bildirim gönder', icon: Send, href: '/admin/notifications', color: 'var(--color-accent)', gradient: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%)', glowColor: 'rgba(245,158,11,0.06)' },
+  { label: 'Rapor İndir', desc: 'Excel ve PDF raporları', icon: Download, href: '/admin/reports', color: 'var(--color-success)', gradient: 'linear-gradient(135deg, rgba(34,197,94,0.08) 0%, rgba(34,197,94,0.02) 100%)', glowColor: 'rgba(34,197,94,0.06)' },
 ];
 
 const chartTooltipStyle = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', fontSize: '12px', boxShadow: 'var(--shadow-md)' };
@@ -45,6 +47,25 @@ const chartTooltipStyle = { background: 'var(--color-surface)', border: '1px sol
 export default function AdminDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
+
+  const handleSendReminder = async (assignmentId: string, staffName: string) => {
+    setSendingReminder(assignmentId);
+    try {
+      const res = await fetch('/api/admin/send-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignmentIds: [assignmentId] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast(`${staffName} için email ve bildirim gönderildi`, 'success');
+    } catch {
+      toast('Hatırlatma gönderilemedi', 'error');
+    } finally {
+      setSendingReminder(null);
+    }
+  };
   const { data, isLoading, error, refetch } = useFetch<DashboardData>('/api/admin/dashboard');
 
   if (isLoading) {
@@ -76,6 +97,13 @@ export default function AdminDashboard() {
   const expiringCerts = data?.expiringCerts ?? [];
   const topPerformers = data?.topPerformers ?? [];
   const recentActivity = data?.recentActivity ?? [];
+  const complianceAlerts = data?.complianceAlerts ?? [];
+
+  // Acil aksiyon sayısı
+  const urgentCount =
+    overdueTrainings.length +
+    expiringCerts.filter(c => c.daysLeft <= 7).length +
+    complianceAlerts.filter(c => c.status === 'critical' || c.status === 'overdue').length;
 
   const totalAssignments = statusDistribution.reduce((s, d) => s + d.value, 0);
 
@@ -87,16 +115,29 @@ export default function AdminDashboard() {
 
       {/* Quick Actions */}
       <BlurFade delay={0.03}>
-        <div className="flex items-center gap-3">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {quickActions.map((a) => (
             <Link
               key={a.label}
               href={a.href}
-              className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 active:scale-95 active:duration-75"
-              style={{ background: `${a.color}10`, color: a.color, border: `1px solid ${a.color}20` }}
+              className="group flex items-center gap-3 rounded-xl border px-4 py-3 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] active:duration-75"
+              style={{
+                background: 'var(--color-surface)',
+                borderColor: 'var(--color-border)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = a.color; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
             >
-              <a.icon className="h-4 w-4" />
-              {a.label}
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-[transform] duration-200 group-hover:scale-110"
+                style={{ background: `color-mix(in srgb, ${a.color} 12%, transparent)` }}
+              >
+                <a.icon className="h-4.5 w-4.5" style={{ color: a.color }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold leading-tight">{a.label}</p>
+                <p className="text-[11px] leading-tight truncate" style={{ color: 'var(--color-text-muted)' }}>{a.desc}</p>
+              </div>
             </Link>
           ))}
         </div>
@@ -117,6 +158,48 @@ export default function AdminDashboard() {
             <Link href="/admin/reports" className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-transform duration-200 hover:scale-105" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
               Detayları Gör <ArrowRight className="h-4 w-4" />
             </Link>
+          </div>
+        </BlurFade>
+      )}
+
+      {/* Acil Aksiyon Widget — Compliance Alarmları */}
+      {complianceAlerts.length > 0 && (
+        <BlurFade delay={0.06}>
+          <div className="rounded-2xl p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--color-error-bg)' }}>
+                  <Shield className="h-4 w-4" style={{ color: 'var(--color-error)' }} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>Uyum Alarmları</h3>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Zorunlu eğitim deadline yaklaşıyor</p>
+                </div>
+              </div>
+              <Link href="/admin/compliance" className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
+                Tümünü Gör →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {complianceAlerts.map((alert, i) => (
+                <div key={i} className="flex items-start gap-3 rounded-xl p-3" style={{
+                  background: alert.status === 'critical' || alert.status === 'overdue' ? 'var(--color-error-bg)' : 'var(--color-warning-bg, #fffbeb)',
+                  border: `1px solid ${alert.status === 'critical' || alert.status === 'overdue' ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)'}30`,
+                }}>
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" style={{ color: alert.status === 'critical' || alert.status === 'overdue' ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)' }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{alert.training}</p>
+                    {alert.regulatoryBody && <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{alert.regulatoryBody}</p>}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs font-bold" style={{ color: alert.status === 'critical' || alert.status === 'overdue' ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)' }}>
+                        {alert.status === 'overdue' ? 'Süre Doldu!' : `${alert.daysLeft} gün`}
+                      </span>
+                      <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>· %{alert.complianceRate} uyumlu</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </BlurFade>
       )}
@@ -305,8 +388,16 @@ export default function AdminDashboard() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <Button size="sm" variant="outline" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }} onClick={() => toast(`${t.name} için hatırlatma gönderildi.`, 'success')}>
-                        <Send className="h-3 w-3" /> Hatırlat
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 rounded-lg text-xs"
+                        style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                        disabled={sendingReminder === t.assignmentId}
+                        onClick={() => handleSendReminder(t.assignmentId, t.name)}
+                      >
+                        <Send className="h-3 w-3" />
+                        {sendingReminder === t.assignmentId ? 'Gönderiliyor...' : 'Hatırlat'}
                       </Button>
                     </td>
                   </tr>
