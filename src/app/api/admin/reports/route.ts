@@ -61,7 +61,7 @@ export async function GET(request: Request) {
         include: {
           assignments: {
             where: { ...assignmentDateFilter },
-            include: { examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true, status: true } } },
+            include: { training: { select: { title: true } }, examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true, status: true } } },
           },
           departmentRel: { select: { name: true } },
         },

@@ -100,7 +100,7 @@ export async function GET(request: Request) {
 
   if (type === 'certificates') {
     const certificates = await prisma.certificate.findMany({
-      where: { organizationId: orgId },
+      where: { training: { organizationId: orgId } },
       include: { user: { select: { firstName: true, lastName: true } }, training: { select: { title: true } } },
       orderBy: { issuedAt: 'desc' },
       take: 200,

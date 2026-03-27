@@ -174,10 +174,10 @@ export default function TrainingDetailPage() {
             ))}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={exportExcel}>
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => exportExcel()}>
               <Download className="h-3.5 w-3.5" /> Excel
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={exportPDF}>
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => exportPDF()}>
               <FileText className="h-3.5 w-3.5" /> PDF
             </Button>
           </div>

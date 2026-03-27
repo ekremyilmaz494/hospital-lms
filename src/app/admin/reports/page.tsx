@@ -24,7 +24,7 @@ interface ReportsData {
   trainingData: { name: string; atanan: number; tamamlayan: number; basarili: number; basarisiz: number; ort: number }[];
   staffPerformance: { name: string; dept: string; completed: number; avgScore: number; status: string; color: string }[];
   departmentData: { dept: string; personel: number; tamamlanma: number; ortPuan: number; basarisiz: number; color: string }[];
-  failureData: { name: string; dept: string; training: string; attempts: number; lastScore: number; status: string }[];
+  failureData: { name: string; dept: string; training: string; attempts: number; lastScore: number; status: string; assignmentId: string }[];
   durationData: { training: string; video: number; sinav: number }[];
 }
 
