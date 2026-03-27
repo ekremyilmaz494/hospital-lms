@@ -14,7 +14,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return errorResponse('phase parametresi zorunludur (pre veya post)', 400)
   }
   const requiredStatus = phase === 'pre' ? 'pre_exam' : 'post_exam'
-  const { error: phaseError } = await getAttemptWithPhaseCheck(id, dbUser!.id, [requiredStatus])
+  const { attempt, error: phaseError } = await getAttemptWithPhaseCheck(id, dbUser!.id, [requiredStatus])
   if (phaseError) return phaseError
 
   // id can be trainingId or assignmentId — find the training
@@ -30,6 +30,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
+  // Onceden kaydedilmis cevaplari getir (auto-save)
+  const savedAnswers = attempt ? await prisma.examAnswer.findMany({
+    where: { attemptId: attempt.id, examPhase: phase },
+    select: { questionId: true, selectedOptionId: true },
+  }) : []
+  const savedMap = new Map(savedAnswers.map(a => [a.questionId, a.selectedOptionId]))
+
   // Get questions with options (exclude isCorrect for security)
   const questions = await prisma.question.findMany({
     where: { trainingId: training.id },
@@ -44,17 +51,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   return jsonResponse({
     trainingTitle: training.title,
-    examType: 'Ön Sınav',
+    examType: phase === 'post' ? 'Son Sınav' : 'Ön Sınav',
     totalTime: training.examDurationMinutes * 60,
-    questions: questions.map((q, idx) => ({
-      id: idx + 1,
-      questionId: q.id,
-      text: q.questionText,
-      options: q.options.map((o, oIdx) => ({
+    questions: questions.map((q, idx) => {
+      const savedOptionId = savedMap.get(q.id)
+      const options = q.options.map((o, oIdx) => ({
         id: String.fromCharCode(97 + oIdx), // a, b, c, d
         optionId: o.id,
         text: o.optionText,
-      })),
-    })),
+      }))
+      // Kaydedilmis cevap varsa, secili option'in id'sini (a,b,c,d) bul
+      const savedAnswer = savedOptionId ? options.find(o => o.optionId === savedOptionId)?.id : undefined
+      return {
+        id: idx + 1,
+        questionId: q.id,
+        text: q.questionText,
+        options,
+        savedAnswer,
+      }
+    }),
   })
 }

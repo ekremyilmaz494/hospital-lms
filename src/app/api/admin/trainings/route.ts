@@ -151,7 +151,7 @@ export async function POST(request: Request) {
       }
 
       return t
-    })
+    }, { timeout: 30000 })
 
     await createAuditLog({
       userId: dbUser!.id,

@@ -181,6 +181,32 @@ export default function VideoPlayerPage() {
     return () => clearInterval(heartbeat);
   }, [isPlaying, currentVideo?.id, currentTime, id]);
 
+  // Video degistiginde currentTime'i lastPosition ile baslat
+  useEffect(() => {
+    if (currentVideo?.lastPosition && currentVideo.lastPosition > 0) {
+      setCurrentTime(currentVideo.lastPosition);
+    } else {
+      setCurrentTime(0);
+    }
+  }, [currentVideo?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sayfa kapanirken son pozisyonu kaydet (beforeunload)
+  useEffect(() => {
+    const saveOnExit = () => {
+      if (currentVideo && currentTime > 0) {
+        const payload = JSON.stringify({
+          videoId: currentVideo.id,
+          watchedTime: currentTime,
+          position: currentTime,
+        });
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon(`/api/exam/${id}/videos`, blob);
+      }
+    };
+    window.addEventListener('beforeunload', saveOnExit);
+    return () => window.removeEventListener('beforeunload', saveOnExit);
+  }, [currentVideo?.id, currentTime, id]);
+
   // Phase guard: redirect based on attempt status (must be before early returns but after all hooks)
   useEffect(() => {
     if (data?.attemptStatus === 'pre_exam') router.replace(`/exam/${id}/pre-exam`);

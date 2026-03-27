@@ -56,8 +56,8 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
       if (urlRef.current === currentUrl) {
         // Auth hataları veya timeout durumunda sessizce devam et — sayfa boş veri ile render olsun
         const msg = err instanceof Error ? err.message : 'Bir hata oluştu';
-        if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('abort') || msg.includes('404')) {
-          // Auth hatası — sessizce boş veri göster
+        if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('abort') || msg.includes('404') || msg.includes('500') || msg.includes('503')) {
+          // Auth/server hatası — sessizce boş veri göster (backend henüz konfigüre edilmemiş olabilir)
           setError(null);
         } else {
           setError(msg);

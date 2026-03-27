@@ -75,6 +75,7 @@ const Particles: React.FC<ParticlesProps> = ({
   const mousePosition = MousePosition()
   const mouse = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const canvasSize = useRef<{ w: number; h: number }>({ w: 0, h: 0 })
+  const rafId = useRef<number>(0)
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1
 
   useEffect(() => {
@@ -87,6 +88,7 @@ const Particles: React.FC<ParticlesProps> = ({
 
     return () => {
       window.removeEventListener("resize", initCanvas)
+      cancelAnimationFrame(rafId.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color])
@@ -269,7 +271,7 @@ const Particles: React.FC<ParticlesProps> = ({
         // update the circle position
       }
     })
-    window.requestAnimationFrame(animate)
+    rafId.current = window.requestAnimationFrame(animate)
   }
 
   return (

@@ -1,21 +1,23 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Clock, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 
 interface Option {
   id: string;
+  optionId: string;
   text: string;
 }
 
 interface Question {
   id: number;
+  questionId: string;
   text: string;
   options: Option[];
+  savedAnswer?: string;
 }
 
 interface ExamData {
@@ -28,58 +30,73 @@ interface ExamData {
 export default function PreExamPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const { data: examData, isLoading, error } = useFetch<ExamData>(`/api/exam/${id}/questions?phase=pre`);
+  const [examData, setExamData] = useState<ExamData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [started, setStarted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Initialize timer when data loads
+  // 1. Once attempt baslat, sonra sorulari cek
   useEffect(() => {
-    if (examData?.totalTime && timeLeft === null) {
-      setTimeLeft(examData.totalTime);
-    }
-  }, [examData, timeLeft]);
+    let cancelled = false;
 
-  // Start exam attempt
-  const startExam = useCallback(async () => {
-    if (started) return;
-    try {
-      const res = await fetch(`/api/exam/${id}/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ examType: 'pre' }),
-      });
-      const attempt = await res.json();
+    async function initExam() {
+      try {
+        // Adim 1: Attempt baslat
+        const startRes = await fetch(`/api/exam/${id}/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ examType: 'pre' }),
+        });
+        const attempt = await startRes.json();
 
-      // Phase guard: redirect if attempt is past pre-exam
-      if (attempt?.status === 'watching_videos') {
-        router.replace(`/exam/${id}/videos`);
-        return;
+        // Phase guard: redirect if attempt is past pre-exam
+        if (attempt?.status === 'watching_videos') {
+          router.replace(`/exam/${id}/videos`);
+          return;
+        }
+        if (attempt?.status === 'post_exam') {
+          router.replace(`/exam/${id}/post-exam`);
+          return;
+        }
+        if (attempt?.status === 'completed') {
+          router.replace('/staff/my-trainings');
+          return;
+        }
+
+        // Adim 2: Sorulari cek (attempt artik var)
+        const qRes = await fetch(`/api/exam/${id}/questions?phase=pre`);
+        if (!qRes.ok) {
+          const errData = await qRes.json().catch(() => ({}));
+          if (!cancelled) setError(errData.error || 'Sorular yüklenemedi');
+          return;
+        }
+        const data = await qRes.json();
+        if (!cancelled) {
+          setExamData(data);
+          setTimeLeft(data.totalTime);
+          // Kaydedilmis cevaplari yukle
+          if (data.questions) {
+            const restored: Record<number, string> = {};
+            for (const q of data.questions) {
+              if (q.savedAnswer) restored[q.id] = q.savedAnswer;
+            }
+            if (Object.keys(restored).length > 0) setAnswers(restored);
+          }
+        }
+      } catch {
+        if (!cancelled) setError('Sınav başlatılamadı');
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-      if (attempt?.status === 'post_exam') {
-        router.replace(`/exam/${id}/post-exam`);
-        return;
-      }
-      if (attempt?.status === 'completed') {
-        router.replace('/staff/my-trainings');
-        return;
-      }
-
-      setStarted(true);
-    } catch {
-      // Continue even if start fails
-      setStarted(true);
     }
-  }, [id, started, router]);
 
-  useEffect(() => {
-    if (examData && !started) {
-      startExam();
-    }
-  }, [examData, started, startExam]);
+    initExam();
+    return () => { cancelled = true; };
+  }, [id, router]);
 
   // Timer countdown
   useEffect(() => {
@@ -188,7 +205,18 @@ export default function PreExamPage() {
                 return (
                   <button
                     key={opt.id}
-                    onClick={() => setAnswers({ ...answers, [q?.id ?? 0]: opt.id })}
+                    onClick={() => {
+                      setAnswers({ ...answers, [q?.id ?? 0]: opt.id });
+                      // Auto-save cevabi
+                      const questionId = q?.questionId ?? '';
+                      if (questionId && opt.optionId) {
+                        fetch(`/api/exam/${id}/save-answer`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ questionId, selectedOptionId: opt.optionId, examPhase: 'pre' }),
+                        }).catch(() => {});
+                      }
+                    }}
                     className="flex w-full items-center gap-3 rounded-lg border p-4 text-left"
                     style={{
                       borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',

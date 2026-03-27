@@ -255,29 +255,6 @@ export default function TrainingsPage() {
           })}
         </div>
 
-        <div className="h-4 w-px" style={{ background: 'var(--color-border)' }} />
-
-        <div className="flex flex-wrap gap-1.5">
-          {allCategories.map((cat) => {
-            const isActive = categoryFilter === cat;
-            const color = categoryColors[cat];
-            return (
-              <button
-                key={cat}
-                onClick={() => setCategoryFilter(isActive ? null : cat)}
-                className="rounded-full px-3 py-1 text-[11px] font-semibold"
-                style={{
-                  background: isActive ? `${color}20` : 'transparent',
-                  color: isActive ? color : 'var(--color-text-muted)',
-                  border: `1.5px solid ${isActive ? color : 'var(--color-border)'}`,
-                  transition: 'background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast)',
-                }}
-              >
-                {cat}
-              </button>
-            );
-          })}
-        </div>
 
         {activeFilters > 0 && (
           <button

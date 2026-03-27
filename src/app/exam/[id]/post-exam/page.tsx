@@ -9,13 +9,16 @@ import { PageLoading } from '@/components/shared/page-loading';
 
 interface Option {
   id: string;
+  optionId: string;
   text: string;
 }
 
 interface Question {
   id: number;
+  questionId: string;
   text: string;
   options: Option[];
+  savedAnswer?: string;
 }
 
 interface ExamData {
@@ -37,6 +40,20 @@ export default function PostExamPage() {
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [phaseChecked, setPhaseChecked] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Kaydedilmis cevaplari yukle
+  useEffect(() => {
+    if (examData?.questions) {
+      const restored: Record<number, string> = {};
+      for (const q of examData.questions) {
+        if (q.savedAnswer) restored[q.id] = q.savedAnswer;
+      }
+      if (Object.keys(restored).length > 0) {
+        setAnswers(restored);
+        setMaxReachedQ(Math.max(...Object.keys(restored).map(Number)) - 1);
+      }
+    }
+  }, [examData]);
 
   // Phase guard — redirect if attempt is not in post_exam status
   useEffect(() => {
@@ -196,7 +213,18 @@ export default function PostExamPage() {
               {(q?.options ?? []).map((opt) => {
                 const isSelected = answers[q?.id ?? 0] === opt.id;
                 return (
-                  <button key={opt.id} onClick={() => setAnswers({ ...answers, [q?.id ?? 0]: opt.id })} className="flex w-full items-center gap-3 rounded-lg border p-4 text-left" style={{ borderColor: isSelected ? 'var(--color-accent)' : 'var(--color-border)', background: isSelected ? 'var(--color-accent-light)' : 'var(--color-surface)', transition: 'border-color var(--transition-fast), background var(--transition-fast)' }}>
+                  <button key={opt.id} onClick={() => {
+                    setAnswers({ ...answers, [q?.id ?? 0]: opt.id });
+                    // Auto-save cevabi
+                    const questionId = q?.questionId ?? '';
+                    if (questionId && opt.optionId) {
+                      fetch(`/api/exam/${id}/save-answer`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ questionId, selectedOptionId: opt.optionId, examPhase: 'post' }),
+                      }).catch(() => {});
+                    }
+                  }} className="flex w-full items-center gap-3 rounded-lg border p-4 text-left" style={{ borderColor: isSelected ? 'var(--color-accent)' : 'var(--color-border)', background: isSelected ? 'var(--color-accent-light)' : 'var(--color-surface)', transition: 'border-color var(--transition-fast), background var(--transition-fast)' }}>
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ background: isSelected ? 'var(--color-accent)' : 'var(--color-border)', color: isSelected ? 'white' : 'var(--color-text-muted)' }}>{opt.id.toUpperCase()}</div>
                     <span className="text-sm" style={{ color: 'var(--color-text-primary)', fontWeight: isSelected ? 600 : 400 }}>{opt.text}</span>
                   </button>

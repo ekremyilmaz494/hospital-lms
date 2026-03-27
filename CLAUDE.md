@@ -145,3 +145,116 @@ Full-stack application. Frontend pages use demo/mock data (switchable). Backend 
 - **AWS** for S3 video storage + CloudFront CDN
 - **Upstash** for serverless Redis
 - Daily cron job at `/api/cron/cleanup` (stale attempts, old notifications, audit log rotation)
+
+<!-- VERCEL BEST PRACTICES START -->
+## Best practices for developing on Vercel
+
+These defaults are optimized for AI coding agents (and humans) working on apps that deploy to Vercel.
+
+- Treat Vercel Functions as stateless + ephemeral (no durable RAM/FS, no background daemons), use Blob or marketplace integrations for preserving state
+- Edge Functions (standalone) are deprecated; prefer Vercel Functions
+- Don't start new projects on Vercel KV/Postgres (both discontinued); use Marketplace Redis/Postgres instead
+- Store secrets in Vercel Env Variables; not in git or `NEXT_PUBLIC_*`
+- Provision Marketplace native integrations with `vercel integration add` (CI/agent-friendly)
+- Sync env + project settings with `vercel env pull` / `vercel pull` when you need local/offline parity
+- Use `waitUntil` for post-response work; avoid the deprecated Function `context` parameter
+- Set Function regions near your primary data source; avoid cross-region DB/service roundtrips
+- Tune Fluid Compute knobs (e.g., `maxDuration`, memory/CPU) for long I/O-heavy calls (LLMs, APIs)
+- Use Runtime Cache for fast **regional** caching + tag invalidation (don't treat it as global KV)
+- Use Cron Jobs for schedules; cron runs in UTC and triggers your production URL via HTTP GET
+- Use Vercel Blob for uploads/media; Use Edge Config for small, globally-read config
+- If Enable Deployment Protection is enabled, use a bypass secret to directly access them
+- Add OpenTelemetry via `@vercel/otel` on Node; don't expect OTEL support on the Edge runtime
+- Enable Web Analytics + Speed Insights early
+- Use AI Gateway for model routing, set AI_GATEWAY_API_KEY, using a model string (e.g. 'anthropic/claude-sonnet-4.6'), Gateway is already default in AI SDK
+  needed. Always curl https://ai-gateway.vercel.sh/v1/models first; never trust model IDs from memory
+- For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
+<!-- VERCEL BEST PRACTICES END -->
+
+---
+
+# Hospital LMS — Claude Sistem Talimatlari
+
+## Proje Tanimi
+Hastane Personel Egitim ve Sinav Yonetim Sistemi (LMS).
+Multi-tenant SaaS — her hastane (organization) birbirinden tamamen izole.
+
+## Kaynaklar & Referanslar
+Bu projede asagidaki GitHub repolarindaki skill ve rehberlerden faydalanilmaktadir:
+
+- Anthropic resmi skill'leri: https://github.com/anthropics/skills
+- Anthropic kod ornekleri: https://github.com/anthropics/claude-cookbooks
+- Claude Code tam sistem: https://github.com/affaan-m/everything-claude-code
+- Subagent koleksiyonu: https://github.com/VoltAgent/awesome-claude-code-subagents
+- Skill dizini: https://github.com/travisvn/awesome-claude-skills
+
+## Multi-Tenant Guvenlik Kurallari (KRITIK)
+- Her veritabani sorgusunda `organizationId` filtresi ZORUNLU
+- Supabase RLS (Row Level Security) her tabloda aktif olmali
+- `service_role_key` sadece sunucu tarafinda kullanilir, client'a asla expose edilmez
+- Farkli organizasyonlarin verileri birbirine ASLA karismamali
+- Yeni tablo eklenince `supabase-rls.sql` dosyasina RLS politikasi da ekle
+
+## Rol Yapisi
+- **Super Admin** — tum organizasyonlari yonetir
+- **Hastane Admin** — sadece kendi organizasyonunu yonetir
+- **Personel** — sadece kendi egitim ve sinavlarini gorur
+
+## Kod Yazma Kurallari
+
+### Genel
+- TypeScript strict mode — `any` tipi YASAK
+- Zod ile tum input validasyonu zorunlu
+- Magic number yok — sabitler ayri `constants.ts` dosyasinda
+- `console.log` birakma — production'da logger kullan
+- Her fonksiyon ve component icin JSDoc yorum
+
+### Next.js
+- App Router kullan, Pages Router KULLANMA
+- Server Components varsayilan — gerekmedikce `"use client"` ekleme
+- Form islemleri Server Actions ile
+- API route'lari: `src/app/api/` altinda
+- Her route icin `loading.tsx`, `error.tsx`, `not-found.tsx` olustur
+
+### Veritabani
+- Prisma migration her sema degisikliginde: `pnpm run db:generate` → `pnpm run db:migrate`
+- Ham SQL yerine Prisma Client kullan
+- Transaction gerektiren islemlerde `prisma.$transaction()` kullan
+- Her sorguda `organizationId` ile filtrele
+
+### UI / Frontend
+- Mevcut Shadcn/ui componentlerini kullan, sifirdan yazma
+- https://github.com/anthropics/skills/tree/main/skills/frontend-design skill'ini uygula:
+  - Generic "AI slop" tasarimdan kac — kalin estetik kararlar al
+  - Inter/Roboto/Arial/sistem fontlarindan kac
+  - Mor gradient uzerine beyaz arka plandan kac
+  - Hastane/saglik baglamina ozgu tasarim dili kullan
+
+### Guvenlik
+- `.env` dosyasina asla secret commit etme
+- Her API endpoint'inde input sanitizasyonu
+- Rate limiting kritik endpoint'lerde zorunlu
+- CORS ayarlari production'da kisitli olmali
+
+## Test Kurallari
+- Her yeni feature icin Vitest unit testi
+- Kritik kullanici akislari icin Playwright e2e testi
+- Test coverage %80 altina dusurulmemelidir
+- `pnpm test` her PR oncesi gecmeli
+
+## Demo Giris Bilgileri
+- Super Admin: `super@demo.com` / `demo123456`
+- Hastane Admin: `admin@demo.com` / `demo123456`
+- Personel: `staff@demo.com` / `demo123456`
+
+## Claude'dan Beklentiler
+1. TypeScript tip guvenligini her zaman koru
+2. Multi-tenant izolasyonunu asla atlama
+3. Supabase RLS destekleyecek sekilde kod yaz
+4. Server / Client Component ayrimina dikkat et
+5. pnpm kullan, baska paket yoneticisi onerme
+6. Mevcut Shadcn/ui componentlerini tercih et
+7. Kullaniciya gosterilen hata mesajlarini Turkce yaz
+8. Guvenlik acigi gorursen hemen uyar
+9. Her onemli degisiklikten sonra test yazmayi hatirlat
+10. https://github.com/VoltAgent/awesome-claude-code-subagents reposundaki `security-auditor` ve `typescript-pro` subagent yaklasimlarini benimse

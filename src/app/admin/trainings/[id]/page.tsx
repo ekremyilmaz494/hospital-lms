@@ -33,7 +33,7 @@ interface TrainingDetail {
   failedCount: number;
   avgScore: number;
   status: string;
-  assignedStaff: { name: string; department: string; attempt: number; preScore: number | null; postScore: number | null; status: string; completedAt: string }[];
+  assignedStaff: { assignmentId: string; userId: string; name: string; department: string; attempt: number; preScore: number | null; postScore: number | null; status: string; completedAt: string }[];
   videos: { title: string; duration: string; order: number }[];
   questions: { text: string; points: number }[];
 }
@@ -110,7 +110,7 @@ export default function TrainingDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
+          <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => router.push(`/admin/trainings/${id}/edit`)}>
             <Edit className="h-4 w-4" /> Düzenle
           </Button>
           <Button onClick={() => setAssignModalOpen(true)} className="gap-2 rounded-xl font-semibold text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)', boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)' }}>
@@ -229,7 +229,18 @@ export default function TrainingDetailPage() {
                           </div>
                           <div className="ml-auto">
                             {s.status === 'failed' && (
-                              <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold rounded-lg" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
+                              <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold rounded-lg" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/admin/trainings/${id}/assignments`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ userId: s.userId }),
+                                    });
+                                    if (res.ok) refetch();
+                                  } catch {}
+                                }}
+                              >
                                 <RotateCcw className="h-3.5 w-3.5" /> Yeni Hak Ver
                               </Button>
                             )}

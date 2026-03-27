@@ -10,7 +10,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Search, Loader2 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
@@ -137,39 +136,63 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
                 <div
                   className="sticky top-0 z-10 p-3 flex items-center gap-3 backdrop-blur-md cursor-pointer select-none"
                   style={{ background: 'var(--color-surface)99', borderBottom: '1px solid var(--color-border)' }}
+                  onClick={() => {
+                    const allSelected = filteredStaff.length > 0 && filteredStaff.every(s => selectedStaff.includes(s.id));
+                    toggleAll(!allSelected);
+                  }}
                 >
-                  <Checkbox
-                    checked={filteredStaff.length > 0 && filteredStaff.every(s => selectedStaff.includes(s.id))}
-                    onCheckedChange={(newChecked) => toggleAll(!!newChecked)}
-                  />
-                  <span
-                    className="text-sm font-semibold flex-1"
-                    onClick={() => {
-                      const allSelected = filteredStaff.length > 0 && filteredStaff.every(s => selectedStaff.includes(s.id));
-                      toggleAll(!allSelected);
-                    }}
-                  >
+                  {(() => {
+                    const allSelected = filteredStaff.length > 0 && filteredStaff.every(s => selectedStaff.includes(s.id));
+                    return (
+                      <div
+                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border"
+                        style={{
+                          borderColor: allSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                          background: allSelected ? 'var(--color-primary)' : 'transparent',
+                          transition: 'background 150ms, border-color 150ms',
+                        }}
+                      >
+                        {allSelected && (
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <span className="text-sm font-semibold flex-1">
                     Tümünü Seç ({filteredStaff.length})
                   </span>
                 </div>
-                {filteredStaff.map(s => (
-                  <div
-                    key={s.id}
-                    className="flex items-center gap-3 p-3 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                  >
-                    <Checkbox
-                      checked={selectedStaff.includes(s.id)}
-                      onCheckedChange={(newChecked) => toggleStaff(s.id, !!newChecked)}
-                    />
+                {filteredStaff.map(s => {
+                  const isChecked = selectedStaff.includes(s.id);
+                  return (
                     <div
-                      className="flex-1"
-                      onClick={() => toggleStaff(s.id, !selectedStaff.includes(s.id))}
+                      key={s.id}
+                      className="flex items-center gap-3 p-3 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                      onClick={() => toggleStaff(s.id, !isChecked)}
                     >
-                      <p className="text-sm font-medium">{s.name}</p>
-                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{s.department}</p>
+                      <div
+                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border"
+                        style={{
+                          borderColor: isChecked ? 'var(--color-primary)' : 'var(--color-border)',
+                          background: isChecked ? 'var(--color-primary)' : 'transparent',
+                          transition: 'background 150ms, border-color 150ms',
+                        }}
+                      >
+                        {isChecked && (
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{s.name}</p>
+                        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{s.department}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

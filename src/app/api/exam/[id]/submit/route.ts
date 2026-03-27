@@ -91,19 +91,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0
 
-  // Idempotency: check if answers already exist for this attempt+phase
-  const existingAnswers = await prisma.examAnswer.count({
-    where: { attemptId: attempt.id, examPhase: phase }
-  })
-  if (existingAnswers > 0) {
-    // Already submitted — return existing data without creating duplicates
+  // Idempotency: eger bu faz icin skor zaten hesaplanmissa tekrar isleme
+  const alreadyScored = phase === 'pre' ? attempt.preExamScore !== null : attempt.postExamScore !== null
+  if (alreadyScored) {
     if (phase === 'pre') {
-      return jsonResponse({ phase: 'pre', score: attempt.preExamScore ? Number(attempt.preExamScore) : score, nextStep: 'videos' })
+      return jsonResponse({ phase: 'pre', score: Number(attempt.preExamScore), nextStep: 'videos' })
     }
-    return jsonResponse({ phase: 'post', score: attempt.postExamScore ? Number(attempt.postExamScore) : score, isPassed: attempt.isPassed, passingScore: attempt.training.passingScore })
+    return jsonResponse({ phase: 'post', score: Number(attempt.postExamScore), isPassed: attempt.isPassed, passingScore: attempt.training.passingScore })
   }
 
-  // Save answers
+  // Onceden auto-save ile kaydedilmis cevaplari sil ve yenilerini yaz
+  await prisma.examAnswer.deleteMany({
+    where: { attemptId: attempt.id, examPhase: phase }
+  })
+
+  // Save final answers with isCorrect
   if (validAnswers.length > 0) {
     await prisma.examAnswer.createMany({ data: validAnswers })
   }

@@ -32,6 +32,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const assignedStaff = training.assignments.map(a => {
     const latestAttempt = a.examAttempts[0] // desc order, take 1
     return {
+      assignmentId: a.id,
+      userId: a.user.id,
       name: `${a.user.firstName ?? ''} ${a.user.lastName ?? ''}`.trim() || a.user.email,
       department: a.user.department ?? '',
       attempt: a.currentAttempt,
