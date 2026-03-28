@@ -74,13 +74,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     questionCount: training._count.questions,
     assignedStaff,
     videos: training.videos.map(v => ({
+      id: v.id,
       title: v.title,
+      videoUrl: v.videoUrl,
       duration: `${Math.floor(v.durationSeconds / 60)}:${String(v.durationSeconds % 60).padStart(2, '0')}`,
       order: v.sortOrder,
     })),
     questions: training.questions.map(q => ({
+      id: q.id,
       text: q.questionText,
       points: q.points,
+      options: q.options.map(o => ({
+        id: o.id,
+        text: o.optionText,
+        isCorrect: o.isCorrect,
+        order: o.sortOrder,
+      })),
     })),
   })
 }

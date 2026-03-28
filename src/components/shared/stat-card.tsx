@@ -111,15 +111,49 @@ export function StatCard({
           )}
         </div>
 
-        {/* Icon */}
-        <div
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110"
-          style={{
-            background: iconBgColor || `color-mix(in srgb, ${accentColor} 12%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${accentColor} 20%, transparent)`,
-          }}
-        >
-          <Icon className="h-5 w-5" style={{ color: accentColor }} />
+        {/* Premium Icon Container */}
+        <div className="relative shrink-0">
+          {/* Outer glow ring */}
+          <div
+            className="absolute -inset-1.5 rounded-2xl opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+            style={{
+              background: `conic-gradient(from 180deg, ${accentColor}00, ${accentColor}30, ${accentColor}00)`,
+              filter: 'blur(4px)',
+            }}
+          />
+          {/* Decorative dot grid behind icon */}
+          <div
+            className="absolute inset-0 rounded-xl opacity-40"
+            style={{
+              backgroundImage: `radial-gradient(${accentColor}30 1px, transparent 1px)`,
+              backgroundSize: '6px 6px',
+            }}
+          />
+          {/* Main icon container */}
+          <div
+            className="relative flex h-13 w-13 items-center justify-center rounded-xl transition-transform duration-400 group-hover:scale-110 group-hover:rotate-3"
+            style={{
+              background: `linear-gradient(145deg, ${accentColor}18, ${accentColor}08)`,
+              border: `1.5px solid ${accentColor}25`,
+              boxShadow: `0 4px 14px ${accentColor}12, inset 0 1px 1px ${accentColor}10`,
+            }}
+          >
+            {/* Inner gradient orb */}
+            <div
+              className="absolute inset-1.5 rounded-lg"
+              style={{
+                background: `radial-gradient(circle at 35% 35%, ${accentColor}15, transparent 70%)`,
+              }}
+            />
+            <Icon
+              className="relative h-6 w-6"
+              style={{
+                color: accentColor,
+                filter: `drop-shadow(0 1px 2px ${accentColor}40)`,
+              }}
+              strokeWidth={1.8}
+            />
+          </div>
         </div>
       </div>
 

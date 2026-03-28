@@ -42,6 +42,7 @@ export default function EditStaffPage() {
   const [formData, setFormData] = useState<StaffEditData | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (data) setFormData({ ...data });
@@ -59,7 +60,17 @@ export default function EditStaffPage() {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Personel bulunamadı</div></div>;
   }
 
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!formData.firstName.trim()) e.firstName = 'Ad zorunludur';
+    if (!formData.lastName.trim()) e.lastName = 'Soyad zorunludur';
+    if (formData.phone && !/^0\d{10}$/.test(formData.phone.replace(/\s/g, ''))) e.phone = 'Geçerli telefon formatı: 05XX XXX XX XX';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const handleSave = async () => {
+    if (!validate()) return;
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/staff/${id}`, {
@@ -126,11 +137,13 @@ export default function EditStaffPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Ad *</Label>
-                <Input value={formData.firstName} onChange={(e) => update('firstName', e.target.value)} autoComplete="given-name" className="h-11 rounded-xl" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
+                <Input value={formData.firstName} onChange={(e) => update('firstName', e.target.value)} autoComplete="given-name" className="h-11 rounded-xl" style={{ background: 'var(--color-bg)', borderColor: errors.firstName ? 'var(--color-error)' : 'var(--color-border)' }} />
+                {errors.firstName && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.firstName}</p>}
               </div>
               <div>
                 <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Soyad *</Label>
-                <Input value={formData.lastName} onChange={(e) => update('lastName', e.target.value)} autoComplete="family-name" className="h-11 rounded-xl" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
+                <Input value={formData.lastName} onChange={(e) => update('lastName', e.target.value)} autoComplete="family-name" className="h-11 rounded-xl" style={{ background: 'var(--color-bg)', borderColor: errors.lastName ? 'var(--color-error)' : 'var(--color-border)' }} />
+                {errors.lastName && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.lastName}</p>}
               </div>
             </div>
             <div>
@@ -145,13 +158,15 @@ export default function EditStaffPage() {
                 <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
                   <Phone className="h-3.5 w-3.5" /> Telefon
                 </Label>
-                <Input value={formData.phone} onChange={(e) => update('phone', e.target.value)} autoComplete="tel" className="h-11 rounded-xl" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
+                <Input value={formData.phone} onChange={(e) => update('phone', e.target.value)} autoComplete="tel" className="h-11 rounded-xl" style={{ background: 'var(--color-bg)', borderColor: errors.phone ? 'var(--color-error)' : 'var(--color-border)' }} />
+                {errors.phone && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.phone}</p>}
               </div>
               <div>
                 <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
                   <Shield className="h-3.5 w-3.5" /> TC Kimlik No
                 </Label>
-                <Input value={formData.tcNo} onChange={(e) => update('tcNo', e.target.value)} className="h-11 rounded-xl font-mono" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
+                <Input value={formData.tcNo} disabled className="h-11 rounded-xl font-mono" style={{ background: 'var(--color-surface-hover)', borderColor: 'var(--color-border)' }} />
+                <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>TC Kimlik No değiştirilemez. Düzeltme için sistem yöneticisi ile iletişime geçin.</p>
               </div>
             </div>
           </div>
@@ -193,20 +208,25 @@ export default function EditStaffPage() {
                 <Input value={formData.title} onChange={(e) => update('title', e.target.value)} className="h-11 rounded-xl" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.isActive}
-                  onChange={(e) => update('isActive', e.target.checked)}
-                  className="h-4 w-4 rounded"
-                  style={{ accentColor: 'var(--color-primary)' }}
-                />
-                <span className="text-sm font-medium">Aktif personel</span>
-              </label>
-              {!formData.isActive && (
-                <span className="text-xs rounded-full px-2.5 py-0.5 font-semibold" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>Pasif</span>
-              )}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isActive}
+                    onChange={(e) => update('isActive', e.target.checked)}
+                    className="h-4 w-4 rounded"
+                    style={{ accentColor: 'var(--color-primary)' }}
+                  />
+                  <span className="text-sm font-medium">Aktif personel</span>
+                </label>
+                {!formData.isActive && (
+                  <span className="text-xs rounded-full px-2.5 py-0.5 font-semibold" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>Pasif</span>
+                )}
+              </div>
+              <p className="text-[11px] leading-relaxed ml-6" style={{ color: 'var(--color-text-muted)' }}>
+                Pasif yapılan personel sisteme giriş yapamaz, eğitimlere erişemez ve raporlarda görünmez.
+              </p>
             </div>
           </div>
         </div>

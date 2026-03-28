@@ -188,7 +188,7 @@ export default function TrainingsPage() {
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
           <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-secondary)' }}>{row.getValue('endDate')}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-secondary)' }}>{new Date(row.getValue('endDate') as string).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
         </div>
       ),
     },
@@ -220,24 +220,13 @@ export default function TrainingsPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Eğitim Yönetimi"
         subtitle={`${filteredTrainings.length} eğitim listeleniyor`}
         action={{ label: 'Yeni Eğitim', icon: Plus, onClick: () => router.push('/admin/trainings/new') }}
+        secondaryAction={{ label: 'Toplu Eğitim Ata', icon: Layers, onClick: () => setShowBulkAssign(true) }}
       />
-      {/* Toplu Atama Butonu */}
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setShowBulkAssign(true)}
-          className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
-          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', transition: 'opacity var(--transition-fast)' }}
-        >
-          <Layers className="h-4 w-4" />
-          Toplu Eğitim Ata
-        </button>
-      </div>
       {showBulkAssign && (
         <BulkAssignModal
           trainings={allTrainings.map(t => ({ id: t.id, title: t.title, category: t.category }))}

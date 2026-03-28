@@ -146,18 +146,13 @@ export function AppSidebar({
       </aside>
 
       {/* ── Expanded Panel (slides from left) ── */}
-      {/* Backdrop */}
-      <div
-        onClick={onToggleCollapse}
-        className="fixed inset-0 z-[55]"
-        style={{
-          background: 'rgba(0,0,0,0.15)',
-          opacity: collapsed ? 0 : 1,
-          pointerEvents: collapsed ? 'none' : 'auto',
-          transition: 'opacity 300ms ease',
-          backdropFilter: collapsed ? 'none' : 'blur(2px)',
-        }}
-      />
+      {/* Backdrop — sadece tıklama alanı, görsel overlay yok */}
+      {!collapsed && (
+        <div
+          onClick={onToggleCollapse}
+          className="fixed inset-0 z-[55]"
+        />
+      )}
 
       {/* Panel */}
       <div

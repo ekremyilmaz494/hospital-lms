@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, certificateExpiryReminderEmail, overdueTrainingReminderEmail } from '@/lib/email'
+import { deleteObject } from '@/lib/s3'
 
 /** Daily cleanup cron job (Vercel Cron) */
 export async function GET(request: Request) {
@@ -119,11 +120,24 @@ export async function GET(request: Request) {
     } catch { /* email hatası cron'u durdurmasın */ }
   }
 
+  // 6. Delete old backups (older than 90 days) and their S3 objects
+  const oldBackups = await prisma.dbBackup.findMany({
+    where: { createdAt: { lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } },
+    select: { id: true, fileUrl: true },
+  })
+  for (const b of oldBackups) {
+    await deleteObject(b.fileUrl).catch(() => {})
+  }
+  const deletedBackups = oldBackups.length > 0
+    ? await prisma.dbBackup.deleteMany({ where: { id: { in: oldBackups.map(b => b.id) } } })
+    : { count: 0 }
+
   return NextResponse.json({
     success: true,
     deletedNotifications: deletedNotifications.count,
     staleAttemptsClosed: staleAttempts.count,
     deletedLogs: deletedLogs.count,
+    deletedBackups: deletedBackups.count,
     certRemindersSent,
     overdueRemindersSent,
     timestamp: new Date().toISOString(),

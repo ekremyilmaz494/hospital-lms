@@ -60,35 +60,15 @@ export async function GET(request: Request) {
     }),
   ])
 
-  // Auto-fix: department alanında UUID olan ama departmentId null olan kullanıcıları düzelt
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const deptMap = new Map(rawDepartments.map(d => [d.id, d.name]))
-  const fixPromises = staff
-    .filter(s => !s.departmentId && s.department && uuidRegex.test(s.department) && deptMap.has(s.department))
-    .map(s => prisma.user.update({
-      where: { id: s.id },
-      data: { departmentId: s.department!, department: deptMap.get(s.department!) },
-    }))
-  if (fixPromises.length > 0) {
-    await Promise.all(fixPromises)
-    // Update staff objects in-place with fixed data
-    for (const s of staff) {
-      if (!s.departmentId && s.department && uuidRegex.test(s.department) && deptMap.has(s.department)) {
-        s.departmentId = s.department
-        s.department = deptMap.get(s.department) ?? s.department
-      }
-    }
-  }
 
-  // Count staff per department (including those fixed above)
-  const deptStaffCount = new Map<string, number>()
-  const allOrgStaff = await prisma.user.findMany({
-    where: { organizationId: dbUser!.organizationId!, role: 'staff' },
-    select: { departmentId: true, department: true },
-  })
-  for (const s of allOrgStaff) {
-    const dId = s.departmentId || (s.department && uuidRegex.test(s.department) ? s.department : null)
-    if (dId) deptStaffCount.set(dId, (deptStaffCount.get(dId) || 0) + 1)
+  // Resolve department names in-memory (read-only, no DB writes in GET)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  for (const s of staff) {
+    if (!s.departmentId && s.department && uuidRegex.test(s.department) && deptMap.has(s.department)) {
+      s.departmentId = s.department
+      s.department = deptMap.get(s.department) ?? s.department
+    }
   }
 
   const departments = rawDepartments.map(d => ({
@@ -96,7 +76,7 @@ export async function GET(request: Request) {
     name: d.name,
     color: d.color,
     description: d.description || '',
-    staffCount: deptStaffCount.get(d.id) || 0,
+    staffCount: d._count.users,
   }))
 
   const activeStaff = staff.filter(s => s.isActive).length
@@ -161,7 +141,7 @@ export async function POST(request: Request) {
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
   const body = await parseBody(request)
-  if (!body) return errorResponse('Invalid body')
+  if (!body) return errorResponse('Geçersiz istek verisi')
 
   const parsed = createUserSchema.safeParse({ ...body as object, role: 'staff', organizationId: dbUser!.organizationId! })
   if (!parsed.success) {
@@ -230,7 +210,8 @@ export async function POST(request: Request) {
         logger.error('Admin Staff', 'Rollback yeniden deneme başarısız — manuel temizlik gerekli', { userId: authUser.user.id })
       }
     }
-    return errorResponse(`Veritabanı hatası: ${dbError instanceof Error ? dbError.message : 'Bilinmeyen hata'}`)
+    logger.error('Admin Staff', 'DB insert başarısız', dbError)
+    return errorResponse('Personel veritabanına kaydedilemedi. Lütfen tekrar deneyin.')
   }
 
   await createAuditLog({

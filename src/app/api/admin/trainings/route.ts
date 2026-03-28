@@ -33,6 +33,7 @@ export async function GET(request: Request) {
       where,
       include: {
         videos: { select: { id: true, title: true, durationSeconds: true, sortOrder: true } },
+        assignments: { select: { status: true } },
         _count: { select: { assignments: true, questions: true, videos: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -42,7 +43,26 @@ export async function GET(request: Request) {
     prisma.training.count({ where }),
   ])
 
-  return jsonResponse({ trainings, total, page, limit, totalPages: Math.ceil(total / limit) })
+  const mapped = trainings.map(t => {
+    const assignedCount = t._count.assignments
+    const completedCount = t.assignments.filter(a => a.status === 'passed').length
+    const completionRate = assignedCount > 0 ? Math.round((completedCount / assignedCount) * 100) : 0
+    return {
+      id: t.id,
+      title: t.title,
+      category: t.category ?? '',
+      assignedCount,
+      completedCount,
+      completionRate,
+      passingScore: t.passingScore,
+      status: t.isActive ? 'Aktif' : 'Taslak',
+      startDate: t.startDate?.toISOString() ?? '',
+      endDate: t.endDate?.toISOString() ?? '',
+      createdBy: '',
+    }
+  })
+
+  return jsonResponse({ trainings: mapped, total, page, limit, totalPages: Math.ceil(total / limit) })
 }
 
 export async function POST(request: Request) {

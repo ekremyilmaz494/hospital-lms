@@ -205,7 +205,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((stat, i) => (
           <BlurFade key={stat.title} delay={0.1 + i * 0.05}><StatCard {...stat} /></BlurFade>
         ))}

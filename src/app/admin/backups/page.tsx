@@ -66,14 +66,14 @@ export default function BackupsPage() {
       <BlurFade delay={0.2}>
         <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
           {backups.length > 0 ? (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
               <thead>
                 <tr style={{ background: 'var(--color-bg)' }}>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tarih</th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tür</th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Boyut</th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Durum</th>
-                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>İşlem</th>
+                  <th className="w-[30%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tarih</th>
+                  <th className="w-[15%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tür</th>
+                  <th className="w-[15%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Boyut</th>
+                  <th className="w-[20%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Durum</th>
+                  <th className="w-[20%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>İşlem</th>
                 </tr>
               </thead>
               <tbody>
@@ -92,7 +92,7 @@ export default function BackupsPage() {
                         <CheckCircle className="h-3.5 w-3.5" /> Tamamlandı
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-right">
+                    <td className="px-5 py-4">
                       <Button variant="ghost" size="sm" className="gap-1.5 rounded-lg" style={{ color: 'var(--color-primary)' }} onClick={async () => {
                         toast(`${b.date} tarihli yedek indiriliyor...`, 'info');
                         try {

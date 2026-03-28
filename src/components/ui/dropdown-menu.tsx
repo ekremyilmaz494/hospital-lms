@@ -41,12 +41,20 @@ function DropdownMenuContent({
       >
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
-          className={cn("z-50 min-w-32 overflow-hidden rounded-xl p-1.5 outline-none", className)}
+          className={cn(
+            "z-50 min-w-36 overflow-hidden rounded-xl p-1.5 outline-none",
+            "origin-(--transform-origin)",
+            "transition-[opacity,transform,scale] duration-200 ease-out",
+            "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:slide-in-from-top-1",
+            "data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:slide-out-to-top-1",
+            className
+          )}
           style={{
             background: 'var(--color-surface)',
             color: 'var(--color-text-primary)',
             border: '1px solid var(--color-border)',
-            boxShadow: 'var(--shadow-lg)',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.02)',
+            backdropFilter: 'blur(8px)',
           }}
           {...props}
         />

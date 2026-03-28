@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Award, Search, Download, Eye, Calendar, CheckCircle2,
   AlertTriangle, Clock,
@@ -65,6 +65,8 @@ export default function CertificatesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [trainingFilter, setTrainingFilter] = useState('');
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const certPdfRef = useRef<HTMLDivElement>(null);
 
   if (isLoading) return <PageLoading />;
 
@@ -475,19 +477,152 @@ export default function CertificatesPage() {
                   Kapat
                 </Button>
                 <button
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl h-11 text-[13px] font-semibold text-white"
+                  disabled={pdfLoading}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl h-11 text-[13px] font-semibold text-white disabled:opacity-60"
                   style={{
                     background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
                     boxShadow: '0 4px 12px rgba(13, 150, 104, 0.2)',
                   }}
-                  onClick={() => toast('PDF indirme özelliği yakında eklenecek', 'info')}
+                  onClick={async () => {
+                    if (!certPdfRef.current) return;
+                    setPdfLoading(true);
+                    try {
+                      const html2canvas = (await import('html2canvas-pro')).default;
+                      const { default: jsPDF } = await import('jspdf');
+                      const el = certPdfRef.current;
+                      el.style.display = 'block';
+                      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+                      el.style.display = 'none';
+                      const imgData = canvas.toDataURL('image/png');
+                      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                      doc.addImage(imgData, 'PNG', 0, 0, 297, 210);
+                      doc.save(`sertifika-${selectedCert.certificateCode}.pdf`);
+                      toast('Sertifika PDF olarak indirildi', 'success');
+                    } catch {
+                      toast('PDF oluşturulamadı', 'error');
+                    } finally {
+                      setPdfLoading(false);
+                    }
+                  }}
                 >
-                  <Download className="h-4 w-4" />
-                  PDF İndir
+                  {pdfLoading ? (
+                    <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Oluşturuluyor...</>
+                  ) : (
+                    <><Download className="h-4 w-4" /> PDF İndir</>
+                  )}
                 </button>
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Hidden PDF Template — rendered offscreen, captured by html2canvas */}
+      {selectedCert && (
+        <div
+          ref={certPdfRef}
+          style={{
+            display: 'none',
+            width: '1122px',
+            height: '793px',
+            position: 'fixed',
+            left: '-9999px',
+            top: 0,
+            background: '#f8fafc',
+            fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Outer border */}
+          <div style={{ position: 'absolute', inset: '20px', border: '3px solid #0d9668', borderRadius: '4px' }}>
+            <div style={{ position: 'absolute', inset: '6px', border: '1px solid #0d966840' }} />
+          </div>
+
+          {/* Corner ornaments */}
+          {[[24, 24], [1122 - 24 - 40, 24], [24, 793 - 24 - 40], [1122 - 24 - 40, 793 - 24 - 40]].map(([x, y], i) => (
+            <div key={i} style={{ position: 'absolute', left: `${x}px`, top: `${y}px`, width: '40px', height: '40px', border: '1.5px solid #0d9668', borderRadius: '2px' }} />
+          ))}
+
+          {/* Top accent */}
+          <div style={{ position: 'absolute', top: '30px', left: '50%', transform: 'translateX(-50%)', width: '200px', height: '6px', background: 'linear-gradient(90deg, #0d9668, #065f46)', borderRadius: '3px' }} />
+
+          {/* Content container */}
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 80px' }}>
+
+            {/* Medal */}
+            <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #0d9668, #065f46)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', boxShadow: '0 4px 20px rgba(13,150,104,0.3)' }}>
+              <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #0d9668, #065f46)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '20px', fontWeight: 'bold' }}>✓</div>
+              </div>
+            </div>
+
+            {/* Title */}
+            <h1 style={{ fontSize: '38px', fontWeight: 800, color: '#0f172a', letterSpacing: '2px', margin: '16px 0 4px', textAlign: 'center' }}>TAMAMLAMA SERTİFİKASI</h1>
+            <p style={{ fontSize: '14px', color: '#94a3b8', margin: 0, letterSpacing: '1px' }}>Hastane LMS Eğitim Programı</p>
+
+            {/* Divider */}
+            <div style={{ width: '300px', height: '1px', background: 'linear-gradient(90deg, transparent, #cbd5e1, transparent)', margin: '20px 0' }} />
+
+            {/* Label */}
+            <p style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '3px', margin: '0 0 8px' }}>Bu Sertifika</p>
+
+            {/* Name */}
+            <h2 style={{ fontSize: '32px', fontWeight: 700, color: '#0f172a', margin: '0 0 4px', textAlign: 'center' }}>{selectedCert.user.name}</h2>
+            <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
+              {selectedCert.user.department}{selectedCert.user.title ? ` · ${selectedCert.user.title}` : ''}
+            </p>
+
+            {/* Description */}
+            <p style={{ fontSize: '12px', color: '#94a3b8', margin: '12px 0 0', textAlign: 'center' }}>
+              adlı personele, aşağıdaki eğitimi başarıyla tamamladığı için verilmiştir.
+            </p>
+
+            {/* Divider */}
+            <div style={{ width: '300px', height: '1px', background: 'linear-gradient(90deg, transparent, #cbd5e1, transparent)', margin: '20px 0' }} />
+
+            {/* Training */}
+            <h3 style={{ fontSize: '22px', fontWeight: 700, color: '#0d9668', margin: '0 0 6px', textAlign: 'center' }}>{selectedCert.training.title}</h3>
+            {selectedCert.training.category && (
+              <span style={{ fontSize: '10px', color: '#64748b', background: '#f1f5f9', padding: '3px 12px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                {selectedCert.training.category}
+              </span>
+            )}
+
+            {/* Stats */}
+            <div style={{ display: 'flex', gap: '16px', margin: '24px 0' }}>
+              {[
+                { label: 'PUAN', value: `${selectedCert.score}%` },
+                { label: 'DENEME', value: `${selectedCert.attemptNumber}.` },
+                { label: 'DURUM', value: selectedCert.isExpired ? 'Süresi Dolmuş' : 'Aktif' },
+              ].map((b) => (
+                <div key={b.label} style={{ width: '140px', background: '#f1f5f9', borderRadius: '10px', padding: '12px 0', textAlign: 'center' }}>
+                  <p style={{ fontSize: '9px', color: '#94a3b8', letterSpacing: '2px', margin: '0 0 4px', textTransform: 'uppercase' }}>{b.label}</p>
+                  <p style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{b.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Bottom info */}
+            <div style={{ width: '100%', maxWidth: '700px', borderTop: '1px solid #e2e8f0', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', marginTop: 'auto' }}>
+              <div>
+                <p style={{ fontSize: '9px', color: '#94a3b8', margin: '0 0 4px', letterSpacing: '1px', textTransform: 'uppercase' }}>Sertifika Kodu</p>
+                <p style={{ fontSize: '13px', fontWeight: 700, color: '#0d9668', margin: 0, fontFamily: 'monospace' }}>{selectedCert.certificateCode}</p>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '9px', color: '#94a3b8', margin: '0 0 4px', letterSpacing: '1px', textTransform: 'uppercase' }}>Veriliş Tarihi</p>
+                <p style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{formatDate(selectedCert.issuedAt)}</p>
+              </div>
+              {selectedCert.expiresAt && (
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: '9px', color: '#94a3b8', margin: '0 0 4px', letterSpacing: '1px', textTransform: 'uppercase' }}>Geçerlilik Tarihi</p>
+                  <p style={{ fontSize: '13px', fontWeight: 700, color: selectedCert.isExpired ? '#dc2626' : '#0f172a', margin: 0 }}>{formatDate(selectedCert.expiresAt)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom accent */}
+          <div style={{ position: 'absolute', bottom: '30px', left: '50%', transform: 'translateX(-50%)', width: '160px', height: '5px', background: 'linear-gradient(90deg, #0d9668, #065f46)', borderRadius: '3px' }} />
         </div>
       )}
     </div>

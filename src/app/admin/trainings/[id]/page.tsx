@@ -34,8 +34,8 @@ interface TrainingDetail {
   avgScore: number;
   status: string;
   assignedStaff: { assignmentId: string; userId: string; name: string; department: string; attempt: number; preScore: number | null; postScore: number | null; status: string; completedAt: string }[];
-  videos: { title: string; duration: string; order: number }[];
-  questions: { text: string; points: number }[];
+  videos: { id: string; title: string; videoUrl: string; duration: string; order: number }[];
+  questions: { id: string; text: string; points: number; options: { id: string; text: string; isCorrect: boolean; order: number }[] }[];
 }
 
 const statusMap: Record<string, { label: string; bg: string; text: string; icon: typeof CheckCircle2 }> = {
@@ -51,6 +51,7 @@ export default function TrainingDetailPage() {
   const id = typeof params?.id === 'string' ? params.id : null;
   const { data: training, isLoading, error, refetch } = useFetch<TrainingDetail>(id ? `/api/admin/trainings/${id}` : null);
   const [activeTab, setActiveTab] = useState('staff');
+  const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
 
   if (!id) {
@@ -173,14 +174,16 @@ export default function TrainingDetailPage() {
               </button>
             ))}
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => exportExcel()}>
-              <Download className="h-3.5 w-3.5" /> Excel
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => exportPDF()}>
-              <FileText className="h-3.5 w-3.5" /> PDF
-            </Button>
-          </div>
+          {activeTab !== 'videos' && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => exportExcel()}>
+                <Download className="h-3.5 w-3.5" /> Excel
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => exportPDF()}>
+                <FileText className="h-3.5 w-3.5" /> PDF
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Tab Content */}
@@ -264,31 +267,95 @@ export default function TrainingDetailPage() {
             {activeTab === 'videos' && (
               <motion.div key="videos" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
                 {trainingVideos.length > 0 ? (
-                  <div className="space-y-3">
-                    {trainingVideos.map((v) => (
-                      <div key={v.order} className="flex items-center gap-4 rounded-xl p-4 group cursor-pointer" style={{ background: 'var(--color-bg)', border: '1px solid transparent', transition: 'border-color var(--transition-fast)' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
-                      >
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
-                          <Play className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>{v.title}</p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Video {v.order}</p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-                            <span className="text-xs font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>{v.duration}</span>
+                  <div className="space-y-2">
+                    {trainingVideos.map((v, vi) => {
+                      const videoKey = v.id ?? `video-${vi}`;
+                      const isActive = activeVideoId === videoKey;
+                      return (
+                        <div key={videoKey} className="rounded-2xl overflow-hidden" style={{ background: isActive ? '#0a0a0a' : 'var(--color-bg)', border: isActive ? '1px solid rgba(13,150,104,0.3)' : '1px solid transparent', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: isActive ? '0 8px 32px rgba(0,0,0,0.12), 0 0 0 1px rgba(13,150,104,0.08)' : 'none' }}>
+                          {/* Video Row */}
+                          <div
+                            className="flex items-center gap-4 px-5 py-4 cursor-pointer group relative"
+                            style={{ background: isActive ? 'linear-gradient(135deg, rgba(13,150,104,0.08) 0%, rgba(13,150,104,0.02) 100%)' : 'transparent' }}
+                            onClick={() => setActiveVideoId(isActive ? null : videoKey)}
+                          >
+                            {/* Order Number */}
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold" style={{ background: isActive ? 'var(--color-primary)' : 'var(--color-primary-light)', color: isActive ? 'white' : 'var(--color-primary)', transition: 'all 0.3s' }}>
+                              {vi + 1}
+                            </div>
+
+                            {/* Play Icon */}
+                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: isActive ? 'rgba(255,255,255,0.1)' : 'var(--color-surface)', transition: 'all 0.3s' }}>
+                              {isActive ? (
+                                <Video className="h-5 w-5 text-white/90" />
+                              ) : (
+                                <Play className="h-4 w-4" style={{ color: 'var(--color-primary)', marginLeft: 2 }} />
+                              )}
+                            </div>
+
+                            {/* Title & Meta */}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold truncate" style={{ color: isActive ? 'white' : 'var(--color-text-primary)', transition: 'color 0.3s' }}>{v.title}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <Clock className="h-3 w-3" style={{ color: isActive ? 'rgba(255,255,255,0.4)' : 'var(--color-text-muted)' }} />
+                                <span className="text-[11px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: isActive ? 'rgba(255,255,255,0.5)' : 'var(--color-text-muted)' }}>{v.duration}</span>
+                              </div>
+                            </div>
+
+                            {/* Status Indicator */}
+                            <div className="flex items-center gap-3 shrink-0">
+                              {isActive && (
+                                <motion.span
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="flex items-center gap-1.5 rounded-full px-2.5 py-1"
+                                  style={{ background: 'rgba(13,150,104,0.15)', border: '1px solid rgba(13,150,104,0.2)' }}
+                                >
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  <span className="text-[10px] font-semibold tracking-wide uppercase text-emerald-400">Oynatılıyor</span>
+                                </motion.span>
+                              )}
+                              <ChevronRight className="h-4 w-4" style={{ color: isActive ? 'rgba(255,255,255,0.3)' : 'var(--color-text-muted)', transform: isActive ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.3s, color 0.3s, opacity 0.3s', opacity: isActive ? 1 : 0 }} />
+                            </div>
                           </div>
-                          <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100" style={{ color: 'var(--color-text-muted)', transition: 'opacity var(--transition-fast)' }} />
+
+                          {/* Cinema Player */}
+                          <AnimatePresence>
+                            {isActive && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+                                className="overflow-hidden"
+                              >
+                                <div className="relative">
+                                  {/* Cinematic top fade */}
+                                  <div className="absolute top-0 left-0 right-0 h-6 z-10" style={{ background: 'linear-gradient(to bottom, #0a0a0a, transparent)' }} />
+                                  <video
+                                    key={videoKey}
+                                    src={v.videoUrl}
+                                    controls
+                                    className="w-full"
+                                    style={{ aspectRatio: '16/9', background: '#000', display: 'block' }}
+                                  />
+                                  {/* Cinematic bottom fade */}
+                                  <div className="absolute bottom-0 left-0 right-0 h-8 z-10 pointer-events-none" style={{ background: 'linear-gradient(to top, #0a0a0a, transparent)' }} />
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+                  <div className="flex flex-col items-center justify-center py-16 gap-3">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: 'var(--color-bg)' }}>
+                      <Video className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
+                    </div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Henüz video eklenmemiş</p>
+                  </div>
                 )}
               </motion.div>
             )}
@@ -297,17 +364,49 @@ export default function TrainingDetailPage() {
             {activeTab === 'questions' && (
               <motion.div key="questions" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
                 {trainingQuestions.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {trainingQuestions.map((q, i) => (
-                      <div key={i} className="flex items-center gap-4 rounded-xl p-4" style={{ background: 'var(--color-bg)' }}>
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold" style={{ background: 'var(--color-accent-light)', color: 'var(--color-accent)' }}>{i + 1}</div>
-                        <div className="flex-1">
-                          <p className="text-sm" style={{ color: 'var(--color-text-primary)' }}>{q.text}</p>
+                      <div key={q.id ?? `q-${i}`} className="rounded-xl p-5" style={{ background: 'var(--color-bg)' }}>
+                        <div className="flex items-start gap-4">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold" style={{ background: 'var(--color-accent-light)', color: 'var(--color-accent)' }}>{i + 1}</div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{q.text}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Award className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
+                            <span className="text-xs font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>{q.points} puan</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <Award className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
-                          <span className="text-xs font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>{q.points} puan</span>
-                        </div>
+                        {q.options.length > 0 ? (
+                          <div className="mt-3 ml-13 space-y-2">
+                            {q.options.map((o, oi) => (
+                              <div
+                                key={o.id}
+                                className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+                                style={{
+                                  background: o.isCorrect ? 'var(--color-success-bg)' : 'var(--color-surface)',
+                                  border: o.isCorrect ? '1px solid var(--color-success)' : '1px solid transparent',
+                                }}
+                              >
+                                <span
+                                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-bold"
+                                  style={{
+                                    background: o.isCorrect ? 'var(--color-success)' : 'var(--color-border)',
+                                    color: o.isCorrect ? 'white' : 'var(--color-text-muted)',
+                                  }}
+                                >
+                                  {String.fromCharCode(65 + oi)}
+                                </span>
+                                <span className="flex-1 text-sm" style={{ color: o.isCorrect ? 'var(--color-success)' : 'var(--color-text-secondary)', fontWeight: o.isCorrect ? 600 : 400 }}>
+                                  {o.text}
+                                </span>
+                                {o.isCorrect && <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: 'var(--color-success)' }} />}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-3 ml-13 text-xs" style={{ color: 'var(--color-text-muted)' }}>Seçenek eklenmemiş</p>
+                        )}
                       </div>
                     ))}
                   </div>

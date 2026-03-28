@@ -2,7 +2,7 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GraduationCap, TrendingUp, Calendar, Edit, Mail, Phone, Building2, Shield, RotateCcw } from 'lucide-react';
+import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, Shield, RotateCcw, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
@@ -58,7 +58,7 @@ export default function StaffDetailPage() {
     { icon: Phone, label: 'Telefon', value: staff.phone, mono: true },
     { icon: Shield, label: 'TC Kimlik', value: staff.tcNo, mono: true },
     { icon: Building2, label: 'Departman', value: staff.department },
-    { icon: Calendar, label: 'Unvan', value: staff.title },
+    { icon: Briefcase, label: 'Unvan', value: staff.title },
   ];
 
   const trainingHistory = staff.trainingHistory ?? [];
@@ -152,9 +152,9 @@ export default function StaffDetailPage() {
                         return (
                           <tr key={i} className="clickable-row" style={{ borderBottom: '1px solid var(--color-border)' }}>
                             <td className="px-3 py-3 font-semibold">{t.title}</td>
-                            <td className="px-3 py-3 font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>{t.attempt}/3</td>
+                            <td className="px-3 py-3 font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>{t.attempt}/{t.maxAttempts}</td>
                             <td className="px-3 py-3 font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>{t.preScore !== null ? `${t.preScore}%` : '—'}</td>
-                            <td className="px-3 py-3 font-mono text-sm font-bold" style={{ color: t.postScore !== null && t.postScore >= 70 ? 'var(--color-success)' : 'var(--color-text-secondary)' }}>{t.postScore !== null ? `${t.postScore}%` : '—'}</td>
+                            <td className="px-3 py-3 font-mono text-sm font-bold" style={{ color: t.status === 'passed' ? 'var(--color-success)' : 'var(--color-text-secondary)' }}>{t.postScore !== null ? `${t.postScore}%` : '—'}</td>
                             <td className="px-3 py-3">
                               <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: st.bg, color: st.text }}>
                                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.text }} />
@@ -196,7 +196,17 @@ export default function StaffDetailPage() {
                   </table>
                 </div>
               ) : (
-                <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+                <div className="flex flex-col items-center gap-3 py-8">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: 'var(--color-info-bg)' }}>
+                    <GraduationCap className="h-6 w-6" style={{ color: 'var(--color-info)' }} />
+                  </div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Henüz eğitim atanmamış</p>
+                  <Link href={`/admin/trainings/new?staffId=${staff.id}`}>
+                    <Button variant="outline" size="sm" className="gap-2 rounded-lg" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
+                      <Plus className="h-3.5 w-3.5" /> Eğitim Ata
+                    </Button>
+                  </Link>
+                </div>
               )}
             </div>
           </MagicCard>

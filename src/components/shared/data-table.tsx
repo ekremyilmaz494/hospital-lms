@@ -95,14 +95,16 @@ export function DataTable<TData, TValue>({
                   borderBottomWidth: '2px',
                 }}
               >
-                {headerGroup.headers.map((header) => (
+                {headerGroup.headers.map((header) => {
+                  const isActionsCol = header.column.id === 'actions';
+                  return (
                   <TableHead
                     key={header.id}
-                    className="text-[11px] font-semibold uppercase tracking-[0.08em]"
+                    className={`text-[11px] font-semibold uppercase tracking-[0.08em]${isActionsCol ? ' w-px' : ''}`}
                     style={{
                       color: 'var(--color-text-muted)',
                       fontFamily: 'var(--font-body)',
-                      padding: '14px 16px',
+                      padding: isActionsCol ? '14px 4px' : '14px 16px',
                     }}
                   >
                     {header.isPlaceholder ? null : (
@@ -121,7 +123,8 @@ export function DataTable<TData, TValue>({
                       </div>
                     )}
                   </TableHead>
-                ))}
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>
@@ -133,18 +136,22 @@ export function DataTable<TData, TValue>({
                   className="clickable-row"
                   style={{ borderColor: 'var(--color-border)' }}
                 >
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getVisibleCells().map((cell) => {
+                    const isActionsCell = cell.column.id === 'actions';
+                    return (
                     <TableCell
                       key={cell.id}
+                      className={isActionsCell ? 'w-px' : ''}
                       style={{
                         color: 'var(--color-text-primary)',
-                        padding: '14px 16px',
+                        padding: isActionsCell ? '14px 4px' : '14px 16px',
                         fontSize: '14px',
                       }}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
-                  ))}
+                    );
+                  })}
                 </TableRow>
               ))
             ) : (

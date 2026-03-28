@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     },
   })
 
-  if (!staff) return errorResponse('Staff not found', 404)
+  if (!staff) return errorResponse('Personel bulunamadı', 404)
 
   // Resolve department name from ID if department field contains a UUID
   let departmentName = staff.department ?? ''
@@ -50,7 +50,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     firstName: staff.firstName,
     lastName: staff.lastName,
     email: staff.email,
-    tcNo: staff.tcNo ?? '',
+    tcNo: staff.tcNo ? `*******${staff.tcNo.slice(-4)}` : '',
     department: departmentName,
     departmentId: staff.departmentId,
     title: staff.title ?? '',
@@ -60,7 +60,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     stats: {
       assignedTrainings: staff.assignments.length,
       completedTrainings: completedAssignments.length,
-      successRate: `%${successRate}`,
+      successRate: `${successRate}%`,
       avgScore: avgScore,
     },
     trainingHistory: staff.assignments.map(a => {
@@ -92,7 +92,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (roleError) return roleError
 
   const body = await parseBody(request)
-  if (!body) return errorResponse('Invalid body')
+  if (!body) return errorResponse('Geçersiz istek verisi')
 
   // role ve organizationId değiştirilmesini engelle — privilege escalation önlemi
   const safeSchema = updateUserSchema.omit({ role: true, organizationId: true })
@@ -100,7 +100,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
-  if (!existing) return errorResponse('Staff not found', 404)
+  if (!existing) return errorResponse('Personel bulunamadı', 404)
 
   const dataToUpdate = { ...parsed.data }
   if (dataToUpdate.departmentId) {
@@ -111,7 +111,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const staff = await prisma.user.update({
-    where: { id },
+    where: { id, organizationId: dbUser!.organizationId! },
     data: dataToUpdate,
   })
 
@@ -140,7 +140,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (roleError) return roleError
 
   const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
-  if (!existing) return errorResponse('Staff not found', 404)
+  if (!existing) return errorResponse('Personel bulunamadı', 404)
 
   // Soft delete — deactivate
   await prisma.user.update({ where: { id }, data: { isActive: false } })

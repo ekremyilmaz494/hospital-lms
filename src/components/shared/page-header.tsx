@@ -23,7 +23,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, badge, action, secondaryAction }: PageHeaderProps) {
   return (
-    <div className="mb-8 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
       <div className="space-y-1.5">
         {badge && (
           <BlurFade delay={0}>

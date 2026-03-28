@@ -48,6 +48,10 @@ interface StaffPageData {
   staff: Staff[];
   departments: Department[];
   stats: { totalStaff: number; activeStaff: number; departmentCount: number; avgScore: number };
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 const DEPARTMENT_COLORS = [
@@ -76,11 +80,8 @@ function StaffActions({ staff }: { staff: Staff }) {
           <Edit className="h-4 w-4" /> Düzenle
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="gap-2" onClick={() => router.push('/admin/trainings/new')}>
+        <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/trainings/new?staffId=${staff.id}`)}>
           <GraduationCap className="h-4 w-4" /> Eğitim Ata
-        </DropdownMenuItem>
-        <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/staff/${staff.id}/edit`)}>
-          <Building2 className="h-4 w-4" /> Departman Değiştir
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="gap-2" onClick={() => window.location.href = `mailto:${staff.email}`}>
@@ -396,7 +397,8 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
 export default function StaffPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { data, isLoading, error, refetch } = useFetch<StaffPageData>('/api/admin/staff');
+  const [currentPage, setCurrentPage] = useState(1);
+  const { data, isLoading, error, refetch } = useFetch<StaffPageData>(`/api/admin/staff?page=${currentPage}&limit=20`);
   const [activeView, setActiveView] = useState<'all' | 'departments'>('departments');
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [showAddDept, setShowAddDept] = useState(false);
@@ -778,6 +780,35 @@ export default function StaffPage() {
         <BlurFade delay={0.05}>
           <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
             <DataTable columns={columns} data={allStaff} searchKey="name" searchPlaceholder="Personel ara (isim, TC, e-posta)..." />
+            <div className="flex items-center justify-between pt-4 mt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                Toplam {data?.total ?? allStaff.length} personel{(data?.totalPages ?? 1) > 1 ? ` — Sayfa ${currentPage}/${data?.totalPages}` : ''}
+              </p>
+              {(data?.totalPages ?? 1) > 1 && (
+                <div className="flex gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="rounded-lg text-xs"
+                    style={{ borderColor: 'var(--color-border)' }}
+                  >
+                    Önceki
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage >= (data?.totalPages ?? 1)}
+                    onClick={() => setCurrentPage(p => p + 1)}
+                    className="rounded-lg text-xs"
+                    style={{ borderColor: 'var(--color-border)' }}
+                  >
+                    Sonraki
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </BlurFade>
       )}
@@ -870,10 +901,22 @@ export default function StaffPage() {
         type="file"
         accept=".xlsx,.xls,.csv"
         className="hidden"
-        onChange={(e) => {
+        onChange={async (e) => {
           const file = e.target.files?.[0];
-          if (file) toast(`"${file.name}" dosyası yüklendi. (${(file.size / 1024).toFixed(0)} KB)`, 'success');
+          if (!file) return;
           e.target.value = '';
+          toast(`"${file.name}" okunuyor...`, 'info');
+          try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetch('/api/admin/bulk-import', { method: 'POST', body: formData });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Import başarısız');
+            toast(`${result.created} personel eklendi${result.failed > 0 ? `, ${result.failed} başarısız` : ''}`, result.created > 0 ? 'success' : 'error');
+            if (result.created > 0) refetch();
+          } catch (err) {
+            toast(err instanceof Error ? err.message : 'Excel dosyası işlenemedi', 'error');
+          }
         }}
       />
     </div>

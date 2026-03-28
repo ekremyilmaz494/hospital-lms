@@ -64,6 +64,21 @@ export async function deleteObject(key: string) {
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
 }
 
+/** Upload a buffer directly to S3 (for server-side operations like backups) */
+export async function uploadBuffer(key: string, body: Buffer, contentType: string) {
+  await s3.send(new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  }))
+}
+
+/** Generate backup storage key */
+export function backupKey(orgId: string) {
+  return `backups/${orgId}/${Date.now()}.json`
+}
+
 /** Generate video storage key (filename sanitized against path traversal) */
 export function videoKey(orgId: string, trainingId: string, filename: string) {
   const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.{2,}/g, '_')

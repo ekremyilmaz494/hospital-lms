@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Bell, Send, Check, CheckCheck, AlertTriangle, Info, CheckCircle, Zap,
-  Filter, Clock, Inbox, BellOff, Trash2, MailOpen, X, Users, Building2, Loader2, UserMinus,
+  Bell, BellOff, Send, AlertTriangle, Info, Check, CheckCircle, Zap,
+  Filter, Clock, Inbox, Trash2, X, Users, UserMinus, Building2, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,7 +54,7 @@ export default function NotificationsPage() {
   const { toast } = useToast();
   const { data, isLoading, error, refetch } = useFetch<Notification[]>('/api/admin/notifications');
   const [filter, setFilter] = useState<FilterType>('all');
-  const [dismissing, setDismissing] = useState<string | null>(null);
+  const [dismissing] = useState<string | null>(null);
 
   // ── Send Modal State ──
   const [showSendModal, setShowSendModal] = useState(false);
@@ -167,38 +167,14 @@ export default function NotificationsPage() {
   }
 
   const notifications = Array.isArray(data) ? data : ((data as unknown as Record<string, unknown>)?.notifications as typeof data) ?? [];
-  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const filtered = notifications.filter(n => {
     if (filter === 'all') return true;
-    if (filter === 'unread') return !n.isRead;
     return n.type === filter;
   });
 
-  const markAllRead = async () => {
-    try {
-      await fetch('/api/admin/notifications/mark-all-read', { method: 'POST' });
-      refetch();
-      toast('Tüm bildirimler okundu olarak işaretlendi', 'success');
-    } catch { /* silent */ }
-  };
-
-  const markRead = async (id: string) => {
-    setDismissing(id);
-    try {
-      await fetch(`/api/admin/notifications/${id}/read`, { method: 'POST' });
-      setTimeout(() => {
-        refetch();
-        setDismissing(null);
-      }, 300);
-    } catch {
-      setDismissing(null);
-    }
-  };
-
   const filters: { id: FilterType; label: string; icon: typeof Bell; count?: number }[] = [
     { id: 'all', label: 'Tümü', icon: Inbox, count: notifications.length },
-    { id: 'unread', label: 'Okunmamış', icon: Bell, count: unreadCount },
     { id: 'info', label: 'Bilgi', icon: Info },
     { id: 'warning', label: 'Uyarı', icon: AlertTriangle },
     { id: 'error', label: 'Acil', icon: Zap },
@@ -222,25 +198,14 @@ export default function NotificationsPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                Bildirimler
+                Bildirim Yonetimi
               </h1>
               <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                Sistem olaylarını takip edin ve yönetin
+                Personele bildirim gonderin ve takip edin
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
-              <Button
-                variant="outline"
-                className="gap-2 rounded-xl h-10 text-[13px]"
-                style={{ borderColor: 'var(--color-border)' }}
-                onClick={markAllRead}
-              >
-                <CheckCheck className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
-                Tümünü Oku
-              </Button>
-            )}
             <button
               onClick={() => setShowSendModal(true)}
               className="flex items-center gap-2 rounded-xl h-10 px-5 text-[13px] font-semibold text-white transition-[transform] duration-200 hover:scale-[1.02] active:scale-[0.98]"
@@ -255,49 +220,6 @@ export default function NotificationsPage() {
           </div>
         </div>
       </BlurFade>
-
-      {/* Unread banner */}
-      {unreadCount > 0 && (
-        <BlurFade delay={0.03}>
-          <div
-            className="flex items-center gap-4 rounded-2xl px-6 py-4 mb-6"
-            style={{
-              background: 'linear-gradient(135deg, rgba(13, 150, 104, 0.08), rgba(13, 150, 104, 0.02))',
-              border: '1px solid rgba(13, 150, 104, 0.15)',
-            }}
-          >
-            <div
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-              style={{ background: 'rgba(13, 150, 104, 0.12)' }}
-            >
-              <Bell className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
-              <span
-                className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center rounded-full text-[10px] font-bold text-white"
-                style={{ background: 'var(--color-primary)', boxShadow: '0 2px 6px rgba(13, 150, 104, 0.4)' }}
-              >
-                {unreadCount}
-              </span>
-            </div>
-            <div className="flex-1">
-              <p className="text-[13px]">
-                <span className="font-bold" style={{ color: 'var(--color-primary)' }}>{unreadCount} okunmamış</span>
-                {' '}bildiriminiz var
-              </p>
-            </div>
-            <button
-              onClick={markAllRead}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150"
-              style={{
-                color: 'var(--color-primary)',
-                background: 'rgba(13, 150, 104, 0.1)',
-              }}
-            >
-              <MailOpen className="h-3.5 w-3.5" />
-              Tümünü Oku
-            </button>
-          </div>
-        </BlurFade>
-      )}
 
       <div className="flex gap-6">
         {/* Filter sidebar */}
@@ -362,11 +284,10 @@ export default function NotificationsPage() {
                     <div
                       className="group relative flex items-start gap-4 rounded-xl border p-5 transition-all duration-300"
                       style={{
-                        background: n.isRead ? 'var(--color-surface)' : 'var(--color-surface)',
-                        borderColor: n.isRead ? 'var(--color-border)' : `${cfg.color}25`,
-                        borderLeftWidth: n.isRead ? '1px' : '3px',
-                        borderLeftColor: n.isRead ? 'var(--color-border)' : cfg.color,
-                        boxShadow: n.isRead ? 'none' : `0 2px 12px ${cfg.color}08`,
+                        background: 'var(--color-surface)',
+                        borderColor: 'var(--color-border)',
+                        borderLeftWidth: '3px',
+                        borderLeftColor: cfg.color,
                         opacity: isDismissing ? 0 : 1,
                         transform: isDismissing ? 'translateX(20px)' : 'translateX(0)',
                       }}
@@ -385,22 +306,19 @@ export default function NotificationsPage() {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2.5 mb-1">
-                          <p className="text-[13px] font-semibold" style={{ color: n.isRead ? 'var(--color-text-secondary)' : 'var(--color-text-primary)' }}>
+                          <p className="text-[13px] font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                             {n.title}
                           </p>
-                          {!n.isRead && (
-                            <span
-                              className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
-                              style={{ background: `${cfg.color}12`, color: cfg.color }}
-                            >
-                              <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: cfg.color }} />
-                              {cfg.label}
-                            </span>
-                          )}
+                          <span
+                            className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                            style={{ background: `${cfg.color}12`, color: cfg.color }}
+                          >
+                            {cfg.label}
+                          </span>
                         </div>
                         <p
                           className="text-[13px] leading-relaxed"
-                          style={{ color: n.isRead ? 'var(--color-text-muted)' : 'var(--color-text-secondary)' }}
+                          style={{ color: 'var(--color-text-secondary)' }}
                         >
                           {n.message}
                         </p>
@@ -414,16 +332,6 @@ export default function NotificationsPage() {
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        {!n.isRead && (
-                          <button
-                            onClick={() => markRead(n.id)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150"
-                            style={{ color: 'var(--color-primary)' }}
-                            title="Okundu işaretle"
-                          >
-                            <Check className="h-4 w-4" />
-                          </button>
-                        )}
                         <button
                           className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150"
                           style={{ color: 'var(--color-text-muted)' }}
