@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createAssignmentSchema } from '@/lib/validations'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -10,16 +10,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  const assignments = await prisma.trainingAssignment.findMany({
-    where: { trainingId: id },
-    include: {
-      user: { select: { id: true, firstName: true, lastName: true, email: true, department: true } },
-      examAttempts: { orderBy: { attemptNumber: 'desc' } },
-    },
-    orderBy: { assignedAt: 'desc' },
-  })
+  const { searchParams } = new URL(request.url)
+  const { page, limit, skip } = safePagination(searchParams)
 
-  return jsonResponse(assignments)
+  const where = { trainingId: id, training: { organizationId: dbUser!.organizationId! } }
+
+  const [assignments, total] = await Promise.all([
+    prisma.trainingAssignment.findMany({
+      where,
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true, department: true } },
+        examAttempts: { orderBy: { attemptNumber: 'desc' } },
+      },
+      orderBy: { assignedAt: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.trainingAssignment.count({ where }),
+  ])
+
+  return jsonResponse({ assignments, total, page, limit })
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -42,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Create assignments for all users (skip existing)
   const existingAssignments = await prisma.trainingAssignment.findMany({
-    where: { trainingId: id, userId: { in: parsed.data.userIds } },
+    where: { trainingId: id, userId: { in: parsed.data.userIds }, training: { organizationId: dbUser!.organizationId! } },
     select: { userId: true },
   })
   const existingUserIds = new Set(existingAssignments.map(a => a.userId))

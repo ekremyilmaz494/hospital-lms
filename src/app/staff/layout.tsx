@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
 import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
@@ -13,7 +14,17 @@ export default function StaffLayout({
   children: React.ReactNode;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const { user, fullName, initials } = useAuth();
+  const { user, isLoading, fullName, initials } = useAuth();
+  const router = useRouter();
+
+  // Auth guard: redirect non-staff users
+  useEffect(() => {
+    if (!isLoading && user && user.role !== 'staff') {
+      router.replace('/auth/login');
+    }
+  }, [user, isLoading, router]);
+
+  if (isLoading || !user) return null;
 
   return (
     <TooltipProvider>

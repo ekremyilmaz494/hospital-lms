@@ -9,9 +9,14 @@ export async function GET() {
   const roleError = requireRole(dbUser!.role, ['staff'])
   if (roleError) return roleError
 
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
   try {
     const certificates = await prisma.certificate.findMany({
-      where: { userId: dbUser!.id },
+      where: {
+        userId: dbUser!.id,
+        training: { organizationId: dbUser!.organizationId! },
+      },
       include: {
         training: { select: { title: true, category: true } },
         attempt: { select: { postExamScore: true, attemptNumber: true } },

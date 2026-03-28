@@ -7,8 +7,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { useAuth } from '@/hooks/use-auth';
+import { useNotificationStore } from '@/store/notification-store';
 
-interface Notification {
+interface NotificationItem {
   id: string;
   title: string;
   message: string;
@@ -18,16 +20,9 @@ interface Notification {
 }
 
 interface NotificationBellProps {
-  notifications?: Notification[];
+  notifications?: NotificationItem[];
   unreadCount?: number;
 }
-
-const defaultNotifications: Notification[] = [
-  { id: '1', title: 'Eğitim süresi yaklaşıyor', message: 'İş Güvenliği eğitiminin bitiş tarihi 2 gün sonra.', time: '2 saat önce', isRead: false, type: 'warning' },
-  { id: '2', title: '3 personel başarısız', message: 'İş Güvenliği sınavında 3 personel başarısız oldu.', time: '5 saat önce', isRead: false, type: 'error' },
-  { id: '3', title: 'Yeni personel eklendi', message: 'Hasan Kılıç başarıyla eklendi.', time: '1 gün önce', isRead: true, type: 'info' },
-  { id: '4', title: 'Eğitim tamamlandı', message: 'El Hijyeni eğitimi %100 tamamlandı.', time: '2 gün önce', isRead: true, type: 'success' },
-];
 
 const typeColors: Record<string, string> = {
   info: 'var(--color-info)',
@@ -36,12 +31,40 @@ const typeColors: Record<string, string> = {
   success: 'var(--color-success)',
 };
 
+/** Format relative time from ISO date string */
+function formatRelativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'Az önce';
+  if (minutes < 60) return `${minutes} dk önce`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} saat önce`;
+  const days = Math.floor(hours / 24);
+  return `${days} gün önce`;
+}
+
 export function NotificationBell({
-  notifications = defaultNotifications,
-  unreadCount,
+  notifications: propNotifications,
+  unreadCount: propUnreadCount,
 }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
-  const count = unreadCount ?? notifications.filter((n) => !n.isRead).length;
+  const { isAdmin, isSuperAdmin, isStaff } = useAuth();
+  const store = useNotificationStore();
+
+  // Map store notifications to display format, falling back to props
+  const notifications: NotificationItem[] = propNotifications ?? store.notifications.map((n) => ({
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    time: formatRelativeTime(n.createdAt),
+    isRead: n.isRead,
+    type: (n.type === 'warning' || n.type === 'error' || n.type === 'success' ? n.type : 'info') as NotificationItem['type'],
+  }));
+
+  const count = propUnreadCount ?? (propNotifications ? propNotifications.filter((n) => !n.isRead).length : store.unreadCount);
+
+  // Dynamic link based on user role
+  const notificationsHref = (isAdmin || isSuperAdmin) ? '/admin/notifications' : isStaff ? '/staff/notifications' : '/auth/login';
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -88,7 +111,7 @@ export function NotificationBell({
           ))}
         </div>
         <div className="border-t px-4 py-2.5 text-center" style={{ borderColor: 'var(--color-border)' }}>
-          <a href="/admin/notifications" className="flex items-center justify-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
+          <a href={notificationsHref} className="flex items-center justify-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
             Tüm Bildirimleri Gör <ExternalLink className="h-3 w-3" />
           </a>
         </div>

@@ -7,6 +7,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
   // Phase guard: verify attempt is in correct exam status
   const { searchParams } = new URL(request.url)
   const phase = searchParams.get('phase')
@@ -19,13 +21,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   // id can be trainingId or assignmentId — find the training
   const assignment = await prisma.trainingAssignment.findFirst({
-    where: { id, userId: dbUser!.id },
+    where: { id, userId: dbUser!.id, training: { organizationId: dbUser!.organizationId! } },
     include: { training: true },
   })
 
   // If not found by assignment ID, try as training ID
   const training = assignment?.training ?? await prisma.training.findFirst({
-    where: { id },
+    where: { id, organizationId: dbUser!.organizationId! },
   })
 
   if (!training) return errorResponse('Eğitim bulunamadı', 404)

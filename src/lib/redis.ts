@@ -2,7 +2,7 @@ import { Redis } from '@upstash/redis'
 
 // ── Lazy Redis client — undefined if not configured ──
 let _redis: Redis | null = null
-function getRedis(): Redis | null {
+export function getRedis(): Redis | null {
   if (_redis) return _redis
   const url = process.env.REDIS_URL
   const token = process.env.REDIS_TOKEN

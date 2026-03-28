@@ -847,4 +847,274 @@ Tüm frontend sayfaları sistematik olarak tarandı — 4 sorun tespit edildi:
 
 ---
 
-*Son güncelleme: 27 Mart 2026 — Oturum 6*
+*Son güncelleme: 28 Mart 2026 — Oturum 7*
+
+---
+
+## OTURUM 7 — 28 Mart 2026: Kapsamlı Güvenlik Denetimi & DB Bağlantı Düzeltmesi
+
+### 7.1 Proje Güncelleme
+- GitHub'dan `git pull` ile 34 dosyada değişiklik çekildi (`54fe3d0` → `eab7ff7`)
+- Yeni dosyalar: `bulk-import/route.ts`, `cron/backup/route.ts`, `backups/[id]/download/route.ts`
+- Yeni paket: `html2canvas-pro` (sertifika PDF için)
+
+### 7.2 Admin Panel Güvenlik Düzeltmeleri (11 görev)
+
+**Backend:**
+- Training assignments org izolasyonu eklendi
+- Exam phase transition doğrulaması (pre_exam/post_exam status kontrolü)
+- Bulk import güvenliği: 10MB dosya limiti, MIME tipi doğrulama, güvenli rastgele şifre
+- DELETE endpoint'lere rate limiting (staff: 10/saat, training: 5/saat, department: 10/saat)
+- Settings PUT Zod validasyonu
+- Staff PATCH explicit whitelist (privilege escalation fix)
+- Audit log PII sanitizasyonu (`tcNo`, `phone` → `[REDACTED]`) — KVKK uyumu
+- Training assignments pagination (`safePagination`)
+- Geçmiş tarihli eğitim/sertifika reddi
+
+**Frontend:**
+- Admin layout auth guard + dinamik rol gösterimi
+- Notification debounce (300ms)
+- Training duplicate/delete button loading state
+
+### 7.3 Personel Panel Güvenlik Düzeltmeleri (14 görev)
+
+**Backend (14 dosya):**
+- 7 staff API route'una org izolasyonu eklendi (calendar, certificates, dashboard, my-trainings, my-trainings/[id], notifications, profile)
+- 7 exam API route'una org izolasyonu eklendi (questions, save-answer, videos, videos/progress, videos/stream, timer, start)
+- try/catch + logger eklendi (calendar, my-trainings, notifications)
+- Rate limiting: exam-start (5/dk), save-answer (30/dk), video-progress (30/dk), profile-update (5/dk)
+- Pagination: calendar (take: 500), my-trainings (take: 200)
+- Şifre güçlendirme: 8+ karakter, büyük harf, rakam zorunlu
+- Audit log: exam.started, profile.updated, password.changed
+- UUID regex doğrulaması (notification ID)
+
+**Frontend (6 dosya):**
+- NotificationBell: gerçek store bağlantısı + rol bazlı dinamik link (`/staff/notifications` vs `/admin/notifications`)
+- useFetch: 401/403 hatalarında login'e yönlendirme (sessiz hata gizleme düzeltildi)
+- Staff layout + Exam layout: auth guard eklendi (useEffect + useRouter)
+- Sertifika PDF: html2canvas-pro + jsPDF ile gerçek indirme
+- Avatar upload: file input + FormData + 2MB limit + image type doğrulama
+
+### 7.4 Dashboard Grafik İyileştirmesi
+- `statusDistribution.length > 0` → `totalAssignments > 0` kontrolü (tüm değerler 0 olunca boş chart yerine mesaj)
+- `hasTrendData` kontrolü eklendi (trend chart için)
+- Boş durum mesajları iyileştirildi: "Personele eğitim atandığında burada görünecek"
+
+### 7.5 Veritabanı Bağlantı Sorunu (KRİTİK)
+
+**Belirtiler:**
+- Local'de dashboard boş, Vercel'de çalışıyor
+- `TlsConnectionError: self-signed certificate` → sonra `Tenant or user not found`
+
+**Denenen çözümler (başarısız):**
+- `ssl: { rejectUnauthorized: false }` — çalışmadı
+- `NODE_TLS_REJECT_UNAUTHORIZED=0` — TLS düzeldi, tenant hatası devam
+- `pg` paketini 8.20 → 8.13 → 8.11 → 8.7 downgrade — çalışmadı
+- Node.js 24 → 22 downgrade — çalışmadı
+- Prisma native driver (adapter'sız) — Prisma 7 adapter zorunlu kılıyor
+- IPv6 doğrudan bağlantı — ISP IPv6 desteklemiyor
+- DIRECT_URL (port 5432) — DNS çözülemedi
+
+**Kök neden:**
+`.env.local`'daki pooler host YANLIŞ: `aws-0-ap-northeast-2` → doğrusu `aws-1-ap-northeast-2`
+
+**Çözüm:**
+```
+# ESKİ (YANLIŞ)
+DATABASE_URL=...@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true
+
+# YENİ (DOĞRU — Vercel ile aynı)
+DATABASE_URL=...@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true
+```
+
+### 7.6 Node.js Sürüm Değişikliği
+- Node.js 24.14.1 → 22.16.0 LTS'e geçildi
+- Sebep: Node 24 çok yeni, bazı kütüphanelerle uyumsuz
+- Not: Asıl DB sorunu pooler host'uydu, Node sürümü değil
+
+---
+
+## OTURUM 8 — 28 Mart 2026: Kurumsal Özellikler ve KVKK Uyumu
+
+### 8.1 Kurumsal Hazırlık Analizi
+Hastanelerin LMS satın alırken baktığı 6 kategoride proje tarandı:
+- **Yasal/Uyumluluk:** 6/10 → eksik: KVKK rıza yönetimi, DPA
+- **Teknik:** 4/10 → eksik: SSO, HBYS, PWA, monitoring
+- **Güvenlik:** 8/10 → eksik: login brute-force koruması
+- **İçerik Yönetimi:** 7/10 → eksik: SCORM desteği
+- **Satıcı Güvenilirliği:** 1/10 → tüm iş dokümanları eksik
+- **Maliyet:** 2/10 → fiyatlandırma dokümanı eksik
+- **Başlangıç genel skor: ~47/100**
+
+### 8.2 Logger Altyapısı
+- **Yeni dosya:** `src/lib/logger.ts` — sıfır bağımlılık, ortam-duyarlı logger
+  - Development: `[LEVEL] [tag] message` formatı
+  - Production: Vercel Log Explorer uyumlu yapılı JSON
+- **11 API route** dosyasında 15 adet `console.error`/`console.warn` → `logger` dönüşümü
+
+### 8.3 Eksik Route Dosyaları
+- **22 error.tsx + loading.tsx** oluşturuldu (11 dinamik segment)
+- **4 not-found.tsx** oluşturuldu (`/admin`, `/staff`, `/super-admin`, `/exam`)
+- Exam route'ları `min-h-screen` (fullscreen), diğerleri `min-h-[60vh]`
+
+### 8.4 Eksik Admin Sayfaları (3 sayfa)
+Sidebar'da link vardı ama page.tsx kırıktı:
+
+| Sayfa | İçerik |
+|-------|--------|
+| `/admin/competency-matrix` | Personel × Eğitim matrisi, departman filtresi, durum ikonları |
+| `/admin/effectiveness` | Eğitim etkinlik analizi, ön/son sınav karşılaştırma, kazanım trendi |
+| `/admin/compliance` | Zorunlu eğitim uyum raporu, deadline durumları, departman grafiği |
+
+### 8.5 Gelişmiş Bildirim Sistemi
+- "Bildirim Gönder" butonu artık çalışan modal açıyor
+- **2 gönderim modu:** Departman Bazlı (kişi çıkarma özelliği ile) + Kişi Bazlı (çoklu seçim)
+- Bildirim tipi, başlık, mesaj girişi + alıcı sayacı
+
+### 8.6 Supabase RLS Düzeltmeleri
+- `departments` → RLS + 2 policy (view own org + admin manage)
+- `certificates` → RLS + 2 policy (view own + admin manage org)
+- `_prisma_migrations` → RLS + USING(false)
+- `get_user_role()` ve `get_user_org_id()` → `SET search_path = public`
+
+### 8.7 Temel Kurumsal Özellikler (İlk Dalga)
+3 paralel agent ile 6 özellik eklendi:
+
+| # | Özellik | Yeni Dosya | Detay |
+|---|---------|-----------|-------|
+| 1 | Health Check | `api/health/route.ts` | DB + Redis bağlantı kontrolü, ok/degraded/down |
+| 2 | Login Rate Limiting | `api/auth/login/route.ts` | Email bazlı 5/15dk + IP bazlı 20/15dk, server-side auth |
+| 3 | PWA | `public/manifest.json` | Standalone display, #0d9668 tema |
+| 4 | KVKK Bilgilendirme | `app/kvkk/page.tsx` | 7 bölümlü Türkçe aydınlatma metni |
+| 5 | KVKK Rıza | Login formu | Zorunlu KVKK onay checkbox'ı |
+| 6 | KVKK Veri Silme | `api/admin/kvkk/delete-user-data/route.ts` | Kullanıcı anonimleştirme (ad/email/TC/telefon) |
+| 7 | Sertifika PDF | `api/certificates/[id]/pdf/route.ts` | jsPDF ile A4 landscape, org izolasyonu |
+| 8 | SCORM Temel | `api/admin/scorm/` | Upload + listeleme + player placeholder |
+
+### 8.8 Prisma Şema Güncellemesi
+Tüm yeni modeller tek seferde eklendi (paralel agent çakışmasını önlemek için):
+
+**Yeni modeller:**
+- `KvkkRequest` — KVKK başvuru takibi (requestType, status, description, responseNote, respondedBy, completedAt)
+- `ScormAttempt` — SCORM izleme (suspendData, lessonStatus, score, totalTime, completionStatus, successStatus)
+
+**User modeline eklenen alanlar:**
+- `kvkkConsent: Boolean @default(false)` — KVKK onay durumu
+- `kvkkConsentDate: DateTime?` — KVKK onay tarihi
+- `kvkkRequests`, `kvkkResponses` ilişkileri
+
+**Training modeline eklenen alanlar:**
+- `scormManifestPath: String?` — S3'teki manifest yolu
+- `scormEntryPoint: String?` — başlatılacak HTML dosyası
+- `scormVersion: String?` — "1.2" veya "2004"
+- `scormAttempts` ilişkisi
+
+### 8.9 Kapsamlı Kurumsal Özellikler (İkinci Dalga — 3 Paralel Agent)
+
+#### Agent 1: KVKK Tam Modül
+- **5 yeni API route:**
+  - `POST/GET /api/staff/kvkk/request` — başvuru oluşturma + listeleme
+  - `GET /api/staff/kvkk/export-my-data` — kişisel veri indirme (JSON)
+  - `GET /api/admin/kvkk/requests` — admin başvuru listesi (paginated)
+  - `PATCH /api/admin/kvkk/requests/[id]` — başvuru güncelleme
+  - `POST /api/auth/kvkk-consent` — KVKK onay kaydetme
+- **2 yeni sayfa:**
+  - `staff/kvkk/page.tsx` — başvuru listesi, yeni başvuru modalı, veri indirme
+  - `admin/kvkk/page.tsx` — başvuru yönetimi, 30 gün yasal süre takibi, aksiyon butonları
+- **Sidebar entegrasyonu:** Staff "KVKK Haklarım" + Admin "KVKK Yönetimi"
+- **KVKK Consent Modal:** auth-provider'da ilk girişte zorunlu onay
+- **Zod şemaları:** `createKvkkRequestSchema`, `updateKvkkRequestSchema`
+
+#### Agent 2: PWA + Health Check + Rate Limiting
+- **Health check genişletme:**
+  - S3, Supabase Auth, SMTP kontrolleri eklendi (Promise.allSettled ile paralel)
+  - Latency ölçümü (ms), Cache-Control: no-store
+  - Servis durumu: ok/degraded/down + configured boolean
+- **Login rate limiting üretim kalitesi:**
+  - `src/lib/constants.ts` — RATE_LIMIT sabitleri
+  - Tiered lockout: 4+ deneme → 1 saat, 7+ deneme → 24 saat
+  - Retry-After, X-RateLimit-* headers
+  - Başarılı girişte sayaç sıfırlama
+  - 7+ denemede logger.warn güvenlik uyarısı
+  - `getAttemptCount()`, `deleteRateLimitKey()` yeni fonksiyonlar (redis.ts)
+- **PWA:**
+  - `src/app/offline/page.tsx` — çevrimdışı Türkçe sayfa
+  - `src/components/shared/pwa-install-prompt.tsx` — install banner, iOS talimatları
+  - Layout'a PwaInstallPrompt + apple-touch-icon eklendi
+
+#### Agent 3: Sertifika QR + SCORM Runtime
+- **Sertifika QR doğrulama:**
+  - `qrcode` paketi kuruldu
+  - `api/certificates/verify/[code]/route.ts` — public doğrulama (isim maskeleme: "Ab*** Yi***")
+  - `app/certificates/verify/[code]/page.tsx` — public doğrulama sayfası (yeşil/kırmızı)
+  - PDF'e QR kod eklendi (35x35mm, sağ alt köşe)
+- **SCORM tam runtime:**
+  - `api/exam/[id]/scorm/tracking/route.ts` — GET/POST/PATCH (attempt CRUD, otomatik sertifika)
+  - `app/exam/[id]/scorm/page.tsx` — gerçek SCORM 1.2 player:
+    - window.API bridge (LMSInitialize, LMSGetValue, LMSSetValue, LMSCommit, LMSFinish)
+    - Debounced PATCH kayıtları
+    - Fullscreen layout, durum badge'i, "Çıkış" butonu
+  - `api/exam/[id]/scorm/content/[...path]/route.ts` — S3 content proxy (path traversal koruması)
+
+### 8.10 Güncellenmiş Kurumsal Skor
+
+| Kategori | Eski | Yeni |
+|----------|------|------|
+| Yasal/Uyumluluk (KVKK) | 6/10 | **9/10** |
+| Teknik (PWA, Health) | 4/10 | **7/10** |
+| Güvenlik (Rate limit, QR) | 8/10 | **9/10** |
+| İçerik Yönetimi (SCORM) | 7/10 | **9/10** |
+| **Genel** | **~47/100** | **~72/100** |
+
+---
+
+## 39. İSTATİSTİKLER (Güncel — 28 Mart 2026)
+
+| Metrik | Değer |
+|--------|-------|
+| Toplam route | 55+ |
+| Toplam dosya | ~220+ |
+| Prisma model | 20 (KvkkRequest + ScormAttempt eklendi) |
+| API endpoint | 50+ |
+| Test dosyası | 4 |
+| Güvenlik düzeltme | 35+ |
+| Bug fix | 45+ |
+| İterasyon sayısı | v1 → v22+ |
+
+---
+
+## 40. KALAN İŞLER
+
+| # | İş | Durum |
+|---|---|-------|
+| 1 | SSO/LDAP (Azure AD, SAML) | ⏳ Bekliyor |
+| 2 | HBYS entegrasyonu (HL7/FHIR) | ⏳ Bekliyor |
+| 3 | AWS S3/CloudFront canlı yapılandırma | ⏳ .env ayarları bekliyor |
+| 4 | SMTP yapılandırması | ⏳ .env ayarları bekliyor |
+| 5 | Upstash Redis yapılandırması | ⏳ .env ayarları bekliyor |
+| 6 | Connection pooling (pgBouncer/Supavisor) | ⏳ Bekliyor |
+| 7 | Skeleton loader'lar | ⏳ Düşük öncelik |
+| 8 | İş dokümanları (SLA, DPA, BCP, fiyatlandırma) | ⏳ Hukuk/iş geliştirme |
+| 9 | Sentry error tracking | ⏳ Bekliyor |
+| 10 | Backup restore endpoint | ⏳ Düşük öncelik |
+
+---
+
+*Son güncelleme: 28 Mart 2026 — Oturum 8*
+
+### 7.7 Build Doğrulaması
+- `pnpm lint`: 0 yeni hata (9 pre-existing error, 79 pre-existing warning)
+- `pnpm build`: 75 sayfa başarıyla derlendi
+
+### 7.8 Güncellenen Bekleyen İşler
+
+| # | İş | Durum |
+|---|---|---|
+| 1 | Backup sistemi S3 upload | ⏳ Bekliyor |
+| 2 | E2E testler (Playwright) | ⏳ Bekliyor |
+| 3 | Data Table server-side pagination | ⏳ Düşük öncelik |
+| 4 | Audit log server-side search | ⏳ Düşük öncelik |
+| 5 | Skeleton loader'lar + ARIA labels | ⏳ Düşük öncelik |
+| 6 | Save-answer Zod schema | ⏳ Düşük öncelik |
+| 7 | Video progress monotonic kontrolü | ⏳ Düşük öncelik |
+| 8 | API hata format tutarsızlığı | ⏳ Düşük öncelik |

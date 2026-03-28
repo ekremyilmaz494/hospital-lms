@@ -1,5 +1,15 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { z } from 'zod/v4'
+
+const settingsSchema = z.object({
+  hospitalName: z.string().min(1).max(255).optional(),
+  logoUrl: z.string().url().optional().or(z.literal('')),
+  email: z.string().email().optional(),
+  phone: z.string().max(20).optional(),
+  address: z.string().max(500).optional(),
+  sessionTimeout: z.number().int().min(5).max(480).optional(),
+})
 
 // GET /api/admin/settings — Hastane ayarlarını getir
 export async function GET() {
@@ -44,7 +54,10 @@ export async function PUT(request: Request) {
   const body = await request.json().catch(() => null)
   if (!body) return errorResponse('Invalid body')
 
-  const { hospitalName, logoUrl, email, phone, address, sessionTimeout } = body
+  const parsed = settingsSchema.safeParse(body)
+  if (!parsed.success) return errorResponse(parsed.error.message)
+
+  const { hospitalName, logoUrl, email, phone, address, sessionTimeout } = parsed.data
 
   const oldOrg = await prisma.organization.findUnique({ where: { id: orgId } })
 

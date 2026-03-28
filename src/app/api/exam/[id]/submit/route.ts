@@ -40,6 +40,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!attempt) return errorResponse('Aktif sınav denemesi bulunamadı. Sınavı yeniden başlatın.', 404)
   if (attempt.status === 'completed') return errorResponse('Bu deneme zaten tamamlanmış', 400)
 
+  // Phase transition validation — ensure attempt status matches the submitted phase
+  const submittedPhase = parsed.data.phase ?? (attempt.status === 'pre_exam' ? 'pre' : 'post')
+  if (submittedPhase === 'pre' && attempt.status !== 'pre_exam') {
+    return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
+  }
+  if (submittedPhase === 'post' && attempt.status !== 'post_exam') {
+    return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
+  }
+
   // Server-side timer check — reject submissions more than 5 minutes past exam duration
   const phaseStartedAt = attempt.status === 'pre_exam' ? attempt.preExamStartedAt : attempt.postExamStartedAt
   if (phaseStartedAt && attempt.training.examDurationMinutes) {

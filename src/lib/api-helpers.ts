@@ -63,6 +63,24 @@ export async function parseBody<T>(request: Request): Promise<T | null> {
   }
 }
 
+/** Sanitize sensitive PII from audit log data */
+function sanitizeAuditData(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return data;
+  const obj = data as Record<string, unknown>;
+  const sanitized: Record<string, unknown> = {};
+  const sensitiveKeys = ['tcNo', 'password', 'passwordHash', 'phone'];
+  for (const [key, value] of Object.entries(obj)) {
+    if (sensitiveKeys.includes(key)) {
+      sanitized[key] = '[REDACTED]';
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeAuditData(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
 /** Audit log helper */
 export async function createAuditLog(params: {
   userId?: string | null
@@ -84,8 +102,8 @@ export async function createAuditLog(params: {
       action: params.action,
       entityType: params.entityType,
       entityId: params.entityId ?? null,
-      oldData: params.oldData ? JSON.parse(JSON.stringify(params.oldData)) : null,
-      newData: params.newData ? JSON.parse(JSON.stringify(params.newData)) : null,
+      oldData: params.oldData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.oldData))) as object : undefined,
+      newData: params.newData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.newData))) as object : undefined,
       ipAddress,
       userAgent,
     },

@@ -8,6 +8,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
   const { searchParams } = new URL(request.url)
   const videoId = searchParams.get('videoId')
   if (!videoId) return errorResponse('videoId required')
@@ -15,8 +17,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Verify attempt belongs to user and is in video phase
   const attempt = await prisma.examAttempt.findFirst({
     where: { id: attemptId, userId: dbUser!.id, status: 'watching_videos' },
+    include: { training: { select: { organizationId: true } } },
   })
   if (!attempt) return errorResponse('Invalid attempt or not in video phase', 403)
+
+  // Verify org isolation
+  if (attempt.training.organizationId !== dbUser!.organizationId) {
+    return errorResponse('Yetkisiz erişim', 403)
+  }
 
   const video = await prisma.trainingVideo.findFirst({
     where: { id: videoId, trainingId: attempt.trainingId },

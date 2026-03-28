@@ -54,6 +54,8 @@ export default function TrainingsPage() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (isLoading) {
     return <PageLoading />;
@@ -74,6 +76,7 @@ export default function TrainingsPage() {
   const activeFilters = [statusFilter, categoryFilter].filter(Boolean).length;
 
   const handleDuplicate = async (training: Training) => {
+    setDuplicatingId(training.id);
     try {
       const res = await fetch(`/api/admin/trainings/${training.id}/duplicate`, { method: 'POST' });
       if (!res.ok) throw new Error('Kopyalama başarısız');
@@ -82,17 +85,22 @@ export default function TrainingsPage() {
       router.push(`/admin/trainings/${data.id}/edit`);
     } catch {
       toast('Eğitim kopyalanırken hata oluştu', 'error');
+    } finally {
+      setDuplicatingId(null);
     }
   };
 
   const handleDelete = async (training: Training) => {
     if (window.confirm(`"${training.title}" eğitimini silmek istediğinize emin misiniz?`)) {
+      setDeletingId(training.id);
       try {
         const res = await fetch(`/api/admin/trainings/${training.id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Silme başarısız');
         refetch();
       } catch {
         toast('Eğitim silinirken hata oluştu', 'error');
+      } finally {
+        setDeletingId(null);
       }
     }
   };
@@ -207,11 +215,11 @@ export default function TrainingsPage() {
             <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/trainings/${row.original.id}/edit`)}>
               <Edit className="h-4 w-4" /> Düzenle
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => handleDuplicate(row.original)}>
-              <Copy className="h-4 w-4" /> Kopyala
+            <DropdownMenuItem className="gap-2" disabled={duplicatingId === row.original.id} onClick={() => handleDuplicate(row.original)}>
+              <Copy className="h-4 w-4" /> {duplicatingId === row.original.id ? 'Kopyalanıyor...' : 'Kopyala'}
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 text-red-500" onClick={() => handleDelete(row.original)}>
-              <Trash2 className="h-4 w-4" /> Sil
+            <DropdownMenuItem className="gap-2 text-red-500" disabled={deletingId === row.original.id} onClick={() => handleDelete(row.original)}>
+              <Trash2 className="h-4 w-4" /> {deletingId === row.original.id ? 'Siliniyor...' : 'Sil'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

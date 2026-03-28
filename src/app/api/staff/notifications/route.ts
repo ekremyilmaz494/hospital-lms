@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -8,21 +9,28 @@ export async function GET(request: Request) {
   const roleError = requireRole(dbUser!.role, ['staff'])
   if (roleError) return roleError
 
-  const { searchParams } = new URL(request.url)
-  const unreadOnly = searchParams.get('unread') === 'true'
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
-  const where: Record<string, unknown> = { userId: dbUser!.id }
-  if (unreadOnly) where.isRead = false
+  try {
+    const { searchParams } = new URL(request.url)
+    const unreadOnly = searchParams.get('unread') === 'true'
 
-  const notifications = await prisma.notification.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-  })
+    const where: Record<string, unknown> = { userId: dbUser!.id }
+    if (unreadOnly) where.isRead = false
 
-  const unreadCount = await prisma.notification.count({ where: { userId: dbUser!.id, isRead: false } })
+    const notifications = await prisma.notification.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    })
 
-  return jsonResponse({ notifications, unreadCount })
+    const unreadCount = await prisma.notification.count({ where: { userId: dbUser!.id, isRead: false } })
+
+    return jsonResponse({ notifications, unreadCount })
+  } catch (err) {
+    logger.error('Staff Notifications', 'Bildirimler yüklenemedi', err)
+    return errorResponse('Bildirimler yüklenemedi', 503)
+  }
 }
 
 // Mark notifications as read
@@ -33,11 +41,14 @@ export async function PATCH(request: Request) {
   const roleError = requireRole(dbUser!.role, ['staff'])
   if (roleError) return roleError
 
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
   if (id) {
-    if (id.length < 10) return jsonResponse({ error: 'Geçersiz bildirim ID' }, 400)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(id)) return errorResponse('Geçersiz bildirim ID', 400)
     const result = await prisma.notification.updateMany({
       where: { id, userId: dbUser!.id },
       data: { isRead: true },

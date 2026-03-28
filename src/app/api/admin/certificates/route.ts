@@ -110,6 +110,10 @@ export async function POST(request: Request) {
     return errorResponse('userId, trainingId ve attemptId zorunludur')
   }
 
+  if (expiresAt && new Date(expiresAt) < new Date()) {
+    return errorResponse('Sertifika son kullanma tarihi geçmişte olamaz', 400)
+  }
+
   const organizationId = dbUser!.organizationId!
 
   try {

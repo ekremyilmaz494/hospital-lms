@@ -10,12 +10,17 @@ export async function GET() {
   const roleError = requireRole(dbUser!.role, ['staff'])
   if (roleError) return roleError
 
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
   const userId = dbUser!.id
 
   try {
     // 1) Assignment stats
     const assignments = await prisma.trainingAssignment.findMany({
-      where: { userId },
+      where: {
+        userId,
+        training: { organizationId: dbUser!.organizationId! },
+      },
       select: {
         id: true,
         status: true,

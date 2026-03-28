@@ -9,9 +9,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const roleError = requireRole(dbUser!.role, ['staff'])
   if (roleError) return roleError
 
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
   // Find assignment — try by ID, then by trainingId
   let assignment = await prisma.trainingAssignment.findFirst({
-    where: { id, userId: dbUser!.id },
+    where: {
+      id,
+      userId: dbUser!.id,
+      training: { organizationId: dbUser!.organizationId! },
+    },
     include: {
       training: {
         include: {
@@ -27,7 +33,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (!assignment) {
     assignment = await prisma.trainingAssignment.findFirst({
-      where: { trainingId: id, userId: dbUser!.id },
+      where: {
+        trainingId: id,
+        userId: dbUser!.id,
+        training: { organizationId: dbUser!.organizationId! },
+      },
       include: {
         training: {
           include: {

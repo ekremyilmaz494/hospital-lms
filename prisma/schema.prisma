@@ -112,6 +112,8 @@ model User {
   role            String   @db.VarChar(20)
   avatarUrl       String?  @db.Text @map("avatar_url")
   isActive        Boolean  @default(true) @map("is_active")
+  kvkkConsent     Boolean  @default(false) @map("kvkk_consent")
+  kvkkConsentDate DateTime? @map("kvkk_consent_date") @db.Timestamptz
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -125,6 +127,8 @@ model User {
   notifications   Notification[]
   auditLogs       AuditLog[]
   certificates    Certificate[]
+  kvkkRequests    KvkkRequest[] @relation("KvkkRequester")
+  kvkkResponses   KvkkRequest[] @relation("KvkkResponder")
 
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
@@ -155,6 +159,11 @@ model Training {
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  // SCORM alanları
+  scormManifestPath   String?   @db.Text @map("scorm_manifest_path")
+  scormEntryPoint     String?   @db.Text @map("scorm_entry_point")
+  scormVersion        String?   @db.VarChar(10) @map("scorm_version")
+
   organization        Organization @relation(fields: [organizationId], references: [id])
   createdBy           User?        @relation("TrainingCreator", fields: [createdById], references: [id])
   videos              TrainingVideo[]
@@ -163,6 +172,7 @@ model Training {
   examAttempts        ExamAttempt[]
   notifications       Notification[]
   certificates        Certificate[]
+  scormAttempts       ScormAttempt[]
 
   @@index([organizationId], map: "idx_trainings_org")
   @@index([startDate, endDate], map: "idx_trainings_dates")
@@ -386,4 +396,48 @@ model Certificate {
 
   @@index([userId], map: "idx_certificates_user")
   @@map("certificates")
+}
+
+// ── KVKK BAŞVURULARI ──
+model KvkkRequest {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @db.Uuid @map("organization_id")
+  userId          String    @db.Uuid @map("user_id")
+  requestType     String    @db.VarChar(30) @map("request_type")
+  status          String    @default("pending") @db.VarChar(20)
+  description     String    @db.Text
+  responseNote    String?   @db.Text @map("response_note")
+  respondedById   String?   @db.Uuid @map("responded_by")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz
+
+  user            User      @relation("KvkkRequester", fields: [userId], references: [id])
+  respondedBy     User?     @relation("KvkkResponder", fields: [respondedById], references: [id])
+
+  @@index([organizationId, status], map: "idx_kvkk_requests_org_status")
+  @@index([userId], map: "idx_kvkk_requests_user")
+  @@map("kvkk_requests")
+}
+
+// ── SCORM DENEMELERİ ──
+model ScormAttempt {
+  id                String    @id @default(uuid()) @db.Uuid
+  organizationId    String    @db.Uuid @map("organization_id")
+  userId            String    @db.Uuid @map("user_id")
+  trainingId        String    @db.Uuid @map("training_id")
+  attemptId         String    @unique @default(uuid()) @db.Uuid @map("attempt_id")
+  suspendData       String?   @db.Text @map("suspend_data")
+  lessonStatus      String?   @db.VarChar(30) @map("lesson_status")
+  score             Float?
+  totalTime         String?   @db.VarChar(50) @map("total_time")
+  launchData        String?   @db.Text @map("launch_data")
+  completionStatus  String?   @db.VarChar(30) @map("completion_status")
+  successStatus     String?   @db.VarChar(30) @map("success_status")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  training          Training  @relation(fields: [trainingId], references: [id])
+
+  @@index([userId, trainingId], map: "idx_scorm_attempts_user_training")
+  @@map("scorm_attempts")
 }

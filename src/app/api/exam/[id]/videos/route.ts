@@ -7,6 +7,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
   // Phase guard: check attempt status for video access
   const attemptInfo = await getAttemptStatus(id, dbUser!.id)
   const attemptStatus = attemptInfo?.status ?? null
@@ -29,7 +31,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const trainingId = assignment2?.trainingId ?? id
 
   const training = await prisma.training.findFirst({
-    where: { id: trainingId },
+    where: { id: trainingId, organizationId: dbUser!.organizationId! },
     select: { id: true, title: true },
   })
 
@@ -82,6 +84,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params
   const { dbUser, error } = await getAuthUser()
   if (error) return error
+
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
   const body = await parseBody<{ videoId: string; watchedTime?: number; position?: number; completed?: boolean }>(request)
   if (!body?.videoId) return errorResponse('videoId required')

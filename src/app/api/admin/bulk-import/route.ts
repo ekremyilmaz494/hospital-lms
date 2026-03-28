@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -18,6 +19,14 @@ export async function POST(request: Request) {
 
   const file = formData.get('file') as File | null
   if (!file) return errorResponse('Dosya seçilmedi')
+
+  // File size check (max 10MB)
+  if (file.size > 10 * 1024 * 1024) return errorResponse('Dosya boyutu 10MB\'ı aşamaz', 400)
+
+  // MIME type / extension validation
+  const validMime = file.type.includes('spreadsheet') || file.type.includes('excel')
+  const validExt = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
+  if (!validMime && !validExt) return errorResponse('Sadece Excel dosyaları (.xlsx, .xls) kabul edilir', 400)
 
   const arrayBuffer = await file.arrayBuffer()
 
@@ -65,7 +74,7 @@ export async function POST(request: Request) {
     const firstName = r['ad'] || r['ad*'] || ''
     const lastName = r['soyad'] || r['soyad*'] || ''
     const email = r['e-posta'] || r['email'] || r['e-posta*'] || ''
-    const password = r['şifre'] || r['sifre'] || r['şifre*'] || r['parola'] || 'Temp1234!'
+    const password = r['şifre'] || r['sifre'] || r['şifre*'] || r['parola'] || ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1')
 
     if (!firstName || !lastName || !email) {
       failed++

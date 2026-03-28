@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Bell, BellOff, Send, AlertTriangle, Info, Check, CheckCircle, Zap,
   Filter, Clock, Inbox, Trash2, X, Users, UserMinus, Building2, Loader2,
@@ -68,6 +68,16 @@ export default function NotificationsPage() {
   const [sendType, setSendType] = useState('info');
   const [sending, setSending] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
+  const [debouncedStaffSearch, setDebouncedStaffSearch] = useState('');
+  const searchTimerRef = useRef<NodeJS.Timeout>(undefined);
+
+  const handleStaffSearch = useCallback((value: string) => {
+    setStaffSearch(value);
+    clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedStaffSearch(value);
+    }, 300);
+  }, []);
 
   // Departmanları yükle
   useEffect(() => {
@@ -86,9 +96,9 @@ export default function NotificationsPage() {
 
   // Bireysel modda filtrelenen personeller
   const filteredStaff = allStaff.filter(s => {
-    if (!staffSearch) return true;
+    if (!debouncedStaffSearch) return true;
     const name = `${s.firstName} ${s.lastName}`.toLowerCase();
-    return name.includes(staffSearch.toLowerCase());
+    return name.includes(debouncedStaffSearch.toLowerCase());
   });
 
   // Gönderilecek kişi sayısı
@@ -483,7 +493,7 @@ export default function NotificationsPage() {
                   <Input
                     placeholder="Personel ara..."
                     value={staffSearch}
-                    onChange={(e) => setStaffSearch(e.target.value)}
+                    onChange={(e) => handleStaffSearch(e.target.value)}
                     className="h-11 rounded-xl text-sm"
                     style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
                   />

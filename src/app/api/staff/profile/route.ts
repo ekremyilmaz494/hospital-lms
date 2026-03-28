@@ -1,10 +1,13 @@
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
-import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
 
 export async function GET() {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
+
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
   const profile = await prisma.user.findUnique({
     where: { id: dbUser!.id },
@@ -49,6 +52,11 @@ export async function PATCH(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
+  const allowed = await checkRateLimit(`profile-update:${dbUser!.id}`, 5, 60)
+  if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
+
   const body = await parseBody<PatchBody>(request)
   if (!body) return errorResponse('Geçersiz istek')
 
@@ -76,6 +84,16 @@ export async function PATCH(request: Request) {
         },
       })
     }
+
+    await createAuditLog({
+      userId: dbUser!.id,
+      organizationId: dbUser!.organizationId,
+      action: 'profile.updated',
+      entityType: 'user',
+      entityId: dbUser!.id,
+      newData: updateData,
+      request,
+    })
   }
 
   // Password change
@@ -83,8 +101,8 @@ export async function PATCH(request: Request) {
     if (!body.currentPassword) {
       return errorResponse('Mevcut şifre gerekli')
     }
-    if (body.newPassword.length < 6) {
-      return errorResponse('Yeni şifre en az 6 karakter olmalı')
+    if (body.newPassword.length < 8 || !/[A-Z]/.test(body.newPassword) || !/\d/.test(body.newPassword)) {
+      return errorResponse('Şifre en az 8 karakter, bir büyük harf ve bir rakam içermelidir')
     }
 
     const supabase = await createClient()
@@ -105,6 +123,15 @@ export async function PATCH(request: Request) {
     if (updateError) {
       return errorResponse('Şifre güncellenemedi: ' + updateError.message)
     }
+
+    await createAuditLog({
+      userId: dbUser!.id,
+      organizationId: dbUser!.organizationId,
+      action: 'password.changed',
+      entityType: 'user',
+      entityId: dbUser!.id,
+      request,
+    })
   }
 
   return jsonResponse({ success: true })

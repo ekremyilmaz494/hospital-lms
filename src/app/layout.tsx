@@ -47,6 +47,10 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${plusJakarta.variable} ${inter.variable} ${jetbrainsMono.variable}`}
     >
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#0d9668" />
+      </head>
       <body className="app-bg antialiased" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"

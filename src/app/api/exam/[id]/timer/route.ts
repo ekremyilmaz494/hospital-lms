@@ -8,20 +8,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
   // Search by attempt ID first, then assignmentId
   let attempt = await prisma.examAttempt.findFirst({
     where: { id, userId: dbUser!.id, status: { in: ['pre_exam', 'post_exam'] } },
-    include: { training: { select: { examDurationMinutes: true } } },
+    include: { training: { select: { examDurationMinutes: true, organizationId: true } } },
   })
   if (!attempt) {
     attempt = await prisma.examAttempt.findFirst({
       where: { assignmentId: id, userId: dbUser!.id, status: { in: ['pre_exam', 'post_exam'] } },
-      include: { training: { select: { examDurationMinutes: true } } },
+      include: { training: { select: { examDurationMinutes: true, organizationId: true } } },
       orderBy: { attemptNumber: 'desc' },
     })
   }
 
   if (!attempt) return errorResponse('Attempt not found', 404)
+
+  // Verify org isolation
+  if (attempt.training.organizationId !== dbUser!.organizationId) {
+    return errorResponse('Yetkisiz erişim', 403)
+  }
 
   // Check if timer already exists (always use attempt.id as timer key)
   const remaining = await getExamTimeRemaining(attempt.id)
@@ -44,6 +51,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id: attemptId } = await params
   const { dbUser, error } = await getAuthUser()
   if (error) return error
+
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
   const remaining = await getExamTimeRemaining(attemptId)
   const expired = await isExamExpired(attemptId)

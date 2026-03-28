@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   User, Mail, Phone, Building2, Shield, Camera, Save, Eye, EyeOff,
   CheckCircle2, AlertTriangle, Calendar, Award, BookOpen, FileText,
@@ -33,6 +33,34 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const { fullName, initials } = useAuth();
   const { data: profile, isLoading, error, refetch } = useFetch<ProfileData>('/api/staff/profile');
+
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast('Sadece resim dosyaları yüklenebilir', 'error');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast('Dosya boyutu 2MB\'ı aşamaz', 'error');
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const res = await fetch('/api/staff/profile', {
+        method: 'PATCH',
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Yükleme başarısız');
+      toast('Fotoğraf güncellendi', 'success');
+      refetch();
+    } catch {
+      toast('Fotoğraf yüklenemedi', 'error');
+    }
+  };
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -189,10 +217,17 @@ export default function ProfilePage() {
                       {displayInitials}
                     </AvatarFallback>
                   </Avatar>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                  />
                   <button
                     className="absolute bottom-0 left-16 flex h-8 w-8 items-center justify-center rounded-full border-2 shadow-md transition-transform duration-200 hover:scale-110 active:scale-95"
                     style={{ background: 'var(--color-primary)', borderColor: 'var(--color-surface)', color: 'white' }}
-                    onClick={() => toast('Fotoğraf yükleme yakında eklenecek', 'info')}
+                    onClick={() => avatarInputRef.current?.click()}
                   >
                     <Camera className="h-3.5 w-3.5" />
                   </button>

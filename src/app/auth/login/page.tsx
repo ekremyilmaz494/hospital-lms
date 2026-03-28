@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { createClient } from '@/lib/supabase/client';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Particles } from '@/components/ui/particles';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { ShimmerButton } from '@/components/ui/shimmer-button';
@@ -33,6 +33,7 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [kvkkAccepted, setKvkkAccepted] = useState(false);
 
   const rawRedirect = searchParams.get('redirectTo');
   // Prevent open redirect — only allow relative paths starting with /
@@ -45,19 +46,27 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (authError) {
-        setError('E-posta veya şifre hatalı.');
+      const data = await res.json();
+
+      if (res.status === 429) {
+        setError('Çok fazla giriş denemesi. 15 dakika bekleyin.');
         setLoading(false);
         return;
       }
 
-      const role = data.user?.user_metadata?.role as string;
+      if (!res.ok) {
+        setError(data.error ?? 'E-posta veya şifre hatalı.');
+        setLoading(false);
+        return;
+      }
+
+      const role = data.user?.role as string;
       const target = redirectTo && redirectTo !== '/' ? redirectTo : ROLE_ROUTES[role] || '/staff/dashboard';
       router.push(target);
       router.refresh();
@@ -232,9 +241,25 @@ function LoginForm() {
                 </div>
               </div>
 
+              <div className="flex items-start gap-2.5">
+                <Checkbox
+                  id="kvkk"
+                  checked={kvkkAccepted}
+                  onCheckedChange={(checked) => setKvkkAccepted(checked === true)}
+                  className="mt-0.5"
+                  required
+                />
+                <label htmlFor="kvkk" className="text-xs leading-relaxed cursor-pointer" style={{ color: 'var(--color-text-secondary)' }}>
+                  <Link href="/kvkk" target="_blank" className="font-semibold underline transition-colors duration-150" style={{ color: 'var(--color-primary)' }}>
+                    KVKK Aydınlatma Metni
+                  </Link>
+                  &apos;ni okudum ve kabul ediyorum.
+                </label>
+              </div>
+
               <ShimmerButton
                 type="submit"
-                disabled={loading}
+                disabled={loading || !kvkkAccepted}
                 className="w-full h-12 gap-2.5 text-[15px] font-semibold"
                 shimmerColor="rgba(255,255,255,0.15)"
                 shimmerSize="0.08em"

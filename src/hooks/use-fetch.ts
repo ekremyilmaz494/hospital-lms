@@ -54,10 +54,16 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
       }
     } catch (err) {
       if (urlRef.current === currentUrl) {
-        // Auth hataları veya timeout durumunda sessizce devam et — sayfa boş veri ile render olsun
         const msg = err instanceof Error ? err.message : 'Bir hata oluştu';
-        if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('abort') || msg.includes('404') || msg.includes('500') || msg.includes('503')) {
-          // Auth/server hatası — sessizce boş veri göster (backend henüz konfigüre edilmemiş olabilir)
+        if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('403')) {
+          // Auth error — redirect to login
+          if (typeof window !== 'undefined') {
+            window.location.href = '/auth/login?reason=session_expired';
+          }
+          return; // Don't set error, we're redirecting
+        }
+        if (msg.includes('abort') || msg.includes('404') || msg.includes('500') || msg.includes('503')) {
+          // Timeout, not-found, or server error — graceful degradation for expected API misses
           setError(null);
         } else {
           setError(msg);

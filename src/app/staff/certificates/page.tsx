@@ -29,6 +29,32 @@ export default function StaffCertificatesPage() {
   const { toast } = useToast();
   const { data, isLoading, error } = useFetch<Certificate[]>('/api/staff/certificates');
   const [selected, setSelected] = useState<Certificate | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  /** Download certificate as PDF via server-side generation */
+  const handleDownloadPDF = async (cert: Certificate) => {
+    setPdfLoading(true);
+    try {
+      const res = await fetch(`/api/certificates/${cert.id}/pdf`);
+      if (!res.ok) {
+        throw new Error('PDF indirilemedi');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sertifika-${cert.certificateCode}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast('Sertifika PDF olarak indirildi', 'success');
+    } catch {
+      toast('PDF oluşturulamadı', 'error');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   if (isLoading) return <PageLoading />;
   if (error) {
@@ -159,9 +185,10 @@ export default function StaffCertificatesPage() {
                         variant="outline"
                         className="flex-1 gap-1.5 rounded-xl text-[12px] h-9"
                         style={{ borderColor: 'var(--color-border)' }}
-                        onClick={() => toast('Yakında eklenecek', 'info')}
+                        disabled={pdfLoading}
+                        onClick={() => { setSelected(cert); handleDownloadPDF(cert); }}
                       >
-                        <Download className="h-3.5 w-3.5" /> İndir
+                        <Download className="h-3.5 w-3.5" /> {pdfLoading ? 'İndiriliyor...' : 'İndir'}
                       </Button>
                     </div>
                   </div>
@@ -256,17 +283,23 @@ export default function StaffCertificatesPage() {
                   Kapat
                 </Button>
                 <button
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl h-11 text-[13px] font-semibold text-white"
+                  disabled={pdfLoading}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl h-11 text-[13px] font-semibold text-white disabled:opacity-60"
                   style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
-                  onClick={() => toast('Yakında eklenecek', 'info')}
+                  onClick={() => selected && handleDownloadPDF(selected)}
                 >
-                  <Download className="h-4 w-4" /> PDF İndir
+                  {pdfLoading ? (
+                    <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Oluşturuluyor...</>
+                  ) : (
+                    <><Download className="h-4 w-4" /> PDF İndir</>
+                  )}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

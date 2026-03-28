@@ -1,7 +1,8 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
-import { updateUserSchema } from '@/lib/validations'
+import { checkRateLimit } from '@/lib/redis'
+import { z } from 'zod/v4'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -94,9 +95,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek verisi')
 
-  // role ve organizationId değiştirilmesini engelle — privilege escalation önlemi
-  const safeSchema = updateUserSchema.omit({ role: true, organizationId: true })
-  const parsed = safeSchema.safeParse(body)
+  // Explicit whitelist — only allow safe fields to be updated
+  const safeUpdateSchema = z.object({
+    firstName: z.string().min(1).max(100).optional(),
+    lastName: z.string().min(1).max(100).optional(),
+    phone: z.string().max(20).optional(),
+    tcNo: z.string().length(11).optional(),
+    title: z.string().max(100).optional(),
+    departmentId: z.string().uuid().optional(),
+    department: z.string().max(100).optional(),
+    isActive: z.boolean().optional(),
+  })
+  const parsed = safeUpdateSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
@@ -138,6 +148,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
+
+  const allowed = await checkRateLimit(`staff-delete:${dbUser!.id}`, 10, 3600)
+  if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
   const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!existing) return errorResponse('Personel bulunamadı', 404)

@@ -24,7 +24,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { options, ...questionData } = parsed.data
 
-  const question = await prisma.question.update({
+  await prisma.question.update({
     where: { id: questionId, trainingId: id },
     data: questionData,
   })

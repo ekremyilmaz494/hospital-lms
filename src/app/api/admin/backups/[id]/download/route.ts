@@ -1,6 +1,7 @@
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 export async function GET(
   request: Request,
@@ -45,8 +46,12 @@ export async function GET(
       })
       const s3Response = await s3.send(command)
       return new Response(s3Response.Body as ReadableStream, { headers })
-    } catch {
-      // S3 erişimi başarısız — aşağıda DB'den yeniden oluştur
+    } catch (s3Error) {
+      logger.error('S3 yedek indirme başarısız, DB yedeklemesine geçiliyor', {
+        backupId: id,
+        fileUrl: backup.fileUrl,
+        error: (s3Error as Error).message,
+      })
     }
   }
 

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUser, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
 
 /** Start a new exam attempt or resume existing one */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -7,8 +8,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
+  const allowed = await checkRateLimit(`exam-start:${dbUser!.id}`, 5, 60)
+  if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
+
   const assignment = await prisma.trainingAssignment.findFirst({
-    where: { id: assignmentId, userId: dbUser!.id },
+    where: {
+      id: assignmentId,
+      userId: dbUser!.id,
+      training: { organizationId: dbUser!.organizationId! },
+    },
     include: { training: true },
   })
 
@@ -82,6 +92,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   })
 
   if (!attempt) return errorResponse('Maksimum deneme sayısına ulaştınız', 403)
+
+  await createAuditLog({
+    userId: dbUser!.id,
+    organizationId: dbUser!.organizationId,
+    action: 'exam.started',
+    entityType: 'exam_attempt',
+    entityId: attempt.id,
+    newData: { trainingId: assignment.trainingId, attemptNumber: attempt.attemptNumber },
+    request,
+  })
 
   return jsonResponse(attempt)
 }

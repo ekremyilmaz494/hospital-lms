@@ -1,12 +1,18 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { updateVideoProgressSchema } from '@/lib/validations'
+import { checkRateLimit } from '@/lib/redis'
 
 /** Update video watch progress */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: attemptId } = await params
   const { dbUser, error } = await getAuthUser()
   if (error) return error
+
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
+  const allowed = await checkRateLimit(`video-progress:${dbUser!.id}`, 30, 60)
+  if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
 
   const body = await parseBody<{ videoId: string; watchedSeconds: number; lastPositionSeconds: number }>(request)
   if (!body?.videoId) return errorResponse('videoId required')
@@ -16,9 +22,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const attempt = await prisma.examAttempt.findFirst({
     where: { id: attemptId, userId: dbUser!.id, status: 'watching_videos' },
+    include: { training: { select: { organizationId: true } } },
   })
 
   if (!attempt) return errorResponse('Invalid attempt or not in video phase', 400)
+
+  // Verify org isolation
+  if (attempt.training.organizationId !== dbUser!.organizationId) {
+    return errorResponse('Yetkisiz erişim', 403)
+  }
 
   const video = await prisma.trainingVideo.findUnique({ where: { id: body.videoId } })
   if (!video) return errorResponse('Video not found', 404)
@@ -88,6 +100,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id: attemptId } = await params
   const { dbUser, error } = await getAuthUser()
   if (error) return error
+
+  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
+  // Verify attempt belongs to user's org
+  const attempt = await prisma.examAttempt.findFirst({
+    where: { id: attemptId, userId: dbUser!.id },
+    include: { training: { select: { organizationId: true } } },
+  })
+
+  if (!attempt || attempt.training.organizationId !== dbUser!.organizationId) {
+    return errorResponse('Yetkisiz erişim', 403)
+  }
 
   const progressList = await prisma.videoProgress.findMany({
     where: { attemptId, userId: dbUser!.id },

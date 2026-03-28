@@ -106,6 +106,7 @@ export default function AdminDashboard() {
     complianceAlerts.filter(c => c.status === 'critical' || c.status === 'overdue').length;
 
   const totalAssignments = statusDistribution.reduce((s, d) => s + d.value, 0);
+  const hasTrendData = trendData.some(t => t.atanan > 0 || t.tamamlanan > 0 || t.basarisiz > 0);
 
   return (
     <div className="space-y-6">
@@ -215,6 +216,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <BlurFade delay={0.3} className="lg:col-span-2">
           <ChartCard title="Aylık Eğitim Trendi" icon={<TrendingUp className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
+            {hasTrendData ? (
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart data={trendData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
@@ -235,6 +237,9 @@ export default function AdminDashboard() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+            ) : (
+              <div className="h-72 flex items-center justify-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz eğitim ataması yapılmamış. Personele eğitim atadıkça burada aylık trend görünecek.</div>
+            )}
           </ChartCard>
         </BlurFade>
 
@@ -242,7 +247,7 @@ export default function AdminDashboard() {
         <BlurFade delay={0.35}>
           <div className="rounded-2xl border p-6 h-full" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
             <h3 className="text-sm font-bold mb-4">Eğitim Durum Dağılımı</h3>
-            {statusDistribution.length > 0 ? (
+            {totalAssignments > 0 ? (
               <>
                 <div className="h-44">
                   <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -269,7 +274,7 @@ export default function AdminDashboard() {
                 </div>
               </>
             ) : (
-              <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+              <div className="h-44 flex items-center justify-center text-sm text-center px-4" style={{ color: 'var(--color-text-muted)' }}>Personele eğitim atandığında durum dağılımı burada görünecek</div>
             )}
           </div>
         </BlurFade>
@@ -293,7 +298,7 @@ export default function AdminDashboard() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+              <div className="h-64 flex items-center justify-center text-sm text-center px-4" style={{ color: 'var(--color-text-muted)' }}>Personele eğitim atandığında departman karşılaştırması burada görünecek</div>
             )}
           </ChartCard>
         </BlurFade>

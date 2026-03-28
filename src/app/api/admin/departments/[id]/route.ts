@@ -2,6 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
 import { updateDepartmentSchema } from '@/lib/validations'
 
 type Params = { params: Promise<{ id: string }> }
@@ -114,6 +115,9 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   })
 
   if (!department) return errorResponse('Departman bulunamadı', 404)
+
+  const allowed = await checkRateLimit(`dept-delete:${dbUser!.id}`, 10, 3600)
+  if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
   // Personellerin departmentId'sini null yap, sonra departmanı sil
   await prisma.$transaction([
