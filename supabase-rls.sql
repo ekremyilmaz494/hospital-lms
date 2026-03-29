@@ -93,6 +93,7 @@ CREATE POLICY "super_admin_audit_all" ON audit_logs FOR ALL USING (auth.user_rol
 CREATE POLICY "admin_audit_select" ON audit_logs FOR SELECT USING (auth.user_role() = 'admin' AND organization_id = auth.user_org_id());
 
 -- DB BACKUPS
+CREATE POLICY "super_admin_backups_all" ON db_backups FOR ALL USING (auth.user_role() = 'super_admin');
 CREATE POLICY "admin_backups_all" ON db_backups FOR ALL USING (auth.user_role() = 'admin' AND organization_id = auth.user_org_id());
 
 -- DEPARTMENTS

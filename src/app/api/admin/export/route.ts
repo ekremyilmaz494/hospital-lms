@@ -236,7 +236,67 @@ export async function GET(request: Request) {
     })
   }
 
-  return errorResponse('Invalid export type. Use: staff, trainings, results')
+  // ── AUDIT LOGS ──
+  if (type === 'audit-logs') {
+    const dateFilter: Record<string, unknown> = {}
+    if (dateFrom) dateFilter.gte = dateFrom
+    if (dateTo) dateFilter.lte = dateTo
+
+    const logs = await prisma.auditLog.findMany({
+      where: {
+        organizationId: orgId,
+        ...(dateFrom || dateTo ? { createdAt: dateFilter } : {}),
+      },
+      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 5000,
+    })
+
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet('Denetim Kayitlari')
+    ws.columns = [
+      { header: 'Tarih', key: 'date', width: 20 },
+      { header: 'Kullanici', key: 'user', width: 25 },
+      { header: 'Email', key: 'email', width: 25 },
+      { header: 'Islem', key: 'action', width: 25 },
+      { header: 'Varlik Tipi', key: 'entityType', width: 15 },
+      { header: 'Varlik ID', key: 'entityId', width: 15 },
+      { header: 'IP Adresi', key: 'ip', width: 15 },
+    ]
+
+    logs.forEach(log => {
+      ws.addRow({
+        date: log.createdAt.toLocaleString('tr-TR'),
+        user: log.user ? `${log.user.firstName} ${log.user.lastName}` : '-',
+        email: log.user?.email ?? '-',
+        action: log.action,
+        entityType: log.entityType,
+        entityId: log.entityId ?? '-',
+        ip: log.ipAddress ?? '-',
+      })
+    })
+
+    styleHeader(ws)
+
+    await createAuditLog({
+      userId: dbUser!.id,
+      organizationId: orgId,
+      action: 'data.export',
+      entityType: 'export',
+      entityId: orgId,
+      newData: { type, format, rowCount: logs.length },
+    })
+
+    const buffer = await wb.xlsx.writeBuffer()
+    return new Response(buffer, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename=denetim-kayitlari.xlsx',
+      },
+    })
+  }
+
+  return errorResponse('Invalid export type. Use: staff, trainings, results, audit-logs')
 }
 
 function styleHeader(ws: ExcelJS.Worksheet) {
