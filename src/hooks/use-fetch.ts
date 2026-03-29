@@ -12,6 +12,7 @@ interface UseFetchResult<T> {
 // In-memory cache: URL → { data, timestamp }
 const cache = new Map<string, { data: unknown; ts: number }>();
 const STALE_TIME = 30_000; // 30 saniye — bu süre içinde cache'den anında göster
+const MAX_CACHE_ENTRIES = 100; // Memory leak onlemi
 
 /** Clear cached data for a specific URL (use before useFetch to prevent stale flash) */
 export function clearFetchCache(url: string) {
@@ -42,28 +43,32 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
       const res = await fetch(currentUrl, { signal: controller.signal });
-      clearTimeout(timeout);
+      // Auth hatalarini HTTP status uzerinden yakala (string esleme yerine)
+      if (res.status === 401 || res.status === 403) {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth/login?reason=session_expired';
+        }
+        return; // Yonlendirme yapiliyor, error set etmeye gerek yok
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       const json = await res.json();
       if (urlRef.current === currentUrl) {
+        // LRU benzeri eviction: max entry sayisi asildiginda en eski kaydi sil
+        if (cache.size >= MAX_CACHE_ENTRIES) {
+          const oldestKey = cache.keys().next().value;
+          if (oldestKey) cache.delete(oldestKey);
+        }
         cache.set(currentUrl, { data: json, ts: Date.now() });
         setData(json);
       }
     } catch (err) {
       if (urlRef.current === currentUrl) {
         const msg = err instanceof Error ? err.message : 'Bir hata oluştu';
-        if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('403')) {
-          // Auth error — redirect to login
-          if (typeof window !== 'undefined') {
-            window.location.href = '/auth/login?reason=session_expired';
-          }
-          return; // Don't set error, we're redirecting
-        }
-        if (msg.includes('abort') || msg.includes('404')) {
-          // Timeout or not-found — graceful degradation
+        if (msg.includes('abort')) {
+          // Timeout — graceful degradation (istek iptal edildi)
           setError(null);
         } else {
           setError(msg);

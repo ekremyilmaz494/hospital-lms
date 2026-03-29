@@ -2,21 +2,30 @@ import { prisma } from '@/lib/prisma'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
 import { z } from 'zod'
 
 const registerSchema = z.object({
   hospitalName: z.string().min(2).max(255),
   hospitalCode: z.string().min(2).max(50).regex(/^[a-zA-Z0-9-]+$/),
   adminEmail: z.string().email(),
-  adminPassword: z.string().min(8),
+  adminPassword: z.string().min(8).regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
+    'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir'
+  ),
   adminFirstName: z.string().min(1).max(100),
   adminLastName: z.string().min(1).max(100),
   planSlug: z.string().optional(),
 })
 
 export async function POST(request: Request) {
+  // Rate limiting — IP bazlı
+  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const allowed = await checkRateLimit(`register:${clientIp}`, 5, 3600)
+  if (!allowed) return errorResponse('Çok fazla kayıt denemesi. Lütfen bir saat sonra tekrar deneyin.', 429)
+
   const body = await parseBody(request)
-  if (!body) return errorResponse('Gecersiz istek verisi')
+  if (!body) return errorResponse('Geçersiz istek verisi')
 
   const parsed = registerSchema.safeParse(body)
   if (!parsed.success) {
@@ -25,20 +34,24 @@ export async function POST(request: Request) {
 
   const { hospitalName, hospitalCode, adminEmail, adminPassword, adminFirstName, adminLastName, planSlug } = parsed.data
 
+  // Email bazlı rate limit
+  const emailAllowed = await checkRateLimit(`register:${adminEmail.toLowerCase()}`, 3, 3600)
+  if (!emailAllowed) return errorResponse('Bu e-posta ile çok fazla kayıt denemesi yapıldı.', 429)
+
   // Kod benzersizliği
   const existingOrg = await prisma.organization.findUnique({ where: { code: hospitalCode } })
-  if (existingOrg) return errorResponse('Bu hastane kodu zaten kullaniliyor')
+  if (existingOrg) return errorResponse('Bu hastane kodu zaten kullanılıyor')
 
   // Email benzersizliği
   const existingUser = await prisma.user.findUnique({ where: { email: adminEmail } })
-  if (existingUser) return errorResponse('Bu e-posta adresi zaten kayitli')
+  if (existingUser) return errorResponse('Bu e-posta adresi zaten kayıtlı')
 
   // Plan bul
   const plan = planSlug
     ? await prisma.subscriptionPlan.findUnique({ where: { slug: planSlug } })
     : await prisma.subscriptionPlan.findFirst({ where: { isActive: true }, orderBy: { priceMonthly: 'asc' } })
 
-  if (!plan) return errorResponse('Abonelik plani bulunamadi')
+  if (!plan) return errorResponse('Abonelik planı bulunamadı')
 
   let org
   try {
@@ -83,7 +96,7 @@ export async function POST(request: Request) {
       // Rollback org
       await prisma.organization.delete({ where: { id: org.id } }).catch(() => {})
       logger.error('Register', 'Supabase auth hatasi', authError.message)
-      return errorResponse('Kullanici olusturulamadi. Lutfen farkli bir e-posta deneyin.')
+      return errorResponse('Kullanıcı oluşturulamadı. Lütfen farklı bir e-posta deneyin.')
     }
 
     await prisma.user.create({
@@ -101,13 +114,13 @@ export async function POST(request: Request) {
 
     return jsonResponse({
       success: true,
-      message: 'Hastane basariyla olusturuldu. 14 gunluk deneme suresi baslamistir.',
+      message: 'Hastane başarıyla oluşturuldu. 14 günlük deneme süresi başlamıştır.',
       redirectUrl: '/auth/login',
     }, 201)
   } catch (err) {
     // Rollback
     if (org) await prisma.organization.delete({ where: { id: org.id } }).catch(() => {})
     logger.error('Register', 'Kayit hatasi', (err as Error).message)
-    return errorResponse('Kayit sirasinda bir hata olustu. Lutfen tekrar deneyin.')
+    return errorResponse('Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.')
   }
 }

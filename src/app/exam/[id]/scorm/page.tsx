@@ -92,8 +92,11 @@ export default function ScormPlayerPage() {
   useEffect(() => {
     if (!training || initialized.current) return
     if (!training.scormEntryPoint) {
-      setStatus('error')
-      setErrorMsg('Bu egitim icin SCORM icerik bulunamadi')
+      // Use queueMicrotask to avoid synchronous setState in effect
+      queueMicrotask(() => {
+        setStatus('error')
+        setErrorMsg('Bu eğitim için SCORM içerik bulunamadı')
+      })
       return
     }
     initialized.current = true
@@ -265,7 +268,7 @@ export default function ScormPlayerPage() {
             className="text-sm font-semibold mb-2"
             style={{ color: 'var(--color-error)' }}
           >
-            {errorMsg || 'Bir hata olustu'}
+            {errorMsg || 'Bir hata oluştu'}
           </p>
           <button
             onClick={() => router.back()}
@@ -276,7 +279,7 @@ export default function ScormPlayerPage() {
               color: 'var(--color-text)',
             }}
           >
-            Geri Don
+            Geri Dön
           </button>
         </div>
       </div>
@@ -316,13 +319,13 @@ export default function ScormPlayerPage() {
             className="text-lg font-bold mb-2"
             style={{ color: 'var(--color-text)', fontFamily: 'var(--font-display)' }}
           >
-            Egitim Tamamlandi
+            Eğitim Tamamlandı
           </h2>
           <p
             className="text-sm mb-6"
             style={{ color: 'var(--color-text-muted)' }}
           >
-            {training?.title} egitimini basariyla tamamladiniz.
+            {training?.title} eğitimini başarıyla tamamladınız.
           </p>
           <button
             onClick={() => router.push('/dashboard')}
@@ -331,7 +334,7 @@ export default function ScormPlayerPage() {
               background: 'var(--color-primary)',
             }}
           >
-            Panele Don
+            Panele Dön
           </button>
         </div>
       </div>
@@ -389,7 +392,7 @@ export default function ScormPlayerPage() {
             className="text-sm font-semibold truncate"
             style={{ color: 'var(--color-text)', fontFamily: 'var(--font-display)' }}
           >
-            {training?.title || 'SCORM Egitim'}
+            {training?.title || 'SCORM Eğitim'}
           </h1>
         </div>
 
@@ -406,11 +409,11 @@ export default function ScormPlayerPage() {
                 : 'var(--color-text-muted)',
             }}
           >
-            {lessonStatus === 'passed' ? 'Basarili' :
-             lessonStatus === 'completed' ? 'Tamamlandi' :
+            {lessonStatus === 'passed' ? 'Başarılı' :
+             lessonStatus === 'completed' ? 'Tamamlandı' :
              lessonStatus === 'incomplete' ? 'Devam Ediyor' :
-             lessonStatus === 'failed' ? 'Basarisiz' :
-             'Baslanmadi'}
+             lessonStatus === 'failed' ? 'Başarısız' :
+             'Başlanmadı'}
           </span>
 
           {/* Exit button */}
@@ -429,7 +432,7 @@ export default function ScormPlayerPage() {
               color: 'var(--color-text)',
             }}
           >
-            Cikis
+            Çıkış
           </button>
         </div>
       </div>

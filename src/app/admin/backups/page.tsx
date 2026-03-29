@@ -1,11 +1,10 @@
 'use client';
 
-import { Database, Download, Plus, Clock, HardDrive, CheckCircle } from 'lucide-react';
+import { Download, Plus, Clock, HardDrive, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatCard } from '@/components/shared/stat-card';
 import { BlurFade } from '@/components/ui/blur-fade';
-import { ShimmerButton } from '@/components/ui/shimmer-button';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';

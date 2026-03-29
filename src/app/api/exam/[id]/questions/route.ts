@@ -20,15 +20,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (phaseError) return phaseError
 
   // id can be trainingId or assignmentId — find the training
+  // Always enforce organizationId to prevent cross-tenant data access
   const assignment = await prisma.trainingAssignment.findFirst({
     where: { id, userId: dbUser!.id, training: { organizationId: dbUser!.organizationId! } },
     include: { training: true },
   })
 
-  // If not found by assignment ID, try as training ID
-  const training = assignment?.training ?? await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
-  })
+  let training = assignment?.training ?? null
+
+  // If not found by assignment ID, try as training ID — still enforce org isolation
+  if (!training) {
+    // Verify the user actually has an assignment for this training in their org
+    const assignmentByTraining = await prisma.trainingAssignment.findFirst({
+      where: { trainingId: id, userId: dbUser!.id, training: { organizationId: dbUser!.organizationId! } },
+      include: { training: true },
+    })
+    training = assignmentByTraining?.training ?? null
+  }
 
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 

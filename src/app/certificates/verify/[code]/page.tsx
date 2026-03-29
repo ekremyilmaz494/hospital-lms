@@ -73,7 +73,7 @@ export default function CertificateVerifyPage() {
               className="text-lg font-bold"
               style={{ color: 'var(--color-text)', fontFamily: 'var(--font-display)' }}
             >
-              Sertifika Dogrulama
+              Sertifika Doğrulama
             </h1>
             <p
               className="text-xs mt-1"
@@ -104,13 +104,13 @@ export default function CertificateVerifyPage() {
                 className="text-sm font-semibold"
                 style={{ color: 'var(--color-error)' }}
               >
-                Sertifika bulunamadi
+                Sertifika bulunamadı
               </p>
               <p
                 className="text-xs text-center"
                 style={{ color: 'var(--color-text-muted)' }}
               >
-                Bu koda ait gecerli bir sertifika kaydi bulunamadi.
+                Bu koda ait geçerli bir sertifika kaydı bulunamadı.
               </p>
             </div>
           )}
@@ -136,7 +136,7 @@ export default function CertificateVerifyPage() {
                 className="text-sm font-semibold"
                 style={{ color: 'var(--color-error)' }}
               >
-                Dogrulama hatasi
+                Doğrulama hatası
               </p>
             </div>
           )}
@@ -162,7 +162,7 @@ export default function CertificateVerifyPage() {
                 className="text-sm font-bold"
                 style={{ color: 'var(--color-primary)' }}
               >
-                Gecerli Sertifika
+                Geçerli Sertifika
               </p>
 
               <div
@@ -182,7 +182,7 @@ export default function CertificateVerifyPage() {
                 </div>
                 <div>
                   <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    Egitim
+                    Eğitim
                   </p>
                   <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
                     {data.trainingTitle}
@@ -201,7 +201,7 @@ export default function CertificateVerifyPage() {
                 <div className="flex gap-6">
                   <div>
                     <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      Verilis Tarihi
+                      Veriliş Tarihi
                     </p>
                     <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
                       {formatDate(data.issuedAt)}
@@ -210,7 +210,7 @@ export default function CertificateVerifyPage() {
                   {data.expiresAt && (
                     <div>
                       <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                        Gecerlilik Tarihi
+                        Geçerlilik Tarihi
                       </p>
                       <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
                         {formatDate(data.expiresAt)}
@@ -243,13 +243,13 @@ export default function CertificateVerifyPage() {
                 className="text-sm font-bold"
                 style={{ color: 'var(--color-error)' }}
               >
-                Suresi Dolmus Sertifika
+                Süresi Dolmuş Sertifika
               </p>
               <p
                 className="text-xs text-center"
                 style={{ color: 'var(--color-text-muted)' }}
               >
-                Bu sertifikanin gecerlilik suresi dolmustur.
+                Bu sertifikanın geçerlilik süresi dolmuştur.
               </p>
 
               <div
@@ -269,7 +269,7 @@ export default function CertificateVerifyPage() {
                 </div>
                 <div>
                   <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    Egitim
+                    Eğitim
                   </p>
                   <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
                     {data.trainingTitle}
@@ -278,7 +278,7 @@ export default function CertificateVerifyPage() {
                 {data.expiresAt && (
                   <div>
                     <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      Bitis Tarihi
+                      Bitiş Tarihi
                     </p>
                     <p
                       className="text-sm font-semibold"

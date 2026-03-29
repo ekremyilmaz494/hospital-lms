@@ -197,13 +197,13 @@ function SsoSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sso),
       });
-      if (!res.ok) throw new Error('Kayit basarisiz');
-      toast('SSO ayarlari kaydedildi', 'success');
-    } catch { toast('SSO ayarlari kaydedilemedi', 'error'); }
+      if (!res.ok) throw new Error('Kayıt başarısız');
+      toast('SSO ayarları kaydedildi', 'success');
+    } catch { toast('SSO ayarları kaydedilemedi', 'error'); }
     finally { setSaving(false); }
   };
 
-  if (!loaded) return <div className="py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Yukleniyor...</div>;
+  if (!loaded) return <div className="py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Yükleniyor...</div>;
 
   const inputClass = 'h-11 rounded-xl text-[13px]';
   const inputStyle = { background: 'var(--color-bg)', borderColor: 'var(--color-border)' };
@@ -214,7 +214,7 @@ function SsoSettings() {
       <div className="flex items-center justify-between rounded-xl p-4" style={{ background: sso.ssoEnabled ? 'rgba(13,150,104,0.06)' : 'var(--color-bg)', border: `1px solid ${sso.ssoEnabled ? 'rgba(13,150,104,0.2)' : 'var(--color-border)'}` }}>
         <div>
           <p className="text-[13px] font-semibold">SSO Aktif</p>
-          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Kurumsal kimlik saglayici ile giris</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Kurumsal kimlik sağlayıcı ile giriş</p>
         </div>
         <Toggle checked={sso.ssoEnabled} onChange={(v) => setSso(s => ({ ...s, ssoEnabled: v }))} />
       </div>
@@ -297,13 +297,13 @@ function SsoSettings() {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center gap-3 rounded-xl p-4" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
               <div className="flex-1">
-                <p className="text-[13px] font-semibold">Otomatik Kullanici Olusturma</p>
-                <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>SSO ile ilk giriste hesap otomatik olusturulur</p>
+                <p className="text-[13px] font-semibold">Otomatik Kullanıcı Oluşturma</p>
+                <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>SSO ile ilk girişte hesap otomatik oluşturulur</p>
               </div>
               <Toggle checked={sso.ssoAutoProvision} onChange={(v) => setSso(s => ({ ...s, ssoAutoProvision: v }))} />
             </div>
             <div>
-              <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Varsayilan Rol</Label>
+              <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Varsayılan Rol</Label>
               <select
                 value={sso.ssoDefaultRole}
                 onChange={(e) => setSso(s => ({ ...s, ssoDefaultRole: e.target.value }))}
@@ -344,7 +344,7 @@ function SsoSettings() {
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
-  const { data, isLoading, error } = useFetch<SettingsData>('/api/admin/settings');
+  const { data, isLoading } = useFetch<SettingsData>('/api/admin/settings');
   const { data: statsData } = useFetch<SystemStats>('/api/admin/dashboard/stats');
   const { data: subData } = useFetch<{ hasSubscription: boolean; subscription?: { status: string; billingCycle: string; expiresAt: string; daysLeft: number | null; trialDaysLeft: number | null }; plan?: { name: string; maxStaff: number | null; maxTrainings: number | null; priceMonthly: number | null; priceAnnual: number | null; features: string[] }; usage?: { staffCount: number; staffLimit: number | null; staffPercent: number; trainingCount: number; trainingLimit: number | null; trainingPercent: number }; invoices?: { id: string; invoiceNumber: string; totalAmount: number; periodStart: string; periodEnd: string; issuedAt: string }[] }>('/api/admin/subscription');
   const [formData, setFormData] = useState<SettingsData | null>(null);
@@ -593,7 +593,7 @@ export default function AdminSettingsPage() {
                 {!subData?.hasSubscription ? (
                   <div className="rounded-2xl border p-8 text-center" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
                     <CreditCard className="mx-auto mb-3 h-10 w-10" style={{ color: 'var(--color-text-muted)' }} />
-                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Aktif abonelik bulunamadi.</p>
+                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Aktif abonelik bulunamadı.</p>
                   </div>
                 ) : (
                   <div className="space-y-6">
@@ -632,7 +632,7 @@ export default function AdminSettingsPage() {
                         }}>
                           <AlertTriangle className="h-4 w-4" style={{ color: subData.subscription.daysLeft <= 7 ? 'var(--color-error)' : 'var(--color-warning)' }} />
                           <span className="text-sm font-semibold" style={{ color: subData.subscription.daysLeft <= 7 ? 'var(--color-error)' : 'var(--color-warning)' }}>
-                            Abonelik suresi {subData.subscription.daysLeft} gun icinde doluyor
+                            Abonelik süresi {subData.subscription.daysLeft} gün içinde doluyor
                           </span>
                         </div>
                       )}
@@ -660,7 +660,7 @@ export default function AdminSettingsPage() {
                         <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
                           <div className="mb-2 flex items-center justify-between">
                             <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-                              <BookOpen className="mr-1.5 inline h-4 w-4" />Egitim
+                              <BookOpen className="mr-1.5 inline h-4 w-4" />Eğitim
                             </span>
                             <span className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
                               {subData.usage.trainingCount} / {subData.usage.trainingLimit ?? '∞'}
@@ -910,10 +910,10 @@ export default function AdminSettingsPage() {
               <div className="p-8">
                 <div className="mb-8">
                   <h2 className="text-lg font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                    Tek Oturum Acma (SSO)
+                    Tek Oturum Açma (SSO)
                   </h2>
                   <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    SAML 2.0 veya OIDC ile kurumsal kimlik saglayicinizi baglayarak personel girisini otomatiklestirin.
+                    SAML 2.0 veya OIDC ile kurumsal kimlik sağlayıcınızı bağlayarak personel girişini otomatikleştirin.
                   </p>
                 </div>
 

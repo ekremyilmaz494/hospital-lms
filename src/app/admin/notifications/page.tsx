@@ -69,6 +69,7 @@ export default function NotificationsPage() {
   const [sending, setSending] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
   const [debouncedStaffSearch, setDebouncedStaffSearch] = useState('');
+  const [alsoSendEmail, setAlsoSendEmail] = useState(false);
   const searchTimerRef = useRef<NodeJS.Timeout>(undefined);
 
   const handleStaffSearch = useCallback((value: string) => {
@@ -84,7 +85,13 @@ export default function NotificationsPage() {
     if (showSendModal && departments.length === 0) {
       fetch('/api/admin/departments').then(r => r.json()).then(d => {
         const depts = Array.isArray(d) ? d : d.departments ?? d.data ?? [];
-        setDepartments(depts);
+        // API "staff" döndürebilir, frontend "users" bekliyor — normalize et
+        const normalized = depts.map((dept: Record<string, unknown>) => ({
+          ...dept,
+          users: (dept.users ?? dept.staff ?? []) as StaffMember[],
+          _count: (dept._count ?? { users: (dept.count as number) ?? 0 }) as { users: number },
+        }));
+        setDepartments(normalized as Department[]);
       }).catch(() => {});
     }
   }, [showSendModal, departments.length]);
@@ -121,22 +128,39 @@ export default function NotificationsPage() {
     }
     setSending(true);
     try {
-      // Her alıcıya bildirim oluştur
-      const results = await Promise.all(
-        recipientIds.map(userId =>
-          fetch('/api/admin/notifications', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, title: sendTitle, message: sendMessage, type: sendType }),
-          })
-        )
-      );
-      const successCount = results.filter(r => r.ok).length;
-      toast(`${successCount} kişiye bildirim gönderildi`, 'success');
+      // Tek request ile toplu bildirim + opsiyonel e-posta gönder
+      const res = await fetch('/api/admin/notifications/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: sendTitle,
+          message: sendMessage,
+          type: sendType,
+          recipientIds,
+          sendEmail: alsoSendEmail,
+        }),
+      });
+      const result = await res.json();
+
+      if (!res.ok) {
+        toast(result.error || 'Bildirim gönderilemedi', 'error');
+        return;
+      }
+
+      const parts: string[] = [`${result.notificationsCreated} kişiye bildirim gönderildi`];
+      if (alsoSendEmail && result.emailsSent > 0) {
+        parts.push(`${result.emailsSent} e-posta gönderildi`);
+      }
+      if (result.emailsFailed > 0) {
+        parts.push(`${result.emailsFailed} e-posta gönderilemedi`);
+      }
+      toast(parts.join('. '), result.emailsFailed > 0 ? 'warning' : 'success');
+
       setShowSendModal(false);
       setSendTitle('');
       setSendMessage('');
       setSendType('info');
+      setAlsoSendEmail(false);
       setSelectedStaffIds(new Set());
       setExcludedStaffIds(new Set());
       setSelectedDeptId('');
@@ -588,11 +612,36 @@ export default function NotificationsPage() {
               </div>
             </div>
 
+            {/* E-posta seçeneği */}
+            <div className="mb-6">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div
+                  onClick={() => setAlsoSendEmail(!alsoSendEmail)}
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors duration-150"
+                  style={{
+                    background: alsoSendEmail ? 'var(--color-primary)' : 'var(--color-bg)',
+                    border: alsoSendEmail ? 'none' : '2px solid var(--color-border)',
+                  }}
+                >
+                  {alsoSendEmail && <Check className="h-3.5 w-3.5 text-white" />}
+                </div>
+                <div>
+                  <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                    E-posta ile de gönder
+                  </span>
+                  <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                    Bildirimle birlikte alıcılara e-posta da gönderilir
+                  </p>
+                </div>
+              </label>
+            </div>
+
             {/* Footer */}
             <div className="flex items-center justify-between pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                 <span className="font-bold" style={{ color: 'var(--color-primary)' }}>{getRecipientCount()}</span> kişiye gönderilecek
-              </p>
+                {alsoSendEmail && <span className="ml-1.5">(+ e-posta)</span>}
+              </div>
               <div className="flex gap-2">
                 <Button variant="outline" className="rounded-xl" onClick={() => setShowSendModal(false)}>İptal</Button>
                 <button

@@ -43,7 +43,6 @@ const categoryColors: Record<string, string> = {
   'Eczane': 'var(--color-warning)',
 };
 
-const allCategories = Object.keys(categoryColors);
 const allStatuses = Object.keys(statusColors);
 
 export default function TrainingsPage() {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2,
@@ -72,7 +72,8 @@ function formatDateRange(start: string, end: string) {
 
 /* ─── Page ─── */
 export default function CalendarPage() {
-  const today = new Date();
+  const todayRef = useRef(new Date());
+  const today = todayRef.current;
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);

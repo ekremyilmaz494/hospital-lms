@@ -3,6 +3,29 @@ import { getAuthUser, requireRole, errorResponse, createAuditLog } from '@/lib/a
 import { checkRateLimit } from '@/lib/redis'
 import ExcelJS from 'exceljs'
 
+/**
+ * CSV injection koruması — hücre değeri tehlikeli karakterle başlıyorsa
+ * tek tırnak ile önekler. =, +, -, @, \t, \r, \n karakterleri Excel'de
+ * formül olarak yorumlanabilir.
+ */
+function sanitizeCellValue(value: unknown): string {
+  if (value == null) return ''
+  const str = String(value)
+  if (/^[=+\-@\t\r\n]/.test(str)) {
+    return `'${str}`
+  }
+  return str
+}
+
+/** Nesne değerlerini CSV injection'a karşı temizler */
+function sanitizeRow(row: Record<string, unknown>): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(row)) {
+    sanitized[key] = typeof value === 'string' ? sanitizeCellValue(value) : value
+  }
+  return sanitized
+}
+
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
@@ -60,12 +83,12 @@ export async function GET(request: Request) {
       { header: 'Departman', key: 'department', width: 20 },
       { header: 'Unvan', key: 'title', width: 20 },
       { header: 'Durum', key: 'isActive', width: 10 },
-      { header: 'Atanan Egitim', key: 'assignmentCount', width: 15 },
-      { header: 'Kayit Tarihi', key: 'createdAt', width: 20 },
+      { header: 'Atanan Eğitim', key: 'assignmentCount', width: 15 },
+      { header: 'Kayıt Tarihi', key: 'createdAt', width: 20 },
     ]
 
     staff.forEach(s => {
-      ws.addRow({
+      ws.addRow(sanitizeRow({
         firstName: s.firstName,
         lastName: s.lastName,
         email: s.email,
@@ -78,7 +101,7 @@ export async function GET(request: Request) {
         isActive: s.isActive ? 'Aktif' : 'Pasif',
         assignmentCount: s._count.assignments,
         createdAt: s.createdAt.toLocaleDateString('tr-TR'),
-      })
+      }))
     })
 
     styleHeader(ws)
@@ -123,30 +146,34 @@ export async function GET(request: Request) {
     })
 
     const wb = new ExcelJS.Workbook()
-    const ws = wb.addWorksheet('Egitimler')
+    const ws = wb.addWorksheet('Eğitimler')
 
     ws.columns = [
-      { header: 'Baslik', key: 'title', width: 40 },
+      { header: 'Başlık', key: 'title', width: 40 },
       { header: 'Kategori', key: 'category', width: 15 },
-      { header: 'Gecme Notu', key: 'passingScore', width: 12 },
+      { header: 'Geçme Notu', key: 'passingScore', width: 12 },
       { header: 'Max Deneme', key: 'maxAttempts', width: 12 },
-      { header: 'Sure (dk)', key: 'examDurationMinutes', width: 12 },
-      { header: 'Video Sayisi', key: 'videoCount', width: 12 },
-      { header: 'Soru Sayisi', key: 'questionCount', width: 12 },
-      { header: 'Atanan Kisi', key: 'assignmentCount', width: 12 },
-      { header: 'Baslangic', key: 'startDate', width: 15 },
-      { header: 'Bitis', key: 'endDate', width: 15 },
+      { header: 'Süre (dk)', key: 'examDurationMinutes', width: 12 },
+      { header: 'Video Sayısı', key: 'videoCount', width: 12 },
+      { header: 'Soru Sayısı', key: 'questionCount', width: 12 },
+      { header: 'Atanan Kişi', key: 'assignmentCount', width: 12 },
+      { header: 'Başlangıç', key: 'startDate', width: 15 },
+      { header: 'Bitiş', key: 'endDate', width: 15 },
     ]
 
     trainings.forEach(t => {
-      ws.addRow({
-        ...t,
+      ws.addRow(sanitizeRow({
+        title: t.title,
+        category: t.category,
+        passingScore: t.passingScore,
+        maxAttempts: t.maxAttempts,
+        examDurationMinutes: t.examDurationMinutes,
         videoCount: t._count.videos,
         questionCount: t._count.questions,
         assignmentCount: t._count.assignments,
         startDate: t.startDate.toLocaleDateString('tr-TR'),
         endDate: t.endDate.toLocaleDateString('tr-TR'),
-      })
+      }))
     })
 
     styleHeader(ws)
@@ -188,32 +215,32 @@ export async function GET(request: Request) {
     })
 
     const wb = new ExcelJS.Workbook()
-    const ws = wb.addWorksheet('Sinav Sonuclari')
+    const ws = wb.addWorksheet('Sınav Sonuçları')
 
     ws.columns = [
       { header: 'Personel', key: 'staff', width: 25 },
       { header: 'Departman', key: 'department', width: 20 },
-      { header: 'Egitim', key: 'training', width: 35 },
+      { header: 'Eğitim', key: 'training', width: 35 },
       { header: 'Deneme No', key: 'attemptNumber', width: 12 },
-      { header: 'On Sinav', key: 'preExamScore', width: 10 },
-      { header: 'Son Sinav', key: 'postExamScore', width: 10 },
-      { header: 'Gecti mi?', key: 'isPassed', width: 10 },
+      { header: 'Ön Sınav', key: 'preExamScore', width: 10 },
+      { header: 'Son Sınav', key: 'postExamScore', width: 10 },
+      { header: 'Geçti mi?', key: 'isPassed', width: 10 },
       { header: 'Durum', key: 'status', width: 15 },
       { header: 'Tarih', key: 'date', width: 20 },
     ]
 
     attempts.forEach(a => {
-      ws.addRow({
+      ws.addRow(sanitizeRow({
         staff: `${a.user.firstName} ${a.user.lastName}`,
         department: a.user.departmentRel?.name ?? '',
         training: a.training.title,
         attemptNumber: a.attemptNumber,
         preExamScore: a.preExamScore ? Number(a.preExamScore) : '-',
         postExamScore: a.postExamScore ? Number(a.postExamScore) : '-',
-        isPassed: a.isPassed ? 'Evet' : 'Hayir',
+        isPassed: a.isPassed ? 'Evet' : 'Hayır',
         status: a.status,
         date: a.createdAt.toLocaleDateString('tr-TR'),
-      })
+      }))
     })
 
     styleHeader(ws)
@@ -253,19 +280,19 @@ export async function GET(request: Request) {
     })
 
     const wb = new ExcelJS.Workbook()
-    const ws = wb.addWorksheet('Denetim Kayitlari')
+    const ws = wb.addWorksheet('Denetim Kayıtları')
     ws.columns = [
       { header: 'Tarih', key: 'date', width: 20 },
-      { header: 'Kullanici', key: 'user', width: 25 },
+      { header: 'Kullanıcı', key: 'user', width: 25 },
       { header: 'Email', key: 'email', width: 25 },
-      { header: 'Islem', key: 'action', width: 25 },
-      { header: 'Varlik Tipi', key: 'entityType', width: 15 },
-      { header: 'Varlik ID', key: 'entityId', width: 15 },
+      { header: 'İşlem', key: 'action', width: 25 },
+      { header: 'Varlık Tipi', key: 'entityType', width: 15 },
+      { header: 'Varlık ID', key: 'entityId', width: 15 },
       { header: 'IP Adresi', key: 'ip', width: 15 },
     ]
 
     logs.forEach(log => {
-      ws.addRow({
+      ws.addRow(sanitizeRow({
         date: log.createdAt.toLocaleString('tr-TR'),
         user: log.user ? `${log.user.firstName} ${log.user.lastName}` : '-',
         email: log.user?.email ?? '-',
@@ -273,7 +300,7 @@ export async function GET(request: Request) {
         entityType: log.entityType,
         entityId: log.entityId ?? '-',
         ip: log.ipAddress ?? '-',
-      })
+      }))
     })
 
     styleHeader(ws)

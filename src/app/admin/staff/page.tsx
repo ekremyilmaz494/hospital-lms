@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
 import {
   Users, Plus, Upload, MoreHorizontal, Eye, Edit, GraduationCap, Mail,
-  Building2, Trash2, UserPlus, UserMinus, Palette, ChevronRight, Search, X, Save
+  Building2, Trash2, UserPlus, ChevronRight, Search, X, Save
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -395,10 +395,9 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
 
 // ── Main Page ──
 export default function StaffPage() {
-  const router = useRouter();
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
-  const { data, isLoading, error, refetch } = useFetch<StaffPageData>(`/api/admin/staff?page=${currentPage}&limit=20`);
+  const { data, isLoading, refetch } = useFetch<StaffPageData>(`/api/admin/staff?page=${currentPage}&limit=20`);
   const [activeView, setActiveView] = useState<'all' | 'departments'>('departments');
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [showAddDept, setShowAddDept] = useState(false);
@@ -582,7 +581,7 @@ export default function StaffPage() {
                                   toast('Departman silindi', 'success');
                                   if (selectedDept === dept.id) setSelectedDept(null);
                                   refetch();
-                                } catch (err) {
+                                } catch (_err) {
                                   toast('Departman silinemedi', 'error');
                                 }
                               }

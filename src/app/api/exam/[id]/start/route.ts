@@ -27,10 +27,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // Egitim tarih araligi kontrolu
   const now = new Date()
   if (now < new Date(assignment.training.startDate)) {
-    return errorResponse('Bu egitim henuz baslanmamis.', 403)
+    return errorResponse('Bu eğitim henüz başlanmamış.', 403)
   }
   if (now > new Date(assignment.training.endDate)) {
-    return errorResponse('Bu egitimin suresi dolmus.', 403)
+    return errorResponse('Bu eğitimin süresi dolmuş.', 403)
   }
 
   if (assignment.status === 'passed') return errorResponse('Zaten başarıyla tamamladınız')

@@ -56,7 +56,7 @@ export default function AdminLayout({
           }}
         >
           <AppTopbar
-            title=""
+            title="Yönetim Paneli"
             onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
             userName={fullName}
             userRole={displayRole}

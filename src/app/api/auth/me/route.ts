@@ -12,12 +12,37 @@ export async function GET() {
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    include: { organization: true },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: true,
+      organizationId: true,
+      departmentId: true,
+      title: true,
+      phone: true,
+      avatarUrl: true,
+      isActive: true,
+      kvkkConsent: true,
+      kvkkConsentDate: true,
+      createdAt: true,
+      updatedAt: true,
+      departmentRel: { select: { name: true } },
+      organization: { select: { name: true, sessionTimeout: true } },
+    },
   })
 
   if (!dbUser) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
-  return NextResponse.json({ user: dbUser })
+  return NextResponse.json({
+    user: {
+      ...dbUser,
+      department: dbUser.departmentRel?.name ?? null,
+      organizationName: dbUser.organization?.name ?? null,
+      sessionTimeout: dbUser.organization?.sessionTimeout ?? 30,
+    },
+  })
 }

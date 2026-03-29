@@ -12,6 +12,12 @@ export type BackupType = 'auto' | 'manual';
 
 export type BillingCycle = 'monthly' | 'annual';
 
+export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+
+export type KvkkRequestType = 'access' | 'delete' | 'rectify' | 'restrict' | 'portability';
+
+export type KvkkRequestStatus = 'pending' | 'in_progress' | 'completed' | 'rejected';
+
 export interface Department {
   id: string;
   organizationId: string;
@@ -39,6 +45,8 @@ export interface User {
   role: UserRole;
   avatarUrl: string | null;
   isActive: boolean;
+  kvkkConsent: boolean;
+  kvkkConsentDate: string | null;
   createdAt: string;
   updatedAt: string;
   departmentRel?: Department | null;
@@ -56,6 +64,21 @@ export interface Organization {
   isSuspended: boolean;
   suspendedReason: string | null;
   suspendedAt: string | null;
+  sessionTimeout: number;
+  defaultPassingScore: number;
+  defaultMaxAttempts: number;
+  defaultExamDuration: number;
+  ssoEnabled: boolean;
+  ssoProvider: string | null;
+  ssoEmailDomain: string | null;
+  samlEntryPoint: string | null;
+  samlIssuer: string | null;
+  samlCert: string | null;
+  oidcDiscoveryUrl: string | null;
+  oidcClientId: string | null;
+  oidcClientSecret: string | null;
+  ssoAutoProvision: boolean;
+  ssoDefaultRole: string;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
@@ -106,6 +129,9 @@ export interface Training {
   complianceDeadline: string | null;
   regulatoryBody: string | null;
   renewalPeriodMonths: number | null;
+  scormManifestPath: string | null;
+  scormEntryPoint: string | null;
+  scormVersion: string | null;
   createdById: string | null;
   createdAt: string;
   updatedAt: string;
@@ -198,11 +224,120 @@ export interface AuditLog {
 }
 
 export interface Certificate {
-  id: string
-  userId: string
-  trainingId: string
-  attemptId: string
-  certificateCode: string
-  issuedAt: string
-  expiresAt: string | null
+  id: string;
+  userId: string;
+  trainingId: string;
+  attemptId: string;
+  certificateCode: string;
+  issuedAt: string;
+  expiresAt: string | null;
+}
+
+export interface VideoProgress {
+  id: string;
+  attemptId: string;
+  videoId: string;
+  userId: string;
+  watchedSeconds: number;
+  totalSeconds: number;
+  isCompleted: boolean;
+  lastPositionSeconds: number;
+  completedAt: string | null;
+  updatedAt: string;
+}
+
+export interface Payment {
+  id: string;
+  subscriptionId: string;
+  organizationId: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  paymentMethod: string | null;
+  iyzicoPaymentId: string | null;
+  iyzicoConversationId: string | null;
+  cardLastFour: string | null;
+  cardBrand: string | null;
+  errorMessage: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface Invoice {
+  id: string;
+  paymentId: string;
+  subscriptionId: string;
+  organizationId: string;
+  invoiceNumber: string;
+  amount: number;
+  taxAmount: number;
+  totalAmount: number;
+  currency: string;
+  billingName: string;
+  billingAddress: string | null;
+  taxNumber: string | null;
+  taxOffice: string | null;
+  periodStart: string;
+  periodEnd: string;
+  issuedAt: string;
+}
+
+export interface ExamAnswer {
+  id: string;
+  attemptId: string;
+  questionId: string;
+  selectedOptionId: string | null;
+  isCorrect: boolean | null;
+  examPhase: ExamPhase;
+  answeredAt: string;
+}
+
+export interface DbBackup {
+  id: string;
+  organizationId: string | null;
+  backupType: BackupType;
+  fileUrl: string;
+  fileSizeMb: number | null;
+  status: string;
+  createdById: string | null;
+  createdAt: string;
+}
+
+export interface KvkkRequest {
+  id: string;
+  organizationId: string;
+  userId: string;
+  requestType: KvkkRequestType;
+  status: KvkkRequestStatus;
+  description: string;
+  responseNote: string | null;
+  respondedById: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface ScormAttempt {
+  id: string;
+  organizationId: string;
+  userId: string;
+  trainingId: string;
+  attemptId: string;
+  suspendData: string | null;
+  lessonStatus: string | null;
+  score: number | null;
+  totalTime: string | null;
+  launchData: string | null;
+  completionStatus: string | null;
+  successStatus: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DepartmentTrainingRule {
+  id: string;
+  departmentId: string;
+  trainingId: string;
+  organizationId: string;
+  isActive: boolean;
+  createdAt: string;
 }

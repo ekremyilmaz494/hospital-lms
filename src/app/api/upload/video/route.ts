@@ -1,11 +1,25 @@
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { getUploadUrl, videoKey } from '@/lib/s3'
 import { logger } from '@/lib/logger'
 
-// Next.js App Router — body size limit for this route
-export const maxDuration = 120 // seconds
+/** Maximum file size: 5GB */
+const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024
 
+/** Allowed video MIME types */
+const ALLOWED_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
+
+interface UploadRequestBody {
+  fileName: string
+  contentType: string
+  fileSize: number
+  trainingId: string
+}
+
+/**
+ * POST /api/upload/video
+ * Returns a presigned S3 URL for direct client-side video upload.
+ * Client uploads the file directly to S3 using the returned URL.
+ */
 export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
@@ -14,39 +28,51 @@ export async function POST(request: Request) {
   if (roleError) return roleError
 
   try {
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
+    const body = await parseBody<UploadRequestBody>(request)
 
-    if (!file || file.size === 0) {
-      return errorResponse('Dosya gerekli', 400)
+    if (!body || !body.fileName || !body.contentType || !body.fileSize || !body.trainingId) {
+      return errorResponse('fileName, contentType, fileSize ve trainingId alanları zorunludur', 400)
     }
 
-    // Max 500MB
-    if (file.size > 500 * 1024 * 1024) {
-      return errorResponse('Dosya 500MB limitini aşıyor', 400)
+    const { fileName, contentType, fileSize, trainingId } = body
+
+    if (!ALLOWED_TYPES.includes(contentType)) {
+      return errorResponse(
+        'İzin verilmeyen dosya türü. Sadece MP4, WebM ve QuickTime video dosyaları yüklenebilir.',
+        400,
+      )
     }
 
-    // Only allow video types
-    if (!file.type.startsWith('video/')) {
-      return errorResponse('Sadece video dosyaları yüklenebilir', 400)
+    // Dosya uzantısı kontrolü — MIME spoofing koruması
+    const ALLOWED_EXTENSIONS = ['mp4', 'webm', 'mov']
+    const ext = fileName.split('.').pop()?.toLowerCase()
+    if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
+      return errorResponse(
+        'Geçersiz dosya uzantısı. Sadece .mp4, .webm ve .mov uzantıları kabul edilir.',
+        400,
+      )
     }
 
-    const timestamp = Date.now()
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const filename = `${timestamp}-${safeName}`
+    if (fileSize <= 0 || fileSize > MAX_FILE_SIZE) {
+      return errorResponse('Dosya boyutu 5GB limitini aşıyor', 400)
+    }
 
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'videos')
-    await mkdir(uploadDir, { recursive: true })
+    const organizationId = dbUser!.organizationId
+    if (!organizationId) {
+      return errorResponse('Kullanıcının organizasyon bilgisi bulunamadı', 403)
+    }
 
-    const filePath = join(uploadDir, filename)
-    const bytes = await file.arrayBuffer()
-    await writeFile(filePath, Buffer.from(bytes))
+    const key = videoKey(organizationId, trainingId, fileName)
+    const uploadUrl = await getUploadUrl(key, contentType)
 
-    const url = `/uploads/videos/${filename}`
-
-    return jsonResponse({ url, filename, size: file.size })
+    return jsonResponse({
+      uploadUrl,
+      key,
+      contentType,
+      fileSize,
+    })
   } catch (err) {
-    logger.error('Video Upload', 'Video yüklenirken hata', err)
-    return errorResponse('Video yüklenirken bir hata oluştu', 500)
+    logger.error('Video Upload', 'Presigned URL oluşturulurken hata', err)
+    return errorResponse('Video yükleme URL\'si oluşturulurken bir hata oluştu', 500)
   }
 }

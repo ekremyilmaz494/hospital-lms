@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ToastProvider } from "@/components/shared/toast";
 import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
+import { ErrorBoundary } from "@/components/shared/error-boundary";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -31,8 +32,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hastane LMS — Personel Eğitim ve Sınav Yönetim Sistemi",
-  description: "Çoklu hastane desteğine sahip profesyonel SaaS LMS sistemi",
+  title: "Hospital LMS - Hastane Personel Eğitim Sistemi",
+  description: "Hastane personeli için eğitim ve sınav yönetim platformu",
 };
 
 export default function RootLayout({
@@ -61,7 +62,9 @@ export default function RootLayout({
           <AuthProvider>
             <SessionTimeoutProvider>
               <ToastProvider>
-                {children}
+                <ErrorBoundary>
+                  {children}
+                </ErrorBoundary>
               </ToastProvider>
             </SessionTimeoutProvider>
           </AuthProvider>

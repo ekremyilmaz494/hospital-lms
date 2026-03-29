@@ -42,7 +42,7 @@ describe('createUserSchema', () => {
       email: 'user@test.com',
       firstName: 'Ali',
       lastName: 'Yilmaz',
-      password: '12345678',
+      password: 'SecurePass1!',
       role: 'staff',
     })
     expect(result.success).toBe(true)
@@ -53,7 +53,7 @@ describe('createUserSchema', () => {
       email: 'invalid',
       firstName: 'Ali',
       lastName: 'Yilmaz',
-      password: '12345678',
+      password: 'SecurePass1!',
       role: 'staff',
     })
     expect(result.success).toBe(false)
@@ -70,12 +70,23 @@ describe('createUserSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects invalid role', () => {
+  it('rejects weak password (no complexity)', () => {
     const result = createUserSchema.safeParse({
       email: 'user@test.com',
       firstName: 'Ali',
       lastName: 'Yilmaz',
       password: '12345678',
+      role: 'staff',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid role', () => {
+    const result = createUserSchema.safeParse({
+      email: 'user@test.com',
+      firstName: 'Ali',
+      lastName: 'Yilmaz',
+      password: 'SecurePass1!',
       role: 'super_admin',
     })
     expect(result.success).toBe(false)

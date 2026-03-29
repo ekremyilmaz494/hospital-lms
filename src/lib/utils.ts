@@ -6,21 +6,33 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: string | Date, locale: string = 'tr-TR'): string {
-  return new Intl.DateTimeFormat(locale, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(new Date(date));
+  try {
+    const parsed = new Date(date);
+    if (isNaN(parsed.getTime())) return 'Geçersiz tarih';
+    return new Intl.DateTimeFormat(locale, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(parsed);
+  } catch {
+    return 'Geçersiz tarih';
+  }
 }
 
 export function formatDateTime(date: string | Date, locale: string = 'tr-TR'): string {
-  return new Intl.DateTimeFormat(locale, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(date));
+  try {
+    const parsed = new Date(date);
+    if (isNaN(parsed.getTime())) return 'Geçersiz tarih';
+    return new Intl.DateTimeFormat(locale, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(parsed);
+  } catch {
+    return 'Geçersiz tarih';
+  }
 }
 
 export function formatDuration(seconds: number): string {

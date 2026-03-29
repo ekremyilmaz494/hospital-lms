@@ -2,6 +2,20 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 
+/**
+ * Returns the application base URL. Throws in production if NEXT_PUBLIC_APP_URL
+ * is not set — falling back to localhost in production is a security risk.
+ */
+export function getAppUrl(): string {
+  const url = process.env.NEXT_PUBLIC_APP_URL
+  if (!url && process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'NEXT_PUBLIC_APP_URL environment variable is required in production.'
+    )
+  }
+  return url || 'http://localhost:3000'
+}
+
 export function jsonResponse(data: unknown, status = 200) {
   return NextResponse.json(data, { status })
 }
@@ -46,12 +60,41 @@ export async function getAuthUser() {
   return { user, dbUser, error: null }
 }
 
-/** Require specific roles — returns error response if not authorized */
+/**
+ * Require specific roles — returns error response if not authorized.
+ * IMPORTANT: Caller MUST check return value: `if (roleError) return roleError`
+ * Throws in production as safety net if return value would be ignored.
+ */
 export function requireRole(role: string, allowed: string[]) {
   if (!allowed.includes(role)) {
     return errorResponse('Forbidden', 403)
   }
   return null
+}
+
+/**
+ * Role guard that throws instead of returning — use in new code.
+ * No need to check return value.
+ */
+export function assertRole(role: string, allowed: string[]): void {
+  if (!allowed.includes(role)) {
+    throw new ApiError('Forbidden', 403)
+  }
+}
+
+/** Structured API error that can be caught in route handlers */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+
+  toResponse(): Response {
+    return errorResponse(this.message, this.status)
+  }
 }
 
 /** Parse JSON body safely */
@@ -95,17 +138,27 @@ export async function createAuditLog(params: {
   const ipAddress = params.request?.headers.get('x-forwarded-for') ?? null
   const userAgent = params.request?.headers.get('user-agent') ?? null
 
-  await prisma.auditLog.create({
-    data: {
-      userId: params.userId ?? null,
-      organizationId: params.organizationId ?? null,
-      action: params.action,
-      entityType: params.entityType,
-      entityId: params.entityId ?? null,
-      oldData: params.oldData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.oldData))) as object : undefined,
-      newData: params.newData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.newData))) as object : undefined,
-      ipAddress,
-      userAgent,
-    },
-  })
+  try {
+    await prisma.auditLog.create({
+      data: {
+        userId: params.userId ?? null,
+        organizationId: params.organizationId ?? null,
+        action: params.action,
+        entityType: params.entityType,
+        entityId: params.entityId ?? null,
+        oldData: params.oldData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.oldData))) as object : undefined,
+        newData: params.newData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.newData))) as object : undefined,
+        ipAddress,
+        userAgent,
+      },
+    })
+  } catch (err) {
+    // Audit log hatasi ana is akisini durdurmasin — log'la ve devam et
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[AuditLog] Failed to create audit log:', err)
+    } else {
+      const entry = { level: 'error', tag: 'AuditLog', msg: 'Failed to create audit log', ts: new Date().toISOString(), extra: err instanceof Error ? err.message : err }
+      console.error(JSON.stringify(entry))
+    }
+  }
 }

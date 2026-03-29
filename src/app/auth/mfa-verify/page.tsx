@@ -74,7 +74,7 @@ function MFAVerifyForm() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Dogrulama kodu hatali');
+        setError(data.error || 'Doğrulama kodu hatalı');
         setCode(['', '', '', '', '', '']);
         inputRefs.current[0]?.focus();
         setLoading(false);
@@ -84,7 +84,7 @@ function MFAVerifyForm() {
       router.push(ROLE_ROUTES[role] || '/staff/dashboard');
       router.refresh();
     } catch {
-      setError('Bir hata olustu. Lutfen tekrar deneyin.');
+      setError('Bir hata oluştu. Lütfen tekrar deneyin.');
       setLoading(false);
     }
   };
@@ -100,9 +100,9 @@ function MFAVerifyForm() {
             >
               <Shield className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">Iki Faktorlu Dogrulama</h1>
+            <h1 className="text-2xl font-bold tracking-tight">İki Faktörlü Doğrulama</h1>
             <p className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
-              Authenticator uygulamanizdan 6 haneli kodu girin
+              Authenticator uygulamanızdan 6 haneli kodu girin
             </p>
           </div>
         </BlurFade>
@@ -144,7 +144,7 @@ function MFAVerifyForm() {
             background="linear-gradient(135deg, #0d9668 0%, #065f46 100%)"
           >
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Shield className="h-5 w-5" />}
-            {loading ? 'Dogrulanıyor...' : 'Dogrula'}
+            {loading ? 'Doğrulanıyor...' : 'Doğrula'}
           </ShimmerButton>
         </BlurFade>
       </div>

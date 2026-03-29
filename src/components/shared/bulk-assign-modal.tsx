@@ -183,6 +183,9 @@ export function BulkAssignModal({ trainings: trainingsFromProps, staff: staffFro
                     const selected = selectedTrainings.has(t.id);
                     return (
                       <button key={t.id} type="button" onClick={() => toggleTraining(t.id)}
+                        role="checkbox"
+                        aria-checked={selected}
+                        aria-label={t.title}
                         className="w-full flex items-center gap-3 rounded-xl p-3 text-left"
                         style={{
                           background: selected ? '#dcfce7' : 'var(--color-surface)',
@@ -220,6 +223,9 @@ export function BulkAssignModal({ trainings: trainingsFromProps, staff: staffFro
                     <div key={dept} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${someSelected ? 'var(--color-primary)' : 'var(--color-border)'}` }}>
                       <div className="flex items-center gap-3 p-3" style={{ background: someSelected ? 'var(--color-primary-light)' : 'var(--color-bg)' }}>
                         <button type="button" onClick={() => toggleDept(dept)}
+                          role="checkbox"
+                          aria-checked={allSelected ? true : someSelected ? 'mixed' : false}
+                          aria-label={dept}
                           className="flex h-5 w-5 shrink-0 items-center justify-center rounded"
                           style={{ background: allSelected ? 'var(--color-primary)' : someSelected ? 'var(--color-primary-light)' : 'var(--color-surface)', border: `1px solid ${allSelected || someSelected ? 'var(--color-primary)' : 'var(--color-border)'}` }}>
                           {allSelected && <Check className="h-3 w-3 text-white" />}
@@ -237,6 +243,9 @@ export function BulkAssignModal({ trainings: trainingsFromProps, staff: staffFro
                             const sel = selectedStaff.has(s.id);
                             return (
                               <button key={s.id} type="button" onClick={() => toggleStaff(s.id)}
+                                role="checkbox"
+                                aria-checked={sel}
+                                aria-label={s.name}
                                 className="w-full flex items-center gap-3 px-3 py-2.5"
                                 style={{ background: sel ? 'var(--color-primary-light)' : 'var(--color-surface)' }}>
                                 <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded" style={{ background: sel ? 'var(--color-primary)' : 'transparent', border: `1px solid ${sel ? 'var(--color-primary)' : 'var(--color-border)'}` }}>

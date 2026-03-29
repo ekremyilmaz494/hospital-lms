@@ -99,12 +99,6 @@ export default function AdminDashboard() {
   const recentActivity = data?.recentActivity ?? [];
   const complianceAlerts = data?.complianceAlerts ?? [];
 
-  // Acil aksiyon sayısı
-  const urgentCount =
-    overdueTrainings.length +
-    expiringCerts.filter(c => c.daysLeft <= 7).length +
-    complianceAlerts.filter(c => c.status === 'critical' || c.status === 'overdue').length;
-
   const totalAssignments = statusDistribution.reduce((s, d) => s + d.value, 0);
   const hasTrendData = trendData.some(t => t.atanan > 0 || t.tamamlanan > 0 || t.basarisiz > 0);
 

@@ -88,6 +88,25 @@ export default function PostExamPage() {
     return () => { cancelled = true; };
   }, [attemptId]);
 
+  // Sayfa kapatilirken son cevabi kaydet (beforeunload)
+  useEffect(() => {
+    const saveOnExit = () => {
+      const qs = examData?.questions ?? [];
+      const lastQ = qs[currentQ];
+      const lastAnswer = lastQ ? answers[lastQ.id] : undefined;
+      if (lastQ?.questionId && lastAnswer) {
+        const opt = lastQ.options.find(o => o.id === lastAnswer);
+        if (opt?.optionId) {
+          const payload = JSON.stringify({ questionId: lastQ.questionId, selectedOptionId: opt.optionId, examPhase: 'post' });
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon(`/api/exam/${id}/save-answer`, blob);
+        }
+      }
+    };
+    window.addEventListener('beforeunload', saveOnExit);
+    return () => window.removeEventListener('beforeunload', saveOnExit);
+  }, [id, examData, currentQ, answers]);
+
   // Countdown interval
   useEffect(() => {
     if (timeLeft === null) return;

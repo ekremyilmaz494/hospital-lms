@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { errorResponse } from '@/lib/api-helpers'
+import { errorResponse, getAppUrl } from '@/lib/api-helpers'
+import { createSsoState } from '@/lib/sso'
 import { logger } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
@@ -9,7 +10,7 @@ export async function POST(request: NextRequest) {
 
   const email = (body.email as string).trim().toLowerCase()
   const domain = email.split('@')[1]
-  if (!domain) return errorResponse('Gecersiz e-posta adresi', 400)
+  if (!domain) return errorResponse('Geçersiz e-posta adresi', 400)
 
   // Find organization by SSO email domain
   const org = await prisma.organization.findFirst({
@@ -34,13 +35,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ssoAvailable: false })
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const appUrl = getAppUrl()
   const callbackUrl = `${appUrl}/api/auth/sso/callback`
 
   if (org.ssoProvider === 'saml' && org.samlEntryPoint) {
-    // SAML: redirect to IdP with RelayState
+    // Nonce tabanli state olustur (CSRF korumasi)
+    const stateNonce = await createSsoState(org.id, email)
+
+    // SAML: redirect to IdP with RelayState (nonce, plain JSON degil)
     const samlUrl = new URL(org.samlEntryPoint)
-    samlUrl.searchParams.set('RelayState', JSON.stringify({ orgId: org.id, email }))
+    samlUrl.searchParams.set('RelayState', stateNonce)
     logger.info('sso:initiate', 'SAML redirect', { orgId: org.id, domain })
 
     return NextResponse.json({
@@ -54,13 +58,16 @@ export async function POST(request: NextRequest) {
   if (org.ssoProvider === 'oidc' && org.oidcDiscoveryUrl && org.oidcClientId) {
     // OIDC: build authorize URL from discovery endpoint
     try {
+      // Nonce tabanli state olustur (CSRF korumasi)
+      const stateNonce = await createSsoState(org.id, email)
+
       const discovery = await fetch(org.oidcDiscoveryUrl).then(r => r.json())
       const authorizeUrl = new URL(discovery.authorization_endpoint)
       authorizeUrl.searchParams.set('client_id', org.oidcClientId)
       authorizeUrl.searchParams.set('redirect_uri', callbackUrl)
       authorizeUrl.searchParams.set('response_type', 'code')
       authorizeUrl.searchParams.set('scope', 'openid email profile')
-      authorizeUrl.searchParams.set('state', JSON.stringify({ orgId: org.id, email }))
+      authorizeUrl.searchParams.set('state', stateNonce)
 
       logger.info('sso:initiate', 'OIDC redirect', { orgId: org.id, domain })
 
@@ -71,7 +78,7 @@ export async function POST(request: NextRequest) {
         orgName: org.name,
       })
     } catch {
-      return errorResponse('SSO yapilandirmasi hatali', 500)
+      return errorResponse('SSO yapılandırması hatalı', 500)
     }
   }
 

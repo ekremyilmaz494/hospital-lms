@@ -1418,3 +1418,332 @@ Bu oturumda proje, hastane satın alma kriterlerine göre sistematik olarak değ
 ---
 
 *Son güncelleme: 29 Mart 2026 — Oturum 10*
+
+---
+
+## 10. PRODUCTION DENETİM + KRİTİK DÜZELTMELER (Oturum 11)
+
+**Tarih:** 29 Mart 2026
+**Kapsam:** Full production audit, 18 hata düzeltmesi, landing page yeniden tasarımı, bildirim sistemi iyileştirmesi, sınav iş akışı kontrolü, Supabase bağlantı denetimi
+
+### 10.1 Production Denetim Raporu
+
+Proje hastaneye teslim öncesi tam denetimden geçirildi. İki rapor üretildi:
+
+**Hata Raporu:** 24 sorun tespit edildi (5 kritik, 6 yüksek, 9 orta, 4 düşük)
+**İyileştirme Raporu:** 18 öneri (3 kritik, 5 yüksek, 7 orta, 3 düşük)
+
+### 10.2 Düzeltilen Kritik Güvenlik Hataları
+
+| # | Hata | Dosya | Düzeltme |
+|---|------|-------|----------|
+| 1 | SSO SAML imza doğrulaması yapılmıyordu | `src/lib/sso.ts` (YENİ), `src/app/api/auth/sso/callback/route.ts` | `xml-crypto` ile XML-DSIG imza doğrulaması eklendi |
+| 2 | OIDC ID Token imza doğrulaması yoktu | `src/lib/sso.ts` | `jose` kütüphanesi ile JWKS bazlı JWT doğrulaması eklendi |
+| 3 | SSO state parametresi imzasızdı (CSRF) | `src/lib/sso.ts`, `src/app/api/auth/sso/initiate/route.ts` | Nonce tabanlı state: Redis'te sakla, callback'te doğrula ve sil (tek kullanımlık) |
+| 4 | Backup PII maskeleme + şifreleme | `src/app/api/admin/backups/route.ts` | TC/telefon maskeleme + AES-256-GCM şifreleme (BACKUP_ENCRYPTION_KEY env) |
+| 5 | Fatura numarası race condition | `src/app/api/payments/callback/route.ts` | `prisma.$transaction` içinde `findFirst` + max sequence ile atomik numara atama |
+
+### 10.3 Düzeltilen Yüksek Öncelikli Hatalar
+
+| # | Hata | Dosya | Düzeltme |
+|---|------|-------|----------|
+| 6 | Dashboard tüm assignment'ları memory'ye çekiyordu (OOM riski) | `src/app/api/admin/dashboard/route.ts` | `groupBy` aggregation ile DB-side hesaplama, `take` limitleri |
+| 7 | `requireRole` return pattern güvensizdi | `src/lib/api-helpers.ts` | `assertRole` throw pattern + `ApiError` class eklendi |
+| 8 | Cron sertifika reminder'ları org izolasyonu yoktu | `src/app/api/cron/reminders/route.ts` | `training.organization.isActive` filtresi eklendi |
+| 9 | Payment checkout subscriptionId boş string olabiliyordu | `src/app/api/payments/checkout/route.ts` | Subscription varlık kontrolü + 404 response |
+| 10 | SCORM tracking organizationId kontrolü eksikti | `src/app/api/exam/[id]/scorm/tracking/route.ts` | GET ve PATCH'te `organizationId` filtresi eklendi |
+| 11 | Email template'lerde URL escape edilmiyordu | `src/lib/email.ts` | `escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')` ile sarıldı |
+
+### 10.4 Düzeltilen Orta/Düşük Öncelikli Hatalar
+
+| # | Hata | Düzeltme |
+|---|------|----------|
+| 12 | useFetch 404 hatalarını yutuyordu | `setError(null)` → 404 artık error olarak gösteriliyor |
+| 13 | useFetch global cache memory leak | MAX_CACHE_ENTRIES=100 limiti + LRU benzeri eviction |
+| 15 | Iyzico randomString hash/header uyumsuzluğu | Tek `generateAuthorizationPair()` fonksiyonu, aynı rnd kullanılıyor |
+| 16 | Audit log hata fırlatması ana akışı durduruyordu | try-catch ile sarıldı, hata loglanıp devam ediliyor |
+| 17 | Şifre karmaşıklık kuralı yoktu | Regex: büyük+küçük harf+rakam+özel karakter zorunlu |
+| 18 | Bulk import rate limiting yoktu | `checkRateLimit('bulk-import:orgId', 3, 3600)` eklendi |
+| 20 | Prisma singleton dev hot reload connection leak | `process.env.NODE_ENV !== 'production'` koşullu global atama |
+
+### 10.5 Yeni Bağımlılıklar
+
+```
+jose@6.2.2          — OIDC JWT doğrulaması
+xml-crypto@6.1.2    — SAML XML imza doğrulaması
+@types/xml-crypto    — TypeScript tipleri
+```
+
+### 10.6 Yeni Dosyalar
+
+| Dosya | Açıklama |
+|-------|----------|
+| `src/lib/sso.ts` | SSO yardımcı modülü: nonce state, SAML imza doğrulama, OIDC JWT doğrulama |
+| `src/app/api/admin/notifications/send/route.ts` | Toplu bildirim + e-posta gönderim API'si |
+| `src/middleware.ts` | Next.js middleware (session refresh + role guard) |
+
+### 10.7 Landing Page Yeniden Tasarımı
+
+Landing page 3 kez yeniden yazıldı. Son versiyon gerçek LMS rakiplerinin (Medbridge, Absorb, Cornerstone) araştırmasına dayanıyor.
+
+**Araştırılan rakipler:** Medbridge (3500+ hastane), Absorb LMS, Cornerstone, symplr, EthosCE, MapleLMS
+**Araştırılan kaynaklar:** SaaSFrame 2026 trendleri, Fibr, VezaDigital, SwipePages
+
+**Eklenen kritik elementler (rakiplerde var, bizde yoktu):**
+1. Mock Dashboard ekran görüntüsü (CSS ile 3 varyant: admin/staff/exam)
+2. Müşteri logoları + 4.8/5 rating badge
+3. 3 testimoniyal (isim, unvan, hastane, 5 yıldız)
+4. FAQ bölümü (6 soru, accordion animasyonlu)
+5. Problem → Çözüm karşılaştırma section'ı
+6. Ürün önizleme (tabbed: Yönetici/Personel/Sınav)
+
+**Section sırası (2026 SaaS best practices):**
+```
+Navbar → Hero (ürün SS) → Social Proof → Problem/Çözüm →
+Nasıl Çalışır (4 adım) → Özellikler (Bento grid) →
+Ürün Önizleme (Tabbed) → Stats → Testimonials →
+Pricing → ROI Calculator → FAQ → CTA → Footer
+```
+
+**Tema:** Koyu tema → Açık/beyaz tema (healthcare sektörü standardı)
+
+### 10.8 Bildirim & Mail Gönderme İyileştirmesi
+
+**Sorunlar:**
+- Her alıcıya ayrı HTTP request gidiyordu (N+1)
+- E-posta hiç gönderilmiyordu
+- Department API format uyumsuzluğu
+
+**Çözümler:**
+1. Yeni `/api/admin/notifications/send` endpoint'i — tek request ile toplu bildirim + opsiyonel e-posta
+2. Zod validasyonu, org izolasyonu, rate limiting, batch e-posta (20'li gruplar)
+3. Frontend: "E-posta ile de gönder" checkbox'ı
+4. Department API response normalizasyonu
+
+### 10.9 Sınav İş Akışı Kontrolü
+
+**Akış doğrulandı:** Pre-exam → Video → Post-exam düzgün çalışıyor.
+
+**Düzeltilen sorunlar:**
+1. Ön sınav timer'ı client-side'dı → Redis'e bağlandı (sayfa yenilemede korunuyor)
+2. Ön sınav `beforeunload` yoktu → `sendBeacon` ile cevap kaydetme eklendi
+3. Son sınav `beforeunload` yoktu → `sendBeacon` ile cevap kaydetme eklendi
+
+**Mevcut korumalar (doğrulandı):**
+- Video: 15sn heartbeat + `beforeunload` sendBeacon + ileri sarma engeli
+- Son sınav: Redis timer + auto-save + süre dolunca auto-submit
+- Cron: 24 saat sonra stale attempt'lar temizleniyor
+
+### 10.10 Supabase Bağlantı Denetimi
+
+**26 dosyada Supabase kullanımı tarandı.**
+
+**Bulunan kritik sorunlar:**
+
+1. **`middleware.ts` dosyası yoktu!** — `proxy.ts` adında bir dosya vardı ama Next.js tarafından tanınmıyordu. Session refresh, role-based route koruması hiçbiri çalışmıyordu.
+   - **Düzeltme:** `src/middleware.ts` oluşturuldu
+
+2. **`/api/auth/me` tüm organization bilgisini (SSO secret dahil) döndürüyordu**
+   - **Düzeltme:** `select` ile sadece `name` ve `sessionTimeout` döndürülüyor
+
+**Doğrulanan bağlantılar:**
+- Browser client (anon key): login, forgot-password, reset-password, realtime, session-timeout — OK
+- Server client (anon key + cookies): API route'larda auth check — OK
+- Service client (service_role key): admin user oluşturma, SSO provision — OK
+- `service_role` key client'a expose edilmiyor — OK
+- Rollback pattern'ları (Supabase user + DB insert atomicity) — OK
+
+### 10.11 Test Durumu
+
+```
+Test Files:  17 passed
+Tests:       219 passed
+TypeScript:  0 error (test dosyaları hariç önceden var olan)
+```
+
+### 10.12 Güncel İstatistikler
+
+| Metrik | Önceki | Güncel |
+|--------|--------|--------|
+| Toplam route | 45+ | 45+ |
+| API endpoint | 65+ | 67+ (notifications/send, middleware eklendi) |
+| Prisma model | 21 | 21 |
+| Düzeltilen hata | — | 18 |
+| Yeni dosya | — | 3 |
+| Yeni bağımlılık | — | 3 (jose, xml-crypto, @types/xml-crypto) |
+| SSO SAML/OIDC | ❌ İmzasız | ✅ Kriptografik doğrulama |
+| Middleware | ❌ Yoktu | ✅ Aktif |
+
+---
+
+*Son güncelleme: 29 Mart 2026 — Oturum 11*
+
+---
+
+## 12. LOCAL ORTAM KURULUMU VE SUPABASE BAĞLANTISI (Oturum 12)
+
+**Tarih:** 29 Mart 2026
+**Amaç:** Projeyi local ortamda ayağa kaldırma ve Supabase'e bağlama
+
+### 12.1 Ortam Hazırlığı
+
+- **pnpm** global olarak kuruldu (v10.33.0, corepack üzerinden)
+- `.env.example` → `.env` olarak kopyalandı
+- `pnpm install` ile 1053 paket yüklendi (33.7s)
+- Prisma Client otomatik generate edildi (postinstall hook)
+- Husky pre-commit hooks aktif
+
+### 12.2 Supabase Bağlantısı
+
+Supabase MCP aracılığıyla proje bilgileri alındı:
+
+| Bilgi | Değer |
+|-------|-------|
+| Proje | `ekremyilmaz494's Project` |
+| Proje ID | `bzvunibntyewobkdsoow` |
+| Bölge | `ap-northeast-2` |
+| Organizasyon | `hospital-lms` |
+| PostgreSQL | 17.6.1 |
+| Durum | ACTIVE_HEALTHY |
+
+`.env` dosyasına eklenen bilgiler:
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase proje URL'i
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Anon (public) key
+- `SUPABASE_SERVICE_ROLE_KEY` — Service role key (kullanıcıdan alındı)
+- `DATABASE_URL` — PostgreSQL connection string (pooler endpoint)
+
+### 12.3 AuthProvider Düzeltmesi
+
+**Sorun:** Supabase URL/key boş olunca `@supabase/ssr` `createBrowserClient` hata fırlatıyordu → sayfa sürekli gelip gidiyordu (runtime error loop).
+
+**Çözüm:**
+- `src/lib/supabase/client.ts` — `hasSupabaseCredentials` flag'i eklendi
+- `src/components/providers/auth-provider.tsx` — Credentials yoksa Supabase çağrılarını atlar, `user=null` / `loading=false` set eder
+
+### 12.4 Veritabanı Durumu
+
+Migration'lar önceden uygulanmış — 20 tablo mevcut:
+`_prisma_migrations`, `audit_logs`, `certificates`, `db_backups`, `departments`, `exam_answers`, `exam_attempts`, `kvkk_requests`, `notifications`, `organization_subscriptions`, `organizations`, `question_options`, `questions`, `scorm_attempts`, `subscription_plans`, `training_assignments`, `training_videos`, `trainings`, `users`, `video_progress`
+
+Demo kullanıcılar zaten oluşturulmuş:
+| Rol | E-posta |
+|-----|---------|
+| Super Admin | `super@demo.com` |
+| Admin | `admin@demo.com` |
+| Staff | `staff@demo.com` |
+| Staff | `ekrem@gmail.com` |
+| Staff | `ekrem1452aa@gmail.com` |
+| Staff | `ayse@gmail.com` |
+
+### 12.5 Dev Server
+
+- `pnpm dev` (Turbopack) — **http://localhost:3000** üzerinde çalışıyor
+- Login sayfası başarıyla yükleniyor (200 OK)
+- Tailwind CSS v4 uyarıları (suggestCanonicalClasses) mevcut — kozmetik, çalışmayı etkilemiyor
+
+### 12.6 Kalan İşler
+
+- [ ] AWS S3/CloudFront bilgileri (video yükleme/streaming)
+- [ ] Upstash Redis bilgileri (exam timer, rate limiting)
+- [ ] SMTP bilgileri (e-posta gönderimi)
+- [ ] Iyzico bilgileri (ödeme sistemi)
+- [ ] RLS politikalarının uygulanması (`supabase-rls.sql`)
+- [x] Landing page tasarım iyileştirmesi ✅ (Oturum 13'te tamamlandı)
+
+---
+
+## Oturum 13 — 29 Mart 2026 (Landing Page Premium Redesign)
+
+### 13.1 CSP Düzeltmesi
+
+- **Sorun:** `eval() is not supported` hatası — React development mode `eval()` gerektiriyor ama CSP header engelliyor
+- **Çözüm:** `next.config.ts`'te `script-src` direktifine sadece development modunda `'unsafe-eval'` eklendi
+- Production'da güvenlik aynen korunuyor
+
+### 13.2 Supabase .env Yapılandırması
+
+- **Sorun:** `.env` dosyasındaki `NEXT_PUBLIC_SUPABASE_URL` ve `NEXT_PUBLIC_SUPABASE_ANON_KEY` boştu → `@supabase/ssr` runtime hatası
+- **Çözüm:** Supabase MCP ile proje bilgileri alınarak `.env` dolduruldu:
+  - Proje: `bzvunibntyewobkdsoow` (ap-northeast-2)
+  - URL: `https://bzvunibntyewobkdsoow.supabase.co`
+  - Anon key ve service role key yapılandırıldı
+
+### 13.3 Landing Page Premium Redesign
+
+**Estetik yön:** "Clinical Luxury" — sağlık sektörü ciddiyeti + modern fintech zarafeti
+
+#### 13.3.1 Component Düzeltmeleri
+
+- **BlurFade** (`src/components/ui/blur-fade.tsx`): No-op olan component framer-motion `motion.div` + `useInView` ile gerçek scroll-reveal animasyonuna dönüştürüldü
+- **MagicCard** (`src/components/ui/magic-card.tsx`): Mouse-position tracking eklendi — `onMouseMove` ile radial gradient cursor'u takip ediyor, hover'da opacity geçişi düzeltildi
+
+#### 13.3.2 Sayfa Yeniden Tasarımı (`src/app/page.tsx`)
+
+Tam yeniden yazım — tüm bölümler korunarak görsel kalite dramatik şekilde yükseltildi:
+
+| Bölüm | Değişiklikler |
+|-------|---------------|
+| **Navbar** | Scroll-aware glassmorphism (küçülen/shadow eklenen), ShimmerButton CTA, animated underline hover, mobil hamburger menü |
+| **Hero** | Particles + DotPattern + animated gradient orbs + floating geometric shapes, AnimatedGradientText badge, gradient text başlık (text-7xl), BorderBeam'li stats bar |
+| **4 Adım** | MagicCard kartlar (mouse-tracking spotlight), lg'de kesikli çizgi bağlantısı, mono uppercase etiketler |
+| **Özellikler** | MagicCard ile her kart, hover'da -translate-y-1 kalkma efekti, her kartın kendi renginde gradient spotlight |
+| **Güven/Uyumluluk** | **Koyu bölüm** (#0f172a → #1e293b gradient), Ripple efekti, genişletilmiş badge kartları (ikon + başlık + açıklama) |
+| **Fiyatlandırma** | ShineBorder + lg:scale-105 vurgulu orta kart, AnimatedShinyText "En Popüler" etiketi, ShimmerButton CTA |
+| **ROI Hesaplayıcı** | **Koyu bölüm**, BorderBeam'li hesaplayıcı kartı, premium styled range slider, karşılaştırma bar chart |
+| **CTA** | Teal gradient + beyaz Particles, ters renkli ShimmerButton (beyaz buton/teal shimmer), güven göstergeleri satırı |
+| **Footer** | **Koyu arka plan** (#0f172a), DotPattern doku, gradient üst sınır çizgisi, iletişim ikonları (Mail/Phone/MapPin) |
+
+**Bölüm ritmi (ışık-karanlık alternasyonu):**
+Navbar(ışık) → Hero(ışık) → 4 Adım(beyaz) → Özellikler(ışık) → Güven(**karanlık**) → Fiyatlandırma(ışık) → ROI(**karanlık**) → CTA(**renkli**) → Footer(**karanlık**)
+
+#### 13.3.3 Kullanılan Premium Componentler
+
+- `ShimmerButton` — Navbar CTA, Hero CTA, Pricing CTA, Final CTA
+- `NumberTicker` — Stats bar (framer-motion spring animasyonu)
+- `Particles` — Hero ve CTA arka planı (canvas-based, mouse-reactive)
+- `DotPattern` — Hero ve Footer doku katmanı
+- `BorderBeam` — Stats bar ve ROI hesaplayıcı (animated border glow)
+- `ShineBorder` — Profesyonel fiyat kartı (teal-gold dönen ışık)
+- `AnimatedShinyText` — "En Popüler" etiketi
+- `AnimatedGradientText` — Hero badge (teal-gold gradient)
+- `MagicCard` — 4 Adım ve Özellikler kartları (mouse-tracking spotlight)
+- `Ripple` — Güven bölümü (concentric rings)
+- `BlurFade` — Tüm bölümler (scroll-triggered fade-in)
+
+#### 13.3.4 Hero Arka Plan Zenginleştirme
+
+5 katmanlı arka plan sistemi:
+1. **3 animated gradient orb** — Teal, amber, sky tonlarında yavaşça hareket eden büyük blur'lu küreler (12-18s CSS animation)
+2. **Dot pattern** — Teal renkli, %6 opacity grid yapısı
+3. **5 floating geometric shape** — Kare ve daire şeklinde, ince border'lı, yavaşça dönen/hareket eden CSS elementleri
+4. **Particles** — Mouse-reactive teal partiküller (canvas)
+5. **Bottom fade** — Sonraki bölüme yumuşak gradient geçişi
+
+Tüm animasyonlar pure CSS (`will-change: transform`, `filter: blur`).
+
+### 13.4 CSS Eklemeleri (`src/app/globals.css`)
+
+- `nav-underline` — Hover'da alttan büyüyen çizgi animasyonu (navbar linkleri)
+- `premium-slider` — ROI hesaplayıcı için özel range input stili (koyu tema)
+- `landing-slider` — ROI hesaplayıcı için açık tema slider stili
+- `hero-orb` / `hero-orb-1,2,3` — Animated gradient mesh orbs (3 adet, 12-18s)
+- `hero-shape` / `hero-shape-1-5` — Floating geometric shapes (5 adet, 18-28s)
+- `hero-float-1,2,3` — Orb hareket keyframes
+- `hero-geo-1,2,3,4,5` — Geometrik şekil hareket/dönme keyframes
+- `mock-ui` — Hover lift efekti
+
+### 13.5 Değiştirilen Dosyalar
+
+| Dosya | Değişiklik |
+|-------|-----------|
+| `next.config.ts` | CSP'ye dev-only `unsafe-eval` eklendi, images.remotePatterns (unsplash) |
+| `.env` | Supabase URL, anon key, service role key dolduruldu |
+| `src/components/ui/blur-fade.tsx` | No-op → gerçek framer-motion scroll-reveal |
+| `src/components/ui/magic-card.tsx` | Mouse-position tracking + radial gradient spotlight |
+| `src/app/page.tsx` | Tam premium landing page redesign (~550 satır) |
+| `src/app/globals.css` | Landing page CSS: slider, orbs, shapes, underline |
+| `src/lib/supabase/client.ts` | `hasSupabaseCredentials` export eklendi (kullanıcı tarafından) |
+
+---
+
+*Son güncelleme: 29 Mart 2026 — Oturum 13*

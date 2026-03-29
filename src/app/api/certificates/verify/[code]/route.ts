@@ -9,12 +9,19 @@ function maskName(name: string): string {
   return name.slice(0, 2) + '***'
 }
 
+/** Valid certificate code: alphanumeric + dashes, 8-64 chars */
+const CERT_CODE_REGEX = /^[A-Za-z0-9\-]{8,64}$/
+
 /** GET /api/certificates/verify/[code] — Public certificate verification */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   const { code } = await params
+
+  if (!CERT_CODE_REGEX.test(code)) {
+    return errorResponse('Geçersiz sertifika kodu formatı', 400)
+  }
 
   try {
     const certificate = await prisma.certificate.findUnique({
@@ -30,7 +37,7 @@ export async function GET(
     })
 
     if (!certificate) {
-      return errorResponse('Sertifika bulunamadi', 404)
+      return errorResponse('Sertifika bulunamadı', 404)
     }
 
     // Get organization name
@@ -56,6 +63,6 @@ export async function GET(
     })
   } catch (err) {
     logger.error('CertVerify', 'Sertifika dogrulama hatasi', err)
-    return errorResponse('Dogrulama sirasinda bir hata olustu', 500)
+    return errorResponse('Doğrulama sırasında bir hata oluştu', 500)
   }
 }

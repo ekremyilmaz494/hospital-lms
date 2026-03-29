@@ -69,12 +69,14 @@ export function NotificationBell({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
+        aria-label="Bildirimler"
         className="relative inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
         style={{ color: 'var(--color-text-secondary)' }}
       >
         <Bell className="h-[18px] w-[18px]" />
         {count > 0 && (
           <span
+            aria-live="polite"
             className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
             style={{ background: 'var(--color-error)' }}
           >

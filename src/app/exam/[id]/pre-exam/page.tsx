@@ -39,7 +39,9 @@ export default function PreExamPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // 1. Once attempt baslat, sonra sorulari cek
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+
+  // 1. Once attempt baslat, sonra sorulari cek, timer'i Redis'ten al
   useEffect(() => {
     let cancelled = false;
 
@@ -67,6 +69,8 @@ export default function PreExamPage() {
           return;
         }
 
+        if (!cancelled) setAttemptId(attempt?.id ?? null);
+
         // Adim 2: Sorulari cek (attempt artik var)
         const qRes = await fetch(`/api/exam/${id}/questions?phase=pre`);
         if (!qRes.ok) {
@@ -77,7 +81,20 @@ export default function PreExamPage() {
         const data = await qRes.json();
         if (!cancelled) {
           setExamData(data);
-          setTimeLeft(data.totalTime);
+
+          // Adim 3: Timer'i Redis'ten al (sunucu tarafli, sayfa yenilemede korunur)
+          if (attempt?.id) {
+            try {
+              const timerRes = await fetch(`/api/exam/${attempt.id}/timer`, { method: 'POST' });
+              const timerData = await timerRes.json();
+              setTimeLeft(timerData.remainingSeconds ?? data.totalTime);
+            } catch {
+              setTimeLeft(data.totalTime);
+            }
+          } else {
+            setTimeLeft(data.totalTime);
+          }
+
           // Kaydedilmis cevaplari yukle
           if (data.questions) {
             const restored: Record<number, string> = {};
@@ -106,6 +123,26 @@ export default function PreExamPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [timeLeft]);
+
+  // Sayfa kapatilirken son cevabi kaydet (beforeunload)
+  useEffect(() => {
+    const saveOnExit = () => {
+      const qs = examData?.questions ?? [];
+      // Cevaplanmis ama henuz save edilmemis son cevabi gonder
+      const lastQ = qs[currentQ];
+      const lastAnswer = lastQ ? answers[lastQ.id] : undefined;
+      if (lastQ?.questionId && lastAnswer) {
+        const opt = lastQ.options.find(o => o.id === lastAnswer);
+        if (opt?.optionId) {
+          const payload = JSON.stringify({ questionId: lastQ.questionId, selectedOptionId: opt.optionId, examPhase: 'pre' });
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon(`/api/exam/${id}/save-answer`, blob);
+        }
+      }
+    };
+    window.addEventListener('beforeunload', saveOnExit);
+    return () => window.removeEventListener('beforeunload', saveOnExit);
+  }, [id, examData, currentQ, answers]);
 
   if (isLoading) {
     return <PageLoading />;

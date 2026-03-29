@@ -16,18 +16,24 @@ export async function GET(
   if (roleError) return roleError
 
   try {
+    const where: Record<string, unknown> = {
+      trainingId,
+      userId: dbUser!.id,
+    }
+    // Org izolasyonu: super_admin haric kullanicilar sadece kendi org'larini gorebilir
+    if (dbUser!.role !== 'super_admin' && dbUser!.organizationId) {
+      where.organizationId = dbUser!.organizationId
+    }
+
     const attempt = await prisma.scormAttempt.findFirst({
-      where: {
-        trainingId,
-        userId: dbUser!.id,
-      },
+      where,
       orderBy: { createdAt: 'desc' },
     })
 
     return jsonResponse(attempt)
   } catch (err) {
     logger.error('SCORM Tracking', 'SCORM attempt sorgulama hatasi', err)
-    return errorResponse('SCORM verisi alinamadi', 500)
+    return errorResponse('SCORM verisi alınamadı', 500)
   }
 }
 
@@ -55,7 +61,7 @@ export async function POST(
     })
 
     if (!assignment) {
-      return errorResponse('Bu egitim icin atamaniz bulunamadi', 403)
+      return errorResponse('Bu eğitim için atamanız bulunamadı', 403)
     }
 
     const attempt = await prisma.scormAttempt.create({
@@ -75,7 +81,7 @@ export async function POST(
     return jsonResponse(attempt, 201)
   } catch (err) {
     logger.error('SCORM Tracking', 'SCORM attempt olusturma hatasi', err)
-    return errorResponse('SCORM oturumu baslatilamadi', 500)
+    return errorResponse('SCORM oturumu başlatılamadı', 500)
   }
 }
 
@@ -101,21 +107,25 @@ export async function PATCH(
   }>(request)
 
   if (!body) {
-    return errorResponse('Gecersiz istek verisi', 400)
+    return errorResponse('Geçersiz istek verisi', 400)
   }
 
   try {
-    // Find latest attempt
+    // Find latest attempt (org izolasyonlu)
+    const scormWhere: Record<string, unknown> = {
+      trainingId,
+      userId: dbUser!.id,
+    }
+    if (dbUser!.role !== 'super_admin' && dbUser!.organizationId) {
+      scormWhere.organizationId = dbUser!.organizationId
+    }
     const existing = await prisma.scormAttempt.findFirst({
-      where: {
-        trainingId,
-        userId: dbUser!.id,
-      },
+      where: scormWhere,
       orderBy: { createdAt: 'desc' },
     })
 
     if (!existing) {
-      return errorResponse('SCORM oturumu bulunamadi', 404)
+      return errorResponse('SCORM oturumu bulunamadı', 404)
     }
 
     const updated = await prisma.scormAttempt.update({
@@ -186,6 +196,6 @@ export async function PATCH(
     return jsonResponse(updated)
   } catch (err) {
     logger.error('SCORM Tracking', 'SCORM attempt guncelleme hatasi', err)
-    return errorResponse('SCORM verisi guncellenemedi', 500)
+    return errorResponse('SCORM verisi güncellenemedi', 500)
   }
 }

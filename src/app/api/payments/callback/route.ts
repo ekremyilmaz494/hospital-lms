@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { retrieveCheckoutForm, generateInvoiceNumber } from '@/lib/iyzico'
+import { verifyIyzicoCallback, retrieveCheckoutForm, generateInvoiceNumber } from '@/lib/iyzico'
 import { logger } from '@/lib/logger'
 
 /**
@@ -16,6 +16,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Önce Iyzico API'sine sorgu atarak ödemeyi sunucu taraflı doğrula
+    // Callback verisine doğrudan güvenmek güvenlik açığıdır
+    const verification = await verifyIyzicoCallback(token)
+    if (verification.status !== 'success') {
+      logger.warn('Payment Callback', 'Iyzico dogrulama basarisiz', { token: token.slice(0, 8) + '...' })
+      return NextResponse.redirect(new URL('/admin/settings?payment=error&msg=verification_failed', process.env.NEXT_PUBLIC_APP_URL!))
+    }
+
+    // Doğrulama başarılı — detaylı bilgiyi al
     const result = await retrieveCheckoutForm(token)
 
     // Ödeme kaydını bul
@@ -40,12 +49,11 @@ export async function POST(request: Request) {
         expiresAt.setMonth(expiresAt.getMonth() + 1)
       }
 
-      // Transaction ile tümünü güncelle
-      const invoiceCount = await prisma.invoice.count()
+      // Transaction icinde fatura numarasi atayarak race condition onle
       const org = await prisma.organization.findUnique({ where: { id: payment.organizationId } })
 
-      await prisma.$transaction([
-        prisma.payment.update({
+      await prisma.$transaction(async (tx) => {
+        await tx.payment.update({
           where: { id: payment.id },
           data: {
             status: 'paid',
@@ -54,8 +62,9 @@ export async function POST(request: Request) {
             cardBrand: result.cardAssociation ?? null,
             paidAt: now,
           },
-        }),
-        prisma.organizationSubscription.update({
+        })
+
+        await tx.organizationSubscription.update({
           where: { id: payment.subscriptionId },
           data: {
             status: 'active',
@@ -63,13 +72,24 @@ export async function POST(request: Request) {
             expiresAt,
             billingCycle: billingCycle ?? 'monthly',
           },
-        }),
-        prisma.invoice.create({
+        })
+
+        // Transaction icinde max invoice numarasini al (race condition yok)
+        const lastInvoice = await tx.invoice.findFirst({
+          orderBy: { issuedAt: 'desc' },
+          select: { invoiceNumber: true },
+        })
+        const lastSeq = lastInvoice?.invoiceNumber
+          ? parseInt(lastInvoice.invoiceNumber.split('-').pop() ?? '0', 10)
+          : 0
+        const nextInvoiceNumber = generateInvoiceNumber(lastSeq + 1)
+
+        await tx.invoice.create({
           data: {
             paymentId: payment.id,
             subscriptionId: payment.subscriptionId,
             organizationId: payment.organizationId,
-            invoiceNumber: generateInvoiceNumber(invoiceCount + 1),
+            invoiceNumber: nextInvoiceNumber,
             amount: payment.amount,
             taxAmount: Number(payment.amount) * 0.20,
             totalAmount: Number(payment.amount) * 1.20,
@@ -78,8 +98,8 @@ export async function POST(request: Request) {
             periodStart: now,
             periodEnd: expiresAt,
           },
-        }),
-      ])
+        })
+      })
 
       logger.info('Payment Callback', 'Odeme basarili', {
         paymentId: payment.id,
@@ -94,7 +114,7 @@ export async function POST(request: Request) {
         where: { id: payment.id },
         data: {
           status: 'failed',
-          errorMessage: result.errorMessage ?? 'Odeme basarisiz',
+          errorMessage: result.errorMessage ?? 'Ödeme başarısız',
         },
       })
 

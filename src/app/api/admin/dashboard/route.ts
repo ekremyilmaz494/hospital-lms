@@ -16,27 +16,29 @@ export async function GET() {
 
   const now = new Date()
 
-  // Parallel queries for dashboard data
+  // ── DB-side aggregation — memory'ye tum kayitlari cekmek yerine ──
   const [
     staffCount,
     activeStaffCount,
     trainingCount,
     activeTrainingCount,
-    assignments,
-    recentLogs,
+    statusCounts,
     compulsoryTrainings,
+    recentLogs,
   ] = await Promise.all([
     prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
     prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
     prisma.training.count({ where: { organizationId: orgId } }),
     prisma.training.count({ where: { organizationId: orgId, isActive: true } }),
-    prisma.trainingAssignment.findMany({
+    // Status bazli aggregation (DB'de hesaplanir)
+    prisma.trainingAssignment.groupBy({
+      by: ['status'],
       where: { training: { organizationId: orgId } },
-      include: {
-        user: { select: { firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
-        training: { select: { title: true, category: true, endDate: true, isCompulsory: true, complianceDeadline: true, regulatoryBody: true } },
-        examAttempts: { select: { postExamScore: true, preExamScore: true, isPassed: true, status: true }, orderBy: { attemptNumber: 'desc' }, take: 1 },
-      },
+      _count: true,
+    }),
+    prisma.training.findMany({
+      where: { organizationId: orgId, isCompulsory: true, isActive: true },
+      select: { id: true, title: true, complianceDeadline: true, regulatoryBody: true, assignments: { select: { status: true } } },
     }),
     prisma.auditLog.findMany({
       where: { organizationId: orgId },
@@ -44,27 +46,24 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
       take: 5,
     }),
-    prisma.training.findMany({
-      where: { organizationId: orgId, isCompulsory: true, isActive: true },
-      select: { id: true, title: true, complianceDeadline: true, regulatoryBody: true, assignments: { select: { status: true } } },
-    }),
   ])
 
-  // Calculate stats from assignments
-  const completedCount = assignments.filter(a => a.status === 'passed').length
-  const failedCount = assignments.filter(a => a.status === 'failed').length
-  const inProgressCount = assignments.filter(a => a.status === 'in_progress').length
-  const totalAssignments = assignments.length
+  // Status count'lari map'le
+  const statusMap = new Map(statusCounts.map(s => [s.status, s._count]))
+  const completedCount = statusMap.get('passed') ?? 0
+  const failedCount = statusMap.get('failed') ?? 0
+  const inProgressCount = statusMap.get('in_progress') ?? 0
+  const totalAssignments = statusCounts.reduce((sum, s) => sum + s._count, 0)
   const completionRate = totalAssignments > 0 ? Math.round((completedCount / totalAssignments) * 100) : 0
 
-  // Compliance stats (zorunlu eğitimler için uyum oranı)
-  const compulsoryAssignments = assignments.filter(a => a.training?.isCompulsory)
+  // Compliance stats (zorunlu egitimler)
+  const compulsoryAssignments = compulsoryTrainings.flatMap(t => t.assignments)
   const compulsoryCompleted = compulsoryAssignments.filter(a => a.status === 'passed').length
   const complianceRate = compulsoryAssignments.length > 0
     ? Math.round((compulsoryCompleted / compulsoryAssignments.length) * 100)
     : 100
 
-  // Compliance deadline alarmları (zorunlu eğitim son tarihi yaklaşanlar)
+  // Compliance deadline alarmlari
   const complianceAlerts = compulsoryTrainings
     .filter(t => t.complianceDeadline && new Date(t.complianceDeadline) > now)
     .map(t => {
@@ -82,25 +81,51 @@ export async function GET() {
     .sort((a, b) => a.daysLeft - b.daysLeft)
     .slice(0, 5)
 
-  // Overdue trainings (training endDate passed but assignment not completed)
-  const overdueTrainings = assignments
-    .filter(a => a.status !== 'passed' && a.training && a.training.endDate && new Date(a.training.endDate) < now)
-    .slice(0, 5)
-    .map(a => ({
-      assignmentId: a.id,
-      trainingId: a.trainingId,
-      name: `${a.user.firstName} ${a.user.lastName}`,
-      dept: a.user.departmentRel?.name ?? '',
-      training: a.training.title,
-      dueDate: new Date(a.training.endDate).toISOString().split('T')[0],
-      daysOverdue: Math.floor((now.getTime() - new Date(a.training.endDate).getTime()) / 86400000),
-      color: 'var(--color-error)',
-    }))
+  // Overdue trainings — sadece ilk 5 (pagination ile DB'den)
+  const overdueAssignments = await prisma.trainingAssignment.findMany({
+    where: {
+      status: { not: 'passed' },
+      training: { organizationId: orgId, endDate: { lt: now } },
+    },
+    include: {
+      user: { select: { firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
+      training: { select: { title: true, endDate: true } },
+    },
+    orderBy: { training: { endDate: 'desc' } },
+    take: 5,
+  })
 
-  // Top performers (highest scores)
+  const overdueTrainings = overdueAssignments.map(a => ({
+    assignmentId: a.id,
+    trainingId: a.trainingId,
+    name: `${a.user.firstName} ${a.user.lastName}`,
+    dept: a.user.departmentRel?.name ?? '',
+    training: a.training.title,
+    dueDate: new Date(a.training.endDate).toISOString().split('T')[0],
+    daysOverdue: Math.floor((now.getTime() - new Date(a.training.endDate).getTime()) / 86400000),
+    color: 'var(--color-error)',
+  }))
+
+  // Top performers — DB aggregation ile (sadece passed, en yuksek skor)
+  const topPerformerData = await prisma.trainingAssignment.findMany({
+    where: {
+      status: 'passed',
+      training: { organizationId: orgId },
+    },
+    include: {
+      user: { select: { id: true, firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
+      examAttempts: {
+        orderBy: { attemptNumber: 'desc' },
+        take: 1,
+        select: { postExamScore: true, preExamScore: true },
+      },
+    },
+    orderBy: { completedAt: 'desc' },
+    take: 200, // Son 200 tamamlanmis atama uzerinden hesapla
+  })
+
   const performerMap = new Map<string, { name: string; department: string; scores: number[]; courses: number; initials: string }>()
-  for (const a of assignments) {
-    if (a.status !== 'passed') continue
+  for (const a of topPerformerData) {
     const key = a.userId
     const existing = performerMap.get(key)
     const score = Number(a.examAttempts[0]?.postExamScore ?? a.examAttempts[0]?.preExamScore ?? 0)
@@ -124,10 +149,24 @@ export async function GET() {
     .sort((a, b) => b.score - a.score)
     .slice(0, 4)
 
-  // Department comparison
+  // Department comparison — DB aggregation
+  const deptAssignments = await prisma.trainingAssignment.findMany({
+    where: { training: { organizationId: orgId } },
+    select: {
+      status: true,
+      user: { select: { departmentRel: { select: { name: true } } } },
+      examAttempts: {
+        orderBy: { attemptNumber: 'desc' },
+        take: 1,
+        select: { postExamScore: true, preExamScore: true },
+      },
+    },
+    take: 5000, // Makul limit
+  })
+
   const deptMap = new Map<string, { total: number; completed: number; scores: number[] }>()
-  for (const a of assignments) {
-    const dept = a.user.departmentRel?.name ?? 'Diğer'
+  for (const a of deptAssignments) {
+    const dept = a.user.departmentRel?.name ?? 'Diger'
     const existing = deptMap.get(dept) ?? { total: 0, completed: 0, scores: [] }
     existing.total++
     if (a.status === 'passed') {
@@ -143,6 +182,30 @@ export async function GET() {
     puan: d.scores.length > 0 ? Math.round(d.scores.reduce((a, b) => a + b, 0) / d.scores.length) : 0,
   }))
 
+  // Trend data — son 6 ay icin aylik aggregation
+  const trendData = []
+  for (let i = 5; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
+
+    const monthCounts = await prisma.trainingAssignment.groupBy({
+      by: ['status'],
+      where: {
+        training: { organizationId: orgId },
+        assignedAt: { gte: start, lt: end },
+      },
+      _count: true,
+    })
+
+    const monthStatusMap = new Map(monthCounts.map(c => [c.status, c._count]))
+    trendData.push({
+      month: start.toLocaleDateString('tr-TR', { month: 'short' }),
+      atanan: monthCounts.reduce((sum, c) => sum + c._count, 0),
+      tamamlanan: monthStatusMap.get('passed') ?? 0,
+      basarisiz: monthStatusMap.get('failed') ?? 0,
+    })
+  }
+
   // Recent activity
   const recentActivity = recentLogs.map(log => ({
     action: log.action,
@@ -151,66 +214,50 @@ export async function GET() {
     type: log.action.includes('delete') ? 'error' : log.action.includes('create') ? 'success' : 'info',
   }))
 
+  // Expiring certificates — ayri sorgu (limit 10)
+  const sixtyDays = new Date(now.getTime() + 60 * 86400000)
+  const expiringCertsData = await prisma.certificate.findMany({
+    where: {
+      training: { organizationId: orgId },
+      expiresAt: { gte: now, lte: sixtyDays },
+    },
+    include: {
+      user: { select: { firstName: true, lastName: true } },
+      training: { select: { title: true } },
+    },
+    orderBy: { expiresAt: 'asc' },
+    take: 10,
+  })
+  const expiringCerts = expiringCertsData.map(c => {
+    const daysLeft = Math.ceil((new Date(c.expiresAt!).getTime() - now.getTime()) / 86400000)
+    return {
+      name: `${c.user.firstName} ${c.user.lastName}`,
+      cert: c.training.title,
+      expiryDate: new Date(c.expiresAt!).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      daysLeft,
+      status: daysLeft <= 7 ? 'critical' : daysLeft <= 30 ? 'warning' : 'ok',
+    }
+  })
+
   return jsonResponse({
     stats: [
       { title: 'Toplam Personel', value: staffCount, icon: 'Users', accentColor: 'var(--color-primary)', trend: { value: activeStaffCount, label: 'aktif', isPositive: true } },
-      { title: 'Aktif Eğitim', value: activeTrainingCount, icon: 'GraduationCap', accentColor: 'var(--color-info)', trend: { value: trainingCount, label: 'toplam', isPositive: true } },
-      { title: 'Tamamlanma Oranı', value: `%${completionRate}`, icon: 'TrendingUp', accentColor: 'var(--color-success)', trend: { value: completedCount, label: 'tamamlanan', isPositive: true } },
-      { title: 'Geciken Eğitim', value: overdueTrainings.length, icon: 'AlertTriangle', accentColor: 'var(--color-error)', trend: { value: failedCount, label: 'başarısız', isPositive: false } },
-      { title: 'Uyum Oranı', value: `%${complianceRate}`, icon: 'ShieldCheck', accentColor: complianceRate >= 80 ? 'var(--color-success)' : complianceRate >= 60 ? 'var(--color-warning)' : 'var(--color-error)', trend: { value: compulsoryTrainings.length, label: 'zorunlu eğitim', isPositive: complianceRate >= 80 } },
+      { title: 'Aktif Egitim', value: activeTrainingCount, icon: 'GraduationCap', accentColor: 'var(--color-info)', trend: { value: trainingCount, label: 'toplam', isPositive: true } },
+      { title: 'Tamamlanma Orani', value: `%${completionRate}`, icon: 'TrendingUp', accentColor: 'var(--color-success)', trend: { value: completedCount, label: 'tamamlanan', isPositive: true } },
+      { title: 'Geciken Egitim', value: overdueTrainings.length, icon: 'AlertTriangle', accentColor: 'var(--color-error)', trend: { value: failedCount, label: 'basarisiz', isPositive: false } },
+      { title: 'Uyum Orani', value: `%${complianceRate}`, icon: 'ShieldCheck', accentColor: complianceRate >= 80 ? 'var(--color-success)' : complianceRate >= 60 ? 'var(--color-warning)' : 'var(--color-error)', trend: { value: compulsoryTrainings.length, label: 'zorunlu egitim', isPositive: complianceRate >= 80 } },
     ],
     complianceAlerts,
-    trendData: await (async () => {
-      const result = []
-      for (let i = 5; i >= 0; i--) {
-        const start = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
-        const monthAssignments = assignments.filter(a => {
-          const d = new Date(a.assignedAt)
-          return d >= start && d < end
-        })
-        result.push({
-          month: start.toLocaleDateString('tr-TR', { month: 'short' }),
-          atanan: monthAssignments.length,
-          tamamlanan: monthAssignments.filter(a => a.status === 'passed').length,
-          basarisiz: monthAssignments.filter(a => a.status === 'failed').length,
-        })
-      }
-      return result
-    })(),
+    trendData,
     statusDistribution: [
       { name: 'Tamamlanan', value: completedCount, color: 'var(--color-success)' },
       { name: 'Devam Eden', value: inProgressCount, color: 'var(--color-info)' },
-      { name: 'Başarısız', value: failedCount, color: 'var(--color-error)' },
+      { name: 'Basarisiz', value: failedCount, color: 'var(--color-error)' },
       { name: 'Bekleyen', value: totalAssignments - completedCount - inProgressCount - failedCount, color: 'var(--color-warning)' },
     ],
     departmentComparison,
     overdueTrainings,
-    expiringCerts: await (async () => {
-      const sixtyDays = new Date(now.getTime() + 60 * 86400000)
-      const certs = await prisma.certificate.findMany({
-        where: {
-          training: { organizationId: orgId },
-          expiresAt: { gte: now, lte: sixtyDays },
-        },
-        include: {
-          user: { select: { firstName: true, lastName: true } },
-          training: { select: { title: true } },
-        },
-        orderBy: { expiresAt: 'asc' },
-        take: 10,
-      })
-      return certs.map(c => {
-        const daysLeft = Math.ceil((new Date(c.expiresAt!).getTime() - now.getTime()) / 86400000)
-        return {
-          name: `${c.user.firstName} ${c.user.lastName}`,
-          cert: c.training.title,
-          expiryDate: new Date(c.expiresAt!).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-          daysLeft,
-          status: daysLeft <= 7 ? 'critical' : daysLeft <= 30 ? 'warning' : 'ok',
-        }
-      })
-    })(),
+    expiringCerts,
     topPerformers,
     recentActivity,
   })

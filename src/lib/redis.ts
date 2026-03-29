@@ -1,5 +1,24 @@
 import { Redis } from '@upstash/redis'
 
+// ── Logger helper (avoid console.log in production) ──
+const logger = {
+  warn: (message: string, meta?: Record<string, unknown>) => {
+    if (process.env.NODE_ENV !== 'test') {
+      console.warn(`[redis] ${message}`, meta ?? '')
+    }
+  },
+}
+
+// ── Key sanitization ──
+const SAFE_KEY_PATTERN = /^[a-zA-Z0-9:_\-@.]+$/
+
+function sanitizeKey(key: string): string {
+  if (!SAFE_KEY_PATTERN.test(key)) {
+    throw new Error(`Invalid rate limit key: contains unsafe characters — "${key}"`)
+  }
+  return key
+}
+
 // ── Lazy Redis client — undefined if not configured ──
 let _redis: Redis | null = null
 export function getRedis(): Redis | null {
@@ -47,8 +66,12 @@ export async function getExamTimeRemaining(attemptId: string): Promise<number | 
 
 export async function isExamExpired(attemptId: string): Promise<boolean> {
   const remaining = await getExamTimeRemaining(attemptId)
-  // Timer yoksa (hiç başlatılmamışsa) expired DEĞİL — submit'i engellemesin
-  if (remaining === null) return false
+  // Timer yoksa — ya hiç başlatılmamış ya da Redis TTL ile temizlenmiş.
+  // Her iki durumda da süresi dolmuş kabul et (sınav bütünlüğü için kritik).
+  if (remaining === null) {
+    logger.warn('Exam timer not found — treating as expired', { attemptId })
+    return true
+  }
   return remaining <= 0
 }
 
@@ -64,10 +87,11 @@ export async function clearExamTimer(attemptId: string) {
 // ── Rate Limiting ──
 
 export async function checkRateLimit(key: string, maxRequests: number, windowSeconds: number): Promise<boolean> {
+  const sanitizedKey = sanitizeKey(key)
   const redis = getRedis()
   if (redis) {
     try {
-      const k = `ratelimit:${key}`
+      const k = `ratelimit:${sanitizedKey}`
       await redis.set(k, 0, { nx: true, ex: windowSeconds })
       const current = await redis.incr(k)
       return current <= maxRequests
@@ -76,8 +100,13 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
     }
   }
 
-  // In-memory fallback
-  const k = `ratelimit:${key}`
+  // In-memory fallback — apply stricter limits in production
+  const isProduction = process.env.NODE_ENV === 'production'
+  if (isProduction) {
+    logger.warn('Redis unavailable in production — using in-memory rate limiter with stricter limits', { key: sanitizedKey })
+  }
+  const effectiveMax = isProduction ? Math.max(1, Math.floor(maxRequests / 2)) : maxRequests
+  const k = `ratelimit:${sanitizedKey}`
   const now = Date.now()
   const entry = memoryRateLimits.get(k)
   if (!entry || entry.expiresAt < now) {
@@ -85,5 +114,5 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
     return true
   }
   entry.count++
-  return entry.count <= maxRequests
+  return entry.count <= effectiveMax
 }

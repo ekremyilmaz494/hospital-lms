@@ -81,7 +81,7 @@ export function DataTable<TData, TValue>({
 
       {/* Table */}
       <div
-        className="overflow-hidden rounded-xl border"
+        className="overflow-x-auto rounded-xl border"
         style={{ borderColor: 'var(--color-border)' }}
       >
         <Table>
@@ -190,12 +190,13 @@ export function DataTable<TData, TValue>({
           arası
         </p>
         {table.getPageCount() > 1 && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5" role="navigation" aria-label="Sayfa gezintisi">
             <Button
               variant="outline"
               size="sm"
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
+              aria-label="İlk sayfa"
               className="h-8 w-8 p-0 rounded-lg"
               style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
             >
@@ -206,6 +207,7 @@ export function DataTable<TData, TValue>({
               size="sm"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
+              aria-label="Önceki sayfa"
               className="h-8 w-8 p-0 rounded-lg"
               style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
             >
@@ -223,6 +225,8 @@ export function DataTable<TData, TValue>({
                 <button
                   key={pageNum}
                   onClick={() => table.setPageIndex(pageNum)}
+                  aria-label={`Sayfa ${pageNum + 1}`}
+                  aria-current={isActive ? 'page' : undefined}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold cursor-pointer transition-[background,color,transform] duration-150 active:scale-90 active:duration-75"
                   style={{
                     background: isActive ? 'var(--color-primary)' : 'var(--color-surface)',
@@ -241,6 +245,7 @@ export function DataTable<TData, TValue>({
               size="sm"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
+              aria-label="Sonraki sayfa"
               className="h-8 w-8 p-0 rounded-lg"
               style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
             >
@@ -251,6 +256,7 @@ export function DataTable<TData, TValue>({
               size="sm"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
+              aria-label="Son sayfa"
               className="h-8 w-8 p-0 rounded-lg"
               style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
             >

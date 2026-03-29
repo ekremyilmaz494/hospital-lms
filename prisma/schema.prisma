@@ -89,7 +89,7 @@ model OrganizationSubscription {
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  plan            SubscriptionPlan @relation(fields: [planId], references: [id])
+  plan            SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
   payments        Payment[]
   invoices        Invoice[]
 
@@ -117,6 +117,7 @@ model Payment {
   invoice             Invoice?
 
   @@index([organizationId], map: "idx_payments_org")
+  @@index([organizationId, status], map: "idx_payments_org_status")
   @@index([iyzicoPaymentId], map: "idx_payments_iyzico")
   @@map("payments")
 }
@@ -357,6 +358,7 @@ model ExamAttempt {
   @@unique([assignmentId, attemptNumber])
   @@index([assignmentId], map: "idx_attempts_assignment")
   @@index([userId], map: "idx_attempts_user")
+  @@index([trainingId], map: "idx_attempts_training")
   @@map("exam_attempts")
 }
 
@@ -417,6 +419,7 @@ model Notification {
   relatedTraining   Training?     @relation(fields: [relatedTrainingId], references: [id])
 
   @@index([userId, isRead], map: "idx_notifications_user")
+  @@index([userId, createdAt], map: "idx_notifications_user_date")
   @@map("notifications")
 }
 

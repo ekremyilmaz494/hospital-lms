@@ -41,11 +41,11 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   // Departman bu hastaneye ait mi?
   const dept = await prisma.department.findFirst({ where: { id: departmentId, organizationId: orgId } })
-  if (!dept) return errorResponse('Departman bulunamadi', 404)
+  if (!dept) return errorResponse('Departman bulunamadı', 404)
 
   // Eğitim bu hastaneye ait mi?
   const training = await prisma.training.findFirst({ where: { id: body.trainingId, organizationId: orgId } })
-  if (!training) return errorResponse('Egitim bulunamadi', 404)
+  if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
   // Kural zaten var mı?
   const existing = await prisma.departmentTrainingRule.findUnique({
@@ -99,7 +99,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const rule = await prisma.departmentTrainingRule.findFirst({
     where: { id: ruleId, departmentId, organizationId: dbUser!.organizationId! },
   })
-  if (!rule) return errorResponse('Kural bulunamadi', 404)
+  if (!rule) return errorResponse('Kural bulunamadı', 404)
 
   await prisma.departmentTrainingRule.delete({ where: { id: ruleId } })
 

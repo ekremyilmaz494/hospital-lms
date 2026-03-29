@@ -60,7 +60,7 @@ function daysUntilExpiry(expiresAt: string | null): number | null {
 
 export default function CertificatesPage() {
   const { toast } = useToast();
-  const { data, isLoading, error, refetch } = useFetch<CertPageData>('/api/admin/certificates');
+  const { data, isLoading, error } = useFetch<CertPageData>('/api/admin/certificates');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [trainingFilter, setTrainingFilter] = useState('');

@@ -84,20 +84,20 @@ export async function GET(
     })
 
     if (!certificate) {
-      return errorResponse('Sertifika bulunamadi', 404)
+      return errorResponse('Sertifika bulunamadı', 404)
     }
 
     // Org isolation: staff can only download their own certs
     if (dbUser!.role === 'staff') {
       if (certificate.userId !== dbUser!.id) {
-        return errorResponse('Bu sertifikaya erisim yetkiniz yok', 403)
+        return errorResponse('Bu sertifikaya erişim yetkiniz yok', 403)
       }
     }
 
     // Admin can only download certs from their org
     if (dbUser!.role === 'admin') {
       if (certificate.training.organizationId !== dbUser!.organizationId) {
-        return errorResponse('Bu sertifikaya erisim yetkiniz yok', 403)
+        return errorResponse('Bu sertifikaya erişim yetkiniz yok', 403)
       }
     }
 
@@ -266,7 +266,7 @@ export async function GET(
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(6)
       doc.setTextColor(148, 163, 184)
-      doc.text(`Dogrulama: ${certificate.certificateCode}`, qrX + 17.5, qrY + 38, {
+      doc.text(`Doğrulama: ${certificate.certificateCode}`, qrX + 17.5, qrY + 38, {
         align: 'center',
       })
     } catch (qrErr) {
@@ -288,6 +288,6 @@ export async function GET(
     })
   } catch (err) {
     logger.error('Certificate PDF', 'PDF olusturulamadi', err)
-    return errorResponse('PDF olusturulamadi', 500)
+    return errorResponse('PDF oluşturulamadı', 500)
   }
 }

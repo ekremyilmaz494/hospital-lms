@@ -43,7 +43,7 @@ export default function StaffLayout({
           style={{ marginLeft: 72 }}
         >
           <AppTopbar
-            title=""
+            title="Personel Paneli"
             onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
             userName={fullName}
             userRole="Personel"

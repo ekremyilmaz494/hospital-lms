@@ -5,7 +5,7 @@ export const createOrganizationSchema = z.object({
   name: z.string().min(2).max(255),
   code: z.string().min(2).max(50),
   address: z.string().optional(),
-  phone: z.string().max(20).optional(),
+  phone: z.string().max(20).regex(/^\+?[0-9\s\-\(\)]{10,20}$/, 'Geçerli bir telefon numarası girin').optional(),
   email: z.email().optional(),
   logoUrl: z.string().url().optional(),
 })
@@ -31,11 +31,14 @@ export const createUserSchema = z.object({
   email: z.string().min(1).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
-  password: z.string().min(8),
+  password: z.string().min(8).regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
+    'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir'
+  ),
   role: z.enum(['admin', 'staff']),
   organizationId: z.string().uuid().optional(),
-  tcNo: z.string().length(11).optional(),
-  phone: z.string().max(20).optional(),
+  tcNo: z.string().length(11).regex(/^\d{11}$/, 'TC No sadece rakamlardan oluşmalıdır').optional(),
+  phone: z.string().max(20).regex(/^\+?[0-9\s\-\(\)]{10,20}$/, 'Geçerli bir telefon numarası girin').optional(),
   department: z.string().max(100).optional(),
   departmentId: z.string().uuid().optional(),
   title: z.string().max(100).optional(),
@@ -51,7 +54,7 @@ const trainingBaseSchema = z.object({
   thumbnailUrl: z.string().url().optional(),
   passingScore: z.coerce.number().int().min(0).max(100).default(70),
   maxAttempts: z.coerce.number().int().min(1).max(10).default(3),
-  examDurationMinutes: z.coerce.number().int().max(180).default(30).transform(v => v < 5 ? 30 : v),
+  examDurationMinutes: z.coerce.number().int().min(5, 'Sınav süresi en az 5 dakika olmalıdır').max(180).default(30),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
 })
@@ -82,7 +85,7 @@ const trainingQuestionInputSchema = z.object({
   text: z.string().min(1),
   points: z.coerce.number().int().min(1).default(10),
   correct: z.coerce.number().int().min(-1).transform(v => v < 0 ? 0 : v),
-  options: z.array(z.string().min(1)).min(2).max(6),
+  options: z.array(z.string().min(1)).min(2).max(6).refine(opts => new Set(opts).size === opts.length, 'Seçeneklerde tekrar olamaz'),
 })
 
 export const createTrainingBodySchema = z.object({
@@ -92,7 +95,7 @@ export const createTrainingBodySchema = z.object({
   thumbnailUrl: z.string().url().optional(),
   passingScore: z.coerce.number().int().min(0).max(100).default(70),
   maxAttempts: z.coerce.number().int().min(1).max(10).default(3),
-  examDurationMinutes: z.coerce.number().int().max(180).default(30).transform(v => v < 5 ? 30 : v),
+  examDurationMinutes: z.coerce.number().int().min(5, 'Sınav süresi en az 5 dakika olmalıdır').max(180).default(30),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   // Compliance alanları
@@ -119,7 +122,7 @@ export const createQuestionSchema = z.object({
     optionText: z.string().min(1),
     isCorrect: z.boolean(),
     sortOrder: z.number().int().default(0),
-  })).min(2),
+  })).min(2).refine(opts => new Set(opts.map(o => o.optionText)).size === opts.length, 'Seçeneklerde tekrar olamaz'),
 })
 
 // ── Assignment ──
@@ -166,6 +169,7 @@ export const createSubscriptionSchema = z.object({
 // ── Notification ──
 export const createNotificationSchema = z.object({
   userId: z.string().uuid(),
+  organizationId: z.string().uuid().optional(),
   title: z.string().min(1).max(500),
   message: z.string().min(1),
   type: z.string().max(50),
@@ -176,4 +180,103 @@ export const createNotificationSchema = z.object({
 export const updateVideoProgressSchema = z.object({
   watchedSeconds: z.number().int().min(0),
   lastPositionSeconds: z.number().int().min(0),
+})
+
+// ── Training Video (standalone) ──
+export const createTrainingVideoSchema = z.object({
+  trainingId: z.string().uuid(),
+  title: z.string().min(1).max(500),
+  description: z.string().max(1000).optional(),
+  videoUrl: z.string().url(),
+  videoKey: z.string().min(1),
+  durationSeconds: z.number().int().positive(),
+  sortOrder: z.number().int().min(0).default(0),
+})
+
+// ── Payment ──
+export const createPaymentSchema = z.object({
+  subscriptionId: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  amount: z.number().positive(),
+  currency: z.string().length(3).default('TRY'),
+  paymentMethod: z.string().max(30).optional(),
+})
+
+// ── Invoice ──
+export const createInvoiceSchema = z.object({
+  paymentId: z.string().uuid(),
+  subscriptionId: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  invoiceNumber: z.string().min(1).max(30),
+  amount: z.number().positive(),
+  taxAmount: z.number().min(0).default(0),
+  totalAmount: z.number().positive(),
+  currency: z.string().length(3).default('TRY'),
+  billingName: z.string().min(1).max(255),
+  billingAddress: z.string().optional(),
+  taxNumber: z.string().max(20).optional(),
+  taxOffice: z.string().max(100).optional(),
+  periodStart: z.string().datetime(),
+  periodEnd: z.string().datetime(),
+})
+
+// ── Exam Answer ──
+export const saveExamAnswerSchema = z.object({
+  questionId: z.string().uuid(),
+  selectedOptionId: z.string().uuid(),
+  examPhase: z.enum(['pre', 'post']),
+})
+
+// ── Certificate ──
+export const createCertificateSchema = z.object({
+  userId: z.string().uuid(),
+  trainingId: z.string().uuid(),
+  attemptId: z.string().uuid(),
+  certificateCode: z.string().min(8).max(50),
+  expiresAt: z.string().datetime().optional(),
+})
+
+// ── Db Backup ──
+export const createBackupSchema = z.object({
+  organizationId: z.string().uuid().optional(),
+  backupType: z.enum(['auto', 'manual']),
+  fileUrl: z.string().url(),
+  fileSizeMb: z.number().positive().optional(),
+})
+
+// ── KVKK Request ──
+export const createKvkkRequestSchema = z.object({
+  requestType: z.enum(['access', 'delete', 'rectify', 'restrict', 'portability']),
+  description: z.string().min(10).max(2000),
+})
+
+export const respondKvkkRequestSchema = z.object({
+  status: z.enum(['in_progress', 'completed', 'rejected']),
+  responseNote: z.string().min(1).max(2000),
+})
+
+// ── SCORM Attempt ──
+export const updateScormAttemptSchema = z.object({
+  suspendData: z.string().optional(),
+  lessonStatus: z.string().max(30).optional(),
+  score: z.number().min(0).max(100).optional(),
+  totalTime: z.string().max(50).optional(),
+  launchData: z.string().optional(),
+  completionStatus: z.string().max(30).optional(),
+  successStatus: z.string().max(30).optional(),
+})
+
+// ── Department Training Rule ──
+export const createDeptTrainingRuleSchema = z.object({
+  departmentId: z.string().uuid(),
+  trainingId: z.string().uuid(),
+  isActive: z.boolean().default(true),
+})
+
+// ── Settings (Organization) ──
+export const updateOrgSettingsSchema = z.object({
+  sessionTimeout: z.number().int().min(5).max(480).optional(),
+  defaultPassingScore: z.number().int().min(0).max(100).optional(),
+  defaultMaxAttempts: z.number().int().min(1).max(10).optional(),
+  defaultExamDuration: z.number().int().min(5).max(180).optional(),
 })

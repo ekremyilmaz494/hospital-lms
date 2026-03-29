@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   if (roleError) return roleError
 
   const { searchParams } = new URL(request.url)
-  const { page, limit, skip } = safePagination(searchParams)
+  const { page, limit } = safePagination(searchParams)
 
   const where = { organizationId: dbUser!.organizationId! }
 

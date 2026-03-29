@@ -70,8 +70,8 @@ export async function GET(request: Request) {
         await sendEmail({
           to: a.user.email,
           subject: daysLeft <= 1
-            ? `SON GUN: "${a.training.title}" egitimi yarin sona eriyor!`
-            : `Hatirlatma: "${a.training.title}" egitimi icin ${daysLeft} gun kaldi`,
+            ? `SON GÜN: "${a.training.title}" eğitimi yarın sona eriyor!`
+            : `Hatırlatma: "${a.training.title}" eğitimi için ${daysLeft} gün kaldı`,
           html: upcomingTrainingReminderEmail(staffName, a.training.title, dueDate, daysLeft),
         })
         upcomingEmailsSent++
@@ -85,8 +85,8 @@ export async function GET(request: Request) {
           data: {
             userId: a.user.id,
             organizationId: a.user.organizationId,
-            title: daysLeft <= 1 ? 'Son Gun Hatirlatmasi' : 'Egitim Hatirlatmasi',
-            message: `"${a.training.title}" egitimi icin ${daysLeft} gun kaldi. Son tarih: ${dueDate}`,
+            title: daysLeft <= 1 ? 'Son Gün Hatırlatması' : 'Eğitim Hatırlatması',
+            message: `"${a.training.title}" eğitimi için ${daysLeft} gün kaldı. Son tarih: ${dueDate}`,
             type: 'reminder',
             relatedTrainingId: a.training.id,
           },
@@ -123,7 +123,7 @@ export async function GET(request: Request) {
     try {
       await sendEmail({
         to: a.user.email,
-        subject: `Gecikmiş Egitim: "${a.training.title}" — ${daysOverdue} gun gecikti`,
+        subject: `Gecikmiş Eğitim: "${a.training.title}" — ${daysOverdue} gün gecikti`,
         html: overdueTrainingReminderEmail(staffName, a.training.title, dueDate, daysOverdue),
       })
       overdueEmailsSent++
@@ -137,8 +137,8 @@ export async function GET(request: Request) {
         data: {
           userId: a.user.id,
           organizationId: a.user.organizationId,
-          title: 'Gecikmiş Egitim Uyarisi',
-          message: `"${a.training.title}" egitimi ${daysOverdue} gundur gecikmiş durumda. Lutfen en kisa surede tamamlayiniz.`,
+          title: 'Gecikmiş Eğitim Uyarısı',
+          message: `"${a.training.title}" eğitimi ${daysOverdue} gündür gecikmiş durumda. Lütfen en kısa sürede tamamlayınız.`,
           type: 'warning',
           relatedTrainingId: a.training.id,
         },
@@ -155,6 +155,7 @@ export async function GET(request: Request) {
     const expiringCerts = await prisma.certificate.findMany({
       where: {
         expiresAt: { gte: targetStart, lt: targetEnd },
+        training: { organization: { isActive: true, isSuspended: false } },
       },
       include: {
         user: { select: { id: true, firstName: true, lastName: true, email: true, organizationId: true } },
@@ -192,8 +193,8 @@ export async function GET(request: Request) {
           data: {
             userId: cert.user.id,
             organizationId: cert.user.organizationId,
-            title: 'Sertifika Yenileme Hatirlatmasi',
-            message: `"${cert.training.title}" sertifikanizin gecerlilik suresi ${daysLeft} gun icinde dolacak. Lutfen yenileme egitimini tamamlayiniz.`,
+            title: 'Sertifika Yenileme Hatırlatması',
+            message: `"${cert.training.title}" sertifikanızın geçerlilik süresi ${daysLeft} gün içinde dolacak. Lütfen yenileme eğitimini tamamlayınız.`,
             type: certNotifType,
             relatedTrainingId: cert.training.id,
           },
@@ -211,6 +212,7 @@ export async function GET(request: Request) {
         lt: new Date(now),
         gte: new Date(now - DAY_MS), // sadece bugün dolanlar (günlük cron, tekrarı önler)
       },
+      training: { organization: { isActive: true, isSuspended: false } },
     },
     include: {
       training: { select: { id: true, title: true, renewalPeriodMonths: true, isActive: true, endDate: true } },
@@ -247,7 +249,7 @@ export async function GET(request: Request) {
           userId: cert.user.id,
           organizationId: cert.user.organizationId,
           title: 'Sertifika Yenileme Gerekli',
-          message: `"${cert.training.title}" sertifikanizin suresi doldu. Egitimi tekrar tamamlamaniz gerekmektedir.`,
+          message: `"${cert.training.title}" sertifikanızın süresi doldu. Eğitimi tekrar tamamlamanız gerekmektedir.`,
           type: 'warning',
           relatedTrainingId: cert.training.id,
         },

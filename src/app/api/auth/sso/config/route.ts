@@ -8,7 +8,7 @@ export async function GET() {
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organizasyon bulunamadi', 403)
+  if (!orgId) return errorResponse('Organizasyon bulunamadı', 403)
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
@@ -47,10 +47,10 @@ export async function PUT(request: Request) {
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organizasyon bulunamadi', 403)
+  if (!orgId) return errorResponse('Organizasyon bulunamadı', 403)
 
   const body = await request.json().catch(() => null)
-  if (!body) return errorResponse('Gecersiz istek verisi')
+  if (!body) return errorResponse('Geçersiz istek verisi')
 
   const {
     ssoEnabled, ssoProvider, ssoEmailDomain,

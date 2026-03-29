@@ -48,6 +48,7 @@ export async function GET(request: Request) {
           title: true,
           departmentRel: { select: { name: true, color: true } },
           assignments: {
+            where: { training: { organizationId: orgId, isActive: true } },
             select: {
               trainingId: true,
               status: true,
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
             },
           },
           certificates: {
+            where: { training: { organizationId: orgId } },
             select: { trainingId: true, issuedAt: true, expiresAt: true },
           },
         },

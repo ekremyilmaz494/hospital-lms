@@ -33,7 +33,7 @@ export default function MFASetupPage() {
       setQrCode(data.qrCode);
       setSecret(data.secret);
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'MFA kurulamadi', 'error');
+      toast(err instanceof Error ? err.message : 'MFA kurulamadı', 'error');
     } finally {
       setEnrolling(false);
     }
@@ -51,14 +51,14 @@ export default function MFASetupPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Kod hatali');
+        setError(data.error || 'Kod hatalı');
         setCode('');
         setLoading(false);
         return;
       }
       setStep('done');
     } catch {
-      setError('Bir hata olustu');
+      setError('Bir hata oluştu');
     } finally {
       setLoading(false);
     }
@@ -77,8 +77,8 @@ export default function MFASetupPage() {
               <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
                 <Shield className="h-7 w-7 text-white" />
               </div>
-              <h1 className="text-lg font-bold text-white">Iki Faktorlu Dogrulama Kurulumu</h1>
-              <p className="text-sm text-white/60 mt-1">Hesabinizi daha guvenli hale getirin</p>
+              <h1 className="text-lg font-bold text-white">İki Faktörlü Doğrulama Kurulumu</h1>
+              <p className="text-sm text-white/60 mt-1">Hesabınızı daha güvenli hale getirin</p>
             </div>
 
             <div className="p-8">
@@ -86,7 +86,7 @@ export default function MFASetupPage() {
                 <div className="text-center space-y-6">
                   <div className="space-y-2">
                     <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                      Google Authenticator, Microsoft Authenticator veya benzeri bir TOTP uygulamasi kullanarak hesabiniza ek bir guvenlik katmani ekleyin.
+                      Google Authenticator, Microsoft Authenticator veya benzeri bir TOTP uygulaması kullanarak hesabınıza ek bir güvenlik katmanı ekleyin.
                     </p>
                   </div>
                   <ShimmerButton
@@ -97,10 +97,10 @@ export default function MFASetupPage() {
                     background="linear-gradient(135deg, #0d9668, #065f46)"
                   >
                     {enrolling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
-                    {enrolling ? 'Hazirlaniyor...' : 'Kuruluma Basla'}
+                    {enrolling ? 'Hazırlanıyor...' : 'Kuruluma Başla'}
                   </ShimmerButton>
                   <Button variant="ghost" className="w-full gap-2 text-sm" onClick={() => router.back()}>
-                    <ArrowLeft className="h-4 w-4" /> Geri Don
+                    <ArrowLeft className="h-4 w-4" /> Geri Dön
                   </Button>
                 </div>
               )}
@@ -109,7 +109,7 @@ export default function MFASetupPage() {
                 <div className="space-y-6">
                   <div className="text-center">
                     <p className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--color-text-muted)' }}>
-                      1. QR kodu tarayin
+                      1. QR kodu tarayın
                     </p>
                     {/* QR Code Image */}
                     <div className="mx-auto w-48 h-48 rounded-xl overflow-hidden border-2 mb-3" style={{ borderColor: 'var(--color-primary)' }}>
@@ -120,7 +120,7 @@ export default function MFASetupPage() {
                       <code className="text-xs font-mono px-3 py-1.5 rounded-lg" style={{ background: 'var(--color-bg)', color: 'var(--color-primary)' }}>
                         {secret}
                       </code>
-                      <button onClick={() => { navigator.clipboard.writeText(secret); toast('Kod kopyalandi', 'success'); }} className="p-1.5 rounded-lg" style={{ color: 'var(--color-text-muted)' }}>
+                      <button onClick={() => { navigator.clipboard.writeText(secret); toast('Kod kopyalandı', 'success'); }} className="p-1.5 rounded-lg" style={{ color: 'var(--color-text-muted)' }}>
                         <Copy className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -128,7 +128,7 @@ export default function MFASetupPage() {
 
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--color-text-muted)' }}>
-                      2. Dogrulama kodunu girin
+                      2. Doğrulama kodunu girin
                     </p>
                     <Input
                       type="text"
@@ -151,7 +151,7 @@ export default function MFASetupPage() {
                     background="linear-gradient(135deg, #0d9668, #065f46)"
                   >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                    {loading ? 'Dogrulaniyor...' : 'Aktive Et'}
+                    {loading ? 'Doğrulanıyor...' : 'Aktive Et'}
                   </ShimmerButton>
                 </div>
               )}
@@ -164,7 +164,7 @@ export default function MFASetupPage() {
                   <div>
                     <h3 className="text-lg font-bold">2FA Aktif!</h3>
                     <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                      Hesabiniz artik iki faktorlu dogrulama ile korunuyor.
+                      Hesabınız artık iki faktörlü doğrulama ile korunuyor.
                     </p>
                   </div>
                   <Button className="w-full h-11 gap-2 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--color-primary)' }} onClick={() => router.back()}>

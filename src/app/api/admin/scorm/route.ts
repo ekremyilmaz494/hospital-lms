@@ -11,7 +11,7 @@ export async function GET() {
   if (roleError) return roleError
 
   if (!dbUser!.organizationId) {
-    return errorResponse('Organizasyon bulunamadi', 403)
+    return errorResponse('Organizasyon bulunamadı', 403)
   }
 
   try {

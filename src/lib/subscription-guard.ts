@@ -20,12 +20,12 @@ export async function checkSubscriptionLimit(
 
   // Abonelik durumu kontrol
   if (subscription.status === 'suspended' || subscription.status === 'expired' || subscription.status === 'cancelled') {
-    return errorResponse('Aboneliginiz aktif degil. Lutfen aboneliginizi yenileyiniz.', 403)
+    return errorResponse('Aboneliğiniz aktif değil. Lütfen aboneliğinizi yenileyiniz.', 403)
   }
 
   // Trial süresi dolmuş mu?
-  if (subscription.status === 'trial' && subscription.trialEndsAt && new Date(subscription.trialEndsAt) < new Date()) {
-    return errorResponse('Deneme suresiniz dolmustur. Lutfen bir plan satin aliniz.', 403)
+  if (subscription.status === 'trial' && subscription.trialEndsAt && new Date(subscription.trialEndsAt) <= new Date()) {
+    return errorResponse('Deneme süreniz dolmuştur. Lütfen bir plan satın alınız.', 403)
   }
 
   const plan = subscription.plan
@@ -36,7 +36,7 @@ export async function checkSubscriptionLimit(
     })
     if (currentStaff >= plan.maxStaff) {
       return errorResponse(
-        `Personel limitine ulastiniz (${currentStaff}/${plan.maxStaff}). Planınizi yukseltin.`,
+        `Personel limitine ulaştınız (${currentStaff}/${plan.maxStaff}). Planınızı yükseltin.`,
         403
       )
     }
@@ -48,7 +48,7 @@ export async function checkSubscriptionLimit(
     })
     if (currentTrainings >= plan.maxTrainings) {
       return errorResponse(
-        `Egitim limitine ulastiniz (${currentTrainings}/${plan.maxTrainings}). Planinizi yukseltin.`,
+        `Eğitim limitine ulaştınız (${currentTrainings}/${plan.maxTrainings}). Planınızı yükseltin.`,
         403
       )
     }

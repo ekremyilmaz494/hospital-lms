@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
 import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
@@ -13,7 +14,19 @@ export default function SuperAdminLayout({
   children: React.ReactNode;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const { fullName, initials } = useAuth();
+  const { user, isLoading, fullName, initials } = useAuth();
+  const router = useRouter();
+
+  // Auth guard: redirect non-super_admin users
+  useEffect(() => {
+    if (!isLoading && (!user || user.role !== 'super_admin')) {
+      router.replace('/auth/login');
+    }
+  }, [user, isLoading, router]);
+
+  if (isLoading || !user || user.role !== 'super_admin') {
+    return null;
+  }
 
   return (
     <TooltipProvider>
@@ -32,7 +45,7 @@ export default function SuperAdminLayout({
           style={{ marginLeft: 72 }}
         >
           <AppTopbar
-            title=""
+            title="Platform Yönetimi"
             onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
             userName={fullName}
             userRole="Platform Yöneticisi"

@@ -1,9 +1,18 @@
 import { randomBytes } from 'crypto'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import ExcelJS from 'exceljs'
+
+/** Maximum number of data rows allowed in a bulk import file */
+const MAX_ROW_COUNT = 5000
+/** Maximum number of sheets allowed in the workbook */
+const MAX_SHEET_COUNT = 5
+/** XLSX files are ZIP archives — first 4 bytes must be the ZIP signature */
+const XLSX_MAGIC_BYTES = [0x50, 0x4B, 0x03, 0x04]
 
 export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -13,6 +22,10 @@ export async function POST(request: Request) {
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId!
+
+  // Rate limiting: saatte en fazla 3 bulk import
+  const allowed = await checkRateLimit(`bulk-import:${orgId}`, 3, 3600)
+  if (!allowed) return errorResponse('Çok fazla toplu içe aktarma denemesi. Lütfen bir saat sonra tekrar deneyin.', 429)
 
   const formData = await request.formData().catch(() => null)
   if (!formData) return errorResponse('Dosya yüklenemedi')
@@ -30,11 +43,27 @@ export async function POST(request: Request) {
 
   const arrayBuffer = await file.arrayBuffer()
 
+  // Validate magic bytes — XLSX files are ZIP archives
+  const header = new Uint8Array(arrayBuffer.slice(0, 4))
+  if (
+    header[0] !== XLSX_MAGIC_BYTES[0] ||
+    header[1] !== XLSX_MAGIC_BYTES[1] ||
+    header[2] !== XLSX_MAGIC_BYTES[2] ||
+    header[3] !== XLSX_MAGIC_BYTES[3]
+  ) {
+    return errorResponse('Geçersiz dosya formatı. Lütfen geçerli bir .xlsx dosyası yükleyin.', 400)
+  }
+
   const workbook = new ExcelJS.Workbook()
   try {
     await workbook.xlsx.load(arrayBuffer)
   } catch {
     return errorResponse('Excel dosyası okunamadı. Lütfen .xlsx formatında yükleyin.')
+  }
+
+  // Sheet count limit
+  if (workbook.worksheets.length > MAX_SHEET_COUNT) {
+    return errorResponse(`Excel dosyası en fazla ${MAX_SHEET_COUNT} sayfa içerebilir.`, 400)
   }
 
   const sheet = workbook.worksheets[0]
@@ -57,6 +86,11 @@ export async function POST(request: Request) {
   })
 
   if (rows.length === 0) return errorResponse('Geçerli satır bulunamadı')
+
+  // Row count limit
+  if (rows.length > MAX_ROW_COUNT) {
+    return errorResponse(`En fazla ${MAX_ROW_COUNT} satır içe aktarılabilir. Dosyada ${rows.length} satır bulundu.`, 400)
+  }
 
   // Load departments for matching
   const departments = await prisma.department.findMany({
@@ -81,8 +115,8 @@ export async function POST(request: Request) {
       if (!firstName) errors.push('Ad eksik')
       if (!lastName) errors.push('Soyad eksik')
       if (!email) errors.push('E-posta eksik')
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push('Gecersiz e-posta')
-      else if (existingEmails.has(email)) errors.push('E-posta zaten kayitli')
+      else if (!z.string().email().safeParse(email).success) errors.push('Geçersiz e-posta')
+      else if (existingEmails.has(email)) errors.push('E-posta zaten kayıtlı')
       else if (seenEmails.has(email)) errors.push('Dosyada tekrar eden e-posta')
       if (email) seenEmails.add(email)
       return {
@@ -115,7 +149,7 @@ export async function POST(request: Request) {
     const firstName = r['ad'] || r['ad*'] || ''
     const lastName = r['soyad'] || r['soyad*'] || ''
     const email = r['e-posta'] || r['email'] || r['e-posta*'] || ''
-    const password = r['şifre'] || r['sifre'] || r['şifre*'] || r['parola'] || ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1')
+    const password = r['şifre'] || r['sifre'] || r['şifre*'] || r['parola'] || (randomBytes(12).toString('base64url').slice(0, 16) + '!Aa1')
 
     if (!firstName || !lastName || !email) {
       failed++
@@ -146,20 +180,29 @@ export async function POST(request: Request) {
       }
 
       // Create DB user
-      await prisma.user.create({
-        data: {
-          id: authUser.user.id,
-          email,
-          firstName,
-          lastName,
-          role: 'staff',
-          organizationId: orgId,
-          tcNo: r['tc'] || r['tc kimlik'] || r['tc no'] || undefined,
-          phone: r['telefon'] || undefined,
-          departmentId: dept?.id,
-          title: r['unvan'] || r['ünvan'] || undefined,
-        },
-      })
+      const authUserId = authUser.user.id
+      try {
+        await prisma.user.create({
+          data: {
+            id: authUserId,
+            email,
+            firstName,
+            lastName,
+            role: 'staff',
+            organizationId: orgId,
+            tcNo: r['tc'] || r['tc kimlik'] || r['tc no'] || undefined,
+            phone: r['telefon'] || undefined,
+            departmentId: dept?.id,
+            title: r['unvan'] || r['ünvan'] || undefined,
+          },
+        })
+      } catch (dbErr) {
+        // Clean up orphaned Supabase auth user when DB insert fails
+        await supabase.auth.admin.deleteUser(authUserId).catch((deleteErr) => {
+          logger.error('Bulk Import', `Failed to delete orphan auth user ${authUserId}`, deleteErr)
+        })
+        throw dbErr
+      }
 
       created++
     } catch (err) {

@@ -1,5 +1,18 @@
 import nodemailer from 'nodemailer'
 
+/**
+ * Escapes HTML special characters to prevent HTML injection in email templates.
+ * Must be applied to all user-provided or database-sourced values before interpolation.
+ */
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT ?? '587'),
@@ -36,13 +49,13 @@ export function trainingAssignedEmail(staffName: string, trainingTitle: string, 
         <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Yeni Egitim Atandi</h2>
-        <p style="color: #64748b;">Merhaba ${staffName},</p>
-        <p style="color: #64748b;"><strong>"${trainingTitle}"</strong> egitimi size atanmistir.</p>
-        <p style="color: #64748b;">Son tarih: <strong>${dueDate}</strong></p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/staff/my-trainings"
+        <h2 style="color: #1e293b; margin-top: 0;">Yeni Eğitim Atandı</h2>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(staffName)},</p>
+        <p style="color: #64748b;"><strong>"${escapeHtml(trainingTitle)}"</strong> eğitimi size atanmıştır.</p>
+        <p style="color: #64748b;">Son tarih: <strong>${escapeHtml(dueDate)}</strong></p>
+        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/staff/my-trainings"
            style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Egitime Basla
+          Eğitime Başla
         </a>
       </div>
     </div>
@@ -56,16 +69,16 @@ export function examResultEmail(staffName: string, trainingTitle: string, score:
         <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Sinav Sonucu</h2>
-        <p style="color: #64748b;">Merhaba ${staffName},</p>
-        <p style="color: #64748b;"><strong>"${trainingTitle}"</strong> sinavinizin sonucu:</p>
+        <h2 style="color: #1e293b; margin-top: 0;">Sınav Sonucu</h2>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(staffName)},</p>
+        <p style="color: #64748b;"><strong>"${escapeHtml(trainingTitle)}"</strong> sınavınızın sonucu:</p>
         <div style="text-align: center; margin: 24px 0;">
           <div style="display: inline-block; background: ${passed ? '#dcfce7' : '#fef2f2'}; border-radius: 50%; width: 80px; height: 80px; line-height: 80px; font-size: 24px; font-weight: bold; color: ${passed ? '#16a34a' : '#dc2626'};">
             ${score}
           </div>
         </div>
         <p style="text-align: center; font-weight: bold; color: ${passed ? '#16a34a' : '#dc2626'};">
-          ${passed ? 'Tebrikler, basariyla gectiniz!' : 'Maalesef gecemediniz.'}
+          ${passed ? 'Tebrikler, başarıyla geçtiniz!' : 'Maalesef geçemediniz.'}
         </p>
       </div>
     </div>
@@ -79,14 +92,14 @@ export function forgotPasswordEmail(name: string, resetLink: string) {
         <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Sifre Sifirlama</h2>
-        <p style="color: #64748b;">Merhaba ${name},</p>
-        <p style="color: #64748b;">Hesabiniz icin bir sifre sifirlama istegi aldik. Asagidaki butona tiklayarak yeni sifrenizi belirleyebilirsiniz:</p>
-        <a href="${resetLink}"
+        <h2 style="color: #1e293b; margin-top: 0;">Şifre Sıfırlama</h2>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(name)},</p>
+        <p style="color: #64748b;">Hesabınız için bir şifre sıfırlama isteği aldık. Aşağıdaki butona tıklayarak yeni şifrenizi belirleyebilirsiniz:</p>
+        <a href="${escapeHtml(resetLink)}"
            style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Sifremi Sifirla
+          Şifremi Sıfırla
         </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu link 1 saat icerisinde gecerliliginizi yitirecektir. Eger siz bu istegi yapmadiysa bu e-postayi goz ardi edebilirsiniz.</p>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu link 1 saat içerisinde geçerliliğini yitirecektir. Eğer siz bu isteği yapmadıysanız bu e-postayı göz ardı edebilirsiniz.</p>
       </div>
     </div>
   `
@@ -99,18 +112,18 @@ export function welcomeEmail(name: string, email: string, resetLink: string) {
         <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Hos Geldiniz!</h2>
-        <p style="color: #64748b;">Merhaba ${name},</p>
-        <p style="color: #64748b;">Hastane LMS hesabiniz olusturulmustur.</p>
+        <h2 style="color: #1e293b; margin-top: 0;">Hoş Geldiniz!</h2>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(name)},</p>
+        <p style="color: #64748b;">Hastane LMS hesabınız oluşturulmuştur.</p>
         <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p style="margin: 4px 0; color: #475569;"><strong>E-posta:</strong> ${email}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>E-posta:</strong> ${escapeHtml(email)}</p>
         </div>
-        <p style="color: #64748b;">Hesabiniza erisim icin asagidaki butona tiklayarak sifrenizi belirleyin:</p>
-        <a href="${resetLink}"
+        <p style="color: #64748b;">Hesabınıza erişim için aşağıdaki butona tıklayarak şifrenizi belirleyin:</p>
+        <a href="${escapeHtml(resetLink)}"
            style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Sifremi Belirle
+          Şifremi Belirle
         </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu link 24 saat icerisinde gecerliliginizi yitirecektir.</p>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu link 24 saat içerisinde geçerliliğini yitirecektir.</p>
       </div>
     </div>
   `
@@ -120,27 +133,27 @@ export function welcomeEmail(name: string, email: string, resetLink: string) {
 export function upcomingTrainingReminderEmail(staffName: string, trainingTitle: string, dueDate: string, daysLeft: number) {
   const urgencyColor = daysLeft <= 1 ? '#dc2626' : '#f59e0b'
   const urgencyBg = daysLeft <= 1 ? '#fef2f2' : '#fffbeb'
-  const urgencyLabel = daysLeft <= 1 ? 'SON GUN! Yarin suresi doluyor' : daysLeft + ' gun kaldi'
+  const urgencyLabel = daysLeft <= 1 ? 'SON GÜN! Yarın süresi doluyor' : daysLeft + ' gün kaldı'
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, ${urgencyColor}, ${daysLeft <= 1 ? '#7f1d1d' : '#92400e'}); padding: 32px; border-radius: 12px 12px 0 0;">
         <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Egitim Deadline Hatirlatmasi</p>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Eğitim Deadline Hatırlatması</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <div style="background: ${urgencyBg}; border-left: 4px solid ${urgencyColor}; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
           <p style="margin: 0; font-weight: bold; color: ${urgencyColor};">${urgencyLabel}</p>
         </div>
-        <p style="color: #64748b;">Merhaba ${staffName},</p>
-        <p style="color: #64748b;"><strong>"${trainingTitle}"</strong> egitiminizin tamamlanma suresi yaklasiyor.</p>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(staffName)},</p>
+        <p style="color: #64748b;"><strong>"${escapeHtml(trainingTitle)}"</strong> eğitiminizin tamamlanma süresi yaklaşıyor.</p>
         <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p style="margin: 4px 0; color: #475569;"><strong>Egitim:</strong> ${trainingTitle}</p>
-          <p style="margin: 4px 0; color: #475569;"><strong>Son Tarih:</strong> ${dueDate}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Eğitim:</strong> ${escapeHtml(trainingTitle)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Son Tarih:</strong> ${escapeHtml(dueDate)}</p>
         </div>
-        <p style="color: #64748b;">Lutfen zamaninda tamamlayiniz. Gecikme durumunda yoneticinize bildirim gidecektir.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/staff/my-trainings"
+        <p style="color: #64748b;">Lütfen zamanında tamamlayınız. Gecikme durumunda yöneticinize bildirim gidecektir.</p>
+        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/staff/my-trainings"
            style="display: inline-block; background: ${urgencyColor}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Egitime Git
+          Eğitime Git
         </a>
       </div>
     </div>
@@ -156,22 +169,22 @@ export function certificateExpiryReminderEmail(staffName: string, trainingTitle:
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, ${urgencyColor}, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
         <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Sertifika Yenileme Hatirlatmasi</p>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Sertifika Yenileme Hatırlatması</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <div style="background: ${urgencyBg}; border-left: 4px solid ${urgencyColor}; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
           <p style="margin: 0; font-weight: bold; color: ${urgencyColor};">${urgencyLabel}</p>
         </div>
-        <p style="color: #64748b;">Merhaba ${staffName},</p>
-        <p style="color: #64748b;"><strong>"${trainingTitle}"</strong> egitim sertifikanizin gecerlilik suresi dolmak uzere.</p>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(staffName)},</p>
+        <p style="color: #64748b;"><strong>"${escapeHtml(trainingTitle)}"</strong> eğitim sertifikanızın geçerlilik süresi dolmak üzere.</p>
         <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p style="margin: 4px 0; color: #475569;"><strong>Sertifika:</strong> ${trainingTitle}</p>
-          <p style="margin: 4px 0; color: #475569;"><strong>Gecerlilik Tarihi:</strong> ${expiryDate}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Sertifika:</strong> ${escapeHtml(trainingTitle)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Geçerlilik Tarihi:</strong> ${escapeHtml(expiryDate)}</p>
         </div>
-        <p style="color: #64748b;">Sertifikanizin suresi dolmadan once egitimi tekrar tamamlamaniz gerekmektedir.</p>
-        <a href="${renewLink}"
+        <p style="color: #64748b;">Sertifikanızın süresi dolmadan önce eğitimi tekrar tamamlamanız gerekmektedir.</p>
+        <a href="${escapeHtml(renewLink)}"
            style="display: inline-block; background: ${urgencyColor}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Egitimi Yenile
+          Eğitimi Yenile
         </a>
       </div>
     </div>
@@ -188,14 +201,14 @@ export function overdueTrainingReminderEmail(staffName: string, trainingTitle: s
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-          <p style="margin: 0; font-weight: bold; color: #dc2626;">${daysOverdue} gun gecikti!</p>
+          <p style="margin: 0; font-weight: bold; color: #dc2626;">${daysOverdue} gün gecikti!</p>
         </div>
-        <p style="color: #64748b;">Merhaba ${staffName},</p>
-        <p style="color: #64748b;"><strong>"${trainingTitle}"</strong> egitiminiz ${dueDate} tarihinde tamamlanmasi gerekiyordu.</p>
-        <p style="color: #64748b;">Lutfen en kisa surede bu egitimi tamamlayiniz.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/staff/my-trainings"
+        <p style="color: #64748b;">Merhaba ${escapeHtml(staffName)},</p>
+        <p style="color: #64748b;"><strong>"${escapeHtml(trainingTitle)}"</strong> eğitiminiz ${escapeHtml(dueDate)} tarihinde tamamlanması gerekiyordu.</p>
+        <p style="color: #64748b;">Lütfen en kısa sürede bu eğitimi tamamlayınız.</p>
+        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/staff/my-trainings"
            style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Egitimi Tamamla
+          Eğitimi Tamamla
         </a>
       </div>
     </div>

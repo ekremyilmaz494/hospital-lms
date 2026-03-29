@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft, ArrowRight, Save, Info, Video, FileQuestion, Users, Check, Plus, Trash2,
+  ArrowLeft, ArrowRight, Info, Video, FileQuestion, Users, Check, Plus, Trash2,
   GripVertical, Upload, Clock, Award, Calendar, Target, Sparkles, BookOpen, CheckCircle2,
   ShieldCheck, RefreshCw, Building2
 } from 'lucide-react';
@@ -30,7 +30,7 @@ interface Dept { id: string; name: string; count: number; color: string; staff: 
 export default function NewTrainingPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { data: departmentsData, isLoading: deptsLoading } = useFetch<Dept[]>('/api/admin/departments');
+  const { data: departmentsData } = useFetch<Dept[]>('/api/admin/departments');
   const departments: Dept[] = departmentsData ?? [];
   const [currentStep, setCurrentStep] = useState(1);
   const [publishing, setPublishing] = useState(false);

@@ -97,12 +97,7 @@ export function DashboardLists() {
             {recentHospitals.map((hospital, idx) => (
               <div
                 key={hospital.id}
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5"
-                style={{
-                  transition: 'background var(--transition-fast)',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-hover)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors duration-150 hover:bg-[var(--color-surface-hover)]"
               >
                 {/* Rank Badge */}
                 <div

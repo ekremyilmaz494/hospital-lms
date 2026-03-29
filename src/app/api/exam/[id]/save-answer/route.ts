@@ -36,7 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       orderBy: { attemptNumber: 'desc' },
     })
   }
-  if (!attempt) return errorResponse('Aktif sinav denemesi bulunamadi', 404)
+  if (!attempt) return errorResponse('Aktif sınav denemesi bulunamadı', 404)
 
   // Verify org isolation
   if (attempt.training.organizationId !== dbUser!.organizationId) {

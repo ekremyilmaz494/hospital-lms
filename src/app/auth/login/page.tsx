@@ -309,14 +309,14 @@ function LoginForm() {
                   }}
                 >
                   <Shield className="h-5 w-5" />
-                  {ssoInfo.orgName} SSO ile Giris Yap
+                  {ssoInfo.orgName} SSO ile Giriş Yap
                 </button>
               )}
 
               {ssoInfo && (
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>veya sifre ile</span>
+                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>veya şifre ile</span>
                   <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
                 </div>
               )}
@@ -331,7 +331,7 @@ function LoginForm() {
                 background="linear-gradient(135deg, #0d9668 0%, #065f46 100%)"
               >
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
-                {loading ? 'Giris yapiliyor...' : 'Giris Yap'}
+                {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
                 {!loading && <ChevronRight className="h-4 w-4 ml-1 opacity-60" />}
               </ShimmerButton>
             </form>

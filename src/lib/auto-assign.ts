@@ -48,6 +48,26 @@ export async function autoAssignByDepartment(
 
   if (assignedCount > 0) {
     logger.info('AutoAssign', `${assignedCount} egitim otomatik atandi`, { userId, departmentId })
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          action: 'auto_assign',
+          entityType: 'training_assignment',
+          entityId: departmentId,
+          organizationId,
+          userId: assignedById ?? userId,
+          newData: {
+            assignedCount,
+            targetUserId: userId,
+            departmentId,
+            message: `${assignedCount} eğitim departman kuralına göre otomatik atandı`,
+          },
+        },
+      })
+    } catch (err) {
+      logger.warn('AutoAssign', 'Audit log olusturulamadi', (err as Error).message)
+    }
   }
 
   return assignedCount

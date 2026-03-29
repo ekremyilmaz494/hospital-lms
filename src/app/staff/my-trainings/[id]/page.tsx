@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch, clearFetchCache } from '@/hooks/use-fetch';
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { PageLoading } from '@/components/shared/page-loading';
 
 interface TrainingVideo {
@@ -46,10 +46,12 @@ export default function TrainingDetailPage() {
   // showing cached data causes wrong step to flash briefly
   const apiUrl = id ? `/api/staff/my-trainings/${id}` : null;
   const cacheCleared = useRef(false);
-  if (apiUrl && !cacheCleared.current) {
-    cacheCleared.current = true;
-    clearFetchCache(apiUrl);
-  }
+  useEffect(() => {
+    if (apiUrl && !cacheCleared.current) {
+      cacheCleared.current = true;
+      clearFetchCache(apiUrl);
+    }
+  }, [apiUrl]);
 
   const { data: training, isLoading, error } = useFetch<TrainingDetail>(apiUrl);
 

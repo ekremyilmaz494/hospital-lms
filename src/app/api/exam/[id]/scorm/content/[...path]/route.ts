@@ -64,12 +64,12 @@ export async function GET(
     })
 
     if (!training || !training.scormManifestPath) {
-      return errorResponse('SCORM icerigi bulunamadi', 404)
+      return errorResponse('SCORM içeriği bulunamadı', 404)
     }
 
     // Org isolation
     if (dbUser!.role !== 'super_admin' && training.organizationId !== dbUser!.organizationId) {
-      return errorResponse('Bu icerigi goruntuleme yetkiniz yok', 403)
+      return errorResponse('Bu içeriği görüntüleme yetkiniz yok', 403)
     }
 
     // Extract base path from manifest path (directory containing imsmanifest.xml)
@@ -78,7 +78,7 @@ export async function GET(
 
     // Prevent path traversal
     if (filePath.includes('..')) {
-      return errorResponse('Gecersiz dosya yolu', 400)
+      return errorResponse('Geçersiz dosya yolu', 400)
     }
 
     const s3Key = `${basePath}/${filePath}`
@@ -91,7 +91,7 @@ export async function GET(
     const response = await s3.send(command)
 
     if (!response.Body) {
-      return errorResponse('Dosya bulunamadi', 404)
+      return errorResponse('Dosya bulunamadı', 404)
     }
 
     // Convert S3 stream to buffer

@@ -1,24 +1,12 @@
-'use client';
+import type { Metadata } from 'next';
+import { ExamAuthGuard } from './exam-auth-guard';
 
-import { useAuth } from '@/hooks/use-auth';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+export const metadata: Metadata = {
+  title: 'Sinav | Hastane LMS',
+  description: 'Hastane personeli egitim sinav modulu',
+};
 
+/** Sinav layout - fullscreen, sidebar yok */
 export default function ExamLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace('/auth/login');
-    }
-  }, [user, isLoading, router]);
-
-  if (isLoading || !user) return null;
-
-  return (
-    <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
-      {children}
-    </div>
-  );
+  return <ExamAuthGuard>{children}</ExamAuthGuard>;
 }

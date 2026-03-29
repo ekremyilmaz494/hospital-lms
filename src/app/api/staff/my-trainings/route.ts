@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
@@ -13,6 +13,7 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url)
+    const { page, limit, skip } = safePagination(searchParams)
     const status = searchParams.get('status') // assigned | in_progress | passed | failed
 
     const where: Record<string, unknown> = {
@@ -21,19 +22,23 @@ export async function GET(request: Request) {
     }
     if (status) where.status = status
 
-    const assignments = await prisma.trainingAssignment.findMany({
-      where,
-      include: {
-        training: {
-          include: {
-            _count: { select: { questions: true, videos: true } },
+    const [assignments, totalCount] = await Promise.all([
+      prisma.trainingAssignment.findMany({
+        where,
+        include: {
+          training: {
+            include: {
+              _count: { select: { questions: true, videos: true } },
+            },
           },
+          examAttempts: { orderBy: { attemptNumber: 'desc' } },
         },
-        examAttempts: { orderBy: { attemptNumber: 'desc' } },
-      },
-      orderBy: { assignedAt: 'desc' },
-      take: 200,
-    })
+        orderBy: { assignedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.trainingAssignment.count({ where }),
+    ])
 
     const now = new Date()
 
@@ -76,7 +81,13 @@ export async function GET(request: Request) {
       }
     })
 
-    return jsonResponse(result)
+    return jsonResponse({
+      data: result,
+      page,
+      limit,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+    })
   } catch (err) {
     logger.error('Staff MyTrainings', 'Eğitimler yüklenemedi', err)
     return errorResponse('Eğitimler yüklenemedi', 503)

@@ -3,7 +3,7 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function AdminError({
+export default function StaffError({
   error,
   reset,
 }: {

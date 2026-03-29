@@ -24,21 +24,25 @@ export async function POST(request: Request) {
 
   // Plan bilgilerini al
   const plan = await prisma.subscriptionPlan.findUnique({ where: { id: body.planId } })
-  if (!plan || !plan.isActive) return errorResponse('Plan bulunamadi', 404)
+  if (!plan || !plan.isActive) return errorResponse('Plan bulunamadı', 404)
 
   const price = body.billingCycle === 'annual' ? plan.priceAnnual : plan.priceMonthly
-  if (!price || Number(price) <= 0) return errorResponse('Bu plan icin fiyat tanimlanmamis')
+  if (!price || Number(price) <= 0) return errorResponse('Bu plan için fiyat tanımlanmamış')
 
   // Organization bilgileri
   const org = await prisma.organization.findUnique({ where: { id: orgId } })
-  if (!org) return errorResponse('Organizasyon bulunamadi', 404)
+  if (!org) return errorResponse('Organizasyon bulunamadı', 404)
+
+  // Aktif abonelik kontrolu
+  const subscription = await prisma.organizationSubscription.findUnique({ where: { organizationId: orgId } })
+  if (!subscription) return errorResponse('Aktif abonelik bulunamadı. Lütfen önce bir plan seçiniz.', 404)
 
   const conversationId = `SUB-${orgId.slice(0, 8)}-${Date.now()}`
 
   // Ödeme kaydı oluştur (pending)
   const payment = await prisma.payment.create({
     data: {
-      subscriptionId: (await prisma.organizationSubscription.findUnique({ where: { organizationId: orgId } }))?.id ?? '',
+      subscriptionId: subscription.id,
       organizationId: orgId,
       amount: price,
       currency: 'TRY',
@@ -85,7 +89,7 @@ export async function POST(request: Request) {
       basketItems: [
         {
           id: plan.id,
-          name: `${plan.name} - ${body.billingCycle === 'annual' ? 'Yillik' : 'Aylik'}`,
+          name: `${plan.name} - ${body.billingCycle === 'annual' ? 'Yıllık' : 'Aylık'}`,
           category1: 'SaaS Abonelik',
           itemType: 'VIRTUAL',
           price: Number(price).toFixed(2),
@@ -114,6 +118,6 @@ export async function POST(request: Request) {
       data: { status: 'failed', errorMessage: (err as Error).message },
     })
     logger.error('Payment Checkout', 'Iyzico checkout baslatilamadi', (err as Error).message)
-    return errorResponse('Odeme formu olusturulamadi. Lutfen tekrar deneyin.')
+    return errorResponse('Ödeme formu oluşturulamadı. Lütfen tekrar deneyin.')
   }
 }

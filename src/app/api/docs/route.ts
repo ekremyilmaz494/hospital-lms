@@ -11,39 +11,39 @@ const API_DOCS = {
   paths: {
     // ── Auth ──
     '/auth/login': {
-      post: { summary: 'Giris yap', tags: ['Auth'], requestBody: { content: { 'application/json': { schema: { properties: { email: { type: 'string' }, password: { type: 'string' } } } } } }, responses: { 200: { description: 'Basarili giris' }, 401: { description: 'Hatali kimlik' }, 429: { description: 'Rate limit' } } },
+      post: { summary: 'Giriş yap', tags: ['Auth'], requestBody: { content: { 'application/json': { schema: { properties: { email: { type: 'string' }, password: { type: 'string' } } } } } }, responses: { 200: { description: 'Başarılı giriş' }, 401: { description: 'Hatalı kimlik' }, 429: { description: 'Rate limit' } } },
     },
-    '/auth/logout': { post: { summary: 'Cikis yap', tags: ['Auth'] } },
-    '/auth/me': { get: { summary: 'Mevcut kullanici bilgisi', tags: ['Auth'], security: [{ bearer: [] }] } },
-    '/auth/mfa/enroll': { post: { summary: '2FA TOTP kurulumu baslat', tags: ['Auth', 'MFA'], security: [{ bearer: [] }] } },
-    '/auth/mfa/verify': { post: { summary: '2FA TOTP kodu dogrula', tags: ['Auth', 'MFA'], security: [{ bearer: [] }] } },
-    '/auth/mfa/unenroll': { post: { summary: '2FA devre disi birak', tags: ['Auth', 'MFA'], security: [{ bearer: [] }] } },
+    '/auth/logout': { post: { summary: 'Çıkış yap', tags: ['Auth'] } },
+    '/auth/me': { get: { summary: 'Mevcut kullanıcı bilgisi', tags: ['Auth'], security: [{ bearer: [] }] } },
+    '/auth/mfa/enroll': { post: { summary: '2FA TOTP kurulumu başlat', tags: ['Auth', 'MFA'], security: [{ bearer: [] }] } },
+    '/auth/mfa/verify': { post: { summary: '2FA TOTP kodu doğrula', tags: ['Auth', 'MFA'], security: [{ bearer: [] }] } },
+    '/auth/mfa/unenroll': { post: { summary: '2FA devre dışı bırak', tags: ['Auth', 'MFA'], security: [{ bearer: [] }] } },
 
     // ── Admin: Dashboard ──
     '/admin/dashboard': { get: { summary: 'Dashboard verileri', tags: ['Admin'], security: [{ bearer: [] }] } },
-    '/admin/dashboard/stats': { get: { summary: 'Ozet istatistikler', tags: ['Admin'], security: [{ bearer: [] }] } },
+    '/admin/dashboard/stats': { get: { summary: 'Özet istatistikler', tags: ['Admin'], security: [{ bearer: [] }] } },
 
     // ── Admin: Staff ──
     '/admin/staff': {
-      get: { summary: 'Personel listesi (sayfalamali)', tags: ['Admin: Personel'], parameters: [{ name: 'page', in: 'query', schema: { type: 'integer' } }, { name: 'limit', in: 'query', schema: { type: 'integer' } }, { name: 'search', in: 'query', schema: { type: 'string' } }], security: [{ bearer: [] }] },
-      post: { summary: 'Yeni personel olustur', tags: ['Admin: Personel'], security: [{ bearer: [] }] },
+      get: { summary: 'Personel listesi (sayfalmalı)', tags: ['Admin: Personel'], parameters: [{ name: 'page', in: 'query', schema: { type: 'integer' } }, { name: 'limit', in: 'query', schema: { type: 'integer' } }, { name: 'search', in: 'query', schema: { type: 'string' } }], security: [{ bearer: [] }] },
+      post: { summary: 'Yeni personel oluştur', tags: ['Admin: Personel'], security: [{ bearer: [] }] },
     },
     '/admin/staff/{id}': {
       get: { summary: 'Personel detay', tags: ['Admin: Personel'], security: [{ bearer: [] }] },
-      patch: { summary: 'Personel guncelle', tags: ['Admin: Personel'], security: [{ bearer: [] }] },
+      patch: { summary: 'Personel güncelle', tags: ['Admin: Personel'], security: [{ bearer: [] }] },
       delete: { summary: 'Personel deaktive et (soft delete)', tags: ['Admin: Personel'], security: [{ bearer: [] }] },
     },
     '/admin/bulk-import': { post: { summary: 'Excel ile toplu personel import', tags: ['Admin: Personel'], requestBody: { content: { 'multipart/form-data': { schema: { properties: { file: { type: 'string', format: 'binary' } } } } } }, security: [{ bearer: [] }] } },
 
     // ── Admin: Trainings ──
     '/admin/trainings': {
-      get: { summary: 'Egitim listesi', tags: ['Admin: Egitim'], security: [{ bearer: [] }] },
-      post: { summary: 'Yeni egitim olustur', tags: ['Admin: Egitim'], security: [{ bearer: [] }] },
+      get: { summary: 'Eğitim listesi', tags: ['Admin: Eğitim'], security: [{ bearer: [] }] },
+      post: { summary: 'Yeni eğitim oluştur', tags: ['Admin: Eğitim'], security: [{ bearer: [] }] },
     },
     '/admin/trainings/{id}': {
-      get: { summary: 'Egitim detay', tags: ['Admin: Egitim'], security: [{ bearer: [] }] },
-      patch: { summary: 'Egitim guncelle', tags: ['Admin: Egitim'], security: [{ bearer: [] }] },
-      delete: { summary: 'Egitim sil', tags: ['Admin: Egitim'], security: [{ bearer: [] }] },
+      get: { summary: 'Eğitim detay', tags: ['Admin: Eğitim'], security: [{ bearer: [] }] },
+      patch: { summary: 'Eğitim güncelle', tags: ['Admin: Eğitim'], security: [{ bearer: [] }] },
+      delete: { summary: 'Eğitim sil', tags: ['Admin: Eğitim'], security: [{ bearer: [] }] },
     },
 
     // ── Admin: Departments ──
@@ -52,7 +52,7 @@ const API_DOCS = {
       post: { summary: 'Yeni departman', tags: ['Admin: Departman'], security: [{ bearer: [] }] },
     },
     '/admin/departments/{id}': {
-      patch: { summary: 'Departman guncelle', tags: ['Admin: Departman'], security: [{ bearer: [] }] },
+      patch: { summary: 'Departman güncelle', tags: ['Admin: Departman'], security: [{ bearer: [] }] },
       delete: { summary: 'Departman sil', tags: ['Admin: Departman'], security: [{ bearer: [] }] },
     },
 
@@ -67,7 +67,7 @@ const API_DOCS = {
     // ── Admin: Notifications ──
     '/admin/notifications': {
       get: { summary: 'Bildirim listesi', tags: ['Admin: Bildirim'], security: [{ bearer: [] }] },
-      post: { summary: 'Bildirim olustur', tags: ['Admin: Bildirim'], security: [{ bearer: [] }] },
+      post: { summary: 'Bildirim oluştur', tags: ['Admin: Bildirim'], security: [{ bearer: [] }] },
     },
 
     // ── Admin: Backups ──
@@ -79,35 +79,35 @@ const API_DOCS = {
 
     // ── Admin: Settings ──
     '/admin/settings': {
-      get: { summary: 'Ayarlari getir', tags: ['Admin: Ayarlar'], security: [{ bearer: [] }] },
-      put: { summary: 'Ayarlari guncelle', tags: ['Admin: Ayarlar'], security: [{ bearer: [] }] },
+      get: { summary: 'Ayarları getir', tags: ['Admin: Ayarlar'], security: [{ bearer: [] }] },
+      put: { summary: 'Ayarları güncelle', tags: ['Admin: Ayarlar'], security: [{ bearer: [] }] },
     },
 
     // ── Admin: Audit & Compliance ──
-    '/admin/audit-logs': { get: { summary: 'Denetim kayitlari', tags: ['Admin: Denetim'], security: [{ bearer: [] }] } },
+    '/admin/audit-logs': { get: { summary: 'Denetim kayıtları', tags: ['Admin: Denetim'], security: [{ bearer: [] }] } },
     '/admin/compliance': { get: { summary: 'Uyum raporu', tags: ['Admin: Denetim'], security: [{ bearer: [] }] } },
-    '/admin/effectiveness': { get: { summary: 'Egitim etkinlik raporu', tags: ['Admin: Denetim'], security: [{ bearer: [] }] } },
+    '/admin/effectiveness': { get: { summary: 'Eğitim etkinlik raporu', tags: ['Admin: Denetim'], security: [{ bearer: [] }] } },
     '/admin/competency-matrix': { get: { summary: 'Yetkinlik matrisi', tags: ['Admin: Denetim'], security: [{ bearer: [] }] } },
 
     // ── Staff ──
     '/staff/dashboard': { get: { summary: 'Personel dashboard', tags: ['Personel'], security: [{ bearer: [] }] } },
-    '/staff/my-trainings': { get: { summary: 'Atanmis egitimler', tags: ['Personel'], security: [{ bearer: [] }] } },
-    '/staff/my-trainings/{id}': { get: { summary: 'Egitim detay', tags: ['Personel'], security: [{ bearer: [] }] } },
-    '/staff/certificates': { get: { summary: 'Sertifikalarim', tags: ['Personel'], security: [{ bearer: [] }] } },
-    '/staff/calendar': { get: { summary: 'Egitim takvimi', tags: ['Personel'], security: [{ bearer: [] }] } },
+    '/staff/my-trainings': { get: { summary: 'Atanmış eğitimler', tags: ['Personel'], security: [{ bearer: [] }] } },
+    '/staff/my-trainings/{id}': { get: { summary: 'Eğitim detay', tags: ['Personel'], security: [{ bearer: [] }] } },
+    '/staff/certificates': { get: { summary: 'Sertifikalarım', tags: ['Personel'], security: [{ bearer: [] }] } },
+    '/staff/calendar': { get: { summary: 'Eğitim takvimi', tags: ['Personel'], security: [{ bearer: [] }] } },
     '/staff/profile': {
       get: { summary: 'Profil bilgileri', tags: ['Personel'], security: [{ bearer: [] }] },
-      patch: { summary: 'Profil guncelle', tags: ['Personel'], security: [{ bearer: [] }] },
+      patch: { summary: 'Profil güncelle', tags: ['Personel'], security: [{ bearer: [] }] },
     },
     '/staff/notifications': { get: { summary: 'Bildirimler', tags: ['Personel'], security: [{ bearer: [] }] } },
 
     // ── Exam ──
-    '/exam/{id}/start': { post: { summary: 'Sinav basalt', tags: ['Sinav'], security: [{ bearer: [] }] } },
-    '/exam/{id}/questions': { get: { summary: 'Sinav sorulari', tags: ['Sinav'], security: [{ bearer: [] }] } },
-    '/exam/{id}/save-answer': { post: { summary: 'Cevap kaydet', tags: ['Sinav'], security: [{ bearer: [] }] } },
-    '/exam/{id}/submit': { post: { summary: 'Sinavi bitir', tags: ['Sinav'], security: [{ bearer: [] }] } },
-    '/exam/{id}/timer': { get: { summary: 'Sinav zamanlayici', tags: ['Sinav'], security: [{ bearer: [] }] } },
-    '/exam/{id}/videos': { get: { summary: 'Egitim videolari', tags: ['Sinav'], security: [{ bearer: [] }] } },
+    '/exam/{id}/start': { post: { summary: 'Sınav başlat', tags: ['Sınav'], security: [{ bearer: [] }] } },
+    '/exam/{id}/questions': { get: { summary: 'Sınav soruları', tags: ['Sınav'], security: [{ bearer: [] }] } },
+    '/exam/{id}/save-answer': { post: { summary: 'Cevap kaydet', tags: ['Sınav'], security: [{ bearer: [] }] } },
+    '/exam/{id}/submit': { post: { summary: 'Sınavı bitir', tags: ['Sınav'], security: [{ bearer: [] }] } },
+    '/exam/{id}/timer': { get: { summary: 'Sınav zamanlayıcı', tags: ['Sınav'], security: [{ bearer: [] }] } },
+    '/exam/{id}/videos': { get: { summary: 'Eğitim videoları', tags: ['Sınav'], security: [{ bearer: [] }] } },
 
     // ── Super Admin ──
     '/super-admin/dashboard': { get: { summary: 'Platform dashboard', tags: ['Super Admin'], security: [{ bearer: [] }] } },
@@ -117,15 +117,15 @@ const API_DOCS = {
     },
     '/super-admin/hospitals/{id}': {
       get: { summary: 'Hastane detay', tags: ['Super Admin'], security: [{ bearer: [] }] },
-      patch: { summary: 'Hastane guncelle', tags: ['Super Admin'], security: [{ bearer: [] }] },
+      patch: { summary: 'Hastane güncelle', tags: ['Super Admin'], security: [{ bearer: [] }] },
     },
-    '/super-admin/subscriptions': { get: { summary: 'Abonelik planlari', tags: ['Super Admin'], security: [{ bearer: [] }] } },
-    '/super-admin/reports': { get: { summary: 'Platform raporlari', tags: ['Super Admin'], security: [{ bearer: [] }] } },
-    '/super-admin/audit-logs': { get: { summary: 'Platform denetim kayitlari', tags: ['Super Admin'], security: [{ bearer: [] }] } },
+    '/super-admin/subscriptions': { get: { summary: 'Abonelik planları', tags: ['Super Admin'], security: [{ bearer: [] }] } },
+    '/super-admin/reports': { get: { summary: 'Platform raporları', tags: ['Super Admin'], security: [{ bearer: [] }] } },
+    '/super-admin/audit-logs': { get: { summary: 'Platform denetim kayıtları', tags: ['Super Admin'], security: [{ bearer: [] }] } },
 
     // ── System ──
-    '/health': { get: { summary: 'Sistem saglık kontrolu', tags: ['Sistem'], description: 'DB, Redis, Auth, S3, SMTP durumunu dondurur' } },
-    '/cron/cleanup': { get: { summary: 'Gunluk temizlik (03:00 UTC)', tags: ['Sistem'] } },
+    '/health': { get: { summary: 'Sistem sağlık kontrolü', tags: ['Sistem'], description: 'DB, Redis, Auth, S3, SMTP durumunu döndürür' } },
+    '/cron/cleanup': { get: { summary: 'Günlük temizlik (03:00 UTC)', tags: ['Sistem'] } },
     '/cron/backup': { get: { summary: 'Gunluk yedekleme (03:15 UTC)', tags: ['Sistem'] } },
   },
   components: {
@@ -134,20 +134,20 @@ const API_DOCS = {
     },
   },
   tags: [
-    { name: 'Auth', description: 'Kimlik dogrulama ve MFA' },
+    { name: 'Auth', description: 'Kimlik doğrulama ve MFA' },
     { name: 'Admin', description: 'Hastane admin paneli' },
-    { name: 'Admin: Personel', description: 'Personel yonetimi' },
-    { name: 'Admin: Egitim', description: 'Egitim yonetimi' },
-    { name: 'Admin: Departman', description: 'Departman yonetimi' },
+    { name: 'Admin: Personel', description: 'Personel yönetimi' },
+    { name: 'Admin: Eğitim', description: 'Eğitim yönetimi' },
+    { name: 'Admin: Departman', description: 'Departman yönetimi' },
     { name: 'Admin: Rapor', description: 'Raporlama ve export' },
-    { name: 'Admin: Sertifika', description: 'Sertifika yonetimi' },
-    { name: 'Admin: Bildirim', description: 'Bildirim yonetimi' },
-    { name: 'Admin: Yedekleme', description: 'Veritabani yedekleme' },
-    { name: 'Admin: Ayarlar', description: 'Platform ayarlari' },
+    { name: 'Admin: Sertifika', description: 'Sertifika yönetimi' },
+    { name: 'Admin: Bildirim', description: 'Bildirim yönetimi' },
+    { name: 'Admin: Yedekleme', description: 'Veritabanı yedekleme' },
+    { name: 'Admin: Ayarlar', description: 'Platform ayarları' },
     { name: 'Admin: Denetim', description: 'Denetim ve uyum' },
     { name: 'Personel', description: 'Personel paneli' },
-    { name: 'Sinav', description: 'Sinav modulu' },
-    { name: 'Super Admin', description: 'Platform yonetimi' },
+    { name: 'Sınav', description: 'Sınav modülü' },
+    { name: 'Super Admin', description: 'Platform yönetimi' },
     { name: 'Sistem', description: 'Sistem servisleri' },
   ],
 }

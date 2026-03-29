@@ -15,7 +15,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const unreadOnly = searchParams.get('unread') === 'true'
 
-    const where: Record<string, unknown> = { userId: dbUser!.id }
+    const where: Record<string, unknown> = {
+      userId: dbUser!.id,
+      organizationId: dbUser!.organizationId,
+    }
     if (unreadOnly) where.isRead = false
 
     const notifications = await prisma.notification.findMany({
@@ -24,7 +27,9 @@ export async function GET(request: Request) {
       take: 50,
     })
 
-    const unreadCount = await prisma.notification.count({ where: { userId: dbUser!.id, isRead: false } })
+    const unreadCount = await prisma.notification.count({
+      where: { userId: dbUser!.id, organizationId: dbUser!.organizationId, isRead: false },
+    })
 
     return jsonResponse({ notifications, unreadCount })
   } catch (err) {
@@ -50,12 +55,15 @@ export async function PATCH(request: Request) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (!uuidRegex.test(id)) return errorResponse('Geçersiz bildirim ID', 400)
     const result = await prisma.notification.updateMany({
-      where: { id, userId: dbUser!.id },
+      where: { id, userId: dbUser!.id, organizationId: dbUser!.organizationId },
       data: { isRead: true },
     })
     if (result.count === 0) return jsonResponse({ error: 'Bildirim bulunamadı' }, 404)
   } else {
-    await prisma.notification.updateMany({ where: { userId: dbUser!.id, isRead: false }, data: { isRead: true } })
+    await prisma.notification.updateMany({
+      where: { userId: dbUser!.id, organizationId: dbUser!.organizationId, isRead: false },
+      data: { isRead: true },
+    })
   }
 
   return jsonResponse({ success: true })

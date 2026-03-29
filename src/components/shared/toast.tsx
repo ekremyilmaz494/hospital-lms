@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
 import { CheckCircle, AlertTriangle, Info, XCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -36,13 +36,12 @@ const colors: Record<ToastType, { bg: string; border: string; text: string; icon
   info: { bg: 'var(--color-info-bg)', border: 'var(--color-info)', text: 'var(--color-info)', icon: 'var(--color-info)' },
 };
 
-let globalId = 0;
-
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const idCounter = useRef(0);
 
   const addToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = ++globalId;
+    const id = ++idCounter.current;
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   }, []);
@@ -56,7 +55,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {/* Toast container */}
-      <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 max-w-sm">
+      <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 max-w-sm" aria-live="polite">
         <AnimatePresence>
           {toasts.map((t) => {
             const Icon = icons[t.type];
@@ -64,6 +63,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             return (
               <motion.div
                 key={t.id}
+                role="alert"
                 initial={{ opacity: 0, y: 20, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 100, scale: 0.95 }}

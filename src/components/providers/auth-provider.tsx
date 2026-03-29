@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, hasSupabaseCredentials } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 
 const DB_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 dakika
@@ -44,11 +44,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [setUser, router]);
 
   useEffect(() => {
+    // Supabase credentials yoksa demo modda calis
+    if (!hasSupabaseCredentials) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
 
     // Get initial session
     setLoading(true);
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
         setUser({
           id: user.id,
@@ -64,11 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           title: user.user_metadata?.title ?? null,
           avatarUrl: user.user_metadata?.avatar_url ?? null,
           isActive: user.user_metadata?.is_active !== false,
+          kvkkConsent: user.user_metadata?.kvkk_consent ?? false,
+          kvkkConsentDate: user.user_metadata?.kvkk_consent_date ?? null,
           createdAt: user.created_at,
           updatedAt: user.updated_at ?? user.created_at,
         });
-        // Hemen DB'den guncel veri al
-        refreshFromDB();
+        // DB'den guncel veri al — loading, refreshFromDB bitene kadar true kalir
+        await refreshFromDB();
       } else {
         setUser(null);
       }
@@ -102,6 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           title: u.user_metadata?.title ?? null,
           avatarUrl: u.user_metadata?.avatar_url ?? null,
           isActive: u.user_metadata?.is_active !== false,
+          kvkkConsent: u.user_metadata?.kvkk_consent ?? false,
+          kvkkConsentDate: u.user_metadata?.kvkk_consent_date ?? null,
           createdAt: u.created_at,
           updatedAt: u.updated_at ?? u.created_at,
         });
