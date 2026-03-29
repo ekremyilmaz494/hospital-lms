@@ -522,6 +522,34 @@ export default function ProfilePage() {
               </div>
             </div>
           </BlurFade>
+
+          {/* ─── MFA / 2FA ─── */}
+          <BlurFade delay={0.5}>
+            <div className="rounded-2xl border p-7" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <div className="mb-5 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--color-info-bg)' }}>
+                  <Shield className="h-5 w-5" style={{ color: 'var(--color-info)' }} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>İki Faktörlü Doğrulama (2FA)</h3>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Hesabınızı ek güvenlik katmanıyla koruyun</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border p-4" style={{ borderColor: 'var(--color-border)' }}>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Authenticator Uygulaması</p>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Google Authenticator veya benzeri uygulama ile 6 haneli kod</p>
+                </div>
+                <a
+                  href="/auth/mfa-setup"
+                  className="rounded-lg px-4 py-2 text-sm font-semibold"
+                  style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
+                >
+                  Ayarla
+                </a>
+              </div>
+            </div>
+          </BlurFade>
         </div>
       </div>
     </div>

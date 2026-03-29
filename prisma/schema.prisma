@@ -41,6 +41,22 @@ model Organization {
   suspendedReason String?  @db.Text @map("suspended_reason")
   suspendedAt     DateTime? @map("suspended_at") @db.Timestamptz
   sessionTimeout  Int      @default(30) @map("session_timeout")
+  defaultPassingScore     Int @default(70) @map("default_passing_score")
+  defaultMaxAttempts      Int @default(3) @map("default_max_attempts")
+  defaultExamDuration     Int @default(30) @map("default_exam_duration")
+  // SSO / SAML Configuration
+  ssoEnabled         Boolean  @default(false) @map("sso_enabled")
+  ssoProvider        String?  @db.VarChar(50) @map("sso_provider")
+  ssoEmailDomain     String?  @db.VarChar(255) @map("sso_email_domain")
+  samlEntryPoint     String?  @db.Text @map("saml_entry_point")
+  samlIssuer         String?  @db.Text @map("saml_issuer")
+  samlCert           String?  @db.Text @map("saml_cert")
+  oidcDiscoveryUrl   String?  @db.Text @map("oidc_discovery_url")
+  oidcClientId       String?  @db.VarChar(255) @map("oidc_client_id")
+  oidcClientSecret   String?  @db.Text @map("oidc_client_secret")
+  ssoAutoProvision   Boolean  @default(true) @map("sso_auto_provision")
+  ssoDefaultRole     String   @default("staff") @db.VarChar(20) @map("sso_default_role")
+
   createdBy       String?  @db.Uuid @map("created_by")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -74,8 +90,62 @@ model OrganizationSubscription {
 
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   plan            SubscriptionPlan @relation(fields: [planId], references: [id])
+  payments        Payment[]
+  invoices        Invoice[]
 
   @@map("organization_subscriptions")
+}
+
+// ── ÖDEMELER ──
+model Payment {
+  id                  String    @id @default(uuid()) @db.Uuid
+  subscriptionId      String    @db.Uuid @map("subscription_id")
+  organizationId      String    @db.Uuid @map("organization_id")
+  amount              Decimal   @db.Decimal(10, 2)
+  currency            String    @default("TRY") @db.VarChar(3)
+  status              String    @default("pending") @db.VarChar(20)
+  paymentMethod       String?   @db.VarChar(30) @map("payment_method")
+  iyzicoPaymentId     String?   @db.VarChar(100) @map("iyzico_payment_id")
+  iyzicoConversationId String?  @db.VarChar(100) @map("iyzico_conversation_id")
+  cardLastFour        String?   @db.VarChar(4) @map("card_last_four")
+  cardBrand           String?   @db.VarChar(20) @map("card_brand")
+  errorMessage        String?   @db.Text @map("error_message")
+  paidAt              DateTime? @map("paid_at") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  subscription        OrganizationSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  invoice             Invoice?
+
+  @@index([organizationId], map: "idx_payments_org")
+  @@index([iyzicoPaymentId], map: "idx_payments_iyzico")
+  @@map("payments")
+}
+
+// ── FATURALAR ──
+model Invoice {
+  id                String    @id @default(uuid()) @db.Uuid
+  paymentId         String    @unique @db.Uuid @map("payment_id")
+  subscriptionId    String    @db.Uuid @map("subscription_id")
+  organizationId    String    @db.Uuid @map("organization_id")
+  invoiceNumber     String    @unique @db.VarChar(30) @map("invoice_number")
+  amount            Decimal   @db.Decimal(10, 2)
+  taxAmount         Decimal   @default(0) @db.Decimal(10, 2) @map("tax_amount")
+  totalAmount       Decimal   @db.Decimal(10, 2) @map("total_amount")
+  currency          String    @default("TRY") @db.VarChar(3)
+  billingName       String    @db.VarChar(255) @map("billing_name")
+  billingAddress    String?   @db.Text @map("billing_address")
+  taxNumber         String?   @db.VarChar(20) @map("tax_number")
+  taxOffice         String?   @db.VarChar(100) @map("tax_office")
+  periodStart       DateTime  @map("period_start") @db.Timestamptz
+  periodEnd         DateTime  @map("period_end") @db.Timestamptz
+  issuedAt          DateTime  @default(now()) @map("issued_at") @db.Timestamptz
+
+  payment           Payment  @relation(fields: [paymentId], references: [id])
+  subscription      OrganizationSubscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([organizationId], map: "idx_invoices_org")
+  @@index([invoiceNumber], map: "idx_invoices_number")
+  @@map("invoices")
 }
 
 // ── DEPARTMANLAR ──
@@ -92,6 +162,7 @@ model Department {
 
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   users           User[]
+  trainingRules   DepartmentTrainingRule[]
 
   @@unique([organizationId, name])
   @@index([organizationId], map: "idx_departments_org")
@@ -175,6 +246,7 @@ model Training {
   notifications       Notification[]
   certificates        Certificate[]
   scormAttempts       ScormAttempt[]
+  departmentRules     DepartmentTrainingRule[]
 
   @@index([organizationId], map: "idx_trainings_org")
   @@index([startDate, endDate], map: "idx_trainings_dates")
@@ -450,4 +522,21 @@ model ScormAttempt {
 
   @@index([userId, trainingId], map: "idx_scorm_attempts_user_training")
   @@map("scorm_attempts")
+}
+
+// ── DEPARTMAN EĞİTİM KURALLARI ──
+model DepartmentTrainingRule {
+  id             String   @id @default(uuid()) @db.Uuid
+  departmentId   String   @db.Uuid @map("department_id")
+  trainingId     String   @db.Uuid @map("training_id")
+  organizationId String   @db.Uuid @map("organization_id")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  department     Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  training       Training   @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, trainingId])
+  @@index([organizationId], map: "idx_dept_training_rules_org")
+  @@map("department_training_rules")
 }

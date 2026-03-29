@@ -71,7 +71,7 @@ export async function GET(
             firstName: true,
             lastName: true,
             organizationId: true,
-            organization: { select: { name: true } },
+            organization: { select: { name: true, logoUrl: true } },
           },
         },
         training: {
@@ -118,6 +118,24 @@ export async function GET(
 
     // Draw decorative border
     drawBorder(doc)
+
+    // Hospital logo (if available)
+    const logoUrl = certificate.user.organization?.logoUrl
+    if (logoUrl) {
+      try {
+        const logoRes = await fetch(logoUrl)
+        if (logoRes.ok) {
+          const logoBuffer = await logoRes.arrayBuffer()
+          const logoBase64 = Buffer.from(logoBuffer).toString('base64')
+          const contentType = logoRes.headers.get('content-type') ?? 'image/png'
+          const logoFormat = contentType.includes('jpeg') || contentType.includes('jpg') ? 'JPEG' : 'PNG'
+          const logoDataUrl = `data:${contentType};base64,${logoBase64}`
+          doc.addImage(logoDataUrl, logoFormat, 15, 15, 30, 30)
+        }
+      } catch (logoErr) {
+        logger.warn('Certificate PDF', 'Logo yuklenemedi, metin basligi kullaniliyor', logoErr)
+      }
+    }
 
     // Organization name
     const orgName = certificate.user.organization?.name ?? 'Hastane LMS'

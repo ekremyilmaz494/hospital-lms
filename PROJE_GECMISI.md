@@ -1106,15 +1106,315 @@ Tüm yeni modeller tek seferde eklendi (paralel agent çakışmasını önlemek 
 - `pnpm lint`: 0 yeni hata (9 pre-existing error, 79 pre-existing warning)
 - `pnpm build`: 75 sayfa başarıyla derlendi
 
-### 7.8 Güncellenen Bekleyen İşler
+---
+
+## 8. OTURUM 9 — Yedekleme Sistemi, Personel Paneli Bug Fix, Sertifika PDF, SSO/SAML, 2FA (29 Mart 2026)
+
+### 8.1 Yedekleme Sistemi Tam Tamamlama
+
+Yedekleme sistemi iskelet halindeydi — tüm eksikler kapatıldı:
+
+| Bileşen | Önceki Durum | Yapılan |
+|---------|-------------|---------|
+| S3 Upload | Sadece path referansı, dosya yüklenmiyor | `uploadBuffer()` + `backupKey()` eklendi (`src/lib/s3.ts`) |
+| GET Route | Ham `DbBackup[]` döndürüyor | `{ backups, stats }` shape'e dönüştürüldü |
+| POST Route | S3'e yüklemiyordu | Gerçek S3 upload + hata durumunda `status: 'failed'` |
+| Download | Endpoint yoktu | `/api/admin/backups/[id]/download` — S3'ten proxy + local fallback |
+| Otomatik Yedek | Cron yoktu | `/api/cron/backup` — günlük 03:15 UTC, tüm aktif org'lar |
+| Temizlik | Eski yedekler temizlenmiyordu | Cleanup cron'a 90 gün eski yedek silme eklendi |
+| Veri Kapsamı | 5 tablo yedekleniyordu | 9 tabloya çıkarıldı (departments, certificates, examAnswers, videoProgress eklendi) |
+| CORS Sorunu | Redirect → S3 CORS hatası | API proxy yaklaşımına geçildi |
+| Tablo Hizalama | Başlık-veri uyumsuzluğu | `table-layout: fixed` + doğru `w-[%]` genişlikleri |
+
+**Dosyalar:** `src/lib/s3.ts`, `src/app/api/admin/backups/route.ts`, `src/app/api/admin/backups/[id]/download/route.ts` (yeni), `src/app/api/cron/backup/route.ts` (yeni), `src/app/api/cron/cleanup/route.ts`, `vercel.json`, `src/app/admin/backups/page.tsx`
+
+### 8.2 Personel Paneli Bug Fix (16 Hata Düzeltildi)
+
+**Kritik düzeltmeler:**
+1. **GET'te DB write kaldırıldı** — Her istek auto-fix yapıyordu, in-memory resolve'a dönüştürüldü
+2. **Excel Import** — Client-side ExcelJS → Server-side `/api/admin/bulk-import` endpoint'ine taşındı
+3. **Eğitim Ata yanlış yönlendirme** — `?staffId=` query param eklendi
+4. **Departman Değiştir duplike menü** — Kaldırıldı
+5. **DB hata mesajı expose** — Güvenli Türkçe mesaj + logger
+6. **Hardcoded `/3` deneme** — `t.maxAttempts` kullanılıyor
+7. **Hardcoded `>= 70` eşik** — `t.status === 'passed'` renklendirme
+8. **PATCH'te organizationId guard** — `where: { id, organizationId }` eklendi
+9. **Calendar → Briefcase** ikonu
+10. **TC maskeleme tutarlılığı** — Detay API'de de maskeleme
+11. **Tüm İngilizce hatalar Türkçeleştirildi**
+12. **Boş eğitim geçmişi empty state** + "Eğitim Ata" butonu
+13. **Edit sayfası form validasyonu** — Ad/Soyad/Telefon doğrulaması
+14. **TC No readonly** yapıldı + açıklama notu
+15. **Pagination UI** — "Toplam X personel" bilgisi + Önceki/Sonraki butonları
+16. **`%85` → `85%`** format düzeltmesi
+17. **Aktif checkbox açıklaması** — "Pasif yapılan personel sisteme giriş yapamaz..." notu
+
+**Dosyalar:** `src/app/admin/staff/page.tsx`, `src/app/admin/staff/[id]/page.tsx`, `src/app/admin/staff/[id]/edit/page.tsx`, `src/app/api/admin/staff/route.ts`, `src/app/api/admin/staff/[id]/route.ts`, `src/app/api/admin/bulk-import/route.ts` (yeni)
+
+### 8.3 Sertifika PDF — Profesyonel Çıktı
+
+- **Sorun:** jsPDF Helvetica fontu Türkçe karakterleri desteklemiyor (İ, Ş, Ç, Ğ → kırık)
+- **Çözüm:** HTML → `html2canvas-pro` → Canvas → jsPDF yaklaşımı
+- Hidden div'de tam CSS kontrolüyle sertifika template render ediliyor
+- 2x resolution ile canvas'a çevrilip A4 landscape PDF olarak kaydediliyor
+- Paket: `html2canvas-pro` eklendi
+
+**Dosya:** `src/app/admin/certificates/page.tsx`
+
+### 8.4 Dashboard İkon Yükseltmesi (Premium StatCard)
+
+- Stat kartlarındaki ikonlar premium tasarıma yükseltildi
+- Çok katmanlı gradient arka plan, decoratif dot-grid pattern, glow halka efekti
+- Hover: `scale-110` + `rotate-3` + conic gradient glow
+- `strokeWidth={1.8}` + `drop-shadow` ikon üzerinde
+- `StatCard` bileşeni global olduğu için tüm panelleri etkiliyor
+
+**Dosya:** `src/components/shared/stat-card.tsx`
+
+### 8.5 Oturum Sonlandırma Analizi
+
+- Tam akış doğrulandı: Settings → API → DB → SessionTimeoutProvider → useSessionTimeout hook
+- Zincir sağlıklı: admin timeout değerini değiştiriyor → DB'ye kaydediliyor → provider yeniden okuyor
+- Kaydetme sonrası anında yansımıyor (sayfa yenilemesi gerekiyor) — kabul edilebilir
+
+### 8.6 Login Sorunu Çözümü (Kritik)
+
+- **Problem:** `admin@demo.com` / `demo123456` ile giriş yapılamıyordu
+- **Kök Neden:** Middleware'in `publicRoutes` listesinde `/api/auth/` yoktu. Login API'sine gelen POST isteği middleware tarafından yakalanıp login sayfasına redirect ediliyordu.
+- **Çözüm:** `/api/auth/` yolu public routes'a eklendi
+- **Doğrulama:** `curl` ile API test → 200 OK + access_token
+
+**Dosya:** `src/lib/supabase/middleware.ts`
+
+### 8.7 Dashboard 500 Hatası Çözümü (Kritik)
+
+- **Problem:** Dashboard stat kartları görünmüyordu — API 500 döndürüyordu
+- **Kök Neden:** Prisma schema'ya `KvkkRequest`, `ScormAttempt` modelleri ve `kvkkConsent`, `kvkkConsentDate` alanları eklenmiş ama DB'de karşılık gelen tablolar/kolonlar oluşturulmamıştı
+- **Çözüm:** DB'ye eksik tablolar (`kvkk_requests`, `scorm_attempts`) ve kolonlar (`kvkk_consent`, `kvkk_consent_date`, SCORM alanları) manuel eklendi
+- **Kalıcı Çözüm:** `pnpm setup` komutu oluşturuldu (adım 8.8)
+
+### 8.8 Setup Otomasyonu — `pnpm setup`
+
+GitHub'dan projeyi çekince sorunsuz çalışması için tek komutlu kurulum scripti:
+
+```bash
+pnpm setup
+```
+
+7 adımlı otomatik kurulum:
+1. `.env` dosyası kontrolü
+2. Zorunlu env var doğrulaması
+3. DB bağlantı testi
+4. `prisma generate`
+5. `prisma db push` (schema sync)
+6. RLS politikaları uygulama
+7. Demo veri seed (idempotent)
+
+**Dosyalar:** `scripts/setup.js` (yeni), `package.json` (`setup`, `db:push`, `db:seed` scriptleri eklendi)
+
+### 8.9 Health Check Genişletme
+
+`/api/health` endpoint'i genişletildi:
+
+| Servis | Kontrol |
+|--------|---------|
+| Database | `SELECT 1` sorgusu |
+| Redis | Set/Get test |
+| Supabase Auth | `/auth/v1/health` ping |
+| S3 | `HeadBucketCommand` |
+| SMTP | Config varlık kontrolü |
+
+**Dosya:** `src/app/api/health/route.ts`
+
+### 8.10 2FA / TOTP Entegrasyonu
+
+Supabase MFA API kullanılarak TOTP (Time-based One-Time Password) entegrasyonu:
+
+**API Route'ları:**
+- `POST /api/auth/mfa/enroll` — TOTP secret + QR code üretir
+- `POST /api/auth/mfa/verify` — TOTP kodunu doğrular (challenge + verify)
+- `POST /api/auth/mfa/unenroll` — MFA devre dışı bırakır
+
+**Frontend Sayfaları:**
+- `/auth/mfa-setup` — QR kod gösterimi, secret kopyalama, 6-haneli kod doğrulama
+- `/auth/mfa-verify` — Login sonrası 6-haneli kod girişi (auto-submit, paste desteği)
+
+**Login Akışı Değişikliği:**
+1. `signInWithPassword` başarılı → `mfa.listFactors()` kontrol
+2. Verified TOTP factor varsa → `{ mfaRequired: true, factorId }` dön
+3. Frontend → `/auth/mfa-verify?factorId=...&role=...` yönlendir
+4. Kullanıcı 6-haneli kod girer → `mfa.challenge()` + `mfa.verify()` → `aal2` düzeyine yükselir
+
+**Dosyalar:** `src/app/api/auth/mfa/enroll/route.ts`, `src/app/api/auth/mfa/verify/route.ts`, `src/app/api/auth/mfa/unenroll/route.ts`, `src/app/auth/mfa-setup/page.tsx`, `src/app/auth/mfa-verify/page.tsx`, `src/app/api/auth/login/route.ts`, `src/app/auth/login/page.tsx`
+
+### 8.11 SSO / SAML Entegrasyonu
+
+Per-organization SSO yapılandırması ile kurumsal kimlik sağlayıcı desteği:
+
+**Desteklenen Sağlayıcılar:**
+- SAML 2.0 (Active Directory, Okta, OneLogin)
+- OpenID Connect (Azure AD, Google Workspace, Keycloak)
+- Google Workspace (Supabase native)
+- Microsoft Azure AD (Supabase native)
+
+**Schema Değişiklikleri — Organization modeline 11 yeni alan:**
+`ssoEnabled`, `ssoProvider`, `ssoEmailDomain`, `samlEntryPoint`, `samlIssuer`, `samlCert`, `oidcDiscoveryUrl`, `oidcClientId`, `oidcClientSecret`, `ssoAutoProvision`, `ssoDefaultRole`
+
+**API Route'ları:**
+- `POST /api/auth/sso/initiate` — Email domain'den org bul, IdP URL döndür
+- `POST/GET /api/auth/sso/callback` — SAML ACS + OIDC code exchange + user auto-provisioning
+- `GET/PUT /api/auth/sso/config` — SSO ayarlarını oku/yaz
+
+**Login Sayfası Değişikliği:**
+- Email girildiğinde domain otomatik kontrol edilir
+- SSO etkin org bulunursa mavi "SSO ile Giriş" butonu + "veya şifre ile" ayracı belirir
+
+**Admin Settings:**
+- Yeni "SSO" tab'ı eklendi
+- SAML: IdP Login URL, Issuer, X.509 Cert yapılandırması
+- OIDC: Discovery URL, Client ID, Client Secret yapılandırması
+- Otomatik kullanıcı oluşturma toggle + varsayılan rol seçimi
+- ACS/Callback URL bilgisi
+
+**Dosyalar:** `prisma/schema.prisma`, `src/app/api/auth/sso/initiate/route.ts`, `src/app/api/auth/sso/callback/route.ts`, `src/app/api/auth/sso/config/route.ts`, `src/app/auth/login/page.tsx`, `src/app/admin/settings/page.tsx`, `src/lib/supabase/middleware.ts`
+
+### 8.12 API Dokümantasyonu — OpenAPI 3.0
+
+`/api/docs` endpoint'i oluşturuldu — 50+ endpoint, tag'li, public erişimli:
+
+**Kategoriler:** Auth (MFA dahil), Admin (Personel, Eğitim, Departman, Rapor, Sertifika, Bildirim, Yedekleme, Ayarlar, Denetim), Personel, Sınav, Super Admin, Sistem
+
+**Dosya:** `src/app/api/docs/route.ts`
+
+### 8.13 IT Müdürü / CIO Kriterleri — Güncel Durum
+
+| Kriter | Durum | Detay |
+|--------|-------|-------|
+| KVKK uyumu | ✅ | KVKK modülü, TC maskeleme, veri silme |
+| Güvenlik / RLS | ✅ | Tüm tablolarda RLS aktif |
+| 2FA / MFA | ✅ | TOTP entegrasyonu (Supabase MFA) |
+| SSO / SAML | ✅ | SAML 2.0 + OIDC + Google/Azure |
+| Yedekleme | ✅ | Günlük otomatik + manuel + indirme |
+| Audit log | ✅ | Tüm işlemler loglanıyor |
+| Session timeout | ✅ | Org bazlı yapılandırılabilir |
+| Health check | ✅ | DB + Redis + Auth + S3 + SMTP |
+| API dokümantasyonu | ✅ | OpenAPI 3.0 (`/api/docs`) |
+| Setup otomasyonu | ✅ | `pnpm setup` tek komut |
+| Veri lokasyonu | 🟡 | AB (Frankfurt) — Türkiye'de değil |
+| HBYS entegrasyonu | ❌ | API hazır ama entegrasyon yok |
+| Penetrasyon testi | ❌ | Harici firma gerektirir |
+
+### 8.14 Build Doğrulaması
+- `pnpm build`: 91 sayfa başarıyla derlendi (0 hata)
+- Yeni sayfalar: `mfa-setup`, `mfa-verify`, `bulk-import`, `health`, `docs`, `cron/backup`
+
+---
+
+---
+
+## 9. KAPSAMLI SaaS OLGUNLAŞTIRMA (Oturum 10 — 29 Mart 2026)
+
+Bu oturumda proje, hastane satın alma kriterlerine göre sistematik olarak değerlendirildi ve 19 eksik tespit edildi. 17'si tamamlandı.
+
+### 9.1 Güvenlik & Veritabanı Düzeltmeleri (8 Kritik Hata)
+
+| Düzeltme | Detay |
+|----------|-------|
+| RLS eksik tablolar | `departments`, `certificates`, `kvkk_requests`, `scorm_attempts` tablolarına RLS politikaları eklendi |
+| tcNo global unique | `@@unique([organizationId, tcNo])` — org-scoped unique yapıldı |
+| department varchar kaldırıldı | 20+ API route'da `departmentRel?.name` ile değiştirildi, UUID regex hack temizlendi |
+| ScormAttempt→User ilişkisi | Eksik FK ilişkisi eklendi |
+| KvkkRequest→Organization | Eksik FK ilişkisi eklendi |
+| ExamAnswer unique | `@@unique([attemptId, questionId, examPhase])` — duplicate cevap engeli |
+| 5 FK index | `training_videos`, `questions`, `question_options`, `exam_answers`, `certificates` |
+| Yeni dosyalar | `src/lib/subscription-guard.ts`, `src/lib/auto-assign.ts`, `src/lib/iyzico.ts` |
+
+### 9.2 CEO Kriterleri
+
+| Özellik | Dosyalar |
+|---------|----------|
+| **Landing page** | `src/app/page.tsx` — Hero, 4-adım akış, 6 özellik kartı, 3 fiyat planı, ROI hesaplayıcı, Devakent logosu |
+| **Devakent markası** | `public/devakent-logo.svg` — Navbar + footer'da SVG logo |
+| **Demo/trial akışı** | Landing page'den "14 Gün Ücretsiz Deneyin" CTA |
+
+### 9.3 CFO / Mali İşler Kriterleri
+
+| Özellik | Dosyalar |
+|---------|----------|
+| **Iyzico ödeme entegrasyonu** | `src/lib/iyzico.ts` — Doğrudan HTTP API (SDK uyumsuzluğu nedeniyle), SHA1 imzalama |
+| **Payment & Invoice tabloları** | `prisma/schema.prisma` — Payment (12 alan), Invoice (14 alan) + RLS |
+| **Checkout API** | `src/app/api/payments/checkout/route.ts` — 3D Secure checkout form başlatma |
+| **Callback API** | `src/app/api/payments/callback/route.ts` — Ödeme sonucu, abonelik aktivasyonu, fatura oluşturma |
+| **Abonelik yönetim paneli** | `src/app/admin/settings/page.tsx` → "Abonelik" tabı: plan durumu, kullanım oranları, fatura listesi |
+| **Limit enforcement** | `src/lib/subscription-guard.ts` — Staff/training POST'larında plan limiti kontrolü |
+| **ROI hesaplayıcı** | `src/app/page.tsx` — İnteraktif slider, sınıf içi vs LMS maliyet karşılaştırması |
+| **Subscription API** | `src/app/api/admin/subscription/route.ts` — Admin'in kendi abonelik/fatura bilgilerini görmesi |
+
+### 9.4 İK / Eğitim Müdürü Kriterleri
+
+| Özellik | Dosyalar |
+|---------|----------|
+| **Departman eğitim kuralları** | `DepartmentTrainingRule` modeli, `src/app/api/admin/departments/[id]/training-rules/route.ts` CRUD |
+| **Otomatik eğitim atama** | `src/lib/auto-assign.ts` — Personel oluşturma + departman üye ekleme sonrası tetiklenir |
+| **Settings eğitim varsayılanları** | Organization'a `defaultPassingScore`, `defaultMaxAttempts`, `defaultExamDuration` alanları, API GET/PUT |
+| **Sertifikaya hastane logosu** | `src/app/api/certificates/[id]/pdf/route.ts` — org.logoUrl varsa PDF'e addImage |
+| **Export tarih filtresi** | `src/app/api/admin/export/route.ts` — `?dateFrom=...&dateTo=...` tüm export tiplerinde |
+
+### 9.5 Kalite / Akreditasyon Müdürü Kriterleri
+
+| Özellik | Dosyalar |
+|---------|----------|
+| **Sertifika yenileme otomasyonu** | `src/app/api/cron/reminders/route.ts` — renewalPeriodMonths aktif, süresi dolunca otomatik yeniden atama |
+| **Compliance drill-down** | `src/app/api/admin/compliance/route.ts` — `?departmentId=...&page=...&limit=...`, tam personel listesi |
+| **JCI denetim raporu** | `src/app/api/admin/export/pdf/route.ts` — `?type=jci-audit` tek tıkla PDF paketi |
+| **Audit logs export** | `src/app/api/admin/export/route.ts` — `?type=audit-logs` Excel export |
+
+### 9.6 Otomatik Hatırlatma Sistemi
+
+| Özellik | Dosyalar |
+|---------|----------|
+| **Cron route** | `src/app/api/cron/reminders/route.ts` — Günlük 07:00 UTC |
+| **4 hatırlatma türü** | Yaklaşan deadline (3/1 gün), gecikmiş (7 güne kadar), sertifika yenileme (30/14/7/3 gün), sertifika süresi dolmuş → yeniden atama |
+| **Email template** | `src/lib/email.ts` — `upcomingTrainingReminderEmail` (renk kodlu urgency) |
+| **Deduplication** | `alreadyNotified()` fonksiyonu — aynı gün aynı bildirim tekrarını önler |
+
+### 9.7 Kalan Özellikler
+
+| Özellik | Dosyalar |
+|---------|----------|
+| **2FA/MFA** | `src/app/staff/profile/page.tsx` — MFA yönetim bölümü (Authenticator ayarla) |
+| **Self-service hastane kaydı** | `src/app/api/auth/register/route.ts` — Public kayıt, 14 gün trial, admin oluşturma |
+| **Health check genişletme** | `src/app/api/health/route.ts` — SMTP gerçek bağlantı doğrulama (nodemailer verify) |
+| **Bulk import preview** | `src/app/api/admin/bulk-import/route.ts` — `?preview=true` modu, satır validasyonu, duplicate kontrolü |
+| **Yetkinlik matrisi pagination** | `src/app/api/admin/competency-matrix/route.ts` — `page/limit/search/departmentId` parametreleri |
+
+### 9.8 Yapılan Teknik Kararlar
+
+1. **iyzipay SDK → Doğrudan HTTP API:** SDK'nın `fs.readdirSync` kullanımı Next.js App Router (Turbopack) ile uyumsuz. Doğrudan `fetch()` + SHA1 imzalama ile çözüldü.
+2. **department varchar kaldırma:** 20+ dosyada cascade refactoring. TypeScript type-checker tüm kırılan noktaları gösterdi, iteratif düzeltme.
+3. **Oto-atama "fire-and-forget":** Ana işlem (personel kaydı) oto-atama hatasından bağımsız — eventual consistency modeli.
+4. **Cron deduplication:** `alreadyNotified()` fonksiyonu bugünün tarih aralığında aynı userId+type+trainingId kombinasyonunu kontrol eder.
+5. **Limit enforcement "soft guard":** Abonelik yoksa veya plan yoksa izin verir (yeni organizasyonlar). Sadece plan limiti tanımlıysa kontrol devreye girer.
+
+### 9.9 Güncel İstatistikler
+
+| Metrik | Değer |
+|--------|-------|
+| Toplam route | 45+ |
+| API endpoint | 65+ |
+| Prisma model | 21 (Payment, Invoice, DepartmentTrainingRule eklendi) |
+| Cron job | 3 (cleanup, backup, reminders) |
+| Email template | 7 |
+| RLS policy | 50+ |
+| Tamamlanan görev (19'dan) | 17/19 |
+
+### 9.10 Kalan İşler
 
 | # | İş | Durum |
-|---|---|---|
-| 1 | Backup sistemi S3 upload | ⏳ Bekliyor |
-| 2 | E2E testler (Playwright) | ⏳ Bekliyor |
-| 3 | Data Table server-side pagination | ⏳ Düşük öncelik |
-| 4 | Audit log server-side search | ⏳ Düşük öncelik |
-| 5 | Skeleton loader'lar + ARIA labels | ⏳ Düşük öncelik |
-| 6 | Save-answer Zod schema | ⏳ Düşük öncelik |
-| 7 | Video progress monotonic kontrolü | ⏳ Düşük öncelik |
-| 8 | API hata format tutarsızlığı | ⏳ Düşük öncelik |
+|---|---|-------|
+| 1 | SSO / SAML logic (schema hazır) | ❌ Büyük proje |
+| 2 | API dokümantasyonu (Swagger/OpenAPI) | ❌ Ayrı proje |
+
+---
+
+*Son güncelleme: 29 Mart 2026 — Oturum 10*

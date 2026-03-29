@@ -16,8 +16,16 @@ export async function GET() {
 
   const now = new Date()
 
-  // Parallel queries with resilience — partial failures don't crash the dashboard
-  const settled = await Promise.allSettled([
+  // Parallel queries for dashboard data
+  const [
+    staffCount,
+    activeStaffCount,
+    trainingCount,
+    activeTrainingCount,
+    assignments,
+    recentLogs,
+    compulsoryTrainings,
+  ] = await Promise.all([
     prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
     prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
     prisma.training.count({ where: { organizationId: orgId } }),
@@ -41,27 +49,6 @@ export async function GET() {
       select: { id: true, title: true, complianceDeadline: true, regulatoryBody: true, assignments: { select: { status: true } } },
     }),
   ])
-
-  const queryErrors: string[] = []
-  function ok<T>(r: PromiseSettledResult<T>, fallback: T, label: string): T {
-    if (r.status === 'fulfilled') return r.value
-    queryErrors.push(`${label}: ${(r.reason as Error)?.message || 'failed'}`)
-    return fallback
-  }
-
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const staffCount = ok(settled[0], 0, 'staffCount') as number
-  const activeStaffCount = ok(settled[1], 0, 'activeStaffCount') as number
-  const trainingCount = ok(settled[2], 0, 'trainingCount') as number
-  const activeTrainingCount = ok(settled[3], 0, 'activeTrainingCount') as number
-  const assignments = ok(settled[4], [], 'assignments') as any[]
-  const recentLogs = ok(settled[5], [], 'recentLogs') as any[]
-  const compulsoryTrainings = ok(settled[6], [], 'compulsoryTrainings') as any[]
-  /* eslint-enable @typescript-eslint/no-explicit-any */
-
-  if (queryErrors.length > 0) {
-    logger.warn('Admin Dashboard', `${queryErrors.length} sorgu basarisiz`, queryErrors)
-  }
 
   // Calculate stats from assignments
   const completedCount = assignments.filter(a => a.status === 'passed').length

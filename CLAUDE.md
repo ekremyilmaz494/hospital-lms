@@ -235,3 +235,13 @@ Bu projede asagidaki GitHub repolarindaki skill ve rehberlerden faydalanilmaktad
 8. Guvenlik acigi gorursen hemen uyar
 9. Her onemli degisiklikten sonra test yazmayi hatirlat
 10. https://github.com/VoltAgent/awesome-claude-code-subagents reposundaki `security-auditor` ve `typescript-pro` subagent yaklasimlarini benimse
+
+---
+
+## Öğrenilen Dersler
+
+> Bu bölüm, projede karşılaşılan hatalar ve çözümlerinden çıkarılan kuralları içerir.
+> Her göreve başlamadan önce bu bölümü oku ve geçmiş hataları tekrarlamamak için tüm kuralları uygula.
+> Yeni bir bug fix veya çalışan çözüm bulunduğunda buraya otomatik olarak yeni bir kural eklenir.
+
+<!-- Henüz ders eklenmedi. İlk bug fix sonrası buraya otomatik eklenecek. -->

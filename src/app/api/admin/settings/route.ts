@@ -9,6 +9,9 @@ const settingsSchema = z.object({
   phone: z.string().max(20).optional(),
   address: z.string().max(500).optional(),
   sessionTimeout: z.number().int().min(5).max(480).optional(),
+  defaultPassingScore: z.coerce.number().int().min(0).max(100).optional(),
+  defaultMaxAttempts: z.coerce.number().int().min(1).max(10).optional(),
+  defaultExamDuration: z.coerce.number().int().min(5).max(180).optional(),
 })
 
 // GET /api/admin/settings — Hastane ayarlarını getir
@@ -24,13 +27,13 @@ export async function GET() {
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { name: true, logoUrl: true, email: true, phone: true, address: true, sessionTimeout: true },
+    select: { name: true, logoUrl: true, email: true, phone: true, address: true, sessionTimeout: true, defaultPassingScore: true, defaultMaxAttempts: true, defaultExamDuration: true },
   })
 
   return jsonResponse({
-    defaultPassingScore: 70,
-    defaultMaxAttempts: 3,
-    defaultExamDuration: 30,
+    defaultPassingScore: org?.defaultPassingScore ?? 70,
+    defaultMaxAttempts: org?.defaultMaxAttempts ?? 3,
+    defaultExamDuration: org?.defaultExamDuration ?? 30,
     hospitalName: org?.name ?? '',
     logoUrl: org?.logoUrl ?? '',
     email: org?.email ?? '',
@@ -57,7 +60,7 @@ export async function PUT(request: Request) {
   const parsed = settingsSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const { hospitalName, logoUrl, email, phone, address, sessionTimeout } = parsed.data
+  const { hospitalName, logoUrl, email, phone, address, sessionTimeout, defaultPassingScore, defaultMaxAttempts, defaultExamDuration } = parsed.data
 
   const oldOrg = await prisma.organization.findUnique({ where: { id: orgId } })
 
@@ -70,6 +73,9 @@ export async function PUT(request: Request) {
       ...(phone !== undefined && { phone }),
       ...(address !== undefined && { address }),
       ...(sessionTimeout !== undefined && { sessionTimeout: Math.min(Math.max(Number(sessionTimeout), 5), 480) }),
+      ...(defaultPassingScore !== undefined && { defaultPassingScore }),
+      ...(defaultMaxAttempts !== undefined && { defaultMaxAttempts }),
+      ...(defaultExamDuration !== undefined && { defaultExamDuration }),
     },
   })
 
@@ -90,5 +96,8 @@ export async function PUT(request: Request) {
     phone: updated.phone ?? '',
     address: updated.address ?? '',
     sessionTimeout: updated.sessionTimeout,
+    defaultPassingScore: updated.defaultPassingScore ?? 70,
+    defaultMaxAttempts: updated.defaultMaxAttempts ?? 3,
+    defaultExamDuration: updated.defaultExamDuration ?? 30,
   })
 }

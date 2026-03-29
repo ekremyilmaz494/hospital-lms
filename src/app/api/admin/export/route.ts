@@ -13,6 +13,18 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type') // staff | trainings | results | audit-logs
   const format = searchParams.get('format') ?? 'xlsx' // xlsx | csv
+  const dateFromRaw = searchParams.get('dateFrom')
+  const dateToRaw = searchParams.get('dateTo')
+
+  /** Parse and validate date string, returns undefined if invalid */
+  const parseDate = (raw: string | null): Date | undefined => {
+    if (!raw) return undefined
+    const d = new Date(raw)
+    return isNaN(d.getTime()) ? undefined : d
+  }
+
+  const dateFrom = parseDate(dateFromRaw)
+  const dateTo = parseDate(dateToRaw)
 
   const orgId = dbUser!.organizationId
   if (!orgId) return errorResponse('Organization not found', 403)
@@ -22,7 +34,16 @@ export async function GET(request: Request) {
 
   if (type === 'staff') {
     const staff = await prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff' },
+      where: {
+        organizationId: orgId,
+        role: 'staff',
+        ...((dateFrom || dateTo) && {
+          createdAt: {
+            ...(dateFrom && { gte: dateFrom }),
+            ...(dateTo && { lte: dateTo }),
+          },
+        }),
+      },
       include: { departmentRel: { select: { name: true } }, _count: { select: { assignments: true } } },
       orderBy: { lastName: 'asc' },
     })
@@ -92,7 +113,11 @@ export async function GET(request: Request) {
 
   if (type === 'trainings') {
     const trainings = await prisma.training.findMany({
-      where: { organizationId: orgId },
+      where: {
+        organizationId: orgId,
+        ...(dateFrom && { startDate: { gte: dateFrom } }),
+        ...(dateTo && { endDate: { lte: dateTo } }),
+      },
       include: { _count: { select: { assignments: true, videos: true, questions: true } } },
       orderBy: { createdAt: 'desc' },
     })
@@ -146,7 +171,15 @@ export async function GET(request: Request) {
 
   if (type === 'results') {
     const attempts = await prisma.examAttempt.findMany({
-      where: { training: { organizationId: orgId } },
+      where: {
+        training: { organizationId: orgId },
+        ...((dateFrom || dateTo) && {
+          createdAt: {
+            ...(dateFrom && { gte: dateFrom }),
+            ...(dateTo && { lte: dateTo }),
+          },
+        }),
+      },
       include: {
         user: { select: { firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
         training: { select: { title: true } },

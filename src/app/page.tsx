@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState } from 'react'
 import {
   GraduationCap, Shield, Building2, BarChart3, Video, Award,
@@ -9,6 +10,60 @@ import {
 } from 'lucide-react'
 import { BlurFade } from '@/components/ui/blur-fade'
 import { NumberTicker } from '@/components/ui/number-ticker'
+
+function ROICalculator() {
+  const [staffCount, setStaffCount] = useState(100)
+  const [trainingsPerYear, setTrainingsPerYear] = useState(6)
+  const classroomCostPerTraining = 2500
+  const lmsCostMonthly = staffCount <= 50 ? 4900 : staffCount <= 200 ? 12900 : 24900
+  const annualClassroom = staffCount * trainingsPerYear * (classroomCostPerTraining / staffCount)
+  const annualLMS = lmsCostMonthly * 12
+  const savings = Math.max(0, annualClassroom - annualLMS)
+  const savingsPercent = annualClassroom > 0 ? Math.round((savings / annualClassroom) * 100) : 0
+
+  return (
+    <div className="rounded-2xl border p-8" style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div>
+          <label className="mb-2 block text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            Personel Sayısı: <span style={{ color: 'var(--color-primary)' }}>{staffCount}</span>
+          </label>
+          <input type="range" min={20} max={500} step={10} value={staffCount} onChange={e => setStaffCount(Number(e.target.value))} className="w-full accent-[#0d9668]" />
+        </div>
+        <div>
+          <label className="mb-2 block text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            Yıllık Eğitim Sayısı: <span style={{ color: 'var(--color-primary)' }}>{trainingsPerYear}</span>
+          </label>
+          <input type="range" min={2} max={24} step={1} value={trainingsPerYear} onChange={e => setTrainingsPerYear(Number(e.target.value))} className="w-full accent-[#0d9668]" />
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl p-5 text-center" style={{ background: 'var(--color-error-bg)' }}>
+          <p className="text-xs font-semibold uppercase" style={{ color: 'var(--color-error)' }}>Sınıf İçi Maliyet</p>
+          <p className="mt-1 text-xl font-extrabold font-heading" style={{ color: 'var(--color-error)' }}>
+            ₺{annualClassroom.toLocaleString('tr-TR')}
+          </p>
+          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>/yıl</p>
+        </div>
+        <div className="rounded-xl p-5 text-center" style={{ background: 'var(--color-primary-light)' }}>
+          <p className="text-xs font-semibold uppercase" style={{ color: 'var(--color-primary)' }}>LMS Maliyeti</p>
+          <p className="mt-1 text-xl font-extrabold font-heading" style={{ color: 'var(--color-primary)' }}>
+            ₺{annualLMS.toLocaleString('tr-TR')}
+          </p>
+          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>/yıl</p>
+        </div>
+        <div className="rounded-xl p-5 text-center" style={{ background: 'var(--color-success-bg)' }}>
+          <p className="text-xs font-semibold uppercase" style={{ color: 'var(--color-success)' }}>Yıllık Tasarruf</p>
+          <p className="mt-1 text-xl font-extrabold font-heading" style={{ color: 'var(--color-success)' }}>
+            ₺{savings.toLocaleString('tr-TR')}
+          </p>
+          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>%{savingsPercent} daha ucuz</p>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const FEATURES = [
   {
@@ -97,16 +152,8 @@ export default function LandingPage() {
         style={{ background: 'rgba(255,255,255,0.85)', borderColor: 'var(--color-border)' }}
       >
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-white"
-              style={{ background: 'linear-gradient(135deg, #0d9668, #065f46)' }}
-            >
-              <GraduationCap className="h-5 w-5" />
-            </div>
-            <span className="text-lg font-bold tracking-tight font-heading" style={{ color: 'var(--color-text-primary)' }}>
-              Hastane LMS
-            </span>
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/devakent-logo.svg" alt="Devakent Hastanesi" width={140} height={38} priority />
           </Link>
           <div className="hidden items-center gap-8 md:flex">
             <a href="#features" className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Özellikler</a>
@@ -407,6 +454,23 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── ROI HESAPLAYICI ── */}
+      <section className="py-20" style={{ background: 'var(--color-surface)' }}>
+        <div className="mx-auto max-w-3xl px-6">
+          <BlurFade delay={0}>
+            <div className="mb-10 text-center">
+              <h2 className="mb-3 text-3xl font-bold tracking-tight font-heading" style={{ color: 'var(--color-text-primary)' }}>
+                Yatırım Getirisi Hesaplayıcı
+              </h2>
+              <p className="text-base" style={{ color: 'var(--color-text-secondary)' }}>
+                Dijital eğitim sistemine geçişle ne kadar tasarruf edeceğinizi hesaplayın
+              </p>
+            </div>
+          </BlurFade>
+          <ROICalculator />
+        </div>
+      </section>
+
       {/* ── CTA ── */}
       <section
         className="py-20"
@@ -445,16 +509,8 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid gap-8 md:grid-cols-4">
             <div>
-              <div className="mb-3 flex items-center gap-2">
-                <div
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-white"
-                  style={{ background: 'linear-gradient(135deg, #0d9668, #065f46)' }}
-                >
-                  <GraduationCap className="h-4.5 w-4.5" />
-                </div>
-                <span className="text-sm font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>
-                  Hastane LMS
-                </span>
+              <div className="mb-3">
+                <Image src="/devakent-logo.svg" alt="Devakent Hastanesi" width={120} height={32} />
               </div>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
                 Sağlık sektörüne özel personel eğitim ve sınav yönetim sistemi.
@@ -487,7 +543,7 @@ export default function LandingPage() {
           </div>
           <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t pt-6 md:flex-row" style={{ borderColor: 'var(--color-border)' }}>
             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              © {new Date().getFullYear()} Hastane LMS. Tüm hakları saklıdır.
+              © {new Date().getFullYear()} Devakent Hastanesi. Tüm hakları saklıdır.
             </p>
             <div className="flex gap-6">
               <Link href="/kvkk" className="text-xs" style={{ color: 'var(--color-text-muted)' }}>KVKK Aydınlatma</Link>

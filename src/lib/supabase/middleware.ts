@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes
-  const publicRoutes = ['/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password', '/api/auth/', '/api/health', '/api/cron/', '/help', '/login', '/kvkk', '/certificates/verify']
+  const publicRoutes = ['/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password', '/auth/mfa-verify', '/auth/mfa-setup', '/api/auth/', '/api/health', '/api/docs', '/api/cron/', '/api/payments/callback', '/help', '/login', '/kvkk', '/certificates/verify']
   if (pathname === '/' || publicRoutes.some((route) => pathname.startsWith(route))) {
     // Authenticated users on login page → redirect to dashboard
     if (user && pathname === '/auth/login') {

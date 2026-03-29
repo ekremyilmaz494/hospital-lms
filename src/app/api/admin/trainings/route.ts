@@ -2,6 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createTrainingBodySchema } from '@/lib/validations'
+import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -71,6 +72,10 @@ export async function POST(request: Request) {
 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
+
+  // Abonelik limit kontrolu
+  const limitError = await checkSubscriptionLimit(dbUser!.organizationId!, 'training')
+  if (limitError) return limitError
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')

@@ -5,6 +5,8 @@ import { createUserSchema } from '@/lib/validations'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
+import { checkSubscriptionLimit } from '@/lib/subscription-guard'
+import { autoAssignByDepartment } from '@/lib/auto-assign'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -126,6 +128,10 @@ export async function POST(request: Request) {
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
+  // Abonelik limit kontrolu
+  const limitError = await checkSubscriptionLimit(dbUser!.organizationId!, 'staff')
+  if (limitError) return limitError
+
   // Rate limit: admin başına dakikada 5 personel oluşturma
   const allowed = await checkRateLimit(`staff-create:${dbUser!.id}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
@@ -210,6 +216,11 @@ export async function POST(request: Request) {
     newData: user,
     request,
   })
+
+  // Departman kurallarına göre otomatik eğitim atama
+  if (user.departmentId) {
+    await autoAssignByDepartment(user.id, user.departmentId, dbUser!.organizationId!, dbUser!.id)
+  }
 
   revalidatePath('/admin/staff')
 

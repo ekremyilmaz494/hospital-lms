@@ -34,6 +34,29 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
+  const [ssoInfo, setSsoInfo] = useState<{ available: boolean; provider: string; redirectUrl: string; orgName: string } | null>(null);
+  const [checkingSso, setCheckingSso] = useState(false);
+
+  // Check SSO availability when email domain changes
+  const checkSso = async (emailValue: string) => {
+    const domain = emailValue.split('@')[1];
+    if (!domain || domain.length < 3) { setSsoInfo(null); return; }
+    setCheckingSso(true);
+    try {
+      const res = await fetch('/api/auth/sso/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailValue }),
+      });
+      const data = await res.json();
+      if (data.ssoAvailable) {
+        setSsoInfo({ available: true, provider: data.provider, redirectUrl: data.redirectUrl, orgName: data.orgName });
+      } else {
+        setSsoInfo(null);
+      }
+    } catch { setSsoInfo(null); }
+    finally { setCheckingSso(false); }
+  };
 
   const rawRedirect = searchParams.get('redirectTo');
   // Prevent open redirect — only allow relative paths starting with /
@@ -63,6 +86,13 @@ function LoginForm() {
       if (!res.ok) {
         setError(data.error ?? 'E-posta veya şifre hatalı.');
         setLoading(false);
+        return;
+      }
+
+      // MFA required — redirect to verification page
+      if (data.mfaRequired) {
+        const role = data.user?.role as string;
+        router.push(`/auth/mfa-verify?factorId=${data.factorId}&role=${role}`);
         return;
       }
 
@@ -205,10 +235,19 @@ function LoginForm() {
                   type="email"
                   placeholder="ornek@hastane.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    // Check SSO when email has valid domain
+                    const val = e.target.value;
+                    if (val.includes('@') && val.split('@')[1]?.includes('.')) {
+                      checkSso(val);
+                    } else {
+                      setSsoInfo(null);
+                    }
+                  }}
                   autoComplete="email"
                   className="h-12 rounded-xl text-[15px]"
-                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                  style={{ background: 'var(--color-surface)', borderColor: ssoInfo ? 'var(--color-info)' : 'var(--color-border)' }}
                   required
                 />
               </div>
@@ -257,6 +296,31 @@ function LoginForm() {
                 </label>
               </div>
 
+              {/* SSO Button — shown when email domain matches an SSO-enabled org */}
+              {ssoInfo && (
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = ssoInfo.redirectUrl; }}
+                  className="w-full h-12 flex items-center justify-center gap-2.5 rounded-xl text-[15px] font-semibold transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                  style={{
+                    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                    color: 'white',
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                  }}
+                >
+                  <Shield className="h-5 w-5" />
+                  {ssoInfo.orgName} SSO ile Giris Yap
+                </button>
+              )}
+
+              {ssoInfo && (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
+                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>veya sifre ile</span>
+                  <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
+                </div>
+              )}
+
               <ShimmerButton
                 type="submit"
                 disabled={loading || !kvkkAccepted}
@@ -267,7 +331,7 @@ function LoginForm() {
                 background="linear-gradient(135deg, #0d9668 0%, #065f46 100%)"
               >
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
-                {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+                {loading ? 'Giris yapiliyor...' : 'Giris Yap'}
                 {!loading && <ChevronRight className="h-4 w-4 ml-1 opacity-60" />}
               </ShimmerButton>
             </form>

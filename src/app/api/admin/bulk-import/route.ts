@@ -64,6 +64,47 @@ export async function POST(request: Request) {
     select: { id: true, name: true },
   })
 
+  // ── Preview Mode: validate without creating ──
+  const url = new URL(request.url)
+  if (url.searchParams.get('preview') === 'true') {
+    const existingEmails = new Set(
+      (await prisma.user.findMany({ where: { organizationId: orgId }, select: { email: true } })).map(u => u.email)
+    )
+    const seenEmails = new Set<string>()
+    const previewRows = rows.map((r, idx) => {
+      const firstName = r['ad'] || r['ad*'] || ''
+      const lastName = r['soyad'] || r['soyad*'] || ''
+      const email = r['e-posta'] || r['email'] || r['e-posta*'] || ''
+      const deptName = r['departman'] || r['bölüm'] || ''
+      const dept = departments.find(d => d.name.toLowerCase() === deptName.toLowerCase())
+      const errors: string[] = []
+      if (!firstName) errors.push('Ad eksik')
+      if (!lastName) errors.push('Soyad eksik')
+      if (!email) errors.push('E-posta eksik')
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push('Gecersiz e-posta')
+      else if (existingEmails.has(email)) errors.push('E-posta zaten kayitli')
+      else if (seenEmails.has(email)) errors.push('Dosyada tekrar eden e-posta')
+      if (email) seenEmails.add(email)
+      return {
+        row: idx + 2,
+        firstName, lastName, email,
+        department: dept?.name || deptName,
+        title: r['unvan'] || r['ünvan'] || '',
+        tcNo: r['tc'] || r['tc kimlik'] || r['tc no'] || '',
+        phone: r['telefon'] || '',
+        valid: errors.length === 0,
+        error: errors.join(', ') || undefined,
+      }
+    })
+    return jsonResponse({
+      preview: true,
+      rows: previewRows,
+      validCount: previewRows.filter(r => r.valid).length,
+      invalidCount: previewRows.filter(r => !r.valid).length,
+      total: previewRows.length,
+    })
+  }
+
   const supabase = await createServiceClient()
 
   let created = 0

@@ -118,5 +118,20 @@ ALTER TABLE scorm_attempts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "admin_scorm_all" ON scorm_attempts FOR ALL USING (organization_id = auth.user_org_id());
 CREATE POLICY "staff_scorm_own" ON scorm_attempts FOR ALL USING (user_id = auth.uid());
 
+-- DEPARTMENT TRAINING RULES
+ALTER TABLE department_training_rules ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_dept_rules_all" ON department_training_rules FOR ALL USING (auth.user_role() = 'admin' AND organization_id = auth.user_org_id());
+CREATE POLICY "staff_dept_rules_select" ON department_training_rules FOR SELECT USING (organization_id = auth.user_org_id());
+
+-- PAYMENTS
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_payments_all" ON payments FOR ALL USING (auth.user_role() = 'super_admin');
+CREATE POLICY "admin_payments_select" ON payments FOR SELECT USING (organization_id = auth.user_org_id());
+
+-- INVOICES
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_invoices_all" ON invoices FOR ALL USING (auth.user_role() = 'super_admin');
+CREATE POLICY "admin_invoices_select" ON invoices FOR SELECT USING (organization_id = auth.user_org_id());
+
 -- Enable realtime for notifications
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;

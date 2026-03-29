@@ -11,9 +11,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "setup": "node scripts/setup.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
     "db:studio": "prisma studio",
+    "db:seed": "node scripts/seed-demo.js",
     "prepare": "husky"
   },
   "lint-staged": {

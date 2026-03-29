@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { autoAssignByDepartment } from '@/lib/auto-assign'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -38,6 +39,11 @@ export async function POST(request: NextRequest, { params }: Params) {
         departmentId,
       },
     })
+
+    // Departman kurallarına göre otomatik eğitim atama
+    for (const uid of body.userIds) {
+      await autoAssignByDepartment(uid, departmentId, dbUser!.organizationId!, dbUser!.id)
+    }
 
     await createAuditLog({
       userId: dbUser!.id,

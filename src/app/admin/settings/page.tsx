@@ -6,7 +6,7 @@ import {
   GraduationCap, Clock, Target, RotateCcw, Bell, BellRing, CalendarClock,
   Shield, Key, Monitor, HardDrive, Users, BookOpen, Award, Info,
   CheckCircle2, ChevronRight, Database, Cloud, Lock, Fingerprint,
-  Zap, Activity, Timer,
+  Zap, Activity, Timer, CreditCard, FileText, AlertTriangle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,8 +57,10 @@ const defaultSettings: SettingsData = {
 
 const tabs = [
   { id: 'hospital', label: 'Kurum', icon: Building2 },
+  { id: 'subscription', label: 'Abonelik', icon: CreditCard },
   { id: 'training', label: 'Eğitim', icon: GraduationCap },
   { id: 'notifications', label: 'Bildirimler', icon: Bell },
+  { id: 'sso', label: 'SSO', icon: Key },
   { id: 'system', label: 'Sistem', icon: Monitor },
 ] as const;
 
@@ -168,10 +170,183 @@ function SecurityRow({ icon: Icon, label, value }: {
   );
 }
 
+/* ─── SSO Settings Component ─── */
+function SsoSettings() {
+  const { toast } = useToast();
+  const [sso, setSso] = useState({
+    ssoEnabled: false, ssoProvider: '', ssoEmailDomain: '',
+    samlEntryPoint: '', samlIssuer: '', hasSamlCert: false,
+    oidcDiscoveryUrl: '', oidcClientId: '', oidcClientSecret: '',
+    ssoAutoProvision: true, ssoDefaultRole: 'staff',
+  });
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/sso/config').then(r => r.json()).then(data => {
+      if (data && !data.error) setSso(prev => ({ ...prev, ...data }));
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/auth/sso/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sso),
+      });
+      if (!res.ok) throw new Error('Kayit basarisiz');
+      toast('SSO ayarlari kaydedildi', 'success');
+    } catch { toast('SSO ayarlari kaydedilemedi', 'error'); }
+    finally { setSaving(false); }
+  };
+
+  if (!loaded) return <div className="py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Yukleniyor...</div>;
+
+  const inputClass = 'h-11 rounded-xl text-[13px]';
+  const inputStyle = { background: 'var(--color-bg)', borderColor: 'var(--color-border)' };
+
+  return (
+    <div className="space-y-6">
+      {/* Enable/Disable Toggle */}
+      <div className="flex items-center justify-between rounded-xl p-4" style={{ background: sso.ssoEnabled ? 'rgba(13,150,104,0.06)' : 'var(--color-bg)', border: `1px solid ${sso.ssoEnabled ? 'rgba(13,150,104,0.2)' : 'var(--color-border)'}` }}>
+        <div>
+          <p className="text-[13px] font-semibold">SSO Aktif</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Kurumsal kimlik saglayici ile giris</p>
+        </div>
+        <Toggle checked={sso.ssoEnabled} onChange={(v) => setSso(s => ({ ...s, ssoEnabled: v }))} />
+      </div>
+
+      {sso.ssoEnabled && (
+        <>
+          {/* Provider Selection */}
+          <div>
+            <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>SSO Saglayici</Label>
+            <select
+              value={sso.ssoProvider}
+              onChange={(e) => setSso(s => ({ ...s, ssoProvider: e.target.value }))}
+              className="h-11 w-full rounded-xl border px-3 text-[13px]"
+              style={{ ...inputStyle, color: 'var(--color-text-primary)' }}
+            >
+              <option value="">Secin...</option>
+              <option value="saml">SAML 2.0 (Active Directory, Okta, OneLogin)</option>
+              <option value="oidc">OpenID Connect (Azure AD, Google Workspace, Keycloak)</option>
+              <option value="google">Google Workspace</option>
+              <option value="azure">Microsoft Azure AD</option>
+            </select>
+          </div>
+
+          {/* Email Domain */}
+          <div>
+            <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>E-posta Alan Adi</Label>
+            <Input value={sso.ssoEmailDomain} onChange={(e) => setSso(s => ({ ...s, ssoEmailDomain: e.target.value }))} placeholder="hastane.local" className={inputClass} style={inputStyle} />
+            <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Bu alan adina sahip e-postalar SSO ile yonlendirilir</p>
+          </div>
+
+          {/* SAML Config */}
+          {sso.ssoProvider === 'saml' && (
+            <div className="rounded-xl p-5 space-y-4" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>SAML 2.0 Yapilandirmasi</p>
+              <div>
+                <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>IdP Login URL (Entry Point)</Label>
+                <Input value={sso.samlEntryPoint} onChange={(e) => setSso(s => ({ ...s, samlEntryPoint: e.target.value }))} placeholder="https://idp.hastane.local/saml/login" className={inputClass} style={inputStyle} />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>IdP Issuer / Entity ID</Label>
+                <Input value={sso.samlIssuer} onChange={(e) => setSso(s => ({ ...s, samlIssuer: e.target.value }))} placeholder="https://idp.hastane.local/saml/metadata" className={inputClass} style={inputStyle} />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>X.509 Sertifika (PEM)</Label>
+                <textarea
+                  value={typeof sso.hasSamlCert === 'string' ? '' : ''}
+                  onChange={(e) => setSso(s => ({ ...s, samlCert: e.target.value } as typeof s))}
+                  placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                  rows={4}
+                  className="w-full rounded-xl border px-3 py-2 text-xs font-mono resize-none"
+                  style={inputStyle}
+                />
+                {sso.hasSamlCert && <p className="text-[11px] mt-1" style={{ color: 'var(--color-success)' }}>Sertifika yuklu</p>}
+              </div>
+            </div>
+          )}
+
+          {/* OIDC Config */}
+          {sso.ssoProvider === 'oidc' && (
+            <div className="rounded-xl p-5 space-y-4" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>OpenID Connect Yapilandirmasi</p>
+              <div>
+                <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Discovery URL</Label>
+                <Input value={sso.oidcDiscoveryUrl} onChange={(e) => setSso(s => ({ ...s, oidcDiscoveryUrl: e.target.value }))} placeholder="https://login.microsoftonline.com/{tenant}/.well-known/openid-configuration" className={inputClass} style={inputStyle} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Client ID</Label>
+                  <Input value={sso.oidcClientId} onChange={(e) => setSso(s => ({ ...s, oidcClientId: e.target.value }))} className={`${inputClass} font-mono`} style={inputStyle} />
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Client Secret</Label>
+                  <Input type="password" value={sso.oidcClientSecret} onChange={(e) => setSso(s => ({ ...s, oidcClientSecret: e.target.value }))} className={`${inputClass} font-mono`} style={inputStyle} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Auto Provision & Default Role */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-3 rounded-xl p-4" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+              <div className="flex-1">
+                <p className="text-[13px] font-semibold">Otomatik Kullanici Olusturma</p>
+                <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>SSO ile ilk giriste hesap otomatik olusturulur</p>
+              </div>
+              <Toggle checked={sso.ssoAutoProvision} onChange={(v) => setSso(s => ({ ...s, ssoAutoProvision: v }))} />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Varsayilan Rol</Label>
+              <select
+                value={sso.ssoDefaultRole}
+                onChange={(e) => setSso(s => ({ ...s, ssoDefaultRole: e.target.value }))}
+                className="h-11 w-full rounded-xl border px-3 text-[13px]"
+                style={{ ...inputStyle, color: 'var(--color-text-primary)' }}
+              >
+                <option value="staff">Personel</option>
+                <option value="admin">Hastane Admin</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Info */}
+          <div className="flex items-start gap-3 rounded-xl p-4" style={{ background: 'var(--color-info-bg)', border: '1px solid rgba(37,99,235,0.1)' }}>
+            <Info className="h-4 w-4 mt-0.5 shrink-0" style={{ color: 'var(--color-info)' }} />
+            <div className="text-[12px] leading-relaxed" style={{ color: 'var(--color-info)' }}>
+              <p className="font-semibold mb-1">ACS / Callback URL&apos;leri</p>
+              <p className="font-mono text-[11px]">SAML ACS: {typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/sso/callback</p>
+              <p className="font-mono text-[11px]">OIDC Redirect: {typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/sso/callback</p>
+            </div>
+          </div>
+
+          {/* Save */}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white"
+            style={{ background: 'var(--color-primary)' }}
+          >
+            {saving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Save className="h-4 w-4" />}
+            {saving ? 'Kaydediliyor...' : 'SSO Ayarlarini Kaydet'}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function AdminSettingsPage() {
   const { toast } = useToast();
   const { data, isLoading, error } = useFetch<SettingsData>('/api/admin/settings');
   const { data: statsData } = useFetch<SystemStats>('/api/admin/dashboard/stats');
+  const { data: subData } = useFetch<{ hasSubscription: boolean; subscription?: { status: string; billingCycle: string; expiresAt: string; daysLeft: number | null; trialDaysLeft: number | null }; plan?: { name: string; maxStaff: number | null; maxTrainings: number | null; priceMonthly: number | null; priceAnnual: number | null; features: string[] }; usage?: { staffCount: number; staffLimit: number | null; staffPercent: number; trainingCount: number; trainingLimit: number | null; trainingPercent: number }; invoices?: { id: string; invoiceNumber: string; totalAmount: number; periodStart: string; periodEnd: string; issuedAt: string }[] }>('/api/admin/subscription');
   const [formData, setFormData] = useState<SettingsData | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -411,6 +586,126 @@ export default function AdminSettingsPage() {
               </div>
             )}
 
+            {/* ─── Abonelik ─── */}
+            {activeTab === 'subscription' && (
+              <div className="p-8">
+                <h3 className="mb-6 text-lg font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>Abonelik ve Faturalama</h3>
+                {!subData?.hasSubscription ? (
+                  <div className="rounded-2xl border p-8 text-center" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
+                    <CreditCard className="mx-auto mb-3 h-10 w-10" style={{ color: 'var(--color-text-muted)' }} />
+                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Aktif abonelik bulunamadi.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Plan Durumu */}
+                    <div className="rounded-2xl border p-6" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
+                      <div className="mb-4 flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-base font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>{subData.plan?.name}</h4>
+                            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold" style={{
+                              background: subData.subscription?.status === 'active' ? 'var(--color-success-bg)' : subData.subscription?.status === 'trial' ? 'var(--color-warning-bg)' : 'var(--color-error-bg)',
+                              color: subData.subscription?.status === 'active' ? 'var(--color-success)' : subData.subscription?.status === 'trial' ? 'var(--color-warning)' : 'var(--color-error)',
+                            }}>
+                              {subData.subscription?.status === 'active' ? 'Aktif' : subData.subscription?.status === 'trial' ? 'Deneme' : subData.subscription?.status}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                            {subData.subscription?.billingCycle === 'annual' ? 'Yillik' : 'Aylik'} faturalandirma
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-extrabold font-heading" style={{ color: 'var(--color-text-primary)' }}>
+                            {subData.subscription?.billingCycle === 'annual'
+                              ? `₺${subData.plan?.priceAnnual?.toLocaleString('tr-TR') ?? '-'}`
+                              : `₺${subData.plan?.priceMonthly?.toLocaleString('tr-TR') ?? '-'}`}
+                          </p>
+                          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                            /{subData.subscription?.billingCycle === 'annual' ? 'yil' : 'ay'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {subData.subscription?.daysLeft !== null && subData.subscription?.daysLeft !== undefined && subData.subscription.daysLeft <= 30 && (
+                        <div className="flex items-center gap-2 rounded-xl p-3" style={{
+                          background: subData.subscription.daysLeft <= 7 ? 'var(--color-error-bg)' : 'var(--color-warning-bg)',
+                        }}>
+                          <AlertTriangle className="h-4 w-4" style={{ color: subData.subscription.daysLeft <= 7 ? 'var(--color-error)' : 'var(--color-warning)' }} />
+                          <span className="text-sm font-semibold" style={{ color: subData.subscription.daysLeft <= 7 ? 'var(--color-error)' : 'var(--color-warning)' }}>
+                            Abonelik suresi {subData.subscription.daysLeft} gun icinde doluyor
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Kullanim */}
+                    {subData.usage && (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                              <Users className="mr-1.5 inline h-4 w-4" />Personel
+                            </span>
+                            <span className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                              {subData.usage.staffCount} / {subData.usage.staffLimit ?? '∞'}
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full" style={{ background: 'var(--color-border)' }}>
+                            <div className="h-2 rounded-full" style={{
+                              width: `${Math.min(subData.usage.staffPercent, 100)}%`,
+                              background: subData.usage.staffPercent > 90 ? 'var(--color-error)' : 'var(--color-primary)',
+                            }} />
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                              <BookOpen className="mr-1.5 inline h-4 w-4" />Egitim
+                            </span>
+                            <span className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                              {subData.usage.trainingCount} / {subData.usage.trainingLimit ?? '∞'}
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full" style={{ background: 'var(--color-border)' }}>
+                            <div className="h-2 rounded-full" style={{
+                              width: `${Math.min(subData.usage.trainingPercent, 100)}%`,
+                              background: subData.usage.trainingPercent > 90 ? 'var(--color-error)' : 'var(--color-primary)',
+                            }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Faturalar */}
+                    {subData.invoices && subData.invoices.length > 0 && (
+                      <div className="rounded-2xl border" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
+                        <div className="border-b px-6 py-4" style={{ borderColor: 'var(--color-border)' }}>
+                          <h4 className="flex items-center gap-2 text-sm font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>
+                            <FileText className="h-4 w-4" /> Son Faturalar
+                          </h4>
+                        </div>
+                        <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                          {subData.invoices.map(inv => (
+                            <div key={inv.id} className="flex items-center justify-between px-6 py-3">
+                              <div>
+                                <span className="text-sm font-semibold font-mono" style={{ color: 'var(--color-text-primary)' }}>{inv.invoiceNumber}</span>
+                                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                                  {new Date(inv.issuedAt).toLocaleDateString('tr-TR')}
+                                </p>
+                              </div>
+                              <span className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                                ₺{inv.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ─── Eğitim ─── */}
             {activeTab === 'training' && (
               <div className="p-8">
@@ -607,6 +902,22 @@ export default function AdminSettingsPage() {
                     </Field>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* ─── SSO ─── */}
+            {activeTab === 'sso' && (
+              <div className="p-8">
+                <div className="mb-8">
+                  <h2 className="text-lg font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+                    Tek Oturum Acma (SSO)
+                  </h2>
+                  <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    SAML 2.0 veya OIDC ile kurumsal kimlik saglayicinizi baglayarak personel girisini otomatiklestirin.
+                  </p>
+                </div>
+
+                <SsoSettings />
               </div>
             )}
 

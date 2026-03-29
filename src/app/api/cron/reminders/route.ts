@@ -23,6 +23,20 @@ export async function GET(request: Request) {
   }
 
   const now = Date.now()
+
+  // Deduplication: bugün zaten gönderilmiş bildirimleri atla
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const todayEnd = new Date(todayStart)
+  todayEnd.setDate(todayEnd.getDate() + 1)
+
+  async function alreadyNotified(userId: string, type: string, trainingId: string): Promise<boolean> {
+    const existing = await prisma.notification.findFirst({
+      where: { userId, type, relatedTrainingId: trainingId, createdAt: { gte: todayStart, lt: todayEnd } },
+    })
+    return !!existing
+  }
+
   let upcomingEmailsSent = 0
   let overdueEmailsSent = 0
   let certEmailsSent = 0
@@ -65,6 +79,7 @@ export async function GET(request: Request) {
         logger.error('Cron Reminders', `Email gonderilemedi: ${a.user.email}`, (err as Error).message)
       }
 
+      if (await alreadyNotified(a.user.id, 'reminder', a.training.id)) continue
       try {
         await prisma.notification.create({
           data: {
@@ -116,6 +131,7 @@ export async function GET(request: Request) {
       logger.error('Cron Reminders', `Overdue email gonderilemedi: ${a.user.email}`, (err as Error).message)
     }
 
+    if (await alreadyNotified(a.user.id, 'warning', a.training.id)) continue
     try {
       await prisma.notification.create({
         data: {
@@ -169,6 +185,8 @@ export async function GET(request: Request) {
         logger.error('Cron Reminders', `Cert email gonderilemedi: ${cert.user.email}`, (err as Error).message)
       }
 
+      const certNotifType = daysLeft <= 7 ? 'warning' : 'reminder'
+      if (await alreadyNotified(cert.user.id, certNotifType, cert.training.id)) continue
       try {
         await prisma.notification.create({
           data: {
@@ -176,7 +194,7 @@ export async function GET(request: Request) {
             organizationId: cert.user.organizationId,
             title: 'Sertifika Yenileme Hatirlatmasi',
             message: `"${cert.training.title}" sertifikanizin gecerlilik suresi ${daysLeft} gun icinde dolacak. Lutfen yenileme egitimini tamamlayiniz.`,
-            type: daysLeft <= 7 ? 'warning' : 'reminder',
+            type: certNotifType,
             relatedTrainingId: cert.training.id,
           },
         })
@@ -185,11 +203,67 @@ export async function GET(request: Request) {
     }
   }
 
+  // ── 4. SERTİFİKA SÜRESİ DOLMUŞ EĞİTİMLERİ YENİDEN ATA (renewalPeriodMonths) ──
+  let renewalReassigned = 0
+  const expiredCerts = await prisma.certificate.findMany({
+    where: {
+      expiresAt: {
+        lt: new Date(now),
+        gte: new Date(now - DAY_MS), // sadece bugün dolanlar (günlük cron, tekrarı önler)
+      },
+    },
+    include: {
+      training: { select: { id: true, title: true, renewalPeriodMonths: true, isActive: true, endDate: true } },
+      user: { select: { id: true, firstName: true, lastName: true, email: true, organizationId: true } },
+    },
+    take: BATCH_SIZE,
+  })
+
+  for (const cert of expiredCerts) {
+    // Sadece renewalPeriodMonths tanımlı ve eğitim aktif ise yeniden ata
+    if (!cert.training.renewalPeriodMonths || !cert.training.isActive) continue
+
+    // Zaten atanmış mı? (aktif atama var mı)
+    const existingAssignment = await prisma.trainingAssignment.findUnique({
+      where: { trainingId_userId: { trainingId: cert.training.id, userId: cert.user.id } },
+    })
+    if (existingAssignment && existingAssignment.status !== 'passed') continue
+
+    try {
+      // Mevcut atamayı sıfırla veya yeni oluştur
+      if (existingAssignment) {
+        await prisma.trainingAssignment.update({
+          where: { id: existingAssignment.id },
+          data: { status: 'assigned', currentAttempt: 0, completedAt: null },
+        })
+      } else {
+        await prisma.trainingAssignment.create({
+          data: { trainingId: cert.training.id, userId: cert.user.id, status: 'assigned' },
+        })
+      }
+
+      await prisma.notification.create({
+        data: {
+          userId: cert.user.id,
+          organizationId: cert.user.organizationId,
+          title: 'Sertifika Yenileme Gerekli',
+          message: `"${cert.training.title}" sertifikanizin suresi doldu. Egitimi tekrar tamamlamaniz gerekmektedir.`,
+          type: 'warning',
+          relatedTrainingId: cert.training.id,
+        },
+      })
+      renewalReassigned++
+    } catch (err) {
+      logger.warn('Cron Reminders', `Yenileme atamasi basarisiz: ${cert.user.id}`, (err as Error).message)
+    }
+  }
+
   logger.info('Cron Reminders', 'Hatirlatma cron tamamlandi', {
     upcomingEmailsSent,
     overdueEmailsSent,
     certEmailsSent,
     notificationsCreated,
+    renewalReassigned,
   })
 
   return NextResponse.json({
@@ -198,6 +272,7 @@ export async function GET(request: Request) {
     overdueEmailsSent,
     certEmailsSent,
     notificationsCreated,
+    renewalReassigned,
     timestamp: new Date().toISOString(),
   })
 }
