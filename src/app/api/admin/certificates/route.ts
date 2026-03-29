@@ -34,7 +34,7 @@ export async function GET(request: Request) {
         }),
       },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true, department: true, title: true } },
+        user: { select: { id: true, firstName: true, lastName: true, email: true, departmentRel: { select: { name: true } }, title: true } },
         training: { select: { id: true, title: true, category: true } },
         attempt: { select: { postExamScore: true, attemptNumber: true, preExamScore: true } },
       },
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
           id: c.user.id,
           name: `${c.user.firstName} ${c.user.lastName}`,
           email: c.user.email,
-          department: c.user.department ?? '',
+          department: c.user.departmentRel?.name ?? '',
           title: c.user.title ?? '',
           initials: `${c.user.firstName[0] ?? ''}${c.user.lastName[0] ?? ''}`.toUpperCase(),
         },

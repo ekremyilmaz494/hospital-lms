@@ -62,8 +62,8 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
           }
           return; // Don't set error, we're redirecting
         }
-        if (msg.includes('abort') || msg.includes('404') || msg.includes('500') || msg.includes('503')) {
-          // Timeout, not-found, or server error — graceful degradation for expected API misses
+        if (msg.includes('abort') || msg.includes('404')) {
+          // Timeout or not-found — graceful degradation
           setError(null);
         } else {
           setError(msg);

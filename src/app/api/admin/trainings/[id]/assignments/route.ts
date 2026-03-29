@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     prisma.trainingAssignment.findMany({
       where,
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true, department: true } },
+        user: { select: { id: true, firstName: true, lastName: true, email: true, departmentRel: { select: { name: true } } } },
         examAttempts: { orderBy: { attemptNumber: 'desc' } },
       },
       orderBy: { assignedAt: 'desc' },

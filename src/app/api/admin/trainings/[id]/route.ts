@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       questions: { include: { options: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } },
       assignments: {
         include: {
-          user: { select: { id: true, firstName: true, lastName: true, email: true, department: true } },
+          user: { select: { id: true, firstName: true, lastName: true, email: true, departmentRel: { select: { name: true } } } },
           examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1 },
         },
       },
@@ -36,7 +36,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       assignmentId: a.id,
       userId: a.user.id,
       name: `${a.user.firstName ?? ''} ${a.user.lastName ?? ''}`.trim() || a.user.email,
-      department: a.user.department ?? '',
+      department: a.user.departmentRel?.name ?? '',
       attempt: a.currentAttempt,
       preScore: latestAttempt?.preExamScore ? Number(latestAttempt.preExamScore) : null,
       postScore: latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : null,

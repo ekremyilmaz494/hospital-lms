@@ -52,6 +52,7 @@ model Organization {
   auditLogs       AuditLog[]
   dbBackups       DbBackup[]
   subscription    OrganizationSubscription?
+  kvkkRequests    KvkkRequest[]
 
   @@map("organizations")
 }
@@ -104,9 +105,8 @@ model User {
   email           String   @unique @db.VarChar(255)
   firstName       String   @db.VarChar(100) @map("first_name")
   lastName        String   @db.VarChar(100) @map("last_name")
-  tcNo            String?  @unique @db.VarChar(11) @map("tc_no")
+  tcNo            String?  @db.VarChar(11) @map("tc_no")
   phone           String?  @db.VarChar(20)
-  department      String?  @db.VarChar(100)
   departmentId    String?  @db.Uuid @map("department_id")
   title           String?  @db.VarChar(100)
   role            String   @db.VarChar(20)
@@ -129,7 +129,9 @@ model User {
   certificates    Certificate[]
   kvkkRequests    KvkkRequest[] @relation("KvkkRequester")
   kvkkResponses   KvkkRequest[] @relation("KvkkResponder")
+  scormAttempts   ScormAttempt[]
 
+  @@unique([organizationId, tcNo])
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
   @@index([departmentId], map: "idx_users_department")
@@ -194,6 +196,7 @@ model TrainingVideo {
   training        Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
   videoProgress   VideoProgress[]
 
+  @@index([trainingId], map: "idx_training_videos_training")
   @@map("training_videos")
 }
 
@@ -211,6 +214,7 @@ model Question {
   options         QuestionOption[]
   examAnswers     ExamAnswer[]
 
+  @@index([trainingId], map: "idx_questions_training")
   @@map("questions")
 }
 
@@ -225,6 +229,7 @@ model QuestionOption {
   question        Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   examAnswers     ExamAnswer[]
 
+  @@index([questionId], map: "idx_question_options_question")
   @@map("question_options")
 }
 
@@ -297,6 +302,8 @@ model ExamAnswer {
   question         Question       @relation(fields: [questionId], references: [id])
   selectedOption   QuestionOption? @relation(fields: [selectedOptionId], references: [id])
 
+  @@unique([attemptId, questionId, examPhase])
+  @@index([attemptId], map: "idx_exam_answers_attempt")
   @@map("exam_answers")
 }
 
@@ -395,6 +402,7 @@ model Certificate {
   attempt         ExamAttempt  @relation(fields: [attemptId], references: [id])
 
   @@index([userId], map: "idx_certificates_user")
+  @@index([trainingId], map: "idx_certificates_training")
   @@map("certificates")
 }
 
@@ -411,6 +419,7 @@ model KvkkRequest {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   completedAt     DateTime? @map("completed_at") @db.Timestamptz
 
+  organization    Organization @relation(fields: [organizationId], references: [id])
   user            User      @relation("KvkkRequester", fields: [userId], references: [id])
   respondedBy     User?     @relation("KvkkResponder", fields: [respondedById], references: [id])
 
@@ -437,6 +446,7 @@ model ScormAttempt {
   updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   training          Training  @relation(fields: [trainingId], references: [id])
+  user              User      @relation(fields: [userId], references: [id])
 
   @@index([userId, trainingId], map: "idx_scorm_attempts_user_training")
   @@map("scorm_attempts")

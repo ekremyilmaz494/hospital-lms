@@ -35,10 +35,9 @@ export async function GET(request: Request) {
   if (type === 'staff-report') {
     const staffCount = await prisma.user.count({ where: { organizationId: orgId, role: 'staff' } })
     const activeStaff = await prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } })
-    const departments = await prisma.user.groupBy({
-      by: ['department'],
-      where: { organizationId: orgId, role: 'staff' },
-      _count: true,
+    const departments = await prisma.department.findMany({
+      where: { organizationId: orgId },
+      include: { _count: { select: { users: true } } },
     })
 
     doc.setFontSize(16)
@@ -59,7 +58,7 @@ export async function GET(request: Request) {
     doc.setFontSize(10)
     doc.setTextColor(60)
     departments.forEach(d => {
-      doc.text(`${d.department ?? 'Belirtilmemis'}: ${d._count} kisi`, 25, y)
+      doc.text(`${d.name}: ${d._count.users} kisi`, 25, y)
       y += 7
     })
   }

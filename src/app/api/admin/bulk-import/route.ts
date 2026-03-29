@@ -116,7 +116,6 @@ export async function POST(request: Request) {
           tcNo: r['tc'] || r['tc kimlik'] || r['tc no'] || undefined,
           phone: r['telefon'] || undefined,
           departmentId: dept?.id,
-          department: dept?.name,
           title: r['unvan'] || r['ünvan'] || undefined,
         },
       })

@@ -123,7 +123,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   await prisma.$transaction([
     prisma.user.updateMany({
       where: { departmentId: id },
-      data: { departmentId: null, department: null },
+      data: { departmentId: null },
     }),
     prisma.department.delete({ where: { id } }),
   ])

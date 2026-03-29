@@ -26,7 +26,7 @@ export async function GET() {
     email: profile.email,
     phone: profile.phone ?? '',
     hospital: profile.organization?.name ?? '',
-    department: profile.departmentRel?.name ?? profile.department ?? '',
+    department: profile.departmentRel?.name ?? '',
     title: profile.title ?? '',
     tcKimlik: profile.tcNo ?? '',
     avatarUrl: profile.avatarUrl ?? '',

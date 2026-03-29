@@ -29,7 +29,7 @@ export async function GET() {
         include: {
           assignments: {
             include: {
-              user: { select: { id: true, firstName: true, lastName: true, department: true, departmentId: true, departmentRel: { select: { name: true } } } },
+              user: { select: { id: true, firstName: true, lastName: true, departmentId: true, departmentRel: { select: { name: true } } } },
               examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true, postExamCompletedAt: true } },
             },
           },
@@ -69,7 +69,7 @@ export async function GET() {
         .map(a => ({
           id: a.user.id,
           name: `${a.user.firstName} ${a.user.lastName}`,
-          department: a.user.departmentRel?.name ?? a.user.department ?? '',
+          department: a.user.departmentRel?.name ?? '',
           status: a.status,
           lastScore: a.examAttempts[0]?.postExamScore ? Number(a.examAttempts[0].postExamScore) : null,
         }))
@@ -109,7 +109,7 @@ export async function GET() {
     const deptComplianceMap = new Map<string, { total: number; passed: number }>()
     for (const t of compulsoryTrainings) {
       for (const a of t.assignments) {
-        const dept = a.user.departmentRel?.name ?? a.user.department ?? 'Diğer'
+        const dept = a.user.departmentRel?.name ?? 'Diğer'
         const existing = deptComplianceMap.get(dept) ?? { total: 0, passed: 0 }
         existing.total++
         if (a.status === 'passed') existing.passed++

@@ -140,7 +140,7 @@ export async function GET(request: Request) {
       const statusLabel = avg >= 80 ? 'Yıldız' : avg >= 50 ? 'Normal' : s.assignments.length > 0 ? 'Risk' : 'Yeni'
       return {
         name: `${s.firstName} ${s.lastName}`,
-        dept: s.departmentRel?.name ?? s.department ?? '',
+        dept: s.departmentRel?.name ?? '',
         completed,
         avgScore: avg,
         status: statusLabel,
@@ -172,7 +172,7 @@ export async function GET(request: Request) {
           return {
             assignmentId: a.id,
             name: `${s.firstName} ${s.lastName}`,
-            dept: s.departmentRel?.name ?? s.department ?? '',
+            dept: s.departmentRel?.name ?? '',
             training: a.training?.title ?? '',
             attempts: a.examAttempts.length,
             lastScore,

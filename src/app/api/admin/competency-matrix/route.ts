@@ -28,7 +28,6 @@ export async function GET() {
           firstName: true,
           lastName: true,
           title: true,
-          department: true,
           departmentRel: { select: { name: true, color: true } },
           assignments: {
             select: {
@@ -46,7 +45,7 @@ export async function GET() {
             select: { trainingId: true, issuedAt: true, expiresAt: true },
           },
         },
-        orderBy: [{ department: 'asc' }, { lastName: 'asc' }],
+        orderBy: [{ lastName: 'asc' }],
       }),
       prisma.training.findMany({
         where: { organizationId: orgId, isActive: true },
@@ -94,7 +93,7 @@ export async function GET() {
         id: s.id,
         name: `${s.firstName} ${s.lastName}`,
         title: s.title,
-        department: s.departmentRel?.name ?? s.department ?? '',
+        department: s.departmentRel?.name ?? '',
         departmentColor: s.departmentRel?.color ?? '#0d9668',
         cells,
         // Özet istatistikler

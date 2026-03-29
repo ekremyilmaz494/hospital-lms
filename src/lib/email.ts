@@ -116,6 +116,37 @@ export function welcomeEmail(name: string, email: string, resetLink: string) {
   `
 }
 
+// Yaklaşan eğitim deadline hatırlatması (3/1 gün kala)
+export function upcomingTrainingReminderEmail(staffName: string, trainingTitle: string, dueDate: string, daysLeft: number) {
+  const urgencyColor = daysLeft <= 1 ? '#dc2626' : '#f59e0b'
+  const urgencyBg = daysLeft <= 1 ? '#fef2f2' : '#fffbeb'
+  const urgencyLabel = daysLeft <= 1 ? 'SON GUN! Yarin suresi doluyor' : daysLeft + ' gun kaldi'
+  return `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, ${urgencyColor}, ${daysLeft <= 1 ? '#7f1d1d' : '#92400e'}); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Egitim Deadline Hatirlatmasi</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <div style="background: ${urgencyBg}; border-left: 4px solid ${urgencyColor}; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+          <p style="margin: 0; font-weight: bold; color: ${urgencyColor};">${urgencyLabel}</p>
+        </div>
+        <p style="color: #64748b;">Merhaba ${staffName},</p>
+        <p style="color: #64748b;"><strong>"${trainingTitle}"</strong> egitiminizin tamamlanma suresi yaklasiyor.</p>
+        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #475569;"><strong>Egitim:</strong> ${trainingTitle}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Son Tarih:</strong> ${dueDate}</p>
+        </div>
+        <p style="color: #64748b;">Lutfen zamaninda tamamlayiniz. Gecikme durumunda yoneticinize bildirim gidecektir.</p>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/staff/my-trainings"
+           style="display: inline-block; background: ${urgencyColor}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Egitime Git
+        </a>
+      </div>
+    </div>
+  `
+}
+
 // Sertifika sona erme hatırlatması (30/7 gün kala)
 export function certificateExpiryReminderEmail(staffName: string, trainingTitle: string, expiryDate: string, daysLeft: number, renewLink: string) {
   const urgencyColor = daysLeft <= 7 ? '#dc2626' : '#f59e0b'

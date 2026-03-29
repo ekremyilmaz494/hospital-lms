@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   if (type === 'staff') {
     const staff = await prisma.user.findMany({
       where: { organizationId: orgId, role: 'staff' },
-      include: { _count: { select: { assignments: true } } },
+      include: { departmentRel: { select: { name: true } }, _count: { select: { assignments: true } } },
       orderBy: { lastName: 'asc' },
     })
 
@@ -45,11 +45,15 @@ export async function GET(request: Request) {
 
     staff.forEach(s => {
       ws.addRow({
-        ...s,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        email: s.email,
         // KVKK: TC No maskeleme — sadece son 4 hane göster
         tcNo: s.tcNo ? `*******${s.tcNo.slice(-4)}` : '',
         // KVKK: Telefon maskeleme — sadece son 3 hane göster
         phone: s.phone ? `***${s.phone.slice(-3)}` : '',
+        department: s.departmentRel?.name ?? '',
+        title: s.title ?? '',
         isActive: s.isActive ? 'Aktif' : 'Pasif',
         assignmentCount: s._count.assignments,
         createdAt: s.createdAt.toLocaleDateString('tr-TR'),
@@ -144,7 +148,7 @@ export async function GET(request: Request) {
     const attempts = await prisma.examAttempt.findMany({
       where: { training: { organizationId: orgId } },
       include: {
-        user: { select: { firstName: true, lastName: true, department: true } },
+        user: { select: { firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
         training: { select: { title: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -168,7 +172,7 @@ export async function GET(request: Request) {
     attempts.forEach(a => {
       ws.addRow({
         staff: `${a.user.firstName} ${a.user.lastName}`,
-        department: a.user.department,
+        department: a.user.departmentRel?.name ?? '',
         training: a.training.title,
         attemptNumber: a.attemptNumber,
         preExamScore: a.preExamScore ? Number(a.preExamScore) : '-',

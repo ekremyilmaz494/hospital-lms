@@ -52,7 +52,6 @@ export async function POST(request: Request) {
         organizationId: parsed.data.organizationId,
         tcNo: parsed.data.tcNo,
         phone: parsed.data.phone,
-        department: parsed.data.department,
         title: parsed.data.title,
       },
     })

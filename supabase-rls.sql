@@ -95,5 +95,28 @@ CREATE POLICY "admin_audit_select" ON audit_logs FOR SELECT USING (auth.user_rol
 -- DB BACKUPS
 CREATE POLICY "admin_backups_all" ON db_backups FOR ALL USING (auth.user_role() = 'admin' AND organization_id = auth.user_org_id());
 
+-- DEPARTMENTS
+ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_departments_all" ON departments FOR ALL USING (auth.user_role() = 'super_admin');
+CREATE POLICY "admin_departments_all" ON departments FOR ALL USING (auth.user_role() = 'admin' AND organization_id = auth.user_org_id());
+CREATE POLICY "staff_departments_select" ON departments FOR SELECT USING (organization_id = auth.user_org_id());
+
+-- CERTIFICATES
+ALTER TABLE certificates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_certificates_all" ON certificates FOR ALL USING (auth.user_role() = 'super_admin');
+CREATE POLICY "admin_certificates_all" ON certificates FOR ALL USING (training_id IN (SELECT id FROM trainings WHERE organization_id = auth.user_org_id()));
+CREATE POLICY "staff_certificates_select" ON certificates FOR SELECT USING (user_id = auth.uid());
+
+-- KVKK REQUESTS
+ALTER TABLE kvkk_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_kvkk_all" ON kvkk_requests FOR ALL USING (auth.user_role() = 'admin' AND organization_id = auth.user_org_id());
+CREATE POLICY "staff_kvkk_own" ON kvkk_requests FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "staff_kvkk_insert" ON kvkk_requests FOR INSERT WITH CHECK (user_id = auth.uid());
+
+-- SCORM ATTEMPTS
+ALTER TABLE scorm_attempts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_scorm_all" ON scorm_attempts FOR ALL USING (organization_id = auth.user_org_id());
+CREATE POLICY "staff_scorm_own" ON scorm_attempts FOR ALL USING (user_id = auth.uid());
+
 -- Enable realtime for notifications
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;

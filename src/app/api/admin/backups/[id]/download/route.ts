@@ -47,7 +47,7 @@ export async function GET(
       const s3Response = await s3.send(command)
       return new Response(s3Response.Body as ReadableStream, { headers })
     } catch (s3Error) {
-      logger.error('S3 yedek indirme başarısız, DB yedeklemesine geçiliyor', {
+      logger.error('Backup Download', 'S3 yedek indirme başarısız, DB yedeklemesine geçiliyor', {
         backupId: id,
         fileUrl: backup.fileUrl,
         error: (s3Error as Error).message,

@@ -19,20 +19,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         include: { training: true, examAttempts: true },
         orderBy: { assignedAt: 'desc' },
       },
+      departmentRel: { select: { name: true } },
       _count: { select: { assignments: true, examAttempts: true } },
     },
   })
 
   if (!staff) return errorResponse('Personel bulunamadı', 404)
 
-  // Resolve department name from ID if department field contains a UUID
-  let departmentName = staff.department ?? ''
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  const deptLookupId = staff.departmentId || (uuidRegex.test(departmentName) ? departmentName : null)
-  if (deptLookupId) {
-    const dept = await prisma.department.findUnique({ where: { id: deptLookupId } })
-    if (dept) departmentName = dept.name
-  }
+  const departmentName = staff.departmentRel?.name ?? ''
 
   // Transform raw Prisma data to frontend format
   const completedAssignments = staff.assignments.filter(a => a.status === 'passed')
@@ -103,7 +97,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     tcNo: z.string().length(11).optional(),
     title: z.string().max(100).optional(),
     departmentId: z.string().uuid().optional(),
-    department: z.string().max(100).optional(),
     isActive: z.boolean().optional(),
   })
   const parsed = safeUpdateSchema.safeParse(body)
@@ -113,12 +106,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!existing) return errorResponse('Personel bulunamadı', 404)
 
   const dataToUpdate = { ...parsed.data }
-  if (dataToUpdate.departmentId) {
-    const dept = await prisma.department.findUnique({ where: { id: dataToUpdate.departmentId } })
-    if (dept) {
-      dataToUpdate.department = dept.name
-    }
-  }
 
   const staff = await prisma.user.update({
     where: { id, organizationId: dbUser!.organizationId! },

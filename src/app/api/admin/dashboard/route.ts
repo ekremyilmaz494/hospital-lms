@@ -33,7 +33,7 @@ export async function GET() {
     prisma.trainingAssignment.findMany({
       where: { training: { organizationId: orgId } },
       include: {
-        user: { select: { firstName: true, lastName: true, department: true } },
+        user: { select: { firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
         training: { select: { title: true, category: true, endDate: true, isCompulsory: true, complianceDeadline: true, regulatoryBody: true } },
         examAttempts: { select: { postExamScore: true, preExamScore: true, isPassed: true, status: true }, orderBy: { attemptNumber: 'desc' }, take: 1 },
       },
@@ -90,7 +90,7 @@ export async function GET() {
       assignmentId: a.id,
       trainingId: a.trainingId,
       name: `${a.user.firstName} ${a.user.lastName}`,
-      dept: a.user.department ?? '',
+      dept: a.user.departmentRel?.name ?? '',
       training: a.training.title,
       dueDate: new Date(a.training.endDate).toISOString().split('T')[0],
       daysOverdue: Math.floor((now.getTime() - new Date(a.training.endDate).getTime()) / 86400000),
@@ -112,7 +112,7 @@ export async function GET() {
       const ln = a.user.lastName ?? ''
       performerMap.set(key, {
         name: `${fn} ${ln}`,
-        department: a.user.department ?? '',
+        department: a.user.departmentRel?.name ?? '',
         scores: [score],
         courses: 1,
         initials: `${fn[0] ?? ''}${ln[0] ?? ''}`.toUpperCase(),
@@ -127,7 +127,7 @@ export async function GET() {
   // Department comparison
   const deptMap = new Map<string, { total: number; completed: number; scores: number[] }>()
   for (const a of assignments) {
-    const dept = a.user.department ?? 'Diğer'
+    const dept = a.user.departmentRel?.name ?? 'Diğer'
     const existing = deptMap.get(dept) ?? { total: 0, completed: 0, scores: [] }
     existing.total++
     if (a.status === 'passed') {
@@ -216,7 +216,8 @@ export async function GET() {
   })
 
   } catch (err) {
-    logger.error('Admin Dashboard', 'Dashboard verileri alınamadı', err)
-    return errorResponse('Dashboard verileri alınamadı, lütfen sayfayı yenileyin', 503)
+    const errMsg = err instanceof Error ? err.message : String(err)
+    logger.error('Admin Dashboard', 'Dashboard verileri alınamadı', errMsg)
+    return errorResponse(`Dashboard verileri alınamadı: ${errMsg}`, 503)
   }
 }

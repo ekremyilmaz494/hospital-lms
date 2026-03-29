@@ -36,7 +36,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       },
       data: {
         departmentId,
-        department: department.name,
       },
     })
 
@@ -58,7 +57,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       },
       data: {
         departmentId: null,
-        department: null,
       },
     })
 

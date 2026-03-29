@@ -36,7 +36,7 @@ export async function GET() {
           },
           departmentRel: { select: { name: true } },
         },
-        orderBy: [{ department: 'asc' }, { lastName: 'asc' }],
+        orderBy: [{ lastName: 'asc' }],
       }),
       prisma.training.findMany({
         where: { organizationId: orgId },
@@ -50,7 +50,7 @@ export async function GET() {
       prisma.certificate.findMany({
         where: { training: { organizationId: orgId } },
         include: {
-          user: { select: { firstName: true, lastName: true, department: true } },
+          user: { select: { firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
           training: { select: { title: true, isCompulsory: true } },
         },
         orderBy: { issuedAt: 'desc' },
@@ -86,7 +86,7 @@ export async function GET() {
       return {
         name: `${s.firstName} ${s.lastName}`,
         title: s.title ?? '',
-        department: s.departmentRel?.name ?? s.department ?? '',
+        department: s.departmentRel?.name ?? '',
         totalAssigned: s.assignments.length,
         totalPassed: s.assignments.filter(a => a.status === 'passed').length,
         compulsoryTotal: compulsoryAssignments.length,
@@ -119,7 +119,7 @@ export async function GET() {
       certificates: {
         active: activeCerts.slice(0, 50).map(c => ({
           staff: `${c.user.firstName} ${c.user.lastName}`,
-          department: c.user.department ?? '',
+          department: c.user.departmentRel?.name ?? '',
           training: c.training.title,
           issuedAt: c.issuedAt.toISOString(),
           expiresAt: c.expiresAt?.toISOString() ?? null,

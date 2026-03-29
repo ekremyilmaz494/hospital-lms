@@ -114,7 +114,7 @@ export async function POST(request: Request) {
               trainingId: t.id,
               title: v.title,
               videoUrl: v.url,
-              videoKey: v.key || v.url,
+              videoKey: v.url,
               durationSeconds: v.durationSeconds || 300,
               sortOrder: idx,
             }
