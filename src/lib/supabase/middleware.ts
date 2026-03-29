@@ -33,8 +33,8 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes
-  const publicRoutes = ['/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password', '/api/auth/', '/help', '/login']
-  if (publicRoutes.some((route) => pathname.startsWith(route))) {
+  const publicRoutes = ['/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password', '/api/auth/', '/api/health', '/api/cron/', '/help', '/login', '/kvkk', '/certificates/verify']
+  if (pathname === '/' || publicRoutes.some((route) => pathname.startsWith(route))) {
     // Authenticated users on login page → redirect to dashboard
     if (user && pathname === '/auth/login') {
       const role = user.user_metadata?.role as string
@@ -72,7 +72,7 @@ export async function updateSession(request: NextRequest) {
   } catch {
     // Supabase unreachable — only allow public routes, block protected ones
     const { pathname } = request.nextUrl
-    const publicRoutes = ['/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password', '/api/auth/', '/help', '/login']
+    const publicRoutes = ['/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password', '/api/auth/', '/api/health', '/help', '/login']
     if (publicRoutes.some((route) => pathname.startsWith(route))) {
       return NextResponse.next({ request })
     }
