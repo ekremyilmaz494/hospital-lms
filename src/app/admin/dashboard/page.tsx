@@ -39,7 +39,7 @@ const iconMap: Record<string, typeof Users> = { Users, GraduationCap, TrendingUp
 
 interface MiniCell { trainingId: string; state: string }
 interface MiniStaffRow { name: string; cells: MiniCell[] }
-interface MatrixPreview { trainings: { id: string; title: string }[]; staff: MiniStaffRow[] }
+interface MatrixPreview { trainings: { id: string; title: string; isCompulsory?: boolean }[]; staff: MiniStaffRow[] }
 
 const matrixStateColor: Record<string, string> = {
   passed: 'var(--color-success)',
