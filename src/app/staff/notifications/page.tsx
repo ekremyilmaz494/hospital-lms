@@ -47,21 +47,34 @@ export default function StaffNotificationsPage() {
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>('all');
 
-  const allNotifications = data?.notifications ?? [];
-  const unreadCount = data?.unreadCount ?? 0;
+  // B8.4/G8.4 — Optimistic UI: API bitmeden önce UI'ı güncelle, hata varsa geri al
+  const [optimisticReadIds, setOptimisticReadIds] = useState<Set<string>>(new Set());
+  const [optimisticAllRead, setOptimisticAllRead] = useState(false);
+
+  const rawNotifications = data?.notifications ?? [];
+  const rawUnreadCount = data?.unreadCount ?? 0;
+
+  // Optimistic override uygula
+  const allNotifications = rawNotifications.map(n =>
+    optimisticAllRead || optimisticReadIds.has(n.id) ? { ...n, isRead: true } : n
+  );
+  const unreadCount = optimisticAllRead ? 0 : Math.max(0, rawUnreadCount - optimisticReadIds.size);
   const notifications = filter === 'unread'
     ? allNotifications.filter(n => !n.isRead)
     : allNotifications;
 
   const handleMarkAllRead = async () => {
-    if (unreadCount === 0) return;
+    if (rawUnreadCount === 0) return;
+    // Optimistic: sayacı ve kartları hemen güncelle
+    setOptimisticAllRead(true);
     setMarkingAll(true);
     try {
       const res = await fetch('/api/staff/notifications', { method: 'PATCH' });
       if (!res.ok) throw new Error();
       toast('Tüm bildirimler okundu olarak işaretlendi', 'success');
-      refetch();
+      refetch().then(() => setOptimisticAllRead(false)); // server state gelince override kaldır
     } catch {
+      setOptimisticAllRead(false); // Rollback
       toast('İşlem başarısız', 'error');
     } finally {
       setMarkingAll(false);
@@ -69,12 +82,16 @@ export default function StaffNotificationsPage() {
   };
 
   const handleMarkRead = async (id: string) => {
+    // Optimistic: kartı hemen okunmuş göster
+    setOptimisticReadIds(prev => new Set(prev).add(id));
     setMarkingId(id);
     try {
       const res = await fetch(`/api/staff/notifications?id=${id}`, { method: 'PATCH' });
       if (!res.ok) throw new Error();
-      refetch();
+      refetch().then(() => setOptimisticReadIds(prev => { const s = new Set(prev); s.delete(id); return s; }));
     } catch {
+      // Rollback
+      setOptimisticReadIds(prev => { const s = new Set(prev); s.delete(id); return s; });
       toast('İşlem başarısız', 'error');
     } finally {
       setMarkingId(null);

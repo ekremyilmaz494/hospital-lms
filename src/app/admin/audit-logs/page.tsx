@@ -135,7 +135,12 @@ export default function AdminAuditLogsPage() {
   const { data, isLoading, error } = useFetch<AuditLogResponse>(queryUrl);
 
   const handleExportCSV = async () => {
-    const res = await fetch('/api/admin/audit-logs?limit=1000');
+    // max 500 kayıt — ?limit=1000 performans sorunu yaratıyordu
+    const exportParams = new URLSearchParams();
+    exportParams.set('limit', '500');
+    exportParams.set('page', '1');
+    if (entityTypeFilter) exportParams.set('entityType', entityTypeFilter);
+    const res = await fetch(`/api/admin/audit-logs?${exportParams.toString()}`);
     if (!res.ok) return;
     const { logs } = await res.json();
     if (!logs?.length) return;

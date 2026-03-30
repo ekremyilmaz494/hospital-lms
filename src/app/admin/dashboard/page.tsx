@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import {
   Users, GraduationCap, TrendingUp, AlertTriangle, Trophy, Activity, Clock, ArrowRight,
-  Plus, Send, Download, Shield, Building2, CalendarClock, UserPlus, ShieldCheck,
+  Plus, Send, Download, Shield, Building2, CalendarClock, UserPlus, ShieldCheck, Grid3X3,
+  Radio, BookOpen,
 } from 'lucide-react';
+import { useRealtimeExams } from '@/hooks/use-realtime-exams';
+import type { LiveExamAttempt } from '@/hooks/use-realtime-exams';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from '@/components/shared/recharts';
 import Link from 'next/link';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -33,7 +36,239 @@ interface DashboardData {
 }
 
 const iconMap: Record<string, typeof Users> = { Users, GraduationCap, TrendingUp, AlertTriangle, ShieldCheck };
+
+interface MiniCell { trainingId: string; state: string }
+interface MiniStaffRow { name: string; cells: MiniCell[] }
+interface MatrixPreview { trainings: { id: string; title: string }[]; staff: MiniStaffRow[] }
+
+const matrixStateColor: Record<string, string> = {
+  passed: 'var(--color-success)',
+  failed: 'var(--color-error)',
+  in_progress: 'var(--color-warning)',
+  assigned: 'var(--color-info)',
+  unassigned: 'var(--color-border)',
+};
+
+function MatrixMiniWidget() {
+  const { data, isLoading } = useFetch<{ trainings: { id: string; title: string; isCompulsory: boolean }[]; staff: { id: string; name: string; department: string; cells: MiniCell[]; completionRate: number }[] }>('/api/admin/competency-matrix');
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border p-6 animate-pulse" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+        <div className="h-4 w-32 rounded" style={{ background: 'var(--color-border)' }} />
+      </div>
+    );
+  }
+
+  const allTrainings = data?.trainings ?? [];
+  const allStaff = data?.staff ?? [];
+  const previewTrainings = allTrainings.slice(0, 6);
+  const previewStaff = allStaff.slice(0, 8);
+
+  if (previewStaff.length === 0 || previewTrainings.length === 0) return null;
+
+  const totalCells = allStaff.length * allTrainings.length;
+  const passedCells = allStaff.flatMap(s => s.cells).filter(c => c.state === 'passed').length;
+  const coverageRate = totalCells > 0 ? Math.round((passedCells / totalCells) * 100) : 0;
+
+  const preview: MatrixPreview = {
+    trainings: previewTrainings,
+    staff: previewStaff.map(s => ({
+      name: s.name,
+      cells: previewTrainings.map(t => s.cells.find(c => c.trainingId === t.id) ?? { trainingId: t.id, state: 'unassigned' }),
+    })),
+  };
+
+  return (
+    <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+      <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
+            <Grid3X3 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold">Yetkinlik Matrisi</h3>
+            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              {allStaff.length} personel · {allTrainings.length} eğitim · %{coverageRate} tamamlandı
+            </p>
+          </div>
+        </div>
+        <Link href="/admin/competency-matrix" className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
+          Tümünü Gör <ArrowRight className="h-3 w-3" />
+        </Link>
+      </div>
+
+      <div className="p-4 overflow-x-auto">
+        <table className="text-[11px]">
+          <thead>
+            <tr>
+              <td className="pr-3 pb-2 w-28" />
+              {preview.trainings.map(t => (
+                <td key={t.id} className="px-1 pb-2 text-center" style={{ minWidth: 28 }}>
+                  <span
+                    className="block text-[9px] font-semibold uppercase tracking-wide truncate"
+                    style={{ color: 'var(--color-text-muted)', maxWidth: 28, writingMode: 'vertical-lr', transform: 'rotate(180deg)', height: 56, lineHeight: 1.3 }}
+                    title={t.title}
+                  >
+                    {t.title.slice(0, 14)}
+                  </span>
+                </td>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {preview.staff.map((s) => (
+              <tr key={s.name}>
+                <td className="pr-3 py-1 text-[11px] font-medium truncate max-w-[7rem]" style={{ color: 'var(--color-text-secondary)' }} title={s.name}>
+                  {s.name.split(' ').slice(0, 2).join(' ')}
+                </td>
+                {s.cells.map((cell, ci) => (
+                  <td key={ci} className="px-1 py-1 text-center">
+                    <span
+                      className="inline-block h-5 w-5 rounded"
+                      style={{
+                        background: matrixStateColor[cell.state] ?? 'var(--color-border)',
+                        opacity: cell.state === 'unassigned' ? 0.3 : 1,
+                      }}
+                      title={cell.state}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Legend */}
+        <div className="flex items-center gap-4 mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+          {[
+            { state: 'passed', label: 'Başarılı' },
+            { state: 'in_progress', label: 'Devam' },
+            { state: 'assigned', label: 'Atandı' },
+            { state: 'failed', label: 'Başarısız' },
+          ].map(({ state, label }) => (
+            <div key={state} className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-sm" style={{ background: matrixStateColor[state] }} />
+              <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+            </div>
+          ))}
+          {allStaff.length > 8 && (
+            <span className="text-[10px] ml-auto" style={{ color: 'var(--color-text-muted)' }}>
+              +{allStaff.length - 8} personel daha
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 const typeColors: Record<string, string> = { success: 'var(--color-success)', error: 'var(--color-error)', info: 'var(--color-info)', warning: 'var(--color-warning)' };
+
+const examStatusLabel: Record<string, { label: string; color: string; bg: string }> = {
+  pre_exam: { label: 'Ön sınav', color: 'var(--color-info)', bg: 'var(--color-info-bg)' },
+  watching_videos: { label: 'Video izliyor', color: 'var(--color-warning)', bg: 'var(--color-warning-bg)' },
+  post_exam: { label: 'Sınav', color: 'var(--color-accent)', bg: 'var(--color-warning-bg)' },
+};
+
+function elapsedLabel(startedAt: string): string {
+  const diffMs = Date.now() - new Date(startedAt).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'az önce';
+  if (mins < 60) return `${mins} dk önce`;
+  return `${Math.floor(mins / 60)} sa önce`;
+}
+
+/** G7.6 — Realtime in-progress exam list for admin dashboard */
+function LiveExamsWidget() {
+  const { attempts, isLoading, activeCount } = useRealtimeExams();
+
+  return (
+    <div
+      className="rounded-2xl border p-5"
+      style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
+    >
+      {/* Header */}
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
+            <Radio className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
+            {activeCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full" style={{ background: 'var(--color-success)', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+            )}
+          </div>
+          <div>
+            <h3 className="text-[15px] font-bold">Anlık Sınavlar</h3>
+            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Şu an sınav yapan personel</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: activeCount > 0 ? 'var(--color-success-bg)' : 'var(--color-bg)' }}>
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: activeCount > 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }} />
+          <span className="text-[12px] font-semibold" style={{ color: activeCount > 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
+            {isLoading ? '...' : `${activeCount} aktif`}
+          </span>
+        </div>
+      </div>
+
+      {/* List */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2].map(i => (
+            <div key={i} className="h-12 animate-pulse rounded-xl" style={{ background: 'var(--color-bg)' }} />
+          ))}
+        </div>
+      ) : attempts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl mb-3" style={{ background: 'var(--color-bg)' }}>
+            <BookOpen className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
+          </div>
+          <p className="text-[13px]" style={{ color: 'var(--color-text-muted)' }}>Şu an aktif sınav yok</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {attempts.slice(0, 8).map((attempt: LiveExamAttempt) => {
+            const st = examStatusLabel[attempt.status] ?? examStatusLabel.pre_exam;
+            return (
+              <div
+                key={attempt.id}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+              >
+                {/* Avatar initials */}
+                <div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                  style={{ background: 'var(--color-primary)' }}
+                >
+                  {attempt.user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-[13px] font-semibold">{attempt.user.name}</p>
+                  <p className="truncate text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                    {attempt.training.title.length > 32 ? attempt.training.title.slice(0, 32) + '…' : attempt.training.title}
+                  </p>
+                </div>
+
+                {/* Status + elapsed */}
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span
+                    className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+                    style={{ background: st.bg, color: st.color }}
+                  >
+                    {st.label}
+                  </span>
+                  <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
+                    {elapsedLabel(attempt.startedAt)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const quickActions = [
   { label: 'Yeni Eğitim', desc: 'Video tabanlı eğitim oluştur', icon: Plus, href: '/admin/trainings/new', color: 'var(--color-primary)', gradient: 'linear-gradient(135deg, rgba(13,150,104,0.08) 0%, rgba(13,150,104,0.02) 100%)', glowColor: 'rgba(13,150,104,0.06)' },
@@ -136,6 +371,11 @@ export default function AdminDashboard() {
             </Link>
           ))}
         </div>
+      </BlurFade>
+
+      {/* G7.6 — Live In-Progress Exams */}
+      <BlurFade delay={0.045}>
+        <LiveExamsWidget />
       </BlurFade>
 
       {/* Warning Banner */}
@@ -406,6 +646,11 @@ export default function AdminDashboard() {
           </div>
         </BlurFade>
       )}
+
+      {/* Competency Matrix Widget */}
+      <BlurFade delay={0.52}>
+        <MatrixMiniWidget />
+      </BlurFade>
 
       {/* Row: Top Performers + Recent Activity */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

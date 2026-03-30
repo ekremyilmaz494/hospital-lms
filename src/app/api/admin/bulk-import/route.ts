@@ -1,18 +1,82 @@
 import { randomBytes } from 'crypto'
-import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
-import { checkRateLimit } from '@/lib/redis'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import ExcelJS from 'exceljs'
 
-/** Maximum number of data rows allowed in a bulk import file */
-const MAX_ROW_COUNT = 5000
-/** Maximum number of sheets allowed in the workbook */
-const MAX_SHEET_COUNT = 5
-/** XLSX files are ZIP archives — first 4 bytes must be the ZIP signature */
-const XLSX_MAGIC_BYTES = [0x50, 0x4B, 0x03, 0x04]
+/** Satır ayrıştırma sonucu */
+interface ParsedRow {
+  rowIndex: number
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+  tcNo?: string
+  phone?: string
+  title?: string
+  deptId?: string
+  deptName?: string
+}
+
+/** Dosyayı ayrıştır ve departmanlarla eşleştir — DB/Auth'a dokunmaz */
+async function parseImportFile(
+  arrayBuffer: ArrayBuffer,
+  orgId: string,
+): Promise<{ rows: ParsedRow[]; parseError?: string }> {
+  const workbook = new ExcelJS.Workbook()
+  try {
+    await workbook.xlsx.load(arrayBuffer)
+  } catch {
+    return { rows: [], parseError: 'Excel dosyası okunamadı. Lütfen .xlsx formatında yükleyin.' }
+  }
+
+  const sheet = workbook.worksheets[0]
+  if (!sheet || sheet.rowCount < 2) {
+    return {
+      rows: [],
+      parseError: 'Excel dosyası boş veya hatalı. İlk satır başlık olmalı: Ad, Soyad, E-posta, Şifre, TC, Telefon, Departman, Unvan',
+    }
+  }
+
+  const rawHeaders = sheet.getRow(1).values as (string | undefined)[]
+  const headers = rawHeaders.slice(1).map(h => (h || '').toString().trim().toLowerCase())
+
+  const rawRows: Array<Record<string, string>> = []
+  sheet.eachRow((row, idx) => {
+    if (idx === 1) return
+    const vals = (row.values as (string | number | undefined)[]).slice(1)
+    const record: Record<string, string> = {}
+    headers.forEach((h, i) => { record[h] = (vals[i] ?? '').toString().trim() })
+    if (record['ad'] || record['e-posta'] || record['email']) rawRows.push(record)
+  })
+
+  if (rawRows.length === 0) return { rows: [], parseError: 'Geçerli satır bulunamadı' }
+
+  const departments = await prisma.department.findMany({
+    where: { organizationId: orgId },
+    select: { id: true, name: true },
+  })
+
+  const rows: ParsedRow[] = rawRows.map((r, i) => {
+    const deptName = r['departman'] || r['departman*'] || ''
+    const dept = departments.find(d => d.name.toLowerCase() === deptName.toLowerCase())
+    return {
+      rowIndex: i + 2,
+      firstName: r['ad'] || r['ad*'] || '',
+      lastName: r['soyad'] || r['soyad*'] || '',
+      email: (r['e-posta'] || r['email'] || r['e-posta*'] || '').toLowerCase(),
+      password: r['şifre'] || r['sifre'] || r['şifre*'] || r['parola'] || ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1'),
+      tcNo: r['tc'] || r['tc kimlik'] || r['tc no'] || undefined,
+      phone: r['telefon'] || undefined,
+      title: r['unvan'] || r['ünvan'] || undefined,
+      deptId: dept?.id,
+      deptName: dept?.name || (deptName || undefined),
+    }
+  })
+
+  return { rows }
+}
 
 export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -23,9 +87,9 @@ export async function POST(request: Request) {
 
   const orgId = dbUser!.organizationId!
 
-  // Rate limiting: saatte en fazla 3 bulk import
-  const allowed = await checkRateLimit(`bulk-import:${orgId}`, 3, 3600)
-  if (!allowed) return errorResponse('Çok fazla toplu içe aktarma denemesi. Lütfen bir saat sonra tekrar deneyin.', 429)
+  // B4.3/G4.3 — mode=preview: pre-flight doğrulama turu (kullanıcı oluşturulmaz)
+  const { searchParams } = new URL(request.url)
+  const isPreview = searchParams.get('mode') === 'preview'
 
   const formData = await request.formData().catch(() => null)
   if (!formData) return errorResponse('Dosya yüklenemedi')
@@ -33,182 +97,114 @@ export async function POST(request: Request) {
   const file = formData.get('file') as File | null
   if (!file) return errorResponse('Dosya seçilmedi')
 
-  // File size check (max 10MB)
   if (file.size > 10 * 1024 * 1024) return errorResponse('Dosya boyutu 10MB\'ı aşamaz', 400)
 
-  // MIME type / extension validation
   const validMime = file.type.includes('spreadsheet') || file.type.includes('excel')
   const validExt = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
   if (!validMime && !validExt) return errorResponse('Sadece Excel dosyaları (.xlsx, .xls) kabul edilir', 400)
 
   const arrayBuffer = await file.arrayBuffer()
+  const { rows, parseError } = await parseImportFile(arrayBuffer, orgId)
+  if (parseError) return errorResponse(parseError)
 
-  // Validate magic bytes — XLSX files are ZIP archives
-  const header = new Uint8Array(arrayBuffer.slice(0, 4))
-  if (
-    header[0] !== XLSX_MAGIC_BYTES[0] ||
-    header[1] !== XLSX_MAGIC_BYTES[1] ||
-    header[2] !== XLSX_MAGIC_BYTES[2] ||
-    header[3] !== XLSX_MAGIC_BYTES[3]
-  ) {
-    return errorResponse('Geçersiz dosya formatı. Lütfen geçerli bir .xlsx dosyası yükleyin.', 400)
-  }
+  // ── Ön doğrulama: her iki modda da çalışır ──────────────────────────────
+  type RowResult = { rowIndex: number; email: string; status: 'ok' | 'error'; reason?: string }
+  const rowResults: RowResult[] = []
+  const validRows: ParsedRow[] = []
 
-  const workbook = new ExcelJS.Workbook()
-  try {
-    await workbook.xlsx.load(arrayBuffer)
-  } catch {
-    return errorResponse('Excel dosyası okunamadı. Lütfen .xlsx formatında yükleyin.')
-  }
+  // Dosya içindeki tekrar eden e-postalar
+  const seenEmails = new Map<string, number>() // email → ilk satır numarası
 
-  // Sheet count limit
-  if (workbook.worksheets.length > MAX_SHEET_COUNT) {
-    return errorResponse(`Excel dosyası en fazla ${MAX_SHEET_COUNT} sayfa içerebilir.`, 400)
-  }
-
-  const sheet = workbook.worksheets[0]
-  if (!sheet || sheet.rowCount < 2) {
-    return errorResponse('Excel dosyası boş veya hatalı. İlk satır başlık olmalı: Ad, Soyad, E-posta, Şifre, TC, Telefon, Departman, Unvan')
-  }
-
-  // Parse headers
-  const rawHeaders = sheet.getRow(1).values as (string | undefined)[]
-  const headers = rawHeaders.slice(1).map(h => (h || '').toString().trim().toLowerCase())
-
-  // Parse rows
-  const rows: Array<Record<string, string>> = []
-  sheet.eachRow((row, idx) => {
-    if (idx === 1) return
-    const vals = (row.values as (string | number | undefined)[]).slice(1)
-    const record: Record<string, string> = {}
-    headers.forEach((h, i) => { record[h] = (vals[i] ?? '').toString().trim() })
-    if (record['ad'] || record['e-posta'] || record['email']) rows.push(record)
+  // DB'deki mevcut e-postalar — tek sorguda çek
+  const emailList = rows.map(r => r.email).filter(Boolean)
+  const existingUsers = await prisma.user.findMany({
+    where: { email: { in: emailList } },
+    select: { email: true },
   })
+  const existingEmailSet = new Set(existingUsers.map(u => u.email.toLowerCase()))
 
-  if (rows.length === 0) return errorResponse('Geçerli satır bulunamadı')
-
-  // Row count limit
-  if (rows.length > MAX_ROW_COUNT) {
-    return errorResponse(`En fazla ${MAX_ROW_COUNT} satır içe aktarılabilir. Dosyada ${rows.length} satır bulundu.`, 400)
-  }
-
-  // Load departments for matching
-  const departments = await prisma.department.findMany({
-    where: { organizationId: orgId },
-    select: { id: true, name: true },
-  })
-
-  // ── Preview Mode: validate without creating ──
-  const url = new URL(request.url)
-  if (url.searchParams.get('preview') === 'true') {
-    const existingEmails = new Set(
-      (await prisma.user.findMany({ where: { organizationId: orgId }, select: { email: true } })).map(u => u.email)
-    )
-    const seenEmails = new Set<string>()
-    const previewRows = rows.map((r, idx) => {
-      const firstName = r['ad'] || r['ad*'] || ''
-      const lastName = r['soyad'] || r['soyad*'] || ''
-      const email = r['e-posta'] || r['email'] || r['e-posta*'] || ''
-      const deptName = r['departman'] || r['bölüm'] || ''
-      const dept = departments.find(d => d.name.toLowerCase() === deptName.toLowerCase())
-      const errors: string[] = []
-      if (!firstName) errors.push('Ad eksik')
-      if (!lastName) errors.push('Soyad eksik')
-      if (!email) errors.push('E-posta eksik')
-      else if (!z.string().email().safeParse(email).success) errors.push('Geçersiz e-posta')
-      else if (existingEmails.has(email)) errors.push('E-posta zaten kayıtlı')
-      else if (seenEmails.has(email)) errors.push('Dosyada tekrar eden e-posta')
-      if (email) seenEmails.add(email)
-      return {
-        row: idx + 2,
-        firstName, lastName, email,
-        department: dept?.name || deptName,
-        title: r['unvan'] || r['ünvan'] || '',
-        tcNo: r['tc'] || r['tc kimlik'] || r['tc no'] || '',
-        phone: r['telefon'] || '',
-        valid: errors.length === 0,
-        error: errors.join(', ') || undefined,
-      }
-    })
-    return jsonResponse({
-      preview: true,
-      rows: previewRows,
-      validCount: previewRows.filter(r => r.valid).length,
-      invalidCount: previewRows.filter(r => !r.valid).length,
-      total: previewRows.length,
-    })
-  }
-
-  const supabase = await createServiceClient()
-
-  let created = 0
-  let failed = 0
-  const errors: string[] = []
-
-  for (const r of rows) {
-    const firstName = r['ad'] || r['ad*'] || ''
-    const lastName = r['soyad'] || r['soyad*'] || ''
-    const email = r['e-posta'] || r['email'] || r['e-posta*'] || ''
-    const password = r['şifre'] || r['sifre'] || r['şifre*'] || r['parola'] || (randomBytes(12).toString('base64url').slice(0, 16) + '!Aa1')
-
-    if (!firstName || !lastName || !email) {
-      failed++
-      errors.push(`Satır ${rows.indexOf(r) + 2}: Ad, Soyad veya E-posta eksik`)
+  for (const row of rows) {
+    if (!row.firstName || !row.lastName || !row.email) {
+      rowResults.push({ rowIndex: row.rowIndex, email: row.email || '—', status: 'error', reason: 'Ad, Soyad veya E-posta eksik' })
       continue
     }
 
-    const deptName = r['departman'] || r['departman*'] || ''
-    const dept = departments.find(d => d.name.toLowerCase() === deptName.toLowerCase())
+    if (seenEmails.has(row.email)) {
+      rowResults.push({
+        rowIndex: row.rowIndex,
+        email: row.email,
+        status: 'error',
+        reason: `Dosya içinde tekrarlayan e-posta (ilk satır: ${seenEmails.get(row.email)})`,
+      })
+      continue
+    }
+    seenEmails.set(row.email, row.rowIndex)
 
+    if (existingEmailSet.has(row.email)) {
+      rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Bu e-posta zaten sistemde kayıtlı' })
+      continue
+    }
+
+    rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'ok' })
+    validRows.push(row)
+  }
+
+  const previewSummary = {
+    total: rows.length,
+    valid: validRows.length,
+    errors: rowResults.filter(r => r.status === 'error').length,
+    rows: rowResults,
+  }
+
+  // Preview modunda sadece doğrulama sonucunu dön — hiçbir şey oluşturma
+  if (isPreview) {
+    return jsonResponse({ preview: true, ...previewSummary })
+  }
+
+  // ── Gerçek import ───────────────────────────────────────────────────────
+  const supabase = await createServiceClient()
+  let created = 0
+  let failed = 0
+  const importErrors: string[] = rowResults
+    .filter(r => r.status === 'error')
+    .map(r => `Satır ${r.rowIndex} (${r.email}): ${r.reason}`)
+
+  for (const row of validRows) {
     try {
-      // Create Supabase auth user
       const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password,
+        email: row.email,
+        password: row.password,
         email_confirm: true,
-        user_metadata: { first_name: firstName, last_name: lastName, role: 'staff', organization_id: orgId },
+        user_metadata: { first_name: row.firstName, last_name: row.lastName, role: 'staff', organization_id: orgId },
       })
 
       if (authError) {
         failed++
-        if (authError.message?.includes('already registered')) {
-          errors.push(`${email}: Bu e-posta zaten kayıtlı`)
-        } else {
-          errors.push(`${email}: ${authError.message}`)
-        }
+        importErrors.push(`${row.email}: ${authError.message?.includes('already registered') ? 'Bu e-posta zaten kayıtlı' : authError.message}`)
         continue
       }
 
-      // Create DB user
-      const authUserId = authUser.user.id
-      try {
-        await prisma.user.create({
-          data: {
-            id: authUserId,
-            email,
-            firstName,
-            lastName,
-            role: 'staff',
-            organizationId: orgId,
-            tcNo: r['tc'] || r['tc kimlik'] || r['tc no'] || undefined,
-            phone: r['telefon'] || undefined,
-            departmentId: dept?.id,
-            title: r['unvan'] || r['ünvan'] || undefined,
-          },
-        })
-      } catch (dbErr) {
-        // Clean up orphaned Supabase auth user when DB insert fails
-        await supabase.auth.admin.deleteUser(authUserId).catch((deleteErr) => {
-          logger.error('Bulk Import', `Failed to delete orphan auth user ${authUserId}`, deleteErr)
-        })
-        throw dbErr
-      }
+      await prisma.user.create({
+        data: {
+          id: authUser.user.id,
+          email: row.email,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          role: 'staff',
+          organizationId: orgId,
+          tcNo: row.tcNo,
+          phone: row.phone,
+          departmentId: row.deptId,
+          department: row.deptName,
+          title: row.title,
+        },
+      })
 
       created++
     } catch (err) {
       failed++
-      errors.push(`${email}: Veritabanı hatası`)
-      logger.error('Bulk Import', `DB insert failed for ${email}`, err)
+      importErrors.push(`${row.email}: Veritabanı hatası`)
+      logger.error('Bulk Import', `DB insert failed for ${row.email}`, err)
     }
   }
 
@@ -221,5 +217,8 @@ export async function POST(request: Request) {
     request,
   })
 
-  return jsonResponse({ created, failed, total: rows.length, errors: errors.slice(0, 10) }, created > 0 ? 201 : 400)
+  return jsonResponse(
+    { created, failed, total: rows.length, errors: importErrors.slice(0, 20) },
+    created > 0 ? 201 : 400,
+  )
 }

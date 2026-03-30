@@ -1,25 +1,6 @@
 import { Redis } from '@upstash/redis'
 
-// ── Logger helper (avoid console.log in production) ──
-const logger = {
-  warn: (message: string, meta?: Record<string, unknown>) => {
-    if (process.env.NODE_ENV !== 'test') {
-      console.warn(`[redis] ${message}`, meta ?? '')
-    }
-  },
-}
-
-// ── Key sanitization ──
-const SAFE_KEY_PATTERN = /^[a-zA-Z0-9:_\-@.]+$/
-
-function sanitizeKey(key: string): string {
-  if (!SAFE_KEY_PATTERN.test(key)) {
-    throw new Error(`Invalid rate limit key: contains unsafe characters — "${key}"`)
-  }
-  return key
-}
-
-// ── Lazy Redis client — undefined if not configured ──
+// ── Lazy Redis client — null if not configured or unreachable ──
 let _redis: Redis | null = null
 export function getRedis(): Redis | null {
   if (_redis) return _redis
@@ -30,7 +11,12 @@ export function getRedis(): Redis | null {
   return _redis
 }
 
-// ── In-memory fallback (dev/staging when Redis is not configured) ──
+// Resets the cached client so next call to getRedis() retries the connection.
+function resetRedis() {
+  _redis = null
+}
+
+// ── In-memory fallback (dev/staging when Redis is not configured or unreachable) ──
 const memoryTimers = new Map<string, number>()
 const memoryRateLimits = new Map<string, { count: number; expiresAt: number }>()
 
@@ -42,12 +28,16 @@ export async function startExamTimer(attemptId: string, durationMinutes: number)
   const expiresAt = Date.now() + durationMinutes * 60 * 1000
   const redis = getRedis()
   if (redis) {
-    await redis.set(`${EXAM_TIMER_PREFIX}${attemptId}`, expiresAt, {
-      ex: durationMinutes * 60 + 60,
-    })
-  } else {
-    memoryTimers.set(attemptId, expiresAt)
+    try {
+      await redis.set(`${EXAM_TIMER_PREFIX}${attemptId}`, expiresAt, {
+        ex: durationMinutes * 60 + 60,
+      })
+      return expiresAt
+    } catch {
+      resetRedis()
+    }
   }
+  memoryTimers.set(attemptId, expiresAt)
   return expiresAt
 }
 
@@ -55,7 +45,12 @@ export async function getExamTimeRemaining(attemptId: string): Promise<number | 
   const redis = getRedis()
   let expiresAt: number | null = null
   if (redis) {
-    expiresAt = await redis.get<number>(`${EXAM_TIMER_PREFIX}${attemptId}`)
+    try {
+      expiresAt = await redis.get<number>(`${EXAM_TIMER_PREFIX}${attemptId}`)
+    } catch {
+      resetRedis()
+      expiresAt = memoryTimers.get(attemptId) ?? null
+    }
   } else {
     expiresAt = memoryTimers.get(attemptId) ?? null
   }
@@ -66,47 +61,42 @@ export async function getExamTimeRemaining(attemptId: string): Promise<number | 
 
 export async function isExamExpired(attemptId: string): Promise<boolean> {
   const remaining = await getExamTimeRemaining(attemptId)
-  // Timer yoksa — ya hiç başlatılmamış ya da Redis TTL ile temizlenmiş.
-  // Her iki durumda da süresi dolmuş kabul et (sınav bütünlüğü için kritik).
-  if (remaining === null) {
-    logger.warn('Exam timer not found — treating as expired', { attemptId })
-    return true
-  }
+  // Timer yoksa (hiç başlatılmamışsa) expired DEĞİL — submit'i engellemesin
+  if (remaining === null) return false
   return remaining <= 0
 }
 
 export async function clearExamTimer(attemptId: string) {
   const redis = getRedis()
   if (redis) {
-    await redis.del(`${EXAM_TIMER_PREFIX}${attemptId}`)
-  } else {
-    memoryTimers.delete(attemptId)
+    try {
+      await redis.del(`${EXAM_TIMER_PREFIX}${attemptId}`)
+      return
+    } catch {
+      resetRedis()
+    }
   }
+  memoryTimers.delete(attemptId)
 }
 
 // ── Rate Limiting ──
 
 export async function checkRateLimit(key: string, maxRequests: number, windowSeconds: number): Promise<boolean> {
-  const sanitizedKey = sanitizeKey(key)
   const redis = getRedis()
   if (redis) {
     try {
-      const k = `ratelimit:${sanitizedKey}`
+      const k = `ratelimit:${key}`
       await redis.set(k, 0, { nx: true, ex: windowSeconds })
       const current = await redis.incr(k)
       return current <= maxRequests
     } catch {
-      return false // fail-closed
+      // Redis unreachable — fall through to in-memory fallback
+      resetRedis()
     }
   }
 
-  // In-memory fallback — apply stricter limits in production
-  const isProduction = process.env.NODE_ENV === 'production'
-  if (isProduction) {
-    logger.warn('Redis unavailable in production — using in-memory rate limiter with stricter limits', { key: sanitizedKey })
-  }
-  const effectiveMax = isProduction ? Math.max(1, Math.floor(maxRequests / 2)) : maxRequests
-  const k = `ratelimit:${sanitizedKey}`
+  // In-memory fallback
+  const k = `ratelimit:${key}`
   const now = Date.now()
   const entry = memoryRateLimits.get(k)
   if (!entry || entry.expiresAt < now) {
@@ -114,5 +104,5 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
     return true
   }
   entry.count++
-  return entry.count <= effectiveMax
+  return entry.count <= maxRequests
 }

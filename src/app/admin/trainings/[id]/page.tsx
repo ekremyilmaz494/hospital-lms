@@ -15,6 +15,7 @@ import { StatCard } from '@/components/shared/stat-card';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFetch } from '@/hooks/use-fetch';
 import { AssignStaffModal } from './assign-staff-modal';
+import { useToast } from '@/components/shared/toast';
 
 interface TrainingDetail {
   title: string;
@@ -50,6 +51,7 @@ export default function TrainingDetailPage() {
   const params = useParams();
   const id = typeof params?.id === 'string' ? params.id : null;
   const { data: training, isLoading, error, refetch } = useFetch<TrainingDetail>(id ? `/api/admin/trainings/${id}` : null);
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('staff');
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -176,10 +178,24 @@ export default function TrainingDetailPage() {
           </div>
           {activeTab !== 'videos' && (
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => exportExcel()}>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => {
+                try {
+                  const exportData = activeTab === 'staff'
+                    ? { headers: ['Ad Soyad', 'Departman', 'Durum', 'Ön Sınav', 'Son Sınav', 'Deneme'], rows: assignedStaff.map(s => [s.name, s.department, statusMap[s.status]?.label ?? s.status, s.preScore ?? '-', s.postScore ?? '-', s.attempt]) }
+                    : { headers: ['#', 'Soru', 'Puan'], rows: trainingQuestions.map((q, i) => [i + 1, q.text, q.points]) };
+                  exportExcel(exportData);
+                } catch (e) { toast((e as Error).message, 'error'); }
+              }}>
                 <Download className="h-3.5 w-3.5" /> Excel
               </Button>
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => exportPDF()}>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => {
+                try {
+                  const exportData = activeTab === 'staff'
+                    ? { headers: ['Ad Soyad', 'Departman', 'Durum', 'Ön Sınav', 'Son Sınav', 'Deneme'], rows: assignedStaff.map(s => [s.name, s.department, statusMap[s.status]?.label ?? s.status, s.preScore ?? '-', s.postScore ?? '-', s.attempt]) }
+                    : { headers: ['#', 'Soru', 'Puan'], rows: trainingQuestions.map((q, i) => [i + 1, q.text, q.points]) };
+                  exportPDF(exportData, training.title);
+                } catch (e) { toast((e as Error).message, 'error'); }
+              }}>
                 <FileText className="h-3.5 w-3.5" /> PDF
               </Button>
             </div>

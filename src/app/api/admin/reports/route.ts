@@ -49,7 +49,7 @@ export async function GET(request: Request) {
         include: {
           assignments: {
             where: { user: { ...userDeptFilter }, ...assignmentDateFilter },
-            include: { examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true } } },
+            include: { examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, preExamScore: true, isPassed: true } } },
           },
           videos: { select: { durationSeconds: true } },
         },
@@ -188,6 +188,30 @@ export async function GET(request: Request) {
       sinav: (t.examDurationMinutes ?? 30) * 60,
     }))
 
+    // G6.5 — Pre/post score comparison per training
+    const scoreComparisonData = trainings
+      .map(t => {
+        const preScores = t.assignments
+          .map(a => a.examAttempts[0]?.preExamScore)
+          .filter(s => s != null)
+          .map(Number)
+        const postScores = t.assignments
+          .map(a => a.examAttempts[0]?.postExamScore)
+          .filter(s => s != null)
+          .map(Number)
+        const preScore = preScores.length > 0 ? Math.round(preScores.reduce((a, b) => a + b, 0) / preScores.length) : 0
+        const postScore = postScores.length > 0 ? Math.round(postScores.reduce((a, b) => a + b, 0) / postScores.length) : 0
+        return {
+          training: t.title.length > 30 ? t.title.slice(0, 30) + '…' : t.title,
+          fullTitle: t.title,
+          preScore,
+          postScore,
+          improvement: postScore - preScore,
+          sampleSize: postScores.length,
+        }
+      })
+      .filter(d => d.sampleSize > 0)
+
     return jsonResponse({
       overviewStats,
       monthlyData,
@@ -196,6 +220,7 @@ export async function GET(request: Request) {
       departmentData,
       failureData,
       durationData,
+      scoreComparisonData,
     })
   } catch (err) {
     logger.error('Admin Reports', 'Rapor verileri alınamadı', err)

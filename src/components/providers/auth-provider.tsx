@@ -2,14 +2,16 @@
 
 import { useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient, hasSupabaseCredentials } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
-import { clearAllFetchCache } from '@/hooks/use-fetch';
+import { usePresenceTracker } from '@/hooks/use-presence-tracker';
 
 const DB_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 dakika
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setLoading, logout } = useAuthStore();
+  const { setUser, setLoading } = useAuthStore();
+  // G3.2 — Track this user's presence in the global active-users channel
+  usePresenceTracker();
   const router = useRouter();
 
   // DB'den guncel role/isActive verisi al (JWT stale olabilir)
@@ -24,8 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (data.user.isActive === false) {
             const supabase = createClient();
             await supabase.auth.signOut();
-            clearAllFetchCache();
-            logout();
+            setUser(null);
             router.push('/auth/login');
             return;
           }
@@ -46,18 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [setUser, router]);
 
   useEffect(() => {
-    // Supabase credentials yoksa demo modda calis
-    if (!hasSupabaseCredentials) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
     const supabase = createClient();
 
     // Get initial session
     setLoading(true);
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setUser({
           id: user.id,
@@ -73,13 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           title: user.user_metadata?.title ?? null,
           avatarUrl: user.user_metadata?.avatar_url ?? null,
           isActive: user.user_metadata?.is_active !== false,
-          kvkkConsent: user.user_metadata?.kvkk_consent ?? false,
-          kvkkConsentDate: user.user_metadata?.kvkk_consent_date ?? null,
           createdAt: user.created_at,
           updatedAt: user.updated_at ?? user.created_at,
         });
-        // DB'den guncel veri al — loading, refreshFromDB bitene kadar true kalir
-        await refreshFromDB();
+        // Hemen DB'den guncel veri al
+        refreshFromDB();
       } else {
         setUser(null);
       }
@@ -95,8 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
-        clearAllFetchCache(); // Stale multi-tenant veriyi temizle
-        logout();
+        setUser(null);
         router.push('/auth/login');
       } else if (session?.user) {
         const u = session.user;
@@ -114,8 +105,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           title: u.user_metadata?.title ?? null,
           avatarUrl: u.user_metadata?.avatar_url ?? null,
           isActive: u.user_metadata?.is_active !== false,
-          kvkkConsent: u.user_metadata?.kvkk_consent ?? false,
-          kvkkConsentDate: u.user_metadata?.kvkk_consent_date ?? null,
           createdAt: u.created_at,
           updatedAt: u.updated_at ?? u.created_at,
         });

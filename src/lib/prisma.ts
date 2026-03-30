@@ -6,12 +6,12 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
+  // Fail-fast: DATABASE_URL eksikse runtime'da anlaşılmaz hatalar yerine burada çöküyoruz
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) {
     throw new Error(
-      'DATABASE_URL ortam değişkeni tanımlanmamış. ' +
-      'Lütfen .env dosyasında DATABASE_URL değerini ayarlayın. ' +
-      'Örnek: DATABASE_URL="postgresql://user:pass@host:5432/dbname"' // secret-scanner-disable-line
+      '[Prisma] DATABASE_URL ortam değişkeni tanımlı değil. ' +
+      '.env.local dosyasına DATABASE_URL=postgresql://... satırını ekleyin.'
     )
   }
   const adapter = new PrismaPg({ connectionString })
@@ -19,8 +19,4 @@ function createPrismaClient() {
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()
-
-// Dev ortaminda hot reload'da yeni connection olusturulmasini onle
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+globalForPrisma.prisma = prisma

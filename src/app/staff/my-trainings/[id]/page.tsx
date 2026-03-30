@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useParams } from 'next/navigation';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft, Video, FileQuestion, CheckCircle, Clock, Play, Target,
@@ -8,7 +9,6 @@ import {
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch, clearFetchCache } from '@/hooks/use-fetch';
-import { useRef, useEffect } from 'react';
 import { PageLoading } from '@/components/shared/page-loading';
 
 interface TrainingVideo {
@@ -42,16 +42,14 @@ export default function TrainingDetailPage() {
   const params = useParams();
   const id = typeof params?.id === 'string' ? params.id : null;
 
+  const apiUrl = id ? `/api/staff/my-trainings/${id}` : null;
+
   // Clear stale cache on mount — exam state changes between attempts,
   // showing cached data causes wrong step to flash briefly
-  const apiUrl = id ? `/api/staff/my-trainings/${id}` : null;
-  const cacheCleared = useRef(false);
   useEffect(() => {
-    if (apiUrl && !cacheCleared.current) {
-      cacheCleared.current = true;
-      clearFetchCache(apiUrl);
-    }
-  }, [apiUrl]);
+    if (apiUrl) clearFetchCache(apiUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data: training, isLoading, error } = useFetch<TrainingDetail>(apiUrl);
 

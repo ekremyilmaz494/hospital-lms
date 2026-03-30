@@ -6,6 +6,7 @@ import { Clock, ChevronRight, AlertTriangle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
+import { useToast } from '@/components/shared/toast';
 
 interface Option {
   id: string;
@@ -31,6 +32,7 @@ interface ExamData {
 export default function PostExamPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
   const { data: examData, isLoading, error } = useFetch<ExamData>(`/api/exam/${id}/questions?phase=post`);
   const [currentQ, setCurrentQ] = useState(0);
   const [maxReachedQ, setMaxReachedQ] = useState(0);
@@ -164,16 +166,22 @@ export default function PostExamPage() {
         });
         const retryData = await retry.json().catch(() => ({}));
         if (retry.ok) {
+          if (retryData.results) {
+            try { sessionStorage.setItem(`exam-results-${id}`, JSON.stringify(retryData.results)); } catch { /* ignore */ }
+          }
           router.push(`/exam/${id}/transition?from=post-exam&score=${retryData.score ?? 0}&passed=${retryData.isPassed ?? false}&passingScore=${retryData.passingScore ?? 70}`);
           return;
         }
-        alert(`Sınav gönderilemedi: ${data.error || retryData.error || 'Bilinmeyen hata'}. Cevaplarınız kaydedilmemiş olabilir.`);
+        toast(`Sınav gönderilemedi: ${data.error || retryData.error || 'Bilinmeyen hata'}. Cevaplarınız kaydedilmemiş olabilir.`, 'error');
         router.push('/staff/my-trainings');
         return;
       }
+      if (data.results) {
+        try { sessionStorage.setItem(`exam-results-${id}`, JSON.stringify(data.results)); } catch { /* ignore */ }
+      }
       router.push(`/exam/${id}/transition?from=post-exam&score=${data.score ?? 0}&passed=${data.isPassed ?? false}&passingScore=${data.passingScore ?? 70}`);
     } catch (err) {
-      alert('Sınav gönderilemedi — internet bağlantınızı kontrol edin. Sayfayı yenileyip tekrar deneyin.');
+      toast('Sınav gönderilemedi — internet bağlantınızı kontrol edin. Sayfayı yenileyip tekrar deneyin.', 'error');
       router.push('/staff/my-trainings');
     } finally {
       setSubmitting(false);

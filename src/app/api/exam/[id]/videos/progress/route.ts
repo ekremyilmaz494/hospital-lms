@@ -32,8 +32,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return errorResponse('Yetkisiz erişim', 403)
   }
 
-  const video = await prisma.trainingVideo.findUnique({ where: { id: body.videoId } })
-  if (!video) return errorResponse('Video not found', 404)
+  // B7.2/G7.2 — videoId bu denemedeki eğitime ait olmalı; cross-training progress yazımını engelle
+  const video = await prisma.trainingVideo.findFirst({
+    where: { id: body.videoId, trainingId: attempt.trainingId },
+  })
+  if (!video) return errorResponse('Video bulunamadı veya bu sınava ait değil', 404)
 
   // watchedSeconds & lastPositionSeconds: video suresiyle sinirla
   const safeWatchedSeconds = Math.min(parsed.data.watchedSeconds, video.durationSeconds)

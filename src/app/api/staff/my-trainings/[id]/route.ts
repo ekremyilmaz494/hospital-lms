@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { dbUser, error } = await getAuthUser()
@@ -10,6 +12,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (roleError) return roleError
 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+
+  // B8.2/G8.2 — Parametre UUID formatında olmalı; hatalı değerler DB'ye ulaşmadan reddedilsin
+  if (!UUID_REGEX.test(id)) return errorResponse('Geçersiz eğitim ID', 400)
 
   // Find assignment — try by ID, then by trainingId
   let assignment = await prisma.trainingAssignment.findFirst({

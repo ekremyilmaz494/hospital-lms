@@ -300,7 +300,9 @@ export default function PreExamPage() {
             <h4 className="mb-3 text-sm font-bold">Soru Navigasyonu</h4>
             <div className="grid grid-cols-5 gap-2">
               {questions.map((_, i) => {
-                const isAnswered = answers[questions[i]?.id ?? 0] !== undefined;
+                // B7.4/G7.4 — id ?? 0 fallback kaldırıldı: undefined id → answered=false (yanlış pozitif önlenir)
+                const qId = questions[i]?.id
+                const isAnswered = qId !== undefined ? answers[qId] !== undefined : false;
                 const isCurrent = i === currentQ;
                 return (
                   <button key={i} onClick={() => setCurrentQ(i)} className="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold" style={{ background: isCurrent ? 'var(--color-primary)' : isAnswered ? 'var(--color-success-bg)' : 'var(--color-surface-hover)', color: isCurrent ? 'white' : isAnswered ? 'var(--color-success)' : 'var(--color-text-muted)', border: `1.5px solid ${isCurrent ? 'var(--color-primary)' : isAnswered ? 'var(--color-success)' : 'var(--color-border)'}`, transition: 'background var(--transition-fast), border-color var(--transition-fast)' }}>

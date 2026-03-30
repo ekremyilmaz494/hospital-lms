@@ -1,17 +1,18 @@
 'use client';
 
 import { useRouter, useParams } from 'next/navigation';
+import { useState } from 'react';
 import {
-  ArrowLeft, Building2, Users, GraduationCap, TrendingUp,
-  Edit, Ban, CheckCircle, CreditCard, Calendar, Activity
+  ArrowLeft, Users, GraduationCap, TrendingUp,
+  Edit, Ban, Calendar, Activity, UserCog, LogIn,
 } from 'lucide-react';
 import { PageLoading } from '@/components/shared/page-loading';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
-import { PageHeader } from '@/components/shared/page-header';
 import { useFetch } from '@/hooks/use-fetch';
+import { useToast } from '@/components/shared/toast';
 
 interface HospitalDetail {
   id: string;
@@ -38,6 +39,28 @@ export default function HospitalDetailPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, error } = useFetch<HospitalDetail>(`/api/super-admin/hospitals/${id}`);
+  const { toast } = useToast();
+  const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
+
+  // G3.4 — Opens a magic-link session for the target user in a new tab
+  const handleImpersonate = async (adminUser: { id: string; name: string; email: string }) => {
+    setImpersonatingId(adminUser.id);
+    try {
+      const res = await fetch('/api/super-admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: adminUser.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Impersonation başarısız');
+      window.open(body.actionLink, '_blank', 'noopener,noreferrer');
+      toast(`"${adminUser.name}" olarak yeni sekmede açıldı`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
+    } finally {
+      setImpersonatingId(null);
+    }
+  };
 
   if (isLoading) {
     return <PageLoading />;
@@ -132,7 +155,19 @@ export default function HospitalDetailPage() {
                     <p className="truncate text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{admin.name}</p>
                     <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{admin.email}</p>
                   </div>
-                  <span className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>{admin.lastLogin}</span>
+                  <button
+                    title={`"${admin.name}" olarak giriş yap`}
+                    disabled={impersonatingId === admin.id}
+                    onClick={() => handleImpersonate(admin)}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition-opacity duration-150 disabled:opacity-40"
+                    style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
+                  >
+                    {impersonatingId === admin.id ? (
+                      <span>...</span>
+                    ) : (
+                      <><UserCog className="h-3 w-3" /> Giriş</>
+                    )}
+                  </button>
                 </div>
               ))}
             </div>

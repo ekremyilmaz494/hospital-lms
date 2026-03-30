@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { submitExamSchema } from '@/lib/validations'
@@ -24,14 +25,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return errorResponse(parsed.error.message)
   }
 
-  // Try as attemptId first, then as assignmentId
+  // B7.3/G7.3 — Explicit organizationId cross-check: training.organizationId === dbUser.organizationId
   let attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser!.id },
+    where: { id: attemptId, userId: dbUser!.id, training: { organizationId: dbUser!.organizationId! } },
     include: { training: true, assignment: true },
   })
   if (!attempt) {
     attempt = await prisma.examAttempt.findFirst({
-      where: { assignmentId: attemptId, userId: dbUser!.id, status: { not: 'completed' } },
+      where: {
+        assignmentId: attemptId,
+        userId: dbUser!.id,
+        status: { not: 'completed' },
+        training: { organizationId: dbUser!.organizationId! },
+      },
       include: { training: true, assignment: true },
       orderBy: { attemptNumber: 'desc' },
     })
@@ -49,9 +55,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
   }
 
-  // Server-side timer check — reject submissions more than 5 minutes past exam duration
+  // B7.1/G7.1 — phaseStartedAt null ise sınav başlatılmamış demek; gönderimi reddet
   const phaseStartedAt = attempt.status === 'pre_exam' ? attempt.preExamStartedAt : attempt.postExamStartedAt
-  if (phaseStartedAt && attempt.training.examDurationMinutes) {
+  if (!phaseStartedAt) {
+    logger.warn('Exam Submit', 'phaseStartedAt null — sınav başlatılmamış, gönderim reddedildi', { attemptId: attempt.id })
+    return errorResponse('Sınav henüz başlatılmamış. Lütfen sınavı yeniden başlatın.', 400)
+  }
+
+  // Server-side timer check — reject submissions more than 5 minutes past exam duration
+  if (attempt.training.examDurationMinutes) {
     const allowedMs = (attempt.training.examDurationMinutes + 5) * 60 * 1000 // +5 min grace
     const elapsed = Date.now() - new Date(phaseStartedAt).getTime()
     if (elapsed > allowedMs) {
@@ -100,6 +112,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0
+
+  // G7.5 — Post-exam: per-question results for the result screen
+  const questionResults = phase === 'post'
+    ? questions
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map(q => {
+          const answer = parsed.data.answers.find(a => a.questionId === q.id)
+          const correctOption = q.options.find(o => o.isCorrect)
+          const selectedOption = answer ? q.options.find(o => o.id === answer.selectedOptionId) : null
+          return {
+            questionText: q.questionText,
+            selectedOptionText: selectedOption?.optionText ?? null,
+            correctOptionText: correctOption?.optionText ?? null,
+            isCorrect: !!(selectedOption && selectedOption.id === correctOption?.id),
+          }
+        })
+    : undefined
 
   // Idempotency: eger bu faz icin skor zaten hesaplanmissa tekrar isleme
   const alreadyScored = phase === 'pre' ? attempt.preExamScore !== null : attempt.postExamScore !== null
@@ -179,7 +208,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Auto-generate certificate
   if (isPassed) {
-    const code = `CERT-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`
+    // B6.1/G6.1 — Kriptografik olarak güvenli sertifika kodu (önceki: Date.now()+Math.random, ~16M kombinasyon)
+    const code = `CERT-${randomBytes(16).toString('hex').toUpperCase()}`
     await prisma.certificate.create({
       data: {
         userId: dbUser!.id,
@@ -199,5 +229,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     newData: { score, isPassed, trainingId: attempt.trainingId },
   })
 
-  return jsonResponse({ phase: 'post', score, isPassed, passingScore: attempt.training.passingScore })
+  return jsonResponse({ phase: 'post', score, isPassed, passingScore: attempt.training.passingScore, results: questionResults })
 }

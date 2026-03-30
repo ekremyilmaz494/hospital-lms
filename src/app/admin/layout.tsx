@@ -7,6 +7,7 @@ import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
 import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
 import { adminNav } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
+import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 
 const roleLabels: Record<string, string> = {
   admin: 'Hastane Admin',
@@ -19,8 +20,18 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('sidebar:admin:collapsed');
+    return saved !== null ? saved === 'true' : true;
+  });
   const { user, isLoading, fullName, initials } = useAuth();
+
+  const toggleSidebar = () => {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    localStorage.setItem('sidebar:admin:collapsed', String(next));
+  };
   const router = useRouter();
 
   useEffect(() => {
@@ -41,7 +52,7 @@ export default function AdminLayout({
         <AppSidebar
           navGroups={adminNav}
           collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onToggleCollapse={toggleSidebar}
           orgName={user?.department ?? ''}
           orgCode=""
           userName={fullName}
@@ -55,9 +66,10 @@ export default function AdminLayout({
             transition: 'margin-left 350ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
+          <ImpersonationBanner />
           <AppTopbar
-            title="Yönetim Paneli"
-            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title=""
+            onToggleSidebar={toggleSidebar}
             userName={fullName}
             userRole={displayRole}
             userInitials={initials}

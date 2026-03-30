@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { BookOpen, Clock, CheckCircle, XCircle, Calendar, Bell, ArrowRight, AlertTriangle, Play } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BookOpen, Clock, CheckCircle, XCircle, Calendar, Bell, ArrowRight, AlertTriangle, Play, Timer } from 'lucide-react';
 import { StatCard } from '@/components/shared/stat-card';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { BorderBeam } from '@/components/ui/border-beam';
@@ -13,6 +14,7 @@ interface Training {
   id: string;
   title: string;
   deadline: string;
+  endDateTime: string | null;
   status: string;
   daysLeft: number;
   progress: number;
@@ -38,7 +40,28 @@ interface DashboardData {
   urgentTraining?: { id: string; title: string; daysLeft: number } | null;
 }
 
-const MONTHS = ['', 'OCA', 'ŞUB', 'MAR', 'NİS', 'MAY', 'HAZ', 'TEM', 'AĞU', 'EYL', 'EKİ', 'KAS', 'ARA'] as const;
+function useCountdown(targetIso: string | null) {
+  const [remaining, setRemaining] = useState<number>(() =>
+    targetIso ? Math.max(0, Math.floor((new Date(targetIso).getTime() - Date.now()) / 1000)) : 0
+  );
+
+  useEffect(() => {
+    if (!targetIso) return;
+    const tick = () => {
+      const secs = Math.max(0, Math.floor((new Date(targetIso).getTime() - Date.now()) / 1000));
+      setRemaining(secs);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [targetIso]);
+
+  const days = Math.floor(remaining / 86400);
+  const hours = Math.floor((remaining % 86400) / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
+  const seconds = remaining % 60;
+  return { days, hours, minutes, seconds, total: remaining };
+}
 
 const statusMap: Record<string, { label: string; bg: string; text: string }> = {
   in_progress: { label: 'Devam Ediyor', bg: 'var(--color-warning-bg)', text: 'var(--color-warning)' },
@@ -46,6 +69,80 @@ const statusMap: Record<string, { label: string; bg: string; text: string }> = {
 };
 
 const typeColors: Record<string, string> = { success: 'var(--color-success)', info: 'var(--color-info)', warning: 'var(--color-warning)', error: 'var(--color-error)' };
+
+function CountdownWidget({ training }: { training: Training }) {
+  const { days, hours, minutes, seconds, total } = useCountdown(training.endDateTime);
+  if (total <= 0) return null;
+
+  const isUrgent = days < 1;
+  const accentColor = isUrgent ? 'var(--color-error)' : days < 3 ? 'var(--color-warning)' : 'var(--color-primary)';
+  const accentBg = isUrgent ? 'var(--color-error-bg)' : days < 3 ? 'var(--color-warning-bg)' : 'var(--color-primary-light)';
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  return (
+    <BlurFade delay={0.08}>
+      <div
+        className="relative overflow-hidden rounded-2xl px-6 py-5"
+        style={{ background: 'var(--color-surface)', border: `1px solid ${accentColor}30`, boxShadow: `0 4px 20px ${accentColor}15` }}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              style={{ background: accentBg }}
+            >
+              <Timer className="h-5 w-5" style={{ color: accentColor }} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                Son teslim tarihi
+              </p>
+              <p className="text-[13px] font-semibold truncate" title={training.title}>
+                {training.title}
+              </p>
+            </div>
+          </div>
+
+          {/* Countdown digits */}
+          <div className="flex items-center gap-1 shrink-0">
+            {days > 0 && (
+              <>
+                <div className="text-center">
+                  <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[20px] font-bold font-mono" style={{ background: accentBg, color: accentColor }}>
+                    {pad(days)}
+                  </div>
+                  <p className="text-[9px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: 'var(--color-text-muted)' }}>gün</p>
+                </div>
+                <span className="text-lg font-bold mb-3" style={{ color: 'var(--color-text-muted)' }}>:</span>
+              </>
+            )}
+            <div className="text-center">
+              <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[20px] font-bold font-mono" style={{ background: accentBg, color: accentColor }}>
+                {pad(hours)}
+              </div>
+              <p className="text-[9px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: 'var(--color-text-muted)' }}>saat</p>
+            </div>
+            <span className="text-lg font-bold mb-3" style={{ color: 'var(--color-text-muted)' }}>:</span>
+            <div className="text-center">
+              <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[20px] font-bold font-mono" style={{ background: accentBg, color: accentColor }}>
+                {pad(minutes)}
+              </div>
+              <p className="text-[9px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: 'var(--color-text-muted)' }}>dk</p>
+            </div>
+            <span className="text-lg font-bold mb-3" style={{ color: 'var(--color-text-muted)' }}>:</span>
+            <div className="text-center">
+              <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[20px] font-bold font-mono transition-colors duration-500" style={{ background: accentBg, color: accentColor }}>
+                {pad(seconds)}
+              </div>
+              <p className="text-[9px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: 'var(--color-text-muted)' }}>sn</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </BlurFade>
+  );
+}
 
 export default function StaffDashboard() {
   const { user } = useAuth();
@@ -138,6 +235,11 @@ export default function StaffDashboard() {
         </BlurFade>
       )}
 
+      {/* Countdown Widget — show for the nearest upcoming training with a real deadline */}
+      {upcomingTrainings.length > 0 && upcomingTrainings[0].endDateTime && upcomingTrainings[0].daysLeft <= 14 && (
+        <CountdownWidget training={upcomingTrainings[0]} />
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s, i) => (
@@ -182,7 +284,7 @@ export default function StaffDashboard() {
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}
                     >
                       <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl" style={{ background: (t.daysLeft ?? 99) <= 3 ? 'var(--color-error-bg)' : 'var(--color-bg)' }}>
-                        <span className="text-[10px] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>{MONTHS[parseInt(t.deadline?.split('.')?.[1] ?? '0', 10)] ?? '?'}</span>
+                        <span className="text-[10px] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>{t.deadline?.split('.')?.[1] === '03' ? 'MAR' : 'NİS'}</span>
                         <span className="text-base font-bold leading-none font-mono" style={{ color: (t.daysLeft ?? 99) <= 3 ? 'var(--color-error)' : 'var(--color-text-primary)' }}>{t.deadline?.split('.')?.[0]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -238,7 +340,7 @@ export default function StaffDashboard() {
                     <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>
                   )}
                   {notifications.map((n, i) => (
-                    <div key={`${n.title}-${i}`} className="flex items-start gap-2.5 rounded-xl px-3 py-2.5 transition-colors duration-150" style={{ background: !n.isRead ? 'var(--color-primary-light)' : 'transparent' }}>
+                    <div key={i} className="flex items-start gap-2.5 rounded-xl px-3 py-2.5 transition-colors duration-150" style={{ background: !n.isRead ? 'var(--color-primary-light)' : 'transparent' }}>
                       {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full animate-pulse" style={{ background: 'var(--color-primary)' }} />}
                       <div className={!n.isRead ? '' : 'ml-4'}>
                         <p className="text-xs font-medium">{n.title}</p>
@@ -263,7 +365,7 @@ export default function StaffDashboard() {
                   <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>
                 )}
                 {recentActivity.map((a, i) => (
-                  <div key={`${a.time}-${i}`} className="flex gap-3">
+                  <div key={i} className="flex gap-3">
                     <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: `${typeColors[a.type] ?? 'var(--color-info)'}15` }}>
                       <div className="h-2 w-2 rounded-full" style={{ background: typeColors[a.type] ?? 'var(--color-info)' }} />
                     </div>

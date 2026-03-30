@@ -99,7 +99,7 @@ export default function NotificationsPage() {
   // Seçili departmanın personelleri
   const selectedDept = departments.find(d => d.id === selectedDeptId);
   const deptStaff = selectedDept?.users ?? [];
-  const allStaff = departments.flatMap(d => d.users);
+  const allStaff = departments.flatMap(d => d.users ?? []);
 
   // Bireysel modda filtrelenen personeller
   const filteredStaff = allStaff.filter(s => {
@@ -466,7 +466,7 @@ export default function NotificationsPage() {
                   >
                     <option value="">Departman seçin...</option>
                     {departments.map(d => (
-                      <option key={d.id} value={d.id}>{d.name} ({d.users.length} kişi)</option>
+                      <option key={d.id} value={d.id}>{d.name} ({d.users?.length ?? 0} kişi)</option>
                     ))}
                   </select>
 

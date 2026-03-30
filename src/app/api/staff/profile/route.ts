@@ -65,7 +65,28 @@ export async function PATCH(request: Request) {
   if (body.firstName !== undefined) updateData.firstName = body.firstName.trim()
   if (body.lastName !== undefined) updateData.lastName = body.lastName.trim()
   if (body.phone !== undefined) updateData.phone = body.phone.trim()
-  if (body.avatarUrl !== undefined) updateData.avatarUrl = body.avatarUrl
+  if (body.avatarUrl !== undefined) {
+    // B4.5 — Avatar URL yalnızca yapılandırılmış CDN/S3 kaynağından gelmelidir
+    if (body.avatarUrl) {
+      let parsedUrl: URL
+      try {
+        parsedUrl = new URL(body.avatarUrl)
+      } catch {
+        return errorResponse('Geçersiz avatar URL')
+      }
+      if (parsedUrl.protocol !== 'https:') {
+        return errorResponse('Avatar URL HTTPS olmalıdır')
+      }
+      const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL
+      if (cdnUrl) {
+        const allowedHost = new URL(cdnUrl).host
+        if (parsedUrl.host !== allowedHost) {
+          return errorResponse('Avatar URL izin verilmeyen kaynaktan geliyor')
+        }
+      }
+    }
+    updateData.avatarUrl = body.avatarUrl
+  }
 
   if (Object.keys(updateData).length > 0) {
     await prisma.user.update({

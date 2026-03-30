@@ -86,6 +86,7 @@ export async function GET() {
           deadline: endDate
             ? new Date(endDate).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
             : '',
+          endDateTime: endDate ? new Date(endDate).toISOString() : null,
           status: a.status,
           daysLeft,
           progress,

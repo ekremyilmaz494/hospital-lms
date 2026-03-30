@@ -5,8 +5,6 @@ import { createUserSchema } from '@/lib/validations'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
-import { checkSubscriptionLimit } from '@/lib/subscription-guard'
-import { autoAssignByDepartment } from '@/lib/auto-assign'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -32,14 +30,13 @@ export async function GET(request: Request) {
       { email: { contains: search, mode: 'insensitive' } },
     ]
   }
-  if (department) where.departmentId = department
+  if (department) where.department = department
   if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 
   const [staff, total, rawDepartments] = await Promise.all([
     prisma.user.findMany({
       where,
       include: {
-        departmentRel: { select: { name: true } },
         _count: { select: { assignments: true, examAttempts: true } },
         assignments: {
           select: {
@@ -62,6 +59,17 @@ export async function GET(request: Request) {
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     }),
   ])
+
+  const deptMap = new Map(rawDepartments.map(d => [d.id, d.name]))
+
+  // Resolve department names in-memory (read-only, no DB writes in GET)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  for (const s of staff) {
+    if (!s.departmentId && s.department && uuidRegex.test(s.department) && deptMap.has(s.department)) {
+      s.departmentId = s.department
+      s.department = deptMap.get(s.department) ?? s.department
+    }
+  }
 
   const departments = rawDepartments.map(d => ({
     id: d.id,
@@ -107,7 +115,7 @@ export async function GET(request: Request) {
       email: s.email,
       // KVKK: TC No maskeleme — sadece son 4 hane göster
       tcNo: s.tcNo ? `*******${s.tcNo.slice(-4)}` : '',
-      department: s.departmentRel?.name || '',
+      department: departments.find(d => d.id === s.departmentId)?.name || s.department || '',
       departmentId: s.departmentId,
       title: s.title || '',
       assignedTrainings: s._count.assignments || 0,
@@ -127,10 +135,6 @@ export async function POST(request: Request) {
 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
-
-  // Abonelik limit kontrolu
-  const limitError = await checkSubscriptionLimit(dbUser!.organizationId!, 'staff')
-  if (limitError) return limitError
 
   // Rate limit: admin başına dakikada 5 personel oluşturma
   const allowed = await checkRateLimit(`staff-create:${dbUser!.id}`, 5, 60)
@@ -174,6 +178,17 @@ export async function POST(request: Request) {
     return errorResponse(safeMsg)
   }
 
+  // B4.2/G4.2 — Cross-tenant departman kontrolü: departmentId bu organizasyona ait olmalı
+  let resolvedDeptName: string | undefined = parsed.data.department
+  if (parsed.data.departmentId) {
+    const dept = await prisma.department.findFirst({
+      where: { id: parsed.data.departmentId, organizationId: dbUser!.organizationId! },
+      select: { name: true },
+    })
+    if (!dept) return errorResponse('Geçersiz departman — bu departman organizasyonunuza ait değil', 400)
+    resolvedDeptName = dept.name
+  }
+
   let user
   try {
     user = await prisma.user.create({
@@ -187,6 +202,7 @@ export async function POST(request: Request) {
         tcNo: parsed.data.tcNo,
         phone: parsed.data.phone,
         departmentId: parsed.data.departmentId,
+        department: resolvedDeptName,
         title: parsed.data.title,
       },
     })
@@ -216,11 +232,6 @@ export async function POST(request: Request) {
     newData: user,
     request,
   })
-
-  // Departman kurallarına göre otomatik eğitim atama
-  if (user.departmentId) {
-    await autoAssignByDepartment(user.id, user.departmentId, dbUser!.organizationId!, dbUser!.id)
-  }
 
   revalidatePath('/admin/staff')
 

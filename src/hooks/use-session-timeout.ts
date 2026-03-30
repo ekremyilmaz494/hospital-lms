@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
@@ -23,68 +23,49 @@ export function useSessionTimeout({
   const router = useRouter();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastActivityRef = useRef<number>(0); // initialized in effect to avoid impure render-time call
-  const onWarningRef = useRef(onWarning);
-  const onTimeoutRef = useRef(onTimeout);
+  const lastActivityRef = useRef<number>(0);
 
-  // Keep callback refs up to date without triggering effect re-runs
-  useEffect(() => {
-    onWarningRef.current = onWarning;
-  }, [onWarning]);
+  const clearTimers = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+  }, []);
 
-  useEffect(() => {
-    onTimeoutRef.current = onTimeout;
-  }, [onTimeout]);
-
-  // A state-based signal to trigger timer reset from outside the effect
-  const [resetSignal, setResetSignal] = useState(0);
+  const handleLogout = useCallback(async () => {
+    clearTimers();
+    onTimeout?.();
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/auth/login?reason=timeout');
+  }, [clearTimers, onTimeout, router]);
 
   const resetTimers = useCallback(() => {
-    setResetSignal(s => s + 1);
-  }, []);
+    if (!enabled || timeoutMinutes <= 0) return;
+
+    lastActivityRef.current = Date.now();
+    clearTimers();
+
+    const timeoutMs = timeoutMinutes * 60_000;
+
+    // Warning timer
+    if (timeoutMs > WARNING_BEFORE_MS && onWarning) {
+      warningTimerRef.current = setTimeout(() => {
+        onWarning(Math.round(WARNING_BEFORE_MS / 1000));
+      }, timeoutMs - WARNING_BEFORE_MS);
+    }
+
+    // Logout timer
+    timerRef.current = setTimeout(handleLogout, timeoutMs);
+  }, [enabled, timeoutMinutes, clearTimers, handleLogout, onWarning]);
 
   useEffect(() => {
     if (!enabled || timeoutMinutes <= 0) return;
 
-    /** Clear existing timers */
-    function clearTimers() {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
-    }
-
-    /** Handle session timeout logout */
-    async function handleLogout() {
-      clearTimers();
-      onTimeoutRef.current?.();
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      router.push('/auth/login?reason=timeout');
-    }
-
-    /** Set up warning and logout timers */
-    function startTimers() {
-      lastActivityRef.current = Date.now();
-      clearTimers();
-
-      const timeoutMs = timeoutMinutes * 60_000;
-
-      // Warning timer
-      if (timeoutMs > WARNING_BEFORE_MS && onWarningRef.current) {
-        warningTimerRef.current = setTimeout(() => {
-          onWarningRef.current?.(Math.round(WARNING_BEFORE_MS / 1000));
-        }, timeoutMs - WARNING_BEFORE_MS);
-      }
-
-      // Logout timer
-      timerRef.current = setTimeout(handleLogout, timeoutMs);
-    }
-
-    startTimers();
+    resetTimers();
 
     const handleActivity = () => {
       // Throttle: only reset if at least 30s since last reset
       if (Date.now() - lastActivityRef.current > 30_000) {
-        startTimers();
+        resetTimers();
       }
     };
 
@@ -98,7 +79,7 @@ export function useSessionTimeout({
         document.removeEventListener(event, handleActivity);
       }
     };
-  }, [enabled, timeoutMinutes, router, resetSignal]);
+  }, [enabled, timeoutMinutes, resetTimers, clearTimers]);
 
   return { resetTimers };
 }

@@ -5,9 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Building2, Plus, MoreHorizontal, Eye, Edit, Ban, CheckCircle, Users,
-  GraduationCap, AlertTriangle, Search, Filter, Shield,
+  GraduationCap, AlertTriangle, Search, Shield, TriangleAlert,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,11 +60,21 @@ const planColors: Record<string, { bg: string; text: string; accent: string }> =
 
 type StatusFilter = 'all' | 'active' | 'suspended';
 
+interface SuspendTarget {
+  hospital: HospitalRaw;
+  mode: 'suspend' | 'activate';
+}
+
 export default function HospitalsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  // G3.1 — Soft suspend modal state
+  const [suspendTarget, setSuspendTarget] = useState<SuspendTarget | null>(null);
+  const [suspendReason, setSuspendReason] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data, isLoading, error, refetch } = useFetch<HospitalsResponse>('/api/super-admin/hospitals?limit=100');
 
@@ -92,32 +106,56 @@ export default function HospitalsPage() {
     return { label: 'Aktif', color: 'var(--color-success)', bg: 'var(--color-success-bg)' };
   };
 
-  const handleSuspend = async (hospital: HospitalRaw) => {
-    const action = hospital.isSuspended ? 'activate' : 'suspend';
-    const confirmed = window.confirm(
-      hospital.isSuspended
-        ? `"${hospital.name}" hastanesi aktif edilecek. Onaylıyor musunuz?`
-        : `"${hospital.name}" hastanesi askıya alınacak. Onaylıyor musunuz?`
-    );
-    if (!confirmed) return;
+  // G3.1 — Open the modal (does NOT call fetch directly)
+  const openSuspendModal = (hospital: HospitalRaw) => {
+    setSuspendTarget({ hospital, mode: hospital.isSuspended ? 'activate' : 'suspend' });
+    setSuspendReason('');
+    setConfirmText('');
+  };
 
+  const closeSuspendModal = () => {
+    setSuspendTarget(null);
+    setSuspendReason('');
+    setConfirmText('');
+  };
+
+  // G3.1 — Called after user has confirmed in the modal
+  const handleSuspendConfirm = async () => {
+    if (!suspendTarget) return;
+    const { hospital, mode } = suspendTarget;
+
+    // Type-to-confirm guard for suspend
+    if (mode === 'suspend' && confirmText.trim() !== hospital.name) return;
+
+    setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/super-admin/hospitals/${hospital.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          isSuspended: !hospital.isSuspended,
-          ...(hospital.isSuspended ? { isActive: true } : {}),
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'İşlem başarısız');
+      if (mode === 'suspend') {
+        const res = await fetch(`/api/super-admin/hospitals/${hospital.id}/suspend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: suspendReason.trim() || null }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Askıya alma başarısız');
+        }
+        toast('Hastane askıya alındı', 'success');
+      } else {
+        const res = await fetch(`/api/super-admin/hospitals/${hospital.id}/suspend`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Aktif etme başarısız');
+        }
+        toast('Hastane aktif edildi', 'success');
       }
-      toast(hospital.isSuspended ? 'Hastane aktif edildi' : 'Hastane askıya alındı', 'success');
+      closeSuspendModal();
       refetch();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -307,7 +345,7 @@ export default function HospitalsPage() {
                         <DropdownMenuItem
                           className="gap-2 cursor-pointer"
                           style={{ color: hospital.isSuspended ? 'var(--color-success)' : 'var(--color-error)' }}
-                          onClick={() => handleSuspend(hospital)}
+                          onClick={() => openSuspendModal(hospital)}
                         >
                           {hospital.isSuspended ? (
                             <><CheckCircle className="h-4 w-4" /> Aktif Et</>
@@ -333,6 +371,130 @@ export default function HospitalsPage() {
           </p>
         </div>
       )}
+
+      {/* G3.1 — Soft Suspend / Activate Confirmation Modal */}
+      <Dialog open={suspendTarget !== null} onOpenChange={(open) => { if (!open) closeSuspendModal(); }}>
+        <DialogContent showCloseButton>
+          {suspendTarget && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3 mb-1">
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-xl"
+                    style={{ background: suspendTarget.mode === 'suspend' ? 'var(--color-error-bg)' : 'var(--color-success-bg)' }}
+                  >
+                    {suspendTarget.mode === 'suspend'
+                      ? <TriangleAlert className="h-5 w-5" style={{ color: 'var(--color-error)' }} />
+                      : <CheckCircle className="h-5 w-5" style={{ color: 'var(--color-success)' }} />
+                    }
+                  </div>
+                  <DialogTitle>
+                    {suspendTarget.mode === 'suspend' ? 'Hastaneyi Askıya Al' : 'Hastaneyi Aktif Et'}
+                  </DialogTitle>
+                </div>
+                <DialogDescription>
+                  {suspendTarget.mode === 'suspend'
+                    ? `"${suspendTarget.hospital.name}" askıya alındığında bu hastane adminleri ve personeli sisteme erişemez.`
+                    : `"${suspendTarget.hospital.name}" aktif edilecek ve kullanıcılar sisteme tekrar erişebilecek.`}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {suspendTarget.mode === 'suspend' && (
+                  <>
+                    {/* Reason field */}
+                    <div className="space-y-1.5">
+                      <Label className="text-[13px] font-semibold">Askıya Alma Nedeni</Label>
+                      <textarea
+                        rows={3}
+                        placeholder="Ör: Ödeme gecikti, abonelik sona erdi..."
+                        value={suspendReason}
+                        onChange={(e) => setSuspendReason(e.target.value)}
+                        className="w-full resize-none rounded-xl border px-3 py-2.5 text-[13px] outline-none"
+                        style={{
+                          background: 'var(--color-bg)',
+                          borderColor: 'var(--color-border)',
+                          color: 'var(--color-text-primary)',
+                        }}
+                      />
+                    </div>
+
+                    {/* Type-to-confirm */}
+                    <div className="space-y-1.5">
+                      <Label className="text-[13px] font-semibold">
+                        Onaylamak için hastane adını yazın:{' '}
+                        <span className="font-mono" style={{ color: 'var(--color-error)' }}>
+                          {suspendTarget.hospital.name}
+                        </span>
+                      </Label>
+                      <input
+                        type="text"
+                        value={confirmText}
+                        onChange={(e) => setConfirmText(e.target.value)}
+                        placeholder={suspendTarget.hospital.name}
+                        className="w-full rounded-xl border px-3 py-2 text-[13px] outline-none"
+                        style={{
+                          background: 'var(--color-bg)',
+                          borderColor: confirmText && confirmText !== suspendTarget.hospital.name
+                            ? 'var(--color-error)'
+                            : 'var(--color-border)',
+                          color: 'var(--color-text-primary)',
+                        }}
+                      />
+                      {confirmText && confirmText !== suspendTarget.hospital.name && (
+                        <p className="text-[11px]" style={{ color: 'var(--color-error)' }}>
+                          Hastane adı eşleşmiyor
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {suspendTarget.mode === 'activate' && (
+                  <div
+                    className="flex items-center gap-2.5 rounded-xl px-4 py-3"
+                    style={{ background: 'var(--color-success-bg)', border: '1px solid var(--color-success)20' }}
+                  >
+                    <Shield className="h-4 w-4 shrink-0" style={{ color: 'var(--color-success)' }} />
+                    <p className="text-[12px]" style={{ color: 'var(--color-success)' }}>
+                      Bu hastane {suspendTarget.hospital._count.users} kullanıcıya sahip. Aktif etme sonrası tümü sisteme erişebilir.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={closeSuspendModal}
+                  className="rounded-xl border px-4 py-2 text-[13px] font-semibold transition-colors duration-150"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleSuspendConfirm}
+                  disabled={
+                    isSubmitting ||
+                    (suspendTarget.mode === 'suspend' && confirmText.trim() !== suspendTarget.hospital.name)
+                  }
+                  className="rounded-xl px-4 py-2 text-[13px] font-semibold text-white transition-opacity duration-150 disabled:opacity-40"
+                  style={{
+                    background: suspendTarget.mode === 'suspend' ? 'var(--color-error)' : 'var(--color-success)',
+                  }}
+                >
+                  {isSubmitting
+                    ? 'İşleniyor...'
+                    : suspendTarget.mode === 'suspend'
+                      ? 'Askıya Al'
+                      : 'Aktif Et'
+                  }
+                </button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

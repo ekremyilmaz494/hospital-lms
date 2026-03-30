@@ -120,7 +120,61 @@ export async function GET(request: Request) {
     } catch { /* email hatası cron'u durdurmasın */ }
   }
 
-  // 6. Delete old backups (older than 90 days) and their S3 objects
+  // 6. Sona eren / yakında bitecek abonelikleri kontrol et — admin'e bildirim gönder
+  const subWarningDays = [7, 1] // 7 gün ve 1 gün kala uyar
+  const subWarningMs = Math.max(...subWarningDays) * 24 * 60 * 60 * 1000
+  const expiringSubscriptions = await prisma.organizationSubscription.findMany({
+    where: {
+      status: { in: ['active', 'trialing'] },
+      expiresAt: { gte: new Date(), lte: new Date(Date.now() + subWarningMs) },
+    },
+    include: {
+      organization: {
+        select: {
+          name: true,
+          users: { where: { role: 'admin', isActive: true }, select: { email: true, firstName: true, lastName: true }, take: 3 },
+        },
+      },
+    },
+  })
+
+  let subscriptionWarningsSent = 0
+  for (const sub of expiringSubscriptions) {
+    if (!sub.expiresAt) continue
+    const daysLeft = Math.ceil((new Date(sub.expiresAt).getTime() - Date.now()) / 86400000)
+    if (!subWarningDays.includes(daysLeft)) continue
+
+    // Abonelik bitiş bildirimi — organizasyonun admin kullanıcılarına gönder
+    for (const admin of sub.organization.users) {
+      try {
+        await sendEmail({
+          to: admin.email,
+          subject: `[${sub.organization.name}] Abonelik ${daysLeft === 1 ? 'Yarın' : `${daysLeft} Gün İçinde`} Sona Eriyor`,
+          html: `<p>Sayın ${admin.firstName} ${admin.lastName},</p>
+<p><strong>${sub.organization.name}</strong> kurumunuzun aboneliği <strong>${daysLeft} gün</strong> içinde sona erecektir.</p>
+<p>Hizmet kesintisi yaşamamak için aboneliğinizi yenilemenizi öneririz.</p>
+<p>İletişim: <a href="mailto:${process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? 'destek@hastanelms.com'}">${process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? 'destek@hastanelms.com'}</a></p>`,
+        })
+        subscriptionWarningsSent++
+
+        // Dashboard bildirimi oluştur — userId'yi önceden çek, bulunamazsa bildirimi atla
+        const adminUser = await prisma.user.findFirst({ where: { email: admin.email }, select: { id: true } })
+        if (adminUser) {
+          await prisma.notification.create({
+            data: {
+              userId: adminUser.id,
+              organizationId: sub.organizationId,
+              title: 'Abonelik Sona Eriyor',
+              message: `Aboneliğiniz ${daysLeft} gün içinde sona erecek. Yenileme için destek ekibiyle iletişime geçin.`,
+              type: 'subscription_expiry',
+            },
+          }).catch(() => {}) // Bildirim hatası cron'u durdurmasın
+        }
+      } catch { /* email hatası devam ettirir */ }
+    }
+  }
+
+  // 7. Delete old backups (older than 90 days) and their S3 objects
   const oldBackups = await prisma.dbBackup.findMany({
     where: { createdAt: { lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } },
     select: { id: true, fileUrl: true },
@@ -140,6 +194,7 @@ export async function GET(request: Request) {
     deletedBackups: deletedBackups.count,
     certRemindersSent,
     overdueRemindersSent,
+    subscriptionWarningsSent,
     timestamp: new Date().toISOString(),
   })
 }

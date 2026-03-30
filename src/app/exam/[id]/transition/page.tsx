@@ -2,7 +2,14 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { Play, Award, CheckCircle, ArrowRight, Clock } from 'lucide-react';
+import { Play, Award, CheckCircle, ArrowRight, Clock, Check, X } from 'lucide-react';
+
+interface QuestionResult {
+  questionText: string;
+  selectedOptionText: string | null;
+  correctOptionText: string | null;
+  isCorrect: boolean;
+}
 
 const COUNTDOWN_SECONDS = 60;
 
@@ -19,6 +26,7 @@ function TransitionContent() {
   const [timeLeft, setTimeLeft] = useState(COUNTDOWN_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const navigatedRef = useRef(false);
+  const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
 
   // Determine type
   const isPreToVideos = from === 'pre' || from === 'pre-exam';
@@ -55,77 +63,198 @@ function TransitionContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // G7.5 — Load per-question results from sessionStorage (written by post-exam page on submit)
+  useEffect(() => {
+    if (!isPostResult) return;
+    try {
+      const stored = sessionStorage.getItem(`exam-results-${id}`);
+      if (stored) {
+        setQuestionResults(JSON.parse(stored) as QuestionResult[]);
+        sessionStorage.removeItem(`exam-results-${id}`);
+      }
+    } catch { /* ignore */ }
+  }, [isPostResult, id]);
+
   // ═══ POST-EXAM RESULT SCREEN ═══
   if (isPostResult) {
     const isPassed = passed === 'true';
     const scoreNum = Number(score ?? 0);
     const passingNum = Number(passingScore ?? 70);
+    const correctCount = questionResults.filter(r => r.isCorrect).length;
+    const wrongCount = questionResults.filter(r => !r.isCorrect && r.selectedOptionText !== null).length;
+    const skippedCount = questionResults.filter(r => r.selectedOptionText === null).length;
 
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{
-        background: isPassed
-          ? 'linear-gradient(135deg, #059669, #064e3b)'
-          : 'linear-gradient(135deg, #991b1b, #450a0a)',
-      }}>
-        <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'var(--color-surface)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-          <div className="px-8 pt-8 pb-6 text-center" style={{
-            background: isPassed
-              ? 'linear-gradient(135deg, #059669, #047857)'
-              : 'linear-gradient(135deg, #dc2626, #991b1b)',
-          }}>
-            <div className="flex h-16 w-16 items-center justify-center rounded-full mx-auto mb-4" style={{ background: 'rgba(255,255,255,0.15)' }}>
-              {isPassed ? <CheckCircle className="h-8 w-8 text-white" /> : <Clock className="h-8 w-8 text-white" />}
+      <div
+        className="min-h-screen overflow-y-auto py-8 px-4"
+        style={{
+          background: isPassed
+            ? 'linear-gradient(135deg, #059669, #064e3b)'
+            : 'linear-gradient(135deg, #991b1b, #450a0a)',
+        }}
+      >
+        <div className="mx-auto w-full max-w-md space-y-4">
+          {/* Score Card */}
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-surface)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div className="px-8 pt-8 pb-6 text-center" style={{
+              background: isPassed
+                ? 'linear-gradient(135deg, #059669, #047857)'
+                : 'linear-gradient(135deg, #dc2626, #991b1b)',
+            }}>
+              <div className="flex h-16 w-16 items-center justify-center rounded-full mx-auto mb-4" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                {isPassed ? <CheckCircle className="h-8 w-8 text-white" /> : <Clock className="h-8 w-8 text-white" />}
+              </div>
+              <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
+                {isPassed ? 'Tebrikler! Sınavı Geçtiniz!' : 'Sınav Başarısız'}
+              </h2>
+              <p className="text-sm text-white/70 mt-1">
+                {isPassed ? 'Eğitimi başarıyla tamamladınız.' : 'Baraj puanını geçemediniz.'}
+              </p>
             </div>
-            <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
-              {isPassed ? 'Tebrikler! Sınavı Geçtiniz!' : 'Sınav Başarısız'}
-            </h2>
-            <p className="text-sm text-white/70 mt-1">
-              {isPassed ? 'Eğitimi başarıyla tamamladınız.' : 'Baraj puanını geçemediniz.'}
-            </p>
+
+            <div className="px-8 py-6 space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-xl p-4 text-center" style={{ background: 'var(--color-bg)' }}>
+                  <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--color-text-muted)' }}>Puanınız</p>
+                  <p className="text-3xl font-bold font-mono" style={{ color: isPassed ? 'var(--color-success)' : 'var(--color-error)' }}>
+                    {scoreNum}%
+                  </p>
+                </div>
+                <div className="rounded-xl p-4 text-center" style={{ background: 'var(--color-bg)' }}>
+                  <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--color-text-muted)' }}>Baraj Puanı</p>
+                  <p className="text-3xl font-bold font-mono">{passingNum}%</p>
+                </div>
+              </div>
+
+              <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                <div className="h-full rounded-full" style={{
+                  width: `${scoreNum}%`,
+                  background: isPassed ? 'linear-gradient(90deg, #059669, #34d399)' : 'linear-gradient(90deg, #dc2626, #f87171)',
+                  transition: 'width 1s ease-out',
+                }} />
+              </div>
+
+              {/* Correct / Wrong / Skipped summary */}
+              {questionResults.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl p-3 text-center" style={{ background: 'var(--color-success-bg)' }}>
+                    <p className="text-xl font-bold font-mono" style={{ color: 'var(--color-success)' }}>{correctCount}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-success)' }}>Doğru</p>
+                  </div>
+                  <div className="rounded-xl p-3 text-center" style={{ background: 'var(--color-error-bg)' }}>
+                    <p className="text-xl font-bold font-mono" style={{ color: 'var(--color-error)' }}>{wrongCount}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-error)' }}>Yanlış</p>
+                  </div>
+                  <div className="rounded-xl p-3 text-center" style={{ background: 'var(--color-bg)' }}>
+                    <p className="text-xl font-bold font-mono" style={{ color: 'var(--color-text-muted)' }}>{skippedCount}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Boş</p>
+                  </div>
+                </div>
+              )}
+
+              {!isPassed && (
+                <div className="rounded-xl p-4" style={{ background: 'var(--color-warning-bg)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                  <p className="text-[13px] font-semibold" style={{ color: 'var(--color-warning)' }}>
+                    Bir sonraki denemenizde tekrar deneyebilirsiniz.
+                  </p>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    2. denemeden itibaren ön sınav atlanır, doğrudan videoları izleyip son sınava girersiniz.
+                  </p>
+                </div>
+              )}
+
+              <button
+                onClick={() => router.push('/staff/my-trainings')}
+                className="w-full flex items-center justify-center gap-2 rounded-xl h-12 text-[14px] font-semibold text-white"
+                style={{
+                  background: isPassed ? 'linear-gradient(135deg, var(--color-primary), #065f46)' : 'linear-gradient(135deg, #475569, #334155)',
+                }}
+              >
+                Eğitimlerime Dön
+              </button>
+            </div>
           </div>
 
-          <div className="px-8 py-6 space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-xl p-4 text-center" style={{ background: 'var(--color-bg)' }}>
-                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--color-text-muted)' }}>Puanınız</p>
-                <p className="text-3xl font-bold font-mono" style={{ color: isPassed ? 'var(--color-success)' : 'var(--color-error)' }}>
-                  {scoreNum}%
+          {/* Per-question results */}
+          {questionResults.length > 0 && (
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+              <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                <h3 className="text-[14px] font-bold" style={{ fontFamily: 'var(--font-display)' }}>
+                  Soru Analizi
+                </h3>
+                <p className="text-[12px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                  {questionResults.length} sorunun cevap dökümü
                 </p>
               </div>
-              <div className="rounded-xl p-4 text-center" style={{ background: 'var(--color-bg)' }}>
-                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--color-text-muted)' }}>Baraj Puanı</p>
-                <p className="text-3xl font-bold font-mono">{passingNum}%</p>
+              <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                {questionResults.map((result, i) => (
+                  <div key={i} className="px-6 py-4">
+                    {/* Question header */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white mt-0.5"
+                        style={{
+                          background: result.isCorrect ? 'var(--color-success)' : 'var(--color-error)',
+                        }}
+                      >
+                        {result.isCorrect ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                      </div>
+                      <p className="text-[13px] font-medium leading-snug flex-1" style={{ color: 'var(--color-text-primary)' }}>
+                        <span className="font-bold mr-1.5" style={{ color: 'var(--color-text-muted)' }}>{i + 1}.</span>
+                        {result.questionText}
+                      </p>
+                    </div>
+
+                    {/* Answer rows */}
+                    <div className="ml-10 space-y-1.5">
+                      {result.selectedOptionText && (
+                        <div
+                          className="flex items-center gap-2 rounded-lg px-3 py-2"
+                          style={{
+                            background: result.isCorrect ? 'var(--color-success-bg)' : 'var(--color-error-bg)',
+                            border: `1px solid ${result.isCorrect ? 'rgba(5,150,105,0.2)' : 'rgba(220,38,38,0.2)'}`,
+                          }}
+                        >
+                          <span className="text-[10px] font-bold uppercase tracking-wide shrink-0" style={{ color: result.isCorrect ? 'var(--color-success)' : 'var(--color-error)' }}>
+                            {result.isCorrect ? 'Doğru' : 'Verilen'}
+                          </span>
+                          <span className="text-[12px]" style={{ color: 'var(--color-text-primary)' }}>
+                            {result.selectedOptionText}
+                          </span>
+                        </div>
+                      )}
+
+                      {!result.isCorrect && result.correctOptionText && (
+                        <div
+                          className="flex items-center gap-2 rounded-lg px-3 py-2"
+                          style={{
+                            background: 'var(--color-success-bg)',
+                            border: '1px solid rgba(5,150,105,0.2)',
+                          }}
+                        >
+                          <span className="text-[10px] font-bold uppercase tracking-wide shrink-0" style={{ color: 'var(--color-success)' }}>
+                            Doğru
+                          </span>
+                          <span className="text-[12px]" style={{ color: 'var(--color-text-primary)' }}>
+                            {result.correctOptionText}
+                          </span>
+                        </div>
+                      )}
+
+                      {result.selectedOptionText === null && (
+                        <div
+                          className="flex items-center gap-2 rounded-lg px-3 py-2"
+                          style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+                        >
+                          <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Boş bırakıldı</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-
-            <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
-              <div className="h-full rounded-full transition-all duration-1000" style={{
-                width: `${scoreNum}%`,
-                background: isPassed ? 'linear-gradient(90deg, #059669, #34d399)' : 'linear-gradient(90deg, #dc2626, #f87171)',
-              }} />
-            </div>
-
-            {!isPassed && (
-              <div className="rounded-xl p-4" style={{ background: 'var(--color-warning-bg)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-                <p className="text-[13px] font-semibold" style={{ color: 'var(--color-warning)' }}>
-                  Bir sonraki denemenizde tekrar deneyebilirsiniz.
-                </p>
-                <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                  2. denemeden itibaren ön sınav atlanır, doğrudan videoları izleyip son sınava girersiniz.
-                </p>
-              </div>
-            )}
-
-            <button
-              onClick={() => router.push('/staff/my-trainings')}
-              className="w-full flex items-center justify-center gap-2 rounded-xl h-12 text-[14px] font-semibold text-white"
-              style={{
-                background: isPassed ? 'linear-gradient(135deg, var(--color-primary), #065f46)' : 'linear-gradient(135deg, #475569, #334155)',
-              }}
-            >
-              Eğitimlerime Dön
-            </button>
-          </div>
+          )}
         </div>
       </div>
     );

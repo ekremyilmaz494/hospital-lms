@@ -3,8 +3,9 @@
 import {
   Building2, CreditCard, Users, GraduationCap, TrendingUp, AlertTriangle,
   ArrowRight, ExternalLink, Clock, Calendar, Activity, Shield, Plus,
-  BarChart3, Globe, Server,
+  BarChart3, Globe, Server, Radio,
 } from 'lucide-react';
+import { useActiveUsersCount } from '@/hooks/use-active-users-count';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from '@/components/shared/recharts';
 import Link from 'next/link';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -136,6 +137,55 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 
 const PIE_COLORS = ['var(--color-success)', 'var(--color-info)', 'var(--color-error)', 'var(--color-warning)'];
 
+/** G3.2 — Anlık aktif kullanıcı sayısını gösteren Presence widget'ı */
+function ActiveUsersWidget() {
+  const { total, byRole } = useActiveUsersCount()
+
+  const segments = [
+    { label: 'Super Admin', count: byRole.super_admin, color: 'var(--color-accent)' },
+    { label: 'Hastane Admin', count: byRole.admin, color: 'var(--color-primary)' },
+    { label: 'Personel', count: byRole.staff, color: 'var(--color-info)' },
+  ]
+
+  return (
+    <div
+      className="flex items-center gap-4 rounded-2xl border px-5 py-4"
+      style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
+    >
+      {/* Live indicator + main count */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--color-success-bg)' }}>
+          <Radio className="h-5 w-5" style={{ color: 'var(--color-success)' }} />
+          {/* Pulsing dot */}
+          <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full" style={{ background: 'var(--color-success)', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+        </div>
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Aktif Kullanıcı</p>
+          <p className="text-2xl font-bold font-mono leading-none" style={{ color: 'var(--color-text-primary)' }}>{total}</p>
+        </div>
+      </div>
+
+      <div className="h-8 w-px" style={{ background: 'var(--color-border)' }} />
+
+      {/* Role breakdown */}
+      <div className="flex items-center gap-5">
+        {segments.map((seg) => (
+          <div key={seg.label} className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full" style={{ background: seg.color }} />
+            <span className="text-[12px]" style={{ color: 'var(--color-text-secondary)' }}>{seg.label}</span>
+            <span className="text-[13px] font-bold font-mono" style={{ color: seg.color }}>{seg.count}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="ml-auto flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: 'var(--color-success-bg)' }}>
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--color-success)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <span className="text-[11px] font-semibold" style={{ color: 'var(--color-success)' }}>Canlı</span>
+      </div>
+    </div>
+  )
+}
+
 export default function SuperAdminDashboard() {
   const { data, isLoading, error } = useFetch<DashboardData>('/api/super-admin/dashboard');
 
@@ -203,6 +253,11 @@ export default function SuperAdminDashboard() {
             </Link>
           ))}
         </div>
+      </BlurFade>
+
+      {/* G3.2 — Live Active Users */}
+      <BlurFade delay={0.04}>
+        <ActiveUsersWidget />
       </BlurFade>
 
       {/* Stat Cards */}

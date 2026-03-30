@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense, useRef, useCallback } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight, Clock } from 'lucide-react';
@@ -34,33 +34,7 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
-  const [ssoInfo, setSsoInfo] = useState<{ available: boolean; provider: string; redirectUrl: string; orgName: string } | null>(null);
-  const [checkingSso, setCheckingSso] = useState(false);
-  const ssoDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // SSO kontrolü — 400ms debounce ile (her tuş vuruşunda API çağrısını önler)
-  const checkSso = useCallback((emailValue: string) => {
-    if (ssoDebounceRef.current) clearTimeout(ssoDebounceRef.current);
-    const domain = emailValue.split('@')[1];
-    if (!domain || domain.length < 3) { setSsoInfo(null); return; }
-    ssoDebounceRef.current = setTimeout(async () => {
-      setCheckingSso(true);
-      try {
-        const res = await fetch('/api/auth/sso/initiate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailValue }),
-        });
-        const data = await res.json();
-        if (data.ssoAvailable) {
-          setSsoInfo({ available: true, provider: data.provider, redirectUrl: data.redirectUrl, orgName: data.orgName });
-        } else {
-          setSsoInfo(null);
-        }
-      } catch { setSsoInfo(null); }
-      finally { setCheckingSso(false); }
-    }, 400);
-  }, []);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const rawRedirect = searchParams.get('redirectTo');
   // Prevent open redirect — only allow relative paths starting with /
@@ -76,8 +50,14 @@ function LoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
+      // If not rememberMe, mark session as tab-only (auth-provider clears on new tab)
+      if (!rememberMe) {
+        sessionStorage.setItem('lms_session_only', '1');
+      } else {
+        sessionStorage.removeItem('lms_session_only');
+      }
 
       const data = await res.json();
 
@@ -90,13 +70,6 @@ function LoginForm() {
       if (!res.ok) {
         setError(data.error ?? 'E-posta veya şifre hatalı.');
         setLoading(false);
-        return;
-      }
-
-      // MFA required — redirect to verification page
-      if (data.mfaRequired) {
-        const role = data.user?.role as string;
-        router.push(`/auth/mfa-verify?factorId=${data.factorId}&role=${role}`);
         return;
       }
 
@@ -190,7 +163,7 @@ function LoginForm() {
 
       {/* ── Right Panel: Login Form ── */}
       <div className="flex flex-1 items-center justify-center p-6 sm:p-8" style={{ background: 'var(--color-bg)' }}>
-        <div className="w-full max-w-[420px]">
+        <div className="w-full max-w-105">
           {/* Mobile logo */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white font-heading" style={{ background: 'var(--color-primary)' }}>H</div>
@@ -239,19 +212,10 @@ function LoginForm() {
                   type="email"
                   placeholder="ornek@hastane.com"
                   value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    // Check SSO when email has valid domain
-                    const val = e.target.value;
-                    if (val.includes('@') && val.split('@')[1]?.includes('.')) {
-                      checkSso(val);
-                    } else {
-                      setSsoInfo(null);
-                    }
-                  }}
+                  onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
                   className="h-12 rounded-xl text-[15px]"
-                  style={{ background: 'var(--color-surface)', borderColor: ssoInfo ? 'var(--color-info)' : 'var(--color-border)' }}
+                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
                   required
                 />
               </div>
@@ -279,7 +243,7 @@ function LoginForm() {
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors duration-150"
                     style={{ color: 'var(--color-text-muted)' }}
                   >
-                    {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+                    {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
                   </button>
                 </div>
               </div>
@@ -300,30 +264,16 @@ function LoginForm() {
                 </label>
               </div>
 
-              {/* SSO Button — shown when email domain matches an SSO-enabled org */}
-              {ssoInfo && (
-                <button
-                  type="button"
-                  onClick={() => { window.location.href = ssoInfo.redirectUrl; }}
-                  className="w-full h-12 flex items-center justify-center gap-2.5 rounded-xl text-[15px] font-semibold transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99]"
-                  style={{
-                    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                    color: 'white',
-                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
-                  }}
-                >
-                  <Shield className="h-5 w-5" />
-                  {ssoInfo.orgName} SSO ile Giriş Yap
-                </button>
-              )}
-
-              {ssoInfo && (
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>veya şifre ile</span>
-                  <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
-                </div>
-              )}
+              <div className="flex items-center gap-2.5">
+                <Checkbox
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                />
+                <label htmlFor="rememberMe" className="text-xs font-medium cursor-pointer select-none" style={{ color: 'var(--color-text-secondary)' }}>
+                  Beni 30 gün hatırla
+                </label>
+              </div>
 
               <ShimmerButton
                 type="submit"

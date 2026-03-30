@@ -19,14 +19,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         include: { training: true, examAttempts: true },
         orderBy: { assignedAt: 'desc' },
       },
-      departmentRel: { select: { name: true } },
       _count: { select: { assignments: true, examAttempts: true } },
     },
   })
 
   if (!staff) return errorResponse('Personel bulunamadı', 404)
 
-  const departmentName = staff.departmentRel?.name ?? ''
+  // Resolve department name — always scope to organizationId (B4.2: cross-tenant guard)
+  let departmentName = staff.department ?? ''
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const deptLookupId = staff.departmentId || (uuidRegex.test(departmentName) ? departmentName : null)
+  if (deptLookupId) {
+    const dept = await prisma.department.findFirst({
+      where: { id: deptLookupId, organizationId: dbUser!.organizationId! },
+    })
+    if (dept) departmentName = dept.name
+  }
 
   // Transform raw Prisma data to frontend format
   const completedAssignments = staff.assignments.filter(a => a.status === 'passed')
@@ -97,6 +105,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     tcNo: z.string().length(11).optional(),
     title: z.string().max(100).optional(),
     departmentId: z.string().uuid().optional(),
+    department: z.string().max(100).optional(),
     isActive: z.boolean().optional(),
   })
   const parsed = safeUpdateSchema.safeParse(body)
@@ -106,6 +115,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!existing) return errorResponse('Personel bulunamadı', 404)
 
   const dataToUpdate = { ...parsed.data }
+  if (dataToUpdate.departmentId) {
+    // B4.2/G4.2 — Departmanın bu organizasyona ait olduğunu doğrula
+    const dept = await prisma.department.findFirst({
+      where: { id: dataToUpdate.departmentId, organizationId: dbUser!.organizationId! },
+    })
+    if (!dept) return errorResponse('Geçersiz departman — bu departman organizasyonunuza ait değil', 400)
+    dataToUpdate.department = dept.name
+  }
 
   const staff = await prisma.user.update({
     where: { id, organizationId: dbUser!.organizationId! },
@@ -142,8 +159,18 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!existing) return errorResponse('Personel bulunamadı', 404)
 
-  // Soft delete — deactivate
-  await prisma.user.update({ where: { id }, data: { isActive: false } })
+  // B4.4 — Soft delete: deactivate + aktif sınavları iptal et
+  await prisma.$transaction([
+    prisma.user.update({ where: { id }, data: { isActive: false } }),
+    // Devam eden sınav girişimlerini iptal et — orphan kalmaları önler
+    prisma.examAttempt.updateMany({
+      where: {
+        userId: id,
+        status: { in: ['pre_exam', 'watching_videos', 'post_exam'] },
+      },
+      data: { status: 'expired', isPassed: false, postExamCompletedAt: new Date() },
+    }),
+  ])
 
   await createAuditLog({
     userId: dbUser!.id,

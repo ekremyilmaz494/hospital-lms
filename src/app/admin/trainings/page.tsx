@@ -22,17 +22,18 @@ interface Training {
   completionRate: number;
   passingScore: number;
   status: string;
+  publishStatus: string;
   startDate: string;
   endDate: string;
   createdBy: string;
 }
 
-const statusColors: Record<string, { bg: string; text: string }> = {
-  'Aktif': { bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
-  'Taslak': { bg: 'var(--color-warning-bg)', text: 'var(--color-warning)' },
-  'Tamamlandı': { bg: 'var(--color-info-bg)', text: 'var(--color-info)' },
-  'Süresi Doldu': { bg: 'var(--color-error-bg)', text: 'var(--color-error)' },
+const publishStatusConfig: Record<string, { label: string; bg: string; text: string }> = {
+  published: { label: 'Yayında', bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
+  draft: { label: 'Taslak', bg: 'var(--color-warning-bg)', text: 'var(--color-warning)' },
+  archived: { label: 'Arşivlendi', bg: 'var(--color-info-bg)', text: 'var(--color-info)' },
 };
+
 
 const categoryColors: Record<string, string> = {
   'Enfeksiyon': 'var(--color-error)',
@@ -43,7 +44,7 @@ const categoryColors: Record<string, string> = {
   'Eczane': 'var(--color-warning)',
 };
 
-const allStatuses = Object.keys(statusColors);
+const allCategories = Object.keys(categoryColors);
 
 export default function TrainingsPage() {
   const router = useRouter();
@@ -67,7 +68,7 @@ export default function TrainingsPage() {
   const allTrainings = data?.trainings ?? [];
 
   const filteredTrainings = allTrainings.filter((t) => {
-    if (statusFilter && t.status !== statusFilter) return false;
+    if (statusFilter && t.publishStatus !== statusFilter) return false;
     if (categoryFilter && t.category !== categoryFilter) return false;
     return true;
   });
@@ -86,6 +87,22 @@ export default function TrainingsPage() {
       toast('Eğitim kopyalanırken hata oluştu', 'error');
     } finally {
       setDuplicatingId(null);
+    }
+  };
+
+  const handlePublishStatus = async (training: Training, status: 'draft' | 'published' | 'archived') => {
+    try {
+      const res = await fetch(`/api/admin/trainings/${training.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publishStatus: status }),
+      });
+      if (!res.ok) throw new Error();
+      const label = publishStatusConfig[status]?.label ?? status;
+      toast(`"${training.title}" ${label} olarak güncellendi`, 'success');
+      refetch();
+    } catch {
+      toast('Durum güncellenemedi', 'error');
     }
   };
 
@@ -176,15 +193,15 @@ export default function TrainingsPage() {
       },
     },
     {
-      accessorKey: 'status',
+      accessorKey: 'publishStatus',
       header: 'Durum',
       cell: ({ row }) => {
-        const status = row.getValue('status') as string;
-        const colors = statusColors[status] || { bg: 'var(--color-info-bg)', text: 'var(--color-info)' };
+        const ps = (row.original.publishStatus ?? 'published') as string;
+        const cfg = publishStatusConfig[ps] || publishStatusConfig.published;
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold" style={{ background: colors.bg, color: colors.text }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: colors.text }} />
-            {status}
+          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold" style={{ background: cfg.bg, color: cfg.text }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: cfg.text }} />
+            {cfg.label}
           </span>
         );
       },
@@ -217,6 +234,21 @@ export default function TrainingsPage() {
             <DropdownMenuItem className="gap-2" disabled={duplicatingId === row.original.id} onClick={() => handleDuplicate(row.original)}>
               <Copy className="h-4 w-4" /> {duplicatingId === row.original.id ? 'Kopyalanıyor...' : 'Kopyala'}
             </DropdownMenuItem>
+            {row.original.publishStatus !== 'published' && (
+              <DropdownMenuItem className="gap-2" onClick={() => handlePublishStatus(row.original, 'published')}>
+                <Eye className="h-4 w-4" style={{ color: 'var(--color-success)' }} /> Yayınla
+              </DropdownMenuItem>
+            )}
+            {row.original.publishStatus !== 'draft' && (
+              <DropdownMenuItem className="gap-2" onClick={() => handlePublishStatus(row.original, 'draft')}>
+                <Edit className="h-4 w-4" style={{ color: 'var(--color-warning)' }} /> Taslağa Al
+              </DropdownMenuItem>
+            )}
+            {row.original.publishStatus !== 'archived' && (
+              <DropdownMenuItem className="gap-2" onClick={() => handlePublishStatus(row.original, 'archived')}>
+                <X className="h-4 w-4" style={{ color: 'var(--color-info)' }} /> Arşivle
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem className="gap-2 text-red-500" disabled={deletingId === row.original.id} onClick={() => handleDelete(row.original)}>
               <Trash2 className="h-4 w-4" /> {deletingId === row.original.id ? 'Siliniyor...' : 'Sil'}
             </DropdownMenuItem>
@@ -247,9 +279,9 @@ export default function TrainingsPage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: 'Toplam', value: allTrainings.length, color: 'var(--color-primary)' },
-          { label: 'Aktif', value: allTrainings.filter(t => t.status === 'Aktif').length, color: 'var(--color-success)' },
-          { label: 'Taslak', value: allTrainings.filter(t => t.status === 'Taslak').length, color: 'var(--color-warning)' },
-          { label: 'Tamamlandı', value: allTrainings.filter(t => t.status === 'Tamamlandı').length, color: 'var(--color-info)' },
+          { label: 'Yayında', value: allTrainings.filter(t => t.publishStatus === 'published').length, color: 'var(--color-success)' },
+          { label: 'Taslak', value: allTrainings.filter(t => t.publishStatus === 'draft').length, color: 'var(--color-warning)' },
+          { label: 'Arşivlendi', value: allTrainings.filter(t => t.publishStatus === 'archived').length, color: 'var(--color-info)' },
         ].map((s) => (
           <div
             key={s.label}
@@ -268,22 +300,21 @@ export default function TrainingsPage() {
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Filtreler:</span>
 
         <div className="flex gap-1.5">
-          {allStatuses.map((status) => {
-            const isActive = statusFilter === status;
-            const colors = statusColors[status];
+          {Object.entries(publishStatusConfig).map(([key, cfg]) => {
+            const isActive = statusFilter === key;
             return (
               <button
-                key={status}
-                onClick={() => setStatusFilter(isActive ? null : status)}
+                key={key}
+                onClick={() => setStatusFilter(isActive ? null : key)}
                 className="rounded-full px-3 py-1 text-[11px] font-semibold"
                 style={{
-                  background: isActive ? colors.bg : 'transparent',
-                  color: isActive ? colors.text : 'var(--color-text-muted)',
-                  border: `1.5px solid ${isActive ? colors.text : 'var(--color-border)'}`,
+                  background: isActive ? cfg.bg : 'transparent',
+                  color: isActive ? cfg.text : 'var(--color-text-muted)',
+                  border: `1.5px solid ${isActive ? cfg.text : 'var(--color-border)'}`,
                   transition: 'background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast)',
                 }}
               >
-                {status}
+                {cfg.label}
               </button>
             );
           })}

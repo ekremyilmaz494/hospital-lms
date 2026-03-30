@@ -9,6 +9,7 @@ import { exportExcel, printPage } from '@/lib/export';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart,
 } from '@/components/shared/recharts';
+import { TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatCard } from '@/components/shared/stat-card';
@@ -26,6 +27,7 @@ interface ReportsData {
   departmentData: { dept: string; personel: number; tamamlanma: number; ortPuan: number; basarisiz: number; color: string }[];
   failureData: { name: string; dept: string; training: string; attempts: number; lastScore: number; status: string; assignmentId: string }[];
   durationData: { training: string; video: number; sinav: number }[];
+  scoreComparisonData: { training: string; fullTitle: string; preScore: number; postScore: number; improvement: number; sampleSize: number }[];
 }
 
 const iconMap: Record<string, typeof Users> = { GraduationCap, Users, Target, Award };
@@ -36,6 +38,7 @@ const tabs = [
   { id: 'staff', label: 'Personel', icon: Users },
   { id: 'department', label: 'Departman', icon: Building2 },
   { id: 'failure', label: 'Başarısızlık', icon: AlertTriangle },
+  { id: 'score-comparison', label: 'Skor Analizi', icon: TrendingUp },
   { id: 'duration', label: 'Süre Analizi', icon: Clock },
 ];
 
@@ -82,6 +85,7 @@ export default function ReportsPage() {
   const departmentData = data?.departmentData ?? [];
   const failureData = data?.failureData ?? [];
   const durationData = data?.durationData ?? [];
+  const scoreComparisonData = data?.scoreComparisonData ?? [];
 
   return (
     <div className="space-y-6">
@@ -344,6 +348,85 @@ export default function ReportsPage() {
               ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Başarısız personel yok</p>}
             </div>
           </BlurFade>
+        </div>
+      )}
+
+      {activeTab === 'score-comparison' && (
+        <div className="space-y-6">
+          {scoreComparisonData.length > 0 ? (
+            <>
+              <BlurFade delay={0.05}>
+                <ChartCard title="Ön Sınav → Son Sınav Skor Karşılaştırması" icon={<TrendingUp className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                      <BarChart data={scoreComparisonData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                        <XAxis dataKey="training" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} unit="%" />
+                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => [`${v}%`]} />
+                        <Legend wrapperStyle={{ fontSize: '12px' }} />
+                        <Bar dataKey="preScore" name="Ön Sınav Ort." fill="var(--color-info)" radius={[6, 6, 0, 0]} barSize={22} />
+                        <Bar dataKey="postScore" name="Son Sınav Ort." fill="var(--color-primary)" radius={[6, 6, 0, 0]} barSize={22} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </ChartCard>
+              </BlurFade>
+
+              {/* Improvement table */}
+              <BlurFade delay={0.1}>
+                <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+                  <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                    <h3 className="text-sm font-bold">Eğitim Başına Gelişim</h3>
+                    <p className="text-[12px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Son sınav − Ön sınav farkı</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ background: 'var(--color-bg)' }}>
+                          <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Eğitim</th>
+                          <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Ön Sınav</th>
+                          <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Son Sınav</th>
+                          <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Gelişim</th>
+                          <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Örneklem</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scoreComparisonData.map((d) => {
+                          const isPositive = d.improvement >= 0;
+                          return (
+                            <tr key={d.fullTitle} className="transition-colors duration-100 hover:bg-(--color-surface-hover)" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                              <td className="px-5 py-3.5 text-sm font-semibold max-w-[220px] truncate" title={d.fullTitle}>{d.fullTitle}</td>
+                              <td className="px-4 py-3.5 text-center font-mono text-sm" style={{ color: 'var(--color-info)' }}>{d.preScore}%</td>
+                              <td className="px-4 py-3.5 text-center font-mono text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>{d.postScore}%</td>
+                              <td className="px-4 py-3.5 text-center">
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[12px] font-bold font-mono"
+                                  style={{
+                                    background: isPositive ? 'var(--color-success-bg)' : 'var(--color-error-bg)',
+                                    color: isPositive ? 'var(--color-success)' : 'var(--color-error)',
+                                  }}
+                                >
+                                  {isPositive ? '+' : ''}{d.improvement}%
+                                </span>
+                              </td>
+                              <td className="px-4 py-3.5 text-center text-sm font-mono" style={{ color: 'var(--color-text-muted)' }}>{d.sampleSize}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </BlurFade>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-2xl border py-16" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <TrendingUp className="h-8 w-8 mb-3" style={{ color: 'var(--color-text-muted)' }} />
+              <p className="text-sm font-semibold mb-1">Henüz skor verisi yok</p>
+              <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>En az bir sınav tamamlandığında karşılaştırma grafiği burada görünecek</p>
+            </div>
+          )}
         </div>
       )}
 

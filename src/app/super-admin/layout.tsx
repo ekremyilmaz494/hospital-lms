@@ -13,20 +13,26 @@ export default function SuperAdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const { user, isLoading, fullName, initials } = useAuth();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('sidebar:super-admin:collapsed');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const { fullName, initials, user, isLoading } = useAuth();
+
+  const toggleSidebar = () => {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    localStorage.setItem('sidebar:super-admin:collapsed', String(next));
+  };
   const router = useRouter();
 
-  // Auth guard: redirect non-super_admin users
+  // Second line of defense: redirect non-super_admin users even if middleware is bypassed
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'super_admin')) {
+    if (!isLoading && user && user.role !== 'super_admin') {
       router.replace('/auth/login');
     }
   }, [user, isLoading, router]);
-
-  if (isLoading || !user || user.role !== 'super_admin') {
-    return null;
-  }
 
   return (
     <TooltipProvider>
@@ -34,7 +40,7 @@ export default function SuperAdminLayout({
         <AppSidebar
           navGroups={superAdminNav}
           collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onToggleCollapse={toggleSidebar}
           orgName="Hastane LMS"
           userName={fullName}
           userRole="Platform Yöneticisi"
@@ -45,8 +51,8 @@ export default function SuperAdminLayout({
           style={{ marginLeft: 72 }}
         >
           <AppTopbar
-            title="Platform Yönetimi"
-            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title=""
+            onToggleSidebar={toggleSidebar}
             userName={fullName}
             userRole="Platform Yöneticisi"
             userInitials={initials}

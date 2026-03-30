@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
@@ -259,14 +260,14 @@ export default function NewTrainingPage() {
 
                 <div>
                   <Label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Açıklama</Label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
-                    placeholder="Eğitim hakkında kısa bir açıklama yazın..."
-                    className="mt-2 w-full rounded-xl border px-4 py-3 text-sm"
-                    style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)', resize: 'vertical' }}
-                  />
+                  <div className="mt-2">
+                    <RichTextEditor
+                      value={description}
+                      onChange={setDescription}
+                      placeholder="Eğitim hakkında açıklama yazın..."
+                      minHeight={100}
+                    />
+                  </div>
                 </div>
 
                 <div

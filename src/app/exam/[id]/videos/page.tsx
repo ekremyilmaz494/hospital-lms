@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, startTransition } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Play, Pause, Volume2, VolumeX, CheckCircle, Lock, ArrowRight, AlertTriangle, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -128,8 +128,10 @@ export default function VideoPlayerPage() {
     }
   }, [currentVideoIdx, videosData.length, changeVideo]);
 
-  // When video ends, mark as completed
+  // Heartbeat error counter — declared before handleVideoEnded to avoid access-before-declare
   const [heartbeatErrors, setHeartbeatErrors] = useState(0);
+
+  // When video ends, mark as completed
   const [showPostExamPrompt, setShowPostExamPrompt] = useState(false);
   const handleVideoEnded = useCallback(() => { // eslint-disable-line
     setIsPlaying(false);
@@ -183,10 +185,9 @@ export default function VideoPlayerPage() {
 
   // Video degistiginde currentTime'i lastPosition ile baslat
   useEffect(() => {
-    const position = currentVideo?.lastPosition ?? 0;
-    startTransition(() => {
-      setCurrentTime(position > 0 ? position : 0);
-    });
+    const pos = currentVideo?.lastPosition ?? 0;
+    // queueMicrotask: avoid synchronous setState in effect (react-compiler rule)
+    queueMicrotask(() => setCurrentTime(pos > 0 ? pos : 0));
   }, [currentVideo?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sayfa kapanirken son pozisyonu kaydet (beforeunload)

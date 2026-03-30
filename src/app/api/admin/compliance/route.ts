@@ -23,11 +23,13 @@ export async function GET() {
   try {
     const now = new Date()
 
+    // B6.3 — Büyük hastanelerde sonsuz yük önleme: atama başına ilk 500 personel
     const [compulsoryTrainings, allStaff] = await Promise.all([
       prisma.training.findMany({
         where: { organizationId: orgId, isCompulsory: true },
         include: {
           assignments: {
+            take: 500, // Büyük hastanelerde performans koruması
             include: {
               user: { select: { id: true, firstName: true, lastName: true, departmentId: true, departmentRel: { select: { name: true } } } },
               examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true, postExamCompletedAt: true } },
@@ -36,6 +38,7 @@ export async function GET() {
           certificates: { select: { userId: true, issuedAt: true, expiresAt: true } },
         },
         orderBy: { complianceDeadline: 'asc' },
+        take: 100, // Zorunlu eğitim sayısı için üst sınır
       }),
       prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
     ])

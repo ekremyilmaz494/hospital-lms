@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, User, CreditCard, ArrowLeft, Save } from 'lucide-react';
+import { useFetch } from '@/hooks/use-fetch';
+
+interface Plan { id: string; name: string; slug: string; priceMonthly: number | null }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,12 +16,15 @@ export default function NewHospitalPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const { data: plansData } = useFetch<{ plans: Plan[] }>('/api/super-admin/subscriptions');
+  const plans = plansData?.plans ?? [];
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
     setSaveError(null);
     const formData = new FormData(e.currentTarget);
+    const planId = formData.get('planId') as string | null;
     const body = {
       name: formData.get('name'),
       code: formData.get('code'),
@@ -29,7 +35,7 @@ export default function NewHospitalPage() {
       adminLastName: formData.get('adminLastName'),
       adminEmail: formData.get('adminEmail'),
       adminPassword: formData.get('adminPassword'),
-      plan: formData.get('plan'),
+      ...(planId && { planId }),
       trialDays: Number(formData.get('trialDays') ?? 14),
     };
     try {
@@ -166,14 +172,16 @@ export default function NewHospitalPage() {
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Abonelik Planı *</Label>
                 <select
-                  name="plan"
+                  name="planId"
                   className="mt-1.5 w-full rounded-md border px-3 py-2.5 text-sm"
                   style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
                 >
-                  <option value="">Plan seçin...</option>
-                  <option value="starter">Başlangıç</option>
-                  <option value="pro">Profesyonel</option>
-                  <option value="enterprise">Kurumsal</option>
+                  <option value="">Plan seçin (isteğe bağlı)...</option>
+                  {plans.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.priceMonthly ? ` — ₺${p.priceMonthly}/ay` : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 
 /** Start a new exam attempt or resume existing one */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -39,8 +40,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return errorResponse('Maksimum deneme sayısına ulaştınız')
   }
 
-  // Atomic: check for active attempt OR create new one inside a transaction
-  const attempt = await prisma.$transaction(async (tx) => {
+  // B7.5 — Transaction hatalarını yakala; MAX_ATTEMPTS dışındaki hatalar 500 döndürmesin
+  let attempt: Awaited<ReturnType<typeof prisma.examAttempt.findFirst>> | null = null
+  try {
+  attempt = await prisma.$transaction(async (tx) => {
     // Check for active (incomplete) attempt
     const existing = await tx.examAttempt.findFirst({
       where: {
@@ -88,8 +91,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return created
   }).catch((err: Error) => {
     if (err.message === 'MAX_ATTEMPTS_EXCEEDED') return null
-    throw err
+    throw err // re-throw to outer try-catch
   })
+  } catch (err) {
+    logger.error('Exam Start', 'Sınav başlatma hatası', err)
+    return errorResponse('Sınav başlatılamadı. Lütfen tekrar deneyin.', 500)
+  }
 
   if (!attempt) return errorResponse('Maksimum deneme sayısına ulaştınız', 403)
 

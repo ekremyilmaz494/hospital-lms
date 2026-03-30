@@ -7,14 +7,25 @@ import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
 import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
 import { staffNav } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
+import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 
 export default function StaffLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('sidebar:staff:collapsed');
+    return saved !== null ? saved === 'true' : true;
+  });
   const { user, isLoading, fullName, initials } = useAuth();
+
+  const toggleSidebar = () => {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    localStorage.setItem('sidebar:staff:collapsed', String(next));
+  };
   const router = useRouter();
 
   // Auth guard: redirect non-staff users
@@ -32,7 +43,7 @@ export default function StaffLayout({
         <AppSidebar
           navGroups={staffNav}
           collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onToggleCollapse={toggleSidebar}
           orgName={user?.department ?? ''}
           userName={fullName}
           userRole="Personel"
@@ -42,9 +53,10 @@ export default function StaffLayout({
           className="min-h-screen"
           style={{ marginLeft: 72 }}
         >
+          <ImpersonationBanner />
           <AppTopbar
-            title="Personel Paneli"
-            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title=""
+            onToggleSidebar={toggleSidebar}
             userName={fullName}
             userRole="Personel"
             userInitials={initials}

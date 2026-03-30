@@ -224,6 +224,8 @@ model Training {
   startDate            DateTime  @map("start_date") @db.Timestamptz
   endDate              DateTime  @map("end_date") @db.Timestamptz
   isActive             Boolean   @default(true) @map("is_active")
+  // G5.4 — Yayın durumu: draft | published | archived
+  publishStatus        String    @default("published") @db.VarChar(20) @map("publish_status")
   // Compliance / Uyum Alanları
   isCompulsory         Boolean   @default(false) @map("is_compulsory")
   complianceDeadline   DateTime? @map("compliance_deadline") @db.Timestamptz

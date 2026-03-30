@@ -24,9 +24,9 @@ export function errorResponse(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
-export function safePagination(params: URLSearchParams) {
+export function safePagination(params: URLSearchParams, maxLimit = 100) {
   const page = Math.max(Number(params.get('page') || '1'), 1)
-  const limit = Math.min(Math.max(Number(params.get('limit') || '20'), 1), 100)
+  const limit = Math.min(Math.max(Number(params.get('limit') || '20'), 1), maxLimit)
   const search = (params.get('search') ?? '').slice(0, 200)
   return { page, limit, search, skip: (page - 1) * limit }
 }
@@ -113,7 +113,8 @@ function sanitizeAuditData(data: unknown): unknown {
   if (!data || typeof data !== 'object') return data;
   const obj = data as Record<string, unknown>;
   const sanitized: Record<string, unknown> = {};
-  const sensitiveKeys = ['tcNo', 'password', 'passwordHash', 'phone'];
+  // KVKK: Kişisel veriler audit log'da redact edilmeli
+  const sensitiveKeys = ['tcNo', 'password', 'passwordHash', 'phone', 'email', 'firstName', 'lastName', 'address'];
   for (const [key, value] of Object.entries(obj)) {
     if (sensitiveKeys.includes(key)) {
       sanitized[key] = '[REDACTED]';

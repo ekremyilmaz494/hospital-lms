@@ -13,20 +13,6 @@ export interface ReportData {
   rows?: (string | number | boolean | null | undefined)[][];
 }
 
-/**
- * CSV injection koruması — hücre değeri tehlikeli karakterle başlıyorsa
- * tek tırnak ile önekler. =, +, -, @, \t, \r, \n karakterleri Excel'de
- * formül olarak yorumlanabilir.
- */
-function sanitizeCellValue(value: string | number | boolean | null | undefined): string {
-  if (value == null) return ''
-  const str = String(value)
-  if (/^[=+\-@\t\r\n]/.test(str)) {
-    return `'${str}`
-  }
-  return str
-}
-
 export function exportExcel(reportData?: ReportData) {
   if (!reportData?.headers || !reportData?.rows || reportData.rows.length === 0) {
     throw new Error('Dışa aktarılacak veri bulunamadı.');
@@ -36,8 +22,8 @@ export function exportExcel(reportData?: ReportData) {
   const rows = reportData.rows;
 
   const csvContent = [
-    headers.map(h => `"${sanitizeCellValue(h)}"`).join(','),
-    ...rows.map(r => r.map(c => `"${sanitizeCellValue(c)}"`).join(',')),
+    headers.join(','),
+    ...rows.map(r => r.map(c => csvCell(c)).join(',')),
   ].join('\n');
 
   const BOM = '\uFEFF';
@@ -61,7 +47,7 @@ export function exportPDF(reportData?: ReportData, title?: string) {
     startY: 28,
     head: [reportData.headers],
     body: reportData.rows.map(row =>
-      row.map(cell => sanitizeCellValue(cell))
+      row.map(cell => (cell == null ? '' : String(cell)))
     ),
     styles: { fontSize: 8 },
     headStyles: { fillColor: [13, 150, 104] },
@@ -87,4 +73,17 @@ function downloadBlob(blob: Blob, filename: string) {
 
 function formatDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * B6.4/G6.3 — CSV formula injection koruması.
+ * =, +, -, @ ile başlayan değerler Excel/Sheets'te formül olarak yorumlanır.
+ * OWASP CSV Injection: https://owasp.org/www-community/attacks/CSV_Injection
+ */
+function csvCell(value: string | number | boolean | null | undefined): string {
+  const str = value == null ? '' : String(value)
+  // Formül injection tetikleyici karakterlerini ' ile escape et
+  const sanitized = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str
+  // Çift tırnak içinde sar; içindeki tırnakları ikile
+  return `"${sanitized.replace(/"/g, '""')}"`
 }

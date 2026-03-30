@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { checkRateLimit } from '@/lib/redis'
 
 /**
  * Escapes HTML special characters to prevent HTML injection in email templates.
@@ -29,12 +30,32 @@ interface EmailOptions {
   html: string
 }
 
+// Rate limits: max 200 emails/hour globally, max 20/hour per recipient
+const EMAIL_GLOBAL_LIMIT = 200
+const EMAIL_PER_RECIPIENT_LIMIT = 20
+const EMAIL_WINDOW_SECONDS = 3600
+
 export async function sendEmail({ to, subject, html }: EmailOptions) {
-  const recipients = Array.isArray(to) ? to.join(', ') : to
+  const recipientList = Array.isArray(to) ? to : [to]
+
+  // Global hourly cap — prevents runaway cron/bulk sends
+  const globalOk = await checkRateLimit('email:global', EMAIL_GLOBAL_LIMIT, EMAIL_WINDOW_SECONDS)
+  if (!globalOk) {
+    throw new Error('Global e-posta rate limiti aşıldı (saatte 200). Lütfen daha sonra tekrar deneyin.')
+  }
+
+  // Per-recipient cap — prevents flooding a single address
+  for (const recipient of recipientList) {
+    const key = `email:recipient:${recipient.toLowerCase()}`
+    const recipientOk = await checkRateLimit(key, EMAIL_PER_RECIPIENT_LIMIT, EMAIL_WINDOW_SECONDS)
+    if (!recipientOk) {
+      throw new Error(`"${recipient}" adresine saatte ${EMAIL_PER_RECIPIENT_LIMIT} e-postadan fazla gönderilemez.`)
+    }
+  }
 
   await transporter.sendMail({
     from: process.env.SMTP_FROM ?? 'Hastane LMS <noreply@hastanelms.com>',
-    to: recipients,
+    to: recipientList.join(', '),
     subject,
     html,
   })

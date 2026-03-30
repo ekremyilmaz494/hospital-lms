@@ -65,7 +65,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     startDate: training.startDate,
     endDate: training.endDate,
     isActive: training.isActive,
-    status: training.isActive ? 'active' : 'inactive',
+    publishStatus: training.publishStatus,
+    status: training.publishStatus === 'published' ? 'active' : training.publishStatus === 'draft' ? 'draft' : 'archived',
     assignedCount: training._count.assignments,
     completedCount,
     passedCount,
@@ -112,6 +113,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const existing = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!existing) return errorResponse('Training not found', 404)
 
+  // B5.5 — Güncelleme sırasında bitiş tarihi geçmişte olamaz
+  if (parsed.data.endDate && new Date(parsed.data.endDate) < new Date()) {
+    return errorResponse('Bitiş tarihi geçmişte olamaz', 400)
+  }
+
   const data: Record<string, unknown> = { ...parsed.data }
   if (parsed.data.startDate) data.startDate = new Date(parsed.data.startDate)
   if (parsed.data.endDate) data.endDate = new Date(parsed.data.endDate)
@@ -149,14 +155,47 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const existing = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!existing) return errorResponse('Training not found', 404)
 
-  // Soft delete: isActive false yap, cascade silme yerine veri korunur
-  await prisma.training.update({ where: { id }, data: { isActive: false } })
+  // B5.2/G5.2 — Devam eden sınavları kontrol et; ?force=true olmadan engelle
+  const { searchParams } = new URL(request.url)
+  const force = searchParams.get('force') === 'true'
 
-  // Aktif atamalari iptal et (assigned/in_progress → locked)
-  await prisma.trainingAssignment.updateMany({
-    where: { trainingId: id, status: { in: ['assigned', 'in_progress'] } },
-    data: { status: 'locked' },
+  const activeAttemptCount = await prisma.examAttempt.count({
+    where: {
+      assignment: { trainingId: id },
+      status: { in: ['pre_exam', 'watching_videos', 'post_exam'] },
+    },
   })
+
+  if (activeAttemptCount > 0 && !force) {
+    return jsonResponse(
+      {
+        requiresConfirmation: true,
+        activeAttemptCount,
+        message: `${activeAttemptCount} personelin devam eden sınavı var. Arşivlemek için ?force=true ekleyin.`,
+      },
+      409,
+    )
+  }
+
+  // Soft delete: isActive false yap, cascade silme yerine veri korunur
+  await prisma.$transaction([
+    prisma.training.update({ where: { id }, data: { isActive: false } }),
+    // Devam eden sınav girişimlerini iptal et (force ile onaylandı)
+    ...(activeAttemptCount > 0
+      ? [prisma.examAttempt.updateMany({
+          where: {
+            assignment: { trainingId: id },
+            status: { in: ['pre_exam', 'watching_videos', 'post_exam'] },
+          },
+          data: { status: 'expired', isPassed: false, postExamCompletedAt: new Date() },
+        })]
+      : []),
+    // Aktif atamaları kilitle (assigned/in_progress → locked)
+    prisma.trainingAssignment.updateMany({
+      where: { trainingId: id, status: { in: ['assigned', 'in_progress'] } },
+      data: { status: 'locked' },
+    }),
+  ])
 
   await createAuditLog({
     userId: dbUser!.id,

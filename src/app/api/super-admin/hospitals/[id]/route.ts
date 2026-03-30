@@ -71,6 +71,24 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const oldData = await prisma.organization.findUnique({ where: { id } })
   if (!oldData) return errorResponse('Hospital not found', 404)
 
+  // Count all cascading data — caller must explicitly confirm deletion
+  const { searchParams } = new URL(request.url)
+  const confirmed = searchParams.get('confirm') === 'true'
+
+  const [userCount, trainingCount, assignmentCount] = await Promise.all([
+    prisma.user.count({ where: { organizationId: id } }),
+    prisma.training.count({ where: { organizationId: id } }),
+    prisma.trainingAssignment.count({ where: { training: { organizationId: id } } }),
+  ])
+
+  const impact = { users: userCount, trainings: trainingCount, assignments: assignmentCount }
+  const hasData = userCount > 0 || trainingCount > 0 || assignmentCount > 0
+
+  // Return impact summary without deleting — UI uses this to show confirmation dialog
+  if (hasData && !confirmed) {
+    return jsonResponse({ requiresConfirmation: true, impact }, 200)
+  }
+
   await prisma.organization.delete({ where: { id } })
 
   await createAuditLog({
@@ -79,8 +97,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     entityType: 'organization',
     entityId: id,
     oldData,
+    newData: { impact },
     request,
   })
 
-  return jsonResponse({ success: true })
+  return jsonResponse({ success: true, impact })
 }

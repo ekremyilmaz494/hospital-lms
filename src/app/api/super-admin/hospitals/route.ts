@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   if (roleError) return roleError
 
   const { searchParams } = new URL(request.url)
-  const { page, limit, search, skip } = safePagination(searchParams)
+  const { page, limit, search, skip } = safePagination(searchParams, 500)
   const status = searchParams.get('status') // active | suspended | all
 
   const where: Record<string, unknown> = {}
@@ -56,8 +56,36 @@ export async function POST(request: Request) {
   const existing = await prisma.organization.findUnique({ where: { code: parsed.data.code } })
   if (existing) return errorResponse('Bu kod zaten kullanılıyor', 409)
 
-  const hospital = await prisma.organization.create({
-    data: { ...parsed.data, createdBy: dbUser!.id },
+  // planId verilmişse planın var olduğunu doğrula
+  const { planId, trialDays, ...orgData } = parsed.data
+  if (planId) {
+    const plan = await prisma.subscriptionPlan.findUnique({ where: { id: planId } })
+    if (!plan) return errorResponse('Belirtilen abonelik planı bulunamadı', 404)
+  }
+
+  // Organizasyon + abonelik aynı transaction içinde oluştur
+  const hospital = await prisma.$transaction(async (tx) => {
+    const org = await tx.organization.create({
+      data: { ...orgData, createdBy: dbUser!.id },
+    })
+
+    if (planId) {
+      const trialEndsAt = trialDays > 0
+        ? new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000)
+        : null
+
+      await tx.organizationSubscription.create({
+        data: {
+          organizationId: org.id,
+          planId,
+          status: trialEndsAt ? 'trialing' : 'active',
+          billingCycle: 'monthly',
+          ...(trialEndsAt && { trialEndsAt }),
+        },
+      })
+    }
+
+    return org
   })
 
   await createAuditLog({
@@ -65,7 +93,7 @@ export async function POST(request: Request) {
     action: 'create',
     entityType: 'organization',
     entityId: hospital.id,
-    newData: hospital,
+    newData: { ...hospital, planId, trialDays },
     request,
   })
 

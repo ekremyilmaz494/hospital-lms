@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   const { page, limit, search, skip } = safePagination(searchParams)
   const category = searchParams.get('category')
   const isActive = searchParams.get('isActive')
+  const publishStatus = searchParams.get('publishStatus') // draft | published | archived
 
   const where: Record<string, unknown> = {
     organizationId: dbUser!.organizationId!,
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
   }
   if (category) where.category = category
   if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
+  if (publishStatus) where.publishStatus = publishStatus
 
   const [trainings, total] = await Promise.all([
     prisma.training.findMany({
@@ -56,7 +58,8 @@ export async function GET(request: Request) {
       completedCount,
       completionRate,
       passingScore: t.passingScore,
-      status: t.isActive ? 'Aktif' : 'Taslak',
+      publishStatus: t.publishStatus,
+      status: t.publishStatus === 'published' ? 'Yayında' : t.publishStatus === 'draft' ? 'Taslak' : 'Arşivlendi',
       startDate: t.startDate?.toISOString() ?? '',
       endDate: t.endDate?.toISOString() ?? '',
       createdBy: '',
