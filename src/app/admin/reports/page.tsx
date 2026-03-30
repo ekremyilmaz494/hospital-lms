@@ -363,7 +363,7 @@ export default function ReportsPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                         <XAxis dataKey="training" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
                         <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} unit="%" />
-                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => [`${v}%`]} />
+                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => [`${v}%`]} />
                         <Legend wrapperStyle={{ fontSize: '12px' }} />
                         <Bar dataKey="preScore" name="Ön Sınav Ort." fill="var(--color-info)" radius={[6, 6, 0, 0]} barSize={22} />
                         <Bar dataKey="postScore" name="Son Sınav Ort." fill="var(--color-primary)" radius={[6, 6, 0, 0]} barSize={22} />
