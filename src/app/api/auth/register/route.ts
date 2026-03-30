@@ -19,8 +19,11 @@ const registerSchema = z.object({
 })
 
 export async function POST(request: Request) {
-  // Rate limiting — IP bazlı
-  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  // Rate limiting — IP bazlı (x-vercel-forwarded-for trusted on Vercel; fallback for other environments)
+  const clientIp =
+    request.headers.get('x-vercel-forwarded-for') ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown'
   const allowed = await checkRateLimit(`register:${clientIp}`, 5, 3600)
   if (!allowed) return errorResponse('Çok fazla kayıt denemesi. Lütfen bir saat sonra tekrar deneyin.', 429)
 

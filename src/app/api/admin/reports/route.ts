@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
@@ -10,6 +11,10 @@ export async function GET(request: Request) {
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId!
+
+  // Rate limit: dakikada 10 rapor sorgusu (ağır aggregation — DoS koruması)
+  const allowed = await checkRateLimit(`reports:${orgId}`, 10, 60)
+  if (!allowed) return errorResponse('Çok fazla rapor sorgusu. Lütfen bir dakika bekleyin.', 429)
 
   // Filtre parametreleri
   const { searchParams } = new URL(request.url)
@@ -43,7 +48,7 @@ export async function GET(request: Request) {
         where: { training: { organizationId: orgId }, postExamScore: { not: null }, user: { ...userDeptFilter }, ...(dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}) },
         _avg: { postExamScore: true },
       }),
-      // Training-based report
+      // Training-based report (max 500 — DoS koruması)
       prisma.training.findMany({
         where: { organizationId: orgId },
         include: {
@@ -54,8 +59,9 @@ export async function GET(request: Request) {
           videos: { select: { durationSeconds: true } },
         },
         orderBy: { createdAt: 'desc' },
+        take: 500,
       }),
-      // Staff-based report
+      // Staff-based report (max 2000 — DoS koruması)
       prisma.user.findMany({
         where: { organizationId: orgId, role: 'staff', ...userDeptFilter },
         include: {
@@ -65,6 +71,7 @@ export async function GET(request: Request) {
           },
           departmentRel: { select: { name: true } },
         },
+        take: 2000,
       }),
       // Departments
       prisma.department.findMany({

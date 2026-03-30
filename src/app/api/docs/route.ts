@@ -153,7 +153,8 @@ const API_DOCS = {
 }
 
 export async function GET() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
   return NextResponse.json(API_DOCS, {
-    headers: { 'Access-Control-Allow-Origin': '*' },
+    headers: { 'Access-Control-Allow-Origin': appUrl },
   })
 }

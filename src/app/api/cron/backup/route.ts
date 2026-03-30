@@ -5,8 +5,11 @@ import { uploadBuffer, backupKey } from '@/lib/s3'
 /** Daily auto-backup cron job — runs at 03:15 UTC (after cleanup at 03:00) */
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) {
+    throw new Error('CRON_SECRET environment variable is required')
+  }
   const authHeader = request.headers.get('authorization')
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -149,16 +149,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     await prisma.examAnswer.createMany({ data: validAnswers })
   }
 
-  // Update attempt based on phase
+  // Update attempt based on phase — atomic status guard prevents double-submit race condition
   if (phase === 'pre') {
-    await prisma.examAttempt.update({
-      where: { id: attempt.id },
-      data: {
-        preExamScore: score,
-        preExamCompletedAt: new Date(),
-        status: 'watching_videos',
-      },
+    const updated = await prisma.examAttempt.updateMany({
+      where: { id: attempt.id, status: 'pre_exam' },
+      data: { preExamScore: score, preExamCompletedAt: new Date(), status: 'watching_videos' },
     })
+    if (updated.count === 0) {
+      // Concurrent request already processed this submission
+      return jsonResponse({ phase: 'pre', score: Number(attempt.preExamScore ?? score), nextStep: 'videos' })
+    }
     await clearExamTimer(attempt.id)
     return jsonResponse({ phase: 'pre', score, nextStep: 'videos' })
   }
@@ -166,15 +166,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // Post-exam
   const isPassed = score >= attempt.training.passingScore
 
-  await prisma.examAttempt.update({
-    where: { id: attempt.id },
-    data: {
-      postExamScore: score,
-      postExamCompletedAt: new Date(),
-      isPassed,
-      status: 'completed',
-    },
+  const updated = await prisma.examAttempt.updateMany({
+    where: { id: attempt.id, status: 'post_exam' },
+    data: { postExamScore: score, postExamCompletedAt: new Date(), isPassed, status: 'completed' },
   })
+  if (updated.count === 0) {
+    // Concurrent request already completed this attempt
+    return jsonResponse({ phase: 'post', score: Number(attempt.postExamScore ?? score), isPassed: attempt.isPassed ?? isPassed, passingScore: attempt.training.passingScore })
+  }
 
   // Timer temizle
   await clearExamTimer(attempt.id)

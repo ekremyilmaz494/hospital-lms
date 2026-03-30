@@ -12,9 +12,18 @@ export async function GET(request: Request) {
   if (!allowed) {
     return NextResponse.redirect(`${origin}/auth/login?error=rate_limited`)
   }
-  // Open redirect önlemi — sadece relative path'lere izin ver
+  // Open redirect önlemi — URL parse ederek sadece aynı origin'e izin ver
   const rawRedirect = searchParams.get('redirectTo') ?? '/'
-  const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/'
+  let redirectTo = '/'
+  try {
+    // Absolute URL ise origin eşleşmesi zorunlu; relative path decode edilip kontrol edilir
+    const resolved = new URL(rawRedirect, origin)
+    if (resolved.origin === origin) {
+      redirectTo = resolved.pathname + resolved.search + resolved.hash
+    }
+  } catch {
+    // Geçersiz URL — varsayılan '/' kullan
+  }
 
   if (code) {
     const supabase = await createClient()

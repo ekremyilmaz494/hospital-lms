@@ -6,7 +6,20 @@ import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3'
 
 const APP_VERSION = process.env.npm_package_version ?? '0.1.0'
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Only reveal service details to authenticated monitoring requests
+  const healthSecret = process.env.HEALTH_CHECK_SECRET
+  const isAuthenticated = healthSecret &&
+    request.headers.get('x-health-secret') === healthSecret
+
+  if (!isAuthenticated) {
+    // Public response: minimal — avoids leaking service topology
+    return NextResponse.json(
+      { status: 'ok', timestamp: new Date().toISOString() },
+      { status: 200 },
+    )
+  }
+
   const services: Record<string, boolean> = {
     database: false,
     redis: false,

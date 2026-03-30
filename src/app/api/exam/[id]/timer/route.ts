@@ -54,6 +54,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
+  // Ownership + org isolation check before Redis query
+  const attempt = await prisma.examAttempt.findFirst({
+    where: { id: attemptId, userId: dbUser!.id },
+    include: { training: { select: { organizationId: true } } },
+  })
+  if (!attempt) return errorResponse('Attempt not found', 404)
+  if (attempt.training.organizationId !== dbUser!.organizationId) {
+    return errorResponse('Yetkisiz erişim', 403)
+  }
+
   const remaining = await getExamTimeRemaining(attemptId)
   const expired = await isExamExpired(attemptId)
 

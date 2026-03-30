@@ -19,6 +19,7 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import { AssignTrainingModal } from './assign-training-modal';
 
 // ── Types ──
 interface Staff {
@@ -67,28 +68,37 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 // ── Staff Actions Component ──
 function StaffActions({ staff }: { staff: Staff }) {
   const router = useRouter();
+  const [assignTrainingOpen, setAssignTrainingOpen] = useState(false);
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg transition-colors duration-150 hover:bg-(--color-surface-hover)">
-        <MoreHorizontal className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/staff/${staff.id}`)}>
-          <Eye className="h-4 w-4" /> Detay
-        </DropdownMenuItem>
-        <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/staff/${staff.id}/edit`)}>
-          <Edit className="h-4 w-4" /> Düzenle
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/trainings/new?staffId=${staff.id}`)}>
-          <GraduationCap className="h-4 w-4" /> Eğitim Ata
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="gap-2" onClick={() => window.location.href = `mailto:${staff.email}`}>
-          <Mail className="h-4 w-4" /> E-posta Gönder
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg transition-colors duration-150 hover:bg-(--color-surface-hover)">
+          <MoreHorizontal className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/staff/${staff.id}`)}>
+            <Eye className="h-4 w-4" /> Detay
+          </DropdownMenuItem>
+          <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/staff/${staff.id}/edit`)}>
+            <Edit className="h-4 w-4" /> Düzenle
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="gap-2" onClick={() => setAssignTrainingOpen(true)}>
+            <GraduationCap className="h-4 w-4" /> Eğitim Ata
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="gap-2" onClick={() => window.location.href = `mailto:${staff.email}`}>
+            <Mail className="h-4 w-4" /> E-posta Gönder
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AssignTrainingModal
+        staffId={staff.id}
+        staffName={staff.name}
+        open={assignTrainingOpen}
+        onOpenChange={setAssignTrainingOpen}
+      />
+    </>
   );
 }
 

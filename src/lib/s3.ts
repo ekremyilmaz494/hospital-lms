@@ -79,8 +79,14 @@ export function backupKey(orgId: string) {
   return `backups/${orgId}/${Date.now()}.json`
 }
 
-/** Generate video storage key (filename sanitized against path traversal) */
+const ALLOWED_VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'ogg']
+
+/** Generate video storage key using a random UUID — avoids path traversal and filename guessing */
 export function videoKey(orgId: string, trainingId: string, filename: string) {
-  const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.{2,}/g, '_')
-  return `videos/${orgId}/${trainingId}/${Date.now()}-${safe}`
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  if (!ALLOWED_VIDEO_EXTENSIONS.includes(ext)) {
+    throw new Error(`İzin verilmeyen dosya uzantısı: .${ext}`)
+  }
+  const id = crypto.randomUUID()
+  return `videos/${orgId}/${trainingId}/${id}.${ext}`
 }

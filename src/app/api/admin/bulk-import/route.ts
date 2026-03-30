@@ -104,6 +104,15 @@ export async function POST(request: Request) {
   if (!validMime && !validExt) return errorResponse('Sadece Excel dosyaları (.xlsx, .xls) kabul edilir', 400)
 
   const arrayBuffer = await file.arrayBuffer()
+
+  // Magic bytes validation — MIME/extension can be spoofed; check actual file signature
+  const header = new Uint8Array(arrayBuffer.slice(0, 8))
+  const isZip = header[0] === 0x50 && header[1] === 0x4b // PK — ZIP-based (xlsx)
+  const isCFB = header[0] === 0xd0 && header[1] === 0xcf // OLE2 compound doc (xls)
+  if (!isZip && !isCFB) {
+    return errorResponse('Geçersiz dosya formatı. Sadece gerçek Excel dosyaları (.xlsx, .xls) kabul edilir.', 400)
+  }
+
   const { rows, parseError } = await parseImportFile(arrayBuffer, orgId)
   if (parseError) return errorResponse(parseError)
 

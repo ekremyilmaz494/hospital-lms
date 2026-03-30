@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { createServiceClient } from '@/lib/supabase/server'
+import { checkRateLimit } from '@/lib/redis'
 import { z } from 'zod/v4'
 
 const impersonateSchema = z.object({
@@ -24,6 +25,10 @@ export async function POST(request: Request) {
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])
   if (roleError) return roleError
+
+  // Rate limit: max 10 impersonations per super-admin per hour
+  const rateLimitOk = await checkRateLimit(`impersonate:${dbUser!.id}`, 10, 3600)
+  if (!rateLimitOk) return errorResponse('Çok fazla impersonation denemesi. Lütfen bir saat sonra tekrar deneyin.', 429)
 
   let body: { userId: string }
   try {

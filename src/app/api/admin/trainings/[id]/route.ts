@@ -122,7 +122,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (parsed.data.startDate) data.startDate = new Date(parsed.data.startDate)
   if (parsed.data.endDate) data.endDate = new Date(parsed.data.endDate)
 
-  const training = await prisma.training.update({ where: { id }, data })
+  const training = await prisma.training.update({ where: { id, organizationId: dbUser!.organizationId! }, data })
 
   await createAuditLog({
     userId: dbUser!.id,
@@ -179,7 +179,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   // Soft delete: isActive false yap, cascade silme yerine veri korunur
   await prisma.$transaction([
-    prisma.training.update({ where: { id }, data: { isActive: false } }),
+    prisma.training.update({ where: { id, organizationId: dbUser!.organizationId! }, data: { isActive: false } }),
     // Devam eden sınav girişimlerini iptal et (force ile onaylandı)
     ...(activeAttemptCount > 0
       ? [prisma.examAttempt.updateMany({

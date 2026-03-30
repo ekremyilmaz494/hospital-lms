@@ -26,13 +26,13 @@ export async function GET(request: Request) {
       include: { _count: { select: { users: true } } },
     }),
     // Monthly hospital registrations (last 12 months)
-    prisma.$queryRawUnsafe<{ month: string; count: bigint }[]>(`
+    prisma.$queryRaw<{ month: string; count: bigint }[]>`
       SELECT to_char(created_at, 'YYYY-MM') as month, count(*)::bigint as count
       FROM organizations
       WHERE created_at > now() - interval '12 months'
       GROUP BY month
       ORDER BY month
-    `),
+    `,
   ])
 
   return jsonResponse({

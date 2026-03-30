@@ -5,10 +5,12 @@ import { deleteObject } from '@/lib/s3'
 
 /** Daily cleanup cron job (Vercel Cron) */
 export async function GET(request: Request) {
-  // Verify cron secret — block if undefined
   const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) {
+    throw new Error('CRON_SECRET environment variable is required')
+  }
   const authHeader = request.headers.get('authorization')
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
