@@ -327,15 +327,11 @@ export function AppSidebar({
               type="button"
               onClick={async () => {
                 try {
-                  const res = await fetch('/api/auth/logout', { method: 'POST' });
-                  if (!res.ok) {
-                    throw new Error(`Çıkış başarısız: HTTP ${res.status}`);
-                  }
-                  window.location.href = '/auth/login';
-                } catch (err) {
-                  const message = err instanceof Error ? err.message : 'Çıkış yapılırken bir hata oluştu';
-                  alert(message);
+                  await fetch('/api/auth/logout', { method: 'POST' });
+                } catch {
+                  // Ignore errors — redirect to login regardless
                 }
+                window.location.href = '/auth/login';
               }}
               className="shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium icon-btn"
               style={{ color: 'var(--color-danger, #ef4444)' }}

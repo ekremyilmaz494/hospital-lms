@@ -67,6 +67,10 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = createUserSchema.omit({ password: true, email: true }).partial()
 
+export const passwordSchema = z.string()
+  .min(8, 'Şifre en az 8 karakter olmalıdır')
+  .max(128, 'Şifre en fazla 128 karakter olabilir')
+
 // ── Training ──
 const trainingBaseSchema = z.object({
   title: z.string().min(1).max(500),
