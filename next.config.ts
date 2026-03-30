@@ -3,8 +3,11 @@ import type { NextConfig } from "next";
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 const nextConfig: NextConfig = {
+  compress: true,
+  poweredByHeader: false,
   experimental: {
     proxyClientMaxBodySize: '512mb',
+    optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion'],
   },
   headers: async () => [
     {

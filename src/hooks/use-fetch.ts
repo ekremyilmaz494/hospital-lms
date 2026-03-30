@@ -51,7 +51,7 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
     }
     setError(null);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 20000);
     try {
       const res = await fetch(currentUrl, { signal: controller.signal });
       clearTimeout(timeout);
@@ -74,8 +74,11 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
           }
           return; // Don't set error, we're redirecting
         }
-        if (msg.includes('abort') || msg.includes('404') || msg.includes('500') || msg.includes('503')) {
-          // Timeout, not-found, or server error — graceful degradation for expected API misses
+        if (msg.includes('abort')) {
+          // Timeout — API 20s'den uzun sürdü, kullanıcıya bildir
+          setError('Sunucu yanıt vermedi, lütfen sayfayı yenileyin');
+        } else if (msg.includes('404') || msg.includes('500') || msg.includes('503')) {
+          // not-found veya server error — graceful degradation
           setError(null);
         } else {
           setError(msg);

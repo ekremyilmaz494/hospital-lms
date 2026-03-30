@@ -291,7 +291,21 @@ Bu projede asagidaki GitHub repolarindaki skill ve rehberlerden faydalanilmaktad
 - **Kök Neden**: `src/hooks/use-fetch.ts` timeout 8000ms; dashboard API 8s sürdüğünde AbortController tam anda tetikleniyor. Timeout hatası `setError(null)` ile sessizce yutulduğu için `data=null`, `isLoading=false`, `error=null` — boş sayfa render edildi
 - **Çözüm 1**: `use-fetch.ts` timeout 8000ms → 20000ms (anlık düzeltme)
 - **Çözüm 2**: Dashboard API'deki 6 ayrı trend DB sorgusunu tek sorguda birleştir (`src/app/api/admin/dashboard/route.ts`) → API süresi ~1-2s'ye düştü
-- **Kural 1**: `useFetch` timeout, en yavaş API'nin 2 katı olmalı; timeout hatası asla sessiz yutulmamalı
-- **Kural 2**: API route'larda döngü içinde `await prisma...` YASAK — paralel `Promise.all` veya tek sorgu + uygulama katmanı gruplama kullan
+- **Kural 1**: `useFetch` timeout, en yavaş API'nin 2 katı olmalı; timeout hatası asla sessiz yutulmamalı — abort hatası `setError(null)` ile yutulursa kullanıcı boş sayfa görür
+- **Kural 2**: API route'larda döngü içinde `await prisma...` YASAK — tüm bağımsız sorgular tek `Promise.all` içinde paralel çalıştırılmalı
 - **Kural 3**: `git pull` sonrası dashboard çalışmıyorsa önce `pnpm db:generate` çalıştır (Prisma client stale kalır)
+- **Kural 4**: Vercel'de yavaşlama olursa ilk bakılacak yer: API route'larda sıralı `await` zinciri. Her `await prisma...` ayrı bir DB round-trip demektir.
+- **Tarih**: 2026-03-30
+
+### Vercel Performans — Yavaş Sayfa/Buton Sorunu
+- **Problem**: Vercel'de bazı sayfalar ve butonlar çok yavaş yükleniyor
+- **Kök Neden 1**: Dashboard API'de 6 bağımsız `await prisma...` sırayla çalışıyordu — toplam DB round-trip: 6
+- **Kök Neden 2**: `useFetch` timeout 8000ms — yavaş API istekleri sessizce kesiliyordu
+- **Kök Neden 3**: `recharts`, `lucide-react`, `framer-motion` gibi büyük kütüphaneler tam bundle halinde yükleniyordu
+- **Çözüm 1**: Dashboard API tüm sorgular tek `Promise.all`'a taşındı → DB round-trip: 6 → 2
+- **Çözüm 2**: `useFetch` timeout 8000ms → 20000ms; abort hatası artık kullanıcıya gösterilir
+- **Çözüm 3**: `next.config.ts`'e `optimizePackageImports` eklendi (recharts, lucide-react, framer-motion)
+- **Kural 1**: Yeni API route yazarken tüm bağımsız sorgular `Promise.all` ile çalıştırılmalı — sıralı `await` YASAK
+- **Kural 2**: `useFetch` ile çekilen veriler boş görünüyorsa önce timeout ve sessiz hata yutma kontrol edilmeli
+- **Kural 3**: `next.config.ts`'deki `optimizePackageImports` listesine yeni ağır kütüphaneler eklenmeli
 - **Tarih**: 2026-03-30
