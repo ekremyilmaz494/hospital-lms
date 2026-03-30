@@ -195,7 +195,6 @@ export async function POST(request: Request) {
           tcNo: row.tcNo,
           phone: row.phone,
           departmentId: row.deptId,
-          department: row.deptName,
           title: row.title,
         },
       })
