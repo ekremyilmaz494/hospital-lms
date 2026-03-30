@@ -72,7 +72,7 @@ export default function StaffNotificationsPage() {
       const res = await fetch('/api/staff/notifications', { method: 'PATCH' });
       if (!res.ok) throw new Error();
       toast('Tüm bildirimler okundu olarak işaretlendi', 'success');
-      refetch().then(() => setOptimisticAllRead(false)); // server state gelince override kaldır
+      void refetch(); setOptimisticAllRead(false);
     } catch {
       setOptimisticAllRead(false); // Rollback
       toast('İşlem başarısız', 'error');
@@ -88,7 +88,7 @@ export default function StaffNotificationsPage() {
     try {
       const res = await fetch(`/api/staff/notifications?id=${id}`, { method: 'PATCH' });
       if (!res.ok) throw new Error();
-      refetch().then(() => setOptimisticReadIds(prev => { const s = new Set(prev); s.delete(id); return s; }));
+      void refetch(); setOptimisticReadIds(prev => { const s = new Set(prev); s.delete(id); return s; });
     } catch {
       // Rollback
       setOptimisticReadIds(prev => { const s = new Set(prev); s.delete(id); return s; });

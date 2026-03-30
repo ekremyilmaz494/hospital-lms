@@ -67,6 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           title: user.user_metadata?.title ?? null,
           avatarUrl: user.user_metadata?.avatar_url ?? null,
           isActive: user.user_metadata?.is_active !== false,
+          kvkkConsent: user.user_metadata?.kvkk_consent ?? false,
+          kvkkConsentDate: user.user_metadata?.kvkk_consent_date ?? null,
           createdAt: user.created_at,
           updatedAt: user.updated_at ?? user.created_at,
         });
@@ -105,6 +107,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           title: u.user_metadata?.title ?? null,
           avatarUrl: u.user_metadata?.avatar_url ?? null,
           isActive: u.user_metadata?.is_active !== false,
+          kvkkConsent: u.user_metadata?.kvkk_consent ?? false,
+          kvkkConsentDate: u.user_metadata?.kvkk_consent_date ?? null,
           createdAt: u.created_at,
           updatedAt: u.updated_at ?? u.created_at,
         });

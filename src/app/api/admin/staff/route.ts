@@ -62,14 +62,6 @@ export async function GET(request: Request) {
 
   const deptMap = new Map(rawDepartments.map(d => [d.id, d.name]))
 
-  // Resolve department names in-memory (read-only, no DB writes in GET)
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  for (const s of staff) {
-    if (!s.departmentId && s.department && uuidRegex.test(s.department) && deptMap.has(s.department)) {
-      s.departmentId = s.department
-      s.department = deptMap.get(s.department) ?? s.department
-    }
-  }
 
   const departments = rawDepartments.map(d => ({
     id: d.id,
@@ -115,7 +107,7 @@ export async function GET(request: Request) {
       email: s.email,
       // KVKK: TC No maskeleme — sadece son 4 hane göster
       tcNo: s.tcNo ? `*******${s.tcNo.slice(-4)}` : '',
-      department: departments.find(d => d.id === s.departmentId)?.name || s.department || '',
+      department: departments.find(d => d.id === s.departmentId)?.name || '',
       departmentId: s.departmentId,
       title: s.title || '',
       assignedTrainings: s._count.assignments || 0,
@@ -202,7 +194,6 @@ export async function POST(request: Request) {
         tcNo: parsed.data.tcNo,
         phone: parsed.data.phone,
         departmentId: parsed.data.departmentId,
-        department: resolvedDeptName,
         title: parsed.data.title,
       },
     })

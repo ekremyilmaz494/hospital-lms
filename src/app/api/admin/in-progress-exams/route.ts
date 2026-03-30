@@ -32,7 +32,7 @@ export async function GET() {
       assignment: {
         select: {
           user: {
-            select: { id: true, firstName: true, lastName: true, department: true },
+            select: { id: true, firstName: true, lastName: true, departmentId: true },
           },
           training: {
             select: { id: true, title: true, examDurationMinutes: true },
@@ -54,7 +54,7 @@ export async function GET() {
       user: {
         id: a.assignment.user.id,
         name: `${a.assignment.user.firstName} ${a.assignment.user.lastName}`,
-        department: a.assignment.user.department ?? null,
+        department: a.assignment.user.departmentId ?? null,
       },
       training: {
         id: a.assignment.training.id,

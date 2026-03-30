@@ -26,12 +26,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!staff) return errorResponse('Personel bulunamadı', 404)
 
   // Resolve department name — always scope to organizationId (B4.2: cross-tenant guard)
-  let departmentName = staff.department ?? ''
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  const deptLookupId = staff.departmentId || (uuidRegex.test(departmentName) ? departmentName : null)
-  if (deptLookupId) {
+  let departmentName = ''
+  if (staff.departmentId) {
     const dept = await prisma.department.findFirst({
-      where: { id: deptLookupId, organizationId: dbUser!.organizationId! },
+      where: { id: staff.departmentId, organizationId: dbUser!.organizationId! },
     })
     if (dept) departmentName = dept.name
   }

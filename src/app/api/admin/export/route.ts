@@ -56,7 +56,7 @@ export async function GET(request: Request) {
         tcNo: s.tcNo ? `*******${s.tcNo.slice(-4)}` : '',
         // KVKK: Telefon maskeleme — sadece son 3 hane göster
         phone: s.phone ? `***${s.phone.slice(-3)}` : '',
-        department: sanitizeCell(s.department ?? ''),
+        department: sanitizeCell(s.departmentId ?? ''),
         title: sanitizeCell(s.title ?? ''),
         isActive: s.isActive ? 'Aktif' : 'Pasif',
         assignmentCount: s._count.assignments,
@@ -174,7 +174,7 @@ export async function GET(request: Request) {
             const batch = await prisma.examAttempt.findMany({
               where: { training: { organizationId: orgId } },
               include: {
-                user: { select: { firstName: true, lastName: true, department: true } },
+                user: { select: { firstName: true, lastName: true, departmentId: true } },
                 training: { select: { title: true } },
               },
               orderBy: { createdAt: 'desc' },
@@ -185,7 +185,7 @@ export async function GET(request: Request) {
             for (const a of batch) {
               const row = [
                 csvCell(sanitizeCell(`${a.user.firstName} ${a.user.lastName}`)),
-                csvCell(sanitizeCell(a.user.department ?? '')),
+                csvCell(sanitizeCell(a.user.departmentId ?? '')),
                 csvCell(sanitizeCell(a.training.title)),
                 String(a.attemptNumber),
                 a.preExamScore != null ? String(Number(a.preExamScore)) : '',
@@ -216,7 +216,7 @@ export async function GET(request: Request) {
     const attempts = await prisma.examAttempt.findMany({
       where: { training: { organizationId: orgId } },
       include: {
-        user: { select: { firstName: true, lastName: true, department: true } },
+        user: { select: { firstName: true, lastName: true, departmentId: true } },
         training: { select: { title: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -241,7 +241,7 @@ export async function GET(request: Request) {
     attempts.forEach(a => {
       ws.addRow({
         staff: sanitizeCell(`${a.user.firstName} ${a.user.lastName}`),
-        department: sanitizeCell(a.user.department ?? ''),
+        department: sanitizeCell(a.user.departmentId ?? ''),
         training: sanitizeCell(a.training.title),
         attemptNumber: a.attemptNumber,
         preExamScore: a.preExamScore != null ? Number(a.preExamScore) : '-',
