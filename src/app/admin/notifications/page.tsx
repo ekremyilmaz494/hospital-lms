@@ -54,7 +54,22 @@ export default function NotificationsPage() {
   const { toast } = useToast();
   const { data, isLoading, error, refetch } = useFetch<Notification[]>('/api/admin/notifications');
   const [filter, setFilter] = useState<FilterType>('all');
-  const [dismissing] = useState<string | null>(null);
+  const [dismissing, setDismissing] = useState<string | null>(null);
+
+  const handleDelete = async (notifId: string) => {
+    setDismissing(notifId);
+    try {
+      const res = await fetch(`/api/admin/notifications/${notifId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast('Bildirim silindi', 'success');
+      refetch();
+    } catch {
+      toast('Bildirim silinemedi', 'error');
+    } finally {
+      setDismissing(null);
+    }
+  };
 
   // ── Send Modal State ──
   const [showSendModal, setShowSendModal] = useState(false);
@@ -367,11 +382,15 @@ export default function NotificationsPage() {
                       {/* Actions */}
                       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <button
-                          className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150"
-                          style={{ color: 'var(--color-text-muted)' }}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150 disabled:opacity-50"
+                          style={{ color: 'var(--color-error)' }}
                           title="Sil"
+                          disabled={dismissing === n.id}
+                          onClick={() => handleDelete(n.id)}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          {dismissing === n.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Trash2 className="h-3.5 w-3.5" />}
                         </button>
                       </div>
                     </div>
