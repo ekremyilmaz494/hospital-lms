@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/providers/auth-provider";
 import { ToastProvider } from "@/components/shared/toast";
 import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -64,6 +65,7 @@ export default function RootLayout({
               <ToastProvider>
                 <ErrorBoundary>
                   {children}
+                  <PWAInstallPrompt />
                 </ErrorBoundary>
               </ToastProvider>
             </SessionTimeoutProvider>

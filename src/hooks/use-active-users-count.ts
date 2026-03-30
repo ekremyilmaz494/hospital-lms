@@ -28,8 +28,8 @@ export function useActiveUsersCount(): ActiveUsersState {
 
   useEffect(() => {
     const supabase = createClient()
-
-    const channel = supabase.channel('active-users')
+    // Unique kanal adı: Strict Mode'da iki kez mount edildiğinde "already joined" hatasını önler
+    const channel = supabase.channel(`active-users-${Date.now()}`)
 
     channel
       .on('presence', { event: 'sync' }, () => {
@@ -51,6 +51,7 @@ export function useActiveUsersCount(): ActiveUsersState {
       .subscribe()
 
     return () => {
+      channel.unsubscribe()
       supabase.removeChannel(channel)
     }
   }, [])

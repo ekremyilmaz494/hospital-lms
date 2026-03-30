@@ -69,6 +69,12 @@ model Organization {
   dbBackups       DbBackup[]
   subscription    OrganizationSubscription?
   kvkkRequests    KvkkRequest[]
+  smgActivities   SmgActivity[]
+  smgPeriods      SmgPeriod[]
+  contentLibraryInstalls OrganizationContentLibrary[]
+  hisIntegrations HisIntegration[]
+  competencyForms CompetencyForm[]
+  syncLogs        SyncLog[]
 
   @@map("organizations")
 }
@@ -186,6 +192,7 @@ model User {
   isActive        Boolean  @default(true) @map("is_active")
   kvkkConsent     Boolean  @default(false) @map("kvkk_consent")
   kvkkConsentDate DateTime? @map("kvkk_consent_date") @db.Timestamptz
+  hisExternalId   String?  @db.VarChar(100) @map("his_external_id")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -202,11 +209,19 @@ model User {
   kvkkRequests    KvkkRequest[] @relation("KvkkRequester")
   kvkkResponses   KvkkRequest[] @relation("KvkkResponder")
   scormAttempts   ScormAttempt[]
+  smgActivities   SmgActivity[] @relation("UserSmgActivities")
+  smgApprovals    SmgActivity[] @relation("SmgApprovals")
+  createdContentLibraries  ContentLibrary[]             @relation("ContentLibraryCreator")
+  contentLibraryInstalls   OrganizationContentLibrary[] @relation("ContentLibraryInstaller")
+  subjectEvaluations   CompetencyEvaluation[] @relation("EvaluationSubject")
+  evaluatorEvaluations CompetencyEvaluation[] @relation("EvaluationEvaluator")
+  pushSubscriptions    PushSubscription[]
 
   @@unique([organizationId, tcNo])
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
   @@index([departmentId], map: "idx_users_department")
+  @@index([hisExternalId], map: "idx_users_his_external_id")
   @@map("users")
 }
 
@@ -240,7 +255,12 @@ model Training {
   scormEntryPoint     String?   @db.Text @map("scorm_entry_point")
   scormVersion        String?   @db.VarChar(10) @map("scorm_version")
 
-  organization        Organization @relation(fields: [organizationId], references: [id])
+  // İçerik Kütüphanesi
+  isFromLibrary       Boolean   @default(false) @map("is_from_library")
+  sourceLibraryId     String?   @db.Uuid @map("source_library_id")
+
+  organization        Organization    @relation(fields: [organizationId], references: [id])
+  sourceLibrary       ContentLibrary? @relation("TrainingFromLibrary", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
   createdBy           User?        @relation("TrainingCreator", fields: [createdById], references: [id])
   videos              TrainingVideo[]
   questions           Question[]
@@ -544,4 +564,242 @@ model DepartmentTrainingRule {
   @@unique([departmentId, trainingId])
   @@index([organizationId], map: "idx_dept_training_rules_org")
   @@map("department_training_rules")
+}
+
+// ── SMG AKTİVİTELERİ ──
+model SmgActivity {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @db.Uuid @map("user_id")
+  organizationId String    @db.Uuid @map("organization_id")
+  activityType   String    @db.VarChar(50) @map("activity_type")
+  // COURSE_COMPLETION | EXTERNAL_TRAINING | CONFERENCE | PUBLICATION
+  title          String    @db.VarChar(255)
+  provider       String?   @db.VarChar(255)
+  completionDate DateTime  @map("completion_date") @db.Date
+  smgPoints      Int       @map("smg_points")
+  certificateUrl String?   @db.VarChar(1000) @map("certificate_url")
+  approvalStatus String    @default("PENDING") @db.VarChar(20) @map("approval_status")
+  // PENDING | APPROVED | REJECTED
+  approvedBy     String?   @db.Uuid @map("approved_by")
+  approvedAt     DateTime? @map("approved_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user           User         @relation("UserSmgActivities", fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  approver       User?        @relation("SmgApprovals", fields: [approvedBy], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "idx_smg_activities_user")
+  @@index([organizationId], map: "idx_smg_activities_org")
+  @@map("smg_activities")
+}
+
+// ── SMG DÖNEMLERİ ──
+model SmgPeriod {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid @map("organization_id")
+  name           String   @db.VarChar(255)
+  startDate      DateTime @map("start_date") @db.Date
+  endDate        DateTime @map("end_date") @db.Date
+  requiredPoints Int      @map("required_points")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId], map: "idx_smg_periods_org")
+  @@map("smg_periods")
+}
+
+// ── İÇERİK KÜTÜPHANESİ ──
+model ContentLibrary {
+  id           String   @id @default(uuid()) @db.Uuid
+  title        String   @db.VarChar(500)
+  description  String?  @db.Text
+  category     String   @db.VarChar(50)
+  // INFECTION_CONTROL | FIRE_SAFETY | PATIENT_RIGHTS | KVKK |
+  // OCCUPATIONAL_HEALTH | FIRST_AID | MEDICAL_WASTE | HAND_HYGIENE |
+  // WORKPLACE_VIOLENCE | EMERGENCY_PROCEDURES
+  thumbnailUrl String?  @db.Text @map("thumbnail_url")
+  duration     Int      // dakika
+  smgPoints    Int      @default(0) @map("smg_points")
+  difficulty   String   @db.VarChar(20) // BASIC | INTERMEDIATE | ADVANCED
+  targetRoles  Json     @map("target_roles") // ["doctor","nurse","all"]
+  isActive     Boolean  @default(true) @map("is_active")
+  createdById  String?  @db.Uuid @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  createdBy User?                      @relation("ContentLibraryCreator", fields: [createdById], references: [id])
+  installs  OrganizationContentLibrary[]
+  trainings Training[]                 @relation("TrainingFromLibrary")
+
+  @@index([category], map: "idx_content_library_category")
+  @@map("content_library")
+}
+
+// ── KURUM İÇERİK KÜTÜPHANESİ (kurulum takibi) ──
+model OrganizationContentLibrary {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @db.Uuid @map("organization_id")
+  contentLibraryId String   @db.Uuid @map("content_library_id")
+  installedAt      DateTime @default(now()) @map("installed_at") @db.Timestamptz
+  installedBy      String?  @db.Uuid @map("installed_by")
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentLibrary ContentLibrary @relation(fields: [contentLibraryId], references: [id], onDelete: Cascade)
+  installer      User?          @relation("ContentLibraryInstaller", fields: [installedBy], references: [id])
+
+  @@unique([organizationId, contentLibraryId])
+  @@index([organizationId], map: "idx_org_content_library_org")
+  @@map("organization_content_library")
+}
+
+// ── HIS ENTEGRASYONU ──
+model HisIntegration {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid @map("organization_id")
+  name           String    @db.VarChar(255)
+  baseUrl        String    @db.VarChar(500) @map("base_url")
+  authType       String    @db.VarChar(20) @map("auth_type")
+  credentials    Json
+  isActive       Boolean   @default(true) @map("is_active")
+  lastSyncAt     DateTime? @map("last_sync_at") @db.Timestamptz
+  syncInterval   Int       @default(60) @map("sync_interval")
+  fieldMapping   Json      @default("{}") @map("field_mapping")
+  webhookToken   String    @unique @db.VarChar(128) @map("webhook_token")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  syncLogs       SyncLog[]
+
+  @@index([organizationId], map: "idx_his_integrations_org")
+  @@index([isActive], map: "idx_his_integrations_active")
+  @@map("his_integrations")
+}
+
+// ── SENKRONIZASYON LOGLARI ──
+model SyncLog {
+  id               String    @id @default(uuid()) @db.Uuid
+  organizationId   String    @db.Uuid @map("organization_id")
+  integrationId    String    @db.Uuid @map("integration_id")
+  syncType         String    @db.VarChar(30) @map("sync_type")
+  status           String    @default("RUNNING") @db.VarChar(20)
+  totalRecords     Int       @default(0) @map("total_records")
+  processedRecords Int       @default(0) @map("processed_records")
+  errors           Json      @default("[]")
+  startedAt        DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  completedAt      DateTime? @map("completed_at") @db.Timestamptz
+
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  integration      HisIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId], map: "idx_sync_logs_org")
+  @@index([integrationId], map: "idx_sync_logs_integration")
+  @@index([status], map: "idx_sync_logs_status")
+  @@map("sync_logs")
+}
+
+// ── 360° YETKİNLİK DEĞERLENDİRME ──
+
+model CompetencyForm {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid @map("organization_id")
+  title          String    @db.VarChar(255)
+  description    String?   @db.Text
+  targetRole     String?   @db.VarChar(100) @map("target_role")
+  periodStart    DateTime  @map("period_start") @db.Date
+  periodEnd      DateTime  @map("period_end") @db.Date
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  categories     CompetencyCategory[]
+  evaluations    CompetencyEvaluation[]
+
+  @@index([organizationId], map: "idx_comp_forms_org")
+  @@map("competency_forms")
+}
+
+model CompetencyCategory {
+  id      String  @id @default(uuid()) @db.Uuid
+  formId  String  @db.Uuid @map("form_id")
+  name    String  @db.VarChar(255)
+  weight  Int     @default(0)
+  order   Int     @default(0)
+
+  form    CompetencyForm   @relation(fields: [formId], references: [id], onDelete: Cascade)
+  items   CompetencyItem[]
+
+  @@index([formId], map: "idx_comp_categories_form")
+  @@map("competency_categories")
+}
+
+model CompetencyItem {
+  id           String  @id @default(uuid()) @db.Uuid
+  categoryId   String  @db.Uuid @map("category_id")
+  text         String  @db.VarChar(500)
+  description  String? @db.Text
+  order        Int     @default(0)
+
+  category CompetencyCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  answers  CompetencyAnswer[]
+
+  @@index([categoryId], map: "idx_comp_items_category")
+  @@map("competency_items")
+}
+
+model CompetencyEvaluation {
+  id             String    @id @default(uuid()) @db.Uuid
+  formId         String    @db.Uuid @map("form_id")
+  subjectId      String    @db.Uuid @map("subject_id")
+  evaluatorId    String    @db.Uuid @map("evaluator_id")
+  evaluatorType  String    @db.VarChar(20) @map("evaluator_type")
+  // SELF | MANAGER | PEER | SUBORDINATE
+  status         String    @default("PENDING") @db.VarChar(20)
+  // PENDING | COMPLETED
+  overallScore   Decimal?  @db.Decimal(4, 2) @map("overall_score")
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  form      CompetencyForm      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  subject   User                @relation("EvaluationSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+  evaluator User                @relation("EvaluationEvaluator", fields: [evaluatorId], references: [id], onDelete: Cascade)
+  answers   CompetencyAnswer[]
+
+  @@unique([formId, subjectId, evaluatorId])
+  @@index([subjectId], map: "idx_comp_evals_subject")
+  @@index([evaluatorId], map: "idx_comp_evals_evaluator")
+  @@index([formId], map: "idx_comp_evals_form")
+  @@map("competency_evaluations")
+}
+
+model CompetencyAnswer {
+  id           String  @id @default(uuid()) @db.Uuid
+  evaluationId String  @db.Uuid @map("evaluation_id")
+  itemId       String  @db.Uuid @map("item_id")
+  score        Int
+  comment      String? @db.Text
+
+  evaluation CompetencyEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  item       CompetencyItem       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluationId, itemId])
+  @@index([evaluationId], map: "idx_comp_answers_eval")
+  @@map("competency_answers")
+}
+
+// ── WEB PUSH ABONELİKLERİ ──
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid @map("user_id")
+  endpoint  String   @db.Text
+  p256dh    String   @db.Text
+  auth      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@index([userId], map: "idx_push_subscriptions_user")
+  @@map("push_subscriptions")
 }

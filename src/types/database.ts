@@ -47,6 +47,7 @@ export interface User {
   isActive: boolean;
   kvkkConsent: boolean;
   kvkkConsentDate: string | null;
+  hisExternalId?: string | null;
   createdAt: string;
   updatedAt: string;
   departmentRel?: Department | null;
@@ -340,4 +341,49 @@ export interface DepartmentTrainingRule {
   organizationId: string;
   isActive: boolean;
   createdAt: string;
+}
+
+// ── HIS Entegrasyon Tipleri ──
+
+export type HisAuthType = 'API_KEY' | 'BASIC_AUTH' | 'OAUTH2';
+export type SyncType = 'STAFF_IMPORT' | 'DEPARTMENT_IMPORT' | 'FULL_SYNC';
+export type SyncStatus = 'RUNNING' | 'SUCCESS' | 'FAILED';
+
+export interface HisIntegration {
+  id: string;
+  organizationId: string;
+  name: string;
+  baseUrl: string;
+  authType: HisAuthType;
+  credentials: { masked: true } | { v: string };
+  isActive: boolean;
+  lastSyncAt: string | null;
+  syncInterval: number;
+  fieldMapping: Record<string, string>;
+  webhookToken: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SyncLog {
+  id: string;
+  organizationId: string;
+  integrationId: string;
+  syncType: SyncType;
+  status: SyncStatus;
+  totalRecords: number;
+  processedRecords: number;
+  errors: Array<{ externalId: string; error: string }>;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export interface SyncResult {
+  success: boolean;
+  totalRecords: number;
+  processedRecords: number;
+  created: number;
+  updated: number;
+  deactivated: number;
+  errors: Array<{ externalId: string; error: string }>;
 }

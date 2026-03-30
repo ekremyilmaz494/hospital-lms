@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   User, Mail, Phone, Building2, Shield, Camera, Save, Eye, EyeOff,
   CheckCircle2, AlertTriangle, Calendar, Award, BookOpen, FileText,
-  Lock, Loader2, Briefcase,
+  Lock, Loader2, Briefcase, Bell, BellOff,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,14 @@ interface ProfileData {
   avatarUrl: string;
   stats: { assignments: number; exams: number; certificates: number };
   createdAt: string;
+}
+
+/** VAPID public key'i Uint8Array'e çevirir (PushManager.subscribe için gerekli) */
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
 }
 
 export default function ProfilePage() {
@@ -73,6 +81,11 @@ export default function ProfilePage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
+  // ── Push Bildirimleri ──
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+
   // Initialize form when profile data arrives
   useEffect(() => {
     if (profile) {
@@ -81,6 +94,74 @@ export default function ProfilePage() {
       setPhone(profile.phone ?? '');
     }
   }, [profile]);
+
+  // Push bildirim desteğini ve mevcut aboneliği kontrol et
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    setPushSupported(true);
+    // Zaten izin verildi mi ve aktif abonelik var mı?
+    if (Notification.permission === 'granted') {
+      navigator.serviceWorker.ready
+        .then(reg => reg.pushManager.getSubscription())
+        .then(sub => { if (sub) setPushEnabled(true); })
+        .catch(() => {});
+    }
+  }, []);
+
+  const handleTogglePush = async () => {
+    if (!pushSupported) return;
+    setPushLoading(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+
+      if (pushEnabled) {
+        // Aboneliği iptal et
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch('/api/staff/push/unsubscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+        setPushEnabled(false);
+        toast('Anlık bildirimler devre dışı bırakıldı', 'success');
+      } else {
+        // İzin iste
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          toast('Bildirim izni verilmedi. Tarayıcı ayarlarından izin verebilirsiniz.', 'error');
+          return;
+        }
+        // Abone ol
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
+        if (!vapidKey) { toast('Push bildirimleri yapılandırılmamış', 'error'); return; }
+
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
+        });
+        const json = sub.toJSON();
+        await fetch('/api/staff/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            endpoint: json.endpoint,
+            p256dh: json.keys?.p256dh,
+            auth: json.keys?.auth,
+          }),
+        });
+        setPushEnabled(true);
+        toast('Anlık bildirimler aktif edildi', 'success');
+      }
+    } catch {
+      toast('Bildirim ayarı değiştirilemedi', 'error');
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     if (!firstName.trim() || !lastName.trim()) {
@@ -550,6 +631,66 @@ export default function ProfilePage() {
               </div>
             </div>
           </BlurFade>
+
+          {/* ─── Anlık Bildirimler ─── */}
+          {pushSupported && (
+            <BlurFade delay={0.6}>
+              <div className="rounded-2xl border p-7" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl"
+                    style={{ background: pushEnabled ? 'var(--color-primary-light)' : 'var(--color-surface-hover)' }}>
+                    {pushEnabled
+                      ? <Bell className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+                      : <BellOff className="h-5 w-5" style={{ color: 'var(--color-text-muted)' }} />
+                    }
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>
+                      Anlık Bildirimler
+                    </h3>
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      Yeni eğitim ve sınav atamalarında anında haberdar olun
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border p-4"
+                  style={{ borderColor: 'var(--color-border)' }}>
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      {pushEnabled ? 'Bildirimler Açık' : 'Bildirimler Kapalı'}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      {pushEnabled
+                        ? 'Bu cihazda anlık bildirim alıyorsunuz'
+                        : 'Eğitim ve sınav bildirimlerini alın'}
+                    </p>
+                  </div>
+
+                  {/* Toggle switch */}
+                  <button
+                    onClick={handleTogglePush}
+                    disabled={pushLoading}
+                    className="relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors disabled:opacity-50"
+                    style={{ background: pushEnabled ? 'var(--color-primary)' : 'var(--color-border)' }}
+                    aria-label={pushEnabled ? 'Bildirimleri kapat' : 'Bildirimleri aç'}
+                  >
+                    <span
+                      className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform"
+                      style={{ transform: pushEnabled ? 'translateX(20px)' : 'translateX(2px)' }}
+                    />
+                  </button>
+                </div>
+
+                {Notification.permission === 'denied' && (
+                  <p className="mt-3 flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-warning)' }}>
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    Tarayıcıda bildirim izni reddedilmiş. Adres çubuğundaki kilit simgesinden izin verebilirsiniz.
+                  </p>
+                )}
+              </div>
+            </BlurFade>
+          )}
         </div>
       </div>
     </div>

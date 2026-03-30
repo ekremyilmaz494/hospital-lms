@@ -219,6 +219,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
   }
 
+  // Eğitim tamamlandığında otomatik SMG aktivitesi (fire-and-forget)
+  if (isPassed) {
+    prisma.smgActivity.create({
+      data: {
+        userId: dbUser!.id,
+        organizationId: attempt.training.organizationId,
+        activityType: 'COURSE_COMPLETION',
+        title: attempt.training.title,
+        provider: 'Devakent LMS',
+        completionDate: new Date(),
+        smgPoints: 10,
+        approvalStatus: 'APPROVED',
+        approvedAt: new Date(),
+      },
+    }).catch(err => logger.error('SMG', 'Otomatik SMG aktivitesi oluşturulamadı', { err, attemptId: attempt.id }))
+  }
+
   await createAuditLog({
     userId: dbUser!.id,
     organizationId: attempt.training.organizationId,

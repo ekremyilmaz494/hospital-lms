@@ -30,7 +30,7 @@ const typeColors: Record<string, { bg: string; text: string }> = {
 };
 
 export default function AuditLogsPage() {
-  const { data: logs, isLoading, error } = useFetch<AuditLog[]>('/api/super-admin/audit-logs');
+  const { data, isLoading, error } = useFetch<{ logs: AuditLog[]; total: number }>('/api/super-admin/audit-logs');
 
   if (isLoading) {
     return <PageLoading />;
@@ -40,7 +40,7 @@ export default function AuditLogsPage() {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
   }
 
-  const logList = logs ?? [];
+  const logList = data?.logs ?? [];
 
   return (
     <div className="space-y-6">

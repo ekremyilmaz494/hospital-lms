@@ -8,6 +8,7 @@ import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
 import { staffNav } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
+import { MobileBottomNav } from '@/components/layouts/mobile-bottom-nav';
 
 export default function StaffLayout({
   children,
@@ -40,19 +41,20 @@ export default function StaffLayout({
   return (
     <TooltipProvider>
       <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
-        <AppSidebar
-          navGroups={staffNav}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={toggleSidebar}
-          orgName={user?.department ?? ''}
-          userName={fullName}
-          userRole="Personel"
-          userInitials={initials}
-        />
-        <main
-          className="min-h-screen"
-          style={{ marginLeft: 72 }}
-        >
+        {/* Sidebar: sadece md ve üzerinde göster */}
+        <div className="hidden md:block">
+          <AppSidebar
+            navGroups={staffNav}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleSidebar}
+            orgName={user?.department ?? ''}
+            userName={fullName}
+            userRole="Personel"
+            userInitials={initials}
+          />
+        </div>
+        {/* Ana içerik: mobilde margin yok, md'de sidebar kadar margin */}
+        <main className="min-h-screen md:ml-[72px] pb-16 md:pb-0">
           <ImpersonationBanner />
           <AppTopbar
             title=""
@@ -61,8 +63,10 @@ export default function StaffLayout({
             userRole="Personel"
             userInitials={initials}
           />
-          <div className="p-8">{children}</div>
+          <div className="p-4 md:p-8">{children}</div>
         </main>
+        {/* Mobil alt navigasyon */}
+        <MobileBottomNav />
       </div>
     </TooltipProvider>
   );

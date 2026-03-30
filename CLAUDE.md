@@ -309,3 +309,10 @@ Bu projede asagidaki GitHub repolarindaki skill ve rehberlerden faydalanilmaktad
 - **Kural 2**: `useFetch` ile çekilen veriler boş görünüyorsa önce timeout ve sessiz hata yutma kontrol edilmeli
 - **Kural 3**: `next.config.ts`'deki `optimizePackageImports` listesine yeni ağır kütüphaneler eklenmeli
 - **Tarih**: 2026-03-30
+
+### Next.js 16 + Turbopack ile PWA (next-pwa) Uyumsuzluğu
+- **Problem**: `pnpm build` "This build is using Turbopack, with a `webpack` config" hatası veriyordu
+- **Kök Neden**: Next.js 16'dan itibaren `next build` varsayılan olarak Turbopack kullanıyor; `@ducanh2912/next-pwa` ise Workbox webpack plugin kullandığından Turbopack ile çalışmıyor
+- **Çözüm**: `package.json`'daki build script'ine `--webpack` flag'i eklendi: `"build": "prisma generate && next build --webpack"`
+- **Kural**: `@ducanh2912/next-pwa` kullanan projelerde `next build` komutuna `--webpack` flag'i eklenmelidir; `next dev --turbopack` development'ta kullanılabilir ama build webpack gerektirir
+- **Tarih**: 2026-03-30

@@ -29,5 +29,22 @@ export async function GET(request: Request) {
     prisma.auditLog.count({ where }),
   ])
 
-  return jsonResponse({ logs, total, page, limit, totalPages: Math.ceil(total / limit) })
+  const formatted = logs.map(log => {
+    const fn = log.user?.firstName ?? ''
+    const ln = log.user?.lastName ?? ''
+    const name = `${fn} ${ln}`.trim() || log.user?.email || 'Sistem'
+    return {
+      id: log.id,
+      user: name,
+      initials: `${fn[0] ?? ''}${ln[0] ?? ''}`.toUpperCase() || 'S',
+      color: 'var(--color-primary)',
+      action: log.action,
+      entity: log.entityId ?? '',
+      entityType: log.entityType ?? '',
+      ip: log.ipAddress ?? '-',
+      time: log.createdAt.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    }
+  })
+
+  return jsonResponse({ logs: formatted, total, page, limit, totalPages: Math.ceil(total / limit) })
 }

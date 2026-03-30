@@ -17,6 +17,10 @@ import {
   ShieldCheck,
   Grid3x3,
   TrendingUp,
+  Library,
+  Star,
+  Plug,
+  BarChart2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -47,6 +51,7 @@ export const superAdminNav: NavGroup[] = [
         ],
       },
       { title: 'Abonelikler', href: '/super-admin/subscriptions', icon: CreditCard },
+      { title: 'İçerik Kütüphanesi', href: '/super-admin/content-library', icon: Library },
       { title: 'Raporlar', href: '/super-admin/reports', icon: BarChart3 },
       { title: 'Audit Log', href: '/super-admin/audit-logs', icon: Shield },
     ],
@@ -72,6 +77,7 @@ export const adminNav: NavGroup[] = [
           { title: 'Yeni Eğitim', href: '/admin/trainings/new' },
         ],
       },
+      { title: 'İçerik Kütüphanesi', href: '/admin/content-library', icon: Library },
       {
         title: 'Personel',
         href: '/admin/staff',
@@ -83,7 +89,9 @@ export const adminNav: NavGroup[] = [
       { title: 'Sertifikalar', href: '/admin/certificates', icon: Award },
       { title: 'Uyum Raporu', href: '/admin/compliance', icon: ShieldCheck },
       { title: 'Yetkinlik Matrisi', href: '/admin/competency-matrix', icon: Grid3x3 },
+      { title: '360° Değerlendirme', href: '/admin/competency', icon: BarChart2 },
       { title: 'Etkinlik Analizi', href: '/admin/effectiveness', icon: TrendingUp },
+      { title: 'SMG Takibi', href: '/admin/smg', icon: Star },
       { title: 'Raporlar', href: '/admin/reports', icon: BarChart3 },
       { title: 'Bildirimler', href: '/admin/notifications', icon: Bell },
       { title: 'İşlem Geçmişi', href: '/admin/audit-logs', icon: History },
@@ -94,6 +102,7 @@ export const adminNav: NavGroup[] = [
     label: 'SİSTEM',
     items: [
       { title: 'Ayarlar', href: '/admin/settings', icon: Settings },
+      { title: 'Entegrasyonlar', href: '/admin/settings/integrations', icon: Plug },
     ],
   },
 ];
@@ -104,6 +113,8 @@ export const staffNav: NavGroup[] = [
       { title: 'Dashboard', href: '/staff/dashboard', icon: LayoutDashboard },
       { title: 'Eğitimlerim', href: '/staff/my-trainings', icon: BookOpen },
       { title: 'Sertifikalarım', href: '/staff/certificates', icon: Award },
+      { title: 'SMG Puanlarım', href: '/staff/smg', icon: Star },
+      { title: 'Değerlendirmeler', href: '/staff/evaluations', icon: BarChart2 },
       { title: 'Takvim', href: '/staff/calendar', icon: Calendar },
       { title: 'Bildirimler', href: '/staff/notifications', icon: Bell },
     ],
