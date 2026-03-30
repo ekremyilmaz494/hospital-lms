@@ -19,6 +19,11 @@ export function clearFetchCache(url: string) {
   cache.delete(url);
 }
 
+/** Clear the entire cache — call on logout to prevent stale multi-tenant data */
+export function clearAllFetchCache() {
+  cache.clear();
+}
+
 export function useFetch<T>(url: string | null): UseFetchResult<T> {
   const cached = url ? cache.get(url) : null;
   const [data, setData] = useState<T | null>((cached?.data as T) ?? null);
@@ -40,7 +45,7 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
     }
     setError(null);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 20000);
     try {
       const res = await fetch(currentUrl, { signal: controller.signal });
       // Auth hatalarini HTTP status uzerinden yakala (string esleme yerine)
@@ -67,9 +72,9 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
     } catch (err) {
       if (urlRef.current === currentUrl) {
         const msg = err instanceof Error ? err.message : 'Bir hata oluştu';
-        if (msg.includes('abort')) {
-          // Timeout — graceful degradation (istek iptal edildi)
-          setError(null);
+        if (msg.toLowerCase().includes('abort')) {
+          // Timeout — kullanıcıya bildir
+          setError('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.');
         } else {
           setError(msg);
         }

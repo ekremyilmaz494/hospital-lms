@@ -29,7 +29,9 @@ export function useRealtimeNotifications() {
           const notification = payload.new as Notification
           addNotification(notification)
 
-          // Browser notification
+          // Yalnızca kullanıcı daha önce izin verdiyse browser bildirimi göster.
+          // İzin isteği burada yapılmaz — kullanıcı eylemi gerektirdiğinden
+          // hook içinde otomatik istemek Chrome/Firefox tarafından engellenir.
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification(notification.title, {
               body: notification.message,
@@ -39,11 +41,6 @@ export function useRealtimeNotifications() {
         }
       )
       .subscribe()
-
-    // Request browser notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
 
     return () => {
       supabase.removeChannel(channel)

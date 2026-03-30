@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { passwordSchema } from '@/lib/validations';
 import { Eye, EyeOff, Lock, Loader2, CheckCircle, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,13 +18,21 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Yönlendirme timer'ını unmount'ta temizle
+  useEffect(() => () => {
+    if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 8) {
-      setError('Şifre en az 8 karakter olmalıdır.');
+    // Merkezi şifre politikası (validations.ts)
+    const result = passwordSchema.safeParse(password);
+    if (!result.success) {
+      setError(result.error.issues[0]?.message ?? 'Geçersiz şifre.');
       return;
     }
 
@@ -49,7 +58,7 @@ export default function ResetPasswordPage() {
       }
 
       setSuccess(true);
-      setTimeout(() => {
+      redirectTimerRef.current = setTimeout(() => {
         router.push('/auth/login');
       }, 3000);
     } catch {
@@ -162,7 +171,7 @@ export default function ResetPasswordPage() {
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors duration-150"
                       style={{ color: 'var(--color-text-muted)' }}
                     >
-                      {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                      {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
                     </button>
                   </div>
                 </div>

@@ -23,7 +23,7 @@ export function useSessionTimeout({
   const router = useRouter();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastActivityRef = useRef<number>(Date.now());
+  const lastActivityRef = useRef<number>(0); // initialized in effect to avoid impure render-time call
   const onWarningRef = useRef(onWarning);
   const onTimeoutRef = useRef(onTimeout);
 

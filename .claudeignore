@@ -1,0 +1,61 @@
+# =============================================
+# .claudeignore — Token tasarrufu için dışlanan dosyalar
+# =============================================
+
+# Bağımlılıklar
+node_modules/
+.pnpm-store/
+
+# Veritabanı ve Prisma
+prisma/migrations/
+*.db
+*.sqlite
+*.db-journal
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Build çıktıları
+.next/
+dist/
+build/
+out/
+
+# Log ve cache
+*.log
+.turbo/
+.cache/
+coverage/
+
+# Ortam dosyaları
+.env
+.env.*
+!.env.example
+
+# Lock dosyaları
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Test snapshot
+**/__snapshots__/
+
+# Büyük statik dosyalar
+public/
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.ico
+*.woff
+*.woff2
+
+# IDE ve OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated (Prisma client output)
+src/generated/

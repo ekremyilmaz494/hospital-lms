@@ -244,4 +244,54 @@ Bu projede asagidaki GitHub repolarindaki skill ve rehberlerden faydalanilmaktad
 > Her göreve başlamadan önce bu bölümü oku ve geçmiş hataları tekrarlamamak için tüm kuralları uygula.
 > Yeni bir bug fix veya çalışan çözüm bulunduğunda buraya otomatik olarak yeni bir kural eklenir.
 
-<!-- Henüz ders eklenmedi. İlk bug fix sonrası buraya otomatik eklenecek. -->
+### Middleware Public Routes Eksikliği
+- **Problem**: Login API'si (`POST /api/auth/login`) çalışmıyordu — 302 redirect döndürüyordu
+- **Kök Neden**: Middleware'in `publicRoutes` listesinde `/api/auth/` yoktu
+- **Çözüm**: `/api/auth/` yolunu middleware'in public routes listesine ekle
+- **Kural**: Yeni public API endpoint oluşturulduğunda mutlaka `src/lib/supabase/middleware.ts` → `publicRoutes` dizisine ekle
+- **Tarih**: 2026-03-29
+
+### Prisma Schema - DB Uyumsuzluğu
+- **Problem**: Dashboard 500 hatası veriyordu
+- **Kök Neden**: Schema'ya yeni modeller eklendi ama DB'de tablolar oluşturulmadı
+- **Çözüm**: `pnpm setup` scripti (`prisma db push` ile otomatik sync)
+- **Kural**: Schema değişikliğinden sonra mutlaka `pnpm db:generate` + `pnpm db:push` çalıştır
+- **Tarih**: 2026-03-29
+
+### GET Request'te DB Write Anti-Pattern
+- **Problem**: Staff GET'te her istekte `prisma.user.update()` çağrılıyordu
+- **Kök Neden**: Auto-fix logic GET içinde DB write olarak yapılıyordu
+- **Çözüm**: In-memory çözümlemeye dönüştürüldü
+- **Kural**: GET handler'larında asla DB write yapma. Data fix'ler migration/setup script olmalı
+- **Tarih**: 2026-03-29
+
+### jsPDF Türkçe Karakter Sorunu
+- **Problem**: PDF'te İ, Ş, Ç, Ğ kırık görünüyordu
+- **Kök Neden**: jsPDF Helvetica ASCII-only
+- **Çözüm**: HTML → html2canvas-pro → Canvas → jsPDF yaklaşımı
+- **Kural**: Türkçe PDF için jsPDF `.text()` kullanma — HTML template + html2canvas tercih et
+- **Tarih**: 2026-03-29
+
+### ExcelJS Client-Side Çalışmıyor
+- **Problem**: Browser'da ExcelJS runtime hatası veriyordu
+- **Kök Neden**: ExcelJS Node.js stream/Buffer API'lerine bağımlı
+- **Çözüm**: FormData ile server'a gönder, server-side parse et
+- **Kural**: ExcelJS her zaman server-side kullan. Client-side için SheetJS (xlsx) tercih et
+- **Tarih**: 2026-03-29
+
+### DB Hata Mesajı Kullanıcıya Expose
+- **Problem**: DB hata detayları (tablo adları, kolon bilgileri) kullanıcıya gösteriliyordu
+- **Kök Neden**: `errorResponse(\`DB hatası: \${dbError.message}\`)` ile iç hata mesajı iletiliyordu
+- **Çözüm**: Güvenli Türkçe mesaj + `logger.error()` ile sunucu loguna yazma
+- **Kural**: API hatalarında asla iç sistem detayı kullanıcıya gösterme
+- **Tarih**: 2026-03-29
+
+### useFetch Timeout ile API Race Condition — Stat Kartlar Gözükmüyor
+- **Problem**: Dashboard stat kartları (Toplam Personel, Aktif Eğitim vb.) render edilmiyordu; sayfanın geri kalanı görünüyordu
+- **Kök Neden**: `src/hooks/use-fetch.ts` timeout 8000ms; dashboard API 8s sürdüğünde AbortController tam anda tetikleniyor. Timeout hatası `setError(null)` ile sessizce yutulduğu için `data=null`, `isLoading=false`, `error=null` — boş sayfa render edildi
+- **Çözüm 1**: `use-fetch.ts` timeout 8000ms → 20000ms (anlık düzeltme)
+- **Çözüm 2**: Dashboard API'deki 6 ayrı trend DB sorgusunu tek sorguda birleştir (`src/app/api/admin/dashboard/route.ts`) → API süresi ~1-2s'ye düştü
+- **Kural 1**: `useFetch` timeout, en yavaş API'nin 2 katı olmalı; timeout hatası asla sessiz yutulmamalı
+- **Kural 2**: API route'larda döngü içinde `await prisma...` YASAK — paralel `Promise.all` veya tek sorgu + uygulama katmanı gruplama kullan
+- **Kural 3**: `git pull` sonrası dashboard çalışmıyorsa önce `pnpm db:generate` çalıştır (Prisma client stale kalır)
+- **Tarih**: 2026-03-30

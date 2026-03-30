@@ -4,11 +4,12 @@ import { useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient, hasSupabaseCredentials } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
+import { clearAllFetchCache } from '@/hooks/use-fetch';
 
 const DB_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 dakika
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setLoading } = useAuthStore();
+  const { setUser, setLoading, logout } = useAuthStore();
   const router = useRouter();
 
   // DB'den guncel role/isActive verisi al (JWT stale olabilir)
@@ -23,7 +24,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (data.user.isActive === false) {
             const supabase = createClient();
             await supabase.auth.signOut();
-            setUser(null);
+            clearAllFetchCache();
+            logout();
             router.push('/auth/login');
             return;
           }
@@ -93,7 +95,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
-        setUser(null);
+        clearAllFetchCache(); // Stale multi-tenant veriyi temizle
+        logout();
         router.push('/auth/login');
       } else if (session?.user) {
         const u = session.user;

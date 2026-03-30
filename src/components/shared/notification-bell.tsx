@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Bell, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 import {
   Popover,
   PopoverContent,
@@ -113,9 +114,9 @@ export function NotificationBell({
           ))}
         </div>
         <div className="border-t px-4 py-2.5 text-center" style={{ borderColor: 'var(--color-border)' }}>
-          <a href={notificationsHref} className="flex items-center justify-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
+          <Link href={notificationsHref} className="flex items-center justify-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
             Tüm Bildirimleri Gör <ExternalLink className="h-3 w-3" />
-          </a>
+          </Link>
         </div>
       </PopoverContent>
     </Popover>

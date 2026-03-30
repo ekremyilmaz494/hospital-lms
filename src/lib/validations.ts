@@ -26,15 +26,20 @@ export const createDepartmentSchema = z.object({
 
 export const updateDepartmentSchema = createDepartmentSchema.partial()
 
+// ── Şifre politikası — tek kaynak, tüm formlarda import edilir ──
+export const passwordSchema = z.string()
+  .min(8, 'Şifre en az 8 karakter olmalıdır')
+  .regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
+    'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir'
+  )
+
 // ── User ──
 export const createUserSchema = z.object({
   email: z.string().min(1).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
-  password: z.string().min(8).regex(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
-    'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir'
-  ),
+  password: passwordSchema,
   role: z.enum(['admin', 'staff']),
   organizationId: z.string().uuid().optional(),
   tcNo: z.string().length(11).regex(/^\d{11}$/, 'TC No sadece rakamlardan oluşmalıdır').optional(),

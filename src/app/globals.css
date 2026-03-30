@@ -622,6 +622,15 @@ code, pre, .font-mono {
 
 /* ── LANDING PAGE ── */
 
+/* Anchor scroll offset — fixed navbar (64px) + extra clearance */
+[id="ozellikler"],
+[id="nasil-calisir"],
+[id="fiyat"],
+[id="sss"],
+[id="iletisim"] {
+  scroll-margin-top: 80px;
+}
+
 /* ROI slider — light theme */
 .landing-slider {
   -webkit-appearance: none;

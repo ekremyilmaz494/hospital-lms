@@ -182,29 +182,32 @@ export async function GET() {
     puan: d.scores.length > 0 ? Math.round(d.scores.reduce((a, b) => a + b, 0) / d.scores.length) : 0,
   }))
 
-  // Trend data — son 6 ay icin aylik aggregation
-  const trendData = []
+  // Trend data — son 6 ay tek sorguda, uygulama katmanında gruplama
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+  const trendRaw = await prisma.trainingAssignment.findMany({
+    where: {
+      training: { organizationId: orgId },
+      assignedAt: { gte: sixMonthsAgo },
+    },
+    select: { status: true, assignedAt: true },
+  })
+
+  const trendMap = new Map<string, { atanan: number; tamamlanan: number; basarisiz: number; month: string }>()
   for (let i = 5; i >= 0; i--) {
-    const start = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
-
-    const monthCounts = await prisma.trainingAssignment.groupBy({
-      by: ['status'],
-      where: {
-        training: { organizationId: orgId },
-        assignedAt: { gte: start, lt: end },
-      },
-      _count: true,
-    })
-
-    const monthStatusMap = new Map(monthCounts.map(c => [c.status, c._count]))
-    trendData.push({
-      month: start.toLocaleDateString('tr-TR', { month: 'short' }),
-      atanan: monthCounts.reduce((sum, c) => sum + c._count, 0),
-      tamamlanan: monthStatusMap.get('passed') ?? 0,
-      basarisiz: monthStatusMap.get('failed') ?? 0,
-    })
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${d.getMonth()}`
+    trendMap.set(key, { atanan: 0, tamamlanan: 0, basarisiz: 0, month: d.toLocaleDateString('tr-TR', { month: 'short' }) })
   }
+  for (const a of trendRaw) {
+    const d = new Date(a.assignedAt)
+    const key = `${d.getFullYear()}-${d.getMonth()}`
+    const entry = trendMap.get(key)
+    if (!entry) continue
+    entry.atanan++
+    if (a.status === 'passed') entry.tamamlanan++
+    if (a.status === 'failed') entry.basarisiz++
+  }
+  const trendData = Array.from(trendMap.values())
 
   // Recent activity
   const recentActivity = recentLogs.map(log => ({

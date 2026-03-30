@@ -1,11 +1,23 @@
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { checkRateLimit } from '@/lib/redis'
+
+// MFA brute-force koruması: 5 dakikada en fazla 5 deneme
+const MFA_RATE_LIMIT_WINDOW = 5 * 60   // saniye
+const MFA_RATE_LIMIT_MAX = 5
 
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return errorResponse('Oturum bulunamadı', 401)
+
+  // Rate limiting: kullanıcı başına 5 dk / 5 deneme
+  const allowed = await checkRateLimit(`mfa:verify:${user.id}`, MFA_RATE_LIMIT_MAX, MFA_RATE_LIMIT_WINDOW)
+  if (!allowed) {
+    logger.warn('mfa:verify', 'Rate limit aşıldı', { userId: user.id })
+    return errorResponse('Çok fazla deneme. 5 dakika sonra tekrar deneyin.', 429)
+  }
 
   const body = await request.json().catch(() => null)
   if (!body?.factorId || !body?.code) return errorResponse('Factor ID ve kod gereklidir', 400)

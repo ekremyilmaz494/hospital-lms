@@ -219,8 +219,10 @@ async function provisionAndLogin({
       return NextResponse.redirect(new URL('/auth/login?error=sso_provision_failed', request.url))
     }
 
-    dbUser = await prisma.user.create({
-      data: {
+    // upsert: eş zamanlı iki SSO isteği yarışsa bile duplicate key hatası almaz
+    dbUser = await prisma.user.upsert({
+      where: { email },
+      create: {
         id: authUser.user.id,
         email,
         firstName,
@@ -228,6 +230,7 @@ async function provisionAndLogin({
         role: org.ssoDefaultRole,
         organizationId: org.id,
       },
+      update: {},
     })
 
     logger.info('sso:callback', 'Yeni SSO kullanicisi olusturuldu', { email, orgId: org.id })

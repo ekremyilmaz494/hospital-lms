@@ -61,9 +61,11 @@ export async function getAuthUser() {
 }
 
 /**
+ * @deprecated Dönüş değerinin kontrol edilmesi unutulabilir — yeni kodda `assertRole` kullanın.
+ * Mevcut kullanımlar çalışmaya devam eder, ancak yeni route'lara eklemeyin.
+ *
  * Require specific roles — returns error response if not authorized.
  * IMPORTANT: Caller MUST check return value: `if (roleError) return roleError`
- * Throws in production as safety net if return value would be ignored.
  */
 export function requireRole(role: string, allowed: string[]) {
   if (!allowed.includes(role)) {

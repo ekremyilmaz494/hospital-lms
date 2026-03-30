@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight, Clock } from 'lucide-react';
@@ -36,27 +36,31 @@ function LoginForm() {
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
   const [ssoInfo, setSsoInfo] = useState<{ available: boolean; provider: string; redirectUrl: string; orgName: string } | null>(null);
   const [checkingSso, setCheckingSso] = useState(false);
+  const ssoDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Check SSO availability when email domain changes
-  const checkSso = async (emailValue: string) => {
+  // SSO kontrolü — 400ms debounce ile (her tuş vuruşunda API çağrısını önler)
+  const checkSso = useCallback((emailValue: string) => {
+    if (ssoDebounceRef.current) clearTimeout(ssoDebounceRef.current);
     const domain = emailValue.split('@')[1];
     if (!domain || domain.length < 3) { setSsoInfo(null); return; }
-    setCheckingSso(true);
-    try {
-      const res = await fetch('/api/auth/sso/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailValue }),
-      });
-      const data = await res.json();
-      if (data.ssoAvailable) {
-        setSsoInfo({ available: true, provider: data.provider, redirectUrl: data.redirectUrl, orgName: data.orgName });
-      } else {
-        setSsoInfo(null);
-      }
-    } catch { setSsoInfo(null); }
-    finally { setCheckingSso(false); }
-  };
+    ssoDebounceRef.current = setTimeout(async () => {
+      setCheckingSso(true);
+      try {
+        const res = await fetch('/api/auth/sso/initiate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailValue }),
+        });
+        const data = await res.json();
+        if (data.ssoAvailable) {
+          setSsoInfo({ available: true, provider: data.provider, redirectUrl: data.redirectUrl, orgName: data.orgName });
+        } else {
+          setSsoInfo(null);
+        }
+      } catch { setSsoInfo(null); }
+      finally { setCheckingSso(false); }
+    }, 400);
+  }, []);
 
   const rawRedirect = searchParams.get('redirectTo');
   // Prevent open redirect — only allow relative paths starting with /
@@ -186,7 +190,7 @@ function LoginForm() {
 
       {/* ── Right Panel: Login Form ── */}
       <div className="flex flex-1 items-center justify-center p-6 sm:p-8" style={{ background: 'var(--color-bg)' }}>
-        <div className="w-full max-w-105">
+        <div className="w-full max-w-[420px]">
           {/* Mobile logo */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white font-heading" style={{ background: 'var(--color-primary)' }}>H</div>
@@ -275,7 +279,7 @@ function LoginForm() {
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors duration-150"
                     style={{ color: 'var(--color-text-muted)' }}
                   >
-                    {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                    {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
                   </button>
                 </div>
               </div>

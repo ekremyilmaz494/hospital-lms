@@ -72,8 +72,7 @@ function formatDateRange(start: string, end: string) {
 
 /* ─── Page ─── */
 export default function CalendarPage() {
-  const todayRef = useRef(new Date());
-  const today = todayRef.current;
+  const today = useMemo(() => new Date(), []);
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);

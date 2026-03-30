@@ -1,6 +1,7 @@
 'use client';
 
 import { type LucideIcon } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { BlurFade } from '@/components/ui/blur-fade';
 
@@ -71,17 +72,31 @@ export function PageHeader({ title, subtitle, badge, action, secondaryAction }: 
               </Button>
             )}
             {action && (
-              <button
-                onClick={action.onClick}
-                className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
-                style={{
-                  background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
-                  boxShadow: '0 4px 14px rgba(var(--color-primary-rgb), 0.3)',
-                }}
-              >
-                {action.icon && <action.icon className="h-4 w-4" />}
-                {action.label}
-              </button>
+              action.href ? (
+                <Link
+                  href={action.href}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
+                    boxShadow: '0 4px 14px rgba(var(--color-primary-rgb), 0.3)',
+                  }}
+                >
+                  {action.icon && <action.icon className="h-4 w-4" />}
+                  {action.label}
+                </Link>
+              ) : (
+                <button
+                  onClick={action.onClick}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
+                    boxShadow: '0 4px 14px rgba(var(--color-primary-rgb), 0.3)',
+                  }}
+                >
+                  {action.icon && <action.icon className="h-4 w-4" />}
+                  {action.label}
+                </button>
+              )
             )}
           </div>
         </BlurFade>

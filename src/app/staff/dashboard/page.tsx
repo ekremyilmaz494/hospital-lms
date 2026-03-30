@@ -38,6 +38,8 @@ interface DashboardData {
   urgentTraining?: { id: string; title: string; daysLeft: number } | null;
 }
 
+const MONTHS = ['', 'OCA', 'ŞUB', 'MAR', 'NİS', 'MAY', 'HAZ', 'TEM', 'AĞU', 'EYL', 'EKİ', 'KAS', 'ARA'] as const;
+
 const statusMap: Record<string, { label: string; bg: string; text: string }> = {
   in_progress: { label: 'Devam Ediyor', bg: 'var(--color-warning-bg)', text: 'var(--color-warning)' },
   assigned: { label: 'Atandı', bg: 'var(--color-info-bg)', text: 'var(--color-info)' },
@@ -180,7 +182,7 @@ export default function StaffDashboard() {
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}
                     >
                       <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl" style={{ background: (t.daysLeft ?? 99) <= 3 ? 'var(--color-error-bg)' : 'var(--color-bg)' }}>
-                        <span className="text-[10px] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>{t.deadline?.split('.')?.[1] === '03' ? 'MAR' : 'NİS'}</span>
+                        <span className="text-[10px] font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>{MONTHS[parseInt(t.deadline?.split('.')?.[1] ?? '0', 10)] ?? '?'}</span>
                         <span className="text-base font-bold leading-none font-mono" style={{ color: (t.daysLeft ?? 99) <= 3 ? 'var(--color-error)' : 'var(--color-text-primary)' }}>{t.deadline?.split('.')?.[0]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -236,7 +238,7 @@ export default function StaffDashboard() {
                     <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>
                   )}
                   {notifications.map((n, i) => (
-                    <div key={i} className="flex items-start gap-2.5 rounded-xl px-3 py-2.5 transition-colors duration-150" style={{ background: !n.isRead ? 'var(--color-primary-light)' : 'transparent' }}>
+                    <div key={`${n.title}-${i}`} className="flex items-start gap-2.5 rounded-xl px-3 py-2.5 transition-colors duration-150" style={{ background: !n.isRead ? 'var(--color-primary-light)' : 'transparent' }}>
                       {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full animate-pulse" style={{ background: 'var(--color-primary)' }} />}
                       <div className={!n.isRead ? '' : 'ml-4'}>
                         <p className="text-xs font-medium">{n.title}</p>
@@ -261,7 +263,7 @@ export default function StaffDashboard() {
                   <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>
                 )}
                 {recentActivity.map((a, i) => (
-                  <div key={i} className="flex gap-3">
+                  <div key={`${a.time}-${i}`} className="flex gap-3">
                     <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: `${typeColors[a.type] ?? 'var(--color-info)'}15` }}>
                       <div className="h-2 w-2 rounded-full" style={{ background: typeColors[a.type] ?? 'var(--color-info)' }} />
                     </div>

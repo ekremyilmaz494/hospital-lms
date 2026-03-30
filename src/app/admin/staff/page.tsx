@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
 import {
@@ -99,6 +99,11 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({ ad: '', soyad: '', email: '', sifre: '', tc: '', telefon: '', departman: '', unvan: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+  }, []);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -138,7 +143,7 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
         throw new Error(body.error || 'Kayıt başarısız');
       }
       setSaved(true);
-      setTimeout(() => { onSaved(); onClose(); }, 1500);
+      closeTimerRef.current = setTimeout(() => { onSaved(); onClose(); }, 1500);
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
     } finally {

@@ -131,7 +131,7 @@ export function StatCard({
           />
           {/* Main icon container */}
           <div
-            className="relative flex h-13 w-13 items-center justify-center rounded-xl transition-transform duration-400 group-hover:scale-110 group-hover:rotate-3"
+            className="relative flex h-[52px] w-[52px] items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
             style={{
               background: `linear-gradient(145deg, ${accentColor}18, ${accentColor}08)`,
               border: `1.5px solid ${accentColor}25`,

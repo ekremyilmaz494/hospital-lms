@@ -14,7 +14,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: true,
   isAuthenticated: false,
-  setUser: (user) => set({ user, isAuthenticated: !!user, isLoading: false }),
+  // isLoading'i burada false yapmıyoruz — yalnızca setLoading() ile kontrol edilir.
+  // setUser çağrısından sonra refreshFromDB() tamamlanana kadar loading true kalmalı.
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
   setLoading: (isLoading) => set({ isLoading }),
   logout: () => set({ user: null, isAuthenticated: false, isLoading: false }),
 }));

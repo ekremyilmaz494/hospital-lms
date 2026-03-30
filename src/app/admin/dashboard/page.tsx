@@ -127,7 +127,7 @@ export default function AdminDashboard() {
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-[transform] duration-200 group-hover:scale-110"
                 style={{ background: `color-mix(in srgb, ${a.color} 12%, transparent)` }}
               >
-                <a.icon className="h-4.5 w-4.5" style={{ color: a.color }} />
+                <a.icon className="h-[18px] w-[18px]" style={{ color: a.color }} />
               </div>
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold leading-tight">{a.label}</p>
