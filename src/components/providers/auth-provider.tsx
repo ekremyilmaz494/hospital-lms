@@ -49,9 +49,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = createClient();
 
-    // Get initial session
+    // Get initial session — use getSession() (local JWT parse, no HTTP round-trip).
+    // Middleware already validates the token server-side via getUser().
     setLoading(true);
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user ?? null;
       if (user) {
         setUser({
           id: user.id,

@@ -4,11 +4,15 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  // getSession() = local JWT parse, no HTTP round-trip to Supabase Auth server.
+  // Middleware already validated the token with getUser() on every request.
+  const { data: { session }, error } = await supabase.auth.getSession()
 
-  if (error || !user) {
+  if (error || !session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const user = session.user
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
@@ -37,12 +41,15 @@ export async function GET() {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
-  return NextResponse.json({
-    user: {
-      ...dbUser,
-      department: dbUser.departmentRel?.name ?? null,
-      organizationName: dbUser.organization?.name ?? null,
-      sessionTimeout: dbUser.organization?.sessionTimeout ?? 30,
+  return NextResponse.json(
+    {
+      user: {
+        ...dbUser,
+        department: dbUser.departmentRel?.name ?? null,
+        organizationName: dbUser.organization?.name ?? null,
+        sessionTimeout: dbUser.organization?.sessionTimeout ?? 30,
+      },
     },
-  })
+    { headers: { 'Cache-Control': 'private, max-age=30' } }
+  )
 }

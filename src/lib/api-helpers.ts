@@ -31,14 +31,21 @@ export function safePagination(params: URLSearchParams, maxLimit = 100) {
   return { page, limit, search, skip: (page - 1) * limit }
 }
 
-/** Get authenticated user + DB profile. Returns null responses on failure. */
+/** Get authenticated user + DB profile. Returns null responses on failure.
+ *
+ * Uses getSession() (local JWT parse) instead of getUser() (HTTP round-trip)
+ * because middleware already validates the token with getUser() on every request.
+ * This eliminates a redundant Supabase Auth HTTP call per API route (~50-150ms).
+ */
 export async function getAuthUser() {
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const { data: { session }, error } = await supabase.auth.getSession()
 
-  if (error || !user) {
+  if (error || !session) {
     return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
   }
+
+  const user = session.user
 
   const dbUser = await prisma.user.findUnique({ where: { id: user.id } })
 

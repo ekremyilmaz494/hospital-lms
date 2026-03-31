@@ -79,6 +79,63 @@ export async function clearExamTimer(attemptId: string) {
   memoryTimers.delete(attemptId)
 }
 
+// ── API Response Cache ──
+
+const memoryCache = new Map<string, { value: string; expiresAt: number }>()
+
+/**
+ * Get a cached value by key.
+ * Returns null if not found, expired, or on Redis error.
+ */
+export async function getCached<T>(key: string): Promise<T | null> {
+  const redis = getRedis()
+  if (redis) {
+    try {
+      const raw = await redis.get<string>(key)
+      if (raw == null) return null
+      return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T
+    } catch {
+      resetRedis()
+    }
+  }
+  const entry = memoryCache.get(key)
+  if (!entry || entry.expiresAt < Date.now()) return null
+  return JSON.parse(entry.value) as T
+}
+
+/**
+ * Cache a value with TTL in seconds.
+ * Falls back to in-memory if Redis is unavailable.
+ */
+export async function setCached(key: string, value: unknown, ttlSeconds: number): Promise<void> {
+  const serialized = JSON.stringify(value)
+  const redis = getRedis()
+  if (redis) {
+    try {
+      await redis.set(key, serialized, { ex: ttlSeconds })
+      return
+    } catch {
+      resetRedis()
+    }
+  }
+  memoryCache.set(key, { value: serialized, expiresAt: Date.now() + ttlSeconds * 1000 })
+}
+
+/**
+ * Invalidate a cached key (e.g., after a write operation).
+ */
+export async function invalidateCache(key: string): Promise<void> {
+  const redis = getRedis()
+  if (redis) {
+    try {
+      await redis.del(key)
+    } catch {
+      resetRedis()
+    }
+  }
+  memoryCache.delete(key)
+}
+
 // ── Rate Limiting ──
 
 export async function checkRateLimit(key: string, maxRequests: number, windowSeconds: number): Promise<boolean> {

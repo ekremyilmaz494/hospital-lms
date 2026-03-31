@@ -316,3 +316,17 @@ Bu projede asagidaki GitHub repolarindaki skill ve rehberlerden faydalanilmaktad
 - **Çözüm**: `package.json`'daki build script'ine `--webpack` flag'i eklendi: `"build": "prisma generate && next build --webpack"`
 - **Kural**: `@ducanh2912/next-pwa` kullanan projelerde `next build` komutuna `--webpack` flag'i eklenmelidir; `next dev --turbopack` development'ta kullanılabilir ama build webpack gerektirir
 - **Tarih**: 2026-03-30
+
+### Next.js + Supabase Performans — Çift Auth HTTP Call ve Cache Eksikliği
+- **Problem**: Her API request'te sayfa geçişleri ve login yavaştı. Local dev özellikle etkileniyordu.
+- **Kök Neden 1**: `getAuthUser()` her API route'unda `supabase.auth.getUser()` çağırıyordu. Middleware zaten `getUser()` ile doğrulama yaptığından **çift HTTP round-trip** oluşturuyordu (~50-150ms ek gecikme per request).
+- **Kök Neden 2**: Dashboard API 5000+ `trainingAssignment` kaydı çekip Node.js'de işliyordu; Redis cache yoktu, her page açılışında 12 DB sorgusu çalışıyordu.
+- **Kök Neden 3**: `/api/auth/me` cache header'ı yoktu, AuthProvider mount'ta 3 sıralı HTTP call yapıyordu.
+- **Çözüm 1**: `getAuthUser()` içinde `getUser()` → `getSession()` (local JWT parse, HTTP yok) — `src/lib/api-helpers.ts`
+- **Çözüm 2**: `src/lib/redis.ts`'e `getCached`/`setCached`/`invalidateCache` helper'ları eklendi. Dashboard API 5 dk TTL ile cache'lendi — `src/app/api/admin/dashboard/route.ts`
+- **Çözüm 3**: `/api/auth/me` response'a `Cache-Control: private, max-age=30` eklendi
+- **Kural 1**: API route'larda `supabase.auth.getUser()` KULLANMA — middleware zaten doğruluyor. `getSession()` yeterli (local parse, network yok)
+- **Kural 2**: Pahalı hesaplama yapan API route'larına Redis cache ekle (`getCached`/`setCached` `src/lib/redis.ts`'de). Aggregate dashboard gibi sorgular için 5 dk TTL idealdir.
+- **Kural 3**: Data yazma (create/update/delete) sonrasında ilgili cache key'i `invalidateCache(key)` ile temizle
+- **Kural 4**: Auth profil endpoint'lerine (`/api/auth/me` gibi) `Cache-Control: private, max-age=30` ekle
+- **Tarih**: 2026-03-31

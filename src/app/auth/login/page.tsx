@@ -76,7 +76,6 @@ function LoginForm() {
       const role = data.user?.role as string;
       const target = redirectTo && redirectTo !== '/' ? redirectTo : ROLE_ROUTES[role] || '/staff/dashboard';
       router.push(target);
-      router.refresh();
     } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
       setLoading(false);

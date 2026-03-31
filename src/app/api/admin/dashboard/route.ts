@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+
+const DASHBOARD_CACHE_TTL = 300 // 5 dakika
 
 export async function GET() {
   const { dbUser, error } = await getAuthUser()
@@ -11,6 +14,11 @@ export async function GET() {
 
   const orgId = dbUser!.organizationId
   if (!orgId) return errorResponse('Organization not found', 403)
+
+  // ── Redis cache: 5 dk TTL ──
+  const cacheKey = `dashboard:${orgId}`
+  const cached = await getCached<object>(cacheKey)
+  if (cached) return jsonResponse(cached)
 
   try {
 
@@ -244,7 +252,7 @@ export async function GET() {
     }
   })
 
-  return jsonResponse({
+  const responseData = {
     stats: [
       { title: 'Toplam Personel', value: staffCount, icon: 'Users', accentColor: 'var(--color-primary)', trend: { value: activeStaffCount, label: 'aktif', isPositive: true } },
       { title: 'Aktif Egitim', value: activeTrainingCount, icon: 'GraduationCap', accentColor: 'var(--color-info)', trend: { value: trainingCount, label: 'toplam', isPositive: true } },
@@ -265,7 +273,10 @@ export async function GET() {
     expiringCerts,
     topPerformers,
     recentActivity,
-  })
+  }
+
+  await setCached(cacheKey, responseData, DASHBOARD_CACHE_TTL)
+  return jsonResponse(responseData)
 
   } catch (err) {
     logger.error('Admin Dashboard', 'Dashboard verileri alinamadi', err instanceof Error ? err.message : err)
