@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, safePagination, createAuditLog } from '@/lib/api-helpers'
 import { startEvaluationSchema } from '@/lib/validations'
 
 export async function GET(request: Request) {
@@ -72,6 +72,16 @@ export async function POST(request: Request) {
 
   if (evaluators.length === 0) return errorResponse('En az bir değerlendirici gereklidir')
 
+  // Tüm evaluator ID'lerinin bu organizasyona ait olduğunu doğrula
+  const evaluatorIds = evaluators.map(e => e.id)
+  const validUsers = await prisma.user.findMany({
+    where: { id: { in: evaluatorIds }, organizationId: orgId },
+    select: { id: true },
+  })
+  if (validUsers.length !== evaluatorIds.length) {
+    return errorResponse('Bazı değerlendiriciler bu kuruluşa ait değil', 400)
+  }
+
   // Evaluations oluştur (mevcut olanları atla)
   const created: string[] = []
   for (const ev of evaluators) {
@@ -114,6 +124,16 @@ export async function POST(request: Request) {
       message: `"${form.title}" formu kapsamında hakkınızda ${evaluators.length} kişilik değerlendirme süreci başlatıldı.`,
       type: 'competency_evaluation',
     },
+  })
+
+  await createAuditLog({
+    userId: dbUser!.id,
+    organizationId: orgId,
+    action: 'CREATE',
+    entityType: 'CompetencyEvaluation',
+    entityId: subjectId,
+    newData: { created: created.length, total: evaluators.length },
+    request,
   })
 
   return jsonResponse({ created: created.length, total: evaluators.length }, 201)

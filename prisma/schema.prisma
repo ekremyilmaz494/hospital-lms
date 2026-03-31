@@ -72,9 +72,10 @@ model Organization {
   smgActivities   SmgActivity[]
   smgPeriods      SmgPeriod[]
   contentLibraryInstalls OrganizationContentLibrary[]
-  hisIntegrations HisIntegration[]
-  competencyForms CompetencyForm[]
-  syncLogs        SyncLog[]
+  hisIntegrations      HisIntegration[]
+  competencyForms      CompetencyForm[]
+  syncLogs             SyncLog[]
+  accreditationReports AccreditationReport[]
 
   @@map("organizations")
 }
@@ -216,6 +217,7 @@ model User {
   subjectEvaluations   CompetencyEvaluation[] @relation("EvaluationSubject")
   evaluatorEvaluations CompetencyEvaluation[] @relation("EvaluationEvaluator")
   pushSubscriptions    PushSubscription[]
+  accreditationReports AccreditationReport[]
 
   @@unique([organizationId, tcNo])
   @@index([organizationId], map: "idx_users_org")
@@ -802,4 +804,44 @@ model PushSubscription {
   @@unique([userId, endpoint])
   @@index([userId], map: "idx_push_subscriptions_user")
   @@map("push_subscriptions")
+}
+
+// ── AKREDİTASYON STANDARTLARI (global — organizasyona bağlı değil) ──
+model AccreditationStandard {
+  id                        String   @id @default(uuid()) @db.Uuid
+  code                      String   @unique @db.VarChar(50)
+  title                     String   @db.VarChar(500)
+  description               String?  @db.Text
+  standardBody              String   @db.VarChar(20) @map("standard_body")
+  requiredTrainingCategories Json    @default("[]") @map("required_training_categories")
+  requiredCompletionRate    Int      @default(80) @map("required_completion_rate")
+  isActive                  Boolean  @default(true) @map("is_active")
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([standardBody], map: "idx_accreditation_standards_body")
+  @@map("accreditation_standards")
+}
+
+// ── AKREDİTASYON RAPORLARI ──
+model AccreditationReport {
+  id                    String   @id @default(uuid()) @db.Uuid
+  organizationId        String   @db.Uuid @map("organization_id")
+  title                 String   @db.VarChar(500)
+  standardBody          String   @db.VarChar(20) @map("standard_body")
+  generatedAt           DateTime @default(now()) @map("generated_at") @db.Timestamptz
+  generatedBy           String   @db.Uuid @map("generated_by")
+  periodStart           DateTime @map("period_start") @db.Timestamptz
+  periodEnd             DateTime @map("period_end") @db.Timestamptz
+  overallComplianceRate Decimal  @default(0) @db.Decimal(5, 2) @map("overall_compliance_rate")
+  findings              Json     @default("[]")
+  reportUrl             String?  @db.Text @map("report_url")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  generatedByUser User         @relation(fields: [generatedBy], references: [id], onDelete: Restrict)
+
+  @@index([organizationId], map: "idx_accreditation_reports_org")
+  @@index([standardBody], map: "idx_accreditation_reports_body")
+  @@index([generatedAt], map: "idx_accreditation_reports_date")
+  @@map("accreditation_reports")
 }

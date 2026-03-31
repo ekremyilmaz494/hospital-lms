@@ -21,6 +21,7 @@ import {
   Star,
   Plug,
   BarChart2,
+  ClipboardCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -96,13 +97,21 @@ export const adminNav: NavGroup[] = [
       { title: 'Bildirimler', href: '/admin/notifications', icon: Bell },
       { title: 'İşlem Geçmişi', href: '/admin/audit-logs', icon: History },
       { title: 'Yedekleme', href: '/admin/backups', icon: Database },
+      { title: 'Akreditasyon', href: '/admin/accreditation', icon: ClipboardCheck },
     ],
   },
   {
     label: 'SİSTEM',
     items: [
-      { title: 'Ayarlar', href: '/admin/settings', icon: Settings },
-      { title: 'Entegrasyonlar', href: '/admin/settings/integrations', icon: Plug },
+      {
+        title: 'Ayarlar',
+        href: '/admin/settings',
+        icon: Settings,
+        children: [
+          { title: 'Genel Ayarlar', href: '/admin/settings' },
+          { title: 'Entegrasyonlar', href: '/admin/settings/integrations' },
+        ],
+      },
     ],
   },
 ];

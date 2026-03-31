@@ -58,7 +58,7 @@ export function AppSidebar({
     <>
       {/* ── Collapsed Rail (always visible, 72px) ── */}
       <aside
-        className="fixed top-0 left-0 z-50 h-screen flex flex-col items-center border-r"
+        className="fixed top-0 left-0 z-50 h-screen overflow-hidden flex flex-col items-center border-r"
         style={{
           width: 72,
           background: 'var(--color-surface)',
@@ -83,7 +83,7 @@ export function AppSidebar({
         <div className="h-px w-10 shrink-0" style={{ background: 'var(--color-border)' }} />
 
         {/* Icon nav */}
-        <ScrollArea className="flex-1 py-3 w-full">
+        <ScrollArea className="flex-1 min-h-0 py-3 w-full">
           <nav className="flex flex-col items-center gap-1 px-2">
             {navGroups.flatMap((g) => g.items).map((item) => {
               const Icon = item.icon;
@@ -156,7 +156,7 @@ export function AppSidebar({
 
       {/* Panel */}
       <div
-        className="fixed top-0 left-0 z-[60] h-screen flex flex-col border-r"
+        className="fixed top-0 left-0 z-[60] h-screen overflow-hidden flex flex-col border-r"
         style={{
           width: 280,
           background: 'var(--color-surface)',
@@ -196,7 +196,7 @@ export function AppSidebar({
         <div className="h-px mx-3 shrink-0" style={{ background: 'var(--color-border)' }} />
 
         {/* Full navigation */}
-        <ScrollArea className="flex-1 px-3 py-3">
+        <ScrollArea className="flex-1 min-h-0 px-3 py-3">
           {navGroups.map((group, groupIdx) => (
             <div key={groupIdx} className={cn(groupIdx > 0 && 'mt-4')}>
               {group.label && (

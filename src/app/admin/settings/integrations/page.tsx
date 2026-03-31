@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Plug, CheckCircle2, AlertTriangle, Save, Play, RefreshCw,
   Plus, Trash2, X, Eye, EyeOff, Loader2, ChevronDown,
@@ -717,9 +717,8 @@ export default function HisIntegrationsPage() {
             <div />
 
             {fieldMapping.map((row, i) => (
-              <>
+              <React.Fragment key={i}>
                 <Input
-                  key={`his-${i}`}
                   value={row.hisField}
                   onChange={e => updateMappingRow(i, 'hisField', e.target.value)}
                   placeholder="personelId"
@@ -760,7 +759,7 @@ export default function HisIntegrationsPage() {
                 >
                   <Trash2 size={14} />
                 </button>
-              </>
+              </React.Fragment>
             ))}
           </div>
         </div>

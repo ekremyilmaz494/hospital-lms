@@ -454,11 +454,16 @@ export default function AdminCompetencyPage() {
   if (formsLoading && !formsData) return <PageLoading />;
 
   const toggleFormActive = async (id: string, isActive: boolean) => {
-    await fetch(`/api/admin/competency/forms/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isActive: !isActive }),
-    });
-    refetchForms?.();
+    try {
+      const res = await fetch(`/api/admin/competency/forms/${id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !isActive }),
+      });
+      if (!res.ok) throw new Error();
+      refetchForms?.();
+    } catch {
+      toast('Durum güncellenemedi.', 'error');
+    }
   };
 
   const deleteForm = async (id: string) => {
@@ -469,11 +474,16 @@ export default function AdminCompetencyPage() {
   };
 
   const sendReminder = async (evaluationId: string, evaluatorId: string) => {
-    await fetch('/api/admin/notifications', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: evaluatorId, title: 'Değerlendirme Hatırlatması', message: 'Bekleyen yetkinlik değerlendirmenizi tamamlamayı unutmayın.', type: 'competency_evaluation' }),
-    });
-    toast('Hatırlatma gönderildi.', 'success');
+    try {
+      const res = await fetch('/api/admin/notifications', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: evaluatorId, title: 'Değerlendirme Hatırlatması', message: 'Bekleyen yetkinlik değerlendirmenizi tamamlamayı unutmayın.', type: 'competency_evaluation' }),
+      });
+      if (!res.ok) throw new Error();
+      toast('Hatırlatma gönderildi.', 'success');
+    } catch {
+      toast('Hatırlatma gönderilemedi.', 'error');
+    }
   };
 
   const tabs = [

@@ -257,14 +257,14 @@ export default function TrainingDetailPage() {
                                       body: JSON.stringify({ userId: s.userId }),
                                     });
                                     if (res.ok) refetch();
-                                  } catch {}
+                                  } catch { toast('İşlem başarısız oldu.', 'error'); }
                                 }}
                               >
                                 <RotateCcw className="h-3.5 w-3.5" /> Yeni Hak Ver
                               </Button>
                             )}
                             {s.status === 'passed' && (
-                              <button className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium opacity-0 group-hover:opacity-100" style={{ color: 'var(--color-text-muted)', transition: 'opacity var(--transition-fast)' }}>
+                              <button onClick={() => router.push(`/admin/staff/${s.userId}`)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium opacity-0 group-hover:opacity-100" style={{ color: 'var(--color-text-muted)', transition: 'opacity var(--transition-fast)' }}>
                                 <Eye className="h-3.5 w-3.5" /> Detay<ChevronRight className="h-3 w-3" />
                               </button>
                             )}
