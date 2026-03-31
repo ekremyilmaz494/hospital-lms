@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Star, Plus, Loader2, ChevronDown } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from '@/components/shared/recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatCard } from '@/components/shared/stat-card';
 import { BlurFade } from '@/components/ui/blur-fade';

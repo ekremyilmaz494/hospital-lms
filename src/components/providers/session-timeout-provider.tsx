@@ -3,26 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/store/auth-store';
 import { useSessionTimeout } from '@/hooks/use-session-timeout';
-import { Clock, LogOut, MousePointerClick } from 'lucide-react';
+import { Clock, MousePointerClick } from 'lucide-react';
 
 export function SessionTimeoutProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
-  const [sessionTimeout, setSessionTimeout] = useState(30);
+  const { user, sessionTimeout } = useAuthStore();
   const [warning, setWarning] = useState<number | null>(null);
-
-  // Fetch org session timeout
-  useEffect(() => {
-    if (!user) return;
-    fetch('/api/auth/me')
-      .then(res => res.json())
-      .then(data => {
-        const timeout = data?.user?.organization?.sessionTimeout;
-        if (typeof timeout === 'number' && timeout > 0) {
-          setSessionTimeout(timeout);
-        }
-      })
-      .catch(() => {});
-  }, [user]);
 
   const handleWarning = useCallback((remainingSeconds: number) => {
     setWarning(remainingSeconds);

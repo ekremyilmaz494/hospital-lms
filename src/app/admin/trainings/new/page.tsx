@@ -10,7 +10,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import dynamic from 'next/dynamic';
+const RichTextEditor = dynamic(
+  () => import('@/components/ui/rich-text-editor').then(m => ({ default: m.RichTextEditor })),
+  {
+    ssr: false,
+    loading: () => <div className="animate-pulse rounded-lg border h-28" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />,
+  }
+);
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';

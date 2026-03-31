@@ -1,7 +1,7 @@
 'use client';
 
 import { ShieldCheck, AlertTriangle, Clock, CheckCircle, Building2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from '@/components/shared/recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { PageHeader } from '@/components/shared/page-header';
 import { ChartCard } from '@/components/shared/chart-card';
 import { BlurFade } from '@/components/ui/blur-fade';

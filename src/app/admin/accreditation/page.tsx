@@ -140,7 +140,7 @@ export default function AccreditationPage() {
       const json = await res.json();
       setStandards(json.standards ?? []);
     } catch {
-      toast({ title: 'Standartlar yüklenemedi', variant: 'destructive' });
+      toast('Standartlar yüklenemedi', 'error');
     } finally {
       setLoadingStandards(false);
     }
@@ -153,7 +153,7 @@ export default function AccreditationPage() {
       const json = await res.json();
       setReports(json.reports ?? []);
     } catch {
-      toast({ title: 'Raporlar yüklenemedi', variant: 'destructive' });
+      toast('Raporlar yüklenemedi', 'error');
     } finally {
       setLoadingReports(false);
     }
@@ -182,7 +182,7 @@ export default function AccreditationPage() {
       }
       setActionPlanCategories(Array.from(missing));
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : 'Simülasyon başarısız', variant: 'destructive' });
+      toast(err instanceof Error ? err.message : 'Simülasyon başarısız', 'error');
     } finally {
       setLoadingCompliance(false);
     }
@@ -202,11 +202,11 @@ export default function AccreditationPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Hata');
-      toast({ title: 'Rapor oluşturuldu ve kaydedildi' });
+      toast('Rapor oluşturuldu ve kaydedildi');
       // Raporlar tabına geç
       setActiveTab('reports');
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : 'Rapor oluşturulamadı', variant: 'destructive' });
+      toast(err instanceof Error ? err.message : 'Rapor oluşturulamadı', 'error');
     } finally {
       setGenerating(false);
     }
@@ -214,7 +214,7 @@ export default function AccreditationPage() {
 
   const createActionPlan = async () => {
     if (actionPlanCategories.length === 0) {
-      toast({ title: 'En az bir kategori seçin', variant: 'destructive' });
+      toast('En az bir kategori seçin', 'error');
       return;
     }
     setCreatingPlan(true);
@@ -230,9 +230,9 @@ export default function AccreditationPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Hata');
-      toast({ title: json.message ?? 'Aksiyon planı oluşturuldu' });
+      toast(json.message ?? 'Aksiyon planı oluşturuldu');
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : 'Aksiyon planı oluşturulamadı', variant: 'destructive' });
+      toast(err instanceof Error ? err.message : 'Aksiyon planı oluşturulamadı', 'error');
     } finally {
       setCreatingPlan(false);
     }
@@ -251,7 +251,7 @@ export default function AccreditationPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      toast({ title: 'PDF indirilemedi', variant: 'destructive' });
+      toast('PDF indirilemedi', 'error');
     } finally {
       setDownloadingId(null);
     }

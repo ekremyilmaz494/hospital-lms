@@ -1,7 +1,7 @@
 'use client';
 
 import { TrendingUp, BarChart3, Award, Target, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from '@/components/shared/recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { PageHeader } from '@/components/shared/page-header';
 import { ChartCard } from '@/components/shared/chart-card';
 import { BlurFade } from '@/components/ui/blur-fade';

@@ -57,7 +57,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: {
     proxyClientMaxBodySize: '512mb',
-    optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion'],
+    optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion', 'date-fns', '@tanstack/react-table', '@tiptap/react'],
   },
   headers: async () => [
     {

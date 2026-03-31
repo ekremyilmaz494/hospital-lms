@@ -9,7 +9,7 @@ import { usePresenceTracker } from '@/hooks/use-presence-tracker';
 const DB_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 dakika
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setLoading } = useAuthStore();
+  const { setUser, setLoading, setSessionTimeout } = useAuthStore();
   // G3.2 — Track this user's presence in the global active-users channel
   usePresenceTracker();
   const router = useRouter();
@@ -39,12 +39,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             departmentId: data.user.departmentId ?? currentUser.departmentId,
             title: data.user.title ?? currentUser.title,
           });
+          if (typeof data.user.sessionTimeout === 'number' && data.user.sessionTimeout > 0) {
+            setSessionTimeout(data.user.sessionTimeout);
+          }
         }
       }
     } catch {
       // Sessizce devam et — JWT verileri fallback olarak kullanilir
     }
-  }, [setUser, router]);
+  }, [setUser, setSessionTimeout, router]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -74,8 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           createdAt: user.created_at,
           updatedAt: user.updated_at ?? user.created_at,
         });
-        // Hemen DB'den guncel veri al
-        refreshFromDB();
+        // JWT verisi ilk yuklemede yeterli — DB refresh'i 3s sonra yap
+        setTimeout(() => refreshFromDB(), 3000);
       } else {
         setUser(null);
       }

@@ -99,8 +99,8 @@ export async function POST(request: Request) {
       userId: dbUser!.id,
       organizationId: orgId,
       action: 'accreditation_action_plan_created',
-      resource: 'training_assignment',
-      details: {
+      entityType: 'training_assignment',
+      newData: {
         categories,
         createdCount: result.count,
         trainingsCount: trainings.length,

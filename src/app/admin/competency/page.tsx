@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Plus, Trash2, GripVertical, ChevronDown, ChevronUp, Users, BarChart3, FileText, CheckCircle, Clock, AlertCircle, Loader2, Download, X, Star } from 'lucide-react';
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, Tooltip } from '@/components/shared/recharts';
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { PageHeader } from '@/components/shared/page-header';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';

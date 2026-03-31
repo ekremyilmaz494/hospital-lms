@@ -45,9 +45,9 @@ export async function POST(request: Request) {
       userId,
       organizationId: orgId,
       action: 'accreditation_report_generated',
-      resource: 'accreditation_report',
-      resourceId: report.reportId,
-      details: { standardBody, overallComplianceRate: report.overallComplianceRate },
+      entityType: 'accreditation_report',
+      entityId: report.reportId,
+      newData: { standardBody, overallComplianceRate: report.overallComplianceRate },
     })
 
     return jsonResponse({ report }, 201)

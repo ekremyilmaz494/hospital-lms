@@ -90,7 +90,7 @@ export async function GET() {
         },
       },
       orderBy: { completedAt: 'desc' },
-      take: 200,
+      take: 20,
     }),
     // Department comparison (önceden ayrı await'ti)
     prisma.trainingAssignment.findMany({
@@ -104,7 +104,7 @@ export async function GET() {
           select: { postExamScore: true, preExamScore: true },
         },
       },
-      take: 5000,
+      take: 500,
     }),
     // Trend data — son 6 ay (önceden ayrı await'ti)
     prisma.trainingAssignment.findMany({

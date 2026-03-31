@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import "./shine-border.css"
 
 type TColorProp = string | string[]
 

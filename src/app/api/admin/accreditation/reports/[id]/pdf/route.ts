@@ -38,7 +38,7 @@ export async function GET(
 
   if (!report) return errorResponse('Rapor bulunamadı', 404)
 
-  const findings = report.findings as FindingRecord[]
+  const findings = report.findings as unknown as FindingRecord[]
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
 

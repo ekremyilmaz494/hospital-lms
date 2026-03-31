@@ -16,28 +16,33 @@ export function usePresenceTracker() {
     if (!user?.id) return
 
     const supabase = createClient()
+    let channel: ReturnType<typeof supabase.channel> | null = null
 
-    const channel = supabase.channel('active-users', {
-      config: { presence: { key: user.id } },
-    })
+    // Sayfa yuklendikten 5s sonra WebSocket baglantisinı ac
+    const timer = setTimeout(() => {
+      channel = supabase.channel('active-users', {
+        config: { presence: { key: user.id } },
+      })
 
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        // no-op: tracker side doesn't need to react to sync
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({
-            userId: user.id,
-            role: user.role,
-            organizationId: user.organizationId ?? null,
-            joinedAt: new Date().toISOString(),
-          })
-        }
-      })
+      channel
+        .on('presence', { event: 'sync' }, () => {
+          // no-op: tracker side doesn't need to react to sync
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel!.track({
+              userId: user.id,
+              role: user.role,
+              organizationId: user.organizationId ?? null,
+              joinedAt: new Date().toISOString(),
+            })
+          }
+        })
+    }, 5000)
 
     return () => {
-      supabase.removeChannel(channel)
+      clearTimeout(timer)
+      if (channel) supabase.removeChannel(channel)
     }
   }, [user?.id, user?.role, user?.organizationId])
 }

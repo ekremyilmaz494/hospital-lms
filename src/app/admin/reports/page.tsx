@@ -8,7 +8,7 @@ import {
 import { exportExcel, printPage } from '@/lib/export';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart,
-} from '@/components/shared/recharts';
+} from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/page-header';

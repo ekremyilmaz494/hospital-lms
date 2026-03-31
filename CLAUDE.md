@@ -104,7 +104,7 @@ return jsonResponse(data);                             // Consistent responses
 - CORS configured for `/api/*` routes scoped to `NEXT_PUBLIC_APP_URL`
 
 ### Prisma conventions
-- Generated client at `src/generated/prisma` (import from `@/generated/prisma/client`)
+- Generated client at `src/generated/prisma` (import from `@/generated/prisma/client`); excluded from tsconfig to avoid proactive TS scanning
 - Singleton instance in `src/lib/prisma.ts` using `PrismaPg` adapter
 - Models use camelCase fields with `@map("snake_case")` for DB columns and `@@map("table_name")` for tables
 - All IDs are UUIDs (`@db.Uuid`)
