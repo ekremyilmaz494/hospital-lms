@@ -390,11 +390,17 @@ code, pre, .font-mono {
   transition-duration: 80ms;
 }
 
-/* Generic focus ring for keyboard nav */
-:focus-visible {
+/* Generic focus ring for keyboard nav (input/textarea/select kendi stilini yönetir) */
+:focus-visible:not(input):not(textarea):not(select) {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
   border-radius: inherit;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 
 /* Ripple press effect for buttons */
