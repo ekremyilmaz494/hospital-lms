@@ -12,6 +12,7 @@ interface UseFetchResult<T> {
 // In-memory cache: URL → { data, timestamp }
 const cache = new Map<string, { data: unknown; ts: number }>();
 const STALE_TIME = 30_000; // 30 saniye — bu süre içinde cache'den anında göster
+const TIMEOUT_MS = 30_000; // 30 saniye — API timeout
 
 /** Clear cached data for a specific URL (use before useFetch to prevent stale flash) */
 export function clearFetchCache(url: string) {
@@ -31,12 +32,15 @@ export function invalidateFetchCache(pattern: string) {
 }
 
 export function useFetch<T>(url: string | null): UseFetchResult<T> {
-  const cached = url ? cache.get(url) : null;
+  const normalizedUrl = url?.trim() || null;
+  const cached = normalizedUrl ? cache.get(normalizedUrl) : null;
   const [data, setData] = useState<T | null>((cached?.data as T) ?? null);
   const [isLoading, setIsLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
-  const urlRef = useRef(url);
-  urlRef.current = url;
+  const urlRef = useRef(normalizedUrl);
+  urlRef.current = normalizedUrl;
+
+  const forceRef = useRef(false);
 
   const fetchData = useCallback(async (background = false) => {
     const currentUrl = urlRef.current;
@@ -45,15 +49,19 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
       return;
     }
     if (!background) {
-      // Only show loading if no cached data
       const existing = cache.get(currentUrl);
       if (!existing) setIsLoading(true);
     }
-    setError(null);
+    if (!background) setError(null);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const bypassHttpCache = forceRef.current;
+    forceRef.current = false;
     try {
-      const res = await fetch(currentUrl, { signal: controller.signal });
+      const res = await fetch(currentUrl, {
+        signal: controller.signal,
+        ...(bypassHttpCache && { cache: 'reload' as RequestCache }),
+      });
       clearTimeout(timeout);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -66,20 +74,29 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
       }
     } catch (err) {
       if (urlRef.current === currentUrl) {
+        // Background revalidation başarısız olursa mevcut cache'i koru, hata gösterme
+        if (background) return;
+
+        // AbortError (timeout) — açıkça kontrol et
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.warn(`[useFetch] Timeout: ${currentUrl} (>${TIMEOUT_MS}ms)`);
+          setError('Sunucu yanıt vermedi, lütfen sayfayı yenileyin.');
+          return;
+        }
+
         const msg = err instanceof Error ? err.message : 'Bir hata oluştu';
         if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('403')) {
-          // Auth error — redirect to login
           if (typeof window !== 'undefined') {
             window.location.href = '/auth/login?reason=session_expired';
           }
-          return; // Don't set error, we're redirecting
+          return;
         }
-        if (msg.includes('abort')) {
-          // Timeout — API 20s'den uzun sürdü, kullanıcıya bildir
-          setError('Sunucu yanıt vermedi, lütfen sayfayı yenileyin');
-        } else if (msg.includes('404') || msg.includes('500') || msg.includes('503')) {
-          // not-found veya server error — graceful degradation
-          setError(null);
+        if (msg.includes('404')) {
+          setError('İstenen kaynak bulunamadı');
+        } else if (msg.includes('500')) {
+          setError('Sunucu hatası oluştu, lütfen sayfayı yenileyin');
+        } else if (msg.includes('503')) {
+          setError('Servis geçici olarak kullanılamıyor, lütfen sayfayı yenileyin');
         } else {
           setError(msg);
         }
@@ -93,16 +110,14 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
   }, []);
 
   useEffect(() => {
-    if (!url) {
+    if (!normalizedUrl) {
       setIsLoading(false);
       return;
     }
-    const existing = cache.get(url);
+    const existing = cache.get(normalizedUrl);
     if (existing) {
-      // Show cached data immediately
       setData(existing.data as T);
       setIsLoading(false);
-      // If stale, revalidate in background
       if (Date.now() - existing.ts > STALE_TIME) {
         fetchData(true);
       }
@@ -110,12 +125,13 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
       setData(null);
       fetchData();
     }
-  }, [url, fetchData]);
+  }, [normalizedUrl, fetchData]);
 
   const refetch = useCallback(() => {
-    if (url) cache.delete(url);
+    if (normalizedUrl) cache.delete(normalizedUrl);
+    forceRef.current = true;
     fetchData();
-  }, [url, fetchData]);
+  }, [normalizedUrl, fetchData]);
 
   return { data, isLoading, error, refetch };
 }

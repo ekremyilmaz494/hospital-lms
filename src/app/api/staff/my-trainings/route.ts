@@ -78,6 +78,10 @@ export async function GET(request: Request) {
         progress,
         daysLeft,
         score,
+        examOnly: t.examOnly,
+        questionCount: t._count.questions,
+        examDurationMinutes: t.examDurationMinutes,
+        passingScore: t.passingScore,
       }
     })
 

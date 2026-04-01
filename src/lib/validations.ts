@@ -322,3 +322,79 @@ export const submitEvaluationSchema = z.object({
     comment: z.string().max(500).optional(),
   })).min(1),
 })
+
+// ── EĞİTİM KATEGORİLERİ ──
+export const createTrainingCategorySchema = z.object({
+  label: z.string().min(1, 'Kategori adı zorunludur').max(30, 'Kategori adı en fazla 30 karakter olabilir'),
+  icon:  z.string().min(1, 'İkon zorunludur').max(10),
+  order: z.coerce.number().int().min(0).optional(),
+})
+
+export const updateTrainingCategorySchema = z.object({
+  label: z.string().min(1).max(30).optional(),
+  icon:  z.string().min(1).max(10).optional(),
+  order: z.coerce.number().int().min(0).optional(),
+})
+
+// ── BAĞIMSIZ SINAV ──
+export const createStandaloneExamSchema = z.object({
+  title: z.string().min(3, 'Başlık en az 3 karakter olmalı').max(200),
+  description: z.string().max(2000).optional(),
+  category: z.string().max(100).optional(),
+  passingScore: z.coerce.number().int().min(0).max(100).default(70),
+  maxAttempts: z.coerce.number().int().min(1).max(10).default(3),
+  examDurationMinutes: z.coerce.number().int().min(5).max(180).default(30),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  isCompulsory: z.boolean().default(false),
+  questions: z.array(z.object({
+    text: z.string().min(5, 'Soru metni en az 5 karakter olmalı'),
+    points: z.coerce.number().int().min(1).max(10).default(1),
+    correctOptionIndex: z.coerce.number().int().min(0).max(3),
+    options: z.array(z.string().min(1)).length(4, 'Her soru için 4 şık gereklidir'),
+  })).min(1, 'En az 1 soru gerekli').max(200),
+  selectedDepts: z.array(z.string().uuid()).optional(),
+  excludedStaff: z.array(z.string().uuid()).optional(),
+  randomizeQuestions: z.boolean().default(false),
+  randomQuestionCount: z.coerce.number().int().min(1).optional(),
+})
+
+export const updateStandaloneExamSchema = z.object({
+  title: z.string().min(3).max(200).optional(),
+  description: z.string().max(2000).optional(),
+  category: z.string().max(100).optional(),
+  passingScore: z.coerce.number().int().min(0).max(100).optional(),
+  maxAttempts: z.coerce.number().int().min(1).max(10).optional(),
+  examDurationMinutes: z.coerce.number().int().min(5).max(180).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  isCompulsory: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+})
+
+// ── SORU BANKASI ──
+export const createQuestionBankSchema = z.object({
+  text: z.string().min(5, 'Soru metni en az 5 karakter olmalı').max(2000),
+  category: z.string().min(1).max(100),
+  difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
+  tags: z.array(z.string().max(50)).max(10).default([]),
+  points: z.coerce.number().int().min(1).max(10).default(1),
+  options: z.array(z.object({
+    text: z.string().min(1, 'Şık metni boş olamaz'),
+    isCorrect: z.boolean(),
+    order: z.coerce.number().int().min(0),
+  })).min(2).max(6),
+})
+
+export const updateQuestionBankSchema = z.object({
+  text: z.string().min(5).max(2000).optional(),
+  category: z.string().min(1).max(100).optional(),
+  difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
+  tags: z.array(z.string().max(50)).max(10).optional(),
+  points: z.coerce.number().int().min(1).max(10).optional(),
+  options: z.array(z.object({
+    text: z.string().min(1),
+    isCorrect: z.boolean(),
+    order: z.coerce.number().int().min(0),
+  })).min(2).max(6).optional(),
+})

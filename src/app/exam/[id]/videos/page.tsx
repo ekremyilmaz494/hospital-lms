@@ -210,6 +210,7 @@ export default function VideoPlayerPage() {
   // Phase guard: redirect based on attempt status (must be before early returns but after all hooks)
   useEffect(() => {
     if (data?.attemptStatus === 'pre_exam') router.replace(`/exam/${id}/pre-exam`);
+    else if (data?.attemptStatus === 'post_exam') router.replace(`/exam/${id}/post-exam`);
     else if (data?.attemptStatus === 'completed') router.replace('/staff/my-trainings');
   }, [data?.attemptStatus, id, router]);
 

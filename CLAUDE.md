@@ -238,6 +238,57 @@ Bu projede asagidaki GitHub repolarindaki skill ve rehberlerden faydalanilmaktad
 
 ---
 
+## Otomatik Doğrulama Kuralı
+
+Her kod değişikliğinden sonra aşağıdaki adımları sırayla uygula.
+Kullanıcıdan onay bekleme, her şeyi kendin yap:
+
+### 1. TypeScript Kontrolü
+```bash
+pnpm tsc --noEmit
+```
+Hata varsa → düzelt → tekrar çalıştır. Temiz geçene kadar devam et.
+
+### 2. Lint Kontrolü
+```bash
+pnpm lint
+```
+Hata varsa → düzelt. Warning'leri geçebilirsin, error'ları geçemezsin.
+
+### 3. Build Kontrolü
+```bash
+pnpm build --webpack
+```
+Build hatası varsa → hata mesajını oku → ilgili dosyayı düzelt → tekrar build al.
+"Build failed" görürsen bir sonraki adıma geçme.
+
+### 4. Test Kontrolü (ilgili dosya varsa)
+```bash
+pnpm test
+```
+Mevcut testler bozulduysa düzelt. Yeni önemli bir özellik eklediysen test dosyası da yaz.
+
+### 5. Sorun Çözme Protokolü
+Herhangi bir adımda hata alınırsa:
+1. Hata mesajını tam oku
+2. İlgili dosyayı aç ve satır numarasına git
+3. Düzelt
+4. Sadece o adımı tekrar çalıştır (tümünü baştan alma)
+5. 3 denemede çözemediysen kullanıcıya hata mesajını göster ve sor
+
+### 6. Adım Tamamlama Raporu
+Tüm kontroller geçince kullanıcıya şu formatta özet ver:
+```
+✅ TypeScript — temiz
+✅ Lint — temiz
+✅ Build — başarılı
+✅ Test — X test geçti
+📁 Değiştirilen dosyalar: [liste]
+➡️ Sıradaki adım: [adım adı]
+```
+
+---
+
 ## Öğrenilen Dersler
 
 > Bu bölüm, projede karşılaşılan hatalar ve çözümlerinden çıkarılan kuralları içerir.

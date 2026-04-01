@@ -34,7 +34,7 @@ interface TrainingDetail {
   failedCount: number;
   avgScore: number;
   status: string;
-  assignedStaff: { assignmentId: string; userId: string; name: string; department: string; attempt: number; preScore: number | null; postScore: number | null; status: string; completedAt: string }[];
+  assignedStaff: { assignmentId: string; userId: string; name: string; department: string; attempt: number; progress: number; preScore: number | null; postScore: number | null; status: string; completedAt: string }[];
   videos: { id: string; title: string; videoUrl: string; duration: string; order: number }[];
   questions: { id: string; text: string; points: number; options: { id: string; text: string; isCorrect: boolean; order: number }[] }[];
 }
@@ -228,6 +228,22 @@ export default function TrainingDetailPage() {
                           <div className="min-w-17.5 text-center">
                             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Deneme</p>
                             <p className="text-sm font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{s.attempt}/{training.maxAttempts}</p>
+                          </div>
+                          <div className="min-w-25">
+                            <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>İlerleme</p>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${s.progress}%`,
+                                    background: s.progress === 0 ? 'var(--color-text-muted)' : s.progress === 100 ? 'var(--color-success)' : 'var(--color-info)',
+                                    transition: 'width var(--transition-fast)',
+                                  }}
+                                />
+                              </div>
+                              <span className="text-xs font-semibold" style={{ fontFamily: 'var(--font-mono)', color: s.progress === 100 ? 'var(--color-success)' : s.progress > 0 ? 'var(--color-info)' : 'var(--color-text-muted)' }}>{s.progress}%</span>
+                            </div>
                           </div>
                           <div className="min-w-17.5 text-center">
                             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Ön Sınav</p>

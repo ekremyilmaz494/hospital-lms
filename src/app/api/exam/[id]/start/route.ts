@@ -64,6 +64,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       throw new Error('MAX_ATTEMPTS_EXCEEDED')
     }
 
+    // examOnly sınavlarda ön sınav ve video atlanır → doğrudan post_exam
+    const isExamOnly = assignment.training.examOnly === true
+
+    if (isExamOnly) {
+      const created = await tx.examAttempt.create({
+        data: {
+          assignmentId,
+          userId: dbUser!.id,
+          trainingId: assignment.trainingId,
+          attemptNumber: newAttemptNumber,
+          status: 'post_exam',
+          postExamStartedAt: new Date(),
+        },
+        include: { videoProgress: true },
+      })
+
+      await tx.trainingAssignment.update({
+        where: { id: assignmentId },
+        data: { currentAttempt: newAttemptNumber, status: 'in_progress' },
+      })
+
+      return created
+    }
+
     // 2. ve sonraki denemelerde ön sınav atlanır → doğrudan watching_videos
     const isRetry = newAttemptNumber > 1
     const initialStatus = isRetry ? 'watching_videos' : 'pre_exam'
@@ -110,5 +134,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     request,
   })
 
-  return jsonResponse(attempt)
+  const examOnly = assignment.training.examOnly === true
+  return jsonResponse({
+    ...attempt,
+    examOnly,
+    redirectTo: examOnly ? 'post-exam' : undefined,
+  })
 }

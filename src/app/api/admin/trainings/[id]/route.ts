@@ -1,7 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
-import { checkRateLimit } from '@/lib/redis'
+import { checkRateLimit, invalidateCache } from '@/lib/redis'
 import { updateTrainingSchema } from '@/lib/validations'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -32,12 +32,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Transform for frontend
   const assignedStaff = training.assignments.map(a => {
     const latestAttempt = a.examAttempts[0] // desc order, take 1
+    const progress = (() => {
+      const attempt = latestAttempt
+      if (!attempt) return 0
+      const steps = [
+        !!attempt.preExamCompletedAt,
+        !!attempt.videosCompletedAt,
+        !!attempt.postExamCompletedAt,
+      ]
+      return Math.round((steps.filter(Boolean).length / 3) * 100)
+    })()
     return {
       assignmentId: a.id,
       userId: a.user.id,
       name: `${a.user.firstName ?? ''} ${a.user.lastName ?? ''}`.trim() || a.user.email,
       department: a.user.departmentRel?.name ?? '',
       attempt: a.currentAttempt,
+      progress,
       preScore: latestAttempt?.preExamScore ? Number(latestAttempt.preExamScore) : null,
       postScore: latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : null,
       status: a.status,
@@ -138,6 +149,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   revalidatePath('/staff/my-trainings')
   revalidatePath('/admin/trainings')
 
+  try { await invalidateCache(`dashboard:${dbUser!.organizationId!}`) } catch {}
+
   return jsonResponse(training)
 }
 
@@ -209,6 +222,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   revalidatePath('/staff/my-trainings')
   revalidatePath('/admin/trainings')
+
+  try { await invalidateCache(`dashboard:${dbUser!.organizationId!}`) } catch {}
 
   return jsonResponse({ success: true })
 }

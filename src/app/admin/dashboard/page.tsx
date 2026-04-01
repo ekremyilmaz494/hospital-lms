@@ -8,9 +8,15 @@ import {
 } from 'lucide-react';
 import { useRealtimeExams } from '@/hooks/use-realtime-exams';
 import type { LiveExamAttempt } from '@/hooks/use-realtime-exams';
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+
+const ChartSkeleton = () => (
+  <div className="h-64 rounded-2xl animate-pulse" style={{ background: 'var(--color-surface)' }} />
+);
+const TrendChart = dynamic(() => import('@/components/shared/charts/admin-dashboard-charts').then(m => ({ default: m.TrendChart })), { ssr: false, loading: ChartSkeleton });
+const StatusDonut = dynamic(() => import('@/components/shared/charts/admin-dashboard-charts').then(m => ({ default: m.StatusDonut })), { ssr: false, loading: ChartSkeleton });
+const DepartmentBar = dynamic(() => import('@/components/shared/charts/admin-dashboard-charts').then(m => ({ default: m.DepartmentBar })), { ssr: false, loading: ChartSkeleton });
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
 import { PageHeader } from '@/components/shared/page-header';
@@ -61,7 +67,14 @@ function elapsedLabel(startedAt: string): string {
 
 /** G7.6 — Realtime in-progress exam list for admin dashboard */
 function LiveExamsWidget() {
-  const { attempts, isLoading, activeCount } = useRealtimeExams();
+  const { attempts, isLoading, activeCount, isConnected } = useRealtimeExams();
+
+  // Fallback: Realtime bağlantısı yoksa API'den çek
+  const { data: fallbackData } = useFetch<{ attempts: LiveExamAttempt[] }>(
+    !isConnected && !isLoading ? '/api/admin/in-progress-exams' : null
+  );
+  const displayExams = isConnected ? attempts : (fallbackData?.attempts ?? attempts);
+  const displayCount = isConnected ? activeCount : displayExams.filter(a => ['pre_exam', 'watching_videos', 'post_exam'].includes(a.status)).length;
 
   return (
     <div
@@ -73,7 +86,7 @@ function LiveExamsWidget() {
         <div className="flex items-center gap-2.5">
           <div className="relative flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
             <Radio className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
-            {activeCount > 0 && (
+            {displayCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full" style={{ background: 'var(--color-success)', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
             )}
           </div>
@@ -82,11 +95,19 @@ function LiveExamsWidget() {
             <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Şu an sınav yapan personel</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: activeCount > 0 ? 'var(--color-success-bg)' : 'var(--color-bg)' }}>
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: activeCount > 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }} />
-          <span className="text-[12px] font-semibold" style={{ color: activeCount > 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
-            {isLoading ? '...' : `${activeCount} aktif`}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: isConnected ? 'var(--color-success-bg)' : 'var(--color-warning-bg)' }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: isConnected ? 'var(--color-success)' : 'var(--color-warning)', animation: isConnected ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none' }} />
+            <span className="text-[10px] font-semibold" style={{ color: isConnected ? 'var(--color-success)' : 'var(--color-warning)' }}>
+              {isConnected ? 'Canlı' : 'Önbellek'}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: displayCount > 0 ? 'var(--color-success-bg)' : 'var(--color-bg)' }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: displayCount > 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }} />
+            <span className="text-[12px] font-semibold" style={{ color: displayCount > 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
+              {isLoading ? '...' : `${displayCount} aktif`}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -97,7 +118,7 @@ function LiveExamsWidget() {
             <div key={i} className="h-12 animate-pulse rounded-xl" style={{ background: 'var(--color-bg)' }} />
           ))}
         </div>
-      ) : attempts.length === 0 ? (
+      ) : displayExams.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl mb-3" style={{ background: 'var(--color-bg)' }}>
             <BookOpen className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
@@ -106,7 +127,7 @@ function LiveExamsWidget() {
         </div>
       ) : (
         <div className="space-y-2">
-          {attempts.slice(0, 8).map((attempt: LiveExamAttempt) => {
+          {displayExams.slice(0, 8).map((attempt: LiveExamAttempt) => {
             const st = examStatusLabel[attempt.status] ?? examStatusLabel.pre_exam;
             return (
               <div
@@ -158,7 +179,6 @@ const quickActions = [
   { label: 'Rapor İndir', desc: 'Excel ve PDF raporları', icon: Download, href: '/admin/reports', color: 'var(--color-success)', gradient: 'linear-gradient(135deg, rgba(34,197,94,0.08) 0%, rgba(34,197,94,0.02) 100%)', glowColor: 'rgba(34,197,94,0.06)' },
 ];
 
-const chartTooltipStyle = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', fontSize: '12px', boxShadow: 'var(--shadow-md)' };
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -333,24 +353,7 @@ export default function AdminDashboard() {
           <ChartCard title="Aylık Eğitim Trendi" icon={<TrendingUp className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
             {hasTrendData ? (
             <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <AreaChart data={trendData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gTamamlanan" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-success)" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="var(--color-success)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={chartTooltipStyle} />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Area type="monotone" dataKey="tamamlanan" name="Tamamlanan" stroke="var(--color-success)" fill="url(#gTamamlanan)" strokeWidth={2.5} dot={{ r: 3, fill: 'var(--color-success)', strokeWidth: 2, stroke: 'var(--color-surface)' }} />
-                  <Area type="monotone" dataKey="atanan" name="Atanan" stroke="var(--color-info)" fill="transparent" strokeWidth={1.5} strokeDasharray="5 5" />
-                  <Bar dataKey="basarisiz" name="Başarısız" fill="var(--color-error)" radius={[3, 3, 0, 0]} barSize={14} opacity={0.8} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <TrendChart data={trendData} />
             </div>
             ) : (
               <div className="h-72 flex items-center justify-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz eğitim ataması yapılmamış. Personele eğitim atadıkça burada aylık trend görünecek.</div>
@@ -365,16 +368,7 @@ export default function AdminDashboard() {
             {totalAssignments > 0 ? (
               <>
                 <div className="h-44">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <PieChart>
-                      <Pie data={statusDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value" stroke="none">
-                        {statusDistribution.map((entry, i) => (
-                          <Cell key={i} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={chartTooltipStyle} formatter={(value: unknown, name: unknown) => [`${Number(value)} (${totalAssignments > 0 ? Math.round(Number(value) / totalAssignments * 100) : 0}%)`, String(name)]} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <StatusDonut data={statusDistribution} total={totalAssignments} />
                 </div>
                 <div className="mt-3 space-y-2">
                   {statusDistribution.map((s) => (
@@ -402,15 +396,7 @@ export default function AdminDashboard() {
           <ChartCard title="Departman Karşılaştırması" icon={<Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
             {departmentComparison.length > 0 ? (
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                  <BarChart data={departmentComparison} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} unit="%" />
-                    <YAxis dataKey="dept" type="category" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} width={80} />
-                    <Tooltip contentStyle={chartTooltipStyle} />
-                    <Bar dataKey="oran" name="Tamamlanma %" fill="var(--color-primary)" radius={[0, 4, 4, 0]} barSize={14} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <DepartmentBar data={departmentComparison} />
               </div>
             ) : (
               <div className="h-64 flex items-center justify-center text-sm text-center px-4" style={{ color: 'var(--color-text-muted)' }}>Personele eğitim atandığında departman karşılaştırması burada görünecek</div>

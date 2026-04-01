@@ -1,9 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   BookOpen, Clock, CheckCircle, XCircle, Lock, Play, Target, Award,
-  ArrowRight, Zap, TrendingUp, BarChart3, AlertTriangle,
+  ArrowRight, Zap, TrendingUp, BarChart3, AlertTriangle, ClipboardCheck,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
@@ -20,6 +21,10 @@ interface Training {
   progress: number;
   daysLeft?: number;
   score?: number;
+  examOnly?: boolean;
+  questionCount?: number;
+  examDurationMinutes?: number;
+  passingScore?: number;
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string; icon: typeof BookOpen }> = {
@@ -43,7 +48,8 @@ function getCatColor(category: string): string {
 }
 
 export default function MyTrainingsPage() {
-  const { data: trainings, isLoading, error } = useFetch<Training[]>('/api/staff/my-trainings');
+  const { data: rawData, isLoading, error } = useFetch<{ data: Training[] } | Training[]>('/api/staff/my-trainings');
+  const [activeTab, setActiveTab] = useState<'trainings' | 'exams'>('trainings');
 
   if (isLoading) return <PageLoading />;
 
@@ -55,7 +61,10 @@ export default function MyTrainingsPage() {
     );
   }
 
-  const trainingList = trainings ?? [];
+  const allItems: Training[] = Array.isArray(rawData) ? rawData : (rawData as { data: Training[] })?.data ?? [];
+  const trainingList = allItems.filter((t) => activeTab === 'exams' ? t.examOnly : !t.examOnly);
+  const examCount = allItems.filter((t) => t.examOnly).length;
+  const trainingCount = allItems.filter((t) => !t.examOnly).length;
   const isExhaustedFailed = (t: Training) => t.status === 'failed' && t.attempt >= t.maxAttempts;
   const activeTrainings = trainingList.filter(t => (t.status === 'assigned' || t.status === 'in_progress' || t.status === 'failed') && !isExhaustedFailed(t));
   const exhaustedTrainings = trainingList.filter(t => isExhaustedFailed(t));
@@ -90,6 +99,44 @@ export default function MyTrainingsPage() {
               Atanan ve tamamlanan eğitimlerinizi takip edin
             </p>
           </div>
+        </div>
+      </BlurFade>
+
+      {/* Tab Switcher */}
+      <BlurFade delay={0.02}>
+        <div className="flex gap-1 rounded-xl p-1 mb-6" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+          <button
+            onClick={() => setActiveTab('trainings')}
+            className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold flex-1 justify-center"
+            style={{
+              background: activeTab === 'trainings' ? 'var(--color-surface)' : 'transparent',
+              color: activeTab === 'trainings' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+              boxShadow: activeTab === 'trainings' ? 'var(--shadow-sm)' : 'none',
+              transition: 'background var(--transition-fast), color var(--transition-fast)',
+            }}
+          >
+            <BookOpen className="h-4 w-4" />
+            Eğitimlerim
+            <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: activeTab === 'trainings' ? 'var(--color-primary-light)' : 'var(--color-bg)', color: activeTab === 'trainings' ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+              {trainingCount}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('exams')}
+            className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold flex-1 justify-center"
+            style={{
+              background: activeTab === 'exams' ? 'var(--color-surface)' : 'transparent',
+              color: activeTab === 'exams' ? 'var(--color-accent)' : 'var(--color-text-muted)',
+              boxShadow: activeTab === 'exams' ? 'var(--shadow-sm)' : 'none',
+              transition: 'background var(--transition-fast), color var(--transition-fast)',
+            }}
+          >
+            <ClipboardCheck className="h-4 w-4" />
+            Sınavlarım
+            <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: activeTab === 'exams' ? 'var(--color-accent-light)' : 'var(--color-bg)', color: activeTab === 'exams' ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
+              {examCount}
+            </span>
+          </button>
         </div>
       </BlurFade>
 
@@ -156,7 +203,7 @@ export default function MyTrainingsPage() {
                             border: `1px solid ${catColor}20`,
                           }}
                         >
-                          <BookOpen className="h-6 w-6" style={{ color: catColor }} />
+                          {t.examOnly ? <ClipboardCheck className="h-6 w-6" style={{ color: catColor }} /> : <BookOpen className="h-6 w-6" style={{ color: catColor }} />}
                         </div>
 
                         {/* Content */}
@@ -173,6 +220,12 @@ export default function MyTrainingsPage() {
                           </div>
                           <h3 className="text-[15px] font-bold mb-2">{t.title}</h3>
                           <div className="flex items-center gap-5 text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
+                            {t.examOnly && (
+                              <span className="flex items-center gap-1">
+                                <ClipboardCheck className="h-3 w-3" />
+                                {t.questionCount} soru · {t.examDurationMinutes} dk · Baraj: {t.passingScore}
+                              </span>
+                            )}
                             <span className="flex items-center gap-1">
                               <Target className="h-3 w-3" />
                               Deneme: <strong className="font-mono ml-0.5">{t.attempt ?? 0}/{t.maxAttempts ?? 3}</strong>

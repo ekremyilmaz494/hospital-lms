@@ -2,6 +2,16 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { getAttemptWithPhaseCheck } from '@/lib/exam-helpers'
 
+/** Fisher-Yates shuffle */
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { dbUser, error } = await getAuthUser()
@@ -48,7 +58,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const savedMap = new Map(savedAnswers.map(a => [a.questionId, a.selectedOptionId]))
 
   // Get questions with options (exclude isCorrect for security)
-  const questions = await prisma.question.findMany({
+  let questions = await prisma.question.findMany({
     where: { trainingId: training.id },
     include: {
       options: {
@@ -59,13 +69,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     orderBy: { sortOrder: 'asc' },
   })
 
+  // Soru karıştırma (examOnly + randomizeQuestions)
+  if (training.examOnly && training.randomizeQuestions) {
+    questions = shuffle(questions)
+    if (training.randomQuestionCount && training.randomQuestionCount > 0 && training.randomQuestionCount < questions.length) {
+      questions = questions.slice(0, training.randomQuestionCount)
+    }
+  }
+
   return jsonResponse({
     trainingTitle: training.title,
-    examType: phase === 'post' ? 'Son Sınav' : 'Ön Sınav',
+    examType: training.examOnly ? 'Sınav' : (phase === 'post' ? 'Son Sınav' : 'Ön Sınav'),
     totalTime: training.examDurationMinutes * 60,
     questions: questions.map((q, idx) => {
       const savedOptionId = savedMap.get(q.id)
-      const options = q.options.map((o, oIdx) => ({
+      // Şık karıştırma (examOnly sınavlarda her zaman)
+      const rawOptions = training.examOnly ? shuffle(q.options) : q.options
+      const options = rawOptions.map((o, oIdx) => ({
         id: String.fromCharCode(97 + oIdx), // a, b, c, d
         optionId: o.id,
         text: o.optionText,

@@ -4,7 +4,7 @@ import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, creat
 import { createUserSchema } from '@/lib/validations'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
-import { checkRateLimit } from '@/lib/redis'
+import { checkRateLimit, invalidateCache } from '@/lib/redis'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -33,20 +33,11 @@ export async function GET(request: Request) {
   if (department) where.department = department
   if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 
-  const [staff, total, rawDepartments] = await Promise.all([
+  const [staff, total, rawDepartments, activeStaff] = await Promise.all([
     prisma.user.findMany({
       where,
       include: {
         _count: { select: { assignments: true, examAttempts: true } },
-        assignments: {
-          select: {
-            status: true,
-            examAttempts: {
-              where: { isPassed: true },
-              select: { postExamScore: true },
-            },
-          },
-        },
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -58,10 +49,26 @@ export async function GET(request: Request) {
       include: { _count: { select: { users: true } } },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     }),
+    prisma.user.count({ where: { organizationId: dbUser!.organizationId!, role: 'staff', isActive: true } }),
   ])
 
-  const deptMap = new Map(rawDepartments.map(d => [d.id, d.name]))
+  // Staff ID'leri ile toplu olarak completed count ve avg score hesapla (N+1 yerine 2 sorgu)
+  const staffIds = staff.map(s => s.id)
+  const [completedCounts, avgScores] = staffIds.length > 0 ? await Promise.all([
+    prisma.trainingAssignment.groupBy({
+      by: ['userId'],
+      where: { userId: { in: staffIds }, status: 'passed' },
+      _count: true,
+    }),
+    prisma.examAttempt.groupBy({
+      by: ['userId'],
+      where: { userId: { in: staffIds }, isPassed: true },
+      _avg: { postExamScore: true },
+    }),
+  ]) : [[], []]
 
+  const completedMap = new Map(completedCounts.map(c => [c.userId, c._count]))
+  const avgScoreMap = new Map(avgScores.map(a => [a.userId, Math.round(Number(a._avg.postExamScore ?? 0))]))
 
   const departments = rawDepartments.map(d => ({
     id: d.id,
@@ -71,16 +78,10 @@ export async function GET(request: Request) {
     staffCount: d._count.users,
   }))
 
-  const activeStaff = staff.filter(s => s.isActive).length
-
-  // Calculate overall avgScore from all passed exam attempts in the org
-  const allPassedScores = staff
-    .flatMap(s => s.assignments)
-    .flatMap(a => a.examAttempts)
-    .map(e => Number(e.postExamScore))
-    .filter(score => !isNaN(score) && score > 0)
-  const overallAvgScore = allPassedScores.length > 0
-    ? Math.round(allPassedScores.reduce((sum, sc) => sum + sc, 0) / allPassedScores.length)
+  // Overall avg score (tüm org için)
+  const allAvgScores = avgScores.map(a => Number(a._avg.postExamScore ?? 0)).filter(s => s > 0)
+  const overallAvgScore = allAvgScores.length > 0
+    ? Math.round(allAvgScores.reduce((sum, sc) => sum + sc, 0) / allAvgScores.length)
     : 0
 
   const stats = {
@@ -90,35 +91,27 @@ export async function GET(request: Request) {
     avgScore: overallAvgScore
   }
 
-  // Frontend'e uyması için staff verisini map'liyoruz
-  const formattedStaff = staff.map(s => {
-    const completedTrainings = s.assignments.filter(a => a.status === 'passed').length
-    const passedScores = s.assignments
-      .flatMap(a => a.examAttempts)
-      .map(e => Number(e.postExamScore))
-      .filter(score => !isNaN(score) && score > 0)
-    const avgScore = passedScores.length > 0
-      ? Math.round(passedScores.reduce((sum, sc) => sum + sc, 0) / passedScores.length)
-      : 0
+  const formattedStaff = staff.map(s => ({
+    id: s.id,
+    name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+    email: s.email,
+    // KVKK: TC No maskeleme — sadece son 4 hane göster
+    tcNo: s.tcNo ? `*******${s.tcNo.slice(-4)}` : '',
+    department: departments.find(d => d.id === s.departmentId)?.name || '',
+    departmentId: s.departmentId,
+    title: s.title || '',
+    assignedTrainings: s._count.assignments || 0,
+    completedTrainings: completedMap.get(s.id) ?? 0,
+    avgScore: avgScoreMap.get(s.id) ?? 0,
+    status: s.isActive ? 'Aktif' : 'Pasif',
+    initials: `${s.firstName?.[0] || ''}${s.lastName?.[0] || ''}`.toUpperCase()
+  }))
 
-    return {
-      id: s.id,
-      name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
-      email: s.email,
-      // KVKK: TC No maskeleme — sadece son 4 hane göster
-      tcNo: s.tcNo ? `*******${s.tcNo.slice(-4)}` : '',
-      department: departments.find(d => d.id === s.departmentId)?.name || '',
-      departmentId: s.departmentId,
-      title: s.title || '',
-      assignedTrainings: s._count.assignments || 0,
-      completedTrainings,
-      avgScore,
-      status: s.isActive ? 'Aktif' : 'Pasif',
-      initials: `${s.firstName?.[0] || ''}${s.lastName?.[0] || ''}`.toUpperCase()
-    }
-  })
-
-  return jsonResponse({ staff: formattedStaff, departments, stats, total, page, limit, totalPages: Math.ceil(total / limit) })
+  return jsonResponse(
+    { staff: formattedStaff, departments, stats, total, page, limit, totalPages: Math.ceil(total / limit) },
+    200,
+    { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+  )
 }
 
 export async function POST(request: Request) {
@@ -225,6 +218,8 @@ export async function POST(request: Request) {
   })
 
   revalidatePath('/admin/staff')
+
+  try { await invalidateCache(`dashboard:${dbUser!.organizationId!}`) } catch {}
 
   return jsonResponse(user, 201)
 }

@@ -39,6 +39,19 @@ function TransitionContent() {
       ? `/exam/${id}/post-exam`
       : '/staff/my-trainings';
 
+  // examOnly guard: pre→videos geçişinde examOnly ise post-exam'e yönlendir
+  useEffect(() => {
+    if (!isPreToVideos) return;
+    fetch(`/api/exam/${id}/start`, { method: 'POST' })
+      .then(res => res.json())
+      .then(attempt => {
+        if (attempt?.examOnly) {
+          router.replace(`/exam/${id}/post-exam`);
+        }
+      })
+      .catch(() => {});
+  }, [id, isPreToVideos, router]);
+
   const shouldCountdown = !isPostResult;
 
   const navigate = () => {

@@ -183,3 +183,39 @@ CREATE POLICY "staff_comp_answers_own" ON competency_answers FOR ALL USING (EXIS
 -- PUSH SUBSCRIPTIONS
 ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "user_push_subscriptions_own" ON push_subscriptions FOR ALL USING (user_id = auth.uid());
+
+
+-- TRAINING CATEGORIES
+ALTER TABLE training_categories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_training_categories_all" ON training_categories
+  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_training_categories_all" ON training_categories
+  FOR ALL USING (
+    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+CREATE POLICY "staff_training_categories_select" ON training_categories
+  FOR SELECT USING (
+    organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+
+-- QUESTION BANK
+ALTER TABLE question_bank ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_question_bank_all" ON question_bank FOR ALL
+  USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid));
+
+-- QUESTION BANK OPTIONS
+ALTER TABLE question_bank_options ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_question_bank_options_all" ON question_bank_options FOR ALL
+  USING (question_bank_id IN (
+    SELECT id FROM question_bank
+    WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  ));
+
+-- ACCREDITATION STANDARDS (eksik)
+ALTER TABLE accreditation_standards ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_accreditation_standards_all" ON accreditation_standards
+  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_accreditation_standards_select" ON accreditation_standards
+  FOR SELECT USING (true);

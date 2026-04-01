@@ -126,6 +126,7 @@ export interface Training {
   startDate: string;
   endDate: string;
   isActive: boolean;
+  examOnly: boolean;
   isCompulsory: boolean;
   complianceDeadline: string | null;
   regulatoryBody: string | null;
@@ -376,6 +377,31 @@ export interface SyncLog {
   errors: Array<{ externalId: string; error: string }>;
   startedAt: string;
   completedAt: string | null;
+}
+
+// ── SORU BANKASI TİPLERİ ──
+
+export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
+
+export interface QuestionBank {
+  id: string;
+  organizationId: string;
+  text: string;
+  category: string;
+  difficulty: QuestionDifficulty;
+  tags: string[];
+  points: number;
+  options: QuestionBankOption[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuestionBankOption {
+  id: string;
+  questionBankId: string;
+  text: string;
+  isCorrect: boolean;
+  order: number;
 }
 
 export interface SyncResult {

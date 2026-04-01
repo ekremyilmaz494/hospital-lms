@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   BarChart3, Download, FileText, Users, GraduationCap, Building2, AlertTriangle, Clock, Printer,
   TrendingDown, Target, Award, Filter, X,
@@ -51,13 +51,15 @@ export default function ReportsPage() {
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  const filterParams = new URLSearchParams();
-  if (dateFrom) filterParams.set('from', new Date(dateFrom).toISOString());
-  if (dateTo) filterParams.set('to', new Date(dateTo + 'T23:59:59').toISOString());
-  const filterQuery = filterParams.toString() ? `?${filterParams.toString()}` : '';
+  const filterQuery = useMemo(() => {
+    const p = new URLSearchParams();
+    if (dateFrom) p.set('from', new Date(dateFrom).toISOString());
+    if (dateTo) p.set('to', new Date(dateTo + 'T23:59:59').toISOString());
+    return p.toString() ? `?${p.toString()}` : '';
+  }, [dateFrom, dateTo]);
   const hasFilters = !!(dateFrom || dateTo);
 
-  const { data, isLoading, error } = useFetch<ReportsData>(`/api/admin/reports${filterQuery}`);
+  const { data, isLoading, error, refetch } = useFetch<ReportsData>(`/api/admin/reports${filterQuery}`);
 
   const handlePDFExport = async () => {
     const res = await fetch('/api/admin/export/pdf?type=training-report');
@@ -336,7 +338,7 @@ export default function ReportsPage() {
                           <td className="px-4 py-4">
                             <Button size="sm" className="gap-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: 'var(--color-primary)' }} onClick={async () => {
                               if (window.confirm(`${f.name} için "${f.training}" eğitiminde yeni deneme hakkı verilsin mi?`)) {
-                                try { const res = await fetch('/api/admin/trainings/reset-attempt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assignmentId: f.assignmentId }) }); if (!res.ok) { const d = await res.json(); throw new Error(d.error); } toast(`${f.name} için yeni deneme hakkı verildi.`, 'success'); } catch (err) { toast(err instanceof Error ? err.message : 'İşlem başarısız', 'error'); }
+                                try { const res = await fetch('/api/admin/trainings/reset-attempt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assignmentId: f.assignmentId }) }); if (!res.ok) { const d = await res.json(); throw new Error(d.error); } toast(`${f.name} için yeni deneme hakkı verildi.`, 'success'); refetch(); } catch (err) { toast(err instanceof Error ? err.message : 'İşlem başarısız', 'error'); }
                               }
                             }}>Yeni Hak Ver</Button>
                           </td>

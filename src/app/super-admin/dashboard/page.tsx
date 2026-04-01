@@ -6,9 +6,16 @@ import {
   BarChart3, Globe, Server, Radio,
 } from 'lucide-react';
 import { useActiveUsersCount } from '@/hooks/use-active-users-count';
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+
+const ChartSkeleton = () => (
+  <div className="h-64 rounded-2xl animate-pulse" style={{ background: 'var(--color-surface)' }} />
+);
+const MonthlyTrendChart = dynamic(() => import('@/components/shared/charts/super-admin-dashboard-charts').then(m => ({ default: m.MonthlyTrendChart })), { ssr: false, loading: ChartSkeleton });
+const SubscriptionPieChart = dynamic(() => import('@/components/shared/charts/super-admin-dashboard-charts').then(m => ({ default: m.SubscriptionPieChart })), { ssr: false, loading: ChartSkeleton });
+const SubscriptionBarChart = dynamic(() => import('@/components/shared/charts/super-admin-dashboard-charts').then(m => ({ default: m.SubscriptionBarChart })), { ssr: false, loading: ChartSkeleton });
 import { StatCard } from '@/components/shared/stat-card';
 import { PageHeader } from '@/components/shared/page-header';
 import { ChartCard } from '@/components/shared/chart-card';
@@ -117,25 +124,6 @@ const actionLabels: Record<string, string> = {
   'department.create': 'Departman oluşturdu',
 };
 
-interface CustomTooltipProps {
-  active?: boolean;
-  payload?: { color: string; name: string; value: number }[];
-  label?: string;
-}
-
-const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border px-3 py-2 text-xs" style={{ background: 'var(--color-surface-elevated)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-md)', fontFamily: 'var(--font-mono)' }}>
-      <p className="mb-1 font-semibold" style={{ color: 'var(--color-text-primary)' }}>{label}</p>
-      {payload.map((entry, idx) => (
-        <p key={idx} style={{ color: entry.color }}>{entry.name}: <strong>{entry.value.toLocaleString('tr-TR')}</strong></p>
-      ))}
-    </div>
-  );
-};
-
-const PIE_COLORS = ['var(--color-success)', 'var(--color-info)', 'var(--color-error)', 'var(--color-warning)'];
 
 /** G3.2 — Anlık aktif kullanıcı sayısını gösteren Presence widget'ı */
 function ActiveUsersWidget() {
@@ -284,31 +272,7 @@ export default function SuperAdminDashboard() {
         <BlurFade delay={0.07} className="lg:col-span-4">
           <ChartCard title="Aylık Kayıt Trendi" icon={<TrendingUp className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
             <div className="h-[300px]">
-              {monthlyData.length === 0 ? (
-                <div className="flex items-center justify-center h-full"><p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p></div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                  <AreaChart data={monthlyData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradHospital" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="var(--color-accent)" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gradPersonel" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                    <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: '12px', fontFamily: 'var(--font-body)' }} />
-                    <Area type="monotone" dataKey="hastane" name="Hastane" stroke="var(--color-accent)" strokeWidth={2.5} fill="url(#gradHospital)" />
-                    <Area type="monotone" dataKey="personel" name="Personel" stroke="var(--color-primary)" strokeWidth={2.5} fill="url(#gradPersonel)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
+              <MonthlyTrendChart data={monthlyData} />
             </div>
           </ChartCard>
         </BlurFade>
@@ -322,17 +286,7 @@ export default function SuperAdminDashboard() {
                 <div className="flex h-full">
                   {/* Pie chart */}
                   <div className="flex-1">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                      <PieChart>
-                        <Pie data={subPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" stroke="none">
-                          {subPieData.map((_, i) => (
-                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'var(--font-body)' }} />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <SubscriptionPieChart data={subPieData} />
                   </div>
                   {/* Stats sidebar */}
                   {overview && (
@@ -397,18 +351,7 @@ export default function SuperAdminDashboard() {
                   {subscriptionData.length === 0 ? (
                     <div className="flex items-center justify-center h-full"><p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p></div>
                   ) : (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                      <BarChart data={subscriptionData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                        <XAxis dataKey="plan" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
-                        <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'var(--font-body)' }} />
-                        <Bar dataKey="aktif" name="Aktif" fill="var(--color-success)" radius={[4, 4, 0, 0]} barSize={24} />
-                        <Bar dataKey="trial" name="Deneme" fill="var(--color-info)" radius={[4, 4, 0, 0]} barSize={24} />
-                        <Bar dataKey="suresiDoldu" name="Süresi Doldu" fill="var(--color-error)" radius={[4, 4, 0, 0]} barSize={24} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <SubscriptionBarChart data={subscriptionData} />
                   )}
                 </div>
               </ChartCard>

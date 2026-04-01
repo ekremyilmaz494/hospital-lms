@@ -133,16 +133,24 @@ export function BulkAssignModal({ trainings: trainingsFromProps, staff: staffFro
 
         {/* Step göstergesi */}
         <div className="flex px-6 pt-4 gap-2">
-          {[{ n: 1, label: 'Eğitimler', icon: GraduationCap }, { n: 2, label: 'Personel', icon: Users }].map(s => (
-            <button key={s.n} type="button" onClick={() => s.n < step || (s.n === 2 && selectedTrainings.size > 0) ? setStep(s.n as 1 | 2) : null}
+          {[{ n: 1, label: 'Eğitimler', icon: GraduationCap }, { n: 2, label: 'Personel', icon: Users }].map(s => {
+            const isDisabled = s.n === 2 && step === 1 && selectedTrainings.size === 0;
+            return (
+            <button key={s.n} type="button" onClick={() => {
+                if (isDisabled) {
+                  toast('Önce en az bir eğitim seçin', 'warning');
+                  return;
+                }
+                setStep(s.n as 1 | 2);
+              }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-              style={{ background: step === s.n ? 'var(--color-primary)' : 'var(--color-bg)', color: step === s.n ? 'white' : 'var(--color-text-muted)', border: `1px solid ${step === s.n ? 'var(--color-primary)' : 'var(--color-border)'}` }}>
+              style={{ background: step === s.n ? 'var(--color-primary)' : 'var(--color-bg)', color: step === s.n ? 'white' : 'var(--color-text-muted)', border: `1px solid ${step === s.n ? 'var(--color-primary)' : 'var(--color-border)'}`, opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer' }}>
               <s.icon className="h-4 w-4" />
               {s.label}
               {s.n === 1 && selectedTrainings.size > 0 && <span className="rounded-full px-1.5 py-0.5 text-xs font-bold" style={{ background: 'rgba(255,255,255,0.25)' }}>{selectedTrainings.size}</span>}
               {s.n === 2 && selectedStaff.size > 0 && <span className="rounded-full px-1.5 py-0.5 text-xs font-bold" style={{ background: 'rgba(255,255,255,0.25)' }}>{selectedStaff.size}</span>}
             </button>
-          ))}
+          ); })}
         </div>
 
         {/* İçerik */}

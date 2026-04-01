@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createOrganizationSchema } from '@/lib/validations'
+import { TRAINING_CATEGORIES } from '@/lib/training-categories'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -84,6 +85,18 @@ export async function POST(request: Request) {
         },
       })
     }
+
+    // Yeni hastane için varsayılan eğitim kategorilerini seed et
+    await tx.trainingCategory.createMany({
+      data: TRAINING_CATEGORIES.map((cat, i) => ({
+        organizationId: org.id,
+        value: cat.value,
+        label: cat.label,
+        icon: cat.icon,
+        order: i,
+        isDefault: true,
+      })),
+    })
 
     return org
   })

@@ -1,8 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { Menu, Moon, Search, Sun, X } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useAuthStore } from '@/store/auth-store';
 import { NotificationBell } from '@/components/shared/notification-bell';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -41,8 +44,20 @@ export function AppTopbar({
   userInitials = 'KL',
   unreadNotifications = 0,
 }: AppTopbarProps) {
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [searchOpen, setSearchOpen] = useState(false);
+  const { user } = useAuthStore();
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    useAuthStore.getState().setUser(null);
+    router.push('/auth/login');
+  };
+
+  const profilePath = user?.role === 'admin' ? '/admin/settings' : user?.role === 'super_admin' ? '/super-admin/settings' : '/staff/profile';
+  const notificationsPath = user?.role === 'staff' ? '/staff/notifications' : '/admin/notifications';
 
   return (
     <header
@@ -179,10 +194,10 @@ export function AppTopbar({
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profilim</DropdownMenuItem>
-            <DropdownMenuItem>Bildirimler</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push(profilePath)}>Profilim</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push(notificationsPath)}>Bildirimler</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-500">Çıkış Yap</DropdownMenuItem>
+            <DropdownMenuItem className="text-red-500" onClick={handleLogout}>Çıkış Yap</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

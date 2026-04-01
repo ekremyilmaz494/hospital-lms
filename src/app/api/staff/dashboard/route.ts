@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
+import { getCached, setCached } from '@/lib/redis'
+
+const CACHE_TTL = 60
 
 // GET /api/staff/dashboard — Personel dashboard verileri
 export async function GET() {
@@ -15,62 +18,74 @@ export async function GET() {
   const userId = dbUser!.id
 
   try {
-    // 1) Assignment stats
-    const assignments = await prisma.trainingAssignment.findMany({
-      where: {
-        userId,
-        training: { organizationId: dbUser!.organizationId! },
-      },
-      select: {
-        id: true,
-        status: true,
-        trainingId: true,
-        completedAt: true,
-        training: {
-          select: {
-            id: true,
-            title: true,
-            endDate: true,
+    const cacheKey = `staff:dashboard:${userId}`
+    const cached = await getCached<Record<string, unknown>>(cacheKey)
+    if (cached) {
+      return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+    }
+
+    // 1) Assignments + attempts + notifications + recent activity — tümü paralel
+    const [assignments, notifications, recentAttempts] = await Promise.all([
+      prisma.trainingAssignment.findMany({
+        where: {
+          userId,
+          training: { organizationId: dbUser!.organizationId! },
+        },
+        include: {
+          training: {
+            select: {
+              id: true, title: true, category: true, examOnly: true,
+              passingScore: true, startDate: true, endDate: true,
+            },
+          },
+          examAttempts: {
+            orderBy: { createdAt: 'desc' as const },
+            take: 1,
+            select: {
+              postExamScore: true, preExamScore: true, isPassed: true,
+              status: true, preExamCompletedAt: true, videosCompletedAt: true,
+              postExamCompletedAt: true,
+            },
           },
         },
-      },
-    })
+        take: 200,
+      }),
+      prisma.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { title: true, isRead: true, createdAt: true },
+      }),
+      prisma.examAttempt.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          status: true, isPassed: true, postExamScore: true,
+          preExamCompletedAt: true, videosCompletedAt: true,
+          postExamCompletedAt: true, createdAt: true,
+          training: { select: { title: true } },
+        },
+      }),
+    ])
 
+    // 2) Assignment stats
     const assigned = assignments.length
     const inProgress = assignments.filter(a => a.status === 'in_progress').length
     const completed = assignments.filter(a => a.status === 'passed').length
     const failed = assignments.filter(a => a.status === 'failed').length
     const overallProgress = assigned > 0 ? Math.round((completed / assigned) * 100) : 0
 
-    // 2) Upcoming trainings (assigned or in_progress, with deadline)
-    const activeAssignments = assignments.filter(
-      a => a.status === 'assigned' || a.status === 'in_progress'
-    )
-
-    // Get progress info for active assignments
-    const assignmentIds = activeAssignments.map(a => a.id)
-    const attempts = assignmentIds.length > 0
-      ? await prisma.examAttempt.findMany({
-          where: { assignmentId: { in: assignmentIds } },
-          select: {
-            assignmentId: true,
-            videosCompletedAt: true,
-            preExamCompletedAt: true,
-            postExamCompletedAt: true,
-          },
-          orderBy: { attemptNumber: 'desc' },
-        })
-      : []
-
-    const upcomingTrainings = activeAssignments
+    // 3) Upcoming trainings — attempt verisi zaten include ile geldi
+    const upcomingTrainings = assignments
+      .filter(a => a.status === 'assigned' || a.status === 'in_progress')
       .map(a => {
         const endDate = a.training.endDate
         const daysLeft = endDate
           ? Math.ceil((new Date(endDate).getTime() - Date.now()) / 86400000)
           : 999
 
-        // Estimate progress from latest attempt
-        const latestAttempt = attempts.find(att => att.assignmentId === a.id)
+        const latestAttempt = a.examAttempts[0]
         let progress = 0
         if (latestAttempt) {
           if (latestAttempt.postExamCompletedAt) progress = 100
@@ -95,38 +110,10 @@ export async function GET() {
       .sort((a, b) => a.daysLeft - b.daysLeft)
       .slice(0, 5)
 
-    // 3) Urgent training (closest deadline, <= 7 days)
+    // 4) Urgent training (closest deadline, <= 7 days)
     const urgentTraining = upcomingTrainings.find(t => t.daysLeft > 0 && t.daysLeft <= 7) ?? null
 
-    // 4) Recent notifications
-    const notifications = await prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: {
-        title: true,
-        isRead: true,
-        createdAt: true,
-      },
-    })
-
-    // 5) Recent activity from exam attempts
-    const recentAttempts = await prisma.examAttempt.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: {
-        status: true,
-        isPassed: true,
-        postExamScore: true,
-        preExamCompletedAt: true,
-        videosCompletedAt: true,
-        postExamCompletedAt: true,
-        createdAt: true,
-        training: { select: { title: true } },
-      },
-    })
-
+    // 5) Recent activity
     const recentActivity = recentAttempts.map(a => {
       let text = ''
       let type = 'info'
@@ -157,7 +144,7 @@ export async function GET() {
       }
     })
 
-    return jsonResponse({
+    const responseData = {
       stats: { assigned, inProgress, completed, failed, overallProgress },
       upcomingTrainings,
       urgentTraining: urgentTraining ? { id: urgentTraining.id, title: urgentTraining.title, daysLeft: urgentTraining.daysLeft } : null,
@@ -167,7 +154,11 @@ export async function GET() {
         isRead: n.isRead,
       })),
       recentActivity,
-    })
+    }
+
+    await setCached(cacheKey, responseData, CACHE_TTL)
+
+    return jsonResponse(responseData, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('Staff Dashboard', 'Dashboard verileri yüklenemedi', err)
     return errorResponse('Dashboard verileri yüklenemedi', 500)

@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { submitExamSchema } from '@/lib/validations'
-import { checkRateLimit, clearExamTimer } from '@/lib/redis'
+import { checkRateLimit, clearExamTimer, invalidateCache } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
 
@@ -179,8 +179,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await clearExamTimer(attempt.id)
 
   // Update assignment status
+  // assignment.maxAttempts admin "Yeni Hak Ver" ile override edilmiş olabilir
+  const effectiveMaxAttempts = attempt.assignment.maxAttempts ?? attempt.training.maxAttempts
   const newStatus = isPassed ? 'passed' : (
-    attempt.assignment.currentAttempt >= attempt.assignment.maxAttempts ? 'failed' : 'in_progress'
+    attempt.attemptNumber >= effectiveMaxAttempts ? 'failed' : 'in_progress'
   )
 
   await prisma.trainingAssignment.update({
@@ -244,6 +246,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     entityId: attempt.id,
     newData: { score, isPassed, trainingId: attempt.trainingId },
   })
+
+  try { await invalidateCache(`dashboard:${attempt.training.organizationId}`) } catch {}
 
   return jsonResponse({ phase: 'post', score, isPassed, passingScore: attempt.training.passingScore, results: questionResults })
 }

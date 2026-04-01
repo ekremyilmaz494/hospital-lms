@@ -6,7 +6,8 @@ export function getRedis(): Redis | null {
   if (_redis) return _redis
   const url = process.env.REDIS_URL
   const token = process.env.REDIS_TOKEN
-  if (!url || !token) return null
+  // Placeholder veya boş değerler varsa Redis'i atla
+  if (!url || !token || url.includes('your-redis') || token.includes('your-redis')) return null
   _redis = new Redis({ url, token })
   return _redis
 }

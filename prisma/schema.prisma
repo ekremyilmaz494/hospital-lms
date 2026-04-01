@@ -76,6 +76,8 @@ model Organization {
   competencyForms      CompetencyForm[]
   syncLogs             SyncLog[]
   accreditationReports AccreditationReport[]
+  trainingCategories   TrainingCategory[]
+  questionBank         QuestionBank[]
 
   @@map("organizations")
 }
@@ -257,6 +259,11 @@ model Training {
   scormEntryPoint     String?   @db.Text @map("scorm_entry_point")
   scormVersion        String?   @db.VarChar(10) @map("scorm_version")
 
+  // Bağımsız Sınav
+  examOnly             Boolean   @default(false) @map("exam_only")
+  randomizeQuestions   Boolean   @default(false) @map("randomize_questions")
+  randomQuestionCount  Int?      @map("random_question_count")
+
   // İçerik Kütüphanesi
   isFromLibrary       Boolean   @default(false) @map("is_from_library")
   sourceLibraryId     String?   @db.Uuid @map("source_library_id")
@@ -351,6 +358,8 @@ model TrainingAssignment {
   @@index([userId], map: "idx_assignments_user")
   @@index([trainingId], map: "idx_assignments_training")
   @@index([status], map: "idx_assignments_status")
+  @@index([userId, status], map: "idx_assignments_user_status")
+  @@index([trainingId, status], map: "idx_assignments_training_status")
   @@map("training_assignments")
 }
 
@@ -383,6 +392,8 @@ model ExamAttempt {
   @@index([assignmentId], map: "idx_attempts_assignment")
   @@index([userId], map: "idx_attempts_user")
   @@index([trainingId], map: "idx_attempts_training")
+  @@index([trainingId, status], map: "idx_attempts_training_status")
+  @@index([userId, trainingId], map: "idx_attempts_user_training")
   @@map("exam_attempts")
 }
 
@@ -444,6 +455,7 @@ model Notification {
 
   @@index([userId, isRead], map: "idx_notifications_user")
   @@index([userId, createdAt], map: "idx_notifications_user_date")
+  @@index([organizationId, isRead, createdAt], map: "idx_notifications_org_read_date")
   @@map("notifications")
 }
 
@@ -467,6 +479,7 @@ model AuditLog {
   @@index([userId], map: "idx_audit_logs_user")
   @@index([entityType, entityId], map: "idx_audit_logs_entity")
   @@index([createdAt], map: "idx_audit_logs_date")
+  @@index([organizationId, createdAt], map: "idx_audit_logs_org_date")
   @@map("audit_logs")
 }
 
@@ -844,4 +857,53 @@ model AccreditationReport {
   @@index([standardBody], map: "idx_accreditation_reports_body")
   @@index([generatedAt], map: "idx_accreditation_reports_date")
   @@map("accreditation_reports")
+}
+
+// ── EĞİTİM KATEGORİLERİ ──
+model TrainingCategory {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid @map("organization_id")
+  value          String       @db.VarChar(100)
+  label          String       @db.VarChar(100)
+  icon           String       @db.VarChar(10)
+  order          Int          @default(0)
+  isDefault      Boolean      @default(false) @map("is_default")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, value])
+  @@index([organizationId, order], map: "idx_training_categories_org_order")
+  @@map("training_categories")
+}
+
+// ── SORU BANKASI ──
+model QuestionBank {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @db.Uuid @map("organization_id")
+  text           String               @db.Text
+  category       String               @db.VarChar(100)
+  difficulty     String               @default("medium") @db.VarChar(10)
+  tags           String[]
+  points         Int                  @default(1)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  options        QuestionBankOption[]
+
+  @@index([organizationId], map: "idx_question_bank_org")
+  @@map("question_bank")
+}
+
+model QuestionBankOption {
+  id             String       @id @default(uuid()) @db.Uuid
+  questionBankId String       @db.Uuid @map("question_bank_id")
+  text           String       @db.Text
+  isCorrect      Boolean      @map("is_correct")
+  order          Int
+
+  question       QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
+
+  @@map("question_bank_options")
 }

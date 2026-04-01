@@ -77,8 +77,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           createdAt: user.created_at,
           updatedAt: user.updated_at ?? user.created_at,
         });
-        // JWT verisi ilk yuklemede yeterli — DB refresh'i 3s sonra yap
-        setTimeout(() => refreshFromDB(), 3000);
+        // JWT verisi ilk yuklemede yeterli — DB refresh'i idle zamanda yap
+        if (typeof requestIdleCallback === 'function') {
+          requestIdleCallback(() => refreshFromDB());
+        } else {
+          setTimeout(() => refreshFromDB(), 100);
+        }
       } else {
         setUser(null);
       }

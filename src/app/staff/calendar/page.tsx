@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2,
-  BookOpen, AlertTriangle, X, ArrowRight, Play, Target, Layers,
+  BookOpen, AlertTriangle, X, ArrowRight, Play, Target, Layers, ClipboardList,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
@@ -19,6 +19,7 @@ interface CalendarEvent {
   category: string;
   status: 'assigned' | 'in_progress' | 'completed' | 'failed';
   trainingId: string;
+  eventType: 'training' | 'exam';
 }
 
 /* ─── Constants ─── */
@@ -383,19 +384,18 @@ export default function CalendarPage() {
                       <div className="mt-1 flex flex-col gap-0.5 w-full min-w-0">
                         {dayEvents.slice(0, 2).map(evt => {
                           const cfg = STATUS_CONFIG[evt.status];
+                          const pillColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
+                          const PillIcon = evt.eventType === 'exam' ? ClipboardList : BookOpen;
                           return (
                             <div
                               key={evt.id}
                               className="flex items-center gap-1 rounded-md px-1.5 py-0.5 w-full min-w-0"
-                              style={{ background: `${cfg.color}12` }}
+                              style={{ background: `${pillColor}12` }}
                             >
-                              <span
-                                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                                style={{ background: cfg.color }}
-                              />
+                              <PillIcon className="h-2.5 w-2.5 shrink-0" style={{ color: pillColor }} />
                               <span
                                 className="truncate text-[9px] font-semibold leading-tight"
-                                style={{ color: cfg.color }}
+                                style={{ color: pillColor }}
                               >
                                 {evt.title}
                               </span>
@@ -427,6 +427,18 @@ export default function CalendarPage() {
                   </span>
                 </div>
               ))}
+              <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1">
+                <BookOpen className="h-3 w-3" style={{ color: 'var(--color-info)' }} />
+                <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                  Eğitim
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1">
+                <ClipboardList className="h-3 w-3" style={{ color: 'var(--color-accent)' }} />
+                <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                  Sınav
+                </span>
+              </div>
               <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1 ml-auto">
                 <span className="h-2 w-2 rounded-full" style={{ background: 'var(--color-error)' }} />
                 <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
@@ -487,7 +499,9 @@ export default function CalendarPage() {
                   ) : (
                     selectedDayEvents.map(evt => {
                       const cfg = STATUS_CONFIG[evt.status];
-                      const Icon = cfg.icon;
+                      const Icon = evt.eventType === 'exam' ? ClipboardList : cfg.icon;
+                      const iconBg = evt.eventType === 'exam' ? 'var(--color-accent-light)' : cfg.bg;
+                      const iconColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
                       const days = daysUntil(evt.end);
                       return (
                         <Link
@@ -506,9 +520,9 @@ export default function CalendarPage() {
                         >
                           <div
                             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg mt-0.5"
-                            style={{ background: cfg.bg }}
+                            style={{ background: iconBg }}
                           >
-                            <Icon className="h-4 w-4" style={{ color: cfg.color }} />
+                            <Icon className="h-4 w-4" style={{ color: iconColor }} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-[13px] font-semibold truncate group-hover:text-clip">{evt.title}</p>

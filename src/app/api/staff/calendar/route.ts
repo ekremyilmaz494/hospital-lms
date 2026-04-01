@@ -34,7 +34,7 @@ export async function GET(request: Request) {
         },
       },
       include: {
-        training: { select: { id: true, title: true, category: true, startDate: true, endDate: true, examDurationMinutes: true } },
+        training: { select: { id: true, title: true, category: true, startDate: true, endDate: true, examDurationMinutes: true, examOnly: true } },
       },
       take: 200,
     })
@@ -48,6 +48,7 @@ export async function GET(request: Request) {
       category: a.training.category,
       status: a.status,
       trainingId: a.training.id,
+      eventType: a.training.examOnly ? 'exam' as const : 'training' as const,
     }))
 
     return jsonResponse(events)

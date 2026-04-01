@@ -55,13 +55,13 @@ export default function PreExamPage() {
         });
         const attempt = await startRes.json();
 
-        // Phase guard: redirect if attempt is past pre-exam
-        if (attempt?.status === 'watching_videos') {
-          router.replace(`/exam/${id}/videos`);
+        // Phase guard: redirect if attempt is past pre-exam or examOnly
+        if (attempt?.examOnly || attempt?.status === 'post_exam') {
+          router.replace(`/exam/${id}/post-exam`);
           return;
         }
-        if (attempt?.status === 'post_exam') {
-          router.replace(`/exam/${id}/post-exam`);
+        if (attempt?.status === 'watching_videos') {
+          router.replace(`/exam/${id}/videos`);
           return;
         }
         if (attempt?.status === 'completed') {

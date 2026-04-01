@@ -26,6 +26,7 @@ export function useRealtimeExams() {
   const { user } = useAuthStore()
   const [attempts, setAttempts] = useState<LiveExamAttempt[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isConnected, setIsConnected] = useState(false)
 
   const fetchInitial = useCallback(async () => {
     try {
@@ -62,14 +63,17 @@ export function useRealtimeExams() {
           fetchInitial()
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        setIsConnected(status === 'SUBSCRIBED')
+      })
 
     return () => {
       supabase.removeChannel(channel)
+      setIsConnected(false)
     }
   }, [user?.id, user?.role, user?.organizationId, fetchInitial])
 
   const activeCount = attempts.filter(a => IN_PROGRESS_STATUSES.has(a.status)).length
 
-  return { attempts, isLoading, activeCount }
+  return { attempts, isLoading, activeCount, isConnected }
 }

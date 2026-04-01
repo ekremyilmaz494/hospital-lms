@@ -1,6 +1,10 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
+import { getCached, setCached } from '@/lib/redis'
+
+const CACHE_KEY = 'super-admin:dashboard'
+const CACHE_TTL = 300
 
 export async function GET() {
   const { dbUser, error } = await getAuthUser()
@@ -10,6 +14,9 @@ export async function GET() {
   if (roleError) return roleError
 
   try {
+    const cached = await getCached<Record<string, unknown>>(CACHE_KEY)
+    if (cached) return jsonResponse(cached)
+
     const [
       hospitalCount,
       activeHospitalCount,
@@ -76,21 +83,28 @@ export async function GET() {
     }
     const subscriptionData = Array.from(planCounts.entries()).map(([plan, counts]) => ({ plan, ...counts }))
 
-    // Monthly registration trend (last 6 months)
+    // Monthly registration trend (last 6 months) — tüm sorgular paralel
     const now = new Date()
-    const monthlyData = []
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const nextDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const idx = 5 - i
+      const date = new Date(now.getFullYear(), now.getMonth() - idx, 1)
+      const nextDate = new Date(now.getFullYear(), now.getMonth() - idx + 1, 1)
       const monthName = date.toLocaleDateString('tr-TR', { month: 'short' })
+      return { date, nextDate, monthName }
+    })
 
-      const [hospitalMonthCount, userMonthCount] = await Promise.all([
-        prisma.organization.count({ where: { createdAt: { gte: date, lt: nextDate } } }),
-        prisma.user.count({ where: { createdAt: { gte: date, lt: nextDate } } }),
-      ])
+    const monthQueries = months.flatMap(m => [
+      prisma.organization.count({ where: { createdAt: { gte: m.date, lt: m.nextDate } } }),
+      prisma.user.count({ where: { createdAt: { gte: m.date, lt: m.nextDate } } }),
+    ])
 
-      monthlyData.push({ month: monthName, hastane: hospitalMonthCount, personel: userMonthCount })
-    }
+    const monthResults = await Promise.all(monthQueries)
+
+    const monthlyData = months.map((m, i) => ({
+      month: m.monthName,
+      hastane: monthResults[i * 2],
+      personel: monthResults[i * 2 + 1],
+    }))
 
     // Recent hospitals formatted
     const formattedHospitals = recentHospitals.map(h => ({
@@ -145,7 +159,7 @@ export async function GET() {
       variant: 'error',
     } : undefined
 
-    return jsonResponse({
+    const responseData = {
       stats,
       alert,
       monthlyData,
@@ -164,7 +178,11 @@ export async function GET() {
         expiredSubscriptions: expiredSubscriptions,
         completionRate,
       },
-    })
+    }
+
+    await setCached(CACHE_KEY, responseData, CACHE_TTL)
+
+    return jsonResponse(responseData)
   } catch (err) {
     logger.error('SuperAdmin Dashboard', 'Dashboard verileri alınamadı', err)
     return errorResponse('Dashboard verileri alınamadı', 503)

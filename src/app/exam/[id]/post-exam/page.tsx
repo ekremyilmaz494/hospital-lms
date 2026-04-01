@@ -41,6 +41,8 @@ export default function PostExamPage() {
   const [submitting, setSubmitting] = useState(false);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [phaseChecked, setPhaseChecked] = useState(false);
+  const [isExamOnly, setIsExamOnly] = useState(false);
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Kaydedilmis cevaplari yukle
@@ -71,6 +73,7 @@ export default function PostExamPage() {
           return;
         }
         setAttemptId(attempt.id);
+        if (attempt.examOnly) setIsExamOnly(true);
         setPhaseChecked(true);
       })
       .catch(() => setPhaseChecked(true));
@@ -120,6 +123,33 @@ export default function PostExamPage() {
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [timeLeft !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Anti-cheat: Tab visibility detection (examOnly)
+  useEffect(() => {
+    if (!isExamOnly) return;
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setTabSwitchCount((prev) => {
+          const next = prev + 1;
+          if (next >= 3) {
+            toast('3. ihlal: Sınavınız otomatik sonlandırıldı', 'error');
+          } else {
+            toast(`Uyarı: Sekme değiştirme tespit edildi (${next}/3)`, 'warning');
+          }
+          return next;
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isExamOnly, toast]);
+
+  // Force submit on 3rd tab switch violation
+  useEffect(() => {
+    if (tabSwitchCount >= 3 && handleFinishRef.current) {
+      handleFinishRef.current();
+    }
+  }, [tabSwitchCount]);
 
   // Auto-submit when timer hits zero
   const handleFinishRef = useRef<() => void>(undefined);
@@ -212,12 +242,26 @@ export default function PostExamPage() {
   const answeredCount = Object.keys(answers).length;
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
+    <div
+      className="min-h-screen"
+      style={{ background: 'var(--color-bg)' }}
+      onContextMenu={isExamOnly ? (e) => e.preventDefault() : undefined}
+      onCopy={isExamOnly ? (e) => e.preventDefault() : undefined}
+    >
+      {/* Tab switch warning banner */}
+      {isExamOnly && tabSwitchCount > 0 && (
+        <div
+          className="sticky top-0 z-60 flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white"
+          style={{ background: tabSwitchCount >= 2 ? 'var(--color-error)' : 'var(--color-warning)' }}
+        >
+          Sekme değiştirme tespit edildi ({tabSwitchCount}/3) — 3. ihlalde sınav sonlandırılır
+        </div>
+      )}
       <div className="sticky top-0 z-50 border-b px-6 py-3" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h3 className="text-sm font-bold">{examData.trainingTitle ?? ''}</h3>
-            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--color-accent-light)', color: 'var(--color-accent)' }}>{examData.examType ?? 'Son Sınav'}</span>
+            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--color-accent-light)', color: 'var(--color-accent)' }}>{isExamOnly ? 'Sınav' : (examData.examType ?? 'Son Sınav')}</span>
             <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Soru {currentQ + 1}/{questions.length}</span>
           </div>
           <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: 'var(--color-surface-hover)' }}>

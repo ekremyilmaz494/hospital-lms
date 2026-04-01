@@ -585,20 +585,20 @@ export default function StaffPage() {
                           <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); setEditingDept({ id: dept.id, name: dept.name, color: dept.color }); }}><Edit className="h-4 w-4" /> Düzenle</DropdownMenuItem>
                           <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); setSelectedDept(dept.id); setShowAssignStaff(true); }}><UserPlus className="h-4 w-4" /> Personel Ekle</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="gap-2 text-red-500"
                             onClick={async (e) => {
                               e.stopPropagation();
-                              if (confirm('Bu departmanı silmek istediğinize emin misiniz? (İçindeki personeller boşa düşecektir)')) {
-                                try {
-                                  const res = await fetch(`/api/admin/departments/${dept.id}`, { method: 'DELETE' });
-                                  if (!res.ok) throw new Error('Silinemedi');
-                                  toast('Departman silindi', 'success');
-                                  if (selectedDept === dept.id) setSelectedDept(null);
-                                  refetch();
-                                } catch (_err) {
-                                  toast('Departman silinemedi', 'error');
-                                }
+                              if (!confirm('Bu departmanı silmek istediğinize emin misiniz? (İçindeki personeller boşa düşecektir)')) return;
+                              try {
+                                const res = await fetch(`/api/admin/departments/${dept.id}`, { method: 'DELETE' });
+                                const resData = await res.json().catch(() => ({}));
+                                if (!res.ok) throw new Error(resData.error || 'Departman silinemedi');
+                                toast('Departman silindi', 'success');
+                                if (selectedDept === dept.id) setSelectedDept(null);
+                                refetch();
+                              } catch (err) {
+                                toast(err instanceof Error ? err.message : 'Departman silinemedi', 'error');
                               }
                             }}
                           >
@@ -704,9 +704,11 @@ export default function StaffPage() {
                           const res = await fetch('/api/admin/departments', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ name: newDeptName, color: newDeptColor }),
+                            body: JSON.stringify({ name: newDeptName.trim(), color: newDeptColor }),
                           });
-                          if (!res.ok) throw new Error('Departman oluşturulamadı');
+                          const resData = await res.json().catch(() => ({}));
+                          if (!res.ok) throw new Error(resData.error || 'Departman oluşturulamadı');
+                          toast(`"${newDeptName.trim()}" departmanı oluşturuldu`, 'success');
                           setShowAddDept(false);
                           setNewDeptName('');
                           refetch();
@@ -764,16 +766,16 @@ export default function StaffPage() {
                   className="gap-2 rounded-xl text-red-500"
                   style={{ borderColor: 'var(--color-error)' }}
                   onClick={async () => {
-                    if (confirm(`"${selectedDeptData.name}" departmanını silmek istediğinize emin misiniz?`)) {
-                      try {
-                        const res = await fetch(`/api/admin/departments/${selectedDept}`, { method: 'DELETE' });
-                        if (!res.ok) throw new Error('Silinemedi');
-                        toast('Departman silindi', 'success');
-                        setSelectedDept(null);
-                        refetch();
-                      } catch {
-                        toast('Departman silinemedi', 'error');
-                      }
+                    if (!confirm(`"${selectedDeptData.name}" departmanını silmek istediğinize emin misiniz?`)) return;
+                    try {
+                      const res = await fetch(`/api/admin/departments/${selectedDept}`, { method: 'DELETE' });
+                      const resData = await res.json().catch(() => ({}));
+                      if (!res.ok) throw new Error(resData.error || 'Departman silinemedi');
+                      toast('Departman silindi', 'success');
+                      setSelectedDept(null);
+                      refetch();
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : 'Departman silinemedi', 'error');
                     }
                   }}
                 >

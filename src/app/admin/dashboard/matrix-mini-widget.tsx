@@ -123,12 +123,12 @@ export function MatrixMiniWidget() {
 
       {/* ── Matrix ── */}
       <div className="overflow-x-auto px-5 pb-4 pt-4">
-        <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: 11, width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th style={{ width: 116, paddingBottom: 6 }} />
+              <th style={{ width: 130, paddingBottom: 6 }} />
               {preview.trainings.map((t) => (
-                <th key={t.id} style={{ width: 34, paddingBottom: 6, paddingLeft: 3, paddingRight: 3, textAlign: 'center', verticalAlign: 'bottom' }}>
+                <th key={t.id} style={{ paddingBottom: 6, paddingLeft: 3, paddingRight: 3, textAlign: 'center', verticalAlign: 'bottom' }}>
                   <div className="flex flex-col items-center gap-1">
                     <span
                       style={{
@@ -159,7 +159,7 @@ export function MatrixMiniWidget() {
                   </div>
                 </th>
               ))}
-              <th style={{ width: 64, paddingBottom: 6, paddingLeft: 10, textAlign: 'left', verticalAlign: 'bottom' }}>
+              <th style={{ width: 80, paddingBottom: 6, paddingLeft: 10, textAlign: 'left', verticalAlign: 'bottom' }}>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>ORAN</span>
               </th>
             </tr>

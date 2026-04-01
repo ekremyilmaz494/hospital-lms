@@ -22,6 +22,8 @@ import {
   Plug,
   BarChart2,
   ClipboardCheck,
+  ClipboardList,
+  Tags,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -55,6 +57,7 @@ export const superAdminNav: NavGroup[] = [
       { title: 'İçerik Kütüphanesi', href: '/super-admin/content-library', icon: Library },
       { title: 'Raporlar', href: '/super-admin/reports', icon: BarChart3 },
       { title: 'Audit Log', href: '/super-admin/audit-logs', icon: Shield },
+      { title: 'Yedekleme', href: '/super-admin/backups', icon: Database },
     ],
   },
   {
@@ -76,6 +79,17 @@ export const adminNav: NavGroup[] = [
         children: [
           { title: 'Eğitim Listesi', href: '/admin/trainings' },
           { title: 'Yeni Eğitim', href: '/admin/trainings/new' },
+          { title: 'Kategori Yönetimi', href: '/admin/settings/categories' },
+        ],
+      },
+      {
+        title: 'Sınavlar',
+        href: '/admin/exams',
+        icon: ClipboardList,
+        children: [
+          { title: 'Sınav Listesi', href: '/admin/exams' },
+          { title: 'Yeni Sınav', href: '/admin/exams/new' },
+          { title: 'Soru Bankası', href: '/admin/exams/question-bank' },
         ],
       },
       { title: 'İçerik Kütüphanesi', href: '/admin/content-library', icon: Library },
@@ -96,7 +110,6 @@ export const adminNav: NavGroup[] = [
       { title: 'Raporlar', href: '/admin/reports', icon: BarChart3 },
       { title: 'Bildirimler', href: '/admin/notifications', icon: Bell },
       { title: 'İşlem Geçmişi', href: '/admin/audit-logs', icon: History },
-      { title: 'Yedekleme', href: '/admin/backups', icon: Database },
       { title: 'Akreditasyon', href: '/admin/accreditation', icon: ClipboardCheck },
     ],
   },

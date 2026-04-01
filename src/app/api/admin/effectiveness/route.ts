@@ -1,8 +1,7 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
-import { checkRateLimit } from '@/lib/redis'
+import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { checkRateLimit, getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
-import { NextResponse } from 'next/server'
 
 /**
  * GET /api/admin/effectiveness
@@ -20,41 +19,51 @@ export async function GET() {
   const allowed = await checkRateLimit(`effectiveness:${orgId}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
-  try {
-    // Tüm geçerli attempts (pre + post skoru olan): öğrenme kazanımını ölçmek için
-    const attempts = await prisma.examAttempt.findMany({
-      where: {
-        training: { organizationId: orgId },
-        preExamScore: { not: null },
-        postExamScore: { not: null },
-      },
-      select: {
-        trainingId: true,
-        attemptNumber: true,
-        preExamScore: true,
-        postExamScore: true,
-        isPassed: true,
-        postExamCompletedAt: true,
-        training: {
-          select: { title: true, category: true, isCompulsory: true },
-        },
-      },
-      orderBy: { postExamCompletedAt: 'asc' },
-    })
+  // Redis cache: 5 dk TTL
+  const cacheKey = `effectiveness:${orgId}`
+  const cached = await getCached<object>(cacheKey)
+  if (cached) return jsonResponse(cached)
 
-    // Tüm attempt'ler (pass rate için — sadece pre skoru olan veya post olmayan dahil)
-    const allAttempts = await prisma.examAttempt.findMany({
-      where: {
-        training: { organizationId: orgId },
-        postExamScore: { not: null },
-      },
-      select: {
-        trainingId: true,
-        isPassed: true,
-        postExamScore: true,
-        postExamCompletedAt: true,
-      },
-    })
+  try {
+    // Bağımsız sorgular paralel — DB round-trip: 2 → 1
+    const [attempts, allAttempts] = await Promise.all([
+      // Pre + post skoru olan attempts: öğrenme kazanımını ölçmek için
+      prisma.examAttempt.findMany({
+        where: {
+          training: { organizationId: orgId },
+          preExamScore: { not: null },
+          postExamScore: { not: null },
+        },
+        select: {
+          trainingId: true,
+          attemptNumber: true,
+          preExamScore: true,
+          postExamScore: true,
+          isPassed: true,
+          postExamCompletedAt: true,
+          training: {
+            select: { title: true, category: true, isCompulsory: true },
+          },
+        },
+        orderBy: { postExamCompletedAt: 'asc' },
+        take: 2000,
+      }),
+      // Tüm attempt'ler (pass rate için)
+      prisma.examAttempt.findMany({
+        where: {
+          training: { organizationId: orgId },
+          postExamScore: { not: null },
+        },
+        select: {
+          trainingId: true,
+          isPassed: true,
+          postExamScore: true,
+          postExamCompletedAt: true,
+        },
+        orderBy: { postExamCompletedAt: 'desc' },
+        take: 2000,
+      }),
+    ])
 
     // Training bazlı gruplama
     const trainingMap = new Map<
@@ -218,7 +227,7 @@ export async function GET() {
       avgGain: d.gainCount > 0 ? Math.round((d.sumGain / d.gainCount) * 10) / 10 : null,
     }))
 
-    return NextResponse.json({
+    const responseData = {
       summary: {
         totalTrainingsAnalyzed: trainingEffectiveness.length,
         totalAttempts: allAttempts.length,
@@ -228,7 +237,10 @@ export async function GET() {
       globalTrend,
       categoryBreakdown,
       trainingEffectiveness,
-    })
+    }
+
+    await setCached(cacheKey, responseData, 300) // 5 dk TTL
+    return jsonResponse(responseData)
   } catch (err) {
     logger.error('Effectiveness', 'Etkinlik analizi alınamadı', err)
     return errorResponse('Etkinlik analizi alınamadı', 503)

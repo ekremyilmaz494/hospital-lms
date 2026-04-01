@@ -12,6 +12,8 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import { ShimmerButton } from '@/components/ui/shimmer-button';
 import { Ripple } from '@/components/ui/ripple';
 import { BorderBeam } from '@/components/ui/border-beam';
+import { createClient } from '@/lib/supabase/client';
+import { useAuthStore } from '@/store/auth-store';
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/super-admin/dashboard',
@@ -34,6 +36,7 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
+  const [kvkkError, setKvkkError] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
   const rawRedirect = searchParams.get('redirectTo');
@@ -44,6 +47,12 @@ function LoginForm() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!kvkkAccepted) {
+      setKvkkError(true);
+      return;
+    }
+    setKvkkError(false);
     setLoading(true);
 
     try {
@@ -75,6 +84,38 @@ function LoginForm() {
 
       const role = data.user?.role as string;
       const target = redirectTo && redirectTo !== '/' ? redirectTo : ROLE_ROUTES[role] || '/staff/dashboard';
+
+      // Sunucu cookie set etti; browser client'ı session'ı okuyarak store'u önceden
+      // dolduralım — böylece admin layout mount olduğunda user zaten mevcut olur.
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const u = session.user;
+          useAuthStore.getState().setUser({
+            id: u.id,
+            email: u.email ?? '',
+            firstName: u.user_metadata?.first_name ?? '',
+            lastName: u.user_metadata?.last_name ?? '',
+            role: u.user_metadata?.role ?? 'staff',
+            organizationId: u.user_metadata?.organization_id ?? null,
+            tcNo: u.user_metadata?.tc_no ?? null,
+            phone: u.user_metadata?.phone ?? null,
+            departmentId: u.user_metadata?.department_id ?? null,
+            department: u.user_metadata?.department ?? null,
+            title: u.user_metadata?.title ?? null,
+            avatarUrl: u.user_metadata?.avatar_url ?? null,
+            isActive: u.user_metadata?.is_active !== false,
+            kvkkConsent: u.user_metadata?.kvkk_consent ?? false,
+            kvkkConsentDate: u.user_metadata?.kvkk_consent_date ?? null,
+            createdAt: u.created_at,
+            updatedAt: u.updated_at ?? u.created_at,
+          });
+        }
+      } catch {
+        // Fallback: store doldurulamazsa AuthProvider onAuthStateChange ile yakalar
+      }
+
       router.push(target);
     } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
@@ -247,20 +288,30 @@ function LoginForm() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5">
-                <Checkbox
-                  id="kvkk"
-                  checked={kvkkAccepted}
-                  onCheckedChange={(checked) => setKvkkAccepted(checked === true)}
-                  className="mt-0.5"
-                  required
-                />
-                <label htmlFor="kvkk" className="text-xs leading-relaxed cursor-pointer" style={{ color: 'var(--color-text-secondary)' }}>
-                  <Link href="/kvkk" target="_blank" className="font-semibold underline transition-colors duration-150" style={{ color: 'var(--color-primary)' }}>
-                    KVKK Aydınlatma Metni
-                  </Link>
-                  &apos;ni okudum ve kabul ediyorum.
-                </label>
+              <div className="space-y-1.5">
+                <div className="flex items-start gap-2.5">
+                  <Checkbox
+                    id="kvkk"
+                    checked={kvkkAccepted}
+                    onCheckedChange={(checked) => {
+                      setKvkkAccepted(checked === true);
+                      if (checked) setKvkkError(false);
+                    }}
+                    className="mt-0.5"
+                    style={kvkkError ? { borderColor: 'var(--color-error)' } : undefined}
+                  />
+                  <label htmlFor="kvkk" className="text-xs leading-relaxed cursor-pointer" style={{ color: kvkkError ? 'var(--color-error)' : 'var(--color-text-secondary)' }}>
+                    <Link href="/kvkk" target="_blank" className="font-semibold underline transition-colors duration-150" style={{ color: 'var(--color-primary)' }}>
+                      KVKK Aydınlatma Metni
+                    </Link>
+                    &apos;ni okudum ve kabul ediyorum.
+                  </label>
+                </div>
+                {kvkkError && (
+                  <p className="text-xs font-medium pl-6" style={{ color: 'var(--color-error)' }}>
+                    Devam etmek için KVKK metnini onaylamanız zorunludur.
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2.5">
@@ -276,7 +327,7 @@ function LoginForm() {
 
               <ShimmerButton
                 type="submit"
-                disabled={loading || !kvkkAccepted}
+                disabled={loading}
                 className="w-full h-12 gap-2.5 text-[15px] font-semibold"
                 shimmerColor="rgba(255,255,255,0.15)"
                 shimmerSize="0.08em"

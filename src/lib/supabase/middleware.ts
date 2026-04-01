@@ -1,91 +1,96 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const PUBLIC_ROUTES = ['/', '/kvkk', '/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password', '/auth/mfa-verify', '/auth/mfa-setup', '/api/health', '/api/docs', '/api/cron/', '/api/payments/callback', '/help', '/certificates/verify']
+
+function isPublicRoute(pathname: string): boolean {
+  return pathname === '/' || PUBLIC_ROUTES.some((route) => route !== '/' && pathname.startsWith(route))
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
-  try {
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value)
-            )
-            supabaseResponse = NextResponse.next({ request })
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options)
-            )
-          },
-        },
-      }
-    )
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
   const { pathname } = request.nextUrl
 
-  // API routes handle their own auth — never redirect them to the login page
+  // ── API route'ları: middleware'de auth yapma ──
+  // Her API route kendi getAuthUser() (getSession → local JWT parse) ile doğrulama yapıyor.
+  // Middleware'de getUser() HTTP call'ı gereksiz (~100-150ms tasarruf per API request).
   if (pathname.startsWith('/api/')) {
     return supabaseResponse
   }
 
-  // Public routes
-  const publicRoutes = ['/', '/kvkk', '/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password', '/auth/mfa-verify', '/auth/mfa-setup', '/api/health', '/api/docs', '/api/cron/', '/api/payments/callback', '/help', '/certificates/verify']
-  if (pathname === '/' || publicRoutes.some((route) => pathname === route || (route !== '/' && pathname.startsWith(route)))) {
-    // Authenticated users on login page or root → redirect to dashboard
-    if (user && (pathname === '/auth/login' || pathname === '/')) {
-      const role = user.user_metadata?.role as string
-      const dashboardUrl = getDashboardUrl(role)
-      return NextResponse.redirect(new URL(dashboardUrl, request.url))
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  // ── Public route'lar: getSession() = local JWT parse, HTTP yok ──
+  // Sadece authenticated kullanıcıyı login sayfasından dashboard'a yönlendirmek için kullanılır.
+  if (isPublicRoute(pathname)) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user && (pathname === '/auth/login' || pathname === '/')) {
+        const role = session.user.user_metadata?.role as string
+        return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+      }
+    } catch {
+      // Session parse başarısız — public sayfayı normal göster
     }
     return supabaseResponse
   }
 
-  // Unauthenticated → login
-  if (!user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
-    // Only store same-origin relative paths as redirectTo — prevents open redirect
-    // e.g. /admin/dashboard is OK, https://phishing.com is NOT
-    if (pathname && pathname.startsWith('/') && !pathname.startsWith('//')) {
-      url.searchParams.set('redirectTo', pathname)
+  // ── Protected route'lar: getUser() = Supabase'e HTTP call (token doğrulama + refresh) ──
+  // Bu route'lar güvenlik-kritik: gerçek JWT doğrulaması ve token refresh gerekli.
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    // Unauthenticated → login'e yönlendir
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      if (pathname && pathname.startsWith('/') && !pathname.startsWith('//')) {
+        url.searchParams.set('redirectTo', pathname)
+      }
+      return NextResponse.redirect(url)
     }
-    return NextResponse.redirect(url)
-  }
 
-  // Role-based access control
-  const role = user.user_metadata?.role as string
+    // Role-based access control
+    const role = user.user_metadata?.role as string
 
-  if (pathname.startsWith('/super-admin') && role !== 'super_admin') {
-    return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
-  }
-  if (pathname.startsWith('/admin') && role !== 'admin') {
-    return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
-  }
-  if (pathname.startsWith('/staff') && role !== 'staff') {
-    return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
-  }
-  if (pathname.startsWith('/exam') && role !== 'staff') {
-    return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
-  }
+    if (pathname.startsWith('/super-admin') && role !== 'super_admin') {
+      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+    }
+    if (pathname.startsWith('/admin') && role !== 'admin') {
+      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+    }
+    if (pathname.startsWith('/staff') && role !== 'staff') {
+      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+    }
+    if (pathname.startsWith('/exam') && role !== 'staff') {
+      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+    }
 
-  return supabaseResponse
+    return supabaseResponse
   } catch {
-    // Supabase unreachable — only allow public routes, block protected ones
-    const { pathname } = request.nextUrl
-    const publicRoutes = ['/', '/kvkk', '/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password', '/auth/mfa-verify', '/auth/mfa-setup', '/api/health', '/api/docs', '/api/cron/', '/api/payments/callback', '/help', '/certificates/verify']
-    if (publicRoutes.some((route) => pathname === route || (route !== '/' && pathname.startsWith(route)))) {
-      return NextResponse.next({ request })
-    }
-    // Redirect to login for protected routes when auth is unavailable
+    // Supabase unreachable — redirect to login for protected routes
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     return NextResponse.redirect(url)

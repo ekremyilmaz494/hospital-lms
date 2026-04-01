@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
-import { checkRateLimit } from '@/lib/redis'
+import { checkRateLimit, getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
@@ -16,11 +16,15 @@ export async function GET(request: Request) {
   const allowed = await checkRateLimit(`reports:${orgId}`, 10, 60)
   if (!allowed) return errorResponse('Çok fazla rapor sorgusu. Lütfen bir dakika bekleyin.', 429)
 
-  // Filtre parametreleri
   const { searchParams } = new URL(request.url)
   const fromParam = searchParams.get('from')
   const toParam = searchParams.get('to')
   const departmentId = searchParams.get('departmentId')
+
+  // Redis cache: 10 dk TTL (filtre parametreleri cache key'e dahil)
+  const cacheKey = `reports:${orgId}:${fromParam ?? 'all'}:${toParam ?? 'all'}:${departmentId ?? 'all'}`
+  const cached = await getCached<object>(cacheKey)
+  if (cached) return jsonResponse(cached)
   const dateFrom = fromParam ? new Date(fromParam) : undefined
   const dateTo = toParam ? new Date(toParam) : undefined
 
@@ -219,7 +223,7 @@ export async function GET(request: Request) {
       })
       .filter(d => d.sampleSize > 0)
 
-    return jsonResponse({
+    const responseData = {
       overviewStats,
       monthlyData,
       trainingData,
@@ -228,7 +232,10 @@ export async function GET(request: Request) {
       failureData,
       durationData,
       scoreComparisonData,
-    })
+    }
+
+    await setCached(cacheKey, responseData, 600) // 10 dk TTL
+    return jsonResponse(responseData)
   } catch (err) {
     logger.error('Admin Reports', 'Rapor verileri alınamadı', err)
     return errorResponse('Rapor verileri alınamadı', 503)

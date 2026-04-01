@@ -176,7 +176,57 @@ export async function GET(request: Request) {
     }
   }
 
-  // 7. Delete old backups (older than 90 days) and their S3 objects
+  // 7. Sınav hatırlatmaları (3 gün ve 1 gün kala)
+  let examRemindersSent = 0
+  for (const reminderDays of [3, 1]) {
+    const targetDate = new Date(Date.now() + reminderDays * 24 * 60 * 60 * 1000)
+    const targetStart = new Date(targetDate)
+    targetStart.setHours(0, 0, 0, 0)
+    const targetEnd = new Date(targetDate)
+    targetEnd.setHours(23, 59, 59, 999)
+
+    const pendingExamAssignments = await prisma.trainingAssignment.findMany({
+      where: {
+        status: 'assigned',
+        training: {
+          examOnly: true,
+          endDate: { gte: targetStart, lte: targetEnd },
+          isActive: true,
+        },
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        training: { select: { title: true, organizationId: true, endDate: true } },
+      },
+      take: 500,
+    })
+
+    for (const a of pendingExamAssignments) {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: a.user.id,
+            organizationId: a.training.organizationId,
+            title: `Sınav Hatırlatması: ${reminderDays} Gün Kaldı`,
+            message: `"${a.training.title}" sınavına ${reminderDays} gün içinde girmelisiniz.`,
+            type: 'warning',
+            relatedTrainingId: a.trainingId,
+          },
+        })
+        await sendEmail({
+          to: a.user.email,
+          subject: `Sınav Hatırlatması: "${a.training.title}" — ${reminderDays} gün kaldı`,
+          html: `<p>Sayın ${a.user.firstName} ${a.user.lastName},</p>
+<p><strong>"${a.training.title}"</strong> sınavının bitiş tarihine <strong>${reminderDays} gün</strong> kalmıştır.</p>
+<p>Lütfen zamanında sınava girin.</p>
+<p>Bitiş tarihi: <strong>${a.training.endDate ? new Date(a.training.endDate).toLocaleDateString('tr-TR') : '-'}</strong></p>`,
+        })
+        examRemindersSent++
+      } catch { /* hatırlatma hatası cron'u durdurmasın */ }
+    }
+  }
+
+  // 8. Delete old backups (older than 90 days) and their S3 objects
   const oldBackups = await prisma.dbBackup.findMany({
     where: { createdAt: { lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } },
     select: { id: true, fileUrl: true },
@@ -197,6 +247,7 @@ export async function GET(request: Request) {
     certRemindersSent,
     overdueRemindersSent,
     subscriptionWarningsSent,
+    examRemindersSent,
     timestamp: new Date().toISOString(),
   })
 }

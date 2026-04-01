@@ -16,8 +16,8 @@ export function getAppUrl(): string {
   return url || 'http://localhost:3000'
 }
 
-export function jsonResponse(data: unknown, status = 200) {
-  return NextResponse.json(data, { status })
+export function jsonResponse(data: unknown, status = 200, headers?: Record<string, string>) {
+  return NextResponse.json(data, { status, headers })
 }
 
 export function errorResponse(message: string, status = 400) {

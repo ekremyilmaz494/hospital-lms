@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createAssignmentSchema } from '@/lib/validations'
+import { invalidateCache } from '@/lib/redis'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -96,6 +97,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     newData: { userIds: newUserIds, count: assignments.count },
     request,
   })
+
+  try { await invalidateCache(`dashboard:${dbUser!.organizationId!}`) } catch {}
 
   return jsonResponse({ created: assignments.count, skipped: existingUserIds.size }, 201)
 }

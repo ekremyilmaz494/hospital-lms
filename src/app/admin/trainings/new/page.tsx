@@ -30,7 +30,6 @@ const steps = [
 ];
 
 import { TRAINING_CATEGORIES } from '@/lib/training-categories';
-const categories = TRAINING_CATEGORIES;
 
 interface DeptStaff { id: string; name: string; title: string; initials: string; }
 interface Dept { id: string; name: string; count: number; color: string; staff: DeptStaff[]; }
@@ -40,6 +39,8 @@ export default function NewTrainingPage() {
   const { toast } = useToast();
   const { data: departmentsData } = useFetch<Dept[]>('/api/admin/departments');
   const departments: Dept[] = departmentsData ?? [];
+  const { data: dbCategories } = useFetch<{ id: string; value: string; label: string; icon: string }[]>('/api/admin/training-categories');
+  const categories = dbCategories && dbCategories.length > 0 ? dbCategories : TRAINING_CATEGORIES;
   const [currentStep, setCurrentStep] = useState(1);
   const [publishing, setPublishing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -281,22 +282,8 @@ export default function NewTrainingPage() {
                   className="rounded-xl p-5"
                   style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
                 >
-                  <p className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>Sınav Ayarları</p>
-                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Target className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
-                        <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Baraj Puanı</Label>
-                      </div>
-                      <Input type="number" value={passingScore} onChange={(e) => setPassingScore(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Award className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
-                        <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Deneme Hakkı</Label>
-                      </div>
-                      <Input type="number" value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
-                    </div>
+                  <p className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>Eğitim Tarihleri</p>
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
                         <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-info)' }} />
@@ -310,6 +297,29 @@ export default function NewTrainingPage() {
                         <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Bitiş</Label>
                       </div>
                       <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="rounded-xl p-5"
+                  style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+                >
+                  <p className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>Sınav Ayarları</p>
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Target className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
+                        <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Baraj Puanı</Label>
+                      </div>
+                      <Input type="number" value={passingScore} onChange={(e) => setPassingScore(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Award className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
+                        <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Deneme Hakkı</Label>
+                      </div>
+                      <Input type="number" value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">

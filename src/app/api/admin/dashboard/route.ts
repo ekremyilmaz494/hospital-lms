@@ -16,9 +16,10 @@ export async function GET() {
   if (!orgId) return errorResponse('Organization not found', 403)
 
   // ── Redis cache: 5 dk TTL ──
+  const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' }
   const cacheKey = `dashboard:${orgId}`
   const cached = await getCached<object>(cacheKey)
-  if (cached) return jsonResponse(cached)
+  if (cached) return jsonResponse(cached, 200, CACHE_HEADERS)
 
   try {
 
@@ -276,7 +277,7 @@ export async function GET() {
   }
 
   await setCached(cacheKey, responseData, DASHBOARD_CACHE_TTL)
-  return jsonResponse(responseData)
+  return jsonResponse(responseData, 200, CACHE_HEADERS)
 
   } catch (err) {
     logger.error('Admin Dashboard', 'Dashboard verileri alinamadi', err instanceof Error ? err.message : err)
