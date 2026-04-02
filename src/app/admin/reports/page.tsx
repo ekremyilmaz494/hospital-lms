@@ -216,11 +216,11 @@ export default function ReportsPage() {
                 <table className="w-full text-sm">
                   <thead><tr style={{ background: 'var(--color-bg)' }}><th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Eğitim</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Atanan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tamamlayan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Başarılı</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Ort. Puan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tamamlanma</th></tr></thead>
                   <tbody>
-                    {trainingData.map((t) => {
+                    {trainingData.map((t, i) => {
                       const rate = t.atanan > 0 ? Math.round((t.tamamlayan / t.atanan) * 100) : 0;
                       const rateColor = rate >= 80 ? 'var(--color-success)' : rate >= 60 ? 'var(--color-warning)' : 'var(--color-error)';
                       return (
-                        <tr key={t.name} className="group transition-colors duration-100 hover:bg-(--color-surface-hover)" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <tr key={`training-${i}`} className="group transition-colors duration-100 hover:bg-(--color-surface-hover)" style={{ borderBottom: '1px solid var(--color-border)' }}>
                           <td className="px-5 py-4"><span className="text-sm font-semibold">{t.name}</span></td>
                           <td className="px-4 py-4 text-sm font-mono">{t.atanan}</td>
                           <td className="px-4 py-4 text-sm font-mono">{t.tamamlayan}</td>
@@ -246,8 +246,8 @@ export default function ReportsPage() {
                 <table className="w-full text-sm">
                   <thead><tr style={{ background: 'var(--color-bg)' }}><th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Personel</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Departman</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tamamlanan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Ort. Puan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Durum</th></tr></thead>
                   <tbody>
-                    {staffPerformance.map((s) => (
-                      <tr key={s.name} className="group transition-colors duration-100 hover:bg-(--color-surface-hover)" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    {staffPerformance.map((s, i) => (
+                      <tr key={`staff-${i}`} className="group transition-colors duration-100 hover:bg-(--color-surface-hover)" style={{ borderBottom: '1px solid var(--color-border)' }}>
                         <td className="px-5 py-4"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: s.color }}>{s.name.split(' ').map(n => n[0]).join('')}</div><span className="text-sm font-semibold">{s.name}</span></div></td>
                         <td className="px-4 py-4"><span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: `${s.color}15`, color: s.color }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />{s.dept}</span></td>
                         <td className="px-4 py-4 text-sm font-mono font-semibold">{s.completed}</td>

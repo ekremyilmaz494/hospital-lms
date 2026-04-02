@@ -75,5 +75,5 @@ export function useRealtimeExams() {
 
   const activeCount = attempts.filter(a => IN_PROGRESS_STATUSES.has(a.status)).length
 
-  return { attempts, isLoading, activeCount, isConnected }
+  return { attempts, isLoading, activeCount, isConnected, refetch: fetchInitial }
 }

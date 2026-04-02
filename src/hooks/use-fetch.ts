@@ -9,6 +9,11 @@ interface UseFetchResult<T> {
   refetch: () => void;
 }
 
+interface UseFetchOptions {
+  /** Polling interval in milliseconds. Pass 0 or omit to disable. */
+  interval?: number;
+}
+
 // In-memory cache: URL → { data, timestamp }
 const cache = new Map<string, { data: unknown; ts: number }>();
 const STALE_TIME = 30_000; // 30 saniye — bu süre içinde cache'den anında göster
@@ -31,7 +36,7 @@ export function invalidateFetchCache(pattern: string) {
   }
 }
 
-export function useFetch<T>(url: string | null): UseFetchResult<T> {
+export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseFetchResult<T> {
   const normalizedUrl = url?.trim() || null;
   const cached = normalizedUrl ? cache.get(normalizedUrl) : null;
   const [data, setData] = useState<T | null>((cached?.data as T) ?? null);
@@ -127,11 +132,27 @@ export function useFetch<T>(url: string | null): UseFetchResult<T> {
     }
   }, [normalizedUrl, fetchData]);
 
+  // Interval-based background polling
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intervalMs = options?.interval;
+
+  useEffect(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (!normalizedUrl || !intervalMs || intervalMs <= 0) return;
+    intervalRef.current = setInterval(() => fetchData(true), intervalMs);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [normalizedUrl, intervalMs, fetchData]);
+
   const refetch = useCallback(() => {
     if (normalizedUrl) cache.delete(normalizedUrl);
     forceRef.current = true;
+    // Reset interval timer to avoid double-fetch
+    if (intervalRef.current && intervalMs && intervalMs > 0) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(() => fetchData(true), intervalMs);
+    }
     fetchData();
-  }, [normalizedUrl, fetchData]);
+  }, [normalizedUrl, fetchData, intervalMs]);
 
   return { data, isLoading, error, refetch };
 }

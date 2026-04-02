@@ -150,44 +150,49 @@
 }
 
 .dark {
+  /* ── KARANLIK TEMA — Premium, Linear/Vercel-inspired ── */
   --color-primary: #34d399;
   --color-primary-hover: #6ee7b7;
-  --color-primary-light: rgba(52, 211, 153, 0.1);
+  --color-primary-light: rgba(52, 211, 153, 0.08);
   --color-primary-rgb: 52, 211, 153;
-  --color-accent: #f59e0b;
-  --color-accent-hover: #fbbf24;
-  --color-accent-light: rgba(245, 158, 11, 0.1);
+  --color-accent: #fbbf24;
+  --color-accent-hover: #fcd34d;
+  --color-accent-light: rgba(251, 191, 36, 0.08);
 
-  --color-bg: #0c0f14;
-  --color-bg-rgb: 12, 15, 20;
-  --color-surface: #151921;
-  --color-surface-elevated: #1c2130;
-  --color-surface-hover: #1e293b;
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
-  --color-border: #1e293b;
-  --color-border-hover: #334155;
+  /* Layered surfaces — 4 distinct elevation levels for depth */
+  --color-bg: #09090b;
+  --color-bg-rgb: 9, 9, 11;
+  --color-surface: #111113;
+  --color-surface-elevated: #18181b;
+  --color-surface-hover: #1c1c20;
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+  --color-border: #27272a;
+  --color-border-hover: #3f3f46;
 
+  /* Semantic status — slightly muted for dark bg, stronger bg tint */
   --color-success: #34d399;
-  --color-success-bg: rgba(52, 211, 153, 0.1);
+  --color-success-bg: rgba(52, 211, 153, 0.12);
   --color-warning: #fbbf24;
-  --color-warning-bg: rgba(251, 191, 36, 0.1);
+  --color-warning-bg: rgba(251, 191, 36, 0.12);
   --color-error: #f87171;
-  --color-error-bg: rgba(248, 113, 113, 0.1);
+  --color-error-bg: rgba(248, 113, 113, 0.12);
   --color-info: #60a5fa;
-  --color-info-bg: rgba(96, 165, 250, 0.1);
+  --color-info-bg: rgba(96, 165, 250, 0.12);
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.2), 0 2px 12px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.25), 0 4px 24px rgba(0, 0, 0, 0.35);
-  --shadow-xl: 0 16px 32px rgba(0, 0, 0, 0.3), 0 8px 48px rgba(0, 0, 0, 0.4);
-  --shadow-card-hover: 0 12px 28px rgba(52, 211, 153, 0.06), 0 4px 16px rgba(0, 0, 0, 0.3);
+  /* Shadows — subtle glow on dark, using primary tint */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-card-hover: 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(52, 211, 153, 0.08);
 
+  /* shadcn/ui overrides for dark */
   --sidebar-background: var(--color-surface);
   --sidebar-foreground: var(--color-text-primary);
   --sidebar-primary: var(--color-primary);
-  --sidebar-primary-foreground: #0c0f14;
+  --sidebar-primary-foreground: #09090b;
   --sidebar-accent: var(--color-primary-light);
   --sidebar-accent-foreground: var(--color-primary);
   --sidebar-border: var(--color-border);
@@ -317,6 +322,11 @@ code, pre, .font-mono {
   transform: scaleY(0.5);
   transition: opacity 150ms, transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* CSS spec: ::before on <tr> creates an anonymous table-cell — kills column alignment.
+   Disable the pseudo-element accent for table rows; hover background still works. */
+tr.clickable-row::before {
+  display: none;
+}
 .clickable-row:hover {
   background: var(--color-surface-hover);
 }
@@ -424,9 +434,31 @@ select:focus-visible {
 
 .dark .app-bg {
   background:
-    radial-gradient(ellipse at 10% 20%, rgba(52, 211, 153, 0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 90% 80%, rgba(245, 158, 11, 0.02) 0%, transparent 50%),
+    radial-gradient(ellipse at 10% 20%, rgba(52, 211, 153, 0.025) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 80%, rgba(251, 191, 36, 0.015) 0%, transparent 50%),
     var(--color-bg);
+}
+
+/* ── DARK MODE REFINEMENTS ── */
+
+/* Skeleton pulse visibility in dark mode */
+.dark .animate-pulse {
+  --tw-pulse-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Better dark mode input/select styling */
+.dark input,
+.dark textarea,
+.dark select {
+  color-scheme: dark;
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
 }
 
 /* ── ANIMATIONS ── */

@@ -325,6 +325,7 @@ export default function SuperAdminContentLibraryPage() {
     {
       accessorKey: 'title',
       header: 'İçerik',
+      size: 250,
       cell: ({ row }) => {
         const cat = CATEGORY_CONFIG[row.original.category as ContentLibraryCategoryKey]
         return (
@@ -335,8 +336,8 @@ export default function SuperAdminContentLibraryPage() {
             >
               <Library className="h-5 w-5" style={{ color: cat?.color ?? 'var(--color-primary)' }} />
             </div>
-            <div>
-              <p className="font-semibold text-sm" style={{ color: 'var(--color-text-primary)' }}>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>
                 {row.original.title}
               </p>
               {row.original.description && (
@@ -352,6 +353,7 @@ export default function SuperAdminContentLibraryPage() {
     {
       accessorKey: 'category',
       header: 'Kategori',
+      size: 110,
       cell: ({ row }) => {
         const cat = CATEGORY_CONFIG[row.original.category as ContentLibraryCategoryKey]
         return (
@@ -365,6 +367,7 @@ export default function SuperAdminContentLibraryPage() {
     {
       accessorKey: 'difficulty',
       header: 'Zorluk',
+      size: 90,
       cell: ({ row }) => {
         const diff = DIFFICULTY_CONFIG[row.original.difficulty as ContentLibraryDifficulty]
         return (
@@ -378,6 +381,7 @@ export default function SuperAdminContentLibraryPage() {
     {
       accessorKey: 'duration',
       header: 'Süre',
+      size: 80,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
           <Clock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
@@ -390,6 +394,7 @@ export default function SuperAdminContentLibraryPage() {
     {
       accessorKey: 'smgPoints',
       header: 'SMG',
+      size: 70,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
           <Star className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
@@ -402,6 +407,7 @@ export default function SuperAdminContentLibraryPage() {
     {
       accessorKey: 'targetRoles',
       header: 'Hedef Roller',
+      size: 140,
       cell: ({ row }) => {
         const roles = row.original.targetRoles
         const roleLabels = CONTENT_LIBRARY_TARGET_ROLES.filter(r => roles.includes(r.value))
@@ -420,6 +426,7 @@ export default function SuperAdminContentLibraryPage() {
     {
       accessorKey: 'installCount',
       header: 'Kurulum',
+      size: 80,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
           <Users2 className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
@@ -432,6 +439,7 @@ export default function SuperAdminContentLibraryPage() {
     {
       accessorKey: 'isActive',
       header: 'Durum',
+      size: 90,
       cell: ({ row }) => {
         const active = row.original.isActive
         return (
@@ -449,6 +457,7 @@ export default function SuperAdminContentLibraryPage() {
     {
       id: 'actions',
       header: '',
+      size: 50,
       cell: ({ row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-[var(--color-surface-hover)]">

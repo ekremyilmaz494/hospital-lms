@@ -22,7 +22,12 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-import { GET } from '../route'
+vi.mock('@/lib/redis', () => ({
+  getCached: vi.fn().mockResolvedValue(null),
+  setCached: vi.fn().mockResolvedValue(undefined),
+}))
+
+import { GET } from '../stats/route'
 import { getAuthUser, requireRole } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
 
@@ -32,11 +37,8 @@ const mockUserCount = vi.mocked(prisma.user.count)
 const mockTrainingCount = vi.mocked(prisma.training.count)
 const mockTrainingFindMany = vi.mocked(prisma.training.findMany)
 const mockAssignmentGroupBy = vi.mocked(prisma.trainingAssignment.groupBy)
-const mockAssignmentFindMany = vi.mocked(prisma.trainingAssignment.findMany)
-const mockAuditLogFindMany = vi.mocked(prisma.auditLog.findMany)
-const mockCertificateFindMany = vi.mocked(prisma.certificate.findMany)
 
-describe('GET /api/admin/dashboard', () => {
+describe('GET /api/admin/dashboard/stats', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -73,7 +75,7 @@ describe('GET /api/admin/dashboard', () => {
     expect(data.error).toBe('Forbidden')
   })
 
-  it('returns dashboard stats on success', async () => {
+  it('returns stats data on success', async () => {
     mockGetAuthUser.mockResolvedValue({
       user: { id: 'admin-1' },
       dbUser: { id: 'admin-1', role: 'admin', organizationId: 'org-1', isActive: true },
@@ -88,7 +90,7 @@ describe('GET /api/admin/dashboard', () => {
     // Mock training counts
     mockTrainingCount.mockResolvedValue(10 as never)
 
-    // Mock assignment status aggregation (new groupBy pattern)
+    // Mock assignment status aggregation
     mockAssignmentGroupBy.mockResolvedValue([
       { status: 'passed', _count: 5 },
       { status: 'failed', _count: 2 },
@@ -98,15 +100,6 @@ describe('GET /api/admin/dashboard', () => {
     // Mock compulsory trainings
     mockTrainingFindMany.mockResolvedValue([] as never)
 
-    // Mock audit logs
-    mockAuditLogFindMany.mockResolvedValue([] as never)
-
-    // Mock overdue + top performer + department assignments
-    mockAssignmentFindMany.mockResolvedValue([] as never)
-
-    // Mock expiring certificates
-    mockCertificateFindMany.mockResolvedValue([] as never)
-
     const response = await GET()
     const data = await response.json()
 
@@ -115,7 +108,7 @@ describe('GET /api/admin/dashboard', () => {
     expect(Array.isArray(data.stats)).toBe(true)
     expect(data.stats.length).toBe(5)
 
-    // Verify stat titles (Turkce karakter degisikligi dahil)
+    // Verify stat titles
     const titles = data.stats.map((s: { title: string }) => s.title)
     expect(titles).toContain('Toplam Personel')
     expect(titles).toContain('Aktif Egitim')
@@ -123,14 +116,8 @@ describe('GET /api/admin/dashboard', () => {
     expect(titles).toContain('Geciken Egitim')
     expect(titles).toContain('Uyum Orani')
 
-    // Verify other sections exist
+    // Verify stats endpoint returns these sections
     expect(data.complianceAlerts).toBeDefined()
-    expect(data.trendData).toBeDefined()
     expect(data.statusDistribution).toBeDefined()
-    expect(data.departmentComparison).toBeDefined()
-    expect(data.overdueTrainings).toBeDefined()
-    expect(data.expiringCerts).toBeDefined()
-    expect(data.topPerformers).toBeDefined()
-    expect(data.recentActivity).toBeDefined()
   })
 })

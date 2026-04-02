@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { Play, Award, CheckCircle, ArrowRight, Clock, Check, X } from 'lucide-react';
+import { SignatureModal } from '@/components/shared/signature-modal';
 
 interface QuestionResult {
   questionText: string;
@@ -27,6 +28,8 @@ function TransitionContent() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const navigatedRef = useRef(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
+  const [signed, setSigned] = useState(false);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
 
   // Determine type
   const isPreToVideos = from === 'pre' || from === 'pre-exam';
@@ -76,6 +79,21 @@ function TransitionContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fetch attempt info for signature check (post-result only)
+  useEffect(() => {
+    if (!isPostResult || passed !== 'true') return
+    fetch(`/api/exam/${id}/start`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        const aId = data?.attemptId || data?.id
+        if (aId) {
+          setAttemptId(aId)
+          if (data.signedAt) setSigned(true)
+        }
+      })
+      .catch(() => {})
+  }, [id, isPostResult, passed])
+
   // G7.5 — Load per-question results from sessionStorage (written by post-exam page on submit)
   useEffect(() => {
     if (!isPostResult) return;
@@ -96,6 +114,22 @@ function TransitionContent() {
     const correctCount = questionResults.filter(r => r.isCorrect).length;
     const wrongCount = questionResults.filter(r => !r.isCorrect && r.selectedOptionText !== null).length;
     const skippedCount = questionResults.filter(r => r.selectedOptionText === null).length;
+
+    // İmza modalı — passed ve henüz imzalanmamışsa göster
+    if (isPassed && !signed && attemptId) {
+      return (
+        <div
+          className="min-h-screen flex items-center justify-center p-4"
+          style={{ background: 'linear-gradient(135deg, #059669, #064e3b)' }}
+        >
+          <SignatureModal
+            attemptId={attemptId}
+            onSigned={() => setSigned(true)}
+            onClose={() => {}}
+          />
+        </div>
+      )
+    }
 
     return (
       <div

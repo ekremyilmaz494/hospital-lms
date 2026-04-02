@@ -1857,4 +1857,306 @@ Tüm animasyonlar pure CSS (`will-change: transform`, `filter: blur`).
 
 ---
 
-*Son güncelleme: 2 Nisan 2026 — Oturum 14*
+## Oturum 15 — Tablo Kolon Hizalama Düzeltmesi
+**Tarih:** 2 Nisan 2026
+
+### Özet
+Bu oturum önceki (context dışı kalan) büyük bir oturumun devamıdır. Önceki oturumda yapılanlar:
+- AWS S3 video altyapısı (bucket, IAM, CORS, upload, streaming proxy)
+- Dijital imza özelliği (7 parça: schema, API, bileşen, entegrasyon, admin görünümü, PDF rapor, indirme butonu)
+- Dashboard performans optimizasyonları (Redis cache, parallel queries)
+- Çeşitli bug fix'ler (staff creation P2002, video DB records, React duplicate keys, accreditation renk hatası)
+
+Bu oturumda odak: **DataTable kolon hizalama bozukluğu** düzeltildi.
+
+### Sorun
+Tüm `DataTable` kullanan sayfalarda tablo başlıkları (th) ile altındaki veriler (td) kayıyordu. Uzun isimler/e-postalar hücreleri süresiz genişletiyordu ve diğer kolonlar bozuluyordu.
+
+### Kök Sebep
+`src/components/ui/table.tsx` dosyasındaki shadcn/ui `TableHead` ve `TableCell` bileşenlerinde `whitespace-nowrap` class'ı vardı. Bu, uzun içeriklerin satır kırılmasını engelleyerek hücreleri sonsuza kadar genişletiyordu.
+
+### Çözüm (3 Katmanlı)
+
+**1. table.tsx — whitespace-nowrap kaldırıldı**
+- `TableHead`: `whitespace-nowrap` silindi
+- `TableCell`: `whitespace-nowrap` silindi
+- Header'larda nowrap gerekli olduğu için DataTable'da header'a `whitespace-nowrap` eklendi
+
+**2. data-table.tsx — TanStack Table size değerlerini CSS'e yansıtma**
+- `TableHead` ve `TableCell` render'larına koşullu `width` + `minWidth` eklendi
+- TanStack Table varsayılan `size` değeri 150'dir; `!== 150` kontrolü ile sadece açıkça tanımlanmış size'lar uygulanır
+```typescript
+style={{
+  ...mevcutStiller,
+  ...(header.getSize() !== 150 ? { width: header.getSize(), minWidth: header.getSize() } : {}),
+}}
+```
+
+**3. Tüm DataTable kullanan sayfalara kolon size eklendi**
+
+| Sayfa | Kolonlar & Size |
+|---|---|
+| `admin/staff/page.tsx` | name:250, department:140, title:120, completedTrainings:80, avgScore:90, status:90, actions:50 |
+| `admin/trainings/page.tsx` | title:280, assignedCount:80, completedCount:100, completionRate:140, publishStatus:100, endDate:110, actions:50 |
+| `admin/exams/page.tsx` | title:260, questionCount:70, assignedCount:90, passRate:130, status:100, endDate:110, actions:50 |
+| `admin/exams/[id]/results/page.tsx` | userFullName:200, department:130, postExamScore:90, status:90, attemptNumber:80, durationMinutes:70, completedAt:100 |
+| `super-admin/content-library/page.tsx` | title:250, category:110, difficulty:90, duration:80, smgPoints:70, targetRoles:140, installCount:80, isActive:90, actions:50 |
+
+**4. Uzun içerik taşma kontrolü**
+- İsim/başlık kolonlarına `truncate` + `min-w-0` eklendi
+- Department badge'lere `truncate` + `shrink-0` (dot indicator için) eklendi
+
+### Denenen ve Vazgeçilen Yaklaşımlar
+1. **`table-layout: fixed` + `<colgroup>`**: Tüm kolonları eşit piksel genişliğe böldü → sağda büyük boş alan kaldı, isimler 2-3 harfe kısıldı. Kaldırıldı.
+2. **`maxWidth` inline style**: Doğal tablo genişliğini korudu ama kolon hizalaması tutarsız kaldı. Kaldırıldı.
+3. **Final yaklaşım**: `whitespace-nowrap` kaldır + `width`/`minWidth` ile sabit kolon genişlikleri — en dengeli sonuç.
+
+### Değiştirilen Dosyalar
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/components/ui/table.tsx` | `whitespace-nowrap` kaldırıldı (TableHead + TableCell) |
+| `src/components/shared/data-table.tsx` | Header'a `whitespace-nowrap` + koşullu `width`/`minWidth` eklendi |
+| `src/app/admin/staff/page.tsx` | 7 kolona `size` + `truncate` + `min-w-0` eklendi |
+| `src/app/admin/trainings/page.tsx` | 7 kolona `size` + `truncate` + `min-w-0` eklendi |
+| `src/app/admin/exams/page.tsx` | 7 kolona `size` + `truncate` + `min-w-0` eklendi |
+| `src/app/admin/exams/[id]/results/page.tsx` | 7 kolona `size` + `truncate` eklendi |
+| `src/app/super-admin/content-library/page.tsx` | 9 kolona `size` + `truncate` + `min-w-0` eklendi |
+
+### Teknik Notlar
+- TanStack Table'da `size` prop sadece JS state'idir — DOM'a otomatik yansımaz, `header.getSize()` ile style'a bağlamak gerekir
+- `min-w-0` flex çocuklarında kritiktir: CSS flexbox varsayılan `min-width: auto` uygular, bu da truncate'i engeller
+- `whitespace-nowrap` kaldırınca tablo uzun metinleri sarabilir, ama `truncate` ile kontrol altında tutulur
+
+---
+
+---
+
+## Oturum 16 — 2 Nisan 2026
+
+### 1. Dashboard Dinamikleştirme (Progressive Loading + Auto-Refresh)
+
+**Problem:** Dashboard tek bir monolitik API endpoint'inden (`/api/admin/dashboard`) tüm veriyi çekiyordu. 12 DB sorgusu tamamlanana kadar kullanıcı tam sayfa spinner görüyordu. Veri geldikten sonra otomatik yenilenme yoktu.
+
+**Çözüm:** API'yi 5 bağımsız endpoint'e bölüp, her bölümün kendi skeleton'ıyla bağımsız yüklenmesi sağlandı.
+
+#### useFetch Hook'una Polling Desteği
+- `src/hooks/use-fetch.ts`'e `interval` parametresi eklendi
+- `setInterval` ile arka planda otomatik yenileme
+- `refetch()` çağrıldığında interval timer sıfırlanır (çift fetch önlenir)
+
+#### 5 Yeni API Endpoint
+| Endpoint | İçerik | Cache TTL | Polling |
+|---|---|---|---|
+| `/api/admin/dashboard/stats` | Stat kartları, uyum alarmları, durum dağılımı | 120s | 60s |
+| `/api/admin/dashboard/charts` | Trend, departman karşılaştırma | 300s | — |
+| `/api/admin/dashboard/compliance` | Geciken eğitimler | 180s | 120s |
+| `/api/admin/dashboard/activity` | Top performers, son aktiviteler | 120s | 90s |
+| `/api/admin/dashboard/certs` | Sertifika süreleri | 300s | — |
+
+#### Cache Invalidation
+- `src/lib/dashboard-cache.ts` oluşturuldu — `invalidateDashboardCache(orgId)` tüm 5 cache key'i paralel siler
+- 9 dosyadaki mevcut `invalidateCache('dashboard:...')` çağrıları güncellendi
+
+#### Dashboard Page Progressive Loading
+- Tek `useFetch<DashboardData>` → 5 ayrı `useFetch` çağrısı
+- Tam sayfa `<PageLoading />` spinner kaldırıldı
+- Her bölüm kendi skeleton'ıyla bağımsız render ediliyor
+- Her bölüm kendi hata durumunu `SectionError` ile gösteriyor
+- `src/components/shared/skeletons.tsx` oluşturuldu (StatCardSkeleton, TableSkeleton, ListSkeleton, AlertSkeleton, SectionError)
+
+#### Değiştirilen/Oluşturulan Dosyalar
+| Dosya | Değişiklik |
+|---|---|
+| `src/hooks/use-fetch.ts` | `interval` polling desteği |
+| `src/lib/dashboard-cache.ts` | Yeni — cache invalidation helper |
+| `src/components/shared/skeletons.tsx` | Yeni — skeleton + section error bileşenleri |
+| `src/app/api/admin/dashboard/stats/route.ts` | Rewrite — full stats + compliance alerts |
+| `src/app/api/admin/dashboard/charts/route.ts` | Yeni — trend + departman |
+| `src/app/api/admin/dashboard/compliance/route.ts` | Yeni — geciken eğitimler |
+| `src/app/api/admin/dashboard/activity/route.ts` | Yeni — performers + activity |
+| `src/app/api/admin/dashboard/certs/route.ts` | Yeni — sertifika süreleri |
+| `src/app/api/admin/dashboard/route.ts` | Silindi (monolitik endpoint) |
+| `src/app/admin/dashboard/page.tsx` | Progressive loading refactor |
+| 7 dosyada cache invalidation | `invalidateCache` → `invalidateDashboardCache` |
+
+---
+
+### 2. İçerik Kütüphanesi Grid Bug Fix
+
+**Problem:** İçerik Kütüphanesi'nde bir eğitimin detayına tıklandığında aynı satırdaki tüm eğitimlerin detayı açılıyordu.
+
+**Kök Neden:** CSS Grid'de `align-items: stretch` (varsayılan) — bir kart açılınca aynı satırdaki kartlar da aynı yüksekliğe uzuyordu.
+
+**Çözüm:** Grid'e `items-start` eklendi — her kart kendi yüksekliğini koruyor.
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/app/admin/content-library/page.tsx` | Grid'e `items-start` class'ı eklendi |
+
+---
+
+### 3. İçerik Kütüphanesi Premium Tasarım (/frontend-design)
+
+**Hedef:** İçerik Kütüphanesi sayfasının profesyonel ve premium bir tasarıma dönüştürülmesi.
+
+**Yapılan İyileştirmeler:**
+- **Hero Header:** Düz PageHeader yerine gradient arka plan + dot pattern texture + büyük ikon
+- **Tab Switcher:** "Raised surface" yaklaşımı, aktif tab box-shadow ile öne çıkıyor
+- **İçerik Kartları:** Hover'da kategori rengine göre dinamik box-shadow, -translate-y-1 lift efekti, thumbnail gradient overlay, glassmorphism badge'lar
+- **Eğitim Video Kartları:** Expanded durumda ikon gradient'e dönüşüyor, ChevronDown rotation animasyonu, video listesinde hover'da "Oynat" label'ı
+- **Platform Kütüphanesi:** SVG circular progress ile kurulum oranı göstergesi, arama çubuğu, kategori chip'lerinde renk dot'u
+- **Eğitim Videolarım:** 4'lü stats grid (eğitim sayısı, video, yayında, süre)
+- **Accordion:** CSS `grid-template-rows: 0fr → 1fr` ile yumuşak açılma/kapanma animasyonu (eski sert max-height animasyonu kaldırıldı)
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/app/admin/content-library/page.tsx` | Tam sayfa premium tasarım refactor |
+
+---
+
+### 4. Eğitim Kategorileri Emoji → Lucide SVG İkon Dönüşümü
+
+**Problem:** Emoji simgeler (`🦠`, `👷`, `🪪`...) cihazdan cihaza farklı görünüyor, profesyonel değildi.
+
+**Çözüm:** Lucide ikon adlarıyla değiştirildi + `CategoryIcon` mapper bileşeni oluşturuldu.
+
+#### İkon Eşleştirmesi
+| Kategori | Eski | Yeni | Renk |
+|---|---|---|---|
+| Enfeksiyon | 🦠 | Shield | #ef4444 |
+| İş Güvenliği | 👷 | HardHat | #f59e0b |
+| Hasta Hakları | 🪪 | HeartHandshake | #3b82f6 |
+| Radyoloji | ☢️ | Radiation | #a855f7 |
+| Laboratuvar | 🔬 | Microscope | #06b6d4 |
+| Eczane | 💊 | Pill | #ec4899 |
+| Acil Servis | 🚑 | Siren | #dc2626 |
+| Genel Eğitim | 📚 | BookOpen | #0d9668 |
+
+#### Kategori Yönetimi Sayfası (Yeni Kategori Ekle Modal)
+- Emoji grid → 37 adet Lucide ikon grid
+- Renk seçici (10 renk paleti) eklendi
+- Canlı önizleme (ikon + renk + isim) eklendi
+- DB column `icon VarChar(10)` → `VarChar(30)` (Lucide ikon adları daha uzun)
+- Validasyon `.max(10)` → `.max(30)`
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/lib/training-categories.ts` | Emoji → Lucide ikon adları + renk alanı |
+| `src/components/shared/category-icon.tsx` | Yeni — Lucide ikon mapper (37 ikon) + `CATEGORY_ICON_NAMES` export |
+| `src/app/admin/content-library/page.tsx` | 3 yerde emoji → `<CategoryIcon>` |
+| `src/app/admin/trainings/new/page.tsx` | Kategori seçiminde emoji → renkli ikon kutucukları |
+| `src/app/admin/settings/categories/page.tsx` | İkon picker grid + renk picker + canlı önizleme |
+| `prisma/schema.prisma` | `icon VarChar(10)` → `VarChar(30)` |
+| `src/lib/validations.ts` | icon max(10) → max(30) |
+
+---
+
+### 5. Anlık Sınavlar — Stale Session Fix + Yenile Butonu
+
+**Problem 1:** "Anlık Sınavlar" bölümünde hiçbir personel giriş yapmamış olsa bile eski sınav girişimleri "aktif" olarak görünüyordu.
+
+**Kök Neden:** API sadece `status IN ('pre_exam', 'watching_videos', 'post_exam')` filtresi yapıyor ama zaman filtresi yoktu. Yarıda bırakılan sınavlar sonsuza kadar aktif görünüyordu.
+
+**Çözüm:** Son 4 saat eşiği eklendi — daha eski attempt'ler filtreleniyor.
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/app/api/admin/in-progress-exams/route.ts` | `STALE_THRESHOLD` (4 saat) filtresi eklendi |
+
+**Problem 2:** Canlı bölümü yenilemek için tüm sayfayı yenilemek gerekiyordu.
+
+**Çözüm:** Yenile butonu eklendi.
+- `useRealtimeExams` hook'undan `refetch` fonksiyonu expose edildi
+- RefreshCw ikonu ile yenile butonu eklendi
+- Basıldığında `animate-spin` + yeşil renk + primary-light arka plan
+- Minimum 800ms spin süresi (kullanıcı feedback'i görsün)
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/hooks/use-realtime-exams.ts` | `refetch: fetchInitial` return'a eklendi |
+| `src/app/admin/dashboard/page.tsx` | Yenile butonu + spin animasyonu |
+
+---
+
+### 6. Dark Mode Premium İyileştirmesi
+
+**Hedef:** Karanlık temada Notion/Linear/Vercel kalitesinde SaaS deneyimi.
+
+#### CSS Variables (Zinc paleti)
+| Değişken | Eski | Yeni |
+|---|---|---|
+| `--color-bg` | `#0c0f14` (slate) | `#09090b` (zinc) |
+| `--color-surface` | `#151921` | `#111113` |
+| `--color-surface-elevated` | `#1c2130` | `#18181b` |
+| `--color-surface-hover` | `#1e293b` | `#1c1c20` |
+| `--color-border` | `#1e293b` | `#27272a` |
+| `--color-border-hover` | `#334155` | `#3f3f46` |
+| `--color-text-primary` | `#f1f5f9` | `#fafafa` |
+| `--color-text-secondary` | `#94a3b8` | `#a1a1aa` |
+| `--color-text-muted` | `#64748b` | `#71717a` |
+
+#### Diğer Dark Mode Düzeltmeleri
+- Shadow sistemi: `rgba(255,255,255,0.05)` ince beyaz kenar + koyu gölge = "yüzen kart" hissi
+- Status bg opacity: 0.10 → 0.12 (daha belirgin)
+- Chart tooltip: `surface-elevated` + text renk kontrolleri + shadow
+- Chart legend: `color: var(--color-text-secondary)` — dark'ta okunabilir
+- Skeleton animasyonları: `var(--color-bg)` → `var(--color-surface-hover)` — dark modda görünür
+- Skeleton pulse: `--tw-pulse-color` override
+- Scrollbar: dark mode renkleri
+- Input/select: `color-scheme: dark`
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/app/globals.css` | Tüm dark tema paleti, shadow sistemi, skeleton pulse, scrollbar, input |
+| `src/components/shared/charts/admin-dashboard-charts.tsx` | Tooltip + Legend dark mode |
+| `src/components/shared/charts/super-admin-dashboard-charts.tsx` | Legend dark mode |
+| `src/components/shared/charts/exam-results-charts.tsx` | Tooltip dark mode |
+| `src/components/shared/skeletons.tsx` | Placeholder renkleri `surface-hover`, chart skeleton border |
+
+---
+
+### 7. Eğitim Listesi — "Kopyala" Butonu Kaldırıldı
+
+**İstek:** Eğitim yönetimi sayfasındaki dropdown menüden "Kopyala" seçeneğinin kaldırılması.
+
+**Yapılan:**
+- `<DropdownMenuItem>` "Kopyala" satırı silindi
+- `handleDuplicate` fonksiyonu kaldırıldı
+- `duplicatingId` state kaldırıldı
+- `Copy` import'u kaldırıldı
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/app/admin/trainings/page.tsx` | Kopyala butonu, fonksiyon, state, import temizlendi |
+
+---
+
+### 8. CSS `tr::before` Kolon Kayması — Bug Fix & Öğrenilen Ders
+
+**Problem:** Tüm tablolarda kolon başlıkları ile veriler 1 kolon sağa kaymıştı.
+
+**Kök Neden:** CSS spesifikasyonunda `<tr>` elementine eklenen `::before` pseudo-element anonim tablo hücresi olarak davranır. `.clickable-row::before` tbody `<tr>`'ye ekleniyordu ama thead'e eklenmiyordu → tbody'de 8 kolon (hayalet + 7 td), thead'de 7 kolon.
+
+**Çözüm:** `tr.clickable-row::before { display: none; }` kuralı eklendi.
+
+**Debug Yöntemi:** Tarayıcı konsolunda `offsetLeft` karşılaştırması (th vs td).
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/app/globals.css` | `tr.clickable-row::before { display: none }` eklendi |
+
+---
+
+### Teknik Notlar — Oturum 16
+
+1. **Progressive Loading paterni:** Monolitik API → N ayrı endpoint, her bölüm kendi skeleton'ıyla bağımsız yüklenir. useFetch'e `interval` option ile polling.
+2. **CSS Grid `items-start`:** Accordion kartları grid'de kullanılıyorsa `items-start` şart — yoksa aynı satırdaki kartlar en yüksek karta uzar.
+3. **CSS `grid-template-rows: 0fr → 1fr`:** Smooth accordion animasyonu için `max-height` yerine bu teknik kullanılmalı — doğal yüksekliğe geçiş.
+4. **Lucide ikon mapper:** String ikon adlarını Lucide bileşenlerine çeviren `CategoryIcon` bileşeni — DB'den gelen string ikonlarla uyumlu.
+5. **Dark mode paleti:** Slate tonları (mavi baskın) yerine Zinc tonları (nötr) — Linear/Vercel yaklaşımı.
+6. **`tr::before` CSS trap:** Table row'larda `::before`/`::after` pseudo-element kullanma — anonim hücre oluşturur.
+
+---
+
+*Son güncelleme: 2 Nisan 2026 — Oturum 16*

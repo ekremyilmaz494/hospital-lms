@@ -15,6 +15,7 @@ import {
 import { PageHeader } from '@/components/shared/page-header';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
+import { CategoryIcon, CATEGORY_ICON_NAMES } from '@/components/shared/category-icon';
 
 interface CategoryItem {
   id: string;
@@ -25,10 +26,10 @@ interface CategoryItem {
   isDefault: boolean;
 }
 
-const HEALTH_EMOJIS = [
-  '🦠', '🧬', '💉', '🩺', '🏥', '🩻', '🔬', '💊',
-  '🚑', '🩸', '🧪', '🫀', '🫁', '🦴', '🩹', '🧠',
-  '👁️', '🦷', '🩼', '👨‍⚕️', '🌡️', '🧴', '🫶', '📋',
+/** Color palette for icon picker */
+const ICON_COLORS = [
+  '#ef4444', '#f59e0b', '#0d9668', '#3b82f6', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#dc2626', '#64748b', '#10b981',
 ];
 
 export default function CategoriesPage() {
@@ -37,7 +38,8 @@ export default function CategoriesPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [newLabel, setNewLabel] = useState('');
-  const [newIcon, setNewIcon] = useState('📚');
+  const [newIcon, setNewIcon] = useState('BookOpen');
+  const [newColor, setNewColor] = useState('#0d9668');
   const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<CategoryItem | null>(null);
@@ -63,7 +65,7 @@ export default function CategoriesPage() {
       toast('Kategori eklendi', 'success');
       setModalOpen(false);
       setNewLabel('');
-      setNewIcon('📚');
+      setNewIcon('BookOpen');
       refetch();
     } catch {
       toast('Bir hata oluştu', 'error');
@@ -106,7 +108,6 @@ export default function CategoriesPage() {
     if (swapIdx < 0 || swapIdx >= sorted.length) return;
 
     const swapTarget = sorted[swapIdx];
-    // İki kategoriyi swap et
     await Promise.all([
       fetch(`/api/admin/training-categories/${cat.id}`, {
         method: 'PATCH',
@@ -184,12 +185,12 @@ export default function CategoriesPage() {
                   {idx + 1}
                 </span>
 
-                {/* İkon */}
+                {/* İkon — Lucide icon with colored bg */}
                 <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
                   style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
                 >
-                  {cat.icon}
+                  <CategoryIcon name={cat.icon} className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
                 </div>
 
                 {/* Label */}
@@ -263,29 +264,78 @@ export default function CategoriesPage() {
               </p>
             </div>
 
+            {/* Icon Picker */}
             <div>
               <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>
                 İkon Seç
               </Label>
               <div className="grid grid-cols-8 gap-1.5">
-                {HEALTH_EMOJIS.map(emoji => (
+                {CATEGORY_ICON_NAMES.map(iconName => (
                   <button
-                    key={emoji}
+                    key={iconName}
                     type="button"
-                    onClick={() => setNewIcon(emoji)}
-                    className="flex h-9 w-full items-center justify-center rounded-lg text-lg transition-all"
+                    onClick={() => setNewIcon(iconName)}
+                    className="flex h-10 w-full items-center justify-center rounded-xl transition-all duration-150"
                     style={{
-                      background: newIcon === emoji ? 'var(--color-primary-light)' : 'var(--color-bg)',
-                      border: `2px solid ${newIcon === emoji ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                      background: newIcon === iconName ? `color-mix(in srgb, ${newColor} 15%, transparent)` : 'var(--color-bg)',
+                      border: `2px solid ${newIcon === iconName ? newColor : 'var(--color-border)'}`,
+                      boxShadow: newIcon === iconName ? `0 2px 8px color-mix(in srgb, ${newColor} 20%, transparent)` : 'none',
                     }}
+                    title={iconName}
                   >
-                    {emoji}
+                    <CategoryIcon
+                      name={iconName}
+                      className="h-4.5 w-4.5"
+                      style={{ color: newIcon === iconName ? newColor : 'var(--color-text-muted)' }}
+                    />
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-center text-sm">
-                Seçilen: <span className="text-lg">{newIcon}</span>
-              </p>
+            </div>
+
+            {/* Color Picker */}
+            <div>
+              <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>
+                İkon Rengi
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {ICON_COLORS.map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setNewColor(color)}
+                    className="h-7 w-7 rounded-full transition-all duration-150"
+                    style={{
+                      background: color,
+                      border: `2.5px solid ${newColor === color ? 'var(--color-text-primary)' : 'transparent'}`,
+                      outline: newColor === color ? `2px solid ${color}` : 'none',
+                      outlineOffset: '2px',
+                      transform: newColor === color ? 'scale(1.15)' : 'scale(1)',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div
+              className="flex items-center justify-center gap-3 rounded-xl py-3"
+              style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+            >
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-xl"
+                style={{ background: `color-mix(in srgb, ${newColor} 12%, transparent)` }}
+              >
+                <CategoryIcon name={newIcon} className="h-5 w-5" style={{ color: newColor }} />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                  {newLabel || 'Kategori Adı'}
+                </p>
+                <p className="text-[10px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
+                  {newIcon}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -311,8 +361,11 @@ export default function CategoriesPage() {
             <DialogTitle>Kategoriyi Sil</DialogTitle>
           </DialogHeader>
           <p className="text-sm py-2" style={{ color: 'var(--color-text-secondary)' }}>
-            <strong>{deleteTarget?.icon} {deleteTarget?.label}</strong> kategorisini silmek istediğinizden emin misiniz?
-            Bu işlem geri alınamaz.
+            <span className="inline-flex items-center gap-1.5 font-bold">
+              <CategoryIcon name={deleteTarget?.icon ?? 'BookOpen'} className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+              {deleteTarget?.label}
+            </span>
+            {' '}kategorisini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>

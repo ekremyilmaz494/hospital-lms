@@ -18,10 +18,17 @@ export async function GET() {
 
   const IN_PROGRESS_STATUSES = ['pre_exam', 'watching_videos', 'post_exam']
 
+  // Only show attempts started/updated within the last 4 hours — older ones are likely abandoned
+  const STALE_THRESHOLD = new Date(Date.now() - 4 * 60 * 60 * 1000)
+
   const attempts = await prisma.examAttempt.findMany({
     where: {
       status: { in: IN_PROGRESS_STATUSES },
       assignment: { user: { organizationId } },
+      OR: [
+        { preExamStartedAt: { gte: STALE_THRESHOLD } },
+        { createdAt: { gte: STALE_THRESHOLD } },
+      ],
     },
     select: {
       id: true,

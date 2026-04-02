@@ -100,11 +100,12 @@ export function DataTable<TData, TValue>({
                   return (
                   <TableHead
                     key={header.id}
-                    className={`text-[11px] font-semibold uppercase tracking-[0.08em]${isActionsCol ? ' w-px' : ''}`}
+                    className={`text-[11px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap${isActionsCol ? ' w-px' : ''}`}
                     style={{
                       color: 'var(--color-text-muted)',
                       fontFamily: 'var(--font-body)',
                       padding: isActionsCol ? '14px 4px' : '14px 16px',
+                      ...(header.getSize() !== 150 ? { width: header.getSize(), minWidth: header.getSize() } : {}),
                     }}
                   >
                     {header.isPlaceholder ? null : (
@@ -146,6 +147,7 @@ export function DataTable<TData, TValue>({
                         color: 'var(--color-text-primary)',
                         padding: isActionsCell ? '14px 4px' : '14px 16px',
                         fontSize: '14px',
+                        ...(cell.column.getSize() !== 150 ? { width: cell.column.getSize(), minWidth: cell.column.getSize() } : {}),
                       }}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

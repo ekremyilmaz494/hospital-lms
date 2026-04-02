@@ -43,11 +43,15 @@ export function ScoreDistributionChart({ data, passingScore }: ScoreDistribution
             <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} allowDecimals={false} />
             <Tooltip
               contentStyle={{
-                background: 'var(--color-surface)',
+                background: 'var(--color-surface-elevated)',
                 border: '1px solid var(--color-border)',
                 borderRadius: 8,
                 fontSize: 12,
+                color: 'var(--color-text-primary)',
+                boxShadow: 'var(--shadow-lg)',
               }}
+              labelStyle={{ color: 'var(--color-text-primary)' }}
+              itemStyle={{ color: 'var(--color-text-secondary)' }}
             />
             <Bar dataKey="count" radius={[4, 4, 0, 0]}>
               {data.map((entry, idx) => (

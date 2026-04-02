@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft, GraduationCap, Users, TrendingUp, Clock, Edit, Play, BarChart3,
   FileText, RotateCcw, Download, Eye, Video, CheckCircle2, XCircle, Timer,
-  ChevronRight, Award
+  ChevronRight, Award, PenLine, FileDown
 } from 'lucide-react';
 import { PageLoading } from '@/components/shared/page-loading';
 import { Button } from '@/components/ui/button';
@@ -33,8 +33,9 @@ interface TrainingDetail {
   passedCount: number;
   failedCount: number;
   avgScore: number;
+  signedCount: number;
   status: string;
-  assignedStaff: { assignmentId: string; userId: string; name: string; department: string; attempt: number; progress: number; preScore: number | null; postScore: number | null; status: string; completedAt: string }[];
+  assignedStaff: { assignmentId: string; userId: string; name: string; department: string; attempt: number; progress: number; preScore: number | null; postScore: number | null; status: string; completedAt: string; signedAt: string | null; signatureMethod: string | null }[];
   videos: { id: string; title: string; videoUrl: string; duration: string; order: number }[];
   questions: { id: string; text: string; points: number; options: { id: string; text: string; isCorrect: boolean; order: number }[] }[];
 }
@@ -55,6 +56,7 @@ export default function TrainingDetailPage() {
   const [activeTab, setActiveTab] = useState('staff');
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [downloadingReport, setDownloadingReport] = useState(false);
 
   if (!id) {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitim bulunamadı</div></div>;
@@ -113,6 +115,29 @@ export default function TrainingDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 rounded-xl"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            disabled={downloadingReport}
+            onClick={async () => {
+              setDownloadingReport(true);
+              try {
+                const res = await fetch(`/api/admin/trainings/${id}/signature-report`);
+                if (!res.ok) throw new Error('Rapor oluşturulamadı');
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'imza_raporu.pdf';
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch { toast('İmza raporu indirilemedi', 'error'); }
+              finally { setDownloadingReport(false); }
+            }}
+          >
+            <FileDown className="h-4 w-4" /> {downloadingReport ? 'Hazırlanıyor...' : 'İmza Raporu'}
+          </Button>
           <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => router.push(`/admin/trainings/${id}/edit`)}>
             <Edit className="h-4 w-4" /> Düzenle
           </Button>
@@ -138,12 +163,13 @@ export default function TrainingDetailPage() {
       </p>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <StatCard title="Atanan" value={training.assignedCount ?? 0} icon={Users} accentColor="var(--color-info)" />
         <StatCard title="Tamamlayan" value={training.completedCount ?? 0} icon={TrendingUp} accentColor="var(--color-primary)" />
         <StatCard title="Başarılı" value={training.passedCount ?? 0} icon={GraduationCap} accentColor="var(--color-success)" />
         <StatCard title="Başarısız" value={training.failedCount ?? 0} icon={GraduationCap} accentColor="var(--color-error)" />
         <StatCard title="Ort. Puan" value={training.avgScore ?? 0} icon={BarChart3} accentColor="var(--color-accent)" />
+        <StatCard title="İmzalanan" value={`${training.signedCount ?? 0}/${training.passedCount ?? 0}`} icon={PenLine} accentColor="var(--color-primary)" />
       </div>
 
       {/* Tabs Section */}
@@ -211,7 +237,7 @@ export default function TrainingDetailPage() {
                 {assignedStaff.length > 0 ? (
                   <div>
                     {/* Header Row */}
-                    <div className="grid items-center px-4 py-2 mb-1" style={{ gridTemplateColumns: 'minmax(160px, 2fr) 60px minmax(80px, 1fr) 65px 65px 100px 85px 100px', gap: '10px', color: 'var(--color-text-muted)' }}>
+                    <div className="grid items-center px-4 py-2 mb-1" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 60px 60px 95px 75px 90px 90px', gap: '8px', color: 'var(--color-text-muted)' }}>
                       <span className="text-xs font-semibold uppercase tracking-wide">Personel</span>
                       <span className="text-xs font-semibold uppercase tracking-wide text-center">Deneme</span>
                       <span className="text-xs font-semibold uppercase tracking-wide">İlerleme</span>
@@ -219,6 +245,7 @@ export default function TrainingDetailPage() {
                       <span className="text-xs font-semibold uppercase tracking-wide text-center">Son Sınav</span>
                       <span className="text-xs font-semibold uppercase tracking-wide">Durum</span>
                       <span className="text-xs font-semibold uppercase tracking-wide text-center">Tarih</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-center">İmza</span>
                       <span />
                     </div>
                     {/* Data Rows */}
@@ -227,7 +254,7 @@ export default function TrainingDetailPage() {
                         const st = statusMap[s.status] || statusMap.assigned;
                         const StatusIcon = st.icon;
                         return (
-                          <div key={s.name} className="grid items-center rounded-xl px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(160px, 2fr) 60px minmax(80px, 1fr) 65px 65px 100px 85px 100px', gap: '10px', background: 'var(--color-bg)', border: '1px solid transparent', transition: 'border-color var(--transition-fast)' }}
+                          <div key={s.name} className="grid items-center rounded-xl px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 60px 60px 95px 75px 90px 90px', gap: '8px', background: 'var(--color-bg)', border: '1px solid transparent', transition: 'border-color var(--transition-fast)' }}
                             onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
                           >
@@ -260,6 +287,21 @@ export default function TrainingDetailPage() {
                             </div>
                             {/* Tarih */}
                             <p className="text-xs font-medium text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{s.completedAt ? new Date(s.completedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</p>
+                            {/* İmza */}
+                            <div className="text-center">
+                              {s.signedAt ? (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
+                                  {s.signatureMethod === 'canvas' ? '🖊️' : '✓'}
+                                  {new Date(s.signedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}
+                                </span>
+                              ) : s.status === 'passed' ? (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--color-warning-bg, #fef3c7)', color: 'var(--color-warning, #d97706)' }}>
+                                  Bekleniyor
+                                </span>
+                              ) : (
+                                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>—</span>
+                              )}
+                            </div>
                             {/* Actions */}
                             <div className="flex justify-end">
                               {s.status === 'failed' && (

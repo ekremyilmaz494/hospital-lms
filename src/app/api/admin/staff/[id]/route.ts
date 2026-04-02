@@ -1,7 +1,8 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
-import { checkRateLimit, invalidateCache } from '@/lib/redis'
+import { checkRateLimit } from '@/lib/redis'
+import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { z } from 'zod/v4'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -140,7 +141,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   revalidatePath('/admin/staff')
 
-  try { await invalidateCache(`dashboard:${dbUser!.organizationId!}`) } catch {}
+  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
 
   return jsonResponse(staff)
 }
@@ -183,7 +184,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   revalidatePath('/admin/staff')
 
-  try { await invalidateCache(`dashboard:${dbUser!.organizationId!}`) } catch {}
+  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
 
   return jsonResponse({ success: true })
 }

@@ -229,6 +229,7 @@ export default function ExamsPage() {
     {
       accessorKey: 'title',
       header: 'Sınav Adı',
+      size: 260,
       cell: ({ row }) => (
         <div className="flex items-center gap-3">
           <div
@@ -237,8 +238,8 @@ export default function ExamsPage() {
           >
             <ClipboardList className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
           </div>
-          <div>
-            <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          <div className="min-w-0">
+            <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
               {row.getValue('title')}
             </p>
             {row.original.category && (
@@ -256,6 +257,7 @@ export default function ExamsPage() {
     {
       accessorKey: 'questionCount',
       header: 'Soru',
+      size: 70,
       cell: ({ row }) => (
         <span className="font-medium" style={{ fontFamily: 'var(--font-mono)' }}>
           {row.getValue('questionCount')}
@@ -265,6 +267,7 @@ export default function ExamsPage() {
     {
       accessorKey: 'assignedCount',
       header: 'Katılımcı',
+      size: 90,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
           <Users className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
@@ -277,6 +280,7 @@ export default function ExamsPage() {
     {
       id: 'passRate',
       header: 'Geçme %',
+      size: 130,
       cell: ({ row }) => {
         const total = row.original.attemptCount;
         const passed = row.original.passedCount;
@@ -311,6 +315,7 @@ export default function ExamsPage() {
     {
       id: 'status',
       header: 'Durum',
+      size: 100,
       cell: ({ row }) => {
         const status = getExamStatus(row.original);
         return (
@@ -327,6 +332,7 @@ export default function ExamsPage() {
     {
       accessorKey: 'endDate',
       header: 'Bitiş',
+      size: 110,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
           <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
@@ -343,6 +349,7 @@ export default function ExamsPage() {
     {
       id: 'actions',
       header: '',
+      size: 50,
       cell: ({ row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md hover:bg-accent hover:text-accent-foreground">

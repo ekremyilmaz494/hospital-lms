@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createTrainingBodySchema } from '@/lib/validations'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
-import { invalidateCache } from '@/lib/redis'
+import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -200,7 +200,7 @@ export async function POST(request: Request) {
     revalidatePath('/staff/my-trainings')
     revalidatePath('/admin/trainings')
 
-    try { await invalidateCache(`dashboard:${dbUser!.organizationId!}`) } catch {}
+    try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
 
     return jsonResponse(training, 201)
   } catch (err: unknown) {

@@ -2,7 +2,8 @@ import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { submitExamSchema } from '@/lib/validations'
-import { checkRateLimit, clearExamTimer, invalidateCache } from '@/lib/redis'
+import { checkRateLimit, clearExamTimer } from '@/lib/redis'
+import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { logger } from '@/lib/logger'
 
 
@@ -247,7 +248,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     newData: { score, isPassed, trainingId: attempt.trainingId },
   })
 
-  try { await invalidateCache(`dashboard:${attempt.training.organizationId}`) } catch {}
+  try { await invalidateDashboardCache(attempt.training.organizationId) } catch {}
 
   return jsonResponse({ phase: 'post', score, isPassed, passingScore: attempt.training.passingScore, results: questionResults })
 }

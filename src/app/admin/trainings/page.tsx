@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
-import { GraduationCap, Plus, MoreHorizontal, Eye, Edit, Trash2, Calendar, Users, X, Layers, Copy } from 'lucide-react';
+import { GraduationCap, Plus, MoreHorizontal, Eye, Edit, Trash2, Calendar, Users, X, Layers } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { PageHeader } from '@/components/shared/page-header';
 import { DataTable } from '@/components/shared/data-table';
@@ -54,7 +54,6 @@ export default function TrainingsPage() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
-  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (isLoading) {
@@ -74,21 +73,6 @@ export default function TrainingsPage() {
   });
 
   const activeFilters = [statusFilter, categoryFilter].filter(Boolean).length;
-
-  const handleDuplicate = async (training: Training) => {
-    setDuplicatingId(training.id);
-    try {
-      const res = await fetch(`/api/admin/trainings/${training.id}/duplicate`, { method: 'POST' });
-      if (!res.ok) throw new Error('Kopyalama başarısız');
-      const data = await res.json();
-      toast(`"${training.title}" kopyalandı. Taslak olarak kaydedildi.`, 'success');
-      router.push(`/admin/trainings/${data.id}/edit`);
-    } catch {
-      toast('Eğitim kopyalanırken hata oluştu', 'error');
-    } finally {
-      setDuplicatingId(null);
-    }
-  };
 
   const handlePublishStatus = async (training: Training, status: 'draft' | 'published' | 'archived') => {
     try {
@@ -125,17 +109,18 @@ export default function TrainingsPage() {
     {
       accessorKey: 'title',
       header: 'Eğitim Adı',
+      size: 280,
       cell: ({ row }) => (
-        <Link href={`/admin/trainings/${row.original.id}`} className="flex items-center gap-3 group">
+        <Link href={`/admin/trainings/${row.original.id}`} className="flex items-center gap-3 group min-w-0">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
             style={{ background: `${categoryColors[row.original.category] || 'var(--color-primary)'}20` }}
           >
             <GraduationCap className="h-5 w-5" style={{ color: categoryColors[row.original.category] || 'var(--color-primary)' }} />
           </div>
-          <div>
+          <div className="min-w-0">
             <p
-              className="font-semibold"
+              className="font-semibold truncate"
               style={{ color: 'var(--color-text-primary)', transition: 'color var(--transition-fast)' }}
               onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-primary)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
@@ -160,6 +145,7 @@ export default function TrainingsPage() {
     {
       accessorKey: 'assignedCount',
       header: 'Atanan',
+      size: 80,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
           <Users className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
@@ -170,6 +156,7 @@ export default function TrainingsPage() {
     {
       accessorKey: 'completedCount',
       header: 'Tamamlayan',
+      size: 100,
       cell: ({ row }) => (
         <span className="font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-primary)' }}>
           {row.original.completedCount}/{row.original.assignedCount}
@@ -179,6 +166,7 @@ export default function TrainingsPage() {
     {
       accessorKey: 'completionRate',
       header: 'Tamamlanma',
+      size: 140,
       cell: ({ row }) => {
         const rate = row.getValue('completionRate') as number;
         const color = rate >= 80 ? 'var(--color-success)' : rate >= 50 ? 'var(--color-warning)' : 'var(--color-error)';
@@ -195,6 +183,7 @@ export default function TrainingsPage() {
     {
       accessorKey: 'publishStatus',
       header: 'Durum',
+      size: 100,
       cell: ({ row }) => {
         const ps = (row.original.publishStatus ?? 'published') as string;
         const cfg = publishStatusConfig[ps] || publishStatusConfig.published;
@@ -209,6 +198,7 @@ export default function TrainingsPage() {
     {
       accessorKey: 'endDate',
       header: 'Bitiş',
+      size: 110,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
           <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
@@ -219,6 +209,7 @@ export default function TrainingsPage() {
     {
       id: 'actions',
       header: '',
+      size: 50,
       cell: ({ row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md hover:bg-accent hover:text-accent-foreground">
@@ -230,9 +221,6 @@ export default function TrainingsPage() {
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/trainings/${row.original.id}/edit`)}>
               <Edit className="h-4 w-4" /> Düzenle
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" disabled={duplicatingId === row.original.id} onClick={() => handleDuplicate(row.original)}>
-              <Copy className="h-4 w-4" /> {duplicatingId === row.original.id ? 'Kopyalanıyor...' : 'Kopyala'}
             </DropdownMenuItem>
             {row.original.publishStatus !== 'published' && (
               <DropdownMenuItem className="gap-2" onClick={() => handlePublishStatus(row.original, 'published')}>

@@ -326,13 +326,13 @@ export const submitEvaluationSchema = z.object({
 // ── EĞİTİM KATEGORİLERİ ──
 export const createTrainingCategorySchema = z.object({
   label: z.string().min(1, 'Kategori adı zorunludur').max(30, 'Kategori adı en fazla 30 karakter olabilir'),
-  icon:  z.string().min(1, 'İkon zorunludur').max(10),
+  icon:  z.string().min(1, 'İkon zorunludur').max(30),
   order: z.coerce.number().int().min(0).optional(),
 })
 
 export const updateTrainingCategorySchema = z.object({
   label: z.string().min(1).max(30).optional(),
-  icon:  z.string().min(1).max(10).optional(),
+  icon:  z.string().min(1).max(30).optional(),
   order: z.coerce.number().int().min(0).optional(),
 })
 

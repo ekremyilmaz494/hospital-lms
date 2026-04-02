@@ -380,6 +380,10 @@ model ExamAttempt {
   isPassed              Boolean   @default(false) @map("is_passed")
   status                String    @default("pre_exam") @db.VarChar(30)
   createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  signedAt              DateTime? @map("signed_at") @db.Timestamptz
+  signatureData         String?   @db.Text    @map("signature_data")
+  signatureIp           String?   @db.VarChar(45) @map("signature_ip")
+  signatureMethod       String?   @db.VarChar(20) @map("signature_method")
 
   assignment            TrainingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   user                  User               @relation(fields: [userId], references: [id])
@@ -865,7 +869,7 @@ model TrainingCategory {
   organizationId String       @db.Uuid @map("organization_id")
   value          String       @db.VarChar(100)
   label          String       @db.VarChar(100)
-  icon           String       @db.VarChar(10)
+  icon           String       @db.VarChar(30)
   order          Int          @default(0)
   isDefault      Boolean      @default(false) @map("is_default")
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz

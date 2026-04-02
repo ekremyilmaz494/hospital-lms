@@ -12,6 +12,7 @@ import {
 import { createStandaloneExamSchema } from '@/lib/validations'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import { getCached, setCached, invalidateCache } from '@/lib/redis'
+import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -245,7 +246,7 @@ export async function POST(request: Request) {
       await Promise.all([
         invalidateCache(`standalone-exams:${dbUser!.organizationId!}:1::`),
         invalidateCache(`reports:${dbUser!.organizationId!}:all:all:all`),
-        invalidateCache(`dashboard:${dbUser!.organizationId!}`),
+        invalidateDashboardCache(dbUser!.organizationId!),
       ])
     } catch {}
 

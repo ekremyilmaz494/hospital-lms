@@ -1,7 +1,8 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
-import { checkRateLimit, invalidateCache } from '@/lib/redis'
+import { checkRateLimit } from '@/lib/redis'
+import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { updateTrainingSchema } from '@/lib/validations'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +54,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       postScore: latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : null,
       status: a.status,
       completedAt: a.completedAt ? a.completedAt.toISOString() : '',
+      signedAt: latestAttempt?.signedAt?.toISOString() ?? null,
+      signatureMethod: latestAttempt?.signatureMethod ?? null,
     }
   })
 
@@ -64,6 +67,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .filter(s => s !== null && s !== undefined)
     .map(Number)
   const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+  const signedCount = training.assignments.filter(a => a.examAttempts[0]?.signedAt).length
 
   return jsonResponse({
     id: training.id,
@@ -83,6 +87,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     passedCount,
     failedCount,
     avgScore,
+    signedCount,
     videoCount: training._count.videos,
     questionCount: training._count.questions,
     assignedStaff,
@@ -149,7 +154,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   revalidatePath('/staff/my-trainings')
   revalidatePath('/admin/trainings')
 
-  try { await invalidateCache(`dashboard:${dbUser!.organizationId!}`) } catch {}
+  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
 
   return jsonResponse(training)
 }
@@ -223,7 +228,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   revalidatePath('/staff/my-trainings')
   revalidatePath('/admin/trainings')
 
-  try { await invalidateCache(`dashboard:${dbUser!.organizationId!}`) } catch {}
+  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
 
   return jsonResponse({ success: true })
 }

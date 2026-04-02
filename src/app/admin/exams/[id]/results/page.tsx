@@ -179,8 +179,9 @@ export default function ExamResultsPage() {
     {
       accessorKey: 'userFullName',
       header: 'İsim',
+      size: 200,
       cell: ({ row }) => (
-        <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
+        <span className="font-medium truncate block" style={{ color: 'var(--color-text-primary)' }}>
           {row.getValue('userFullName')}
         </span>
       ),
@@ -188,6 +189,7 @@ export default function ExamResultsPage() {
     {
       accessorKey: 'department',
       header: 'Departman',
+      size: 130,
       cell: ({ row }) => (
         <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
           {row.getValue('department') || '-'}
@@ -197,6 +199,7 @@ export default function ExamResultsPage() {
     {
       accessorKey: 'postExamScore',
       header: 'Puan',
+      size: 90,
       cell: ({ row }) => {
         const score = row.original.postExamScore;
         const isBelow = score !== null && score < (exam?.passingScore ?? 70);
@@ -216,6 +219,7 @@ export default function ExamResultsPage() {
     {
       id: 'status',
       header: 'Durum',
+      size: 90,
       cell: ({ row }) => (
         <span
           className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
@@ -237,6 +241,7 @@ export default function ExamResultsPage() {
     {
       accessorKey: 'attemptNumber',
       header: 'Deneme',
+      size: 80,
       cell: ({ row }) => (
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
           #{row.getValue('attemptNumber')}
@@ -246,6 +251,7 @@ export default function ExamResultsPage() {
     {
       accessorKey: 'durationMinutes',
       header: 'Süre',
+      size: 70,
       cell: ({ row }) => (
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
           {row.getValue('durationMinutes')} dk
@@ -255,6 +261,7 @@ export default function ExamResultsPage() {
     {
       accessorKey: 'completedAt',
       header: 'Tarih',
+      size: 100,
       cell: ({ row }) => (
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-text-muted)' }}>
           {row.original.completedAt

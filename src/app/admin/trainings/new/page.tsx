@@ -30,6 +30,7 @@ const steps = [
 ];
 
 import { TRAINING_CATEGORIES } from '@/lib/training-categories';
+import { CategoryIcon } from '@/components/shared/category-icon';
 
 interface DeptStaff { id: string; name: string; title: string; initials: string; }
 interface Dept { id: string; name: string; count: number; color: string; staff: DeptStaff[]; }
@@ -248,16 +249,33 @@ export default function NewTrainingPage() {
                         key={cat.value}
                         type="button"
                         onClick={() => setSelectedCategory(cat.value)}
-                        className="flex items-center gap-2.5 rounded-xl border px-3.5 py-3"
+                        className="flex items-center gap-2.5 rounded-xl border px-3.5 py-3 transition-all duration-200"
                         style={{
                           borderColor: selectedCategory === cat.value ? 'var(--color-primary)' : 'var(--color-border)',
                           background: selectedCategory === cat.value ? 'var(--color-primary-light)' : 'var(--color-bg)',
-                          transition: 'border-color var(--transition-fast), background var(--transition-fast)',
+                          boxShadow: selectedCategory === cat.value ? '0 2px 8px color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'none',
                         }}
                       >
-                        <span className="text-lg">{cat.icon}</span>
+                        <div
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                          style={{
+                            background: selectedCategory === cat.value
+                              ? 'var(--color-primary)'
+                              : `color-mix(in srgb, ${'color' in cat ? cat.color : 'var(--color-primary)'} 10%, transparent)`,
+                          }}
+                        >
+                          <CategoryIcon
+                            name={cat.icon}
+                            className="h-4 w-4"
+                            style={{
+                              color: selectedCategory === cat.value
+                                ? '#fff'
+                                : ('color' in cat ? cat.color : 'var(--color-text-muted)'),
+                            }}
+                          />
+                        </div>
                         <span
-                          className="text-sm font-medium"
+                          className="text-sm font-semibold"
                           style={{ color: selectedCategory === cat.value ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}
                         >
                           {cat.label}

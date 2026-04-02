@@ -4,7 +4,8 @@ import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, creat
 import { createUserSchema } from '@/lib/validations'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
-import { checkRateLimit, invalidateCache } from '@/lib/redis'
+import { checkRateLimit } from '@/lib/redis'
+import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -226,7 +227,7 @@ export async function POST(request: Request) {
 
   revalidatePath('/admin/staff')
 
-  try { await invalidateCache(`dashboard:${dbUser!.organizationId!}`) } catch {}
+  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
 
   return jsonResponse(user, 201)
 }

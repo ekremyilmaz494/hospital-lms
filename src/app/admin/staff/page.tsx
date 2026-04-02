@@ -445,16 +445,17 @@ export default function StaffPage() {
     {
       accessorKey: 'name',
       header: 'Personel',
+      size: 250,
       cell: ({ row }) => {
         const dept = allDepartments.find(d => d.id === row.original.departmentId);
         return (
           <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9">
+            <Avatar className="h-9 w-9 shrink-0">
               <AvatarFallback className="text-xs font-semibold text-white" style={{ background: dept?.color || 'var(--color-primary)' }}>{row.original.initials}</AvatarFallback>
             </Avatar>
-            <div>
-              <p className="text-sm font-semibold">{row.getValue('name')}</p>
-              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{row.original.email}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold truncate">{row.getValue('name')}</p>
+              <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{row.original.email}</p>
             </div>
           </div>
         );
@@ -463,21 +464,23 @@ export default function StaffPage() {
     {
       accessorKey: 'department',
       header: 'Departman',
+      size: 140,
       cell: ({ row }) => {
         const dept = allDepartments.find(d => d.id === row.original.departmentId);
         const color = dept?.color || 'var(--color-primary)';
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: `${color}15`, color }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold truncate" style={{ background: `${color}15`, color }}>
+            <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: color }} />
             {row.getValue('department')}
           </span>
         );
       },
     },
-    { accessorKey: 'title', header: 'Unvan', cell: ({ row }) => <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{row.getValue('title')}</span> },
+    { accessorKey: 'title', header: 'Unvan', size: 120, cell: ({ row }) => <span className="text-sm truncate block" style={{ color: 'var(--color-text-secondary)' }}>{row.getValue('title')}</span> },
     {
       accessorKey: 'completedTrainings',
       header: 'Eğitim',
+      size: 80,
       cell: ({ row }) => (
         <span className="text-sm font-mono font-medium">{row.getValue('completedTrainings')}/{row.original.assignedTrainings}</span>
       ),
@@ -485,6 +488,7 @@ export default function StaffPage() {
     {
       accessorKey: 'avgScore',
       header: 'Ort. Puan',
+      size: 90,
       cell: ({ row }) => {
         const score = row.getValue('avgScore') as number;
         const color = score >= 80 ? 'var(--color-success)' : score >= 60 ? 'var(--color-warning)' : 'var(--color-error)';
@@ -494,6 +498,7 @@ export default function StaffPage() {
     {
       accessorKey: 'status',
       header: 'Durum',
+      size: 90,
       cell: ({ row }) => {
         const status = row.getValue('status') as string;
         const colors = statusColors[status] || statusColors['Aktif'];
@@ -506,7 +511,7 @@ export default function StaffPage() {
       },
     },
     {
-      id: 'actions', header: '',
+      id: 'actions', header: '', size: 50,
       cell: ({ row }) => (
         <StaffActions staff={row.original} />
       ),

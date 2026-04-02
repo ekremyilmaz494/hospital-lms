@@ -55,7 +55,7 @@ export function MonthlyTrendChart({ data }: MonthlyTrendProps) {
         <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
         <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
         <Tooltip content={<CustomTooltip />} />
-        <Legend wrapperStyle={{ fontSize: '12px', fontFamily: 'var(--font-body)' }} />
+        <Legend wrapperStyle={{ fontSize: '12px', fontFamily: 'var(--font-body)', color: 'var(--color-text-secondary)' }} />
         <Area type="monotone" dataKey="hastane" name="Hastane" stroke="var(--color-accent)" strokeWidth={2.5} fill="url(#gradHospital)" />
         <Area type="monotone" dataKey="personel" name="Personel" stroke="var(--color-primary)" strokeWidth={2.5} fill="url(#gradPersonel)" />
       </AreaChart>
@@ -85,7 +85,7 @@ export function SubscriptionPieChart({ data }: SubscriptionPieProps) {
           ))}
         </Pie>
         <Tooltip content={<CustomTooltip />} />
-        <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'var(--font-body)' }} />
+        <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'var(--font-body)', color: 'var(--color-text-secondary)' }} />
       </PieChart>
     </ResponsiveContainer>
   )
@@ -111,7 +111,7 @@ export function SubscriptionBarChart({ data }: SubscriptionBarProps) {
         <XAxis dataKey="plan" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
         <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
         <Tooltip content={<CustomTooltip />} />
-        <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'var(--font-body)' }} />
+        <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'var(--font-body)', color: 'var(--color-text-secondary)' }} />
         <Bar dataKey="aktif" name="Aktif" fill="var(--color-success)" radius={[4, 4, 0, 0]} barSize={24} />
         <Bar dataKey="trial" name="Deneme" fill="var(--color-info)" radius={[4, 4, 0, 0]} barSize={24} />
         <Bar dataKey="suresiDoldu" name="Süresi Doldu" fill="var(--color-error)" radius={[4, 4, 0, 0]} barSize={24} />

@@ -5,12 +5,19 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 
-const chartTooltipStyle = {
-  background: 'var(--color-surface)',
+const chartTooltipStyle: React.CSSProperties = {
+  background: 'var(--color-surface-elevated)',
   border: '1px solid var(--color-border)',
   borderRadius: '12px',
   fontSize: '12px',
-  boxShadow: 'var(--shadow-md)',
+  padding: '10px 14px',
+  boxShadow: 'var(--shadow-lg)',
+  color: 'var(--color-text-primary)',
+}
+
+const chartLegendStyle: React.CSSProperties = {
+  fontSize: '12px',
+  color: 'var(--color-text-secondary)',
 }
 
 interface TrendChartProps {
@@ -30,8 +37,8 @@ export function TrendChart({ data }: TrendChartProps) {
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
         <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
         <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} />
-        <Tooltip contentStyle={chartTooltipStyle} />
-        <Legend wrapperStyle={{ fontSize: '12px' }} />
+        <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: 'var(--color-text-primary)' }} itemStyle={{ color: 'var(--color-text-secondary)' }} />
+        <Legend wrapperStyle={chartLegendStyle} />
         <Area type="monotone" dataKey="tamamlanan" name="Tamamlanan" stroke="var(--color-success)" fill="url(#gTamamlanan)" strokeWidth={2.5} dot={{ r: 3, fill: 'var(--color-success)', strokeWidth: 2, stroke: 'var(--color-surface)' }} />
         <Area type="monotone" dataKey="atanan" name="Atanan" stroke="var(--color-info)" fill="transparent" strokeWidth={1.5} strokeDasharray="5 5" />
         <Bar dataKey="basarisiz" name="Başarısız" fill="var(--color-error)" radius={[3, 3, 0, 0]} barSize={14} opacity={0.8} />
@@ -54,7 +61,7 @@ export function StatusDonut({ data, total }: StatusDonutProps) {
             <Cell key={i} fill={entry.color} />
           ))}
         </Pie>
-        <Tooltip contentStyle={chartTooltipStyle} formatter={(value: unknown, name: unknown) => [`${Number(value)} (${total > 0 ? Math.round(Number(value) / total * 100) : 0}%)`, String(name)]} />
+        <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: 'var(--color-text-primary)' }} itemStyle={{ color: 'var(--color-text-secondary)' }} formatter={(value: unknown, name: unknown) => [`${Number(value)} (${total > 0 ? Math.round(Number(value) / total * 100) : 0}%)`, String(name)]} />
       </PieChart>
     </ResponsiveContainer>
   )
@@ -71,7 +78,7 @@ export function DepartmentBar({ data }: DepartmentBarProps) {
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
         <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} unit="%" />
         <YAxis dataKey="dept" type="category" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} width={80} />
-        <Tooltip contentStyle={chartTooltipStyle} />
+        <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: 'var(--color-text-primary)' }} itemStyle={{ color: 'var(--color-text-secondary)' }} />
         <Bar dataKey="oran" name="Tamamlanma %" fill="var(--color-primary)" radius={[0, 4, 4, 0]} barSize={14} />
       </BarChart>
     </ResponsiveContainer>
