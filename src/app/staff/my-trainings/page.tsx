@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import {
   BookOpen, Clock, CheckCircle, XCircle, Lock, Play, Target, Award,
@@ -50,6 +50,7 @@ function getCatColor(category: string): string {
 export default function MyTrainingsPage() {
   const { data: rawData, isLoading, error } = useFetch<{ data: Training[] } | Training[]>('/api/staff/my-trainings');
   const [activeTab, setActiveTab] = useState<'trainings' | 'exams'>('trainings');
+  const completedRef = useRef<HTMLDivElement>(null);
 
   if (isLoading) return <PageLoading />;
 
@@ -163,65 +164,30 @@ export default function MyTrainingsPage() {
         </div>
       </BlurFade>
 
-      {/* Completed Trainings — üstte göster */}
+      {/* Tamamlanan Eğitimler kısayol butonu */}
       {completedTrainings.length > 0 && (
-        <>
-          <BlurFade delay={0.06}>
-            <div className="flex items-center gap-2 mb-4">
+        <BlurFade delay={0.04}>
+          <button
+            onClick={() => completedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className="w-full flex items-center justify-between rounded-2xl border px-5 py-3.5 mb-6 transition-all duration-200 hover:-translate-y-0.5"
+            style={{
+              background: 'var(--color-success-bg)',
+              borderColor: 'rgba(5,150,105,0.25)',
+              boxShadow: '0 2px 8px rgba(5,150,105,0.08)',
+            }}
+          >
+            <div className="flex items-center gap-2.5">
               <CheckCircle className="h-4 w-4" style={{ color: 'var(--color-success)' }} />
-              <h2 className="text-[14px] font-bold">Tamamlanan Eğitimler</h2>
-              <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white" style={{ background: 'var(--color-success)' }}>
+              <span className="text-[13px] font-semibold" style={{ color: 'var(--color-success)' }}>
+                Tamamlanan Eğitimler
+              </span>
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white" style={{ background: 'var(--color-success)' }}>
                 {completedTrainings.length}
               </span>
             </div>
-          </BlurFade>
-
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 mb-8">
-            {completedTrainings.map((t, i) => {
-              const sc = statusConfig[t.status] || statusConfig.assigned;
-              const catColor = getCatColor(t.category);
-              const scoreColor = (t.score ?? 0) >= 80 ? 'var(--color-success)' : (t.score ?? 0) >= 60 ? 'var(--color-warning)' : 'var(--color-error)';
-              return (
-                <BlurFade key={t.id} delay={0.08 + i * 0.04}>
-                  <Link href={`/staff/my-trainings/${t.id}`} className="block group">
-                    <div
-                      className="rounded-xl border p-5 transition-all duration-200 hover:-translate-y-0.5"
-                      style={{
-                        background: 'var(--color-surface)',
-                        borderColor: 'var(--color-border)',
-                        boxShadow: 'var(--shadow-sm)',
-                        opacity: t.status === 'locked' ? 0.6 : 1,
-                      }}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: `${catColor}12`, color: catColor }}>
-                          {t.category}
-                        </span>
-                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: sc.bg, color: sc.color }}>
-                          <sc.icon className="h-3 w-3" />
-                          {sc.label}
-                        </span>
-                      </div>
-                      <h3 className="text-[14px] font-bold mb-3">{t.title}</h3>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                          <span className="font-mono">{t.deadline}</span>
-                          <span>Deneme: {t.attempt}/{t.maxAttempts}</span>
-                        </div>
-                        {t.score !== undefined && (
-                          <div className="flex items-center gap-1.5">
-                            <Award className="h-3.5 w-3.5" style={{ color: scoreColor }} />
-                            <span className="text-[14px] font-bold font-mono" style={{ color: scoreColor }}>{t.score}%</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                </BlurFade>
-              );
-            })}
-          </div>
-        </>
+            <ArrowRight className="h-4 w-4" style={{ color: 'var(--color-success)' }} />
+          </button>
+        </BlurFade>
       )}
 
       {/* Active Trainings */}
@@ -389,6 +355,67 @@ export default function MyTrainingsPage() {
         </>
       )}
 
+
+      {/* Completed Trainings — sayfa sonu */}
+      {completedTrainings.length > 0 && (
+        <div ref={completedRef}>
+          <BlurFade delay={0.12}>
+            <div className="flex items-center gap-2 mb-4 mt-4">
+              <CheckCircle className="h-4 w-4" style={{ color: 'var(--color-success)' }} />
+              <h2 className="text-[14px] font-bold">Tamamlanan Eğitimler</h2>
+              <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white" style={{ background: 'var(--color-success)' }}>
+                {completedTrainings.length}
+              </span>
+            </div>
+          </BlurFade>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {completedTrainings.map((t, i) => {
+              const sc = statusConfig[t.status] || statusConfig.assigned;
+              const catColor = getCatColor(t.category);
+              const scoreColor = (t.score ?? 0) >= 80 ? 'var(--color-success)' : (t.score ?? 0) >= 60 ? 'var(--color-warning)' : 'var(--color-error)';
+              return (
+                <BlurFade key={t.id} delay={0.14 + i * 0.04}>
+                  <Link href={`/staff/my-trainings/${t.id}`} className="block group">
+                    <div
+                      className="rounded-xl border p-5 transition-all duration-200 hover:-translate-y-0.5"
+                      style={{
+                        background: 'var(--color-surface)',
+                        borderColor: 'var(--color-border)',
+                        boxShadow: 'var(--shadow-sm)',
+                        opacity: t.status === 'locked' ? 0.6 : 1,
+                      }}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: `${catColor}12`, color: catColor }}>
+                          {t.category}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: sc.bg, color: sc.color }}>
+                          <sc.icon className="h-3 w-3" />
+                          {sc.label}
+                        </span>
+                      </div>
+                      <h3 className="text-[14px] font-bold mb-3">{t.title}</h3>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                          <span className="font-mono">{t.deadline}</span>
+                          <span>Deneme: {t.attempt}/{t.maxAttempts}</span>
+                        </div>
+                        {t.score !== undefined && (
+                          <div className="flex items-center gap-1.5">
+                            <Award className="h-3.5 w-3.5" style={{ color: scoreColor }} />
+                            <span className="text-[14px] font-bold font-mono" style={{ color: scoreColor }}>{t.score}%</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                </BlurFade>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Empty state */}
       {trainingList.length === 0 && (
