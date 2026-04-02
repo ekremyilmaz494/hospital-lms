@@ -383,7 +383,9 @@ export default function CalendarPage() {
                     {cell.isCurrentMonth && dayEvents.length > 0 && (
                       <div className="mt-1 flex flex-col gap-0.5 w-full min-w-0">
                         {dayEvents.slice(0, 2).map(evt => {
-                          const cfg = STATUS_CONFIG[evt.status];
+                          const rawStatus = evt.status as string;
+                          const statusKey = (rawStatus === 'passed' ? 'completed' : rawStatus) as keyof typeof STATUS_CONFIG;
+                          const cfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.assigned;
                           const pillColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
                           const PillIcon = evt.eventType === 'exam' ? ClipboardList : BookOpen;
                           return (

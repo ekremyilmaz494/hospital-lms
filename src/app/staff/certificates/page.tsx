@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  Award, Download, Calendar, CheckCircle2, AlertTriangle, Clock, Copy, Eye,
+  Award, Download, CheckCircle2, AlertTriangle, Copy, Eye, X, Shield, Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BlurFade } from '@/components/ui/blur-fade';
@@ -19,10 +19,139 @@ interface Certificate {
   training: { title: string; category: string };
   score: number;
   attemptNumber: number;
+  user?: { firstName?: string; lastName?: string; organization?: { name?: string } };
 }
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+/** Premium HTML certificate preview */
+function CertificatePreview({ cert }: { cert: Certificate }) {
+  const fullName = cert.user ? `${cert.user.firstName ?? ''} ${cert.user.lastName ?? ''}`.trim() : '';
+  const orgName = cert.user?.organization?.name ?? 'Hastane LMS';
+  const scoreColor = cert.score >= 90 ? '#059669' : cert.score >= 70 ? '#0d9668' : '#f59e0b';
+
+  return (
+    <div
+      className="relative w-full overflow-hidden select-none"
+      style={{
+        background: 'linear-gradient(145deg, #f0fdf4 0%, #ecfdf5 40%, #f8fafc 100%)',
+        border: '3px solid #059669',
+        borderRadius: '16px',
+        fontFamily: 'Georgia, "Times New Roman", serif',
+        aspectRatio: '1.414 / 1',
+        minHeight: '280px',
+      }}
+    >
+      {/* Corner decorations */}
+      {[
+        'top-0 left-0',
+        'top-0 right-0 rotate-90',
+        'bottom-0 left-0 -rotate-90',
+        'bottom-0 right-0 rotate-180',
+      ].map((pos, i) => (
+        <div key={i} className={`absolute ${pos} w-10 h-10`}>
+          <svg viewBox="0 0 40 40" fill="none">
+            <path d="M0 0 L20 0 L20 4 L4 4 L4 20 L0 20 Z" fill="#059669" opacity="0.5" />
+            <path d="M0 0 L12 0 L12 2 L2 2 L2 12 L0 12 Z" fill="#059669" />
+          </svg>
+        </div>
+      ))}
+
+      {/* Top accent line */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 rounded-b-full" style={{ background: 'linear-gradient(90deg, transparent, #059669, transparent)' }} />
+
+      {/* Watermark */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ opacity: 0.03 }}>
+        <Award style={{ width: '60%', height: '60%', color: '#059669' }} />
+      </div>
+
+      <div className="relative h-full flex flex-col items-center justify-between px-8 py-5">
+        {/* Header */}
+        <div className="flex flex-col items-center gap-1 w-full">
+          <div className="flex items-center gap-2">
+            <div className="h-px flex-1" style={{ background: 'linear-gradient(90deg, transparent, #059669)' }} />
+            <span className="text-[9px] font-sans font-bold tracking-[0.3em] uppercase" style={{ color: '#059669' }}>
+              {orgName}
+            </span>
+            <div className="h-px flex-1" style={{ background: 'linear-gradient(90deg, #059669, transparent)' }} />
+          </div>
+
+          <div className="flex items-center gap-2 mt-1">
+            <Star className="h-3 w-3 fill-current" style={{ color: '#f59e0b' }} />
+            <h1 className="text-[15px] font-bold tracking-widest uppercase" style={{ color: '#0d9668', letterSpacing: '0.2em' }}>
+              Başarı Sertifikası
+            </h1>
+            <Star className="h-3 w-3 fill-current" style={{ color: '#f59e0b' }} />
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex flex-col items-center gap-2 text-center">
+          <p className="text-[9px] font-sans tracking-widest uppercase" style={{ color: '#64748b', letterSpacing: '0.15em' }}>
+            Bu sertifika aşağıdaki kişiye verilmiştir
+          </p>
+          {fullName && (
+            <p className="text-[18px] font-bold" style={{ color: '#0f172a', fontStyle: 'italic', textShadow: '0 1px 2px rgba(0,0,0,0.08)' }}>
+              {fullName}
+            </p>
+          )}
+
+          <div className="h-px w-24 mt-0.5" style={{ background: 'linear-gradient(90deg, transparent, #059669, transparent)' }} />
+
+          <p className="text-[8px] font-sans tracking-widest uppercase mt-1" style={{ color: '#64748b' }}>
+            Eğitim
+          </p>
+          <p className="text-[13px] font-bold max-w-[200px] leading-snug" style={{ color: '#059669' }}>
+            {cert.training.title}
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="w-full flex items-end justify-between">
+          {/* Score */}
+          <div className="flex flex-col items-center">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-full border-2"
+              style={{ borderColor: scoreColor, background: `${scoreColor}10` }}
+            >
+              <span className="text-[13px] font-bold font-mono" style={{ color: scoreColor }}>{cert.score}%</span>
+            </div>
+            <span className="text-[8px] font-sans mt-0.5" style={{ color: '#64748b' }}>Puan</span>
+          </div>
+
+          {/* Center bottom */}
+          <div className="flex flex-col items-center gap-1">
+            <Shield className="h-5 w-5" style={{ color: '#059669' }} />
+            <div className="text-center">
+              <p className="text-[7px] font-sans tracking-wider" style={{ color: '#94a3b8' }}>SERTİFİKA KODU</p>
+              <p className="text-[9px] font-mono font-bold" style={{ color: '#059669' }}>{cert.certificateCode.slice(0, 20)}</p>
+            </div>
+          </div>
+
+          {/* Date */}
+          <div className="flex flex-col items-center">
+            <div
+              className="flex flex-col items-center justify-center rounded-lg px-3 py-1.5"
+              style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}
+            >
+              <span className="text-[8px] font-sans" style={{ color: '#64748b' }}>Tarih</span>
+              <span className="text-[9px] font-bold font-mono" style={{ color: '#0f172a' }}>
+                {new Date(cert.issuedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </span>
+            </div>
+            {cert.isExpired && (
+              <span className="text-[8px] font-sans mt-0.5" style={{ color: '#dc2626' }}>Süresi Dolmuş</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom accent line */}
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-0.5 rounded-t-full" style={{ background: 'linear-gradient(90deg, transparent, #059669, transparent)' }} />
+    </div>
+  );
 }
 
 export default function StaffCertificatesPage() {
@@ -31,14 +160,11 @@ export default function StaffCertificatesPage() {
   const [selected, setSelected] = useState<Certificate | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
-  /** Download certificate as PDF via server-side generation */
   const handleDownloadPDF = async (cert: Certificate) => {
     setPdfLoading(true);
     try {
       const res = await fetch(`/api/certificates/${cert.id}/pdf`);
-      if (!res.ok) {
-        throw new Error('PDF indirilemedi');
-      }
+      if (!res.ok) throw new Error('PDF indirilemedi');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -141,7 +267,6 @@ export default function StaffCertificatesPage() {
                       )}
                     </div>
 
-                    {/* Training title */}
                     <h3 className="text-[14px] font-bold mb-1 line-clamp-2">{cert.training.title}</h3>
                     {cert.training.category && (
                       <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-md mb-3" style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}>
@@ -149,7 +274,6 @@ export default function StaffCertificatesPage() {
                       </span>
                     )}
 
-                    {/* Score + Date */}
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       <div className="rounded-xl p-3 text-center" style={{ background: 'var(--color-bg)' }}>
                         <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--color-text-muted)' }}>Puan</p>
@@ -161,8 +285,7 @@ export default function StaffCertificatesPage() {
                       </div>
                     </div>
 
-                    {/* Certificate code */}
-                    <div className="flex items-center gap-2 rounded-lg p-2.5" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+                    <div className="flex items-center gap-2 rounded-lg p-2.5 mb-4" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
                       <code className="flex-1 text-[11px] font-mono font-semibold truncate" style={{ color: 'var(--color-primary)' }}>
                         {cert.certificateCode}
                       </code>
@@ -171,22 +294,21 @@ export default function StaffCertificatesPage() {
                       </button>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex gap-2 mt-4">
+                    <div className="flex gap-2">
                       <Button
                         variant="outline"
                         className="flex-1 gap-1.5 rounded-xl text-[12px] h-9"
                         style={{ borderColor: 'var(--color-border)' }}
                         onClick={() => setSelected(cert)}
                       >
-                        <Eye className="h-3.5 w-3.5" /> Görüntüle
+                        <Eye className="h-3.5 w-3.5" /> Önizle
                       </Button>
                       <Button
                         variant="outline"
                         className="flex-1 gap-1.5 rounded-xl text-[12px] h-9"
                         style={{ borderColor: 'var(--color-border)' }}
                         disabled={pdfLoading}
-                        onClick={() => { setSelected(cert); handleDownloadPDF(cert); }}
+                        onClick={() => handleDownloadPDF(cert)}
                       >
                         <Download className="h-3.5 w-3.5" /> {pdfLoading ? 'İndiriliyor...' : 'İndir'}
                       </Button>
@@ -212,94 +334,60 @@ export default function StaffCertificatesPage() {
         </div>
       )}
 
-      {/* Detail Modal */}
+      {/* Certificate Preview Modal */}
       {selected && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }} />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setSelected(null)}>
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} />
           <div
-            className="relative w-full max-w-md rounded-2xl overflow-hidden"
-            style={{ background: 'var(--color-surface)', boxShadow: 'var(--shadow-xl)' }}
+            className="relative w-full max-w-2xl rounded-2xl overflow-hidden"
+            style={{ background: 'var(--color-surface)', boxShadow: '0 32px 80px rgba(0,0,0,0.4)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative px-8 pt-8 pb-6 text-center" style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}>
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl mx-auto mb-3" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                <Award className="h-7 w-7 text-white" />
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <div className="flex items-center gap-2">
+                <Award className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+                <span className="text-[14px] font-bold">Sertifika Önizlemesi</span>
               </div>
-              <h2 className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>Tamamlama Sertifikası</h2>
-              <p className="text-[12px] text-white/60 mt-1">Hastane LMS</p>
+              <button
+                onClick={() => setSelected(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--color-bg)]"
+              >
+                <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+              </button>
             </div>
 
-            <div className="px-8 py-6 space-y-5">
-              <div className="text-center pb-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <p className="text-base font-bold">{selected.training.title}</p>
-                {selected.training.category && (
-                  <span className="inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-                    {selected.training.category}
-                  </span>
+            {/* Certificate preview */}
+            <div className="p-6">
+              <CertificatePreview cert={selected} />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 px-6 pb-6">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl h-11"
+                style={{ borderColor: 'var(--color-border)' }}
+                onClick={() => setSelected(null)}
+              >
+                Kapat
+              </Button>
+              <button
+                disabled={pdfLoading}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl h-11 text-[13px] font-semibold text-white disabled:opacity-60"
+                style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
+                onClick={() => selected && handleDownloadPDF(selected)}
+              >
+                {pdfLoading ? (
+                  <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Oluşturuluyor...</>
+                ) : (
+                  <><Download className="h-4 w-4" /> PDF İndir</>
                 )}
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="text-center rounded-xl p-3" style={{ background: 'var(--color-bg)' }}>
-                  <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--color-text-muted)' }}>Puan</p>
-                  <p className="text-lg font-bold font-mono" style={{ color: 'var(--color-primary)' }}>{selected.score}%</p>
-                </div>
-                <div className="text-center rounded-xl p-3" style={{ background: 'var(--color-bg)' }}>
-                  <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--color-text-muted)' }}>Deneme</p>
-                  <p className="text-lg font-bold font-mono">{selected.attemptNumber}.</p>
-                </div>
-                <div className="text-center rounded-xl p-3" style={{ background: 'var(--color-bg)' }}>
-                  <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--color-text-muted)' }}>Durum</p>
-                  <p className="text-lg font-bold" style={{ color: selected.isExpired ? 'var(--color-error)' : 'var(--color-success)' }}>
-                    {selected.isExpired ? 'Dolmuş' : 'Aktif'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-xl p-4 space-y-2.5" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Sertifika Kodu</span>
-                  <div className="flex items-center gap-1.5">
-                    <code className="text-[12px] font-mono font-bold" style={{ color: 'var(--color-primary)' }}>{selected.certificateCode}</code>
-                    <button onClick={() => copyCode(selected.certificateCode)} className="p-1 rounded">
-                      <Copy className="h-3 w-3" style={{ color: 'var(--color-text-muted)' }} />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Veriliş Tarihi</span>
-                  <span className="text-[12px] font-mono">{formatDate(selected.issuedAt)}</span>
-                </div>
-                {selected.expiresAt && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Geçerlilik</span>
-                    <span className="text-[12px] font-mono">{formatDate(selected.expiresAt)}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <Button variant="outline" className="flex-1 rounded-xl h-11" style={{ borderColor: 'var(--color-border)' }} onClick={() => setSelected(null)}>
-                  Kapat
-                </Button>
-                <button
-                  disabled={pdfLoading}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl h-11 text-[13px] font-semibold text-white disabled:opacity-60"
-                  style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
-                  onClick={() => selected && handleDownloadPDF(selected)}
-                >
-                  {pdfLoading ? (
-                    <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Oluşturuluyor...</>
-                  ) : (
-                    <><Download className="h-4 w-4" /> PDF İndir</>
-                  )}
-                </button>
-              </div>
+              </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
