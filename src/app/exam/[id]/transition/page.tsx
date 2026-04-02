@@ -23,13 +23,14 @@ function TransitionContent() {
   const score = searchParams.get('score');
   const passed = searchParams.get('passed');
   const passingScore = searchParams.get('passingScore');
+  const attemptIdParam = searchParams.get('attemptId');
 
   const [timeLeft, setTimeLeft] = useState(COUNTDOWN_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const navigatedRef = useRef(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
   const [signed, setSigned] = useState(false);
-  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [attemptId, setAttemptId] = useState<string | null>(() => attemptIdParam ?? null);
 
   // Determine type
   const isPreToVideos = from === 'pre' || from === 'pre-exam';
@@ -82,17 +83,10 @@ function TransitionContent() {
   // Fetch attempt info for signature check (post-result only)
   useEffect(() => {
     if (!isPostResult || passed !== 'true') return
-    fetch(`/api/exam/${id}/start`, { method: 'POST' })
-      .then(res => res.json())
-      .then(data => {
-        const aId = data?.attemptId || data?.id
-        if (aId) {
-          setAttemptId(aId)
-          if (data.signedAt) setSigned(true)
-        }
-      })
-      .catch(() => {})
-  }, [id, isPostResult, passed])
+    if (attemptIdParam) {
+      setAttemptId(attemptIdParam)
+    }
+  }, [isPostResult, passed, attemptIdParam])
 
   // G7.5 — Load per-question results from sessionStorage (written by post-exam page on submit)
   useEffect(() => {

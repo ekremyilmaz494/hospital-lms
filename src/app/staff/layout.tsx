@@ -20,7 +20,15 @@ export default function StaffLayout({
     const saved = localStorage.getItem('sidebar:staff:collapsed');
     return saved !== null ? saved === 'true' : true;
   });
+  const [isMd, setIsMd] = useState(false);
   const { user, isLoading, fullName, initials } = useAuth();
+
+  useEffect(() => {
+    const check = () => setIsMd(window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const toggleSidebar = () => {
     const next = !sidebarCollapsed;
@@ -53,8 +61,14 @@ export default function StaffLayout({
             userInitials={initials}
           />
         </div>
-        {/* Ana içerik: mobilde margin yok, md'de sidebar kadar margin */}
-        <main className="min-h-screen md:ml-[72px] pb-16 md:pb-0">
+        {/* Ana içerik: masaüstünde sidebar durumuna göre kayar, mobilde sabit */}
+        <main
+          className="min-h-screen pb-16 md:pb-0"
+          style={{
+            marginLeft: isMd ? (sidebarCollapsed ? 72 : 280) : 0,
+            transition: 'margin-left 350ms cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
           <ImpersonationBanner />
           <AppTopbar
             title=""
