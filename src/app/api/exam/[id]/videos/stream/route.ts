@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   })
   if (!video) return errorResponse('Video not found', 404)
 
-  const streamUrl = getStreamUrl(video.videoKey)
+  const streamUrl = await getStreamUrl(video.videoKey)
 
   return jsonResponse({ streamUrl, video })
 }

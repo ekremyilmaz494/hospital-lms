@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Library, Clock, Star, CheckCircle2, Plus, Layers, X, ArrowRight,
+  Video, ChevronDown, ChevronRight, Film,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { useFetch } from '@/hooks/use-fetch'
@@ -16,6 +17,7 @@ import {
   type ContentLibraryCategoryKey,
   type ContentLibraryDifficulty,
 } from '@/lib/content-library-categories'
+import { TRAINING_CATEGORIES } from '@/lib/training-categories'
 
 interface ContentLibraryItem {
   id: string
@@ -287,14 +289,313 @@ function ContentCard({ item, onInstall, installing }: ContentCardProps) {
   )
 }
 
+// ── Eğitim Videoları Tipleri ───────────────────────────────────────────────
+
+interface TrainingVideoItem {
+  id: string
+  title: string
+  durationSeconds: number
+  sortOrder: number
+  description: string | null
+  createdAt: string
+}
+
+interface MyTrainingItem {
+  id: string
+  title: string
+  category: string
+  publishStatus: string
+  videoCount: number
+  totalDurationSeconds: number
+  createdAt: string
+  videos: TrainingVideoItem[]
+}
+
+interface MyVideosData {
+  trainings: MyTrainingItem[]
+}
+
+// ── Süre Formatlama ────────────────────────────────────────────────────────
+
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  if (h > 0) return `${h}sa ${m}dk`
+  if (m > 0) return s > 0 ? `${m}dk ${s}sn` : `${m}dk`
+  return `${s}sn`
+}
+
+// ── Eğitim Video Kartı (Accordion) ────────────────────────────────────────
+
+interface TrainingVideoCardProps {
+  item: MyTrainingItem
+  isExpanded: boolean
+  onToggle: () => void
+}
+
+function TrainingVideoCard({ item, isExpanded, onToggle }: TrainingVideoCardProps) {
+  const router = useRouter()
+  const cat = TRAINING_CATEGORIES.find(c => c.value === item.category)
+
+  /** Yayın durumu badge rengi */
+  const statusStyle =
+    item.publishStatus === 'published'
+      ? { bg: 'var(--color-success-bg)', color: 'var(--color-success)', label: 'Yayında' }
+      : item.publishStatus === 'draft'
+        ? { bg: 'var(--color-surface-hover)', color: 'var(--color-text-muted)', label: 'Taslak' }
+        : { bg: 'var(--color-warning-bg, #fef3c7)', color: 'var(--color-warning, #d97706)', label: 'Arşiv' }
+
+  return (
+    <div
+      className="overflow-hidden rounded-2xl border"
+      style={{
+        background: 'var(--color-surface)',
+        borderColor: isExpanded ? 'var(--color-primary)' : 'var(--color-border)',
+        boxShadow: isExpanded ? '0 0 0 1px var(--color-primary)' : 'var(--shadow-sm)',
+        transition: 'border-color 0.15s, box-shadow 0.15s',
+      }}
+    >
+      {/* Kart Başlığı */}
+      <button
+        onClick={onToggle}
+        className="flex w-full items-start gap-3 p-4 text-left"
+      >
+        {/* Kategori ikonu */}
+        <div
+          className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
+          style={{ background: 'var(--color-surface-hover)' }}
+        >
+          {cat?.icon ?? '📚'}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          {/* Başlık + expand ok */}
+          <div className="flex items-center gap-2">
+            <h3
+              className="flex-1 truncate font-bold leading-snug"
+              style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}
+            >
+              {item.title}
+            </h3>
+            {isExpanded
+              ? <ChevronDown className="h-4 w-4 shrink-0" style={{ color: 'var(--color-text-muted)' }} />
+              : <ChevronRight className="h-4 w-4 shrink-0" style={{ color: 'var(--color-text-muted)' }} />
+            }
+          </div>
+
+          {/* Meta bilgiler */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            {/* Kategori badge */}
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+              style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
+            >
+              {cat?.label ?? item.category}
+            </span>
+
+            {/* Yayın durumu */}
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+              style={{ background: statusStyle.bg, color: statusStyle.color }}
+            >
+              {statusStyle.label}
+            </span>
+
+            {/* Video sayısı */}
+            <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              <Film className="h-3 w-3" />
+              {item.videoCount} video
+            </span>
+
+            {/* Toplam süre */}
+            <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              <Clock className="h-3 w-3" />
+              {formatDuration(item.totalDurationSeconds)}
+            </span>
+          </div>
+        </div>
+      </button>
+
+      {/* Accordion İçeriği — Video Listesi */}
+      {isExpanded && (
+        <div
+          className="border-t"
+          style={{ borderColor: 'var(--color-border)' }}
+        >
+          <div className="p-3 space-y-1.5">
+            {item.videos.map((video, idx) => (
+              <div
+                key={video.id}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                style={{ background: 'var(--color-surface-hover)' }}
+              >
+                {/* Sıra numarası */}
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
+                  style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
+                >
+                  {idx + 1}
+                </div>
+
+                {/* Video ikonu */}
+                <Video className="h-4 w-4 shrink-0" style={{ color: 'var(--color-text-muted)' }} />
+
+                {/* Başlık */}
+                <span
+                  className="flex-1 truncate text-sm font-medium"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  {video.title}
+                </span>
+
+                {/* Süre */}
+                <span
+                  className="shrink-0 text-xs font-semibold tabular-nums"
+                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}
+                >
+                  {formatDuration(video.durationSeconds)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Eğitime Git butonu */}
+          <div className="flex justify-end px-4 pb-3">
+            <button
+              onClick={() => router.push(`/admin/trainings/${item.id}/edit`)}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-[var(--color-surface-hover)]"
+              style={{ border: '1.5px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+              Eğitime Git
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Kendi Eğitim Videolarım Sekmesi ────────────────────────────────────────
+
+function MyVideosTab() {
+  const { data, isLoading, error } = useFetch<MyVideosData>('/api/admin/content-library/my-videos')
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  if (isLoading) return <PageLoading />
+  if (error) return (
+    <div className="flex h-64 items-center justify-center text-sm" style={{ color: 'var(--color-error)' }}>
+      {error}
+    </div>
+  )
+
+  const allTrainings = data?.trainings ?? []
+
+  const filtered = categoryFilter
+    ? allTrainings.filter(t => t.category === categoryFilter)
+    : allTrainings
+
+  /** Mevcut eğitimlerde hangi kategoriler kullanılıyor */
+  const usedCategories = TRAINING_CATEGORIES.filter(
+    cat => allTrainings.some(t => t.category === cat.value)
+  )
+
+  return (
+    <div className="space-y-4">
+      {/* Kategori Filtreleri */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => setCategoryFilter(null)}
+          className="rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-colors"
+          style={{
+            background: !categoryFilter ? 'var(--color-primary)' : 'transparent',
+            color: !categoryFilter ? '#fff' : 'var(--color-text-muted)',
+            border: `1.5px solid ${!categoryFilter ? 'var(--color-primary)' : 'var(--color-border)'}`,
+          }}
+        >
+          Tümü ({allTrainings.length})
+        </button>
+
+        {usedCategories.map(cat => {
+          const count = allTrainings.filter(t => t.category === cat.value).length
+          const active = categoryFilter === cat.value
+          return (
+            <button
+              key={cat.value}
+              onClick={() => setCategoryFilter(active ? null : cat.value)}
+              className="rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-colors"
+              style={{
+                background: active ? 'var(--color-primary)' : 'transparent',
+                color: active ? '#fff' : 'var(--color-text-muted)',
+                border: `1.5px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
+              }}
+            >
+              {cat.icon} {cat.label} ({count})
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Eğitim Kartları */}
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map(item => (
+            <TrainingVideoCard
+              key={item.id}
+              item={item}
+              isExpanded={expandedId === item.id}
+              onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div
+          className="flex flex-col items-center justify-center rounded-2xl border py-20 gap-4"
+          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        >
+          <div
+            className="flex h-16 w-16 items-center justify-center rounded-2xl"
+            style={{ background: 'var(--color-surface-hover)' }}
+          >
+            <Film className="h-8 w-8" style={{ color: 'var(--color-text-muted)' }} />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+              {categoryFilter ? 'Bu kategoride video bulunamadı' : 'Henüz yüklenen video yok'}
+            </p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              {categoryFilter
+                ? 'Filtreyi temizleyerek tümünü görün'
+                : 'Yeni eğitim oluştururken video yüklediğinizde burada görünür'
+              }
+            </p>
+          </div>
+          {categoryFilter && (
+            <button
+              onClick={() => setCategoryFilter(null)}
+              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold"
+              style={{ border: '1.5px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+            >
+              <X className="h-3.5 w-3.5" /> Filtreyi Temizle
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Ana Sayfa ─────────────────────────────────────────────────────────────
 
-export default function AdminContentLibraryPage() {
+// ── Platform Kütüphanesi Sekmesi ──────────────────────────────────────────
+
+function PlatformLibraryTab() {
   const { toast } = useToast()
   const { data, isLoading, error, refetch } = useFetch<PageData>('/api/admin/content-library')
-
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [showBulkModal, setShowBulkModal] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [installingId, setInstallingId] = useState<string | null>(null)
 
   if (isLoading) return <PageLoading />
@@ -308,16 +609,15 @@ export default function AdminContentLibraryPage() {
   const filtered = categoryFilter
     ? allItems.filter(i => i.category === categoryFilter)
     : allItems
-
   const installedCount = allItems.filter(i => i.isInstalled).length
 
   const handleInstall = async (id: string) => {
     setInstallingId(id)
     try {
       const res = await fetch(`/api/admin/content-library/${id}/install`, { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Kurulum başarısız')
-      toast(data.message ?? 'İçerik kurumunuza eklendi', 'success')
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Kurulum başarısız')
+      toast(json.message ?? 'İçerik kurumunuza eklendi', 'success')
       refetch()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error')
@@ -327,7 +627,7 @@ export default function AdminContentLibraryPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {showBulkModal && (
         <BulkInstallModal
           items={allItems}
@@ -336,11 +636,20 @@ export default function AdminContentLibraryPage() {
         />
       )}
 
-      <PageHeader
-        title="İçerik Kütüphanesi"
-        subtitle={`${allItems.length} hazır içerik · ${installedCount} kurumunuza eklendi`}
-        secondaryAction={{ label: 'Toplu Ekle', icon: Layers, onClick: () => setShowBulkModal(true) }}
-      />
+      {/* Üst satır: istatistik + Toplu Ekle */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          {allItems.length} hazır içerik · {installedCount} kurumunuza eklendi
+        </p>
+        <button
+          onClick={() => setShowBulkModal(true)}
+          className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-[var(--color-surface-hover)]"
+          style={{ border: '1.5px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+        >
+          <Layers className="h-4 w-4" />
+          Toplu Ekle
+        </button>
+      </div>
 
       {/* Kategori Filtreleri */}
       <div className="flex flex-wrap items-center gap-2">
@@ -400,7 +709,7 @@ export default function AdminContentLibraryPage() {
               {categoryFilter ? 'Bu kategoride içerik bulunamadı' : 'Henüz içerik kütüphanesi hazırlanmamış'}
             </p>
             <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              {categoryFilter ? 'Filteyi temizleyerek tüm içerikleri görün' : 'Platform yöneticisi içerik eklediğinde burada görünür'}
+              {categoryFilter ? 'Filtreyi temizleyerek tüm içerikleri görün' : 'Platform yöneticisi içerik eklediğinde burada görünür'}
             </p>
           </div>
           {categoryFilter && (
@@ -413,6 +722,58 @@ export default function AdminContentLibraryPage() {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Ana Sayfa ─────────────────────────────────────────────────────────────
+
+type ActiveTab = 'platform' | 'my-videos'
+
+export default function AdminContentLibraryPage() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>('platform')
+
+  const tabs: { id: ActiveTab; label: string; icon: React.ElementType }[] = [
+    { id: 'platform', label: 'Platform Kütüphanesi', icon: Library },
+    { id: 'my-videos', label: 'Eğitim Videolarım', icon: Film },
+  ]
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="İçerik Kütüphanesi"
+        subtitle="Platform içerikleri ve yüklenen eğitim videoları"
+      />
+
+      {/* Tab Switcher */}
+      <div
+        className="flex items-center gap-1 rounded-2xl p-1"
+        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', width: 'fit-content' }}
+      >
+        {tabs.map(tab => {
+          const Icon = tab.icon
+          const active = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold"
+              style={{
+                background: active ? 'var(--color-primary)' : 'transparent',
+                color: active ? '#fff' : 'var(--color-text-muted)',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Tab İçerikleri */}
+      {activeTab === 'platform' && <PlatformLibraryTab />}
+      {activeTab === 'my-videos' && <MyVideosTab />}
     </div>
   )
 }

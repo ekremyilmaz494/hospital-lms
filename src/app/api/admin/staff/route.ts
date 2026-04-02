@@ -204,6 +204,13 @@ export async function POST(request: Request) {
       }
     }
     logger.error('Admin Staff', 'DB insert başarısız', dbError)
+    const prismaErr = dbError as { code?: string; meta?: { target?: string[]; modelName?: string } }
+    if (prismaErr.code === 'P2002') {
+      const targets = prismaErr.meta?.target ?? []
+      if (targets.some(t => t.includes('tc_no'))) return errorResponse('Bu TC Kimlik No ile kayıtlı bir personel zaten mevcut')
+      if (targets.some(t => t.includes('email'))) return errorResponse('Bu e-posta adresi ile kayıtlı bir personel zaten mevcut')
+      return errorResponse('Bu bilgilerle kayıtlı bir personel zaten mevcut')
+    }
     return errorResponse('Personel veritabanına kaydedilemedi. Lütfen tekrar deneyin.')
   }
 

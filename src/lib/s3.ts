@@ -45,18 +45,24 @@ export async function getDownloadUrl(key: string) {
 }
 
 /** Generate CloudFront signed URL for video streaming */
-export function getStreamUrl(key: string) {
-  const domain = process.env.AWS_CLOUDFRONT_DOMAIN!
-  const url = `${domain}/${key}`
-  const keyPairId = process.env.AWS_CLOUDFRONT_KEY_PAIR_ID!
-  const privateKey = process.env.AWS_CLOUDFRONT_PRIVATE_KEY!.replace(/\\n/g, '\n')
+export async function getStreamUrl(key: string) {
+  const domain = process.env.AWS_CLOUDFRONT_DOMAIN
+  const keyPairId = process.env.AWS_CLOUDFRONT_KEY_PAIR_ID
+  const privateKey = process.env.AWS_CLOUDFRONT_PRIVATE_KEY
 
-  return getCloudfrontSignedUrl({
-    url,
-    keyPairId,
-    privateKey,
-    dateLessThan: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 hours
-  })
+  // CloudFront configured → signed URL
+  if (domain && keyPairId && privateKey && !domain.includes('your-')) {
+    const url = `${domain.startsWith('http') ? domain : `https://${domain}`}/${key}`
+    return getCloudfrontSignedUrl({
+      url,
+      keyPairId,
+      privateKey: privateKey.replace(/\\n/g, '\n'),
+      dateLessThan: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+    })
+  }
+
+  // Fallback → S3 presigned download URL
+  return getDownloadUrl(key)
 }
 
 /** Delete object from S3 */

@@ -47,6 +47,7 @@ export default function NewTrainingPage() {
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [excludedStaff, setExcludedStaff] = useState<string[]>([]);
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<Record<number, number>>({});
   const [videos, setVideos] = useState<{ id: number; title: string; url: string; file?: File }[]>([
     { id: 1, title: '', url: '' },
   ]);
@@ -486,20 +487,68 @@ export default function NewTrainingPage() {
                               toast('Dosya boyutu 500MB sınırını aşıyor', 'error');
                               return;
                             }
-                            // Show uploading state
                             setVideos(prev => prev.map(v => v.id === video.id ? { ...v, file, url: '' } : v));
-                            try {
-                              const formData = new FormData();
-                              formData.append('file', file);
-                              const res = await fetch('/api/upload/video', { method: 'POST', body: formData });
-                              if (!res.ok) throw new Error('Upload failed');
-                              const data = await res.json();
-                              setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: data.url, file } : v));
-                              toast('Video yüklendi', 'success');
-                            } catch {
-                              toast('Video yüklenemedi', 'error');
+                            setUploadProgress(prev => ({ ...prev, [video.id]: 0 }));
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            const xhr = new XMLHttpRequest();
+                            let s3Phase = false;
+                            xhr.upload.onprogress = (ev) => {
+                              if (ev.lengthComputable && !s3Phase) {
+                                // 0-80%: dosya server'a gidiyor
+                                const pct = Math.round((ev.loaded / ev.total) * 80);
+                                setUploadProgress(prev => ({ ...prev, [video.id]: pct }));
+                              }
+                            };
+                            xhr.upload.onload = () => {
+                              // Server'a gitti, şimdi S3'e yükleniyor (80-95 arası animasyon)
+                              s3Phase = true;
+                              setUploadProgress(prev => ({ ...prev, [video.id]: 82 }));
+                              const tick = setInterval(() => {
+                                setUploadProgress(prev => {
+                                  const cur = prev[video.id] ?? 82;
+                                  if (cur >= 95) { clearInterval(tick); return prev; }
+                                  return { ...prev, [video.id]: cur + 1 };
+                                });
+                              }, 400);
+                              (xhr as unknown as Record<string, unknown>)._s3Tick = tick;
+                            };
+                            xhr.onload = () => {
+                              const tick = (xhr as unknown as Record<string, unknown>)._s3Tick as ReturnType<typeof setInterval> | undefined;
+                              if (tick) clearInterval(tick);
+                              if (xhr.status >= 200 && xhr.status < 300) {
+                                setUploadProgress(prev => ({ ...prev, [video.id]: 100 }));
+                                try {
+                                  const { key } = JSON.parse(xhr.responseText);
+                                  setTimeout(() => {
+                                    setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: key, file } : v));
+                                    setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
+                                  }, 500);
+                                  toast('Video yüklendi', 'success');
+                                } catch {
+                                  toast('Yanıt işlenemedi', 'error');
+                                  setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
+                                }
+                              } else {
+                                try {
+                                  const err = JSON.parse(xhr.responseText);
+                                  toast(err.error || 'Video yüklenemedi', 'error');
+                                } catch {
+                                  toast('Video yüklenemedi', 'error');
+                                }
+                                setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
+                                setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
+                              }
+                            };
+                            xhr.onerror = () => {
+                              const tick = (xhr as unknown as Record<string, unknown>)._s3Tick as ReturnType<typeof setInterval> | undefined;
+                              if (tick) clearInterval(tick);
+                              toast('Video yüklenemedi — bağlantı hatası', 'error');
                               setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
-                            }
+                              setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
+                            };
+                            xhr.open('POST', '/api/upload/video');
+                            xhr.send(formData);
                           }
                         }}
                       />
@@ -519,9 +568,32 @@ export default function NewTrainingPage() {
                             <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                               {video.file.name}
                             </p>
-                            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                              {(video.file.size / (1024 * 1024)).toFixed(2)} MB • {video.url ? 'Yüklendi ✓' : 'Yükleniyor...'}
-                            </p>
+                            {uploadProgress[video.id] !== undefined ? (
+                              <div className="mt-1.5">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                                    <div
+                                      className="h-full rounded-full"
+                                      style={{
+                                        width: `${uploadProgress[video.id]}%`,
+                                        background: 'var(--color-primary)',
+                                        transition: 'width 0.2s ease',
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="text-xs font-bold shrink-0" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-primary)', minWidth: 36, textAlign: 'right' }}>
+                                    {uploadProgress[video.id]}%
+                                  </span>
+                                </div>
+                                <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                                  {(video.file.size / (1024 * 1024)).toFixed(1)} MB • {uploadProgress[video.id] < 80 ? 'Dosya gönderiliyor...' : uploadProgress[video.id] < 100 ? 'S3\'e yükleniyor...' : 'Tamamlandı!'}
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-xs mt-0.5" style={{ color: video.url ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
+                                {(video.file.size / (1024 * 1024)).toFixed(2)} MB {video.url ? '• Yüklendi ✓' : ''}
+                              </p>
+                            )}
                           </>
                         ) : (
                           <>
@@ -916,7 +988,7 @@ export default function NewTrainingPage() {
                       complianceDeadline: isCompulsory && complianceDeadline ? new Date(complianceDeadline).toISOString() : null,
                       regulatoryBody: isCompulsory && regulatoryBody ? regulatoryBody : null,
                       renewalPeriodMonths: isCompulsory && renewalPeriodMonths !== '' ? Number(renewalPeriodMonths) : null,
-                      videos: videos.map(v => ({ title: v.title, url: v.url })),
+                      videos: videos.filter(v => v.url).map(v => ({ title: v.title || v.file?.name || `Video`, url: v.url })),
                       questions,
                       selectedDepts,
                       excludedStaff,

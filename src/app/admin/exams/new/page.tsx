@@ -18,6 +18,8 @@ import {
   X,
   Check,
   Search,
+  Users,
+  Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,6 +99,53 @@ export default function NewExamPage() {
   const [isCompulsory, setIsCompulsory] = useState(false);
   const [randomizeQuestions, setRandomizeQuestions] = useState(false);
   const [randomQuestionCount, setRandomQuestionCount] = useState<number | ''>('');
+
+  // Department & staff assignment
+  const { data: departments } = useFetch<{ id: string; name: string; color: string | null; count: number; staff: { id: string; name: string; title: string; initials: string }[] }[]>('/api/admin/departments');
+  const [selectedDepts, setSelectedDepts] = useState<Set<string>>(new Set());
+  const [excludedStaff, setExcludedStaff] = useState<Set<string>>(new Set());
+
+  const toggleDept = (deptId: string) => {
+    setSelectedDepts(prev => {
+      const next = new Set(prev);
+      if (next.has(deptId)) { next.delete(deptId); } else { next.add(deptId); }
+      return next;
+    });
+    // Remove excluded staff from deselected dept
+    if (selectedDepts.has(deptId)) {
+      const deptStaffIds = new Set(departments?.find(d => d.id === deptId)?.staff.map(s => s.id) ?? []);
+      setExcludedStaff(prev => {
+        const next = new Set(prev);
+        deptStaffIds.forEach(id => next.delete(id));
+        return next;
+      });
+    }
+  };
+
+  const toggleAllDepts = () => {
+    if (!departments) return;
+    if (selectedDepts.size === departments.length) {
+      setSelectedDepts(new Set());
+      setExcludedStaff(new Set());
+    } else {
+      setSelectedDepts(new Set(departments.map(d => d.id)));
+    }
+  };
+
+  const toggleExcludeStaff = (staffId: string) => {
+    setExcludedStaff(prev => {
+      const next = new Set(prev);
+      if (next.has(staffId)) { next.delete(staffId); } else { next.add(staffId); }
+      return next;
+    });
+  };
+
+  const selectedStaffCount = useMemo(() => {
+    if (!departments || selectedDepts.size === 0) return 0;
+    return departments
+      .filter(d => selectedDepts.has(d.id))
+      .reduce((sum, d) => sum + d.staff.filter(s => !excludedStaff.has(s.id)).length, 0);
+  }, [departments, selectedDepts, excludedStaff]);
 
   // Step 2: Questions
   const [questions, setQuestions] = useState<QuestionItem[]>([
@@ -198,6 +247,8 @@ export default function NewExamPage() {
           isCompulsory,
           randomizeQuestions,
           randomQuestionCount: randomizeQuestions && randomQuestionCount ? Number(randomQuestionCount) : undefined,
+          selectedDepts: selectedDepts.size > 0 ? Array.from(selectedDepts) : undefined,
+          excludedStaff: excludedStaff.size > 0 ? Array.from(excludedStaff) : undefined,
           questions: (publishStatus === 'published' ? validQuestions : questions.filter((q) => q.text.length > 0)).map(
             (q) => ({
               text: q.text,
@@ -480,7 +531,140 @@ export default function NewExamPage() {
                 )}
               </div>
 
-              {/* Kart 4: Zorunlu */}
+              {/* Kart 4: Departman & Personel Atama */}
+              <div
+                className="rounded-2xl border p-6"
+                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+                    <h3 className="text-sm font-bold">Departman & Personel Atama</h3>
+                  </div>
+                  {departments && departments.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={toggleAllDepts}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                      style={{ color: 'var(--color-primary)', background: 'var(--color-primary-light)' }}
+                    >
+                      {selectedDepts.size === departments.length ? 'Tümünü Kaldır' : 'Tümünü Seç'}
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
+                  Sınavı hangi departmanlara atamak istediğinizi seçin. Seçmezseniz sınav kimseye atanmaz.
+                </p>
+
+                {/* Departman Seçimi */}
+                {departments && departments.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {departments.map((dept) => {
+                        const isSelected = selectedDepts.has(dept.id);
+                        return (
+                          <button
+                            key={dept.id}
+                            type="button"
+                            onClick={() => toggleDept(dept.id)}
+                            className="flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-left"
+                            style={{
+                              borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                              background: isSelected ? 'var(--color-primary-light)' : 'var(--color-bg)',
+                              transition: 'border-color var(--transition-fast), background var(--transition-fast)',
+                            }}
+                          >
+                            <div
+                              className="h-3 w-3 rounded-full shrink-0"
+                              style={{ background: dept.color || 'var(--color-primary)' }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate" style={{ color: isSelected ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}>
+                                {dept.name}
+                              </p>
+                              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{dept.count} personel</p>
+                            </div>
+                            {isSelected && <Check className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary)' }} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Seçili Departmanların Personeli */}
+                    {selectedDepts.size > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
+                            <p className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                              Atanacak Personel ({selectedStaffCount} kişi)
+                            </p>
+                          </div>
+                          {excludedStaff.size > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setExcludedStaff(new Set())}
+                              className="text-[10px] font-medium px-2 py-1 rounded"
+                              style={{ color: 'var(--color-text-muted)' }}
+                            >
+                              Hariç tutulanları temizle
+                            </button>
+                          )}
+                        </div>
+                        <div
+                          className="rounded-xl border p-3 max-h-48 overflow-y-auto space-y-1"
+                          style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}
+                        >
+                          {departments
+                            .filter(d => selectedDepts.has(d.id))
+                            .flatMap(d => d.staff.map(s => ({ ...s, deptName: d.name, deptColor: d.color })))
+                            .map(s => {
+                              const isExcluded = excludedStaff.has(s.id);
+                              return (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => toggleExcludeStaff(s.id)}
+                                  className="flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left"
+                                  style={{
+                                    opacity: isExcluded ? 0.45 : 1,
+                                    background: isExcluded ? 'var(--color-error-bg, rgba(239,68,68,0.06))' : 'transparent',
+                                    transition: 'opacity var(--transition-fast), background var(--transition-fast)',
+                                  }}
+                                >
+                                  <div
+                                    className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold text-white"
+                                    style={{ background: s.deptColor || 'var(--color-primary)' }}
+                                  >
+                                    {s.initials}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)', textDecoration: isExcluded ? 'line-through' : 'none' }}>{s.name}</p>
+                                    <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{s.deptName}{s.title ? ` · ${s.title}` : ''}</p>
+                                  </div>
+                                  {isExcluded && (
+                                    <span className="text-[10px] font-semibold shrink-0 px-2 py-0.5 rounded-full" style={{ background: 'var(--color-error-bg, rgba(239,68,68,0.1))', color: 'var(--color-error)' }}>
+                                      Hariç
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          {departments
+                            .filter(d => selectedDepts.has(d.id))
+                            .every(d => d.staff.length === 0) && (
+                            <p className="text-xs text-center py-3" style={{ color: 'var(--color-text-muted)' }}>Seçili departmanlarda aktif personel yok</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Henüz departman tanımlanmamış</p>
+                )}
+              </div>
+
+              {/* Kart 5: Zorunlu */}
               <div
                 className="rounded-2xl border p-6"
                 style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}

@@ -62,20 +62,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const progressMap = new Map(progress.map(p => [p.videoId, p]))
 
+  const videoList = videos.map((v) => {
+    const p = progressMap.get(v.id)
+    // S3 videos → proxy through our API (avoids CORS issues)
+    // Legacy /uploads videos → use path directly
+    const hasS3Key = v.videoKey && !v.videoKey.startsWith('/uploads')
+    const url = hasS3Key ? `/api/stream/${v.id}` : v.videoUrl
+    return {
+      id: v.id,
+      title: v.title,
+      url,
+      duration: v.durationSeconds,
+      completed: p?.isCompleted ?? false,
+      lastPosition: p?.lastPositionSeconds ?? 0,
+    }
+  })
+
   return jsonResponse({
     trainingTitle: training.title,
     attemptStatus,
-    videos: videos.map(v => {
-      const p = progressMap.get(v.id)
-      return {
-        id: v.id,
-        title: v.title,
-        url: v.videoUrl,
-        duration: v.durationSeconds,
-        completed: p?.isCompleted ?? false,
-        lastPosition: p?.lastPositionSeconds ?? 0,
-      }
-    }),
+    videos: videoList,
   })
 }
 

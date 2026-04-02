@@ -117,11 +117,12 @@ export async function POST(request: Request) {
       // 2. Videoları Oluştur
       if (videos && videos.length > 0) {
         for (const [idx, v] of videos.entries()) {
-          if (!v.url || !v.title) continue;
+          if (!v.url) continue;
+          const videoTitle = v.title || v.url.split('/').pop()?.replace(/\.[^.]+$/, '') || `Video ${idx + 1}`;
           await tx.trainingVideo.create({
             data: {
               trainingId: t.id,
-              title: v.title,
+              title: videoTitle,
               videoUrl: v.url,
               videoKey: v.url,
               durationSeconds: v.durationSeconds || 300,

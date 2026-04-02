@@ -1747,3 +1747,114 @@ Tüm animasyonlar pure CSS (`will-change: transform`, `filter: blur`).
 ---
 
 *Son güncelleme: 29 Mart 2026 — Oturum 13*
+
+---
+
+## Oturum 14 — 2 Nisan 2026
+
+**Odak:** Kritik bug fix'ler, UX iyileştirmeleri ve realtime fallback mekanizması
+
+### PROMPT 1 — Personel İlerleme % (En Kritik)
+
+**Sorun:** Eğitim detay sayfasında personel listesinde `progress` alanı eksikti — her personelin eğitimdeki ilerleme durumu görünmüyordu.
+
+**Çözüm:**
+- **API** (`src/app/api/admin/trainings/[id]/route.ts`): GET handler'daki `assignedStaff` map'ine 3 adımlı progress hesaplaması eklendi. `examAttempt` üzerindeki `preExamCompletedAt`, `videosCompletedAt`, `postExamCompletedAt` alanlarına bakarak 0/33/67/100 yüzdesi hesaplanıyor (IIFE pattern ile).
+- **Frontend** (`src/app/admin/trainings/[id]/page.tsx`): `TrainingDetail` interface'ine `progress: number` eklendi. "Deneme" ile "Ön Sınav" kolonları arasına "İlerleme" progress bar kolonu eklendi. Renk mantığı: 0% → gri, 1-99% → mavi, 100% → yeşil.
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/app/api/admin/trainings/[id]/route.ts` | `progress` IIFE hesaplaması + return objesine ekleme |
+| `src/app/admin/trainings/[id]/page.tsx` | Interface güncelleme + progress bar kolonu |
+
+---
+
+### PROMPT 2 — Sınav maxAttempts Kontrolü
+
+**Sorun:** `src/app/api/exam/[id]/submit/route.ts`'de sınav bittiğinde assignment status güncellenirken `assignment.currentAttempt >= assignment.maxAttempts` kullanılıyordu. Admin "Yeni Hak Ver" ile override edilen haklar doğru değerlendirilmiyordu.
+
+**Çözüm:**
+- `effectiveMaxAttempts = assignment.maxAttempts ?? training.maxAttempts` fallback'i eklendi
+- Karşılaştırma `attempt.attemptNumber >= effectiveMaxAttempts` olarak güncellendi (gerçek deneme numarası kullanılıyor)
+- `assignment` zaten include ediliyordu, ek sorgu gerekmedi
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/app/api/exam/[id]/submit/route.ts` | `effectiveMaxAttempts` fallback + `attemptNumber` karşılaştırması |
+
+---
+
+### PROMPT 3 — Raporlar Sayfası Toast + Yenileme
+
+**Sorun:** `src/app/admin/reports/page.tsx`'de "Yeni Hak Ver" butonunun onClick'inde başarılı reset-attempt sonrası toast gösteriliyordu ama tablo yenilenmiyordu — kullanıcı sayfayı manuel yenilemek zorundaydı.
+
+**Çözüm:**
+- `useFetch` destructuring'ine `refetch` eklendi: `const { data, isLoading, error, refetch } = useFetch<ReportsData>(...)`
+- Toast sonrasına `refetch()` çağrısı eklendi
+- `useFetch` hook'u zaten `refetch` fonksiyonu döndürüyordu, hook değişikliği gerekmedi
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/app/admin/reports/page.tsx` | `refetch` destructure + toast sonrası `refetch()` çağrısı |
+
+---
+
+### PROMPT 4 — Takvimde Sınavlar
+
+**Sorun:** Personel takviminde `examOnly` sınavlar ile normal eğitimler arasında görsel ayrım yoktu. Tüm eventler aynı status-tabanlı renklerle gösteriliyordu.
+
+**Çözüm:**
+- **API** (`src/app/api/staff/calendar/route.ts`): Training select'e `examOnly: true` eklendi. Her event'e `eventType: 'exam' | 'training'` alanı türetildi (`training.examOnly` değerine göre).
+- **Frontend** (`src/app/staff/calendar/page.tsx`):
+  - `ClipboardList` ikonu import edildi
+  - `CalendarEvent` interface'e `eventType` eklendi
+  - Takvim hücre pill'leri: Eğitimler → mavi `BookOpen` ikonu, Sınavlar → turuncu `ClipboardList` ikonu
+  - Sidebar detay kartları: Sınav eventleri turuncu ikon/arka plan ile farklılaştırıldı
+  - Legend'a "Eğitim" ve "Sınav" açıklamaları eklendi
+- `examOnly` sınavları filtreleyen bir koşul yoktu — zaten dahildi, sadece görsel ayrım eksikti
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/app/api/staff/calendar/route.ts` | `examOnly` select + `eventType` türetme |
+| `src/app/staff/calendar/page.tsx` | `ClipboardList` import, interface güncelleme, pill/sidebar/legend renk ayrımı |
+
+---
+
+### PROMPT 5 — Dashboard Realtime Fallback
+
+**Sorun:** Admin dashboard'daki "Anlık Sınavlar" widget'ı Supabase Realtime bağlantısı kurulamazsa (env eksik, network, vb.) boş kalıyordu — kullanıcıya hiçbir geri bildirim verilmiyordu.
+
+**Çözüm:**
+- **Hook** (`src/hooks/use-realtime-exams.ts`):
+  - `isConnected` state eklendi — Supabase channel `subscribe()` callback'inden `SUBSCRIBED` durumunu dinler
+  - Cleanup'ta `setIsConnected(false)` ile sıfırlanır
+  - Return'e `isConnected` eklendi
+- **Dashboard** (`src/app/admin/dashboard/page.tsx`):
+  - `useFetch` ile fallback: Realtime bağlı değilse `/api/admin/in-progress-exams` API'den çeker
+  - `displayExams` = bağlıysa realtime `attempts`, değilse `fallbackData ?? attempts` (initial fetch)
+  - Header'a bağlantı durumu göstergesi: yeşil nokta + "Canlı" (pulse animasyon) / sarı nokta + "Önbellek"
+  - Tüm `attempts`/`activeCount` referansları `displayExams`/`displayCount` ile değiştirildi
+
+| Dosya | Değişiklik |
+|---|---|
+| `src/hooks/use-realtime-exams.ts` | `isConnected` state + subscribe callback + return güncelleme |
+| `src/app/admin/dashboard/page.tsx` | Fallback fetch + `displayExams`/`displayCount` + bağlantı göstergesi |
+
+---
+
+### Oturum 14 — Değiştirilen Tüm Dosyalar
+
+| Dosya | Açıklama |
+|---|---|
+| `src/app/api/admin/trainings/[id]/route.ts` | Personel progress hesaplaması |
+| `src/app/admin/trainings/[id]/page.tsx` | Progress bar kolonu + interface |
+| `src/app/api/exam/[id]/submit/route.ts` | effectiveMaxAttempts fallback |
+| `src/app/admin/reports/page.tsx` | refetch() ekleme |
+| `src/app/api/staff/calendar/route.ts` | examOnly + eventType |
+| `src/app/staff/calendar/page.tsx` | Eğitim/Sınav görsel ayrımı |
+| `src/hooks/use-realtime-exams.ts` | isConnected state |
+| `src/app/admin/dashboard/page.tsx` | Realtime fallback + bağlantı göstergesi |
+
+---
+
+*Son güncelleme: 2 Nisan 2026 — Oturum 14*

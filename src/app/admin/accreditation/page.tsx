@@ -274,10 +274,10 @@ export default function AccreditationPage() {
             <ClipboardCheck size={24} color="var(--color-primary)" />
           </div>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
               Akreditasyon Yönetimi
             </h1>
-            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, marginTop: 2 }}>
+            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0, marginTop: 2 }}>
               JCI, ISO, TJC ve OSHA standartlarına uyumluluk takibi
             </p>
           </div>
@@ -285,7 +285,7 @@ export default function AccreditationPage() {
 
         {/* ── Standart Seçici ── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: 'var(--color-muted)', fontWeight: 500 }}>Standart:</span>
+          <span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontWeight: 500 }}>Standart:</span>
           {STANDARD_BODIES.map(b => (
             <button
               key={b.value}
@@ -295,7 +295,7 @@ export default function AccreditationPage() {
                 cursor: 'pointer', border: '1.5px solid',
                 borderColor: selectedBody === b.value ? 'var(--color-primary)' : 'var(--color-border, #e2e8f0)',
                 background: selectedBody === b.value ? 'rgba(13,150,104,0.1)' : 'transparent',
-                color: selectedBody === b.value ? 'var(--color-primary)' : 'var(--color-muted)',
+                color: selectedBody === b.value ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                 transition: 'all 0.15s',
               }}
             >
@@ -334,10 +334,10 @@ export default function AccreditationPage() {
           <div>
             {loadingStandards ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-muted)' }} />
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-text-muted)' }} />
               </div>
             ) : standards.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-muted)', fontSize: 14 }}>
+              <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-muted)', fontSize: 14 }}>
                 Bu standart için kayıt bulunamadı.
               </div>
             ) : (
@@ -358,12 +358,12 @@ export default function AccreditationPage() {
                             }}>
                               {std.code}
                             </span>
-                            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                               {std.title}
                             </span>
                           </div>
                           {std.description && (
-                            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 8px' }}>
+                            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 8px' }}>
                               {std.description}
                             </p>
                           )}
@@ -371,7 +371,7 @@ export default function AccreditationPage() {
                             {std.requiredTrainingCategories.map(cat => (
                               <span key={cat} style={{
                                 fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 8,
-                                background: 'var(--color-muted-bg, #f1f5f9)', color: 'var(--color-muted)',
+                                background: 'var(--color-surface-hover, #f1f5f9)', color: 'var(--color-text-muted)',
                               }}>
                                 {cat}
                               </span>
@@ -382,7 +382,7 @@ export default function AccreditationPage() {
                           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-primary)' }}>
                             %{std.requiredCompletionRate}
                           </div>
-                          <div style={{ fontSize: 10, color: 'var(--color-muted)' }}>gerekli oran</div>
+                          <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>gerekli oran</div>
                         </div>
                       </div>
                     </div>
@@ -405,24 +405,24 @@ export default function AccreditationPage() {
               display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap',
             }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', display: 'block', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 }}>
                   Dönem Başlangıcı
                 </label>
                 <input type="date" value={simPeriodStart} onChange={e => setSimPeriodStart(e.target.value)}
                   style={{
                     padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border, #e2e8f0)',
-                    fontSize: 13, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text)',
+                    fontSize: 13, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
                   }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', display: 'block', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 }}>
                   Dönem Bitişi
                 </label>
                 <input type="date" value={simPeriodEnd} onChange={e => setSimPeriodEnd(e.target.value)}
                   style={{
                     padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border, #e2e8f0)',
-                    fontSize: 13, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text)',
+                    fontSize: 13, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
                   }}
                 />
               </div>
@@ -460,7 +460,7 @@ export default function AccreditationPage() {
                       textAlign: 'center',
                     }}>
                       <div style={{ fontSize: 26, fontWeight: 800, color: card.color as string }}>{card.value}</div>
-                      <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 2 }}>{card.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{card.label}</div>
                     </div>
                   ))}
                 </div>
@@ -471,7 +471,7 @@ export default function AccreditationPage() {
                   border: '1px solid var(--color-border, #e2e8f0)', overflow: 'hidden',
                 }}>
                   <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border, #e2e8f0)' }}>
-                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>
+                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }}>
                       Standart Bulgular
                     </h3>
                   </div>
@@ -482,7 +482,7 @@ export default function AccreditationPage() {
                           {['Kod', 'Standart', 'Gereken', 'Gerçekleşen', 'Eksik Personel', 'Durum'].map(h => (
                             <th key={h} style={{
                               padding: '10px 14px', textAlign: 'left', fontSize: 11,
-                              fontWeight: 700, color: 'var(--color-muted)', letterSpacing: '0.05em',
+                              fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.05em',
                             }}>{h}</th>
                           ))}
                         </tr>
@@ -495,10 +495,10 @@ export default function AccreditationPage() {
                             <td style={{ padding: '12px 14px', fontSize: 12, fontWeight: 700, color: 'var(--color-primary)' }}>
                               {f.standardCode}
                             </td>
-                            <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--color-text)', maxWidth: 280 }}>
+                            <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--color-text-primary)', maxWidth: 280 }}>
                               {f.standardTitle}
                             </td>
-                            <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--color-muted)' }}>
+                            <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--color-text-muted)' }}>
                               %{f.requiredRate}
                             </td>
                             <td style={{ padding: '12px 14px', minWidth: 120 }}>
@@ -524,14 +524,14 @@ export default function AccreditationPage() {
                     background: 'var(--color-card, #fff)', borderRadius: 16,
                     border: '1px solid var(--color-border, #e2e8f0)', padding: 20,
                   }}>
-                    <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>
+                    <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }}>
                       Aksiyon Planı Oluştur
                     </h3>
-                    <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                    <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
                       Seçilen kategorilerde eksik eğitimleri tüm personele atar.
                     </p>
                     <div style={{ marginBottom: 12 }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', display: 'block', marginBottom: 6 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 }}>
                         Kategoriler (virgülle ayrılmış)
                       </label>
                       <input
@@ -541,19 +541,19 @@ export default function AccreditationPage() {
                         style={{
                           width: '100%', padding: '8px 12px', borderRadius: 8,
                           border: '1px solid var(--color-border, #e2e8f0)',
-                          fontSize: 12, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text)',
+                          fontSize: 12, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
                           boxSizing: 'border-box',
                         }}
                       />
                     </div>
                     <div style={{ marginBottom: 16 }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', display: 'block', marginBottom: 6 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 }}>
                         Son Tamamlanma Tarihi (isteğe bağlı)
                       </label>
                       <input type="date" value={actionPlanDueDate} onChange={e => setActionPlanDueDate(e.target.value)}
                         style={{
                           padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border, #e2e8f0)',
-                          fontSize: 12, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text)',
+                          fontSize: 12, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
                         }}
                       />
                     </div>
@@ -581,13 +581,13 @@ export default function AccreditationPage() {
                     display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                   }}>
                     <div>
-                      <h3 style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>
+                      <h3 style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }}>
                         Denetim Raporunu Kaydet
                       </h3>
-                      <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 8px' }}>
+                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 8px' }}>
                         Simülasyon sonucunu resmi rapor olarak kaydeder ve PDF indirebilirsiniz.
                       </p>
-                      <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: 0 }}>
+                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
                         Dönem: <strong>{simPeriodStart}</strong> → <strong>{simPeriodEnd}</strong>
                       </p>
                     </div>
@@ -620,11 +620,11 @@ export default function AccreditationPage() {
           <div>
             {loadingReports ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-muted)' }} />
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-text-muted)' }} />
               </div>
             ) : reports.length === 0 ? (
               <div style={{
-                textAlign: 'center', padding: 56, color: 'var(--color-muted)', fontSize: 14,
+                textAlign: 'center', padding: 56, color: 'var(--color-text-muted)', fontSize: 14,
                 background: 'var(--color-card, #fff)', borderRadius: 16,
                 border: '1px solid var(--color-border, #e2e8f0)',
               }}>
@@ -643,7 +643,7 @@ export default function AccreditationPage() {
                       {['Rapor Adı', 'Standart', 'Dönem', 'Uyumluluk', 'Oluşturma Tarihi', ''].map(h => (
                         <th key={h} style={{
                           padding: '12px 16px', textAlign: 'left', fontSize: 11,
-                          fontWeight: 700, color: 'var(--color-muted)', letterSpacing: '0.05em',
+                          fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.05em',
                         }}>{h}</th>
                       ))}
                     </tr>
@@ -656,19 +656,19 @@ export default function AccreditationPage() {
                         <tr key={r.id} style={{
                           borderTop: i > 0 ? '1px solid var(--color-border, #e2e8f0)' : undefined,
                         }}>
-                          <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                          <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                             {r.title}
                           </td>
-                          <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--color-muted)' }}>
+                          <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--color-text-muted)' }}>
                             {r.standardBody}
                           </td>
-                          <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--color-muted)' }}>
+                          <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--color-text-muted)' }}>
                             {new Date(r.periodStart).toLocaleDateString('tr-TR')} — {new Date(r.periodEnd).toLocaleDateString('tr-TR')}
                           </td>
                           <td style={{ padding: '13px 16px' }}>
                             <span style={{ fontSize: 15, fontWeight: 800, color }}>{rate}%</span>
                           </td>
-                          <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--color-muted)' }}>
+                          <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--color-text-muted)' }}>
                             {new Date(r.generatedAt).toLocaleDateString('tr-TR')}
                           </td>
                           <td style={{ padding: '13px 16px' }}>

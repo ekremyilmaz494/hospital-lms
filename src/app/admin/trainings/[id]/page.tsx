@@ -209,85 +209,85 @@ export default function TrainingDetailPage() {
             {activeTab === 'staff' && (
               <motion.div key="staff" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
                 {assignedStaff.length > 0 ? (
-                  <div className="space-y-2">
-                    {assignedStaff.map((s) => {
-                      const st = statusMap[s.status] || statusMap.assigned;
-                      const StatusIcon = st.icon;
-                      return (
-                        <div key={s.name} className="flex items-center gap-4 rounded-xl px-4 py-3.5 group" style={{ background: 'var(--color-bg)', border: '1px solid transparent', transition: 'border-color var(--transition-fast)' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
-                        >
-                          <div className="flex items-center gap-3 min-w-45">
-                            <Avatar className="h-9 w-9"><AvatarFallback className="text-xs font-semibold text-white" style={{ background: 'var(--color-primary)' }}>{s.name.split(' ').map(n => n[0]).join('')}</AvatarFallback></Avatar>
-                            <div>
-                              <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>{s.name}</p>
-                              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{s.department}</p>
+                  <div>
+                    {/* Header Row */}
+                    <div className="grid items-center px-4 py-2 mb-1" style={{ gridTemplateColumns: 'minmax(160px, 2fr) 60px minmax(80px, 1fr) 65px 65px 100px 85px 100px', gap: '10px', color: 'var(--color-text-muted)' }}>
+                      <span className="text-xs font-semibold uppercase tracking-wide">Personel</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-center">Deneme</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide">İlerleme</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-center">Ön Sınav</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-center">Son Sınav</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide">Durum</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-center">Tarih</span>
+                      <span />
+                    </div>
+                    {/* Data Rows */}
+                    <div className="space-y-1.5">
+                      {assignedStaff.map((s) => {
+                        const st = statusMap[s.status] || statusMap.assigned;
+                        const StatusIcon = st.icon;
+                        return (
+                          <div key={s.name} className="grid items-center rounded-xl px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(160px, 2fr) 60px minmax(80px, 1fr) 65px 65px 100px 85px 100px', gap: '10px', background: 'var(--color-bg)', border: '1px solid transparent', transition: 'border-color var(--transition-fast)' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
+                          >
+                            {/* Personel */}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="h-9 w-9 shrink-0"><AvatarFallback className="text-xs font-semibold text-white" style={{ background: 'var(--color-primary)' }}>{s.name.split(' ').map(n => n[0]).join('')}</AvatarFallback></Avatar>
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold truncate" title={s.name} style={{ color: 'var(--color-text-primary)' }}>{s.name}</p>
+                                <p className="text-xs truncate" title={s.department} style={{ color: 'var(--color-text-muted)' }}>{s.department}</p>
+                              </div>
                             </div>
-                          </div>
-                          <div className="min-w-17.5 text-center">
-                            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Deneme</p>
-                            <p className="text-sm font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{s.attempt}/{training.maxAttempts}</p>
-                          </div>
-                          <div className="min-w-25">
-                            <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>İlerleme</p>
+                            {/* Deneme */}
+                            <p className="text-sm font-semibold text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{s.attempt}/{training.maxAttempts}</p>
+                            {/* İlerleme */}
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{
-                                    width: `${s.progress}%`,
-                                    background: s.progress === 0 ? 'var(--color-text-muted)' : s.progress === 100 ? 'var(--color-success)' : 'var(--color-info)',
-                                    transition: 'width var(--transition-fast)',
-                                  }}
-                                />
+                                <div className="h-full rounded-full" style={{ width: `${s.progress}%`, background: s.progress === 0 ? 'var(--color-text-muted)' : s.progress === 100 ? 'var(--color-success)' : 'var(--color-info)', transition: 'width var(--transition-fast)' }} />
                               </div>
-                              <span className="text-xs font-semibold" style={{ fontFamily: 'var(--font-mono)', color: s.progress === 100 ? 'var(--color-success)' : s.progress > 0 ? 'var(--color-info)' : 'var(--color-text-muted)' }}>{s.progress}%</span>
+                              <span className="text-xs font-semibold shrink-0" style={{ fontFamily: 'var(--font-mono)', color: s.progress === 100 ? 'var(--color-success)' : s.progress > 0 ? 'var(--color-info)' : 'var(--color-text-muted)' }}>{s.progress}%</span>
+                            </div>
+                            {/* Ön Sınav */}
+                            <p className="text-sm font-semibold text-center" style={{ fontFamily: 'var(--font-mono)', color: s.preScore !== null ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>{s.preScore !== null ? `${s.preScore}%` : '—'}</p>
+                            {/* Son Sınav */}
+                            <p className="text-sm font-bold text-center" style={{ fontFamily: 'var(--font-mono)', color: s.postScore !== null && s.postScore >= training.passingScore ? 'var(--color-success)' : s.postScore !== null ? 'var(--color-error)' : 'var(--color-text-muted)' }}>{s.postScore !== null ? `${s.postScore}%` : '—'}</p>
+                            {/* Durum */}
+                            <div>
+                              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: st.bg, color: st.text }}>
+                                <StatusIcon className="h-3 w-3" />{st.label}
+                              </span>
+                            </div>
+                            {/* Tarih */}
+                            <p className="text-xs font-medium text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{s.completedAt ? new Date(s.completedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</p>
+                            {/* Actions */}
+                            <div className="flex justify-end">
+                              {s.status === 'failed' && (
+                                <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold rounded-lg" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch(`/api/admin/trainings/${id}/assignments`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ userId: s.userId }),
+                                      });
+                                      if (res.ok) refetch();
+                                    } catch { toast('İşlem başarısız oldu.', 'error'); }
+                                  }}
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" /> Yeni Hak Ver
+                                </Button>
+                              )}
+                              {s.status === 'passed' && (
+                                <button onClick={() => router.push(`/admin/staff/${s.userId}`)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium opacity-0 group-hover:opacity-100" style={{ color: 'var(--color-text-muted)', transition: 'opacity var(--transition-fast)' }}>
+                                  <Eye className="h-3.5 w-3.5" /> Detay<ChevronRight className="h-3 w-3" />
+                                </button>
+                              )}
                             </div>
                           </div>
-                          <div className="min-w-17.5 text-center">
-                            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Ön Sınav</p>
-                            <p className="text-sm font-semibold" style={{ fontFamily: 'var(--font-mono)', color: s.preScore !== null ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>{s.preScore !== null ? `${s.preScore}%` : '—'}</p>
-                          </div>
-                          <div className="min-w-17.5 text-center">
-                            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Son Sınav</p>
-                            <p className="text-sm font-bold" style={{ fontFamily: 'var(--font-mono)', color: s.postScore !== null && s.postScore >= training.passingScore ? 'var(--color-success)' : s.postScore !== null ? 'var(--color-error)' : 'var(--color-text-muted)' }}>{s.postScore !== null ? `${s.postScore}%` : '—'}</p>
-                          </div>
-                          <div className="min-w-30">
-                            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: st.bg, color: st.text }}>
-                              <StatusIcon className="h-3 w-3" />{st.label}
-                            </span>
-                          </div>
-                          <div className="min-w-22.5 text-center">
-                            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Tarih</p>
-                            <p className="text-xs font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{s.completedAt}</p>
-                          </div>
-                          <div className="ml-auto">
-                            {s.status === 'failed' && (
-                              <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold rounded-lg" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch(`/api/admin/trainings/${id}/assignments`, {
-                                      method: 'PATCH',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ userId: s.userId }),
-                                    });
-                                    if (res.ok) refetch();
-                                  } catch { toast('İşlem başarısız oldu.', 'error'); }
-                                }}
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" /> Yeni Hak Ver
-                              </Button>
-                            )}
-                            {s.status === 'passed' && (
-                              <button onClick={() => router.push(`/admin/staff/${s.userId}`)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium opacity-0 group-hover:opacity-100" style={{ color: 'var(--color-text-muted)', transition: 'opacity var(--transition-fast)' }}>
-                                <Eye className="h-3.5 w-3.5" /> Detay<ChevronRight className="h-3 w-3" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
