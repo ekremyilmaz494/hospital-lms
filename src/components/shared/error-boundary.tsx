@@ -41,7 +41,9 @@ export class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    // TODO: Production'da uygun bir logging servisi ile degistir
+    // Client-side component: console.error browser DevTools'ta gorunur.
+    // Server-side logger burada kullanilamaz ("use client" directive).
+    // Merkezi hata izleme gerekirse /api/log-error endpoint'i olusturulabilir.
     console.error("[ErrorBoundary] Yakalanan hata:", error);
     console.error("[ErrorBoundary] Bilesen yigini:", errorInfo.componentStack);
   }

@@ -1,6 +1,7 @@
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { uploadBuffer, videoKey } from '@/lib/s3'
 import { logger } from '@/lib/logger'
+import { checkRateLimit } from '@/lib/redis'
 
 /** Maximum file size: 500MB (server-side upload) */
 const MAX_FILE_SIZE = 500 * 1024 * 1024
@@ -18,6 +19,9 @@ export async function POST(request: Request) {
 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
+
+  const allowed = await checkRateLimit(`upload:${dbUser!.id}`, 20, 3600)
+  if (!allowed) return errorResponse('Çok fazla yükleme işlemi. Lütfen bir saat bekleyin.', 429)
 
   try {
     const formData = await request.formData()

@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { getUploadUrl, videoKey, deleteObject } from '@/lib/s3'
+import { checkRateLimit } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -26,6 +28,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
+
+  const allowed = await checkRateLimit(`upload:${dbUser!.id}`, 20, 3600)
+  if (!allowed) return errorResponse('Çok fazla yükleme işlemi. Lütfen bir saat bekleyin.', 429)
 
   const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!training) return errorResponse('Training not found', 404)
@@ -101,11 +106,35 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   })
   if (!video) return errorResponse('Video not found', 404)
 
-  // Delete from S3
-  await deleteObject(video.videoKey)
+  try {
+    // 1. Önce DB sil (başarısız olursa S3'e dokunulmaz)
+    await prisma.trainingVideo.delete({ where: { id: videoId } })
 
-  // Delete from DB
-  await prisma.trainingVideo.delete({ where: { id: videoId } })
+    // 2. Sonra S3 sil (best-effort; orphan nesneler cron ile temizlenebilir)
+    try {
+      await deleteObject(video.videoKey)
+    } catch (s3Err) {
+      logger.error('TrainingVideo:DELETE', 'S3 silme başarısız, orphan object kalabilir', {
+        videoId,
+        videoKey: video.videoKey,
+        error: s3Err,
+      })
+    }
 
-  return jsonResponse({ success: true })
+    // 3. Audit log (KVKK uyumluluğu)
+    await createAuditLog({
+      userId: dbUser!.id,
+      organizationId: dbUser!.organizationId!,
+      action: 'delete',
+      entityType: 'training_video',
+      entityId: video.id,
+      oldData: { title: video.title, videoKey: video.videoKey },
+      request,
+    })
+
+    return jsonResponse({ success: true })
+  } catch (err) {
+    logger.error('TrainingVideo:DELETE', 'Video silme hatası', err)
+    return errorResponse('Video silinirken bir hata oluştu', 500)
+  }
 }
