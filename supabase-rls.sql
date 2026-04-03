@@ -219,3 +219,17 @@ CREATE POLICY "super_admin_accreditation_standards_all" ON accreditation_standar
   FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "admin_accreditation_standards_select" ON accreditation_standards
   FOR SELECT USING (true);
+
+-- ACCREDITATION REPORTS
+ALTER TABLE accreditation_reports ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_accreditation_reports_all" ON accreditation_reports
+  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_accreditation_reports_all" ON accreditation_reports
+  FOR ALL USING (
+    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+CREATE POLICY "staff_accreditation_reports_select" ON accreditation_reports
+  FOR SELECT USING (
+    organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );

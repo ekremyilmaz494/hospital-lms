@@ -8,10 +8,10 @@ const mockUseCallback = vi.fn((cb: unknown) => cb)
 const mockUseRef = vi.fn((init: unknown) => ({ current: init }))
 
 vi.mock('react', () => ({
-  useState: (...args: unknown[]) => mockUseState(...args),
-  useEffect: (...args: unknown[]) => mockUseEffect(...args),
-  useCallback: (...args: unknown[]) => mockUseCallback(...args),
-  useRef: (...args: unknown[]) => mockUseRef(...args),
+  useState: mockUseState,
+  useEffect: mockUseEffect,
+  useCallback: mockUseCallback,
+  useRef: mockUseRef,
 }))
 
 // clearFetchCache fonksiyonunu doğrudan test edeceğiz

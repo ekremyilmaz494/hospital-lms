@@ -134,7 +134,7 @@ export async function GET(request: Request) {
       organization: {
         select: {
           name: true,
-          users: { where: { role: 'admin', isActive: true }, select: { email: true, firstName: true, lastName: true }, take: 3 },
+          users: { where: { role: 'admin', isActive: true }, select: { id: true, email: true, firstName: true, lastName: true }, take: 3 },
         },
       },
     },
@@ -159,12 +159,11 @@ export async function GET(request: Request) {
         })
         subscriptionWarningsSent++
 
-        // Dashboard bildirimi oluştur — userId'yi önceden çek, bulunamazsa bildirimi atla
-        const adminUser = await prisma.user.findFirst({ where: { email: admin.email }, select: { id: true } })
-        if (adminUser) {
+        // Dashboard bildirimi oluştur
+        if (admin.id) {
           await prisma.notification.create({
             data: {
-              userId: adminUser.id,
+              userId: admin.id,
               organizationId: sub.organizationId,
               title: 'Abonelik Sona Eriyor',
               message: `Aboneliğiniz ${daysLeft} gün içinde sona erecek. Yenileme için destek ekibiyle iletişime geçin.`,

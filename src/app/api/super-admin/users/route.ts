@@ -57,7 +57,8 @@ export async function POST(request: Request) {
     })
   } catch (dbError) {
     await supabase.auth.admin.deleteUser(authUser.user.id)
-    return errorResponse(`Veritabanı hatası: ${dbError instanceof Error ? dbError.message : 'Bilinmeyen hata'}`)
+    logger.error('SuperAdmin Users', 'DB user create başarısız — auth user rollback yapıldı', { userId: authUser.user.id, error: dbError })
+    return errorResponse('Kullanıcı oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.')
   }
 
   await createAuditLog({

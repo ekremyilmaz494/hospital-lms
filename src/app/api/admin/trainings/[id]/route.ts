@@ -4,6 +4,7 @@ import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, creat
 import { checkRateLimit } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { updateTrainingSchema } from '@/lib/validations'
+import { getStreamUrl } from '@/lib/s3'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -91,13 +92,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     videoCount: training._count.videos,
     questionCount: training._count.questions,
     assignedStaff,
-    videos: training.videos.map(v => ({
+    videos: await Promise.all(training.videos.map(async v => ({
       id: v.id,
       title: v.title,
-      videoUrl: v.videoUrl,
+      videoUrl: v.videoKey ? await getStreamUrl(v.videoKey) : v.videoUrl,
       duration: `${Math.floor(v.durationSeconds / 60)}:${String(v.durationSeconds % 60).padStart(2, '0')}`,
       order: v.sortOrder,
-    })),
+    }))),
     questions: training.questions.map(q => ({
       id: q.id,
       text: q.questionText,

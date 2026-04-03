@@ -213,13 +213,37 @@ export function SignatureModal({ attemptId, onSigned, onClose }: SignatureModalP
             /* ── Beyan Modu ── */
             <div>
               <div
-                className="rounded-xl border p-4"
+                className="rounded-xl border p-4 max-h-52 overflow-y-auto"
                 style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}
               >
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-                  Yukarıda belirtilen eğitimi eksiksiz tamamladığımı, içerikleri
-                  anladığımı ve gerekliliklerini yerine getireceğimi beyan ederim.
+                <p className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>
+                  EĞİTİM TAMAMLAMA VE UYUM BEYANI
                 </p>
+                <div className="space-y-2 text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                  <p>
+                    Ben, aşağıda belirtilen koşulları eksiksiz olarak kabul ettiğimi ve yerine getireceğimi beyan ederim:
+                  </p>
+                  <p>
+                    <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>1. Eğitimi Tamamlama:</span>{' '}
+                    Yukarıda belirtilen eğitim programını başından sonuna kadar eksiksiz tamamladığımı, tüm modülleri ve içerikleri gereği gibi incelediğimi beyan ederim.
+                  </p>
+                  <p>
+                    <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>2. İçeriği Anlama:</span>{' '}
+                    Eğitim kapsamında sunulan bilgileri, prosedürleri ve gereklilikleri anladığımı; herhangi bir belirsizlik durumunda ilgili birime danışacağımı taahhüt ederim.
+                  </p>
+                  <p>
+                    <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>3. Uyum Yükümlülüğü:</span>{' '}
+                    Eğitimde belirtilen kural, prosedür ve standartlara günlük çalışmamda uymayı ve gerekliliklerini yerine getirmeyi kabul ederim.
+                  </p>
+                  <p>
+                    <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>4. Gizlilik:</span>{' '}
+                    Eğitim içeriğini ve sınav sorularını kurumsal gizlilik kapsamında değerlendireceğimi, üçüncü şahıslarla paylaşmayacağımı beyan ederim.
+                  </p>
+                  <p>
+                    <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>5. Yasal Bağlayıcılık:</span>{' '}
+                    Bu beyanın kurumsal kayıtlarda dijital imza olarak saklanacağını ve hukuki geçerliliğe sahip olduğunu kabul ederim.
+                  </p>
+                </div>
               </div>
               <label className="flex items-start gap-3 mt-4 cursor-pointer select-none">
                 <input

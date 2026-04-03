@@ -18,31 +18,41 @@ export async function autoAssignByDepartment(
 
   if (rules.length === 0) return 0
 
+  // Aktif ve süresi dolmamış eğitimleri filtrele
+  const now = new Date()
+  const activeRules = rules.filter(
+    (r) => r.training.isActive && !(r.training.endDate && new Date(r.training.endDate) < now)
+  )
+  if (activeRules.length === 0) return 0
+
+  // Tüm mevcut atamaları tek sorguda çek (N+1 yerine)
+  const trainingIds = activeRules.map((r) => r.trainingId)
+  const existingAssignments = await prisma.trainingAssignment.findMany({
+    where: { userId, trainingId: { in: trainingIds } },
+    select: { trainingId: true },
+  })
+  const existingSet = new Set(existingAssignments.map((a) => a.trainingId))
+
+  // Atanmamış eğitimleri toplu oluştur
+  const toAssign = activeRules
+    .filter((r) => !existingSet.has(r.trainingId))
+    .map((r) => ({
+      trainingId: r.trainingId,
+      userId,
+      status: 'assigned' as const,
+      assignedById,
+    }))
+
   let assignedCount = 0
-
-  for (const rule of rules) {
-    // Sadece aktif ve süresi dolmamış eğitimler
-    if (!rule.training.isActive) continue
-    if (rule.training.endDate && new Date(rule.training.endDate) < new Date()) continue
-
-    // Zaten atanmış mı?
-    const existing = await prisma.trainingAssignment.findUnique({
-      where: { trainingId_userId: { trainingId: rule.trainingId, userId } },
-    })
-    if (existing) continue
-
+  if (toAssign.length > 0) {
     try {
-      await prisma.trainingAssignment.create({
-        data: {
-          trainingId: rule.trainingId,
-          userId,
-          status: 'assigned',
-          assignedById,
-        },
+      const result = await prisma.trainingAssignment.createMany({
+        data: toAssign,
+        skipDuplicates: true,
       })
-      assignedCount++
+      assignedCount = result.count
     } catch (err) {
-      logger.warn('AutoAssign', `Otomatik atama basarisiz: user=${userId} training=${rule.trainingId}`, (err as Error).message)
+      logger.warn('AutoAssign', `Toplu otomatik atama basarisiz: user=${userId}`, (err as Error).message)
     }
   }
 

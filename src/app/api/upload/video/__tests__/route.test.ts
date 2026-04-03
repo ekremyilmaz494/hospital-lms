@@ -12,11 +12,11 @@ const mockErrorResponse = vi.fn(
 const mockParseBody = vi.fn()
 
 vi.mock('@/lib/api-helpers', () => ({
-  getAuthUser: (...args: unknown[]) => mockGetAuthUser(...args),
-  requireRole: (...args: unknown[]) => mockRequireRole(...args),
-  jsonResponse: (...args: unknown[]) => mockJsonResponse(...args),
-  errorResponse: (...args: unknown[]) => mockErrorResponse(...args),
-  parseBody: (...args: unknown[]) => mockParseBody(...args),
+  getAuthUser: mockGetAuthUser,
+  requireRole: mockRequireRole,
+  jsonResponse: mockJsonResponse,
+  errorResponse: mockErrorResponse,
+  parseBody: mockParseBody,
 }))
 
 vi.mock('@/lib/s3', () => ({

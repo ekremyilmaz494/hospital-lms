@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import {
   getAuthUser,
   requireRole,
@@ -107,7 +108,7 @@ export async function GET(request: Request) {
     await setCached(cacheKey, responseData, 300) // 5 dk TTL
     return jsonResponse(responseData)
   } catch (err) {
-    console.error('[standalone-exams GET]', err)
+    logger.error('StandaloneExams', 'Sınavlar yüklenirken hata', err)
     return errorResponse('Sınavlar yüklenirken hata oluştu', 500)
   }
 }

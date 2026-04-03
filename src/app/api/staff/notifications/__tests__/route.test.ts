@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextResponse } from 'next/server'
 
 vi.mock('@/lib/api-helpers', () => ({
   getAuthUser: vi.fn(),
@@ -58,7 +59,7 @@ describe('GET /api/staff/notifications', () => {
     mockGetAuthUser.mockResolvedValue({
       user: null,
       dbUser: null,
-      error: Response.json({ error: 'Unauthorized' }, { status: 401 }),
+      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
     })
 
     const response = await GET(createRequest('GET'))
