@@ -30,8 +30,17 @@ export async function GET() {
     description: d.description,
     color: d.color,
     count: d._count.users,
+    _count: d._count,
+    users: d.users.map(u => ({
+      id: u.id,
+      firstName: u.firstName || '',
+      lastName: u.lastName || '',
+      title: u.title || '',
+    })),
     staff: d.users.map(u => ({
       id: u.id,
+      firstName: u.firstName || '',
+      lastName: u.lastName || '',
       name: `${u.firstName || ''} ${u.lastName || ''}`.trim(),
       title: u.title || '',
       initials: `${u.firstName?.[0] || ''}${u.lastName?.[0] || ''}`.toUpperCase(),

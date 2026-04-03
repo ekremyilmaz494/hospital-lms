@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
@@ -67,26 +68,31 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         })
       }
 
-      // Soruları ve şıkları kopyala
-      for (const question of source.questions) {
-        const newQuestion = await tx.question.create({
-          data: {
+      // Soruları ve şıkları kopyala — N sorgu yerine 2 sorgu (createMany + client UUID)
+      if (source.questions.length > 0) {
+        const questionsWithIds = source.questions.map(q => ({ ...q, newId: randomUUID() }))
+
+        await tx.question.createMany({
+          data: questionsWithIds.map(q => ({
+            id: q.newId,
             trainingId: training.id,
-            questionText: question.questionText,
-            questionType: question.questionType,
-            points: question.points,
-            sortOrder: question.sortOrder,
-          },
+            questionText: q.questionText,
+            questionType: q.questionType,
+            points: q.points,
+            sortOrder: q.sortOrder,
+          })),
         })
-        if (question.options.length > 0) {
-          await tx.questionOption.createMany({
-            data: question.options.map(o => ({
-              questionId: newQuestion.id,
-              optionText: o.optionText,
-              isCorrect: o.isCorrect,
-              sortOrder: o.sortOrder,
-            })),
-          })
+
+        const allOptions = questionsWithIds.flatMap(q =>
+          q.options.map(o => ({
+            questionId: q.newId,
+            optionText: o.optionText,
+            isCorrect: o.isCorrect,
+            sortOrder: o.sortOrder,
+          }))
+        )
+        if (allOptions.length > 0) {
+          await tx.questionOption.createMany({ data: allOptions })
         }
       }
 

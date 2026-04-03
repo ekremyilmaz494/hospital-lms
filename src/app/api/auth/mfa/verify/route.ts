@@ -24,6 +24,11 @@ export async function POST(request: Request) {
 
   const { factorId, code } = body as { factorId: string; code: string }
 
+  // Girdi doğrulaması: factorId UUID formatında, code 6 haneli TOTP olmalı
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!UUID_RE.test(factorId)) return errorResponse('Geçersiz factor ID formatı', 400)
+  if (!/^\d{6}$/.test(code)) return errorResponse('Doğrulama kodu 6 haneli olmalıdır', 400)
+
   // Create challenge
   const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
   if (challengeError) return errorResponse('Doğrulama başlatılamadı', 400)

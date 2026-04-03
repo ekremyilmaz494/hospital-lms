@@ -82,6 +82,12 @@ function LoginForm() {
         return;
       }
 
+      // MFA gerekiyorsa doğrulama sayfasına yönlendir (kullanıcı bilgisi MFA öncesi döndürülmez)
+      if (data.mfaRequired) {
+        router.push(`/auth/mfa-verify?factorId=${encodeURIComponent(data.factorId)}`);
+        return;
+      }
+
       const role = data.user?.role as string;
       const target = redirectTo && redirectTo !== '/' ? redirectTo : ROLE_ROUTES[role] || '/staff/dashboard';
 

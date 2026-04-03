@@ -5,6 +5,7 @@ import ExcelJS from 'exceljs'
 
 const XLSX_MAX_ROWS = 5000
 const CSV_BATCH_SIZE = 500
+const CSV_MAX_ROWS = 50_000 // Streaming CSV toplam satır limiti — bellek tükenmesini önle
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -170,7 +171,8 @@ export async function GET(request: Request) {
           controller.enqueue(encoder.encode('\uFEFF')) // BOM for Excel UTF-8
           controller.enqueue(encoder.encode(csvHeader))
           let skip = 0
-          while (true) {
+          let totalEmitted = 0
+          while (totalEmitted < CSV_MAX_ROWS) {
             const batch = await prisma.examAttempt.findMany({
               where: { training: { organizationId: orgId } },
               include: {
@@ -183,6 +185,7 @@ export async function GET(request: Request) {
             })
             if (batch.length === 0) break
             for (const a of batch) {
+              if (totalEmitted >= CSV_MAX_ROWS) break
               const row = [
                 csvCell(sanitizeCell(`${a.user.firstName} ${a.user.lastName}`)),
                 csvCell(sanitizeCell(a.user.departmentId ?? '')),
@@ -195,6 +198,7 @@ export async function GET(request: Request) {
                 a.createdAt.toLocaleDateString('tr-TR'),
               ].join(',') + '\n'
               controller.enqueue(encoder.encode(row))
+              totalEmitted++
             }
             if (batch.length < CSV_BATCH_SIZE) break
             skip += CSV_BATCH_SIZE

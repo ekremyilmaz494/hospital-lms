@@ -78,7 +78,8 @@ export default function CalendarPage() {
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
-  const { data: events, isLoading, error } = useFetch<CalendarEvent[]>('/api/staff/calendar');
+  const { data: calendarData, isLoading, error } = useFetch<{ events: CalendarEvent[]; total: number }>('/api/staff/calendar');
+  const events = calendarData?.events ?? null;
 
   const goToPrevMonth = useCallback(() => {
     setMonth(prev => {

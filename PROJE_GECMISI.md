@@ -2159,4 +2159,63 @@ style={{
 
 ---
 
-*Son güncelleme: 2 Nisan 2026 — Oturum 16*
+---
+
+## Oturum 17 — 3 Nisan 2026: AI İçerik Stüdyosu (NotebookLM Entegrasyonu)
+
+### Yapılan İşler
+
+**1. Python FastAPI Microservice (`ai-content-service/`)**
+- NotebookLM-py kütüphanesi ile içerik üretim servisi oluşturuldu (port 8100)
+- 6 router: health, generate, status, result, analyze, auth
+- Playwright ile otomatik Google login (browser_login.py)
+- Fernet (AES) şifreli cookie yönetimi (cookie_manager.py)
+- Format bazlı üretim: Podcast, Video, Eğitim Özeti, Sınav, Sesli Sınav, Slayt Sunusu, İnfografik
+
+**2. Prisma Modeller + Migration**
+- `AiDocument` — Yüklenen belgeler (S3 + DB)
+- `AiGeneratedContent` — Üretilen içerikler (durum, değerlendirme, kütüphane)
+- `AiGoogleConnection` — Google bağlantı bilgileri (org başına tek, şifreli)
+- Supabase MCP ile tablolar oluşturuldu
+
+**3. Next.js API Routes (12 endpoint)**
+- generate, status, result, approve, evaluate, discard, documents
+- auth/connect, auth/verify, auth/status, auth/test, auth/disconnect
+
+**4. Frontend Bileşenleri (15+ component)**
+- 4 adımlı wizard: Belge Yükle → İstek Yaz → Format Seç → Üret & Değerlendir
+- Google hesap bağlama settings sayfası (Playwright browser login)
+- Audio player (waveform + ileri sarma), video player, quiz renderer, metin önizleme
+- Beğen/Beğenme → Kütüphaneye Ekle değerlendirme akışı
+- Connection required banner, disconnect modal
+
+**5. Çözülen Sorunlar**
+- Upload 404 hatası → .next cache temizleme
+- NotebookLM auth expired → Otomatik browser login
+- `add_text()` parametre sırası düzeltildi (title, content)
+- `wait_until_ready` → `wait_for_completion` API uyumu
+- `generate_infographic` kütüphane bug'ı tespit edildi
+- Quiz JSON formatı uyumsuzluğu (`options` → `answerOptions`) düzeltildi
+- Video timeout 15dk→30dk artırıldı, dosya çakışma hatası düzeltildi
+- Content-preview iframe sorunu → fetch + metin render
+- Range header desteği eklendi (audio/video ileri sarma)
+- Rate limit sıfırlama
+- Python Pydantic schema'da `AUDIO_QUIZ` eklendi
+
+### Test Sonuçları
+| Format | Durum | Detay |
+|--------|-------|-------|
+| Sınav Soruları | ✅ | JSON quiz üretildi, render edildi |
+| Sesli Sınav Hazırlık | ✅ | 15:47 dk MP3 üretildi |
+| Eğitim Özeti | ✅ | Markdown üretildi |
+| Video | ✅ | 9.7MB MP4 üretildi (~20dk sürdü) |
+| Podcast | ✅ | Audio üretildi |
+| İnfografik | ⚠️ | notebooklm-py kütüphane bug'ı |
+
+### Teknik Notlar
+- NotebookLM video üretimi 15-25 dakika sürebilir
+- Her üretimden sonra notebook otomatik siliniyor (API kota yönetimi)
+- Google cookie'ler ~1-2 saatte expire oluyor, yeniden login gerekebilir
+- `INTERNAL_API_KEY` Next.js ve Python arasında aynı olmalı
+
+*Son güncelleme: 3 Nisan 2026 — Oturum 17*

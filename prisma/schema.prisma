@@ -78,6 +78,9 @@ model Organization {
   accreditationReports AccreditationReport[]
   trainingCategories   TrainingCategory[]
   questionBank         QuestionBank[]
+  aiDocuments          AiDocument[]
+  aiGeneratedContents  AiGeneratedContent[]
+  aiGoogleConnection   AiGoogleConnection?
 
   @@map("organizations")
 }
@@ -220,6 +223,9 @@ model User {
   evaluatorEvaluations CompetencyEvaluation[] @relation("EvaluationEvaluator")
   pushSubscriptions    PushSubscription[]
   accreditationReports AccreditationReport[]
+  aiDocuments          AiDocument[]           @relation("UserAiDocuments")
+  aiGenerations        AiGeneratedContent[]   @relation("UserAiGenerations")
+  aiGoogleConnections  AiGoogleConnection[]
 
   @@unique([organizationId, tcNo])
   @@index([organizationId], map: "idx_users_org")
@@ -910,4 +916,86 @@ model QuestionBankOption {
   question       QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
 
   @@map("question_bank_options")
+}
+
+// ── AI İÇERİK STÜDYOSU ──
+model AiDocument {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid @map("organization_id")
+  userId         String   @db.Uuid @map("user_id")
+  fileName       String   @map("file_name") @db.VarChar(500)
+  fileType       String   @map("file_type") @db.VarChar(50)
+  fileSize       Int      @map("file_size")
+  fileUrl        String   @map("file_url") @db.Text
+  fileKey        String   @map("file_key") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  user           User                 @relation("UserAiDocuments", fields: [userId], references: [id])
+  generations    AiGeneratedContent[] @relation("DocumentGenerations")
+
+  @@index([organizationId], map: "idx_ai_documents_org")
+  @@index([userId], map: "idx_ai_documents_user")
+  @@map("ai_documents")
+}
+
+model AiGeneratedContent {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid @map("organization_id")
+  userId         String    @db.Uuid @map("user_id")
+  title          String    @db.VarChar(500)
+  prompt         String    @db.Text
+  outputFormat   String    @map("output_format") @db.VarChar(50)
+  settings       Json      @default("{}")
+  documents      AiDocument[] @relation("DocumentGenerations")
+  status         String    @default("pending") @db.VarChar(30)
+  taskId         String?   @map("task_id") @db.VarChar(100)
+  outputUrl      String?   @map("output_url") @db.Text
+  outputKey      String?   @map("output_key") @db.Text
+  outputFileType String?   @map("output_file_type") @db.VarChar(20)
+  duration       Int?
+  transcript     String?   @db.Text
+  metadata       Json      @default("{}")
+  errorMessage   String?   @map("error_message") @db.Text
+  evaluation     String?   @db.VarChar(20)
+  evaluationNote String?   @map("evaluation_note") @db.Text
+  evaluatedAt    DateTime? @map("evaluated_at") @db.Timestamptz
+  savedToLibrary Boolean   @default(false) @map("saved_to_library")
+  libraryName    String?   @map("library_name") @db.VarChar(500)
+  libraryCategory String?  @map("library_category") @db.VarChar(100)
+  savedAt        DateTime? @map("saved_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User         @relation("UserAiGenerations", fields: [userId], references: [id])
+
+  @@index([organizationId], map: "idx_ai_generated_org")
+  @@index([userId], map: "idx_ai_generated_user")
+  @@index([status], map: "idx_ai_generated_status")
+  @@index([evaluation], map: "idx_ai_generated_eval")
+  @@map("ai_generated_contents")
+}
+
+// ── AI GOOGLE BAĞLANTISI ──
+model AiGoogleConnection {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @unique @db.Uuid @map("organization_id")
+  userId          String    @db.Uuid @map("user_id")
+  email           String
+  method          String    @default("browser")
+  status          String    @default("pending")
+  encryptedCookie String?   @db.Text @map("encrypted_cookie")
+  lastVerifiedAt  DateTime? @map("last_verified_at") @db.Timestamptz
+  lastUsedAt      DateTime? @map("last_used_at") @db.Timestamptz
+  expiresAt       DateTime? @map("expires_at") @db.Timestamptz
+  errorMessage    String?   @map("error_message")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  user            User         @relation(fields: [userId], references: [id])
+
+  @@map("ai_google_connections")
+  @@index([status])
 }

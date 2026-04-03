@@ -66,6 +66,10 @@ export async function PUT(request: Request) {
   const body = await parseBody<{ title: string; message: string; type: string }>(request)
   if (!body?.title || !body?.message) return errorResponse('Title and message required')
 
+  // İçerik uzunluk limiti — bulk × 500 kullanıcı → bellek koruması
+  if (body.title.length > 200) return errorResponse('Başlık en fazla 200 karakter olabilir', 400)
+  if (body.message.length > 5000) return errorResponse('Mesaj en fazla 5000 karakter olabilir', 400)
+
   const staffUsers = await prisma.user.findMany({
     where: { organizationId: dbUser!.organizationId!, role: 'staff', isActive: true },
     select: { id: true },

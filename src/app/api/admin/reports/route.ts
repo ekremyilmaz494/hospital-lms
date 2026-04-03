@@ -36,8 +36,17 @@ export async function GET(request: Request) {
     },
   } : {}
 
-  // Departman filtresi
-  const userDeptFilter = departmentId ? { departmentId } : {}
+  // Departman filtresi — departmentId'nin bu organizasyona ait olduğunu doğrula
+  let validatedDeptId: string | undefined
+  if (departmentId) {
+    const dept = await prisma.department.findFirst({
+      where: { id: departmentId, organizationId: orgId },
+      select: { id: true },
+    })
+    if (!dept) return errorResponse('Departman bulunamadı veya bu organizasyona ait değil', 403)
+    validatedDeptId = dept.id
+  }
+  const userDeptFilter = validatedDeptId ? { departmentId: validatedDeptId } : {}
 
   try {
     const [staffCount, trainingCount, assignmentStatusGroups, avgScoreResult, trainings, staff, departments] = await Promise.all([

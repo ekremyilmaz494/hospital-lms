@@ -7,6 +7,16 @@ function isPublicRoute(pathname: string): boolean {
   return pathname === '/' || PUBLIC_ROUTES.some((route) => route !== '/' && pathname.startsWith(route))
 }
 
+const VALID_ROLES = ['super_admin', 'admin', 'staff'] as const
+type ValidRole = (typeof VALID_ROLES)[number]
+
+function sanitizeRole(raw: unknown): ValidRole {
+  if (typeof raw === 'string' && (VALID_ROLES as readonly string[]).includes(raw)) {
+    return raw as ValidRole
+  }
+  return 'staff'
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -46,7 +56,7 @@ export async function updateSession(request: NextRequest) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user && (pathname === '/auth/login' || pathname === '/')) {
-        const role = session.user.user_metadata?.role as string
+        const role = sanitizeRole(session.user.user_metadata?.role)
         return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
       }
     } catch {
@@ -72,8 +82,8 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    // Role-based access control
-    const role = user.user_metadata?.role as string
+    // Role-based access control — enum doğrulaması ile manipülasyonu engelle
+    const role = sanitizeRole(user.user_metadata?.role)
 
     if (pathname.startsWith('/super-admin') && role !== 'super_admin') {
       return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
@@ -97,7 +107,7 @@ export async function updateSession(request: NextRequest) {
   }
 }
 
-function getDashboardUrl(role: string): string {
+function getDashboardUrl(role: ValidRole): string {
   switch (role) {
     case 'super_admin':
       return '/super-admin/dashboard'

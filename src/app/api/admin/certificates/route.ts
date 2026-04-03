@@ -132,21 +132,27 @@ export async function POST(request: Request) {
     })
     if (!attempt) return errorResponse('Sınav denemesi bulunamadı', 404)
 
-    // Check if certificate already exists for this attempt
-    const existing = await prisma.certificate.findUnique({ where: { attemptId } })
-    if (existing) return errorResponse('Bu deneme için zaten sertifika mevcut', 409)
-
+    // TOCTOU-safe: DB unique constraint (attemptId) + catch ile race condition önlenir
     const code = `CERT-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
 
-    const cert = await prisma.certificate.create({
-      data: {
-        userId,
-        trainingId,
-        attemptId,
-        certificateCode: code,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
-      },
-    })
+    let cert
+    try {
+      cert = await prisma.certificate.create({
+        data: {
+          userId,
+          trainingId,
+          attemptId,
+          certificateCode: code,
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+        },
+      })
+    } catch (e: unknown) {
+      // Prisma unique constraint violation → P2002
+      if (typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === 'P2002') {
+        return errorResponse('Bu deneme için zaten sertifika mevcut', 409)
+      }
+      throw e
+    }
 
     await createAuditLog({
       userId: dbUser!.id,

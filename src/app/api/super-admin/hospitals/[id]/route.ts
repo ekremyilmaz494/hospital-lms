@@ -86,7 +86,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   // Return impact summary without deleting — UI uses this to show confirmation dialog
   if (hasData && !confirmed) {
-    return jsonResponse({ requiresConfirmation: true, impact }, 200)
+    return jsonResponse({ requiresConfirmation: true, impact }, 409)
   }
 
   await prisma.organization.delete({ where: { id } })

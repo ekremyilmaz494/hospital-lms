@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createPlanSchema, updatePlanSchema, createSubscriptionSchema } from '@/lib/validations'
 
 // ── Subscription Plans CRUD ──
@@ -15,16 +15,24 @@ export async function GET(request: Request) {
   const type = searchParams.get('type') // plans | subscriptions
 
   if (type === 'subscriptions') {
-    const subscriptions = await prisma.organizationSubscription.findMany({
-      include: { organization: true, plan: true },
-      orderBy: { createdAt: 'desc' },
-    })
-    return jsonResponse(subscriptions)
+    const { page, limit, skip } = safePagination(searchParams)
+    const [subscriptions, total] = await Promise.all([
+      prisma.organizationSubscription.findMany({
+        include: { organization: true, plan: true },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.organizationSubscription.count(),
+    ])
+    return jsonResponse({ subscriptions, total, page, limit })
   }
 
+  // Planlar sayısı genellikle düşük (~10-20) ama yine de limit koy
   const plans = await prisma.subscriptionPlan.findMany({
     include: { _count: { select: { subscriptions: true } } },
     orderBy: { createdAt: 'desc' },
+    take: 100,
   })
   return jsonResponse(plans)
 }
@@ -103,12 +111,25 @@ export async function PATCH(request: Request) {
   const parsed = updatePlanSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
+  const oldPlan = await prisma.subscriptionPlan.findUnique({ where: { id: body.id } })
+  if (!oldPlan) return errorResponse('Plan bulunamadı', 404)
+
   const plan = await prisma.subscriptionPlan.update({
     where: { id: body.id },
     data: {
       ...parsed.data,
       features: parsed.data.features ? JSON.parse(JSON.stringify(parsed.data.features)) : undefined,
     },
+  })
+
+  await createAuditLog({
+    userId: dbUser!.id,
+    action: 'update',
+    entityType: 'subscription_plan',
+    entityId: plan.id,
+    oldData: oldPlan,
+    newData: plan,
+    request,
   })
 
   return jsonResponse(plan)

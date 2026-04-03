@@ -38,12 +38,16 @@ export async function GET(request: Request) {
       data: { status: 'expired', isPassed: false, postExamScore: 0, postExamCompletedAt: new Date() },
     })
 
-    // Update related TrainingAssignment statuses
-    const assignmentIds = [...new Set(staleAttemptsList.map(a => a.assignmentId))]
-    await prisma.trainingAssignment.updateMany({
-      where: { id: { in: assignmentIds }, status: 'in_progress' },
-      data: { status: 'assigned' },
-    })
+    // Update related TrainingAssignment statuses — filter out null (standalone exam attempts have no assignment)
+    const assignmentIds = [...new Set(
+      staleAttemptsList.map(a => a.assignmentId).filter((id): id is string => id !== null)
+    )]
+    if (assignmentIds.length > 0) {
+      await prisma.trainingAssignment.updateMany({
+        where: { id: { in: assignmentIds }, status: 'in_progress' },
+        data: { status: 'assigned' },
+      })
+    }
   }
 
   const staleAttempts = { count: staleAttemptsList.length }
@@ -200,19 +204,27 @@ export async function GET(request: Request) {
       take: 500,
     })
 
-    for (const a of pendingExamAssignments) {
-      try {
-        await prisma.notification.create({
-          data: {
-            userId: a.user.id,
-            organizationId: a.training.organizationId,
-            title: `Sınav Hatırlatması: ${reminderDays} Gün Kaldı`,
-            message: `"${a.training.title}" sınavına ${reminderDays} gün içinde girmelisiniz.`,
-            type: 'warning',
-            relatedTrainingId: a.trainingId,
-          },
-        })
-        await sendEmail({
+    if (pendingExamAssignments.length === 0) continue
+
+    // Bildirimleri toplu oluştur (N+1 → 1 sorgu)
+    await prisma.notification.createMany({
+      data: pendingExamAssignments.map(a => ({
+        userId: a.user.id,
+        organizationId: a.training.organizationId,
+        title: `Sınav Hatırlatması: ${reminderDays} Gün Kaldı`,
+        message: `"${a.training.title}" sınavına ${reminderDays} gün içinde girmelisiniz.`,
+        type: 'warning',
+        relatedTrainingId: a.trainingId,
+      })),
+      skipDuplicates: true,
+    }).catch(() => {})
+
+    // Emailleri 20'li partiler halinde paralel gönder
+    const EMAIL_BATCH = 20
+    for (let i = 0; i < pendingExamAssignments.length; i += EMAIL_BATCH) {
+      const batch = pendingExamAssignments.slice(i, i + EMAIL_BATCH)
+      const results = await Promise.allSettled(batch.map(a =>
+        sendEmail({
           to: a.user.email,
           subject: `Sınav Hatırlatması: "${a.training.title}" — ${reminderDays} gün kaldı`,
           html: `<p>Sayın ${a.user.firstName} ${a.user.lastName},</p>
@@ -220,8 +232,8 @@ export async function GET(request: Request) {
 <p>Lütfen zamanında sınava girin.</p>
 <p>Bitiş tarihi: <strong>${a.training.endDate ? new Date(a.training.endDate).toLocaleDateString('tr-TR') : '-'}</strong></p>`,
         })
-        examRemindersSent++
-      } catch { /* hatırlatma hatası cron'u durdurmasın */ }
+      ))
+      examRemindersSent += results.filter(r => r.status === 'fulfilled').length
     }
   }
 

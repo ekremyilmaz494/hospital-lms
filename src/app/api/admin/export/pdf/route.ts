@@ -10,7 +10,13 @@ export async function GET(request: Request) {
   if (roleError) return roleError
 
   const { searchParams } = new URL(request.url)
-  const type = searchParams.get('type') // staff-report | training-report | exam-report
+  const type = searchParams.get('type')
+
+  // Geçersiz veya eksik type parametresi → boş PDF yerine hata döndür
+  const VALID_PDF_TYPES = ['staff-report', 'training-report', 'exam-report', 'certificates'] as const
+  if (!type || !(VALID_PDF_TYPES as readonly string[]).includes(type)) {
+    return errorResponse(`Geçersiz rapor tipi. Geçerli değerler: ${VALID_PDF_TYPES.join(', ')}`, 400)
+  }
 
   const orgId = dbUser!.organizationId
   if (!orgId) return errorResponse('Organization not found', 403)

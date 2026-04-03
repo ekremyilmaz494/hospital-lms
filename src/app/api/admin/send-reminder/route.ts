@@ -73,14 +73,35 @@ export async function POST(request: Request) {
     let notificationsSent = 0
     const errors: string[] = []
 
-    for (const a of assignments) {
-      const daysOverdue = a.training.endDate
-        ? Math.floor((Date.now() - new Date(a.training.endDate).getTime()) / 86400000)
-        : 0
+    // Bildirimleri toplu oluştur (N sorgu → 1 sorgu)
+    try {
+      const result = await prisma.notification.createMany({
+        data: assignments.map(a => ({
+          userId: a.user.id,
+          organizationId: orgId,
+          title: 'Eğitim Hatırlatması',
+          message: parsed.data.customMessage
+            ? parsed.data.customMessage
+            : `"${a.training.title}" eğitiminiz gecikmiştir. Lütfen en kısa sürede tamamlayın.`,
+          type: 'reminder',
+          relatedTrainingId: a.trainingId,
+        })),
+        skipDuplicates: true,
+      })
+      notificationsSent = result.count
+    } catch {
+      errors.push('Toplu bildirim oluşturulamadı')
+    }
 
-      // Email gönder
-      try {
-        await sendEmail({
+    // Emailleri 20'li partiler halinde paralel gönder
+    const EMAIL_BATCH = 20
+    for (let i = 0; i < assignments.length; i += EMAIL_BATCH) {
+      const batch = assignments.slice(i, i + EMAIL_BATCH)
+      const results = await Promise.allSettled(batch.map(a => {
+        const daysOverdue = a.training.endDate
+          ? Math.floor((Date.now() - new Date(a.training.endDate).getTime()) / 86400000)
+          : 0
+        return sendEmail({
           to: a.user.email,
           subject: `Hatırlatma: "${a.training.title}" eğitimini tamamlayın`,
           html: overdueTrainingReminderEmail(
@@ -90,29 +111,15 @@ export async function POST(request: Request) {
             daysOverdue,
           ),
         })
-        emailsSent++
-      } catch (emailErr) {
-        errors.push(`${a.user.email}: email gönderilemedi`)
-        logger.error('SendReminder', `Email gönderilemedi: ${a.user.email}`, emailErr)
-      }
-
-      // Uygulama bildirimi oluştur
-      try {
-        await prisma.notification.create({
-          data: {
-            userId: a.user.id,
-            organizationId: orgId,
-            title: 'Eğitim Hatırlatması',
-            message: parsed.data.customMessage
-              ? parsed.data.customMessage
-              : `"${a.training.title}" eğitiminiz gecikmiştir. Lütfen en kısa sürede tamamlayın.`,
-            type: 'reminder',
-            relatedTrainingId: a.trainingId,
-          },
-        })
-        notificationsSent++
-      } catch {
-        errors.push(`${a.user.email}: bildirim oluşturulamadı`)
+      }))
+      for (let j = 0; j < results.length; j++) {
+        if (results[j].status === 'fulfilled') {
+          emailsSent++
+        } else {
+          const email = batch[j].user.email
+          errors.push(`${email}: email gönderilemedi`)
+          logger.error('SendReminder', `Email gönderilemedi: ${email}`, (results[j] as PromiseRejectedResult).reason)
+        }
       }
     }
 

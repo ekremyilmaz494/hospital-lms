@@ -19,6 +19,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   })
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
+  // Verify question belongs to this training (prevents cross-tenant P2025 500 errors)
+  const existingQuestion = await prisma.question.findFirst({
+    where: { id: questionId, trainingId: id },
+  })
+  if (!existingQuestion) return errorResponse('Soru bulunamadı', 404)
+
   const parsed = createQuestionSchema.partial().safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
@@ -58,7 +64,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   })
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
-  await prisma.question.delete({ where: { id: questionId, trainingId: id } })
+  // Verify question belongs to this training (prevents cross-tenant P2025 500 errors)
+  const question = await prisma.question.findFirst({
+    where: { id: questionId, trainingId: id },
+  })
+  if (!question) return errorResponse('Soru bulunamadı', 404)
+
+  await prisma.question.delete({ where: { id: questionId } })
 
   return jsonResponse({ success: true })
 }

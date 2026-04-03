@@ -52,3 +52,10 @@ next-env.d.ts
 /take-screenshots.mjs
 /playwright-report
 /test-results
+
+# AI Content Service
+ai-content-service/browser_profiles/
+ai-content-service/auth_store/*.enc
+ai-content-service/temp/
+ai-content-service/.env
+ai-content-service/_auth_b64.txt

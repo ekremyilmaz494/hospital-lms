@@ -124,10 +124,11 @@ export async function POST(request: Request) {
   // Dosya içindeki tekrar eden e-postalar
   const seenEmails = new Map<string, number>() // email → ilk satır numarası
 
-  // DB'deki mevcut e-postalar — tek sorguda çek
+  // DB'deki mevcut e-postalar — sadece kendi organizasyondaki kullanıcıları kontrol et
+  // (cross-tenant e-posta keşfini önle)
   const emailList = rows.map(r => r.email).filter(Boolean)
   const existingUsers = await prisma.user.findMany({
-    where: { email: { in: emailList } },
+    where: { email: { in: emailList }, organizationId: orgId },
     select: { email: true },
   })
   const existingEmailSet = new Set(existingUsers.map(u => u.email.toLowerCase()))

@@ -89,6 +89,16 @@ export async function PATCH(request: Request) {
   }
 
   if (Object.keys(updateData).length > 0) {
+    // Değişiklik öncesi mevcut değerleri kaydet (sağlık sektörü audit uyumluluğu)
+    const currentProfile = await prisma.user.findUnique({
+      where: { id: dbUser!.id },
+      select: { firstName: true, lastName: true, phone: true, avatarUrl: true },
+    })
+    const oldData: Record<string, unknown> = {}
+    for (const key of Object.keys(updateData)) {
+      oldData[key] = currentProfile?.[key as keyof typeof currentProfile] ?? null
+    }
+
     await prisma.user.update({
       where: { id: dbUser!.id },
       data: updateData,
@@ -112,6 +122,7 @@ export async function PATCH(request: Request) {
       action: 'profile.updated',
       entityType: 'user',
       entityId: dbUser!.id,
+      oldData,
       newData: updateData,
       request,
     })

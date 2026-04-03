@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
@@ -25,19 +25,27 @@ export async function GET(request: Request) {
   }
 
   try {
-    const assignments = await prisma.trainingAssignment.findMany({
-      where: {
-        userId: dbUser!.id,
-        training: {
-          organizationId: dbUser!.organizationId!,
-          ...(dateFilter ?? {}),
+    const { page, limit } = safePagination(searchParams)
+
+    const where = {
+      userId: dbUser!.id,
+      training: {
+        organizationId: dbUser!.organizationId!,
+        ...(dateFilter ?? {}),
+      },
+    }
+
+    const [assignments, total] = await Promise.all([
+      prisma.trainingAssignment.findMany({
+        where,
+        include: {
+          training: { select: { id: true, title: true, category: true, startDate: true, endDate: true, examDurationMinutes: true, examOnly: true } },
         },
-      },
-      include: {
-        training: { select: { id: true, title: true, category: true, startDate: true, endDate: true, examDurationMinutes: true, examOnly: true } },
-      },
-      take: 200,
-    })
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.trainingAssignment.count({ where }),
+    ])
 
     // Transform to calendar events
     const events = assignments.map(a => ({
@@ -51,7 +59,7 @@ export async function GET(request: Request) {
       eventType: a.training.examOnly ? 'exam' as const : 'training' as const,
     }))
 
-    return jsonResponse(events)
+    return jsonResponse({ events, total, page, limit })
   } catch (err) {
     logger.error('Staff Calendar', 'Takvim yüklenemedi', err)
     return errorResponse('Takvim yüklenemedi', 503)

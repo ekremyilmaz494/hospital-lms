@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { createServiceClient } from '@/lib/supabase/server'
-import { checkRateLimit } from '@/lib/redis'
+import { checkRateLimit, setCached } from '@/lib/redis'
 import { z } from 'zod/v4'
+import { randomUUID } from 'crypto'
 
 const impersonateSchema = z.object({
   userId: z.string().uuid(),
@@ -48,13 +49,22 @@ export async function POST(request: Request) {
   if (!targetUser.isActive) return errorResponse('Pasif kullanıcı impersonate edilemez', 400)
   if (targetUser.role === 'super_admin') return errorResponse('Başka bir super admin impersonate edilemez', 403)
 
+  // İmpersonation bilgilerini kriptografik token ile Redis'te sakla (URL manipülasyonunu önle)
+  const impersonationToken = randomUUID()
+  await setCached(`impersonation:${impersonationToken}`, {
+    impersonatedBy: dbUser!.id,
+    impersonatorName: `${dbUser!.firstName} ${dbUser!.lastName}`,
+    targetUserId: targetUser.id,
+    createdAt: new Date().toISOString(),
+  }, 3600) // 1 saat TTL — magic link ile aynı ömür
+
   // Generate single-use magic link via service role key
   const adminClient = await createServiceClient()
   const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
     type: 'magiclink',
     email: targetUser.email,
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/callback?impersonated_by=${dbUser!.id}&impersonator_name=${encodeURIComponent(dbUser!.firstName + ' ' + dbUser!.lastName)}`,
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/callback?imp_token=${impersonationToken}`,
     },
   })
 

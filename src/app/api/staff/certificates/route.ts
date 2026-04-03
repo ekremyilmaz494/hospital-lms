@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 
-export async function GET() {
+export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
@@ -12,23 +12,35 @@ export async function GET() {
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
   try {
-    const certificates = await prisma.certificate.findMany({
-      where: {
-        userId: dbUser!.id,
-        training: { organizationId: dbUser!.organizationId! },
-      },
-      include: {
-        training: { select: { title: true, category: true } },
-        attempt: { select: { postExamScore: true, attemptNumber: true } },
-      },
-      orderBy: { issuedAt: 'desc' },
-      take: 100,
-    })
+    const { searchParams } = new URL(request.url)
+    const { page, limit, skip } = safePagination(searchParams)
+
+    const where = {
+      userId: dbUser!.id,
+      training: { organizationId: dbUser!.organizationId! },
+    }
+
+    const [certificates, total] = await Promise.all([
+      prisma.certificate.findMany({
+        where,
+        include: {
+          training: { select: { title: true, category: true } },
+          attempt: { select: { postExamScore: true, attemptNumber: true } },
+        },
+        orderBy: { issuedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.certificate.count({ where }),
+    ])
 
     const now = new Date()
 
-    return jsonResponse(
-      certificates.map(c => ({
+    return jsonResponse({
+      total,
+      page,
+      limit,
+      certificates: certificates.map(c => ({
         id: c.id,
         certificateCode: c.certificateCode,
         issuedAt: c.issuedAt.toISOString(),
@@ -40,8 +52,8 @@ export async function GET() {
         },
         score: c.attempt.postExamScore ? Number(c.attempt.postExamScore) : 0,
         attemptNumber: c.attempt.attemptNumber,
-      }))
-    )
+      })),
+    })
   } catch (err) {
     logger.error('Staff Certificates', 'Sertifikalar yüklenemedi', err)
     return errorResponse('Sertifikalar yüklenemedi', 503)

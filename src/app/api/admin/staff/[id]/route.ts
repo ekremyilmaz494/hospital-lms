@@ -13,6 +13,42 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
+  // Lightweight mode for edit form — only basic fields, no training history
+  const { searchParams } = new URL(request.url)
+  if (searchParams.get('fields') === 'edit') {
+    const staff = await prisma.user.findFirst({
+      where: { id, organizationId: dbUser!.organizationId! },
+      select: {
+        id: true, firstName: true, lastName: true, email: true,
+        phone: true, tcNo: true, departmentId: true, title: true, isActive: true,
+      },
+    })
+    if (!staff) return errorResponse('Personel bulunamadı', 404)
+
+    let departmentName = ''
+    if (staff.departmentId) {
+      const dept = await prisma.department.findFirst({
+        where: { id: staff.departmentId, organizationId: dbUser!.organizationId! },
+        select: { name: true },
+      })
+      if (dept) departmentName = dept.name
+    }
+
+    return jsonResponse({
+      id: staff.id,
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      email: staff.email,
+      phone: staff.phone ?? '',
+      tcNo: staff.tcNo ? `*******${staff.tcNo.slice(-4)}` : '',
+      department: departmentName,
+      departmentId: staff.departmentId,
+      title: staff.title ?? '',
+      initials: `${(staff.firstName?.[0] ?? '').toUpperCase()}${(staff.lastName?.[0] ?? '').toUpperCase()}`,
+      isActive: staff.isActive,
+    })
+  }
+
   const staff = await prisma.user.findFirst({
     where: { id, organizationId: dbUser!.organizationId! },
     include: {

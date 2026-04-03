@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger'
 
 interface DeleteUserDataBody {
   userId: string
+  organizationId?: string // Super admin için zorunlu — hedef organizasyon
 }
 
 export async function POST(request: Request) {
@@ -43,9 +44,18 @@ export async function POST(request: Request) {
       return errorResponse('Kullanıcı bulunamadı.', 404)
     }
 
-    // ── Tenant isolation: admin can only delete users in their own org ──
-    if (dbUser!.role === 'admin' && targetUser.organizationId !== dbUser!.organizationId) {
+    // ── Tenant isolation: admin kendi org'unda, super_admin herhangi birinde değil ──
+    // Super admin bile sadece belirli bir organizasyondaki kullanıcıyı silebilir
+    // (yanlışlıkla cross-org silmeyi önle)
+    if (targetUser.organizationId !== dbUser!.organizationId && dbUser!.role !== 'super_admin') {
       return errorResponse('Bu kullanıcı üzerinde işlem yetkiniz bulunmamaktadır.', 403)
+    }
+    // Super admin için: hedef kullanıcının organizationId'si body'den gelen org ile eşleşmeli
+    if (dbUser!.role === 'super_admin' && !body.organizationId) {
+      return errorResponse('Super admin KVKK silme işlemi için organizationId zorunludur.', 400)
+    }
+    if (dbUser!.role === 'super_admin' && body.organizationId && targetUser.organizationId !== body.organizationId) {
+      return errorResponse('Kullanıcı belirtilen organizasyona ait değil.', 403)
     }
 
     // ── Prevent deleting other admins / super_admins ──
@@ -64,18 +74,44 @@ export async function POST(request: Request) {
       phone: '[REDACTED]',
     }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        firstName: 'Silinmiş',
-        lastName: 'Kullanıcı',
-        email: anonymizedEmail,
-        tcNo: null,
-        phone: null,
-        avatarUrl: null,
-        isActive: false,
-      },
-    })
+    // KVKK Tam Anonimleştirme — tüm ilişkili tablolardaki PII temizlenir
+    await prisma.$transaction([
+      // 1. Ana kullanıcı tablosu
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          firstName: 'Silinmiş',
+          lastName: 'Kullanıcı',
+          email: anonymizedEmail,
+          tcNo: null,
+          phone: null,
+          avatarUrl: null,
+          isActive: false,
+        },
+      }),
+      // 2. Audit log — oldData/newData içindeki PII'yı temizle
+      prisma.auditLog.updateMany({
+        where: { entityType: 'User', entityId: userId },
+        data: {
+          oldData: { redacted: true, reason: 'KVKK_DATA_DELETION' },
+          newData: { redacted: true, reason: 'KVKK_DATA_DELETION' },
+        },
+      }),
+      // 3. Kullanıcının oluşturduğu audit loglar — IP ve User-Agent temizle
+      prisma.auditLog.updateMany({
+        where: { userId },
+        data: { ipAddress: null, userAgent: null },
+      }),
+      // 4. Sertifikalar — kullanıcı adı sertifika kodunda olabilir
+      prisma.certificate.updateMany({
+        where: { userId },
+        data: { certificateCode: `CERT-REDACTED-${userId.slice(0, 8)}` },
+      }),
+      // 5. Bildirimler — kişiye özel içerik olabilir
+      prisma.notification.deleteMany({
+        where: { userId },
+      }),
+    ])
 
     // ── Audit log ──
     await createAuditLog({

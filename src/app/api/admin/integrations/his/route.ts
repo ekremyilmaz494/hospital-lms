@@ -5,6 +5,7 @@ import {
   parseBody, createAuditLog,
 } from '@/lib/api-helpers'
 import { encrypt } from '@/lib/crypto'
+import { logger } from '@/lib/logger'
 import { hisIntegrationSchema } from '@/lib/validations'
 
 /** GET /api/admin/integrations/his — Entegrasyon ayarlarını döndür (credentials masked) */
@@ -54,7 +55,15 @@ export async function POST(request: Request) {
   }
 
   const { credentials, ...rest } = parsed.data
-  const encryptedCredentials = { v: encrypt(JSON.stringify(credentials)) }
+
+  // Şifreleme başarısızlığını yakala — orphan kayıt oluşmasını önle
+  let encryptedCredentials: { v: string }
+  try {
+    encryptedCredentials = { v: encrypt(JSON.stringify(credentials)) }
+  } catch (encErr) {
+    logger.error('HIS Integration', 'Kimlik bilgisi şifreleme hatası', encErr)
+    return errorResponse('Kimlik bilgileri şifrelenirken bir hata oluştu. Lütfen tekrar deneyin.', 500)
+  }
 
   const existing = await prisma.hisIntegration.findFirst({
     where: { organizationId: dbUser!.organizationId! },

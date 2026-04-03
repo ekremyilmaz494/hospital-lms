@@ -196,8 +196,8 @@ export const createSubscriptionSchema = z.object({
 // ── Notification ──
 export const createNotificationSchema = z.object({
   userId: z.string().uuid(),
-  title: z.string().min(1).max(500),
-  message: z.string().min(1),
+  title: z.string().min(1).max(200),
+  message: z.string().min(1).max(5000),
   type: z.string().max(50),
   relatedTrainingId: z.string().uuid().optional(),
 })

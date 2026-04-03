@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { usePresenceTracker } from '@/hooks/use-presence-tracker';
 
-const DB_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 dakika
+const DB_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 dakika — deaktive kullanıcı penceresini daralt
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setLoading, setSessionTimeout } = useAuthStore();
@@ -77,12 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           createdAt: user.created_at,
           updatedAt: user.updated_at ?? user.created_at,
         });
-        // JWT verisi ilk yuklemede yeterli — DB refresh'i idle zamanda yap
-        if (typeof requestIdleCallback === 'function') {
-          requestIdleCallback(() => refreshFromDB());
-        } else {
-          setTimeout(() => refreshFromDB(), 100);
-        }
+        // JWT hydration sonrası hemen sunucu doğrulaması yap (deaktive kullanıcı tespiti)
+        refreshFromDB();
       } else {
         setUser(null);
       }

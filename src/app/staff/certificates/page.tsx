@@ -156,7 +156,8 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
 
 export default function StaffCertificatesPage() {
   const { toast } = useToast();
-  const { data, isLoading, error } = useFetch<Certificate[]>('/api/staff/certificates');
+  const { data: rawData, isLoading, error } = useFetch<{ certificates: Certificate[]; total: number }>('/api/staff/certificates');
+  const data = rawData?.certificates ?? null;
   const [selected, setSelected] = useState<Certificate | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 

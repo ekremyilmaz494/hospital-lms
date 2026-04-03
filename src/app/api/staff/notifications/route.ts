@@ -65,10 +65,19 @@ export async function PATCH(request: Request) {
     })
     if (result.count === 0) return jsonResponse({ error: 'Bildirim bulunamadı' }, 404)
   } else {
-    await prisma.notification.updateMany({
+    // Snapshot-based mark-all: önce okunmamış ID'leri al, sonra sadece onları güncelle.
+    // updateMany atomik olsa da, bu yaklaşım eşzamanlı yeni bildirimlerin
+    // yanlışlıkla "okundu" olarak işaretlenmesini kesin olarak önler.
+    const unreadIds = await prisma.notification.findMany({
       where: { userId: dbUser!.id, organizationId: dbUser!.organizationId, isRead: false },
-      data: { isRead: true },
+      select: { id: true },
     })
+    if (unreadIds.length > 0) {
+      await prisma.notification.updateMany({
+        where: { id: { in: unreadIds.map(n => n.id) } },
+        data: { isRead: true },
+      })
+    }
   }
 
   return jsonResponse({ success: true })

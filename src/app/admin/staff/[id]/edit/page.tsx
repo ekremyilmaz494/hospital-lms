@@ -37,7 +37,7 @@ export default function EditStaffPage() {
   const { toast } = useToast();
   const params = useParams();
   const id = typeof params?.id === 'string' ? params.id : null;
-  const { data, isLoading, error } = useFetch<StaffEditData>(id ? `/api/admin/staff/${id}` : null);
+  const { data, isLoading, error } = useFetch<StaffEditData>(id ? `/api/admin/staff/${id}?fields=edit` : null);
   const { data: deptsData } = useFetch<Dept[]>('/api/admin/departments');
   const [formData, setFormData] = useState<StaffEditData | null>(null);
   const [saving, setSaving] = useState(false);

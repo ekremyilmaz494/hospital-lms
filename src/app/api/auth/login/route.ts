@@ -89,14 +89,10 @@ export async function POST(request: NextRequest) {
 
     if (activeFactor) {
       logger.info('auth:login', 'MFA gerekli', { userId: data.user?.id, role })
+      // MFA tamamlanmadan kullanıcı bilgisi sızdırılmaz — sadece factorId döndür
       return jsonResponse({
         mfaRequired: true,
         factorId: activeFactor.id,
-        user: {
-          id: data.user?.id,
-          email: data.user?.email,
-          role: role ?? 'staff',
-        },
       })
     }
 
