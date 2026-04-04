@@ -7,6 +7,8 @@ export type OutputFormat =
   | 'STUDY_GUIDE'
   | 'QUIZ'
   | 'AUDIO_QUIZ'
+  | 'FLASHCARDS'
+  | 'SLIDE_DECK'
 
 export type GenerationStatus =
   | 'pending'
@@ -35,7 +37,7 @@ export interface GenerationJob {
   format: OutputFormat
   status: GenerationStatus
   progress: number
-  resultType?: 'audio' | 'video' | 'text' | 'json' | 'image'
+  resultType?: 'audio' | 'video' | 'text' | 'json' | 'image' | 'presentation' | 'document'
   resultUrl?: string
   error?: string
   prompt: string

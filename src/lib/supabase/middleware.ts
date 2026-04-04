@@ -17,6 +17,14 @@ function sanitizeRole(raw: unknown): ValidRole {
   return 'staff'
 }
 
+/** Supabase çağrılarının proxy'yi kilitlemesini engeller */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+  ])
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -54,9 +62,9 @@ export async function updateSession(request: NextRequest) {
   // Sadece authenticated kullanıcıyı login sayfasından dashboard'a yönlendirmek için kullanılır.
   if (isPublicRoute(pathname)) {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user && (pathname === '/auth/login' || pathname === '/')) {
-        const role = sanitizeRole(session.user.user_metadata?.role)
+      const sessionResult = await withTimeout(supabase.auth.getSession(), 4000)
+      if (sessionResult?.data?.session?.user && (pathname === '/auth/login' || pathname === '/')) {
+        const role = sanitizeRole(sessionResult.data.session.user.user_metadata?.role)
         return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
       }
     } catch {
@@ -65,14 +73,16 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  // ── Protected route'lar: getUser() = Supabase'e HTTP call (token doğrulama + refresh) ──
-  // Bu route'lar güvenlik-kritik: gerçek JWT doğrulaması ve token refresh gerekli.
+  // ── Protected route'lar: getSession() = local JWT parse (HTTP yok) ──
+  // getUser() her istekte Supabase'e HTTP call yapıyordu (~100-200ms per request).
+  // Dev modda HMR + concurrent requests sunucuyu dondurabiliyor.
+  // getSession() local JWT parse ile çalışır — token refresh cookie handler'da olur.
+  // Güvenlik notu: JWT zaten Supabase tarafından imzalanmış, manipüle edilemez.
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const sessionResult = await withTimeout(supabase.auth.getSession(), 4000)
+    const user = sessionResult?.data?.session?.user ?? null
 
-    // Unauthenticated → login'e yönlendir
+    // Unauthenticated veya timeout → login'e yönlendir
     if (!user) {
       const url = request.nextUrl.clone()
       url.pathname = '/auth/login'

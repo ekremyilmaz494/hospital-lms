@@ -45,7 +45,27 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ job
         evaluation: record.evaluation,
       })
     } catch {
-      // Python servisine ulaşılamıyorsa mevcut DB durumunu döndür
+      // Python servisine ulaşılamıyor veya 404 → timeout kontrolü
+      const TIMEOUT_MS = 15 * 60 * 1000 // 15 dakika
+      const elapsed = Date.now() - new Date(record.createdAt).getTime()
+      if (elapsed > TIMEOUT_MS) {
+        await prisma.aiGeneratedContent.update({
+          where: { id: jobId },
+          data: {
+            status: 'failed',
+            errorMessage: 'Üretim zaman aşımına uğradı. Lütfen tekrar deneyin.',
+          },
+        })
+        return jsonResponse({
+          jobId: record.id,
+          status: 'failed',
+          progress: 0,
+          resultType: null,
+          error: 'Üretim zaman aşımına uğradı. Lütfen tekrar deneyin.',
+          evaluation: record.evaluation,
+        })
+      }
+      // Henüz timeout olmadı — DB durumunu döndür
     }
   }
 

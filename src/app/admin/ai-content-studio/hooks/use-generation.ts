@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 import type { GenerationJob, OutputFormat } from '../types'
 import { POLLING_INTERVAL_MS } from '../constants'
+import { getFormatConfig } from '../lib/format-config'
 
 export function useGeneration() {
   const [job, setJob] = useState<GenerationJob | null>(null)
@@ -58,13 +59,17 @@ export function useGeneration() {
           if (!statusRes.ok) return
           const status = await statusRes.json()
 
-          setJob((prev) => prev ? {
-            ...prev,
-            status: status.status,
-            progress: status.progress,
-            resultType: status.resultType,
-            error: status.error,
-          } : prev)
+          setJob((prev) => {
+            if (!prev) return prev
+            const fallbackType = getFormatConfig(prev.format).resultType
+            return {
+              ...prev,
+              status: status.status,
+              progress: status.progress,
+              resultType: status.resultType ?? fallbackType,
+              error: status.error,
+            }
+          })
 
           if (status.status === 'completed' || status.status === 'failed') {
             stopPolling()
@@ -81,11 +86,47 @@ export function useGeneration() {
     }
   }, [stopPolling])
 
+  /** Mevcut bir job'u yükle ve gerekirse polling başlat (sayfa yenileme sonrası) */
+  const resumeJob = useCallback((existingJob: GenerationJob) => {
+    stopPolling()
+    setJob(existingJob)
+    setError(null)
+
+    // Aktif job'sa polling başlat
+    if (existingJob.status === 'queued' || existingJob.status === 'processing') {
+      pollingRef.current = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`/api/admin/ai-content-studio/status/${existingJob.id}`)
+          if (!statusRes.ok) return
+          const status = await statusRes.json()
+
+          setJob((prev) => {
+            if (!prev) return prev
+            const fallbackType = getFormatConfig(prev.format).resultType
+            return {
+              ...prev,
+              status: status.status,
+              progress: status.progress,
+              resultType: status.resultType ?? fallbackType,
+              error: status.error,
+            }
+          })
+
+          if (status.status === 'completed' || status.status === 'failed') {
+            stopPolling()
+          }
+        } catch {
+          // Ağ hatalarında polling devam eder
+        }
+      }, POLLING_INTERVAL_MS)
+    }
+  }, [stopPolling])
+
   const reset = useCallback(() => {
     stopPolling()
     setJob(null)
     setError(null)
   }, [stopPolling])
 
-  return { job, starting, error, startGeneration, reset }
+  return { job, starting, error, startGeneration, resumeJob, reset }
 }

@@ -53,7 +53,7 @@ export default function AIContentStudioPage() {
   const isConnected = connectionData?.connected ?? false
 
   const { documents, uploading, error: uploadError, uploadFiles, removeDocument } = useDocumentUpload()
-  const { job, starting, error: genError, startGeneration, reset: resetGeneration } = useGeneration()
+  const { job, starting, error: genError, startGeneration, resumeJob, reset: resetGeneration } = useGeneration()
   const {
     evaluation,
     evaluationNote,
@@ -122,6 +122,38 @@ export default function AIContentStudioPage() {
     setResultUrl(null)
     await handleStartGeneration()
   }
+
+  // Sayfa açılınca son aktif job'u kontrol et (sayfa geçişi sonrası kurtarma)
+  // Sayfa açılınca aktif (queued/processing) job varsa kaldığı yerden devam et
+  useEffect(() => {
+    if (job) return
+    fetch('/api/admin/ai-content-studio/latest')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data?.job) return
+        const j = data.job
+        // Sadece aktif üretim varsa otomatik devam et
+        if (j.status !== 'queued' && j.status !== 'processing') return
+        resumeJob({
+          id: j.id,
+          title: j.title,
+          format: j.format,
+          status: j.status,
+          progress: j.progress ?? 0,
+          resultType: j.resultType,
+          error: j.error,
+          prompt: '',
+          settings: {},
+          documentIds: [],
+          evaluation: j.evaluation,
+          savedToLibrary: j.savedToLibrary,
+          createdAt: j.createdAt,
+        })
+        setSelectedFormat(j.format)
+        setStep(4)
+      })
+      .catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Job tamamlandığında result URL'ini oluştur
   useEffect(() => {

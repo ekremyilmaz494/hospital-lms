@@ -924,7 +924,7 @@ model AiDocument {
   organizationId String   @db.Uuid @map("organization_id")
   userId         String   @db.Uuid @map("user_id")
   fileName       String   @map("file_name") @db.VarChar(500)
-  fileType       String   @map("file_type") @db.VarChar(50)
+  fileType       String   @map("file_type") @db.VarChar(255)
   fileSize       Int      @map("file_size")
   fileUrl        String   @map("file_url") @db.Text
   fileKey        String   @map("file_key") @db.Text

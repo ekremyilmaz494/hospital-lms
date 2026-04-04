@@ -11,10 +11,23 @@ import { getResult } from '@/app/admin/ai-content-studio/lib/ai-service-client'
 const FORMAT_EXT: Record<string, string> = {
   AUDIO_OVERVIEW: 'mp3',
   VIDEO_OVERVIEW: 'mp4',
-  STUDY_GUIDE: 'txt',
+  STUDY_GUIDE: 'md',
   QUIZ: 'json',
   AUDIO_QUIZ: 'mp3',
   INFOGRAPHIC: 'png',
+  FLASHCARDS: 'json',
+  SLIDE_DECK: 'pptx',
+}
+
+const MAPPED_CONTENT_TYPE: Record<string, string> = {
+  AUDIO_OVERVIEW: 'audio/mpeg',
+  VIDEO_OVERVIEW: 'video/mp4',
+  STUDY_GUIDE: 'text/markdown',
+  QUIZ: 'application/json',
+  AUDIO_QUIZ: 'audio/mpeg',
+  FLASHCARDS: 'application/json',
+  INFOGRAPHIC: 'image/png',
+  SLIDE_DECK: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
@@ -48,9 +61,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // S3'e kalıcı klasöre yükle
   const ext = FORMAT_EXT[record.outputFormat] ?? 'bin'
   const s3Key = `content-library/ai/${dbUser!.organizationId}/${jobId}.${ext}`
-  await uploadBuffer(s3Key, buffer, contentType)
+  await uploadBuffer(s3Key, buffer, MAPPED_CONTENT_TYPE[record.outputFormat] ?? contentType)
 
   // ContentLibrary kaydı oluştur
+  const mappedCT = MAPPED_CONTENT_TYPE[record.outputFormat] ?? ''
   const contentItem = await prisma.contentLibrary.create({
     data: {
       title,
@@ -59,7 +73,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       difficulty,
       targetRoles,
       duration: duration ?? 10,
-      thumbnailUrl: contentType.includes('image') ? s3Key : undefined,
+      thumbnailUrl: mappedCT.includes('image') ? s3Key : undefined,
       isActive: true,
       createdById: dbUser!.id,
     },

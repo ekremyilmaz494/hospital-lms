@@ -6,7 +6,7 @@ export interface FormatConfig {
   description: string
   icon: string
   estimatedMinutes: string
-  resultType: 'audio' | 'video' | 'text' | 'json' | 'image'
+  resultType: 'audio' | 'video' | 'text' | 'json' | 'image' | 'presentation' | 'document'
   outputFileType: string
   options?: {
     key: string
@@ -108,6 +108,24 @@ export const FORMAT_CONFIGS: FormatConfig[] = [
         default: 'BRIEF',
       },
     ],
+  },
+  {
+    id: 'FLASHCARDS',
+    label: 'Bilgi Kartları',
+    description: 'Soru-cevap hafıza kartları',
+    icon: '🃏',
+    estimatedMinutes: '1-3 dk',
+    resultType: 'json',
+    outputFileType: 'JSON',
+  },
+  {
+    id: 'SLIDE_DECK',
+    label: 'Sunum / Slayt',
+    description: 'PowerPoint formatında sunum dosyası',
+    icon: '📽️',
+    estimatedMinutes: '3-10 dk',
+    resultType: 'presentation',
+    outputFileType: '.pptx',
   },
 ]
 

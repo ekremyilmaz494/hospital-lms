@@ -191,7 +191,7 @@ function JsonRenderer({ job, data }: { job: GenerationJob; data: unknown }) {
   if (job.format === 'QUIZ' && Array.isArray(data)) {
     return <QuizRenderer data={data as QuizQuestion[]} />
   }
-  if (job.format === 'AUDIO_QUIZ' && Array.isArray(data)) {
+  if ((job.format === 'FLASHCARDS' || job.format === 'AUDIO_QUIZ') && Array.isArray(data)) {
     return <FlashcardRenderer data={data as Flashcard[]} />
   }
   return (
@@ -245,9 +245,9 @@ export function ContentPreview({ job, resultUrl }: Props) {
     if (resultType === 'json' && !jsonLoaded) loadJson()
   }, [resultType, jsonLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-load text
+  // Auto-load text / document
   useEffect(() => {
-    if (resultType !== 'text' || textLoaded) return
+    if ((resultType !== 'text' && resultType !== 'document') || textLoaded) return
     fetch(resultUrl)
       .then((r) => r.ok ? r.text() : Promise.reject('fetch failed'))
       .then((t) => setTextContent(t))
@@ -340,6 +340,30 @@ export function ContentPreview({ job, resultUrl }: Props) {
         </div>
       )}
 
+      {resultType === 'document' && (
+        <div
+          className="rounded-2xl border p-6 overflow-auto"
+          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', maxHeight: '600px' }}
+        >
+          {!textLoaded ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-transparent" style={{ borderTopColor: 'var(--color-primary)' }} />
+            </div>
+          ) : textContent ? (
+            <pre
+              className="text-[13px] leading-relaxed whitespace-pre-wrap"
+              style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}
+            >
+              {textContent}
+            </pre>
+          ) : (
+            <p className="text-center text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
+              İçerik yüklenemedi.
+            </p>
+          )}
+        </div>
+      )}
+
       {resultType === 'json' && (
         <div>
           {!jsonLoaded ? (
@@ -407,6 +431,58 @@ export function ContentPreview({ job, resultUrl }: Props) {
               }}
             />
           </div>
+        </div>
+      )}
+
+      {resultType === 'presentation' && (
+        <div
+          className="flex flex-col items-center gap-4 rounded-2xl border p-8"
+          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        >
+          <div className="flex h-20 w-20 items-center justify-center rounded-2xl" style={{ background: 'var(--color-bg)' }}>
+            <span className="text-4xl">📽️</span>
+          </div>
+          <div className="text-center">
+            <p className="text-[14px] font-bold" style={{ color: 'var(--color-text-primary)' }}>
+              Sunum Dosyası Hazır
+            </p>
+            <p className="mt-1 text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
+              PowerPoint (.pptx) dosyası tarayıcıda önizlenemez.
+            </p>
+          </div>
+          <a
+            href={resultUrl}
+            download
+            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white transition-all"
+            style={{ background: 'var(--color-primary)' }}
+          >
+            <Download className="h-4 w-4" />
+            Sunumu İndir (.pptx)
+          </a>
+        </div>
+      )}
+
+      {/* Fallback — tanınmayan format */}
+      {!['audio', 'video', 'text', 'json', 'image', 'presentation', 'document'].includes(resultType) && (
+        <div
+          className="flex flex-col items-center gap-4 rounded-2xl border p-8"
+          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        >
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: 'var(--color-bg)' }}>
+            <span className="text-3xl">📦</span>
+          </div>
+          <p className="text-[13px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+            Desteklenmeyen format — dosyayı indirin
+          </p>
+          <a
+            href={resultUrl}
+            download
+            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white transition-all"
+            style={{ background: 'var(--color-primary)' }}
+          >
+            <Download className="h-4 w-4" />
+            İndir
+          </a>
         </div>
       )}
     </div>
