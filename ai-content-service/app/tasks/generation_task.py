@@ -1,8 +1,11 @@
 import asyncio
+import logging
 from typing import Dict, Any
 
 from app.models.schemas import GenerateRequest
 from app.services.notebooklm_service import generate_content
+
+logger = logging.getLogger(__name__)
 
 # In-memory job store: job_id → state dict
 # TTL yönetimi Next.js tarafındaki Redis ile yapılır;
@@ -26,6 +29,7 @@ async def run_generation(job_id: str, request: GenerateRequest) -> None:
     try:
         await generate_content(job_id, request, _update_status)
     except Exception as exc:
+        logger.exception("Generation failed for job %s: %s", job_id, exc)
         jobs[job_id] = {
             "status": "failed",
             "progress": 0,

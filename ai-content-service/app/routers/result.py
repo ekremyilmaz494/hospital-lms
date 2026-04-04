@@ -11,18 +11,20 @@ router = APIRouter(dependencies=[Depends(verify_internal_key)])
 @router.get("/result/{job_id}")
 async def result(job_id: str):
     """Tamamlanmış işin sonuç dosyasını stream olarak döndürür."""
+    # Önce diskte dosyayı ara (servis yeniden başlasa bile dosya kalır)
+    path = get_result_path(job_id)
+    if path and path.exists():
+        return FileResponse(
+            path=str(path),
+            media_type=get_content_type(path),
+            filename=path.name,
+        )
+
+    # Dosya yoksa in-memory job store'a bak
     job = get_job(job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="Job bulunamadı.")
+        raise HTTPException(status_code=404, detail="Sonuç dosyası bulunamadı.")
     if job.get("status") != "completed":
         raise HTTPException(status_code=425, detail="İş henüz tamamlanmadı.")
 
-    path = get_result_path(job_id)
-    if not path or not path.exists():
-        raise HTTPException(status_code=404, detail="Sonuç dosyası bulunamadı.")
-
-    return FileResponse(
-        path=str(path),
-        media_type=get_content_type(path),
-        filename=path.name,
-    )
+    raise HTTPException(status_code=404, detail="Sonuç dosyası bulunamadı.")

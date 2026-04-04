@@ -2321,4 +2321,89 @@ Bu oturumda AI İçerik Stüdyosu tamamen sıfırdan yeniden yazıldı. Doküman
 - Markdown rendering: react-markdown yerine regex-based renderMarkdown() helper kullanıldı (bağımlılık eklememe kararı)
 - MindMap: react-flow/d3 yerine pure CSS tree (bağımlılık eklememe)
 
-*Son güncelleme: 4 Nisan 2026 — Oturum 18*
+---
+
+## OTURUM 19 — AI İçerik Stüdyosu: Kütüphane + Arka Plan Üretim Sistemi (4 Nisan 2026)
+
+### Bağlam
+AI İçerik Stüdyosu her ziyarette wizard'ın 4. adımına (son üretim) yönlendiriyordu. Geçmiş içerikler görünmüyordu. Üretim sırasında sayfa değiştirilirse durum kayboluyordu.
+
+### Yapılan Geliştirmeler
+
+#### Yeni Sayfa Yapısı
+| Route | Amaç |
+|-------|------|
+| `/admin/ai-content-studio` | Kütüphane sayfası — tüm üretimler kart halinde |
+| `/admin/ai-content-studio/new` | Wizard (4 adım) — belge yükle → istek yaz → format seç → üret |
+| `/admin/ai-content-studio/[jobId]` | İçerik detay/önizleme sayfası |
+| `/admin/ai-content-studio/settings` | Google hesap bağlantısı (değişmedi) |
+
+#### 1. İçerik Kütüphanesi
+- Responsive kart grid (1/2/3 kolon)
+- Durum filtreleme: Tümü, Üretiliyor, Tamamlanan, Başarısız, Kütüphanede
+- Format filtreleme dropdown
+- Başlık arama
+- Sıralama: tarih (yeni/eski), başlık (A-Z/Z-A)
+- Sayfalama (12 kart/sayfa)
+- Boş durum ekranı + CTA
+- Toplu seçim (checkbox) + toplu silme
+
+#### 2. Arka Plan Üretim + Anlık Bildirim
+- **Zustand store** (`ai-generation-store.ts`): Aktif job'ları global takip, localStorage persist, 24 saat TTL ile otomatik temizleme
+- **AiGenerationPoller**: Admin layout'ta headless component, tüm admin sayfalarında aktif job'ları 3 saniyede bir poll eder
+- Üretim tamamlanınca/başarısız olunca toast bildirimi (hangi sayfada olursa olsun)
+- Toast'ta "İncele" action butonu — tıklayınca detay sayfasına yönlendirir
+- Sidebar'da aktif üretim badge'i (turuncu animasyonlu dot + sayı)
+
+#### 3. Detay Sayfası (`[jobId]/page.tsx`)
+- Job'u API'den yükle + aktifse polling başlat
+- Üretim devam ediyorsa progress bar
+- Tamamlandıysa içerik önizleme + değerlendirme paneli
+- Başarısızsa hata mesajı + "Tekrar Dene" (aynı belgelerle doğrudan regenerate)
+- Sayfa yenilemesinde state korunur (API'den yeniden yüklenir)
+
+#### 4. Toast Sistemi İyileştirmesi
+- `toast()` fonksiyonuna `action` parametresi eklendi: `{ label: string, href: string }`
+- Action'lı toast 8 saniye görünür (normal 4s), tıklanabilir link içerir
+
+#### 5. Format Ayarları İyileştirmesi
+- "Hedef Kitle" bölümü kaldırıldı
+- "Süre" ayarı sadece ses/video formatlarında gösteriliyor (infografik, quiz, flashcard'da gizli)
+
+#### 6. NotebookLM İndirme Hatası Düzeltmesi
+- `notebooklm-py` kütüphanesinin download fonksiyonu `load_httpx_cookies()` ile kendi cookie deposundan okuyor, bizim `auth_store/*.enc`'den değil
+- **Çözüm**: `_set_download_cookies()` fonksiyonu eklendi — cookie'leri Playwright storage state formatında `NOTEBOOKLM_AUTH_JSON` env var'a yazıyor
+- Result endpoint dosya-öncelikli yapıldı — servis restart sonrası da temp dosyalar erişilebilir
+
+#### 7. Analiz Entegrasyonu
+- Belge yüklendiğinde dönen `suggestedFormats` → format seçim adımında "Önerilen" badge'i
+- Belge yüklendiğinde dönen `keyTopics` → prompt adımında tıklanabilir konu chip'leri
+
+### Düzeltilen Bug'lar
+| Bug | Çözüm |
+|-----|-------|
+| sessionStorage tab kapatınca kayıp | `sessionStorage` → `localStorage` |
+| Tamamlanan job hemen store'dan siliniyor | `removeJob` → `updateJob` + `notifiedRef` ile çift bildirim önleme |
+| Poller sıralı await (çoklu job yavaş) | `for...of await` → `Promise.all(jobs.map(...))` paralel polling |
+| useGeneration unmount'ta polling devam | `useEffect(() => () => stopPolling(), [stopPolling])` cleanup |
+| Wizard sayfa yenilemesinde state kayıp | Job başladığında `router.push(/[jobId])` ile detay sayfasına yönlendirme |
+| Status API processing'de format döndürmüyor | Tüm yanıt yollarına `title`, `format`, `createdAt` eklendi |
+| Result endpoint in-memory store'a bağımlı | Dosya-öncelikli arama, servis restart'ta erişim korunur |
+
+### Dosya Değişiklikleri
+| Kategori | Sayı |
+|----------|------|
+| Yeni sayfalar | 3 (page.tsx, new/page.tsx, [jobId]/page.tsx) |
+| Yeni componentler | 2 (content-card.tsx, ai-generation-poller.tsx) |
+| Yeni store | 1 (ai-generation-store.ts) |
+| Yeni API route'lar | 2 (list/route.ts, bulk-delete/route.ts) |
+| Güncellenen dosyalar | ~12 (toast.tsx, sidebar, layout, hooks, API route'lar, Python servisi) |
+| **Toplam** | **~20 dosya** |
+
+### Teknik Notlar
+- `notebooklm-py` download mekanizması `NOTEBOOKLM_AUTH_JSON` env var'dan Playwright storage state formatında cookie okur — bizim cookie store'u bilmez
+- Google cookie'leri genellikle birkaç saat-gün içinde expire oluyor — settings sayfasından yeniden bağlanmak gerekiyor
+- Turbopack cache bozulması: `.next` klasörü silinip dev server yeniden başlatılmalı
+- List API `sortBy` whitelist-based validation ile Prisma injection'a karşı korumalı
+
+*Son güncelleme: 4 Nisan 2026 — Oturum 19*

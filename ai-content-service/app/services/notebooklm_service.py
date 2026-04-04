@@ -4,6 +4,7 @@ generate_* → wait_for_completion → download_* akışıyla çalışır."""
 import asyncio
 import base64
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Callable, Awaitable
@@ -11,6 +12,8 @@ from typing import Callable, Awaitable
 from app.config import settings, TEMP_DIR
 from app.models.schemas import GenerateRequest
 from app.auth_store.cookie_manager import load_cookie
+
+logger = logging.getLogger(__name__)
 
 # Format → (generate metodu, download metodu, dosya uzantısı)
 FORMAT_CONFIG = {
@@ -76,6 +79,31 @@ async def _wait_for_artifact_via_list(
         await asyncio.sleep(5)
 
 
+def _set_download_cookies(raw_cookies: dict) -> None:
+    """Cookie dict'ini Playwright storage state formatına dönüştürüp
+    NOTEBOOKLM_AUTH_JSON env var'ına yazar. notebooklm-py'nin download
+    fonksiyonu bu env var'dan cookie okur."""
+    # Playwright storage state formatı: {"cookies": [{"name": ..., "value": ..., "domain": ...}]}
+    pw_cookies = []
+    for name, value in raw_cookies.items():
+        # Google cookie'leri genellikle .google.com domain'inde
+        domain = ".google.com"
+        # __Secure- ve OSID cookie'leri notebooklm.google.com'a özel
+        if "OSID" in name or name in ("SID", "HSID", "SSID", "NID", "SIDCC"):
+            domain = ".google.com"
+        pw_cookies.append({
+            "name": name,
+            "value": value,
+            "domain": domain,
+            "path": "/",
+            "secure": True,
+            "httpOnly": True,
+        })
+    storage_state = json.dumps({"cookies": pw_cookies, "origins": []})
+    os.environ["NOTEBOOKLM_AUTH_JSON"] = storage_state
+    logger.info("Download cookie'leri ayarlandı (%d cookie)", len(pw_cookies))
+
+
 def _load_cookie_for_generation(request: GenerateRequest) -> dict | None:
     """org_id varsa o org'un cookie'sini, yoksa mevcut ilk cookie'yi yükler."""
     org_id = getattr(request, "org_id", None)
@@ -99,13 +127,13 @@ async def generate_content(
     """NotebookLM üzerinden içerik üretir ve sonucu geçici dosyaya yazar."""
     from notebooklm import NotebookLMClient, AuthTokens
 
-    # Auth bilgisini çöz — önce env var, yoksa cookie store'dan oku
+    # Auth bilgisini çöz — cookie store'dan org bazlı cookie oku
     auth_raw = settings.notebooklm_auth_json
     if auth_raw:
         auth_data = json.loads(base64.b64decode(auth_raw))
         tokens = AuthTokens(**auth_data)
+        raw_cookies = auth_data.get("cookies", {})
     else:
-        # Cookie store'dan org bazlı cookie oku (browser login ile kaydedilmiş)
         cookie_data = _load_cookie_for_generation(request)
         if not cookie_data:
             raise RuntimeError(
@@ -114,8 +142,15 @@ async def generate_content(
             )
         if "auth_state" in cookie_data:
             tokens = AuthTokens(**cookie_data["auth_state"])
+            raw_cookies = cookie_data["auth_state"].get("cookies", {})
         else:
             tokens = AuthTokens(**cookie_data)
+            raw_cookies = cookie_data.get("cookies", {})
+
+    # notebooklm-py download fonksiyonu NOTEBOOKLM_AUTH_JSON env var'ından
+    # Playwright storage state formatında cookie okur. Cookie'leri bu formata
+    # dönüştürüp env var'a yazıyoruz ki download da çalışsın.
+    _set_download_cookies(raw_cookies)
 
     fmt_cfg = FORMAT_CONFIG.get(request.format)
     if not fmt_cfg:
@@ -165,7 +200,10 @@ async def generate_content(
                     "AUDIO_QUIZ": 600,
                     "INFOGRAPHIC": 600,
                     "SLIDE_DECK": 900,
-                }.get(request.format, 300)
+                    "STUDY_GUIDE": 600,
+                    "QUIZ": 600,
+                    "FLASHCARDS": 600,
+                }.get(request.format, 600)
                 try:
                     final_status = await client.artifacts.wait_for_completion(
                         nb_id,
@@ -175,10 +213,12 @@ async def generate_content(
                     if final_status.is_failed:
                         raise RuntimeError(final_status.error or f"{request.format} üretimi tamamlanamadı.")
                 except TimeoutError:
-                    # notebooklm-py _is_media_ready bazen URL'i bulamaz ve
-                    # status'u PROCESSING'e düşürür → sonsuz polling.
-                    # Timeout olursa doğrudan download dene.
-                    pass
+                    # Timeout olursa list_* ile artifact'ı ara
+                    gen_status = await _wait_for_artifact_via_list(
+                        client, nb_id, request.format, timeout=120
+                    )
+                    if gen_status.is_failed:
+                        raise RuntimeError(gen_status.error or f"{request.format} üretimi zaman aşımına uğradı.")
 
             await update_status(job_id, "processing", 80)
 
@@ -190,7 +230,7 @@ async def generate_content(
             if request.format in ("QUIZ", "FLASHCARDS"):
                 dl_kwargs["output_format"] = "json"
 
-            max_dl_retries = 5
+            max_dl_retries = 8
             for attempt in range(max_dl_retries):
                 try:
                     await dl_fn(**dl_kwargs)
