@@ -1,97 +1,129 @@
-// AI İçerik Stüdyosu — Üretilen içerik sonucunu döndür
-// GET /api/admin/ai-content-studio/result/[jobId]
-// Python servisinden dosyayı alır ve doğrudan client'a stream eder
-
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getDownloadUrl } from '@/lib/s3'
+import { logger } from '@/lib/logger'
 
-const AI_SERVICE_URL = process.env.AI_CONTENT_SERVICE_URL ?? 'http://localhost:8100'
-const INTERNAL_KEY = process.env.AI_CONTENT_INTERNAL_KEY ?? ''
-
-const FORMAT_CONTENT_TYPE: Record<string, string> = {
-  AUDIO_OVERVIEW: 'audio/mpeg',
-  VIDEO_OVERVIEW: 'video/mp4',
-  STUDY_GUIDE: 'text/markdown',
-  QUIZ: 'application/json',
-  AUDIO_QUIZ: 'audio/mpeg',
-  FLASHCARDS: 'application/json',
-  INFOGRAPHIC: 'image/png',
-  SLIDE_DECK: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+const CONTENT_TYPE_MAP: Record<string, string> = {
+  mp3: 'audio/mpeg',
+  mp4: 'video/mp4',
+  pdf: 'application/pdf',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  json: 'application/json',
+  png: 'image/png',
+  csv: 'text/csv',
+  md: 'text/markdown',
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
-  const { jobId } = await params
+/** Artifact types that are served directly from contentData as JSON */
+const JSON_ARTIFACT_TYPES = ['quiz', 'flashcards', 'mind_map', 'data_table']
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ jobId: string }> }
+) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
+
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  // DB'den kayıt + org izolasyonu
-  const record = await prisma.aiGeneratedContent.findFirst({
-    where: { id: jobId, organizationId: dbUser!.organizationId! },
-  })
-  if (!record) return errorResponse('İş bulunamadı.', 404)
-  if (record.status !== 'completed') return errorResponse('İş henüz tamamlanmadı.', 425)
+  const orgId = dbUser!.organizationId!
+  const { jobId } = await params
 
-  // ?meta=true ise sadece URL döndür (frontend polling için)
-  if (req.nextUrl.searchParams.get('meta') === 'true') {
+  const generation = await prisma.aiGeneration.findFirst({
+    where: { id: jobId, organizationId: orgId },
+  })
+
+  if (!generation) {
+    return errorResponse('Üretim bulunamadı', 404)
+  }
+
+  if (generation.status !== 'completed') {
+    return errorResponse('İçerik henüz hazır değil', 425)
+  }
+
+  // Meta mode — return file metadata without streaming content
+  const { searchParams } = new URL(request.url)
+  if (searchParams.get('meta') === 'true') {
     return jsonResponse({
       url: `/api/admin/ai-content-studio/result/${jobId}`,
-      format: record.outputFormat,
-      contentType: FORMAT_CONTENT_TYPE[record.outputFormat] ?? 'application/octet-stream',
+      artifactType: generation.artifactType,
+      fileType: generation.outputFileType,
+      fileSize: generation.outputSize,
+      contentType:
+        CONTENT_TYPE_MAP[generation.outputFileType || ''] ||
+        'application/octet-stream',
     })
   }
 
-  // Python servisinden dosyayı al ve doğrudan stream et
-  try {
-    const pyRes = await fetch(`${AI_SERVICE_URL}/api/result/${jobId}`, {
-      headers: { 'X-Internal-Key': INTERNAL_KEY },
-      signal: AbortSignal.timeout(30_000),
-    })
-
-    if (!pyRes.ok) {
-      const body = await pyRes.json().catch(() => ({}))
-      return errorResponse(body.detail ?? 'Sonuç dosyası alınamadı.', pyRes.status)
-    }
-
-    const fullBuffer = Buffer.from(await pyRes.arrayBuffer())
-    const contentType = FORMAT_CONTENT_TYPE[record.outputFormat] ?? pyRes.headers.get('content-type') ?? 'application/octet-stream'
-    const totalSize = fullBuffer.length
-
-    // Range header desteği — audio/video ileri sarma için gerekli
-    const rangeHeader = req.headers.get('range')
-    if (rangeHeader) {
-      const match = rangeHeader.match(/bytes=(\d+)-(\d*)/)
-      if (match) {
-        const start = parseInt(match[1])
-        const end = match[2] ? parseInt(match[2]) : totalSize - 1
-        const chunk = fullBuffer.subarray(start, end + 1)
-
-        return new NextResponse(chunk, {
-          status: 206,
-          headers: {
-            'Content-Type': contentType,
-            'Content-Range': `bytes ${start}-${end}/${totalSize}`,
-            'Content-Length': String(chunk.length),
-            'Accept-Ranges': 'bytes',
-            'Cache-Control': 'private, max-age=3600',
-          },
-        })
-      }
-    }
-
-    return new NextResponse(fullBuffer, {
+  // JSON shortcut — serve contentData directly for structured artifact types
+  if (
+    generation.contentData !== null &&
+    JSON_ARTIFACT_TYPES.includes(generation.artifactType)
+  ) {
+    return new Response(JSON.stringify(generation.contentData), {
       status: 200,
       headers: {
-        'Content-Type': contentType,
-        'Content-Length': String(totalSize),
-        'Accept-Ranges': 'bytes',
+        'Content-Type': 'application/json',
         'Cache-Control': 'private, max-age=3600',
       },
     })
-  } catch (err) {
-    console.error('[AI-Studio] Result fetch error:', err)
-    return errorResponse('Sonuç dosyası alınamadı.', 500)
   }
+
+  // S3 download required
+  if (!generation.outputS3Key) {
+    return errorResponse('İçerik dosyası bulunamadı', 404)
+  }
+
+  let buffer: Uint8Array
+  try {
+    const downloadUrl = await getDownloadUrl(generation.outputS3Key)
+    const s3Response = await fetch(downloadUrl)
+    if (!s3Response.ok) {
+      return errorResponse('Dosya indirilemedi', 502)
+    }
+    const arrayBuffer = await s3Response.arrayBuffer()
+    buffer = new Uint8Array(arrayBuffer)
+  } catch (err) {
+    logger.error('ai-content-studio/result', 'S3 dosya indirme hatası', err)
+    return errorResponse('Dosya indirilemedi', 502)
+  }
+
+  const contentType =
+    CONTENT_TYPE_MAP[generation.outputFileType || ''] ||
+    'application/octet-stream'
+
+  // HTTP Range support for audio/video seeking
+  const rangeHeader = request.headers.get('range')
+  if (rangeHeader) {
+    const match = rangeHeader.match(/bytes=(\d+)-(\d*)/)
+    if (match) {
+      const start = parseInt(match[1], 10)
+      const end = match[2] ? parseInt(match[2], 10) : buffer.length - 1
+      const chunk = buffer.subarray(start, end + 1)
+
+      return new Response(chunk as unknown as BodyInit, {
+        status: 206,
+        headers: {
+          'Content-Type': contentType,
+          'Content-Range': `bytes ${start}-${end}/${buffer.length}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': String(chunk.length),
+          'Cache-Control': 'private, max-age=3600',
+        },
+      })
+    }
+  }
+
+  // Full response
+  return new Response(buffer as unknown as BodyInit, {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': String(buffer.length),
+      'Accept-Ranges': 'bytes',
+      'Content-Disposition': 'inline',
+      'Cache-Control': 'private, max-age=3600',
+    },
+  })
 }

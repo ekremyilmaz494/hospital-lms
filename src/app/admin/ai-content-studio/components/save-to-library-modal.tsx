@@ -1,281 +1,269 @@
 'use client'
 
 import { useState } from 'react'
-import { X, BookOpen, Loader2 } from 'lucide-react'
-import type { OutputFormat } from '../types'
+import { Loader2, BookOpen, X } from 'lucide-react'
+import {
+  CONTENT_LIBRARY_CATEGORIES,
+  CONTENT_LIBRARY_DIFFICULTY,
+  CONTENT_LIBRARY_TARGET_ROLES,
+  type ContentLibraryCategoryKey,
+  type ContentLibraryDifficulty,
+} from '@/lib/content-library-categories'
+import { getFormatConfig } from '../lib/format-config'
 
-interface SaveParams {
+interface LibrarySaveData {
   title: string
   description?: string
   category: string
   difficulty: string
   targetRoles: string[]
-  duration?: number
+  duration: number
+  smgPoints: number
 }
 
-interface Props {
+interface SaveToLibraryModalProps {
   open: boolean
   onClose: () => void
-  onSave: (params: SaveParams) => void
+  onSave: (data: LibrarySaveData) => Promise<void>
   saving: boolean
-  format: OutputFormat
-  defaultTitle?: string
+  defaultTitle: string
+  artifactType: string
 }
 
-const CATEGORIES = [
-  { value: 'CLINICAL', label: 'Klinik' },
-  { value: 'ADMINISTRATIVE', label: 'İdari' },
-  { value: 'COMPLIANCE', label: 'Uyumluluk' },
-  { value: 'TECHNICAL', label: 'Teknik' },
-  { value: 'SOFT_SKILLS', label: 'Soft Skills' },
-  { value: 'ORIENTATION', label: 'Oryantasyon' },
-]
-
-const DIFFICULTIES = [
-  { value: 'BEGINNER', label: 'Başlangıç', color: 'var(--color-success)' },
-  { value: 'INTERMEDIATE', label: 'Orta', color: 'var(--color-warning)' },
-  { value: 'ADVANCED', label: 'İleri', color: 'var(--color-error)' },
-]
-
-const ROLES = [
-  { value: 'DOCTOR', label: 'Doktor' },
-  { value: 'NURSE', label: 'Hemşire' },
-  { value: 'TECHNICIAN', label: 'Teknisyen' },
-  { value: 'ADMIN', label: 'Yönetici' },
-  { value: 'MANAGER', label: 'Müdür' },
-  { value: 'PHARMACIST', label: 'Eczacı' },
-  { value: 'OTHER', label: 'Diğer' },
-]
-
-export function SaveToLibraryModal({ open, onClose, onSave, saving, format, defaultTitle = '' }: Props) {
+export function SaveToLibraryModal({
+  open, onClose, onSave, saving, defaultTitle, artifactType,
+}: SaveToLibraryModalProps) {
+  const config = getFormatConfig(artifactType)
   const [title, setTitle] = useState(defaultTitle)
   const [description, setDescription] = useState('')
-  const [category, setCategory] = useState('CLINICAL')
-  const [difficulty, setDifficulty] = useState('BEGINNER')
-  const [targetRoles, setTargetRoles] = useState<string[]>(['NURSE'])
-  const [duration, setDuration] = useState<string>('')
+  const [category, setCategory] = useState<ContentLibraryCategoryKey>('INFECTION_CONTROL')
+  const [difficulty, setDifficulty] = useState<ContentLibraryDifficulty>('BASIC')
+  const [targetRoles, setTargetRoles] = useState<string[]>(['all'])
+  const [duration, setDuration] = useState(config.estimatedMinutes)
+  const [smgPoints, setSmgPoints] = useState(0)
 
   if (!open) return null
 
-  const toggleRole = (role: string) => {
-    setTargetRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
-    )
-  }
+  const isValid = title.trim().length > 0 && targetRoles.length > 0
 
   const handleSubmit = () => {
-    if (!title.trim() || targetRoles.length === 0) return
+    if (!isValid) return
     onSave({
       title: title.trim(),
       description: description.trim() || undefined,
       category,
       difficulty,
       targetRoles,
-      duration: duration ? parseInt(duration) : undefined,
+      duration,
+      smgPoints,
     })
   }
 
-  const isValid = title.trim().length > 0 && targetRoles.length > 0
+  const toggleRole = (role: string) => {
+    setTargetRoles(prev =>
+      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role],
+    )
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
       <div
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border"
-        style={{
-          background: 'var(--color-surface)',
-          borderColor: 'var(--color-border)',
-          boxShadow: 'var(--shadow-xl)',
-        }}
+        className="absolute inset-0"
+        style={{ background: 'rgba(0, 0, 0, 0.5)' }}
+        onClick={saving ? undefined : onClose}
+        aria-hidden="true"
+      />
+
+      {/* Modal */}
+      <div
+        className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-6"
+        style={{ background: 'var(--color-surface)', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-xl"
-              style={{ background: 'var(--color-primary-light)' }}
-            >
-              <BookOpen className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
-            </div>
-            <div>
-              <h2 className="text-[15px] font-bold">Kütüphaneye Ekle</h2>
-              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                İçerik bilgilerini doldurun
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1.5" style={{ color: 'var(--color-text-muted)' }}>
-            <X className="h-5 w-5" />
-          </button>
+        {/* Close button */}
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={saving}
+          className="absolute right-4 top-4 rounded-lg p-1 transition-colors disabled:opacity-50"
+          style={{ color: 'var(--color-text-muted)' }}
+          aria-label="Kapat"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+          <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            Kütüphaneye Ekle
+          </h2>
         </div>
 
-        {/* Body */}
-        <div className="space-y-5 p-5">
-          {/* Başlık */}
-          <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold">
-              Başlık <span style={{ color: 'var(--color-error)' }}>*</span>
-            </label>
+        <div className="mt-5 space-y-4">
+          {/* Title */}
+          <Field label="Başlık *">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="İçerik başlığını girin"
-              maxLength={200}
-              className="w-full rounded-xl border px-4 py-2.5 text-[13px] outline-none transition-all"
-              style={{
-                borderColor: 'var(--color-border)',
-                background: 'var(--color-bg)',
-                color: 'var(--color-text-primary)',
-              }}
-              onFocus={(e) => (e.target.style.borderColor = 'var(--color-primary)')}
-              onBlur={(e) => (e.target.style.borderColor = 'var(--color-border)')}
+              className="w-full rounded-xl px-3 py-2 text-sm outline-none"
+              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
             />
-          </div>
+          </Field>
 
-          {/* Açıklama */}
-          <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold">Açıklama</label>
+          {/* Description */}
+          <Field label="Açıklama">
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Kısa açıklama (opsiyonel)"
               rows={3}
-              maxLength={500}
-              className="w-full resize-none rounded-xl border px-4 py-2.5 text-[13px] outline-none transition-all"
-              style={{
-                borderColor: 'var(--color-border)',
-                background: 'var(--color-bg)',
-                color: 'var(--color-text-primary)',
-              }}
-              onFocus={(e) => (e.target.style.borderColor = 'var(--color-primary)')}
-              onBlur={(e) => (e.target.style.borderColor = 'var(--color-border)')}
+              className="w-full resize-none rounded-xl px-3 py-2 text-sm outline-none"
+              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
             />
-          </div>
+          </Field>
 
-          {/* Kategori */}
-          <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold">Kategori</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-xl border px-4 py-2.5 text-[13px] outline-none transition-all"
-              style={{
-                borderColor: 'var(--color-border)',
-                background: 'var(--color-bg)',
-                color: 'var(--color-text-primary)',
-              }}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Zorluk */}
-          <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold">Zorluk Seviyesi</label>
-            <div className="flex gap-2">
-              {DIFFICULTIES.map((d) => (
-                <button
-                  key={d.value}
-                  onClick={() => setDifficulty(d.value)}
-                  className="flex-1 rounded-xl border py-2 text-[12px] font-semibold transition-all duration-150"
-                  style={{
-                    borderColor: difficulty === d.value ? d.color : 'var(--color-border)',
-                    background: difficulty === d.value ? `${d.color}18` : 'var(--color-bg)',
-                    color: difficulty === d.value ? d.color : 'var(--color-text-secondary)',
-                  }}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Hedef Roller */}
-          <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold">
-              Hedef Roller <span style={{ color: 'var(--color-error)' }}>*</span>
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {ROLES.map((r) => {
-                const isActive = targetRoles.includes(r.value)
-                return (
+          {/* Category */}
+          <Field label="Kategori *">
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.entries(CONTENT_LIBRARY_CATEGORIES) as [ContentLibraryCategoryKey, { label: string; color: string }][]).map(
+                ([key, { label, color }]) => (
                   <button
-                    key={r.value}
-                    onClick={() => toggleRole(r.value)}
-                    className="rounded-xl border px-3 py-1.5 text-[12px] font-medium transition-all duration-150"
+                    key={key}
+                    type="button"
+                    onClick={() => setCategory(key)}
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors"
                     style={{
-                      borderColor: isActive ? 'var(--color-primary)' : 'var(--color-border)',
-                      background: isActive ? 'var(--color-primary-light)' : 'var(--color-bg)',
-                      color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                      background: category === key ? `color-mix(in srgb, ${color} 20%, var(--color-surface))` : 'var(--color-surface-hover)',
+                      color: category === key ? color : 'var(--color-text-secondary)',
+                      border: `1px solid ${category === key ? color : 'var(--color-border)'}`,
                     }}
                   >
-                    {r.label}
+                    <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+                    {label}
                   </button>
-                )
-              })}
+                ),
+              )}
+            </div>
+          </Field>
+
+          {/* Difficulty */}
+          <Field label="Zorluk *">
+            <div className="flex gap-2">
+              {(Object.entries(CONTENT_LIBRARY_DIFFICULTY) as [ContentLibraryDifficulty, { label: string; color: string }][]).map(
+                ([key, { label, color }]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setDifficulty(key)}
+                    className="flex-1 rounded-xl py-2 text-sm font-medium transition-colors"
+                    style={{
+                      background: difficulty === key ? color : 'var(--color-surface-hover)',
+                      color: difficulty === key ? 'white' : 'var(--color-text-secondary)',
+                      border: `1px solid ${difficulty === key ? color : 'var(--color-border)'}`,
+                    }}
+                  >
+                    {label}
+                  </button>
+                ),
+              )}
+            </div>
+          </Field>
+
+          {/* Target Roles */}
+          <Field label="Hedef Roller *">
+            <div className="flex flex-wrap gap-2">
+              {CONTENT_LIBRARY_TARGET_ROLES.map(({ value, label }) => (
+                <label
+                  key={value}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+                  style={{
+                    background: targetRoles.includes(value) ? 'var(--color-primary-light)' : 'var(--color-surface-hover)',
+                    color: targetRoles.includes(value) ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                    border: `1px solid ${targetRoles.includes(value) ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={targetRoles.includes(value)}
+                    onChange={() => toggleRole(value)}
+                    className="sr-only"
+                  />
+                  {label}
+                </label>
+              ))}
             </div>
             {targetRoles.length === 0 && (
-              <p className="text-[11px]" style={{ color: 'var(--color-error)' }}>
-                En az bir rol seçin
-              </p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--color-error)' }}>En az bir rol seçin</p>
             )}
-          </div>
+          </Field>
 
-          {/* Süre */}
-          <div className="space-y-1.5">
-            <label className="text-[12px] font-semibold">Tahmini Süre (dakika)</label>
-            <input
-              type="number"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              placeholder="Örn: 10"
-              min={1}
-              max={300}
-              className="w-full rounded-xl border px-4 py-2.5 text-[13px] outline-none transition-all"
-              style={{
-                borderColor: 'var(--color-border)',
-                background: 'var(--color-bg)',
-                color: 'var(--color-text-primary)',
-              }}
-              onFocus={(e) => (e.target.style.borderColor = 'var(--color-primary)')}
-              onBlur={(e) => (e.target.style.borderColor = 'var(--color-border)')}
-            />
+          {/* Duration + SMG Points */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Süre (dk) *">
+              <input
+                type="number"
+                value={duration}
+                onChange={(e) => setDuration(Math.max(1, Math.min(480, Number(e.target.value) || 1)))}
+                min={1}
+                max={480}
+                className="w-full rounded-xl px-3 py-2 text-sm outline-none"
+                style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+              />
+            </Field>
+            <Field label="SMG Puanı">
+              <input
+                type="number"
+                value={smgPoints}
+                onChange={(e) => setSmgPoints(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                min={0}
+                max={100}
+                className="w-full rounded-xl px-3 py-2 text-sm outline-none"
+                style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+              />
+            </Field>
           </div>
         </div>
 
-        {/* Footer */}
-        <div
-          className="flex items-center justify-between gap-3 p-5 border-t"
-          style={{ borderColor: 'var(--color-border)' }}
-        >
+        {/* Actions */}
+        <div className="mt-6 flex gap-3">
           <button
+            type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-xl border px-5 py-2.5 text-[13px] font-semibold transition-all"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            className="flex-1 rounded-xl py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+            style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
           >
             İptal
           </button>
           <button
+            type="button"
             onClick={handleSubmit}
-            disabled={!isValid || saving}
-            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white transition-all disabled:opacity-50"
-            style={{
-              background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-              boxShadow: 'var(--shadow-sm)',
-            }}
+            disabled={saving || !isValid}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ background: 'var(--color-primary)', color: 'white' }}
           >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {saving ? 'Kaydediliyor...' : 'Kütüphaneye Ekle'}
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Kaydediliyor...
+              </>
+            ) : (
+              'Kaydet'
+            )}
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+        {label}
+      </label>
+      {children}
     </div>
   )
 }

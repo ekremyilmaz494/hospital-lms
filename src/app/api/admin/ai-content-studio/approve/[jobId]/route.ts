@@ -1,105 +1,104 @@
-// AI İçerik Stüdyosu — Kütüphaneye ekleme (sadece evaluation === "approved")
-// POST /api/admin/ai-content-studio/approve/[jobId]
-// KRİTİK: evaluation !== "approved" ise 403 döner.
-
-import { NextRequest } from 'next/server'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
-import { uploadBuffer } from '@/lib/s3'
 import { prisma } from '@/lib/prisma'
-import { getResult } from '@/app/admin/ai-content-studio/lib/ai-service-client'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
+import { aiApproveSchema } from '@/lib/validations'
+import { copyObject, getDownloadUrl } from '@/lib/s3'
 
-const FORMAT_EXT: Record<string, string> = {
-  AUDIO_OVERVIEW: 'mp3',
-  VIDEO_OVERVIEW: 'mp4',
-  STUDY_GUIDE: 'md',
-  QUIZ: 'json',
-  AUDIO_QUIZ: 'mp3',
-  INFOGRAPHIC: 'png',
-  FLASHCARDS: 'json',
-  SLIDE_DECK: 'pptx',
-}
-
-const MAPPED_CONTENT_TYPE: Record<string, string> = {
-  AUDIO_OVERVIEW: 'audio/mpeg',
-  VIDEO_OVERVIEW: 'video/mp4',
-  STUDY_GUIDE: 'text/markdown',
-  QUIZ: 'application/json',
-  AUDIO_QUIZ: 'audio/mpeg',
-  FLASHCARDS: 'application/json',
-  INFOGRAPHIC: 'image/png',
-  SLIDE_DECK: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-}
-
-export async function POST(request: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
-  const { jobId } = await params
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ jobId: string }> }
+) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
+  const orgId = dbUser!.organizationId!
+  const { jobId } = await params
 
-  const body = await request.json().catch(() => null)
-  if (!body) return errorResponse('Geçersiz istek.')
+  const body = await parseBody(request)
+  if (!body) return errorResponse('Geçersiz istek gövdesi', 400)
 
-  const { title, description, category, difficulty, targetRoles, duration } = body
-  if (!title || !category || !difficulty || !targetRoles?.length) {
-    return errorResponse('title, category, difficulty ve targetRoles zorunludur.')
+  const parsed = aiApproveSchema.safeParse(body)
+  if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message ?? 'Geçersiz veri', 400)
+
+  const generation = await prisma.aiGeneration.findFirst({
+    where: { id: jobId, organizationId: orgId },
+  })
+
+  if (!generation) return errorResponse('Üretim bulunamadı', 404)
+
+  if (generation.evaluation !== 'approved') {
+    return errorResponse('İçerik önce onaylanmalıdır', 403)
   }
 
-  // Kayıt + org izolasyonu
-  const record = await prisma.aiGeneratedContent.findFirst({
-    where: { id: jobId, organizationId: dbUser!.organizationId! },
-  })
-  if (!record) return errorResponse('İş bulunamadı.', 404)
-  if (record.evaluation !== 'approved') {
-    return errorResponse('İçerik önce "Beğendim" olarak değerlendirilmelidir.', 403)
+  if (generation.savedToLibrary === true) {
+    return errorResponse('Bu içerik zaten kütüphanede', 409)
   }
-  if (record.savedToLibrary) return errorResponse('Bu içerik zaten kütüphaneye eklenmiş.')
 
-  // Python servisinden sonuç dosyasını al
-  const { buffer, contentType } = await getResult(jobId)
+  if (generation.status !== 'completed') {
+    return errorResponse('İçerik henüz tamamlanmadı', 400)
+  }
 
-  // S3'e kalıcı klasöre yükle
-  const ext = FORMAT_EXT[record.outputFormat] ?? 'bin'
-  const s3Key = `content-library/ai/${dbUser!.organizationId}/${jobId}.${ext}`
-  await uploadBuffer(s3Key, buffer, MAPPED_CONTENT_TYPE[record.outputFormat] ?? contentType)
+  if (!generation.outputS3Key) {
+    return errorResponse('İçerik dosyası bulunamadı', 400)
+  }
 
-  // ContentLibrary kaydı oluştur
-  const mappedCT = MAPPED_CONTENT_TYPE[record.outputFormat] ?? ''
-  const contentItem = await prisma.contentLibrary.create({
-    data: {
-      title,
-      description: description ?? '',
-      category,
-      difficulty,
-      targetRoles,
-      duration: duration ?? 10,
-      thumbnailUrl: mappedCT.includes('image') ? s3Key : undefined,
-      isActive: true,
-      createdById: dbUser!.id,
-    },
-  })
+  try {
+    const ext = generation.outputFileType || 'bin'
+    const destKey = `content-library/ai/${orgId}/${jobId}.${ext}`
+    await copyObject(generation.outputS3Key!, destKey)
 
-  // AiGeneratedContent'i güncelle — kütüphaneye eklendi
-  await prisma.aiGeneratedContent.update({
-    where: { id: jobId },
-    data: {
-      savedToLibrary: true,
-      libraryName: title,
-      libraryCategory: category,
-      outputUrl: s3Key,
-      outputKey: s3Key,
-      savedAt: new Date(),
-    },
-  })
+    const thumbnailUrl = generation.artifactType === 'infographic' && generation.outputS3Key
+      ? await getDownloadUrl(destKey)
+      : null
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
-    action: 'ai_content.save_to_library',
-    entityType: 'content_library',
-    entityId: contentItem.id,
-    newData: { jobId, format: record.outputFormat, s3Key },
-  })
+    const result = await prisma.$transaction(async (tx) => {
+      const contentLibrary = await tx.contentLibrary.create({
+        data: {
+          title: parsed.data.title,
+          description: parsed.data.description || null,
+          category: parsed.data.category,
+          difficulty: parsed.data.difficulty,
+          targetRoles: parsed.data.targetRoles,
+          duration: parsed.data.duration,
+          smgPoints: parsed.data.smgPoints,
+          thumbnailUrl,
+          isActive: true,
+          createdById: dbUser!.id,
+        },
+      })
 
-  return jsonResponse({ contentLibraryId: contentItem.id, s3Key }, 201)
+      await tx.aiGeneration.update({
+        where: { id: jobId },
+        data: {
+          savedToLibrary: true,
+          contentLibraryId: contentLibrary.id,
+          savedAt: new Date(),
+        },
+      })
+
+      return contentLibrary
+    })
+
+    await createAuditLog({
+      userId: dbUser!.id,
+      organizationId: orgId,
+      action: 'ai_generation_save_to_library',
+      entityType: 'ContentLibrary',
+      entityId: result.id,
+      newData: { title: parsed.data.title, category: parsed.data.category, fromAiGeneration: jobId },
+    })
+
+    logger.info('AI Content Studio', 'AI generation saved to library', { jobId, contentLibraryId: result.id })
+
+    return jsonResponse({
+      contentLibraryId: result.id,
+      title: result.title,
+      category: result.category,
+      message: 'İçerik kütüphaneye eklendi',
+    }, 201)
+  } catch (err) {
+    logger.error('AI Content Studio', 'Failed to save AI generation to library', { jobId, error: err })
+    return errorResponse('Kütüphaneye kaydetme sırasında bir hata oluştu', 500)
+  }
 }

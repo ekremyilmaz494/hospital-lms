@@ -78,8 +78,9 @@ model Organization {
   accreditationReports AccreditationReport[]
   trainingCategories   TrainingCategory[]
   questionBank         QuestionBank[]
-  aiDocuments          AiDocument[]
-  aiGeneratedContents  AiGeneratedContent[]
+  // AI İçerik Stüdyosu
+  aiNotebooks          AiNotebook[]
+  aiGenerations        AiGeneration[]
   aiGoogleConnection   AiGoogleConnection?
 
   @@map("organizations")
@@ -223,8 +224,9 @@ model User {
   evaluatorEvaluations CompetencyEvaluation[] @relation("EvaluationEvaluator")
   pushSubscriptions    PushSubscription[]
   accreditationReports AccreditationReport[]
-  aiDocuments          AiDocument[]           @relation("UserAiDocuments")
-  aiGenerations        AiGeneratedContent[]   @relation("UserAiGenerations")
+  // AI İçerik Stüdyosu
+  aiGenerations        AiGeneration[]       @relation("UserAiGenerations")
+  aiEvaluations        AiGeneration[]       @relation("AiEvaluator")
   aiGoogleConnections  AiGoogleConnection[]
 
   @@unique([organizationId, tcNo])
@@ -656,6 +658,8 @@ model ContentLibrary {
   createdBy User?                      @relation("ContentLibraryCreator", fields: [createdById], references: [id])
   installs  OrganizationContentLibrary[]
   trainings Training[]                 @relation("TrainingFromLibrary")
+  // AI İçerik Stüdyosu
+  aiGenerations AiGeneration[]         @relation("AiToLibrary")
 
   @@index([category], map: "idx_content_library_category")
   @@map("content_library")
@@ -918,72 +922,94 @@ model QuestionBankOption {
   @@map("question_bank_options")
 }
 
-// ── AI İÇERİK STÜDYOSU ──
-model AiDocument {
+// ── AI İÇERİK STÜDYOSU v2 ──
+
+model AiNotebook {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @db.Uuid @map("organization_id")
+  notebookLmId     String   @map("notebooklm_id") @db.VarChar(100)
+  title            String   @db.VarChar(500)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization     Organization       @relation(fields: [organizationId], references: [id])
+  sources          AiNotebookSource[]
+  generations      AiGeneration[]
+
+  @@index([organizationId])
+  @@map("ai_notebooks")
+}
+
+model AiNotebookSource {
   id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @db.Uuid @map("organization_id")
-  userId         String   @db.Uuid @map("user_id")
+  notebookId     String   @db.Uuid @map("notebook_id")
+  sourceLmId     String?  @map("source_lm_id") @db.VarChar(100)
   fileName       String   @map("file_name") @db.VarChar(500)
-  fileType       String   @map("file_type") @db.VarChar(255)
+  fileType       String   @map("file_type") @db.VarChar(50)
   fileSize       Int      @map("file_size")
-  fileUrl        String   @map("file_url") @db.Text
-  fileKey        String   @map("file_key") @db.Text
+  s3Key          String?  @map("s3_key") @db.Text
+  sourceType     String   @map("source_type") @db.VarChar(30)
+  sourceUrl      String?  @map("source_url") @db.Text
+  status         String   @default("uploading") @db.VarChar(30)
+  summary        String?  @db.Text
+  keyTopics      Json?    @map("key_topics")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  organization   Organization         @relation(fields: [organizationId], references: [id])
-  user           User                 @relation("UserAiDocuments", fields: [userId], references: [id])
-  generations    AiGeneratedContent[] @relation("DocumentGenerations")
+  notebook       AiNotebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
 
-  @@index([organizationId], map: "idx_ai_documents_org")
-  @@index([userId], map: "idx_ai_documents_user")
-  @@map("ai_documents")
+  @@index([notebookId])
+  @@map("ai_notebook_sources")
 }
 
-model AiGeneratedContent {
-  id             String    @id @default(uuid()) @db.Uuid
-  organizationId String    @db.Uuid @map("organization_id")
-  userId         String    @db.Uuid @map("user_id")
-  title          String    @db.VarChar(500)
-  prompt         String    @db.Text
-  outputFormat   String    @map("output_format") @db.VarChar(50)
-  settings       Json      @default("{}")
-  documents      AiDocument[] @relation("DocumentGenerations")
-  status         String    @default("pending") @db.VarChar(30)
-  taskId         String?   @map("task_id") @db.VarChar(100)
-  outputUrl      String?   @map("output_url") @db.Text
-  outputKey      String?   @map("output_key") @db.Text
-  outputFileType String?   @map("output_file_type") @db.VarChar(20)
-  duration       Int?
-  transcript     String?   @db.Text
-  metadata       Json      @default("{}")
-  errorMessage   String?   @map("error_message") @db.Text
-  evaluation     String?   @db.VarChar(20)
-  evaluationNote String?   @map("evaluation_note") @db.Text
-  evaluatedAt    DateTime? @map("evaluated_at") @db.Timestamptz
-  savedToLibrary Boolean   @default(false) @map("saved_to_library")
-  libraryName    String?   @map("library_name") @db.VarChar(500)
-  libraryCategory String?  @map("library_category") @db.VarChar(100)
-  savedAt        DateTime? @map("saved_at") @db.Timestamptz
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+model AiGeneration {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @db.Uuid @map("organization_id")
+  userId          String    @db.Uuid @map("user_id")
+  notebookId      String    @db.Uuid @map("notebook_id")
+  title           String    @db.VarChar(500)
+  artifactType    String    @map("artifact_type") @db.VarChar(30)
+  artifactLmId    String?   @map("artifact_lm_id") @db.VarChar(100)
+  taskLmId        String?   @map("task_lm_id") @db.VarChar(100)
+  instructions    String?   @db.Text
+  settings        Json      @default("{}")
+  status          String    @default("pending") @db.VarChar(30)
+  progress        Int       @default(0)
+  outputS3Key     String?   @map("output_s3_key") @db.Text
+  outputFileType  String?   @map("output_file_type") @db.VarChar(20)
+  outputSize      Int?      @map("output_size")
+  transcript      String?   @db.Text
+  contentData     Json?     @map("content_data")
+  metadata        Json      @default("{}")
+  errorMessage    String?   @map("error_message") @db.Text
+  evaluation      String?   @db.VarChar(20)
+  evaluationNote  String?   @map("evaluation_note") @db.Text
+  evaluatedAt     DateTime? @map("evaluated_at") @db.Timestamptz
+  evaluatedById   String?   @db.Uuid @map("evaluated_by_id")
+  savedToLibrary    Boolean   @default(false) @map("saved_to_library")
+  contentLibraryId  String?   @db.Uuid @map("content_library_id")
+  savedAt           DateTime? @map("saved_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  user           User         @relation("UserAiGenerations", fields: [userId], references: [id])
+  organization    Organization    @relation(fields: [organizationId], references: [id])
+  user            User            @relation("UserAiGenerations", fields: [userId], references: [id])
+  notebook        AiNotebook      @relation(fields: [notebookId], references: [id])
+  evaluatedBy     User?           @relation("AiEvaluator", fields: [evaluatedById], references: [id])
+  contentLibrary  ContentLibrary? @relation("AiToLibrary", fields: [contentLibraryId], references: [id])
 
-  @@index([organizationId], map: "idx_ai_generated_org")
-  @@index([userId], map: "idx_ai_generated_user")
-  @@index([status], map: "idx_ai_generated_status")
-  @@index([evaluation], map: "idx_ai_generated_eval")
-  @@map("ai_generated_contents")
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+  @@index([artifactType])
+  @@index([evaluation])
+  @@map("ai_generations")
 }
 
-// ── AI GOOGLE BAĞLANTISI ──
 model AiGoogleConnection {
   id              String    @id @default(uuid()) @db.Uuid
   organizationId  String    @unique @db.Uuid @map("organization_id")
   userId          String    @db.Uuid @map("user_id")
   email           String
-  method          String    @default("browser")
   status          String    @default("pending")
   encryptedCookie String?   @db.Text @map("encrypted_cookie")
   lastVerifiedAt  DateTime? @map("last_verified_at") @db.Timestamptz
@@ -996,6 +1022,7 @@ model AiGoogleConnection {
   organization    Organization @relation(fields: [organizationId], references: [id])
   user            User         @relation(fields: [userId], references: [id])
 
-  @@map("ai_google_connections")
   @@index([status])
+  @@map("ai_google_connections")
 }
+

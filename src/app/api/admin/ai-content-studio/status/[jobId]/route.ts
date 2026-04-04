@@ -1,93 +1,155 @@
-// AI İçerik Stüdyosu — İş durumu sorgulama
-// GET /api/admin/ai-content-studio/status/[jobId]
-
-import { NextRequest } from 'next/server'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
-import { getStatus } from '@/app/admin/ai-content-studio/lib/ai-service-client'
+import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getTaskStatus, AiServiceError } from '@/app/admin/ai-content-studio/lib/ai-service-client'
+import { downloadAndSaveArtifact } from '@/app/admin/ai-content-studio/lib/download-helper'
+import { logger } from '@/lib/logger'
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
-  const { jobId } = await params
+const RESULT_TYPE_MAP: Record<string, string> = {
+  mp3: 'audio',
+  mp4: 'video',
+  pdf: 'presentation',
+  pptx: 'presentation',
+  json: 'json',
+  png: 'image',
+  csv: 'data',
+  md: 'document',
+}
+
+/** Timeout threshold in milliseconds (15 minutes) */
+const GENERATION_TIMEOUT_MS = 15 * 60 * 1000
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ jobId: string }> }
+) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
+
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  // DB'den kayıt + organizasyon izolasyonu
-  const record = await prisma.aiGeneratedContent.findFirst({
-    where: { id: jobId, organizationId: dbUser!.organizationId! },
+  const orgId = dbUser!.organizationId!
+  const { jobId } = await params
+
+  const generation = await prisma.aiGeneration.findFirst({
+    where: { id: jobId, organizationId: orgId },
+    include: {
+      notebook: {
+        select: { notebookLmId: true },
+      },
+    },
   })
-  if (!record) return errorResponse('İş bulunamadı.', 404)
 
-  // Eğer iş henüz tamamlanmadıysa Python servisinden canlı durum al
-  if (record.status === 'queued' || record.status === 'processing') {
+  if (!generation) {
+    return errorResponse('Üretim bulunamadı', 404)
+  }
+
+  let currentStatus = generation.status
+  let currentProgress = generation.progress
+  let currentErrorMessage = generation.errorMessage
+
+  // If already completed or failed, return current DB data directly
+  if (currentStatus === 'completed' || currentStatus === 'failed') {
+    return buildResponse(generation, currentStatus, currentProgress, currentErrorMessage)
+  }
+
+  // If downloading, return current status (download is in progress)
+  if (currentStatus === 'downloading') {
+    return buildResponse(generation, currentStatus, currentProgress, currentErrorMessage)
+  }
+
+  // If queued or processing, poll sidecar for status
+  if ((currentStatus === 'queued' || currentStatus === 'processing') && generation.taskLmId) {
     try {
-      const pyStatus = await getStatus(jobId)
+      const sidecarResult = await getTaskStatus(
+        generation.notebook.notebookLmId,
+        generation.taskLmId
+      )
 
-      // DB'yi güncelle
-      if (pyStatus.status !== record.status || pyStatus.progress > 0) {
-        await prisma.aiGeneratedContent.update({
-          where: { id: jobId },
-          data: {
-            status: pyStatus.status,
-            ...(pyStatus.resultType && { outputFileType: pyStatus.resultType }),
-            ...(pyStatus.error && { errorMessage: pyStatus.error, status: 'failed' }),
-          },
+      if (sidecarResult.status === 'completed') {
+        await prisma.aiGeneration.update({
+          where: { id: generation.id },
+          data: { artifactLmId: sidecarResult.artifact_id },
         })
-      }
 
-      return jsonResponse({
-        jobId: record.id,
-        status: pyStatus.status,
-        progress: pyStatus.progress,
-        resultType: pyStatus.resultType ?? record.outputFileType,
-        error: pyStatus.error ?? record.errorMessage,
-        evaluation: record.evaluation,
-      })
-    } catch {
-      // Python servisine ulaşılamıyor veya 404 → timeout kontrolü
-      const TIMEOUT_MS = 15 * 60 * 1000 // 15 dakika
-      const elapsed = Date.now() - new Date(record.createdAt).getTime()
-      if (elapsed > TIMEOUT_MS) {
-        await prisma.aiGeneratedContent.update({
-          where: { id: jobId },
-          data: {
-            status: 'failed',
-            errorMessage: 'Üretim zaman aşımına uğradı. Lütfen tekrar deneyin.',
-          },
+        // Fire-and-forget download
+        downloadAndSaveArtifact({
+          generationId: generation.id,
+          notebookLmId: generation.notebook.notebookLmId,
+          artifactLmId: sidecarResult.artifact_id!,
+          artifactType: generation.artifactType,
+          organizationId: orgId,
+          settings: (generation.settings as Record<string, string>) || {},
+        }).catch(() => {})
+
+        currentStatus = 'downloading'
+        currentProgress = 90
+      } else if (sidecarResult.status === 'failed') {
+        await prisma.aiGeneration.update({
+          where: { id: generation.id },
+          data: { status: 'failed', errorMessage: sidecarResult.error },
         })
-        return jsonResponse({
-          jobId: record.id,
-          status: 'failed',
-          progress: 0,
-          resultType: null,
-          error: 'Üretim zaman aşımına uğradı. Lütfen tekrar deneyin.',
-          evaluation: record.evaluation,
+
+        currentStatus = 'failed'
+        currentErrorMessage = sidecarResult.error || null
+      } else if (sidecarResult.status === 'processing') {
+        await prisma.aiGeneration.update({
+          where: { id: generation.id },
+          data: { progress: sidecarResult.progress },
         })
+
+        currentProgress = sidecarResult.progress
       }
-      // Henüz timeout olmadı — DB durumunu döndür
+    } catch (err) {
+      logger.error('ai-content-studio/status', 'Sidecar durum sorgusu başarısız', err)
+
+      // Check if generation is older than 15 minutes
+      const age = Date.now() - new Date(generation.createdAt).getTime()
+      if (age > GENERATION_TIMEOUT_MS) {
+        const timeoutMessage = 'Üretim zaman aşımına uğradı'
+        await prisma.aiGeneration.update({
+          where: { id: generation.id },
+          data: { status: 'failed', errorMessage: timeoutMessage },
+        })
+
+        currentStatus = 'failed'
+        currentErrorMessage = timeoutMessage
+      }
     }
   }
 
-  // outputFileType → resultType mapping
-  const fileTypeMap: Record<string, string> = {
-    mp3: 'audio', mp4: 'video', json: 'json',
-    png: 'image', svg: 'image',
-    pptx: 'presentation',
-    md: 'document', txt: 'text',
-  }
-  const resultType = record.outputFileType
-    ? (fileTypeMap[record.outputFileType] ?? record.outputFileType)
-    : null
+  return buildResponse(generation, currentStatus, currentProgress, currentErrorMessage)
+}
 
+function buildResponse(
+  generation: {
+    id: string
+    title: string
+    artifactType: string
+    outputFileType: string | null
+    errorMessage: string | null
+    evaluation: string | null
+    evaluationNote: string | null
+    savedToLibrary: boolean
+    createdAt: Date
+  },
+  status: string,
+  progress: number,
+  errorMessage: string | null
+) {
   return jsonResponse({
-    jobId: record.id,
-    status: record.status,
-    progress: record.status === 'completed' ? 100 : 0,
-    resultType,
-    error: record.errorMessage,
-    evaluation: record.evaluation,
-    evaluationNote: record.evaluationNote,
-    savedToLibrary: record.savedToLibrary,
+    jobId: generation.id,
+    title: generation.title,
+    artifactType: generation.artifactType,
+    status,
+    progress,
+    resultType: generation.outputFileType
+      ? RESULT_TYPE_MAP[generation.outputFileType] || null
+      : null,
+    error: errorMessage,
+    evaluation: generation.evaluation,
+    evaluationNote: generation.evaluationNote,
+    savedToLibrary: generation.savedToLibrary,
+    createdAt: generation.createdAt,
   })
 }

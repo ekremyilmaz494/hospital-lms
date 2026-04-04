@@ -1,177 +1,327 @@
-import type { OutputFormat } from '../types'
-
-export interface FormatConfig {
-  id: OutputFormat
-  label: string
-  description: string
-  icon: string
-  estimatedMinutes: string
-  resultType: 'audio' | 'video' | 'text' | 'json' | 'image' | 'presentation' | 'document'
-  outputFileType: string
-  options?: {
-    key: string
-    label: string
-    values: { value: string; label: string }[]
-    default: string
-  }[]
-}
+import type { FormatConfig, CommonSetting, ArtifactType } from '../types'
 
 export const FORMAT_CONFIGS: FormatConfig[] = [
   {
-    id: 'AUDIO_OVERVIEW',
-    label: 'Podcast / Sesli Anlatım',
-    description: 'Diyalog veya tek kişi anlatım',
+    id: 'audio',
     icon: '🎙️',
-    estimatedMinutes: '5-30 dk',
+    label: 'Ses İçeriği',
+    description: 'Podcast veya sesli anlatım oluşturun',
+    estimatedMinutes: 10,
     resultType: 'audio',
-    outputFileType: '.mp3',
+    outputExtension: 'mp3',
     options: [
       {
-        key: 'audio_format',
-        label: 'Anlatım Stili',
+        key: 'format',
+        label: 'Ses Formatı',
         values: [
-          { value: 'DEEP_DIVE', label: 'Derinlemesine İnceleme' },
-          { value: 'DIALOGUE', label: 'İki Kişi Diyalog' },
-          { value: 'BRIEF', label: 'Kısa Özet' },
-          { value: 'CRITIQUE', label: 'Eleştirel Analiz' },
+          { value: 'deep-dive', label: 'Derinlemesine Analiz' },
+          { value: 'brief', label: 'Kısa Özet' },
+          { value: 'critique', label: 'Eleştirel İnceleme' },
+          { value: 'debate', label: 'Tartışma / Diyalog' },
         ],
-        default: 'DEEP_DIVE',
+        default: 'deep-dive',
+      },
+      {
+        key: 'length',
+        label: 'Uzunluk',
+        values: [
+          { value: 'short', label: 'Kısa (~5 dk)' },
+          { value: 'default', label: 'Normal (~10 dk)' },
+          { value: 'long', label: 'Uzun (~20 dk)' },
+        ],
+        default: 'default',
       },
     ],
   },
   {
-    id: 'VIDEO_OVERVIEW',
-    label: 'Video Senaryosu + Ses',
-    description: 'Ses + metin tabanlı slide',
+    id: 'video',
     icon: '🎬',
-    estimatedMinutes: '3-15 dk',
+    label: 'Video İçeriği',
+    description: 'Eğitim videosu veya sunum videosu',
+    estimatedMinutes: 15,
     resultType: 'video',
-    outputFileType: '.mp4',
+    outputExtension: 'mp4',
     options: [
       {
-        key: 'video_style',
-        label: 'Video Stili',
+        key: 'format',
+        label: 'Video Tipi',
         values: [
-          { value: 'EXPLAINER', label: 'Açıklayıcı' },
-          { value: 'BRIEF', label: 'Kısa' },
-          { value: 'CINEMATIC', label: 'Sinematik' },
-          { value: 'SLIDE', label: 'Slide Tabanlı' },
+          { value: 'explainer', label: 'Açıklayıcı' },
+          { value: 'brief', label: 'Kısa Özet' },
+          { value: 'cinematic', label: 'Sinematik' },
         ],
-        default: 'EXPLAINER',
+        default: 'explainer',
+      },
+      {
+        key: 'style',
+        label: 'Görsel Stil',
+        values: [
+          { value: 'auto', label: 'Otomatik' },
+          { value: 'classic', label: 'Klasik' },
+          { value: 'whiteboard', label: 'Beyaz Tahta' },
+          { value: 'kawaii', label: 'Kawaii' },
+          { value: 'anime', label: 'Anime' },
+          { value: 'watercolor', label: 'Suluboya' },
+          { value: 'retro-print', label: 'Retro' },
+          { value: 'heritage', label: 'Heritage' },
+          { value: 'paper-craft', label: 'Kağıt Sanatı' },
+        ],
+        default: 'auto',
       },
     ],
   },
   {
-    id: 'INFOGRAPHIC',
-    label: 'İnfografik',
-    description: 'Görsel özet, şema, diyagram',
+    id: 'slide_deck',
     icon: '📊',
-    estimatedMinutes: '2-5 dk',
-    resultType: 'image',
-    outputFileType: '.png / .svg',
-  },
-  {
-    id: 'STUDY_GUIDE',
-    label: 'Eğitim Özeti',
-    description: 'Yapılandırılmış metin, kritik noktalar',
-    icon: '📝',
-    estimatedMinutes: '1-3 dk',
-    resultType: 'text',
-    outputFileType: '.pdf / .md',
-  },
-  {
-    id: 'QUIZ',
-    label: 'Sınav Soruları',
-    description: 'Otomatik soru üretimi, çoktan seçmeli',
-    icon: '📋',
-    estimatedMinutes: '1-3 dk',
-    resultType: 'json',
-    outputFileType: 'JSON',
-  },
-  {
-    id: 'AUDIO_QUIZ',
-    label: 'Sesli Sınav Hazırlık',
-    description: 'Soru-cevap formatında sesli hazırlık',
-    icon: '🗣️',
-    estimatedMinutes: '5-15 dk',
-    resultType: 'audio',
-    outputFileType: '.mp3',
+    label: 'Slayt Sunumu',
+    description: 'PDF veya PowerPoint sunum dosyası',
+    estimatedMinutes: 8,
+    resultType: 'presentation',
+    outputExtension: 'pdf',
     options: [
       {
-        key: 'audio_format',
-        label: 'Format',
+        key: 'format',
+        label: 'Sunum Tipi',
         values: [
-          { value: 'DEEP_DIVE', label: 'Derinlemesine' },
-          { value: 'BRIEF', label: 'Kısa Özet' },
-          { value: 'CRITIQUE', label: 'Eleştirel' },
+          { value: 'detailed', label: 'Detaylı' },
+          { value: 'presenter', label: 'Sunum Notlu' },
         ],
-        default: 'BRIEF',
+        default: 'detailed',
+      },
+      {
+        key: 'length',
+        label: 'Uzunluk',
+        values: [
+          { value: 'short', label: 'Kısa (~10 slayt)' },
+          { value: 'default', label: 'Normal (~20 slayt)' },
+        ],
+        default: 'default',
+      },
+      {
+        key: 'output_format',
+        label: 'Dosya Formatı',
+        values: [
+          { value: 'pdf', label: 'PDF' },
+          { value: 'pptx', label: 'PowerPoint (PPTX)' },
+        ],
+        default: 'pdf',
       },
     ],
   },
   {
-    id: 'FLASHCARDS',
-    label: 'Bilgi Kartları',
-    description: 'Soru-cevap hafıza kartları',
-    icon: '🃏',
-    estimatedMinutes: '1-3 dk',
+    id: 'quiz',
+    icon: '❓',
+    label: 'Quiz / Sınav',
+    description: 'Çoktan seçmeli sorular oluşturun',
+    estimatedMinutes: 5,
     resultType: 'json',
-    outputFileType: 'JSON',
+    outputExtension: 'json',
+    options: [
+      {
+        key: 'quantity',
+        label: 'Soru Sayısı',
+        values: [
+          { value: 'fewer', label: 'Az (~5-10)' },
+          { value: 'standard', label: 'Normal (~15-20)' },
+          { value: 'more', label: 'Çok (~25-30)' },
+        ],
+        default: 'standard',
+      },
+      {
+        key: 'difficulty',
+        label: 'Zorluk',
+        values: [
+          { value: 'easy', label: 'Kolay' },
+          { value: 'medium', label: 'Orta' },
+          { value: 'hard', label: 'Zor' },
+        ],
+        default: 'medium',
+      },
+    ],
   },
   {
-    id: 'SLIDE_DECK',
-    label: 'Sunum / Slayt',
-    description: 'PowerPoint formatında sunum dosyası',
-    icon: '📽️',
-    estimatedMinutes: '3-10 dk',
-    resultType: 'presentation',
-    outputFileType: '.pptx',
+    id: 'flashcards',
+    icon: '🃏',
+    label: 'Hafıza Kartları',
+    description: 'Çevrilebilir öğrenme kartları',
+    estimatedMinutes: 5,
+    resultType: 'json',
+    outputExtension: 'json',
+    options: [
+      {
+        key: 'quantity',
+        label: 'Kart Sayısı',
+        values: [
+          { value: 'fewer', label: 'Az (~10-15)' },
+          { value: 'standard', label: 'Normal (~20-30)' },
+          { value: 'more', label: 'Çok (~40-50)' },
+        ],
+        default: 'standard',
+      },
+      {
+        key: 'difficulty',
+        label: 'Zorluk',
+        values: [
+          { value: 'easy', label: 'Kolay' },
+          { value: 'medium', label: 'Orta' },
+          { value: 'hard', label: 'Zor' },
+        ],
+        default: 'medium',
+      },
+    ],
+  },
+  {
+    id: 'report',
+    icon: '📝',
+    label: 'Rapor / Doküman',
+    description: 'Özet rapor, çalışma kılavuzu veya blog yazısı',
+    estimatedMinutes: 5,
+    resultType: 'document',
+    outputExtension: 'md',
+    options: [
+      {
+        key: 'format',
+        label: 'Rapor Tipi',
+        values: [
+          { value: 'briefing-doc', label: 'Brifing Dokümanı' },
+          { value: 'study-guide', label: 'Çalışma Kılavuzu' },
+          { value: 'blog-post', label: 'Blog Yazısı' },
+          { value: 'custom', label: 'Özel Format' },
+        ],
+        default: 'study-guide',
+      },
+    ],
+  },
+  {
+    id: 'infographic',
+    icon: '🎨',
+    label: 'İnfografik',
+    description: 'Görsel bilgi özeti (PNG)',
+    estimatedMinutes: 8,
+    resultType: 'image',
+    outputExtension: 'png',
+    options: [
+      {
+        key: 'orientation',
+        label: 'Yönlendirme',
+        values: [
+          { value: 'portrait', label: 'Dikey' },
+          { value: 'landscape', label: 'Yatay' },
+          { value: 'square', label: 'Kare' },
+        ],
+        default: 'portrait',
+      },
+      {
+        key: 'detail',
+        label: 'Detay Seviyesi',
+        values: [
+          { value: 'low', label: 'Düşük' },
+          { value: 'medium', label: 'Orta' },
+          { value: 'high', label: 'Yüksek' },
+        ],
+        default: 'medium',
+      },
+      {
+        key: 'style',
+        label: 'Görsel Stil',
+        values: [
+          { value: 'auto', label: 'Otomatik' },
+          { value: 'classic', label: 'Klasik' },
+          { value: 'whiteboard', label: 'Beyaz Tahta' },
+          { value: 'watercolor', label: 'Suluboya' },
+        ],
+        default: 'auto',
+      },
+    ],
+  },
+  {
+    id: 'data_table',
+    icon: '📋',
+    label: 'Veri Tablosu',
+    description: 'Yapılandırılmış veri tablosu (CSV)',
+    estimatedMinutes: 3,
+    resultType: 'data',
+    outputExtension: 'csv',
+    options: [],
+  },
+  {
+    id: 'mind_map',
+    icon: '🧠',
+    label: 'Zihin Haritası',
+    description: 'Konu ilişkilerini gösteren ağaç yapısı',
+    estimatedMinutes: 2,
+    resultType: 'json',
+    outputExtension: 'json',
+    options: [],
   },
 ]
 
-/** Ek ayarlar — her format için ortak */
-export interface CommonSettings {
-  duration: string
-  tone: string
-  audience: string
-  language: string
-}
+// ── Ortak Ayarlar ──
 
-export const DURATION_OPTIONS = [
-  { value: '5', label: '5 dk' },
-  { value: '10', label: '10 dk' },
-  { value: '15', label: '15 dk' },
-  { value: '30', label: '30 dk' },
+export const COMMON_SETTINGS: CommonSetting[] = [
+  {
+    key: 'language',
+    label: 'Dil',
+    icon: '🌍',
+    values: [
+      { value: 'tr', label: 'Türkçe' },
+      { value: 'en', label: 'İngilizce' },
+      { value: 'ar', label: 'Arapça' },
+      { value: 'de', label: 'Almanca' },
+      { value: 'fr', label: 'Fransızca' },
+    ],
+    default: 'tr',
+  },
+  {
+    key: 'tone',
+    label: 'Ton',
+    icon: '🎭',
+    values: [
+      { value: 'formal', label: 'Resmi' },
+      { value: 'friendly', label: 'Samimi' },
+      { value: 'concise', label: 'Kısa ve Öz' },
+    ],
+    default: 'formal',
+  },
+  {
+    key: 'audience',
+    label: 'Hedef Kitle',
+    icon: '👥',
+    values: [
+      { value: 'all_staff', label: 'Tüm Personel' },
+      { value: 'nurse', label: 'Hemşire' },
+      { value: 'doctor', label: 'Doktor' },
+      { value: 'technician', label: 'Teknisyen' },
+      { value: 'new_hire', label: 'Yeni Başlayan' },
+      { value: 'manager', label: 'Yönetici' },
+    ],
+    default: 'all_staff',
+  },
 ]
 
-export const TONE_OPTIONS = [
-  { value: 'formal', label: 'Formal / Akademik' },
-  { value: 'friendly', label: 'Samimi / Günlük' },
-  { value: 'concise', label: 'Kısa / Öz' },
-]
+// ── Varsayılan Ortak Ayar Değerleri ──
 
-export const AUDIENCE_OPTIONS = [
-  { value: 'nurse', label: 'Hemşire' },
-  { value: 'doctor', label: 'Doktor' },
-  { value: 'technician', label: 'Teknisyen' },
-  { value: 'all_staff', label: 'Tüm Personel' },
-  { value: 'new_hire', label: 'Yeni Başlayan' },
-  { value: 'manager', label: 'Yönetici' },
-]
-
-export const LANGUAGE_OPTIONS = [
-  { value: 'tr', label: 'Türkçe' },
-  { value: 'en', label: 'İngilizce' },
-  { value: 'ar', label: 'Arapça' },
-]
-
-export const DEFAULT_COMMON_SETTINGS: CommonSettings = {
-  duration: '10',
+export const DEFAULT_COMMON_SETTINGS: Record<string, string> = {
+  language: 'tr',
   tone: 'formal',
   audience: 'all_staff',
-  language: 'tr',
 }
 
-export function getFormatConfig(format: OutputFormat): FormatConfig {
-  return FORMAT_CONFIGS.find((f) => f.id === format) ?? FORMAT_CONFIGS[0]
+// ── Yardımcı ──
+
+export function getFormatConfig(artifactType: string): FormatConfig {
+  const config = FORMAT_CONFIGS.find((f) => f.id === artifactType)
+  if (!config) {
+    return {
+      id: artifactType as ArtifactType,
+      icon: '📄',
+      label: artifactType,
+      description: '',
+      estimatedMinutes: 5,
+      resultType: 'document',
+      outputExtension: 'bin',
+      options: [],
+    }
+  }
+  return config
 }

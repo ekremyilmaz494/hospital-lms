@@ -8,6 +8,7 @@ import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
 import { adminNav } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
+import { AiGenerationPoller } from '@/components/providers/ai-generation-poller';
 
 const roleLabels: Record<string, string> = {
   admin: 'Hastane Admin',
@@ -67,6 +68,7 @@ export default function AdminLayout({
           }}
         >
           <ImpersonationBanner />
+          <AiGenerationPoller />
           <AppTopbar
             title=""
             onToggleSidebar={toggleSidebar}

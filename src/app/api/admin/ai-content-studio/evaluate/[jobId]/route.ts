@@ -1,51 +1,71 @@
-// AI İçerik Stüdyosu — İçerik değerlendirme (beğen / beğenme)
-// PATCH /api/admin/ai-content-studio/evaluate/[jobId]
-// KRİTİK: evaluation = "approved" olmadan "Kütüphaneye Ekle" aktif olmaz.
-
-import { NextRequest } from 'next/server'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
+import { aiEvaluateSchema } from '@/lib/validations'
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
-  const { jobId } = await params
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ jobId: string }> }
+) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
+  const orgId = dbUser!.organizationId!
+  const { jobId } = await params
 
-  const body = await request.json().catch(() => null)
-  if (!body) return errorResponse('Geçersiz istek.')
+  const body = await parseBody(request)
+  if (!body) return errorResponse('Geçersiz istek gövdesi', 400)
 
-  const { evaluation, note } = body
-  if (!evaluation || !['approved', 'rejected'].includes(evaluation)) {
-    return errorResponse('evaluation "approved" veya "rejected" olmalıdır.')
+  const parsed = aiEvaluateSchema.safeParse(body)
+  if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message ?? 'Geçersiz veri', 400)
+
+  const generation = await prisma.aiGeneration.findFirst({
+    where: { id: jobId, organizationId: orgId },
+    include: { user: { select: { firstName: true, lastName: true } } },
+  })
+
+  if (!generation) return errorResponse('Üretim bulunamadı', 404)
+
+  if (generation.status !== 'completed') {
+    return errorResponse('İçerik henüz tamamlanmadı', 400)
   }
 
-  // Kayıt + org izolasyonu
-  const record = await prisma.aiGeneratedContent.findFirst({
-    where: { id: jobId, organizationId: dbUser!.organizationId! },
-  })
-  if (!record) return errorResponse('İş bulunamadı.', 404)
-  if (record.status !== 'completed') return errorResponse('Sadece tamamlanan içerikler değerlendirilebilir.')
-  if (record.savedToLibrary) return errorResponse('Bu içerik zaten kütüphaneye eklenmiş.')
+  if (generation.savedToLibrary === true) {
+    return errorResponse('Kütüphaneye kaydedilmiş içerik değerlendirilemez', 400)
+  }
 
-  await prisma.aiGeneratedContent.update({
+  const updated = await prisma.aiGeneration.update({
     where: { id: jobId },
     data: {
-      evaluation,
-      evaluationNote: note ?? null,
+      evaluation: parsed.data.evaluation,
+      evaluationNote: parsed.data.note || null,
       evaluatedAt: new Date(),
+      evaluatedById: dbUser!.id,
+    },
+    include: {
+      evaluatedBy: { select: { firstName: true, lastName: true } },
     },
   })
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
-    action: `ai_content.${evaluation}`,
-    entityType: 'ai_generated_content',
+    organizationId: orgId,
+    action: 'ai_generation_evaluate',
+    entityType: 'AiGeneration',
     entityId: jobId,
-    newData: { evaluation, note },
+    newData: { evaluation: parsed.data.evaluation, note: parsed.data.note },
   })
 
-  return jsonResponse({ evaluation, evaluatedAt: new Date().toISOString() })
+  logger.info('AI Content Studio', 'AI generation evaluated', { jobId, evaluation: parsed.data.evaluation })
+
+  return jsonResponse({
+    jobId: updated.id,
+    evaluation: updated.evaluation,
+    evaluationNote: updated.evaluationNote,
+    evaluatedAt: updated.evaluatedAt,
+    evaluatedBy: updated.evaluatedBy
+      ? `${updated.evaluatedBy.firstName} ${updated.evaluatedBy.lastName}`.trim()
+      : null,
+  })
 }

@@ -1,38 +1,33 @@
-// ─── Bağlantı Gerekli Banner ───
-// Google hesabı bağlı değilse gösterilen uyarı banner'ı
-// Ana sayfa ve üretim akışında kullanılır
-
 'use client'
 
-import { AlertTriangle, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { AlertTriangle, Settings } from 'lucide-react'
 
 export function ConnectionRequiredBanner() {
   return (
     <div
-      className="flex items-center gap-4 rounded-2xl border p-4"
+      className="flex items-center gap-4 rounded-2xl p-5"
       style={{
-        background: 'var(--color-warning-bg)',
-        borderColor: 'var(--color-warning)',
-        borderLeft: '4px solid var(--color-warning)',
+        background: 'color-mix(in srgb, var(--color-warning) 10%, var(--color-surface))',
+        border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
       }}
     >
-      <AlertTriangle className="h-5 w-5 shrink-0" style={{ color: 'var(--color-warning)' }} />
+      <AlertTriangle className="h-6 w-6 shrink-0" style={{ color: 'var(--color-warning)' }} />
       <div className="flex-1">
-        <p className="text-[13px] font-bold" style={{ color: 'var(--color-warning)' }}>
-          Google Hesabı Bağlı Değil
-        </p>
-        <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-          AI içerik üretmek için Google NotebookLM hesabınızı bağlayın.
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          Google Hesabı Bağlantısı Gerekli
+        </h3>
+        <p className="mt-0.5 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          AI içerik üretmek için Google NotebookLM hesabınızı bağlamanız gerekiyor.
         </p>
       </div>
       <Link
         href="/admin/ai-content-studio/settings"
-        className="flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-bold text-white transition-all"
-        style={{ background: 'var(--color-warning)', boxShadow: 'var(--shadow-sm)' }}
+        className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-opacity hover:opacity-80"
+        style={{ background: 'var(--color-warning)', color: 'white' }}
       >
-        Hesap Bağla
-        <ArrowRight className="h-3.5 w-3.5" />
+        <Settings className="h-4 w-4" />
+        Bağlantı Ayarları
       </Link>
     </div>
   )

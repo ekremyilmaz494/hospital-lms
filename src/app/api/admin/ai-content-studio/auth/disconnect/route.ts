@@ -1,41 +1,48 @@
-// AI İçerik Stüdyosu — Google NotebookLM bağlantı kesme
-// POST /api/admin/ai-content-studio/auth/disconnect
-
-import { NextRequest } from 'next/server'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
+import { disconnectAuth } from '@/app/admin/ai-content-studio/lib/ai-service-client'
 
-const AI_SERVICE_URL = process.env.AI_CONTENT_SERVICE_URL ?? 'http://localhost:8100'
-const INTERNAL_KEY = process.env.AI_CONTENT_INTERNAL_KEY ?? ''
-
-export async function POST(_request: NextRequest) {
+/**
+ * POST /api/admin/ai-content-studio/auth/disconnect
+ *
+ * Google AI bağlantısını keser ve kaydı siler.
+ */
+export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
+
+  const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  // Python servisindeki cookie'yi sil
-  try {
-    await fetch(`${AI_SERVICE_URL}/api/auth/disconnect`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Internal-Key': INTERNAL_KEY },
-      body: JSON.stringify({ org_id: dbUser!.organizationId }),
-      signal: AbortSignal.timeout(10_000),
-    })
-  } catch { /* best-effort */ }
+  const orgId = dbUser!.organizationId!
 
-  // DB'den bağlantı kaydını sil
-  await prisma.aiGoogleConnection.deleteMany({
-    where: { organizationId: dbUser!.organizationId! },
+  const connection = await prisma.aiGoogleConnection.findUnique({
+    where: { organizationId: orgId },
+  })
+
+  if (!connection) {
+    return errorResponse('Aktif bağlantı bulunamadı', 404)
+  }
+
+  try {
+    await disconnectAuth()
+  } catch (err) {
+    logger.error('AI Disconnect', 'Sidecar cleanup hatası', err)
+  }
+
+  await prisma.aiGoogleConnection.delete({
+    where: { organizationId: orgId },
   })
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
-    action: 'ai_google.disconnect',
-    entityType: 'ai_google_connection',
-    entityId: dbUser!.organizationId,
+    organizationId: orgId,
+    action: 'ai_google_disconnect',
+    entityType: 'AiGoogleConnection',
+    oldData: { email: connection.email },
+    request,
   })
 
-  return jsonResponse({ disconnected: true })
+  return jsonResponse({ success: true })
 }

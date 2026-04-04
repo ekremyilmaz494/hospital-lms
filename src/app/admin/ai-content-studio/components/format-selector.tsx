@@ -1,130 +1,87 @@
 'use client'
 
-import { Check, Clock, MessageSquare, Users, Globe } from 'lucide-react'
-import type { OutputFormat } from '../types'
-import type { FormatConfig } from '../lib/format-config'
-import {
-  DURATION_OPTIONS,
-  TONE_OPTIONS,
-  AUDIENCE_OPTIONS,
-  LANGUAGE_OPTIONS,
-} from '../lib/format-config'
+import { Check, Clock } from 'lucide-react'
+import { BlurFade } from '@/components/ui/blur-fade'
+import type { FormatConfig, ArtifactType } from '../types'
+import { COMMON_SETTINGS, DEFAULT_COMMON_SETTINGS } from '../lib/format-config'
 
-interface Props {
+interface FormatSelectorProps {
   formats: FormatConfig[]
-  selected: OutputFormat | null
-  onChange: (format: OutputFormat) => void
+  selected: ArtifactType | null
+  onChange: (format: ArtifactType) => void
   formatOptions: Record<string, string>
   onOptionChange: (key: string, value: string) => void
+  suggestedFormats?: ArtifactType[]
 }
 
-/* ─── Ortak ayar satırı ─── */
-function SettingRow({
-  icon: Icon,
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
-  label: string
-  options: { value: string; label: string }[]
-  value: string
-  onChange: (v: string) => void
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <div
-        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-        style={{ background: 'var(--color-bg)' }}
-      >
-        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-      </div>
-      <div className="flex-1 space-y-1.5">
-        <p className="text-[11px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-          {label}
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {options.map((opt) => {
-            const isActive = value === opt.value
-            return (
-              <button
-                key={opt.value}
-                onClick={() => onChange(opt.value)}
-                className="rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-all duration-150"
-                style={{
-                  borderColor: isActive ? 'var(--color-primary)' : 'var(--color-border)',
-                  background: isActive ? 'var(--color-primary)' : 'transparent',
-                  color: isActive ? '#fff' : 'var(--color-text-secondary)',
-                }}
-              >
-                {opt.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export function FormatSelector({ formats, selected, onChange, formatOptions, onOptionChange }: Props) {
-  const selectedConfig = formats.find((f) => f.id === selected) ?? null
+export function FormatSelector({
+  formats, selected, onChange, formatOptions, onOptionChange, suggestedFormats,
+}: FormatSelectorProps) {
+  const selectedConfig = formats.find(f => f.id === selected)
 
   return (
-    <div className="space-y-5">
-      {/* ── Format kartları ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <div className="space-y-6">
+      {/* Format Grid */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3">
         {formats.map((fmt) => {
           const isSelected = selected === fmt.id
+          const isSuggested = suggestedFormats?.includes(fmt.id)
+
           return (
             <button
               key={fmt.id}
+              type="button"
               onClick={() => onChange(fmt.id)}
-              className="relative flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-all duration-200"
+              className="relative rounded-2xl p-4 text-left transition-all duration-200"
               style={{
-                borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                background: isSelected ? 'var(--color-primary-light)' : 'var(--color-surface)',
-                boxShadow: isSelected ? '0 0 0 2px var(--color-primary)' : 'var(--shadow-sm)',
+                background: 'var(--color-surface)',
+                border: `2px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                boxShadow: isSelected
+                  ? '0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent), var(--shadow-md)'
+                  : 'var(--shadow-sm)',
+                transform: isSelected ? 'translateY(-2px)' : 'none',
               }}
             >
+              {/* Selected check */}
               {isSelected && (
                 <span
-                  className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full"
+                  className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full"
                   style={{ background: 'var(--color-primary)' }}
                 >
-                  <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                  <Check className="h-3 w-3 text-white" />
                 </span>
               )}
 
-              <span className="text-3xl leading-none">{fmt.icon}</span>
-
-              <div className="flex-1">
-                <p className="text-[13px] font-bold leading-tight">{fmt.label}</p>
-                <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--color-text-muted)' }}>
-                  {fmt.description}
-                </p>
-              </div>
-
-              {/* Çıktı + süre badge */}
-              <div className="flex items-center gap-1.5">
+              {/* Suggested badge */}
+              {isSuggested && !isSelected && (
                 <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                  style={{
-                    background: isSelected ? 'rgba(13,150,104,0.15)' : 'var(--color-bg)',
-                    color: isSelected ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                  }}
+                  className="absolute right-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+                  style={{ background: 'var(--color-success)', color: 'white' }}
                 >
-                  ⏱ {fmt.estimatedMinutes}
+                  Önerilen
+                </span>
+              )}
+
+              <span className="text-3xl">{fmt.icon}</span>
+              <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                {fmt.label}
+              </p>
+              <p className="mt-1 line-clamp-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                {fmt.description}
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <span
+                  className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-muted)' }}
+                >
+                  <Clock className="h-3 w-3" />
+                  ~{fmt.estimatedMinutes} dk
                 </span>
                 <span
-                  className="rounded-full px-2 py-0.5 text-[9px] font-bold"
-                  style={{
-                    background: 'var(--color-bg)',
-                    color: 'var(--color-text-muted)',
-                  }}
+                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
+                  style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
                 >
-                  {fmt.outputFileType}
+                  {fmt.outputExtension}
                 </span>
               </div>
             </button>
@@ -132,99 +89,89 @@ export function FormatSelector({ formats, selected, onChange, formatOptions, onO
         })}
       </div>
 
-      {/* ── Formata özel ayarlar ── */}
-      {selectedConfig?.options && selectedConfig.options.length > 0 && (
-        <div
-          className="rounded-2xl border p-4 space-y-4"
-          style={{ borderColor: 'var(--color-primary)', background: 'var(--color-primary-light)' }}
-        >
-          <p className="text-[12px] font-bold" style={{ color: 'var(--color-primary)' }}>
-            {selectedConfig.icon} {selectedConfig.label} Ayarları
-          </p>
-          {selectedConfig.options.map((opt) => {
-            const currentVal = formatOptions[opt.key] ?? opt.default
-            return (
-              <div key={opt.key} className="space-y-2">
-                <p className="text-[12px] font-semibold">{opt.label}</p>
-                <div className="flex flex-wrap gap-2">
-                  {opt.values.map((v) => {
-                    const isActive = currentVal === v.value
-                    return (
-                      <button
-                        key={v.value}
-                        onClick={() => onOptionChange(opt.key, v.value)}
-                        className="rounded-xl border px-3 py-1.5 text-[12px] font-medium transition-all duration-150"
-                        style={{
-                          borderColor: isActive ? 'var(--color-primary)' : 'var(--color-border)',
-                          background: isActive ? 'var(--color-primary)' : 'var(--color-surface)',
-                          color: isActive ? '#fff' : 'var(--color-text-secondary)',
-                          boxShadow: isActive ? 'var(--shadow-sm)' : undefined,
-                        }}
-                      >
-                        {v.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+      {/* Format-Specific Options */}
+      {selectedConfig && selectedConfig.options.length > 0 && (
+        <BlurFade>
+          <div
+            className="rounded-2xl p-5"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <p className="mb-4 flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              <span className="text-lg">{selectedConfig.icon}</span>
+              Format Ayarları
+            </p>
+            <div className="space-y-4">
+              {selectedConfig.options.map((opt) => (
+                <OptionRow
+                  key={opt.key}
+                  label={opt.label}
+                  values={opt.values}
+                  selected={formatOptions[opt.key] || opt.default}
+                  onChange={(val) => onOptionChange(opt.key, val)}
+                />
+              ))}
+            </div>
+          </div>
+        </BlurFade>
       )}
 
-      {/* ── Ek Ayarlar (tüm formatlar için ortak) ── */}
+      {/* Common Settings */}
       {selected && (
-        <div
-          className="rounded-2xl border p-5 space-y-4"
-          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
-        >
-          <p className="text-[13px] font-bold">Ek Ayarlar</p>
-
-          <SettingRow
-            icon={Clock}
-            label="Süre"
-            options={DURATION_OPTIONS}
-            value={formatOptions['duration'] ?? '10'}
-            onChange={(v) => onOptionChange('duration', v)}
-          />
-
-          <div className="border-t" style={{ borderColor: 'var(--color-border)' }} />
-
-          <SettingRow
-            icon={MessageSquare}
-            label="Ton"
-            options={TONE_OPTIONS}
-            value={formatOptions['tone'] ?? 'formal'}
-            onChange={(v) => onOptionChange('tone', v)}
-          />
-
-          <div className="border-t" style={{ borderColor: 'var(--color-border)' }} />
-
-          <SettingRow
-            icon={Users}
-            label="Hedef Kitle"
-            options={AUDIENCE_OPTIONS}
-            value={formatOptions['audience'] ?? 'all_staff'}
-            onChange={(v) => onOptionChange('audience', v)}
-          />
-
-          <div className="border-t" style={{ borderColor: 'var(--color-border)' }} />
-
-          <SettingRow
-            icon={Globe}
-            label="Dil"
-            options={LANGUAGE_OPTIONS}
-            value={formatOptions['language'] ?? 'tr'}
-            onChange={(v) => onOptionChange('language', v)}
-          />
-        </div>
+        <BlurFade delay={0.1}>
+          <div
+            className="rounded-2xl p-5"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <p className="mb-4 text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              Genel Ayarlar
+            </p>
+            <div className="space-y-4">
+              {COMMON_SETTINGS.map((setting) => (
+                <OptionRow
+                  key={setting.key}
+                  label={`${setting.icon} ${setting.label}`}
+                  values={setting.values}
+                  selected={formatOptions[setting.key] || DEFAULT_COMMON_SETTINGS[setting.key] || setting.default}
+                  onChange={(val) => onOptionChange(setting.key, val)}
+                />
+              ))}
+            </div>
+          </div>
+        </BlurFade>
       )}
+    </div>
+  )
+}
 
-      {!selected && (
-        <p className="text-center text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
-          Üretilecek içerik türünü seçin
-        </p>
-      )}
+function OptionRow({
+  label, values, selected, onChange,
+}: {
+  label: string
+  values: { value: string; label: string }[]
+  selected: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+        {label}
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        {values.map((v) => (
+          <button
+            key={v.value}
+            type="button"
+            onClick={() => onChange(v.value)}
+            className="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+            style={{
+              background: selected === v.value ? 'var(--color-primary)' : 'var(--color-surface-hover)',
+              color: selected === v.value ? 'white' : 'var(--color-text-secondary)',
+            }}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

@@ -1,54 +1,56 @@
-// AI İçerik Stüdyosu — İçerik silme
-// DELETE /api/admin/ai-content-studio/discard/[jobId]
-
-import { NextRequest } from 'next/server'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 import { deleteObject } from '@/lib/s3'
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
-  const { jobId } = await params
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ jobId: string }> }
+) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
+  const orgId = dbUser!.organizationId!
 
-  // Kayıt + org izolasyonu
-  const record = await prisma.aiGeneratedContent.findFirst({
-    where: { id: jobId, organizationId: dbUser!.organizationId! },
+  const { jobId } = await params
+
+  const generation = await prisma.aiGeneration.findFirst({
+    where: { id: jobId, organizationId: orgId },
   })
-  if (!record) return errorResponse('İş bulunamadı.', 404)
-  if (record.savedToLibrary) return errorResponse('Kütüphaneye eklenmiş içerik silinemez.')
 
-  // S3'teki dosyayı sil (varsa)
-  if (record.outputKey) {
-    try { await deleteObject(record.outputKey) } catch { /* best-effort */ }
+  if (!generation) {
+    return errorResponse('Üretim bulunamadı', 404)
   }
 
-  // Python servisteki geçici dosyayı temizle (best-effort)
-  try {
-    const AI_SERVICE_URL = process.env.AI_CONTENT_SERVICE_URL ?? 'http://localhost:8100'
-    await fetch(`${AI_SERVICE_URL}/api/result/${jobId}`, {
-      method: 'DELETE',
-      headers: { 'X-Internal-Key': process.env.AI_CONTENT_INTERNAL_KEY ?? '' },
-      signal: AbortSignal.timeout(5000),
-    })
-  } catch { /* Temizleme başarısız olsa da devam et */ }
+  if (generation.savedToLibrary === true) {
+    return errorResponse(
+      'Kütüphaneye kaydedilmiş içerik silinemez. Önce kütüphaneden kaldırın.',
+      403
+    )
+  }
 
-  // İlişkili dokümanları bağlantısını kes, sonra kaydı sil
-  await prisma.aiGeneratedContent.update({
-    where: { id: jobId },
-    data: { documents: { set: [] } },
-  })
-  await prisma.aiGeneratedContent.delete({ where: { id: jobId } })
+  if (generation.outputS3Key) {
+    try {
+      await deleteObject(generation.outputS3Key)
+    } catch (err) {
+      logger.error('AI Discard', 'S3 silme hatası', err)
+    }
+  }
+
+  await prisma.aiGeneration.delete({ where: { id: jobId } })
 
   await createAuditLog({
     userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
-    action: 'ai_content.discard',
-    entityType: 'ai_generated_content',
+    organizationId: orgId,
+    action: 'ai_generation_discard',
+    entityType: 'AiGeneration',
     entityId: jobId,
+    newData: {
+      title: generation.title,
+      artifactType: generation.artifactType,
+    },
   })
 
-  return jsonResponse({ discarded: true })
+  return jsonResponse({ success: true, message: 'İçerik silindi' })
 }

@@ -1,95 +1,193 @@
-// AI İçerik Stüdyosu — Belge yükleme
-// POST /api/admin/ai-content-studio/documents
-
-import { NextRequest } from 'next/server'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import crypto from 'crypto'
+import { prisma } from '@/lib/prisma'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
 import { uploadBuffer } from '@/lib/s3'
-import { prisma } from '@/lib/prisma'
-import { analyzeDocument } from '@/app/admin/ai-content-studio/lib/ai-service-client'
+import { createNotebook, addFileSource, addSource } from '@/app/admin/ai-content-studio/lib/ai-service-client'
+import { aiSourceAddSchema } from '@/lib/validations'
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
-const ALLOWED_TYPES = [
+const ALLOWED_MIME_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'text/plain',
   'text/markdown',
-  'application/octet-stream', // Bazı tarayıcılarda .md dosyaları
-  '',                         // Bazı tarayıcılarda MIME type boş gelir
 ]
-
-// Dosya uzantısına göre de kabul et (MIME type güvenilmez olabilir)
 const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.txt', '.md']
+const MAX_FILE_SIZE = 20 * 1024 * 1024
 
-function isAllowedFile(file: File): boolean {
-  if (ALLOWED_TYPES.includes(file.type)) return true
-  const ext = '.' + (file.name.split('.').pop()?.toLowerCase() ?? '')
-  return ALLOWED_EXTENSIONS.includes(ext)
+async function getOrCreateNotebook(
+  orgId: string,
+  notebookId?: string,
+  title?: string,
+): Promise<{ notebook: { id: string; notebookLmId: string }; notebookId: string }> {
+  if (notebookId) {
+    const existing = await prisma.aiNotebook.findFirst({
+      where: { id: notebookId, organizationId: orgId },
+      select: { id: true, notebookLmId: true },
+    })
+    if (!existing) throw new Error('Notebook bulunamadı')
+    return { notebook: existing, notebookId: existing.id }
+  }
+
+  const nbTitle = title || `AI İçerik - ${new Date().toLocaleDateString('tr-TR')}`
+  const sidecarNb = await createNotebook(nbTitle)
+  const notebook = await prisma.aiNotebook.create({
+    data: {
+      organizationId: orgId,
+      notebookLmId: sidecarNb.id,
+      title: sidecarNb.title,
+    },
+    select: { id: true, notebookLmId: true },
+  })
+  return { notebook, notebookId: notebook.id }
 }
 
-export async function POST(request: NextRequest) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-  const roleError = requireRole(dbUser!.role, ['admin'])
-  if (roleError) return roleError
-
-  const ok = await checkRateLimit(`ai-doc-upload:${dbUser!.organizationId}`, 20, 3600)
-  if (!ok) return errorResponse('Saatte 20 belgeden fazla yüklenemez.', 429)
-
-  const formData = await request.formData().catch(() => null)
-  if (!formData) return errorResponse('Geçersiz form verisi.')
-
-  const file = formData.get('file') as File | null
-  if (!file) return errorResponse('Dosya bulunamadı.')
-  if (!isAllowedFile(file)) return errorResponse(`Desteklenmeyen dosya türü: ${file.type || 'bilinmiyor'} (${file.name})`)
-  if (file.size > MAX_FILE_SIZE) return errorResponse('Dosya 20MB\'ı geçemez.')
-
+export async function POST(request: Request) {
   try {
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const ext = file.name.split('.').pop() ?? 'bin'
-    const s3Key = `ai-studio/docs/${dbUser!.organizationId}/${crypto.randomUUID()}.${ext}`
+    const { dbUser, error } = await getAuthUser()
+    if (error) return error
 
-    // S3'e yükle
-    await uploadBuffer(s3Key, buffer, file.type)
+    const roleError = requireRole(dbUser!.role, ['admin'])
+    if (roleError) return roleError
 
-    // DB'ye AiDocument kaydı oluştur
-    const doc = await prisma.aiDocument.create({
-      data: {
-        organizationId: dbUser!.organizationId!,
-        userId: dbUser!.id,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        fileUrl: s3Key,
-        fileKey: s3Key,
-      },
-    })
+    const orgId = dbUser!.organizationId!
 
-    // Belge analizi (opsiyonel — hata olsa da devam et)
-    let summary: string | undefined
-    let keyTopics: string[] = []
-    try {
-      const text = buffer.toString('utf-8').slice(0, 10_000)
-      const analysis = await analyzeDocument(text, file.name)
-      summary = analysis.summary
-      keyTopics = analysis.keyTopics
-    } catch { /* Analiz opsiyonel */ }
+    const allowed = await checkRateLimit(`ai-doc:${orgId}`, 20, 3600)
+    if (!allowed) return errorResponse('Çok fazla belge yükleme isteği. Lütfen bir saat sonra tekrar deneyin.', 429)
 
-    return jsonResponse({
-      id: doc.id,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      s3Key,
-      s3Url: s3Key,
-      summary,
-      keyTopics,
-      uploadedAt: doc.createdAt.toISOString(),
-    }, 201)
+    const contentType = request.headers.get('content-type') || ''
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData()
+      const file = formData.get('file') as File | null
+
+      if (!file) return errorResponse('Dosya seçilmedi', 400)
+
+      if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+        return errorResponse('Desteklenmeyen dosya türü. Sadece PDF, DOCX, PPTX, TXT ve MD kabul edilir.', 400)
+      }
+
+      const ext = file.name.split('.').pop()?.toLowerCase()
+      if (!ALLOWED_EXTENSIONS.includes(`.${ext}`)) {
+        return errorResponse('Desteklenmeyen dosya uzantısı', 400)
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        return errorResponse('Dosya boyutu 20MB limitini aşıyor', 400)
+      }
+
+      const notebookIdParam = formData.get('notebookId') as string | null
+      const titleParam = formData.get('title') as string | null
+
+      const { notebook, notebookId } = await getOrCreateNotebook(
+        orgId,
+        notebookIdParam || undefined,
+        titleParam || undefined,
+      )
+
+      const s3Key = `ai-studio/docs/${orgId}/${crypto.randomUUID()}.${ext}`
+      const buffer = Buffer.from(await file.arrayBuffer())
+      await uploadBuffer(s3Key, buffer, file.type)
+
+      let sourceLmId: string | null = null
+      try {
+        const result = await addFileSource(notebook.notebookLmId, buffer, file.name)
+        sourceLmId = result.source_id
+      } catch (err) {
+        logger.error('AI Documents', 'Sidecar kaynak ekleme hatası', err)
+      }
+
+      const source = await prisma.aiNotebookSource.create({
+        data: {
+          notebookId,
+          sourceLmId,
+          fileName: file.name,
+          fileType: ext || '',
+          fileSize: file.size,
+          s3Key,
+          sourceType: 'file',
+          status: sourceLmId ? 'processing' : 'error',
+        },
+      })
+
+      return jsonResponse(
+        {
+          source: {
+            id: source.id,
+            notebookId,
+            fileName: source.fileName,
+            fileSize: source.fileSize,
+            status: source.status,
+          },
+        },
+        201,
+      )
+    }
+
+    if (contentType.includes('application/json')) {
+      const body = await parseBody<Record<string, unknown>>(request)
+      if (!body) return errorResponse('Geçersiz istek gövdesi', 400)
+
+      const parsed = aiSourceAddSchema.safeParse(body)
+      if (!parsed.success) {
+        return errorResponse(parsed.error.issues[0]?.message || 'Geçersiz veri', 400)
+      }
+
+      const { notebook, notebookId } = await getOrCreateNotebook(
+        orgId,
+        parsed.data.notebookId,
+        parsed.data.title,
+      )
+
+      let sourceLmId: string | null = null
+      try {
+        const result = await addSource(notebook.notebookLmId, parsed.data.sourceType, {
+          url: parsed.data.url,
+          title: parsed.data.textTitle,
+          content: parsed.data.content,
+        })
+        sourceLmId = result.source_id
+      } catch (err) {
+        logger.error('AI Documents', 'Sidecar kaynak ekleme hatası', err)
+      }
+
+      const fileName =
+        parsed.data.sourceType === 'text'
+          ? parsed.data.textTitle || 'Metin Kaynağı'
+          : parsed.data.url || 'URL Kaynağı'
+
+      const source = await prisma.aiNotebookSource.create({
+        data: {
+          notebookId,
+          sourceLmId,
+          fileName,
+          fileType: parsed.data.sourceType,
+          fileSize: parsed.data.content ? Buffer.byteLength(parsed.data.content, 'utf-8') : 0,
+          sourceType: parsed.data.sourceType,
+          sourceUrl: parsed.data.url || null,
+          status: sourceLmId ? 'processing' : 'error',
+        },
+      })
+
+      return jsonResponse(
+        {
+          source: {
+            id: source.id,
+            notebookId,
+            fileName: source.fileName,
+            fileSize: source.fileSize,
+            status: source.status,
+          },
+        },
+        201,
+      )
+    }
+
+    return errorResponse('Desteklenmeyen Content-Type', 400)
   } catch (err) {
-    console.error('[AI-Studio] Document upload error:', err)
-    const message = err instanceof Error ? err.message : 'Bilinmeyen hata'
-    return errorResponse(`Yükleme hatası: ${message}`, 500)
+    logger.error('AI Documents', 'Beklenmeyen hata', err)
+    return errorResponse('İşlem sırasında bir hata oluştu', 500)
   }
 }

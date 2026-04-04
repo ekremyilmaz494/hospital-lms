@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getSignedUrl as getCloudfrontSignedUrl } from '@aws-sdk/cloudfront-signer'
 
@@ -77,6 +77,15 @@ export async function uploadBuffer(key: string, body: Buffer, contentType: strin
     Key: key,
     Body: body,
     ContentType: contentType,
+  }))
+}
+
+/** Copy an S3 object to a new key (same bucket) */
+export async function copyObject(sourceKey: string, destinationKey: string) {
+  await s3.send(new CopyObjectCommand({
+    Bucket: BUCKET,
+    CopySource: `${BUCKET}/${sourceKey}`,
+    Key: destinationKey,
   }))
 }
 

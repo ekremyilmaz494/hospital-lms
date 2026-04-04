@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAiGenerationStore, selectUnviewedCount, selectActiveCount } from '@/store/ai-generation-store';
 import type { NavGroup } from './sidebar-config';
 
 interface AppSidebarProps {
@@ -35,6 +36,9 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const aiActiveCount = useAiGenerationStore(selectActiveCount);
+  const aiUnviewedCount = useAiGenerationStore(selectUnviewedCount);
+  const aiBadgeCount = aiActiveCount + aiUnviewedCount;
 
   const toggleExpand = useCallback((href: string) => {
     setExpandedItems((prev) =>
@@ -248,11 +252,25 @@ export function AppSidebar({
                         >
                           <Icon className="h-5 w-5 shrink-0" />
                           <span className="truncate">{item.title}</span>
-                          {item.badge && (
+                          {item.href === '/admin/ai-content-studio' && aiBadgeCount > 0 ? (
+                            <span
+                              className="ml-auto flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                              style={{
+                                background: aiActiveCount > 0 ? 'var(--color-warning)' : 'var(--color-primary)',
+                                color: 'white',
+                                animation: aiActiveCount > 0 ? 'pulse 2s infinite' : 'none',
+                              }}
+                            >
+                              {aiActiveCount > 0 && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                              )}
+                              {aiBadgeCount}
+                            </span>
+                          ) : item.badge ? (
                             <span className="ml-auto rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: 'var(--color-accent)', color: 'white' }}>
                               {item.badge}
                             </span>
-                          )}
+                          ) : null}
                         </Link>
                       )}
 

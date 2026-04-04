@@ -1,109 +1,114 @@
-// ─── Google Bağlantı Durumu Kartı ───
-// Bağlı hesap bilgileri + durum badge (aktif/hata/süresi dolmuş)
-
 'use client'
 
-import { CheckCircle2, XCircle, Clock, Mail, Shield, Calendar } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Shield } from 'lucide-react'
 
-interface ConnectionInfo {
+interface GoogleConnectStatusProps {
   connected: boolean
   email: string | null
-  status: string
-  method?: string
+  status: string | null
   lastVerifiedAt: string | null
-  lastUsedAt: string | null
-  expiresAt: string | null
-  errorMessage?: string | null
+  onVerify: () => Promise<void>
+  onDisconnect: () => void
+  verifying: boolean
 }
 
-interface Props {
-  connection: ConnectionInfo
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('tr-TR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('tr-TR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
-function StatusBadge({ status }: { status: string }) {
-  if (status === 'connected') {
+export function GoogleConnectStatus({
+  connected,
+  email,
+  lastVerifiedAt,
+  onVerify,
+  onDisconnect,
+  verifying,
+}: GoogleConnectStatusProps) {
+  if (!connected) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-        <CheckCircle2 className="h-3.5 w-3.5" /> Aktif
-      </span>
+      <div
+        className="flex items-center gap-4 rounded-2xl p-5"
+        style={{
+          background: 'var(--color-surface-hover)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <XCircle className="h-6 w-6 shrink-0" style={{ color: 'var(--color-text-muted)' }} />
+        <div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            Bağlantı Yok
+          </p>
+          <p className="mt-0.5 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            Henüz bir Google hesabı bağlanmamış.
+          </p>
+        </div>
+      </div>
     )
   }
-  if (status === 'expired') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
-        <Clock className="h-3.5 w-3.5" /> Süresi Dolmuş
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>
-      <XCircle className="h-3.5 w-3.5" /> Hata
-    </span>
-  )
-}
 
-export function GoogleConnectStatus({ connection }: Props) {
   return (
     <div
-      className="rounded-2xl border p-5 space-y-4"
-      style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+      className="rounded-2xl p-5"
+      style={{
+        background: 'color-mix(in srgb, var(--color-success) 8%, var(--color-surface))',
+        border: '1px solid color-mix(in srgb, var(--color-success) 25%, transparent)',
+      }}
     >
-      {/* Başlık + badge */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-[14px] font-bold">Google Hesap Bağlantısı</h3>
-        <StatusBadge status={connection.status} />
-      </div>
-
-      {/* Detaylar */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <InfoRow icon={Mail} label="E-posta" value={connection.email ?? '—'} />
-        <InfoRow icon={Shield} label="Yöntem" value={connection.method === 'browser' ? 'Browser Login' : 'Manuel Cookie'} />
-        <InfoRow icon={Calendar} label="Son Doğrulama" value={formatDate(connection.lastVerifiedAt)} />
-        <InfoRow icon={Clock} label="Son Kullanım" value={formatDate(connection.lastUsedAt)} />
-      </div>
-
-      {/* Hata mesajı */}
-      {connection.errorMessage && (
-        <div
-          className="flex items-start gap-2 rounded-xl p-3 text-[12px]"
-          style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
+      <div className="flex items-center gap-3">
+        <CheckCircle className="h-5 w-5 shrink-0" style={{ color: 'var(--color-success)' }} />
+        <span
+          className="rounded-full px-2 py-0.5 text-xs font-semibold"
+          style={{ background: 'var(--color-success)', color: 'white' }}
         >
-          <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
-          <p>{connection.errorMessage}</p>
-        </div>
+          Bağlı
+        </span>
+        <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+          {email}
+        </span>
+      </div>
+
+      {lastVerifiedAt && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          <Shield className="h-3.5 w-3.5" />
+          Son doğrulama: {formatDate(lastVerifiedAt)}
+        </p>
       )}
 
-      {/* Süre bilgisi */}
-      {connection.expiresAt && (
-        <div
-          className="flex items-center gap-2 rounded-xl p-3 text-[12px]"
-          style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={onVerify}
+          disabled={verifying}
+          className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium transition-colors hover:opacity-80 disabled:opacity-50"
+          style={{
+            background: 'transparent',
+            color: 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
         >
-          <Clock className="h-4 w-4 shrink-0" />
-          <p>Cookie süresi: {formatDate(connection.expiresAt)}</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--color-bg)' }}>
-        <Icon className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
-      </div>
-      <div>
-        <p className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
-        <p className="text-[13px] font-semibold">{value}</p>
+          {verifying ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Doğrulanıyor...
+            </>
+          ) : (
+            'Doğrula'
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onDisconnect}
+          className="rounded-xl px-4 py-2 text-sm font-medium transition-colors hover:opacity-80"
+          style={{ color: 'var(--color-error)' }}
+        >
+          Bağlantıyı Kes
+        </button>
       </div>
     </div>
   )

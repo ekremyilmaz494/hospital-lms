@@ -2218,4 +2218,107 @@ style={{
 - Google cookie'ler ~1-2 saatte expire oluyor, yeniden login gerekebilir
 - `INTERNAL_API_KEY` Next.js ve Python arasında aynı olmalı
 
-*Son güncelleme: 3 Nisan 2026 — Oturum 17*
+---
+
+## Oturum 18 — AI İçerik Stüdyosu v2: Sıfırdan Yeniden İnşa (4 Nisan 2026)
+
+### Yapılan İşler
+
+Bu oturumda AI İçerik Stüdyosu tamamen sıfırdan yeniden yazıldı. Doküman odaklı prompt-by-prompt yaklaşımla 13 adımlık plan izlendi. Prompt 1-10 tamamlandı, 11-13 kaldı.
+
+#### Prompt 1: Veritabanı Modelleri
+- Prisma schema'ya 4 yeni model eklendi: `AiNotebook`, `AiNotebookSource`, `AiGeneration`, `AiGoogleConnection`
+- Organization, User, ContentLibrary modellerine ilişkiler bağlandı
+- `db:generate` başarılı, TypeScript temiz
+
+#### Prompt 2: Python Sidecar Servisi (Önceden Mevcuttu)
+- `ai-content-service/` zaten oluşturulmuştu (FastAPI + notebooklm-py)
+- 12 endpoint: auth (login/verify/disconnect), notebooks (create/list), sources (add/status/wait), generate, status, download, health
+
+#### Prompt 3: Next.js API Route'ları — Auth & Belgeler
+- `ai-service-client.ts` — Python sidecar HTTP client (13 fonksiyon, timeout'lu, AiServiceError)
+- 4 auth route: connect (rate limited 5/saat), disconnect, status, verify
+- 2 document route: POST (dual FormData/JSON), GET status polling
+- `validations.ts`'ye 2 schema eklendi (aiConnectSchema, aiSourceAddSchema)
+
+#### Prompt 4: Next.js API Route'ları — Üretim & Sonuç
+- `generate/route.ts` — POST, rate limited 10/saat, Google bağlantı kontrolü, mind_map özel handling
+- `status/[jobId]/route.ts` — GET, sidecar polling, auto-download on complete, 15dk timeout
+- `result/[jobId]/route.ts` — GET, S3 stream, HTTP Range (206), meta mode, JSON shortcut
+- `list/route.ts` — GET, paginated, 5 status filtre, sort, search
+- `latest/route.ts` — GET, son 24 saat aktif job
+- `templates/route.ts` — GET, 6 Türkçe hastane şablonu
+- `download-helper.ts` — async download + S3 upload + JSON parse
+- `validations.ts`'ye aiGenerateSchema eklendi
+
+#### Prompt 5: Next.js API Route'ları — Değerlendirme & Kütüphane
+- `evaluate/[jobId]/route.ts` — PATCH, approved/rejected + note
+- `approve/[jobId]/route.ts` — POST, ContentLibrary oluştur, S3 copy, $transaction
+- `discard/[jobId]/route.ts` — DELETE, S3 cleanup, kütüphane koruma
+- `bulk-delete/route.ts` — POST, max 50, Promise.allSettled S3 silme
+- `s3.ts`'ye `copyObject` eklendi
+- `validations.ts`'ye 3 schema eklendi
+
+#### Prompt 6: Zustand Store & Global Poller
+- `ai-generation-store.ts` — localStorage persist, activeJobs + completedNotifications, TTL cleanup (24h/7d)
+- `ai-generation-poller.tsx` — progressive polling (2s/5s/10s), paralel Promise.all, tıklanabilir toast
+- `sidebar-config.ts` — AI İçerik Stüdyosu menü öğesi + Sparkles ikonu + "Beta" badge
+- `app-sidebar.tsx` — dinamik badge (turuncu pulse aktif, yeşil bildirim)
+- `admin/layout.tsx` — AiGenerationPoller mount
+
+#### Prompt 7: Types, Constants, Format Config & Prompt Templates
+- `types/index.ts` — 20+ type/interface (ArtifactType, GenerationJob, QuizData, FlashcardData, MindMapData, DataTableData, FormatConfig, CommonSetting, GoogleConnectionStatus)
+- `constants.ts` — dosya limitleri, polling intervals, 3 mapping tablosu
+- `format-config.ts` — 9 format config, 3 ortak ayar, getFormatConfig()
+- `prompt-templates.ts` — 8 hastane eğitim şablonu
+
+#### Prompt 8: Frontend Hooks
+- `use-document-upload.ts` — sıralı upload (notebook auto-create), URL/YouTube/Text kaynak ekleme, polling
+- `use-generation.ts` — startGeneration (→ jobId), progressive polling, loadJob, resumeJob, global store sync
+- `use-evaluation.ts` — evaluate (PATCH), approve (→ ContentLibrary), discard (DELETE), jobId değişiminde auto-reset
+
+#### Prompt 9: Wizard Components (8 component)
+- `document-uploader.tsx` — drag-drop + URL/YouTube/Text tabs + belge listesi + durum badge
+- `prompt-composer.tsx` — kategorili şablon kartları + textarea + karakter sayacı + konu önerileri
+- `format-selector.tsx` — 9 format grid + özel/ortak ayar toggle'ları + önerilen badge
+- `generation-progress.tsx` — 5 aşama çizgisi + progress bar + tahmini süre + hata/tamamlandı
+- `connection-required-banner.tsx` — uyarı banner + ayarlar linki
+- `google-connect-form.tsx` — email + browser seçimi + loading state
+- `google-connect-status.tsx` — bağlı/değil kartı + doğrula/kes
+- `google-disconnect-modal.tsx` — onay dialog
+
+#### Prompt 10: Önizleme & Değerlendirme Components (4 component)
+- `content-preview.tsx` — 9 renderer (Audio, Video, Presentation, Quiz, Flashcard, Report, Infographic, DataTable, MindMap) + Generic fallback + renderMarkdown helper (kütüphane yok, regex-based)
+- `evaluation-panel.tsx` — 4 durum (bekliyor, onaylandı, reddedildi, kaydedildi) + inline silme onayı
+- `save-to-library-modal.tsx` — 7 alan form + content-library-categories entegrasyonu
+- `content-card.tsx` — format emoji, durum badge, canlı progress (store'dan), tarih, değerlendirme
+
+### Kalan İşler (Prompt 11-13)
+- **Prompt 11**: Frontend Sayfalar — page.tsx (ana liste), new/page.tsx (4 adımlı wizard), [jobId]/page.tsx (detay/önizleme), settings/page.tsx (Google ayarları)
+- **Prompt 12**: Sidebar & Layout Entegrasyonu — sidebar-config'e menü öğesi (yapıldı), app-sidebar badge (yapıldı), admin layout poller (yapıldı)
+- **Prompt 13**: Test & Doğrulama — Vitest unit testleri, uçtan uca akış testi
+
+### Dosya Sayıları (Bu Oturum)
+| Kategori | Dosya Sayısı |
+|----------|-------------|
+| Prisma schema | 1 güncelleme (4 model) |
+| API routes | 14 yeni |
+| Lib/helper | 4 yeni (ai-service-client, download-helper, format-config, prompt-templates) |
+| Store | 1 yeni (ai-generation-store) |
+| Provider | 1 yeni (ai-generation-poller) |
+| Types/Constants | 2 yeni |
+| Hooks | 3 yeni |
+| Components | 12 yeni |
+| Validations | 1 güncelleme (6 schema eklendi) |
+| S3 | 1 güncelleme (copyObject) |
+| Sidebar/Layout | 3 güncelleme |
+| **Toplam** | **~42 dosya** |
+
+### Teknik Notlar
+- `checkRateLimit()` true = izin verildi, false = bloklandı — ters mantık tuzağı dikkat
+- Agent'lar bazen Türkçe karakterleri ASCII yazdı — her zaman kontrol et
+- `parseBody()` bu projede 1 argüman alıyor (schema ayrı valide edilir)
+- Markdown rendering: react-markdown yerine regex-based renderMarkdown() helper kullanıldı (bağımlılık eklememe kararı)
+- MindMap: react-flow/d3 yerine pure CSS tree (bağımlılık eklememe)
+
+*Son güncelleme: 4 Nisan 2026 — Oturum 18*

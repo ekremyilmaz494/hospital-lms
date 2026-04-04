@@ -1,56 +1,70 @@
 'use client'
 
-import { Loader2, CheckCircle2, XCircle, RefreshCw } from 'lucide-react'
+import { Loader2, CheckCircle, XCircle, RefreshCw, ArrowLeft, Clock, Sparkles } from 'lucide-react'
 import type { GenerationJob } from '../types'
 import { getFormatConfig } from '../lib/format-config'
 
-interface Props {
+interface GenerationProgressProps {
   job: GenerationJob | null
   starting: boolean
   error: string | null
   onReset: () => void
 }
 
-const STAGES = [
-  { label: 'Notebook oluşturuluyor', minProgress: 0 },
-  { label: 'Belge kaynağı ekleniyor', minProgress: 25 },
-  { label: 'İçerik üretiliyor', minProgress: 50 },
-  { label: 'Dosya hazırlanıyor', minProgress: 75 },
-  { label: 'Tamamlandı', minProgress: 100 },
-]
+const STAGES = ['Sırada', 'İşleniyor', 'Üretiliyor', 'İndiriliyor', 'Tamamlandı'] as const
 
-function getCurrentStageIndex(progress: number): number {
-  let idx = 0
-  for (let i = 0; i < STAGES.length; i++) {
-    if (progress >= STAGES[i].minProgress) idx = i
+function getStageIndex(status: string, progress: number): number {
+  switch (status) {
+    case 'queued': return 0
+    case 'processing': return progress < 50 ? 1 : 2
+    case 'downloading': return 3
+    case 'completed': return 4
+    default: return 0
   }
-  return idx
 }
 
-export function GenerationProgress({ job, starting, error, onReset }: Props) {
+const STATUS_LABELS: Record<string, string> = {
+  queued: 'Sırada bekliyor...',
+  processing: 'İçerik üretiliyor...',
+  downloading: 'Dosya indiriliyor...',
+}
+
+export function GenerationProgress({ job, starting, error, onReset }: GenerationProgressProps) {
+  // Starting
   if (starting && !job) {
     return (
-      <div className="flex flex-col items-center gap-4 py-16">
-        <Loader2 className="h-10 w-10 animate-spin" style={{ color: 'var(--color-primary)' }} />
-        <p className="text-[13px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
+      <div className="flex flex-col items-center gap-3 py-16">
+        <Loader2 className="h-12 w-12 animate-spin" style={{ color: 'var(--color-primary)' }} />
+        <p className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           Üretim başlatılıyor...
+        </p>
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          NotebookLM&apos;e bağlanılıyor
         </p>
       </div>
     )
   }
 
+  // Error (no job)
   if (error && !job) {
     return (
-      <div className="flex flex-col items-center gap-4 py-16">
-        <XCircle className="h-10 w-10" style={{ color: 'var(--color-error)' }} />
-        <p className="text-[13px] font-semibold">{error}</p>
+      <div
+        className="rounded-2xl p-8 text-center"
+        style={{ background: 'color-mix(in srgb, var(--color-error) 8%, var(--color-surface))', border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)' }}
+      >
+        <XCircle className="mx-auto h-10 w-10" style={{ color: 'var(--color-error)' }} />
+        <h3 className="mt-3 text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          Üretim Başarısız
+        </h3>
+        <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>{error}</p>
         <button
+          type="button"
           onClick={onReset}
-          className="flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-semibold transition-all"
-          style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
+          className="mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-opacity hover:opacity-80"
+          style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
         >
-          <RefreshCw className="h-4 w-4" />
-          Tekrar Dene
+          <ArrowLeft className="h-4 w-4" />
+          Geri Dön
         </button>
       </div>
     )
@@ -58,149 +72,159 @@ export function GenerationProgress({ job, starting, error, onReset }: Props) {
 
   if (!job) return null
 
-  const { progress, error: jobError, format } = job
-  const status = job.status as string
-  const formatCfg = getFormatConfig(format)
-  const stageIdx = status === 'completed' ? STAGES.length - 1 : getCurrentStageIndex(progress)
+  // Failed
+  if (job.status === 'failed') {
+    return (
+      <div
+        className="rounded-2xl p-8 text-center"
+        style={{ background: 'color-mix(in srgb, var(--color-error) 8%, var(--color-surface))', border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)' }}
+      >
+        <XCircle className="mx-auto h-10 w-10" style={{ color: 'var(--color-error)' }} />
+        <h3 className="mt-3 text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          Üretim Başarısız
+        </h3>
+        <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>{job.error || error || 'Bilinmeyen hata'}</p>
+        <div className="mt-5 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={onReset}
+            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-opacity hover:opacity-80"
+            style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Geri Dön
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-opacity hover:opacity-80"
+            style={{ background: 'var(--color-primary)', color: 'white' }}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Tekrar Dene
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Completed
+  if (job.status === 'completed') {
+    return (
+      <div
+        className="relative overflow-hidden rounded-2xl p-8 text-center"
+        style={{ background: 'color-mix(in srgb, var(--color-success) 8%, var(--color-surface))', border: '1px solid color-mix(in srgb, var(--color-success) 25%, transparent)' }}
+      >
+        {/* Sparkle dots */}
+        <div className="pointer-events-none absolute inset-0">
+          {[...Array(4)].map((_, i) => (
+            <span
+              key={i}
+              className="absolute h-1 w-1 rounded-full"
+              style={{
+                background: 'var(--color-success)',
+                top: `${20 + i * 15}%`,
+                left: `${10 + i * 25}%`,
+                opacity: 0,
+                animation: `sparkle 2s ease-in-out ${i * 0.4}s infinite`,
+              }}
+            />
+          ))}
+        </div>
+        <style>{`
+          @keyframes sparkle {
+            0%, 100% { opacity: 0; transform: scale(0); }
+            50% { opacity: 0.8; transform: scale(1.5); }
+          }
+        `}</style>
+
+        <CheckCircle className="mx-auto h-10 w-10" style={{ color: 'var(--color-success)' }} />
+        <h3 className="mt-3 text-lg font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>
+          İçerik Hazır!
+        </h3>
+        <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          İçeriğiniz başarıyla üretildi. Aşağıda önizleyebilir ve değerlendirebilirsiniz.
+        </p>
+      </div>
+    )
+  }
+
+  // Active: queued / processing / downloading
+  const stageIdx = getStageIndex(job.status, job.progress)
+  const config = getFormatConfig(job.artifactType)
 
   return (
-    <div className="space-y-6">
-      {/* Format etiketi */}
-      <div className="flex items-center gap-2">
-        <span className="text-2xl">{formatCfg.icon}</span>
-        <div>
-          <p className="text-[13px] font-bold">{formatCfg.label} üretiliyor</p>
-          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-            {formatCfg.estimatedMinutes} sürebilir
-          </p>
-        </div>
-      </div>
-
-      {/* İlerleme çubuğu */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[12px] font-semibold">{STAGES[stageIdx].label}</span>
-          <span className="text-[12px] font-bold" style={{ color: 'var(--color-primary)' }}>
-            {status === 'completed' ? 100 : status === 'failed' ? 0 : progress}%
-          </span>
-        </div>
-        <div
-          className="h-2.5 w-full overflow-hidden rounded-full"
-          style={{ background: 'var(--color-border)' }}
-        >
-          <div
-            className="h-full rounded-full transition-all duration-500 ease-out"
-            style={{
-              width: `${status === 'completed' ? 100 : status === 'failed' ? progress : progress}%`,
-              background: status === 'failed'
-                ? 'var(--color-error)'
-                : 'linear-gradient(90deg, var(--color-primary), #34d399)',
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Aşama göstergesi */}
-      <div className="flex items-start gap-0">
-        {STAGES.map((stage, i) => {
-          const done = i < stageIdx || status === 'completed'
-          const active = i === stageIdx && status !== 'completed' && status !== 'failed'
-          const failed = status === 'failed' && i === stageIdx
+    <div className="space-y-6 py-4">
+      {/* Stage Indicator */}
+      <div className="flex items-center justify-between px-2">
+        {STAGES.map((label, i) => {
+          const isPast = i < stageIdx
+          const isActive = i === stageIdx
+          const dotColor = isPast ? 'var(--color-success)' : isActive ? 'var(--color-primary)' : 'var(--color-border)'
 
           return (
-            <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
-              {/* Bağlantı çizgisi + nokta */}
-              <div className="flex w-full items-center">
-                <div
-                  className="h-0.5 flex-1"
+            <div key={label} className="flex flex-1 items-center">
+              <div className="flex flex-col items-center">
+                <span
+                  className="rounded-full"
                   style={{
-                    background: i === 0 ? 'transparent' : done ? 'var(--color-primary)' : 'var(--color-border)',
+                    width: isActive ? 16 : 12,
+                    height: isActive ? 16 : 12,
+                    background: isPast || isActive ? dotColor : 'transparent',
+                    border: `2px solid ${dotColor}`,
+                    animation: isActive ? 'pulse 2s infinite' : 'none',
                   }}
                 />
-                <div
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-300"
-                  style={{
-                    background: failed ? 'var(--color-error)'
-                      : done || status === 'completed' ? 'var(--color-primary)'
-                      : active ? 'var(--color-primary-light)'
-                      : 'var(--color-border)',
-                    border: active ? '2px solid var(--color-primary)' : 'none',
-                  }}
+                <span
+                  className="mt-1.5 text-[10px] font-medium"
+                  style={{ color: isPast ? 'var(--color-success)' : isActive ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
                 >
-                  {active && (
-                    <Loader2 className="h-3 w-3 animate-spin" style={{ color: 'var(--color-primary)' }} />
-                  )}
-                  {done && !active && !failed && (
-                    <CheckCircle2 className="h-4 w-4 text-white" />
-                  )}
-                  {failed && <XCircle className="h-4 w-4 text-white" />}
-                </div>
-                <div
-                  className="h-0.5 flex-1"
-                  style={{
-                    background: i === STAGES.length - 1 ? 'transparent' : done ? 'var(--color-primary)' : 'var(--color-border)',
-                  }}
-                />
+                  {label}
+                </span>
               </div>
-              {/* Etiket */}
-              <p
-                className="text-center text-[9px] leading-tight"
-                style={{
-                  color: done || active ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                  fontWeight: active ? 700 : 400,
-                }}
-              >
-                {stage.label}
-              </p>
+              {i < STAGES.length - 1 && (
+                <div
+                  className="mx-1 h-0.5 flex-1"
+                  style={{ background: i < stageIdx ? 'var(--color-success)' : 'var(--color-border)' }}
+                />
+              )}
             </div>
           )
         })}
       </div>
 
-      {/* Durum mesajı */}
-      {status === 'completed' && (
-        <div
-          className="flex items-center gap-3 rounded-xl p-4"
-          style={{ background: 'var(--color-success-bg)', borderLeft: '4px solid var(--color-success)' }}
-        >
-          <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: 'var(--color-success)' }} />
-          <div>
-            <p className="text-[13px] font-bold" style={{ color: 'var(--color-success)' }}>İçerik başarıyla üretildi!</p>
-            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-              Önizlemeye geçmek için aşağıdaki butona tıklayın.
-            </p>
-          </div>
+      {/* Progress Bar */}
+      <div>
+        <div className="mb-1 text-right">
+          <span className="text-sm font-bold" style={{ color: 'var(--color-primary)' }}>
+            {job.progress}%
+          </span>
         </div>
-      )}
-
-      {status === 'failed' && (
-        <div
-          className="flex items-center gap-3 rounded-xl p-4"
-          style={{ background: 'var(--color-error-bg)', borderLeft: '4px solid var(--color-error)' }}
-        >
-          <XCircle className="h-5 w-5 shrink-0" style={{ color: 'var(--color-error)' }} />
-          <div className="flex-1">
-            <p className="text-[13px] font-bold" style={{ color: 'var(--color-error)' }}>Üretim başarısız</p>
-            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-              {jobError ?? 'Beklenmeyen bir hata oluştu.'}
-            </p>
-          </div>
-          <button
-            onClick={onReset}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-all"
-            style={{ background: 'var(--color-error)', color: '#fff' }}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Tekrar Dene
-          </button>
+        <div className="h-2 overflow-hidden rounded-full" style={{ background: 'var(--color-surface-hover)' }}>
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${job.progress}%`,
+              background: 'linear-gradient(90deg, var(--color-primary), var(--color-success))',
+              transition: 'width 500ms ease',
+            }}
+          />
         </div>
-      )}
+      </div>
 
-      {(status === 'queued' || status === 'processing') && (
-        <p className="text-center text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-          Sayfa kapatılsa da üretim arka planda devam eder.
-        </p>
-      )}
+      {/* Status Text + Estimated Time */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" style={{ color: 'var(--color-primary)' }} />
+          <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+            {STATUS_LABELS[job.status] || 'Devam ediyor...'}
+          </span>
+        </div>
+        <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          <Clock className="h-3.5 w-3.5" />
+          Tahmini süre: ~{config.estimatedMinutes} dakika
+        </span>
+      </div>
     </div>
   )
 }

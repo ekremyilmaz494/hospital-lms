@@ -1,48 +1,55 @@
-// AI İçerik Stüdyosu — Google NotebookLM bağlantı doğrulama
-// POST /api/admin/ai-content-studio/auth/verify
-
-import { NextRequest } from 'next/server'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
+import { verifyAuth, AiServiceError } from '@/app/admin/ai-content-studio/lib/ai-service-client'
 
-const AI_SERVICE_URL = process.env.AI_CONTENT_SERVICE_URL ?? 'http://localhost:8100'
-const INTERNAL_KEY = process.env.AI_CONTENT_INTERNAL_KEY ?? ''
-
-export async function POST(_request: NextRequest) {
+/**
+ * POST /api/admin/ai-content-studio/auth/verify
+ *
+ * Mevcut Google AI bağlantısının geçerliliğini doğrular.
+ */
+export async function POST() {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
+
+  const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  // Python servisine doğrulama isteği
-  const pyRes = await fetch(`${AI_SERVICE_URL}/api/auth/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Internal-Key': INTERNAL_KEY },
-    body: JSON.stringify({ org_id: dbUser!.organizationId }),
-    signal: AbortSignal.timeout(15_000),
+  const orgId = dbUser!.organizationId!
+
+  const connection = await prisma.aiGoogleConnection.findUnique({
+    where: { organizationId: orgId },
   })
 
-  const pyResult = await pyRes.json().catch(() => ({}))
-
-  // DB güncelle
-  if (pyResult.connected) {
-    await prisma.aiGoogleConnection.updateMany({
-      where: { organizationId: dbUser!.organizationId! },
-      data: {
-        status: 'connected',
-        lastVerifiedAt: new Date(),
-        errorMessage: null,
-      },
-    })
-  } else {
-    await prisma.aiGoogleConnection.updateMany({
-      where: { organizationId: dbUser!.organizationId! },
-      data: {
-        status: 'error',
-        errorMessage: pyResult.error ?? 'Doğrulama başarısız.',
-      },
-    })
+  if (!connection) {
+    return errorResponse('Aktif bağlantı bulunamadı', 404)
   }
 
-  return jsonResponse(pyResult)
+  try {
+    const result = await verifyAuth()
+
+    if (result.valid) {
+      await prisma.aiGoogleConnection.update({
+        where: { organizationId: orgId },
+        data: { status: 'connected', lastVerifiedAt: new Date(), errorMessage: null },
+      })
+      return jsonResponse({ valid: true, status: 'connected' })
+    }
+
+    await prisma.aiGoogleConnection.update({
+      where: { organizationId: orgId },
+      data: { status: 'expired', errorMessage: result.error || 'Doğrulama başarısız' },
+    })
+    return jsonResponse({ valid: false, status: 'expired', error: result.error })
+  } catch (err) {
+    const errorMessage = err instanceof AiServiceError ? err.message : 'Doğrulama hatası'
+
+    await prisma.aiGoogleConnection.update({
+      where: { organizationId: orgId },
+      data: { status: 'error', errorMessage },
+    })
+
+    logger.error('AI Verify', 'Bağlantı doğrulaması başarısız', err)
+    return errorResponse('Doğrulama sırasında hata oluştu', 502)
+  }
 }

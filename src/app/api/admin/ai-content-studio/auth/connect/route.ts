@@ -1,91 +1,83 @@
-// AI İçerik Stüdyosu — Google NotebookLM bağlantısı kurma
-// POST /api/admin/ai-content-studio/auth/connect
-
-import { NextRequest } from 'next/server'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
-import { encrypt } from '@/lib/crypto'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
+import { checkRateLimit } from '@/lib/redis'
+import { aiConnectSchema } from '@/lib/validations'
+import { login, AiServiceError } from '@/app/admin/ai-content-studio/lib/ai-service-client'
 
-const AI_SERVICE_URL = process.env.AI_CONTENT_SERVICE_URL ?? 'http://localhost:8100'
-const INTERNAL_KEY = process.env.AI_CONTENT_INTERNAL_KEY ?? ''
-
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/admin/ai-content-studio/auth/connect
+ *
+ * Google AI bağlantısı başlatır. Rate limit ve audit log uygulanır.
+ */
+export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
+
+  const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  const body = await request.json().catch(() => null)
-  if (!body) return errorResponse('Geçersiz istek.')
+  const orgId = dbUser!.organizationId!
 
-  const { email, method, cookieData } = body
-  if (!email) return errorResponse('email zorunludur.')
-  if (!method || !['browser', 'cookie'].includes(method)) {
-    return errorResponse('method "browser" veya "cookie" olmalıdır.')
-  }
-  if (method === 'cookie' && !cookieData) {
-    return errorResponse('Cookie method için cookieData zorunludur.')
-  }
+  const allowed = await checkRateLimit(`ai-connect:${orgId}`, 5, 3600)
+  if (!allowed) return errorResponse('Çok fazla bağlantı denemesi. Lütfen bir saat sonra tekrar deneyin.', 429)
 
-  // Python servisine bağlantı isteği gönder
-  const pyRes = await fetch(`${AI_SERVICE_URL}/api/auth/connect`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Internal-Key': INTERNAL_KEY },
-    body: JSON.stringify({
-      org_id: dbUser!.organizationId,
-      email,
-      method,
-      cookie_data: cookieData ?? undefined,
-    }),
-    signal: AbortSignal.timeout(150_000), // Browser login 120sn sürebilir
-  })
+  const body = await parseBody<{ email: string; browser?: string }>(request)
+  if (!body) return errorResponse('Geçersiz istek gövdesi', 400)
 
-  if (!pyRes.ok) {
-    const pyBody = await pyRes.json().catch(() => ({}))
-    return errorResponse(pyBody.detail ?? 'Bağlantı başarısız.', pyRes.status)
-  }
+  const parsed = aiConnectSchema.safeParse(body)
+  if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message || 'Geçersiz veri', 400)
 
-  const pyResult = await pyRes.json()
+  try {
+    await login(parsed.data.browser)
 
-  // Cookie verisini şifrele
-  const encryptedCookie = cookieData ? encrypt(JSON.stringify(cookieData)) : null
+    await prisma.aiGoogleConnection.upsert({
+      where: { organizationId: orgId },
+      create: {
+        organizationId: orgId,
+        userId: dbUser!.id,
+        email: parsed.data.email,
+        status: 'connected',
+        lastVerifiedAt: new Date(),
+      },
+      update: {
+        userId: dbUser!.id,
+        email: parsed.data.email,
+        status: 'connected',
+        lastVerifiedAt: new Date(),
+        errorMessage: null,
+      },
+    })
 
-  // DB'ye kaydet (upsert — organizasyon başına tek bağlantı)
-  await prisma.aiGoogleConnection.upsert({
-    where: { organizationId: dbUser!.organizationId! },
-    create: {
-      organizationId: dbUser!.organizationId!,
+    await createAuditLog({
       userId: dbUser!.id,
-      email,
-      method,
-      status: 'connected',
-      encryptedCookie,
-      lastVerifiedAt: new Date(),
-    },
-    update: {
-      userId: dbUser!.id,
-      email,
-      method,
-      status: 'connected',
-      encryptedCookie,
-      lastVerifiedAt: new Date(),
-      errorMessage: null,
-    },
-  })
+      organizationId: orgId,
+      action: 'ai_google_connect',
+      entityType: 'AiGoogleConnection',
+      newData: { email: parsed.data.email },
+      request,
+    })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
-    action: 'ai_google.connect',
-    entityType: 'ai_google_connection',
-    entityId: dbUser!.organizationId,
-    newData: { email, method },
-  })
+    return jsonResponse({ success: true, email: parsed.data.email }, 201)
+  } catch (err) {
+    const errorMessage = err instanceof AiServiceError ? err.message : 'Bağlantı hatası'
 
-  return jsonResponse({
-    connected: true,
-    email,
-    method,
-    connectedAt: new Date().toISOString(),
-  })
+    await prisma.aiGoogleConnection.upsert({
+      where: { organizationId: orgId },
+      create: {
+        organizationId: orgId,
+        userId: dbUser!.id,
+        email: parsed.data.email,
+        status: 'error',
+        errorMessage,
+      },
+      update: {
+        status: 'error',
+        errorMessage,
+      },
+    })
+
+    logger.error('AI Connect', 'Google bağlantısı başarısız', err)
+    return errorResponse('Google bağlantısı kurulamadı. Lütfen tekrar deneyin.', 502)
+  }
 }

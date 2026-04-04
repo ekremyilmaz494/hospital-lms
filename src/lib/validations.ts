@@ -398,3 +398,56 @@ export const updateQuestionBankSchema = z.object({
     order: z.coerce.number().int().min(0),
   })).min(2).max(6).optional(),
 })
+
+// ── AI İçerik Stüdyosu ──
+
+export const aiConnectSchema = z.object({
+  email: z.string().email('Geçerli bir e-posta adresi girin'),
+  browser: z.enum(['chromium', 'msedge']).default('chromium'),
+})
+
+export const aiSourceAddSchema = z.object({
+  notebookId: z.string().uuid().optional(),
+  title: z.string().min(1).max(500).optional(),
+  sourceType: z.enum(['url', 'youtube', 'text']),
+  url: z.string().url().max(2000).optional(),
+  content: z.string().min(10).max(500000).optional(),
+  textTitle: z.string().min(1).max(500).optional(),
+}).refine(
+  (d) => {
+    if (d.sourceType === 'url' || d.sourceType === 'youtube') return !!d.url
+    if (d.sourceType === 'text') return !!d.content && !!d.textTitle
+    return true
+  },
+  { message: 'Kaynak türüne göre url veya text alanı zorunludur' }
+)
+
+export const aiGenerateSchema = z.object({
+  notebookId: z.string().uuid(),
+  artifactType: z.enum([
+    'audio', 'video', 'slide_deck', 'quiz', 'flashcards',
+    'report', 'infographic', 'data_table', 'mind_map',
+  ]),
+  title: z.string().min(1).max(500),
+  instructions: z.string().max(2000).optional(),
+  settings: z.record(z.string(), z.string()).optional().default({}),
+})
+
+export const aiEvaluateSchema = z.object({
+  evaluation: z.enum(['approved', 'rejected']),
+  note: z.string().max(1000).optional(),
+})
+
+export const aiApproveSchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().max(2000).optional(),
+  category: contentLibraryCategoryEnum,
+  difficulty: z.enum(['BASIC', 'INTERMEDIATE', 'ADVANCED']),
+  targetRoles: z.array(z.string().min(1)).min(1).max(10),
+  duration: z.coerce.number().int().min(1).max(480),
+  smgPoints: z.coerce.number().int().min(0).max(100).default(0),
+})
+
+export const aiBulkDeleteSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50),
+})

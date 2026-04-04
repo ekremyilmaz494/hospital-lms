@@ -1,38 +1,35 @@
-// AI İçerik Stüdyosu — Google NotebookLM bağlantı durumu
-// GET /api/admin/ai-content-studio/auth/status
-
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
+import { getAuthUser, requireRole, jsonResponse } from '@/lib/api-helpers'
 
+/**
+ * GET /api/admin/ai-content-studio/auth/status
+ *
+ * Organizasyonun Google AI bağlantı durumunu döndürür.
+ */
 export async function GET() {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
+
+  const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
+  const orgId = dbUser!.organizationId!
+
   const connection = await prisma.aiGoogleConnection.findUnique({
-    where: { organizationId: dbUser!.organizationId! },
+    where: { organizationId: orgId },
   })
 
   if (!connection) {
-    return jsonResponse({
-      connected: false,
-      email: null,
-      status: 'not_connected',
-      lastVerifiedAt: null,
-      lastUsedAt: null,
-      expiresAt: null,
-    })
+    return jsonResponse({ connected: false })
   }
 
   return jsonResponse({
     connected: connection.status === 'connected',
     email: connection.email,
     status: connection.status,
-    method: connection.method,
-    lastVerifiedAt: connection.lastVerifiedAt?.toISOString() ?? null,
-    lastUsedAt: connection.lastUsedAt?.toISOString() ?? null,
-    expiresAt: connection.expiresAt?.toISOString() ?? null,
+    lastVerifiedAt: connection.lastVerifiedAt,
+    lastUsedAt: connection.lastUsedAt,
+    expiresAt: connection.expiresAt,
     errorMessage: connection.errorMessage,
   })
 }
