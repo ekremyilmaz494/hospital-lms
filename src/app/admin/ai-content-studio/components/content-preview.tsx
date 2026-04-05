@@ -12,7 +12,6 @@ import {
   ZoomIn,
   ZoomOut,
   X,
-  Maximize2,
   Eye,
   EyeOff,
 } from 'lucide-react'
@@ -166,33 +165,50 @@ function VideoPreview({ url, title }: { url: string; title: string }) {
 // ── 3. PresentationPreview ──
 
 function PresentationPreview({ url, job }: { url: string; job: GenerationJob }) {
-  const outputType = job.settings?.outputFileType ?? job.settings?.format ?? ''
-  const isPdf = outputType.toLowerCase().includes('pdf') || url.toLowerCase().endsWith('.pdf')
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let revoked = false
+    setLoading(true)
+    setError(null)
+
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error('PDF yüklenemedi')
+        return res.blob()
+      })
+      .then((blob) => {
+        if (revoked) return
+        const objectUrl = URL.createObjectURL(blob)
+        setBlobUrl(objectUrl)
+      })
+      .catch((err) => {
+        if (!revoked) setError(err instanceof Error ? err.message : 'Yükleme hatası')
+      })
+      .finally(() => {
+        if (!revoked) setLoading(false)
+      })
+
+    return () => {
+      revoked = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url])
 
   return (
     <PreviewCard title={job.title} icon="📊" url={url}>
-      {isPdf ? (
+      {loading && <LoadingSpinner message="Sunum yükleniyor..." />}
+      {error && <ErrorBlock message={error} onRetry={() => window.location.reload()} />}
+      {blobUrl && (
         <iframe
-          src={url}
+          src={blobUrl}
           className="w-full rounded-xl"
-          style={{ height: 600, border: 'none' }}
+          style={{ height: '85vh', minHeight: 700, border: 'none' }}
           title={job.title}
         />
-      ) : (
-        <div className="flex flex-col items-center justify-center gap-4 py-12">
-          <Maximize2 className="h-10 w-10" style={{ color: 'var(--color-text-muted)' }} />
-          <p className="text-sm text-center" style={{ color: 'var(--color-text-muted)' }}>
-            PPTX dosyaları tarayıcıda önizlenemez. Dosyayı indirerek görüntüleyebilirsiniz.
-          </p>
-          <a
-            href={url}
-            download
-            className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium transition-opacity hover:opacity-80"
-            style={{ background: 'var(--color-primary)', color: 'white' }}
-          >
-            <Download className="h-4 w-4" /> Sunumu İndir
-          </a>
-        </div>
       )}
     </PreviewCard>
   )
@@ -200,8 +216,38 @@ function PresentationPreview({ url, job }: { url: string; job: GenerationJob }) 
 
 // ── 4. QuizPreview ──
 
+/** NotebookLM quiz verisini normalize eder.
+ * NotebookLM iki farklı format dönebilir:
+ *  - Eski: {question, options: string[], correctAnswer: number}
+ *  - Yeni: {question, answerOptions: [{text, isCorrect, rationale}], hint} */
+function normalizeQuizData(raw: Record<string, unknown>): QuizData {
+  const questions = (raw.questions ?? raw.quiz ?? []) as Record<string, unknown>[]
+  return {
+    title: (raw.title as string) ?? 'Quiz',
+    questions: questions.map((q, i) => {
+      // Zaten normalize edilmişse doğrudan döndür
+      if (Array.isArray(q.options) && typeof q.options[0] === 'string') {
+        return q as unknown as QuizQuestion
+      }
+      // NotebookLM answerOptions formatı
+      const answerOptions = (q.answerOptions ?? q.answer_options ?? []) as { text: string; isCorrect?: boolean; is_correct?: boolean }[]
+      const options = answerOptions.map((o) => o.text)
+      const correctIndex = answerOptions.findIndex((o) => o.isCorrect === true || o.is_correct === true)
+      return {
+        id: (q.id as string | number) ?? i,
+        question: (q.question as string) ?? '',
+        options,
+        correctAnswer: correctIndex >= 0 ? correctIndex : 0,
+        explanation: (q.hint ?? q.explanation ?? q.rationale) as string | undefined,
+      }
+    }),
+  }
+}
+
 function QuizPreview({ data: initialData, url }: { data: QuizData | null; url: string }) {
-  const [data, setData] = useState<QuizData | null>(initialData)
+  const [data, setData] = useState<QuizData | null>(
+    initialData ? normalizeQuizData(initialData as unknown as Record<string, unknown>) : null,
+  )
   const [currentQ, setCurrentQ] = useState(0)
   const [showAnswer, setShowAnswer] = useState(false)
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
@@ -214,8 +260,8 @@ function QuizPreview({ data: initialData, url }: { data: QuizData | null; url: s
     try {
       const res = await fetch(url)
       if (!res.ok) throw new Error('Veri yüklenemedi')
-      const json = (await res.json()) as QuizData
-      setData(json)
+      const json = await res.json()
+      setData(normalizeQuizData(json))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bilinmeyen hata')
     } finally {
@@ -231,7 +277,14 @@ function QuizPreview({ data: initialData, url }: { data: QuizData | null; url: s
 
   const questions = data?.questions ?? []
   const total = questions.length
-  const question: QuizQuestion | undefined = questions[currentQ]
+  const rawQuestion = questions[currentQ]
+  // Runtime guard: answerOptions formatında gelen sorular için options oluştur
+  const question: QuizQuestion | undefined = rawQuestion
+    ? {
+        ...rawQuestion,
+        options: rawQuestion.options ?? ((rawQuestion as unknown as Record<string, unknown>).answerOptions as { text: string }[] ?? []).map((o: { text: string }) => o.text),
+      }
+    : undefined
 
   const handleOptionClick = (index: number) => {
     if (selectedOption !== null) return
@@ -283,7 +336,7 @@ function QuizPreview({ data: initialData, url }: { data: QuizData | null; url: s
 
           {/* Options */}
           <div className="flex flex-col gap-2">
-            {question.options.map((option, index) => (
+            {(question.options ?? []).map((option, index) => (
               <button
                 key={index}
                 type="button"

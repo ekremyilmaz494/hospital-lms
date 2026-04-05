@@ -4,7 +4,7 @@
 // 4 adımlı akış: Belge Yükle → Talimat Yaz → Format Seç → Üret
 // Üretim başladığında detay sayfasına yönlendirir
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Upload,
@@ -52,11 +52,20 @@ export default function AIContentStudioNewPage() {
   const docUpload = useDocumentUpload()
   const generation = useGeneration()
   const addJob = useAiGenerationStore((s) => s.addJob)
-  const { data: connectionStatus } = useFetch<GoogleConnectionStatus>(
+  const { data: connectionStatus, refetch: refetchConnection } = useFetch<GoogleConnectionStatus>(
     '/api/admin/ai-content-studio/auth/status',
   )
 
   const isConnected = connectionStatus?.connected === true
+
+  // Settings'ten dönünce bağlantı durumunu yenile
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refetchConnection()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [refetchConnection])
 
   // ── State ──
   const [step, setStep] = useState(0)
@@ -67,6 +76,7 @@ export default function AIContentStudioNewPage() {
     ...DEFAULT_COMMON_SETTINGS,
   })
   const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
 
   // ── Belge analizinden gelen konular ──
   const suggestedTopics = useMemo(() => {
@@ -120,6 +130,7 @@ export default function AIContentStudioNewPage() {
     if (!selectedFormat || !docUpload.notebookId) return
 
     setGenerating(true)
+    setGenerateError(null)
     try {
       const title = docUpload.documents[0]?.fileName ?? 'AI İçerik'
 
@@ -141,7 +152,11 @@ export default function AIContentStudioNewPage() {
           createdAt: new Date().toISOString(),
         })
         router.push(`/admin/ai-content-studio/${jobId}`)
+      } else {
+        setGenerateError(generation.error ?? 'Üretim başlatılamadı')
       }
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : 'Bir hata oluştu')
     } finally {
       setGenerating(false)
     }
@@ -509,6 +524,12 @@ export default function AIContentStudioNewPage() {
                       )}
                     </button>
                   </div>
+
+                  {generateError && (
+                    <p className="text-center text-[12px] mt-2" style={{ color: 'var(--color-error)' }}>
+                      {generateError}
+                    </p>
+                  )}
 
                   {!isConnected && (
                     <p className="text-center text-[12px]" style={{ color: 'var(--color-warning)' }}>

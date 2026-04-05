@@ -11,6 +11,7 @@ import type { LiveExamAttempt } from '@/hooks/use-realtime-exams';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
+// Chart'lar aynı modülden — webpack tek chunk olarak birleştirir
 const TrendChart = dynamic(() => import('@/components/shared/charts/admin-dashboard-charts').then(m => ({ default: m.TrendChart })), { ssr: false, loading: () => <ChartSkeletonInline /> });
 const StatusDonut = dynamic(() => import('@/components/shared/charts/admin-dashboard-charts').then(m => ({ default: m.StatusDonut })), { ssr: false, loading: () => <ChartSkeletonInline /> });
 const DepartmentBar = dynamic(() => import('@/components/shared/charts/admin-dashboard-charts').then(m => ({ default: m.DepartmentBar })), { ssr: false, loading: () => <ChartSkeletonInline /> });
@@ -24,9 +25,10 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/components/shared/toast';
 import { StatCardSkeleton, TableSkeleton, ListSkeleton, AlertSkeleton, SectionError, ChartSkeleton } from '@/components/shared/skeletons';
 
-const BlurFade = dynamic(() => import('@/components/ui/blur-fade').then(m => ({ default: m.BlurFade })), { ssr: false });
-const MagicCard = dynamic(() => import('@/components/ui/magic-card').then(m => ({ default: m.MagicCard })), { ssr: false });
-const BorderBeam = dynamic(() => import('@/components/ui/border-beam').then(m => ({ default: m.BorderBeam })), { ssr: false });
+// Küçük UI bileşenleri — static import (< 5KB)
+import { BlurFade } from '@/components/ui/blur-fade';
+import { MagicCard } from '@/components/ui/magic-card';
+import { BorderBeam } from '@/components/ui/border-beam';
 const MatrixMiniWidget = dynamic(() => import('./matrix-mini-widget').then(m => ({ default: m.MatrixMiniWidget })), {
   ssr: false,
   loading: () => <div className="animate-pulse rounded-2xl border h-64" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />,
@@ -221,12 +223,23 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const [sendingReminder, setSendingReminder] = useState<string | null>(null);
 
-  // ── Progressive data fetching: each section loads independently ──
-  const stats = useFetch<StatsData>('/api/admin/dashboard/stats', { interval: 60_000 });
-  const charts = useFetch<ChartsData>('/api/admin/dashboard/charts');
-  const compliance = useFetch<ComplianceData>('/api/admin/dashboard/compliance', { interval: 120_000 });
-  const activity = useFetch<ActivityData>('/api/admin/dashboard/activity', { interval: 90_000 });
-  const certs = useFetch<CertsData>('/api/admin/dashboard/certs');
+  // ── Combined dashboard data — tek HTTP istek, 90s polling ──
+  interface DashboardCombinedData {
+    stats: StatsData | null;
+    charts: ChartsData | null;
+    compliance: ComplianceData | null;
+    activity: ActivityData | null;
+    certs: CertsData | null;
+  }
+  const { data: dashboardData, isLoading: dashLoading, error: dashError, refetch: dashRefetch } =
+    useFetch<DashboardCombinedData>('/api/admin/dashboard/combined', { interval: 90_000 });
+
+  // Uyumluluk katmanı — mevcut render kodunu bozmamak için
+  const stats = { data: dashboardData?.stats ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch };
+  const charts = { data: dashboardData?.charts ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch };
+  const compliance = { data: dashboardData?.compliance ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch };
+  const activity = { data: dashboardData?.activity ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch };
+  const certs = { data: dashboardData?.certs ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch };
 
   const handleSendReminder = async (assignmentId: string, staffName: string) => {
     setSendingReminder(assignmentId);
@@ -305,7 +318,7 @@ export default function AdminDashboard() {
       </BlurFade>
 
       {/* G7.6 — Live In-Progress Exams (Supabase Realtime — always independent) */}
-      <BlurFade delay={0.045}>
+      <BlurFade delay={0.02}>
         <LiveExamsWidget />
       </BlurFade>
 
@@ -316,7 +329,7 @@ export default function AdminDashboard() {
         <>
           {/* Warning Banner — depends on compliance + certs */}
           {!compliance.isLoading && !certs.isLoading && (overdueTrainings.length > 0 || expiringCerts.filter(c => c.daysLeft <= 7).length > 0) && (
-            <BlurFade delay={0.05}>
+            <BlurFade delay={0.02}>
               <div className="relative overflow-hidden flex items-center gap-4 rounded-2xl px-6 py-4" style={{ background: 'linear-gradient(135deg, var(--color-accent), #92400e)', boxShadow: '0 4px 20px rgba(245, 158, 11, 0.15)' }}>
                 <BorderBeam size={100} duration={8} colorFrom="#fbbf24" colorTo="#f59e0b" />
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
@@ -337,7 +350,7 @@ export default function AdminDashboard() {
           {stats.isLoading ? (
             <AlertSkeleton />
           ) : complianceAlerts.length > 0 ? (
-            <BlurFade delay={0.06}>
+            <BlurFade delay={0.02}>
               <div className="rounded-2xl p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -382,7 +395,7 @@ export default function AdminDashboard() {
             {stats.isLoading
               ? Array.from({ length: 5 }).map((_, i) => <StatCardSkeleton key={i} />)
               : statCards.map((stat, i) => (
-                  <BlurFade key={stat.title} delay={0.1 + i * 0.05}><StatCard {...stat} /></BlurFade>
+                  <BlurFade key={stat.title} delay={0.02 + i * 0.02}><StatCard {...stat} /></BlurFade>
                 ))
             }
           </div>
@@ -391,7 +404,7 @@ export default function AdminDashboard() {
 
       {/* ── Charts Section ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <BlurFade delay={0.3} className="lg:col-span-2">
+        <BlurFade delay={0} className="lg:col-span-2">
           {charts.error ? (
             <SectionError message={charts.error} onRetry={charts.refetch} />
           ) : charts.isLoading ? (
@@ -410,7 +423,7 @@ export default function AdminDashboard() {
         </BlurFade>
 
         {/* Status Donut — data from stats endpoint */}
-        <BlurFade delay={0.35}>
+        <BlurFade delay={0}>
           {stats.isLoading ? (
             <ChartSkeleton />
           ) : (
@@ -444,7 +457,7 @@ export default function AdminDashboard() {
       {/* ── Department Comparison + Certificate Expiry ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Department Comparison — from charts endpoint */}
-        <BlurFade delay={0.4}>
+        <BlurFade delay={0}>
           {charts.error ? (
             <SectionError message={charts.error} onRetry={charts.refetch} />
           ) : charts.isLoading ? (
@@ -463,7 +476,7 @@ export default function AdminDashboard() {
         </BlurFade>
 
         {/* Certificate Expiry Tracker — from certs endpoint */}
-        <BlurFade delay={0.45}>
+        <BlurFade delay={0}>
           {certs.error ? (
             <SectionError message={certs.error} onRetry={certs.refetch} />
           ) : certs.isLoading ? (
@@ -517,7 +530,7 @@ export default function AdminDashboard() {
       ) : compliance.isLoading ? (
         <TableSkeleton rows={3} />
       ) : overdueTrainings.length > 0 ? (
-        <BlurFade delay={0.5}>
+        <BlurFade delay={0}>
           <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
               <div className="flex items-center gap-3">
@@ -583,14 +596,14 @@ export default function AdminDashboard() {
       ) : null}
 
       {/* Competency Matrix Widget */}
-      <BlurFade delay={0.52}>
+      <BlurFade delay={0}>
         <MatrixMiniWidget />
       </BlurFade>
 
       {/* ── Activity Section (polling: 90s) ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Top Performers */}
-        <BlurFade delay={0.55}>
+        <BlurFade delay={0}>
           {activity.error ? (
             <SectionError message={activity.error} onRetry={activity.refetch} />
           ) : activity.isLoading ? (
@@ -633,7 +646,7 @@ export default function AdminDashboard() {
         </BlurFade>
 
         {/* Recent Activity */}
-        <BlurFade delay={0.6}>
+        <BlurFade delay={0}>
           {activity.error ? (
             <SectionError message={activity.error} onRetry={activity.refetch} />
           ) : activity.isLoading ? (

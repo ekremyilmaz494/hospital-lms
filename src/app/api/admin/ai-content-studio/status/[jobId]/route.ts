@@ -15,8 +15,8 @@ const RESULT_TYPE_MAP: Record<string, string> = {
   md: 'document',
 }
 
-/** Timeout threshold in milliseconds (15 minutes) */
-const GENERATION_TIMEOUT_MS = 15 * 60 * 1000
+/** Timeout threshold in milliseconds (45 minutes — ses/video uzun sürebilir) */
+const GENERATION_TIMEOUT_MS = 45 * 60 * 1000
 
 export async function GET(
   request: Request,
@@ -63,7 +63,8 @@ export async function GET(
     try {
       const sidecarResult = await getTaskStatus(
         generation.notebook.notebookLmId,
-        generation.taskLmId
+        generation.taskLmId,
+        orgId,
       )
 
       if (sidecarResult.status === 'completed') {
@@ -103,17 +104,22 @@ export async function GET(
     } catch (err) {
       logger.error('ai-content-studio/status', 'Sidecar durum sorgusu başarısız', err)
 
-      // Check if generation is older than 15 minutes
       const age = Date.now() - new Date(generation.createdAt).getTime()
-      if (age > GENERATION_TIMEOUT_MS) {
-        const timeoutMessage = 'Üretim zaman aşımına uğradı'
+      const is404 = err instanceof AiServiceError && err.status === 404
+
+      // Sidecar 404 = job store'da yok (restart sonrası kaybolmuş)
+      // veya 15 dk timeout aşılmış — her iki durumda da failed yap
+      if (is404 || age > GENERATION_TIMEOUT_MS) {
+        const failMessage = is404
+          ? 'Üretim servisi yeniden başlatıldı, üretim kayboldu. Lütfen tekrar deneyin.'
+          : 'Üretim zaman aşımına uğradı'
         await prisma.aiGeneration.update({
           where: { id: generation.id },
-          data: { status: 'failed', errorMessage: timeoutMessage },
+          data: { status: 'failed', errorMessage: failMessage },
         })
 
         currentStatus = 'failed'
-        currentErrorMessage = timeoutMessage
+        currentErrorMessage = failMessage
       }
     }
   }

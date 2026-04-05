@@ -6,8 +6,10 @@ router = APIRouter()
 
 @router.get("/health")
 async def health():
-    auth_configured = bool(settings.notebooklm_auth_json)
+    """Health check — TypeScript expects: {status, service, version, notebooklm}"""
     return {
         "status": "ok",
-        "notebooklm_auth": "configured" if auth_configured else "missing",
+        "service": "ai-content-service",
+        "version": "1.0.0",
+        "notebooklm": "configured" if settings.notebooklm_auth_json else "cookie-based",
     }

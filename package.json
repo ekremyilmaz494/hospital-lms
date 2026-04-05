@@ -19,6 +19,9 @@
     "db:seed": "node scripts/seed-demo.js",
     "prepare": "husky"
   },
+  "pnpm": {
+    "ignoredBuiltDependencies": ["sharp", "unrs-resolver"]
+  },
   "lint-staged": {
     "*": [
       "node scripts/secret-scanner.js"

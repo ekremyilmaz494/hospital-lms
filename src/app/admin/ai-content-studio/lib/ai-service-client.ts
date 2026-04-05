@@ -1,6 +1,7 @@
 /**
  * AI Content Service — Python sidecar HTTP client.
  * Tüm NotebookLM operasyonları bu client üzerinden yapılır.
+ * org_id: Multi-tenant cookie yönetimi için X-Org-Id header gönderilir.
  */
 
 const BASE_URL = process.env.AI_CONTENT_SERVICE_URL || 'http://localhost:8100'
@@ -34,10 +35,11 @@ interface FetchOptions {
   formData?: FormData
   timeout?: number
   rawResponse?: boolean
+  orgId?: string
 }
 
 async function sidecarFetch<T>(path: string, opts: FetchOptions = {}): Promise<T> {
-  const { method = 'GET', body, formData, timeout = TIMEOUTS.default } = opts
+  const { method = 'GET', body, formData, timeout = TIMEOUTS.default, orgId } = opts
   const url = `${BASE_URL}/api${path}`
 
   const controller = new AbortController()
@@ -45,6 +47,9 @@ async function sidecarFetch<T>(path: string, opts: FetchOptions = {}): Promise<T
 
   const headers: Record<string, string> = {
     'X-Internal-Key': INTERNAL_KEY,
+  }
+  if (orgId) {
+    headers['X-Org-Id'] = orgId
   }
 
   let fetchBody: BodyInit | undefined
@@ -142,41 +147,43 @@ export interface StatusResponse {
 
 // ── Exported Functions ──
 
-/** Health check — auth gerektirmez ama key gönderilir. */
+/** Health check */
 export async function checkHealth(): Promise<HealthResponse> {
   return sidecarFetch<HealthResponse>('/health')
 }
 
 /** Browser login başlat — Playwright açılır, ~30-120s sürebilir. */
-export async function login(browser: 'chromium' | 'msedge' = 'chromium'): Promise<AuthResponse> {
+export async function login(browser: 'chromium' | 'msedge' = 'chromium', orgId?: string): Promise<AuthResponse> {
   return sidecarFetch<AuthResponse>('/auth/login', {
     method: 'POST',
     body: { browser },
     timeout: TIMEOUTS.auth,
+    orgId,
   })
 }
 
 /** Mevcut cookie'lerin geçerliliğini kontrol et. */
-export async function verifyAuth(): Promise<AuthVerifyResponse> {
-  return sidecarFetch<AuthVerifyResponse>('/auth/verify', { method: 'POST' })
+export async function verifyAuth(orgId?: string): Promise<AuthVerifyResponse> {
+  return sidecarFetch<AuthVerifyResponse>('/auth/verify', { method: 'POST', orgId })
 }
 
 /** Cookie'leri sil, client'ı kapat. */
-export async function disconnectAuth(): Promise<AuthResponse> {
-  return sidecarFetch<AuthResponse>('/auth/disconnect', { method: 'POST' })
+export async function disconnectAuth(orgId?: string): Promise<AuthResponse> {
+  return sidecarFetch<AuthResponse>('/auth/disconnect', { method: 'POST', orgId })
 }
 
 /** Yeni NotebookLM notebook'u oluştur. */
-export async function createNotebook(title: string): Promise<NotebookResponse> {
+export async function createNotebook(title: string, orgId?: string): Promise<NotebookResponse> {
   return sidecarFetch<NotebookResponse>('/notebooks/create', {
     method: 'POST',
     body: { title },
+    orgId,
   })
 }
 
 /** Tüm notebook'ları listele. */
-export async function listNotebooks(): Promise<NotebookListResponse> {
-  return sidecarFetch<NotebookListResponse>('/notebooks/list')
+export async function listNotebooks(orgId?: string): Promise<NotebookListResponse> {
+  return sidecarFetch<NotebookListResponse>('/notebooks/list', { orgId })
 }
 
 /** Dosya kaynağı ekle — multipart/form-data. */
@@ -184,6 +191,7 @@ export async function addFileSource(
   notebookId: string,
   fileBuffer: Buffer,
   fileName: string,
+  orgId?: string,
 ): Promise<SourceAddResponse> {
   const fd = new FormData()
   fd.append('notebook_id', notebookId)
@@ -193,6 +201,7 @@ export async function addFileSource(
   return sidecarFetch<SourceAddResponse>('/sources/add', {
     method: 'POST',
     formData: fd,
+    orgId,
   })
 }
 
@@ -201,6 +210,7 @@ export async function addSource(
   notebookId: string,
   sourceType: 'url' | 'youtube' | 'text',
   opts: { url?: string; title?: string; content?: string },
+  orgId?: string,
 ): Promise<SourceAddResponse> {
   const fd = new FormData()
   fd.append('notebook_id', notebookId)
@@ -212,6 +222,7 @@ export async function addSource(
   return sidecarFetch<SourceAddResponse>('/sources/add', {
     method: 'POST',
     formData: fd,
+    orgId,
   })
 }
 
@@ -219,18 +230,21 @@ export async function addSource(
 export async function getSourceStatus(
   notebookId: string,
   sourceId: string,
+  orgId?: string,
 ): Promise<SourceStatusResponse> {
-  return sidecarFetch<SourceStatusResponse>(`/sources/status/${notebookId}/${sourceId}`)
+  return sidecarFetch<SourceStatusResponse>(`/sources/status/${notebookId}/${sourceId}`, { orgId })
 }
 
 /** Kaynak hazır olana kadar bekle (blocking, ~120s). */
 export async function waitForSource(
   notebookId: string,
   sourceId: string,
+  orgId?: string,
 ): Promise<SourceStatusResponse> {
   return sidecarFetch<SourceStatusResponse>(`/sources/wait/${notebookId}/${sourceId}`, {
     method: 'POST',
     timeout: TIMEOUTS.wait,
+    orgId,
   })
 }
 
@@ -240,20 +254,22 @@ export async function startGeneration(params: {
   artifact_type: string
   instructions?: string
   settings?: Record<string, unknown>
-}): Promise<GenerateResponse> {
+}, orgId?: string): Promise<GenerateResponse> {
   return sidecarFetch<GenerateResponse>('/generate', {
     method: 'POST',
     body: params,
     timeout: TIMEOUTS.generate,
+    orgId,
   })
 }
 
-/** Üretim durumunu sorgula (tek seferlik, blocking değil). */
+/** Üretim durumunu sorgula. */
 export async function getTaskStatus(
   notebookId: string,
   taskId: string,
+  orgId?: string,
 ): Promise<StatusResponse> {
-  return sidecarFetch<StatusResponse>(`/status/${notebookId}/${taskId}`)
+  return sidecarFetch<StatusResponse>(`/status/${notebookId}/${taskId}`, { orgId })
 }
 
 /** Tamamlanmış artifact'ı indir — Buffer olarak döner. */
@@ -262,13 +278,14 @@ export async function downloadArtifact(
   artifactId: string,
   artifactType: string,
   outputFormat?: string,
+  orgId?: string,
 ): Promise<Buffer> {
   const qs = new URLSearchParams({ artifact_type: artifactType })
   if (outputFormat) qs.set('output_format', outputFormat)
 
   const res = await sidecarFetch<Response>(
     `/download/${notebookId}/${artifactId}?${qs.toString()}`,
-    { rawResponse: true },
+    { rawResponse: true, orgId },
   )
 
   if (!res.ok) {

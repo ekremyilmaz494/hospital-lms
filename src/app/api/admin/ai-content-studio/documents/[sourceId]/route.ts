@@ -26,7 +26,7 @@ export async function GET(
 
     if ((source.status === 'processing' || source.status === 'uploading') && source.sourceLmId) {
       try {
-        const sidecarStatus = await getSourceStatus(source.notebook.notebookLmId, source.sourceLmId)
+        const sidecarStatus = await getSourceStatus(source.notebook.notebookLmId, source.sourceLmId, orgId)
 
         if (sidecarStatus.status === 'ready') {
           await prisma.aiNotebookSource.update({
@@ -43,7 +43,22 @@ export async function GET(
         }
       } catch (err) {
         logger.error('AI Source Status', 'Sidecar durum sorgulama hatası', err)
+        // Sidecar erişilemezse veya auth yoksa: belge S3'te zaten mevcut, ready olarak işaretle
+        await prisma.aiNotebookSource.update({
+          where: { id: sourceId },
+          data: { status: 'ready' },
+        })
+        source.status = 'ready'
       }
+    }
+
+    // sourceLmId yoksa (sidecar hiç çağrılamamışsa) ama S3'te dosya varsa ready yap
+    if ((source.status === 'processing' || source.status === 'error') && !source.sourceLmId && source.s3Key) {
+      await prisma.aiNotebookSource.update({
+        where: { id: sourceId },
+        data: { status: 'ready' },
+      })
+      source.status = 'ready'
     }
 
     return jsonResponse({

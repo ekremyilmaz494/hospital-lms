@@ -32,7 +32,7 @@ async function getOrCreateNotebook(
   }
 
   const nbTitle = title || `AI İçerik - ${new Date().toLocaleDateString('tr-TR')}`
-  const sidecarNb = await createNotebook(nbTitle)
+  const sidecarNb = await createNotebook(nbTitle, orgId)
   const notebook = await prisma.aiNotebook.create({
     data: {
       organizationId: orgId,
@@ -91,26 +91,30 @@ export async function POST(request: Request) {
       const buffer = Buffer.from(await file.arrayBuffer())
       await uploadBuffer(s3Key, buffer, file.type)
 
-      let sourceLmId: string | null = null
-      try {
-        const result = await addFileSource(notebook.notebookLmId, buffer, file.name)
-        sourceLmId = result.source_id
-      } catch (err) {
-        logger.error('AI Documents', 'Sidecar kaynak ekleme hatası', err)
-      }
-
+      // Belgeyi hemen ready olarak kaydet — sidecar'a ekleme arka planda
       const source = await prisma.aiNotebookSource.create({
         data: {
           notebookId,
-          sourceLmId,
           fileName: file.name,
           fileType: ext || '',
           fileSize: file.size,
           s3Key,
           sourceType: 'file',
-          status: sourceLmId ? 'processing' : 'error',
+          status: 'ready',
         },
       })
+
+      // Sidecar'a kaynak ekleme — fire-and-forget (kullanıcıyı bloklamaz)
+      addFileSource(notebook.notebookLmId, buffer, file.name, orgId)
+        .then(result => {
+          prisma.aiNotebookSource.update({
+            where: { id: source.id },
+            data: { sourceLmId: result.source_id },
+          }).catch(() => {})
+        })
+        .catch(err => {
+          logger.error('AI Documents', 'Sidecar kaynak ekleme hatası (arka plan)', err)
+        })
 
       return jsonResponse(
         {
@@ -141,35 +145,39 @@ export async function POST(request: Request) {
         parsed.data.title,
       )
 
-      let sourceLmId: string | null = null
-      try {
-        const result = await addSource(notebook.notebookLmId, parsed.data.sourceType, {
-          url: parsed.data.url,
-          title: parsed.data.textTitle,
-          content: parsed.data.content,
-        })
-        sourceLmId = result.source_id
-      } catch (err) {
-        logger.error('AI Documents', 'Sidecar kaynak ekleme hatası', err)
-      }
-
       const fileName =
         parsed.data.sourceType === 'text'
           ? parsed.data.textTitle || 'Metin Kaynağı'
           : parsed.data.url || 'URL Kaynağı'
 
+      // Belgeyi hemen ready olarak kaydet
       const source = await prisma.aiNotebookSource.create({
         data: {
           notebookId,
-          sourceLmId,
           fileName,
           fileType: parsed.data.sourceType,
           fileSize: parsed.data.content ? Buffer.byteLength(parsed.data.content, 'utf-8') : 0,
           sourceType: parsed.data.sourceType,
           sourceUrl: parsed.data.url || null,
-          status: sourceLmId ? 'processing' : 'error',
+          status: 'ready',
         },
       })
+
+      // Sidecar'a kaynak ekleme — fire-and-forget
+      addSource(notebook.notebookLmId, parsed.data.sourceType, {
+        url: parsed.data.url,
+        title: parsed.data.textTitle,
+        content: parsed.data.content,
+      }, orgId)
+        .then(result => {
+          prisma.aiNotebookSource.update({
+            where: { id: source.id },
+            data: { sourceLmId: result.source_id },
+          }).catch(() => {})
+        })
+        .catch(err => {
+          logger.error('AI Documents', 'Sidecar kaynak ekleme hatası (arka plan)', err)
+        })
 
       return jsonResponse(
         {

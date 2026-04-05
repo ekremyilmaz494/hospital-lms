@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message || 'Geçersiz veri', 400)
 
   try {
-    await login(parsed.data.browser)
+    await login(parsed.data.browser, orgId)
 
     await prisma.aiGoogleConnection.upsert({
       where: { organizationId: orgId },

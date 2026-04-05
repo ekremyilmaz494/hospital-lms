@@ -56,11 +56,10 @@ async def verify_connection(org_id: str) -> dict:
     try:
         from notebooklm import NotebookLMClient, AuthTokens  # noqa: PLC0415
 
-        # Cookie'den auth token oluştur
-        if "auth_state" in cookie_data:
-            tokens = AuthTokens(**cookie_data["auth_state"])
-        else:
-            tokens = AuthTokens(**cookie_data)
+        # Cookie'den auth token oluştur — sadece AuthTokens'ın kabul ettiği alanları gönder
+        auth_fields = {"cookies", "csrf_token", "session_id"}
+        src = cookie_data.get("auth_state", cookie_data)
+        tokens = AuthTokens(**{k: v for k, v in src.items() if k in auth_fields})
 
         async with NotebookLMClient(tokens) as client:
             # Basit bir istek yaparak bağlantıyı doğrula
@@ -85,10 +84,9 @@ async def test_connection(org_id: str) -> dict:
     try:
         from notebooklm import NotebookLMClient, AuthTokens  # noqa: PLC0415
 
-        if "auth_state" in cookie_data:
-            tokens = AuthTokens(**cookie_data["auth_state"])
-        else:
-            tokens = AuthTokens(**cookie_data)
+        auth_fields = {"cookies", "csrf_token", "session_id"}
+        src = cookie_data.get("auth_state", cookie_data)
+        tokens = AuthTokens(**{k: v for k, v in src.items() if k in auth_fields})
 
         async with NotebookLMClient(tokens) as client:
             # Notebook oluştur ve hemen sil — gerçek API testi

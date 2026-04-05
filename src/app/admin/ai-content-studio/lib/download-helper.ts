@@ -85,7 +85,7 @@ export async function downloadAndSaveArtifact(params: DownloadParams): Promise<v
     }
 
     // Download from sidecar
-    const buffer = await downloadArtifact(notebookLmId, artifactLmId, artifactType, outputFormat)
+    const buffer = await downloadArtifact(notebookLmId, artifactLmId, artifactType, outputFormat, organizationId)
 
     // S3 upload
     const s3Key = `ai-studio/outputs/${organizationId}/${generationId}.${ext}`

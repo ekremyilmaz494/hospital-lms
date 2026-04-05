@@ -9,17 +9,18 @@ import { staffNav } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 import { MobileBottomNav } from '@/components/layouts/mobile-bottom-nav';
+import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 
 export default function StaffLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  useEffect(() => {
     const saved = localStorage.getItem('sidebar:staff:collapsed');
-    return saved !== null ? saved === 'true' : true;
-  });
+    if (saved === 'false') setSidebarCollapsed(false);
+  }, []);
   const [isMd, setIsMd] = useState(false);
   const { user, isLoading, fullName, initials } = useAuth();
 
@@ -44,7 +45,8 @@ export default function StaffLayout({
     }
   }, [user, isLoading, router]);
 
-  if (isLoading || !user) return null;
+  if (isLoading) return <LayoutSkeleton variant="staff" />;
+  if (!user) return null;
 
   return (
     <TooltipProvider>

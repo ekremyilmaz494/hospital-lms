@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, memo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronDown, HelpCircle, LogOut, Menu, X } from 'lucide-react';
@@ -10,6 +10,59 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAiGenerationStore, selectUnviewedCount, selectActiveCount } from '@/store/ai-generation-store';
 import type { NavGroup } from './sidebar-config';
+
+/** AI badge — kendi store subscription'ı ile izole, sidebar'ı re-render etmez */
+function AiBadgeCount() {
+  const aiActiveCount = useAiGenerationStore(selectActiveCount);
+  const aiUnviewedCount = useAiGenerationStore(selectUnviewedCount);
+  const count = aiActiveCount + aiUnviewedCount;
+  if (count === 0) return null;
+  return (
+    <span
+      className="ml-auto flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold"
+      style={{
+        background: aiActiveCount > 0 ? 'var(--color-warning)' : 'var(--color-primary)',
+        color: 'white',
+        animation: aiActiveCount > 0 ? 'pulse 2s infinite' : 'none',
+      }}
+    >
+      {aiActiveCount > 0 && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+      {count}
+    </span>
+  );
+}
+
+/** pathname izolasyonu — sadece bu wrapper re-render olur, parent sidebar değil */
+function NavItemActive({ href, children: childHrefs, render }: {
+  href: string;
+  children?: { href: string }[];
+  render: (active: boolean) => React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const active = pathname === href || pathname.startsWith(href + '/');
+  const groupActive = active || (childHrefs?.some(c => pathname === c.href || pathname.startsWith(c.href + '/')) ?? false);
+  return <>{render(groupActive)}</>;
+}
+
+/** Submenu child item — kendi pathname kontrolü */
+function ChildNavLink({ href, title, onClick }: { href: string; title: string; onClick?: () => void }) {
+  const pathname = usePathname();
+  const active = pathname === href || pathname.startsWith(href + '/');
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="rounded-md px-3 py-2 text-sm transition-[background,color] duration-150 hover:bg-[var(--color-surface-hover)] active:scale-[0.98] active:duration-75"
+      style={{
+        background: active ? 'var(--color-primary-light)' : 'transparent',
+        color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+        fontWeight: active ? 600 : 400,
+      }}
+    >
+      {title}
+    </Link>
+  );
+}
 
 interface AppSidebarProps {
   navGroups: NavGroup[];
@@ -23,7 +76,7 @@ interface AppSidebarProps {
   userInitials?: string;
 }
 
-export function AppSidebar({
+export const AppSidebar = memo(function AppSidebar({
   navGroups,
   collapsed = false,
   onToggleCollapse,
@@ -34,23 +87,13 @@ export function AppSidebar({
   userAvatar,
   userInitials = 'KL',
 }: AppSidebarProps) {
-  const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
-  const aiActiveCount = useAiGenerationStore(selectActiveCount);
-  const aiUnviewedCount = useAiGenerationStore(selectUnviewedCount);
-  const aiBadgeCount = aiActiveCount + aiUnviewedCount;
 
   const toggleExpand = useCallback((href: string) => {
     setExpandedItems((prev) =>
       prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href]
     );
   }, []);
-
-  const isActive = useCallback((href: string) => pathname === href || pathname.startsWith(href + '/'), [pathname]);
-  const isGroupActive = useCallback((href: string, children?: { href: string }[]) => {
-    if (isActive(href)) return true;
-    return children?.some((child) => isActive(child.href)) ?? false;
-  }, [isActive]);
 
   /* ────────────────────────────────────────────
      Collapsed rail (72 px) — always visible
@@ -91,22 +134,23 @@ export function AppSidebar({
           <nav className="flex flex-col items-center gap-1 px-2">
             {navGroups.flatMap((g) => g.items).map((item) => {
               const Icon = item.icon;
-              const active = isGroupActive(item.href, item.children);
               const hasChildren = item.children && item.children.length > 0;
               return (
-                <Tooltip key={item.href}>
-                  <TooltipTrigger
-                    render={<Link href={hasChildren ? item.children![0].href : item.href} />}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl icon-btn"
-                    style={{
-                      background: active ? 'var(--color-primary-light)' : 'transparent',
-                      color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                    }}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{item.title}</TooltipContent>
-                </Tooltip>
+                <NavItemActive key={item.href} href={item.href} children={item.children} render={(active) => (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={<Link href={hasChildren ? item.children![0].href : item.href} />}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl icon-btn"
+                      style={{
+                        background: active ? 'var(--color-primary-light)' : 'transparent',
+                        color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{item.title}</TooltipContent>
+                  </Tooltip>
+                )} />
               );
             })}
           </nav>
@@ -211,104 +255,78 @@ export function AppSidebar({
               <nav className="flex flex-col gap-0.5">
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const active = isGroupActive(item.href, item.children);
                   const expanded = expandedItems.includes(item.href);
                   const hasChildren = item.children && item.children.length > 0;
 
                   return (
-                    <div key={item.href}>
-                      {hasChildren ? (
-                        <button
-                          onClick={() => toggleExpand(item.href)}
-                          className="nav-item flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium active:scale-[0.98] active:duration-75"
-                          data-active={active}
-                          style={{
-                            background: active ? 'var(--color-primary-light)' : 'transparent',
-                            color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                            fontWeight: active ? 600 : 500,
-                          }}
-                        >
-                          <Icon className="h-5 w-5 shrink-0" />
-                          <span className="flex-1 text-left truncate">{item.title}</span>
-                          <ChevronDown
-                            className="h-4 w-4 shrink-0"
+                    <NavItemActive key={item.href} href={item.href} children={item.children} render={(active) => (
+                      <div>
+                        {hasChildren ? (
+                          <button
+                            onClick={() => toggleExpand(item.href)}
+                            className="nav-item flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium active:scale-[0.98] active:duration-75"
+                            data-active={active}
                             style={{
-                              transform: expanded ? 'rotate(0)' : 'rotate(-90deg)',
-                              transition: 'transform 200ms ease',
+                              background: active ? 'var(--color-primary-light)' : 'transparent',
+                              color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                              fontWeight: active ? 600 : 500,
                             }}
-                          />
-                        </button>
-                      ) : (
-                        <Link
-                          href={item.href}
-                          onClick={onToggleCollapse}
-                          className="nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium active:scale-[0.98] active:duration-75"
-                          data-active={active}
-                          style={{
-                            background: active ? 'var(--color-primary-light)' : 'transparent',
-                            color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                            fontWeight: active ? 600 : 500,
-                          }}
-                        >
-                          <Icon className="h-5 w-5 shrink-0" />
-                          <span className="truncate">{item.title}</span>
-                          {item.href === '/admin/ai-content-studio' && aiBadgeCount > 0 ? (
-                            <span
-                              className="ml-auto flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                          >
+                            <Icon className="h-5 w-5 shrink-0" />
+                            <span className="flex-1 text-left truncate">{item.title}</span>
+                            <ChevronDown
+                              className="h-4 w-4 shrink-0"
                               style={{
-                                background: aiActiveCount > 0 ? 'var(--color-warning)' : 'var(--color-primary)',
-                                color: 'white',
-                                animation: aiActiveCount > 0 ? 'pulse 2s infinite' : 'none',
+                                transform: expanded ? 'rotate(0)' : 'rotate(-90deg)',
+                                transition: 'transform 200ms ease',
                               }}
-                            >
-                              {aiActiveCount > 0 && (
-                                <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                              )}
-                              {aiBadgeCount}
-                            </span>
-                          ) : item.badge ? (
-                            <span className="ml-auto rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: 'var(--color-accent)', color: 'white' }}>
-                              {item.badge}
-                            </span>
-                          ) : null}
-                        </Link>
-                      )}
+                            />
+                          </button>
+                        ) : (
+                          <Link
+                            href={item.href}
+                            onClick={onToggleCollapse}
+                            className="nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium active:scale-[0.98] active:duration-75"
+                            data-active={active}
+                            style={{
+                              background: active ? 'var(--color-primary-light)' : 'transparent',
+                              color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                              fontWeight: active ? 600 : 500,
+                            }}
+                          >
+                            <Icon className="h-5 w-5 shrink-0" />
+                            <span className="truncate">{item.title}</span>
+                            {item.href === '/admin/ai-content-studio' ? (
+                              <AiBadgeCount />
+                            ) : item.badge ? (
+                              <span className="ml-auto rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: 'var(--color-accent)', color: 'white' }}>
+                                {item.badge}
+                              </span>
+                            ) : null}
+                          </Link>
+                        )}
 
-                      {/* Submenu */}
-                      {hasChildren && (
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateRows: expanded ? '1fr' : '0fr',
-                            opacity: expanded ? 1 : 0,
-                            transition: 'grid-template-rows 250ms ease, opacity 200ms ease',
-                          }}
-                        >
-                          <div className="overflow-hidden">
-                            <div className="ml-5 mt-0.5 flex flex-col gap-0.5 border-l-2 pl-4" style={{ borderColor: 'var(--color-border)' }}>
-                              {item.children!.map((child) => {
-                                const childActive = isActive(child.href);
-                                return (
-                                  <Link
-                                    key={child.href}
-                                    href={child.href}
-                                    onClick={onToggleCollapse}
-                                    className="rounded-md px-3 py-2 text-sm transition-[background,color] duration-150 hover:bg-[var(--color-surface-hover)] active:scale-[0.98] active:duration-75"
-                                    style={{
-                                      background: childActive ? 'var(--color-primary-light)' : 'transparent',
-                                      color: childActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                                      fontWeight: childActive ? 600 : 400,
-                                    }}
-                                  >
-                                    {child.title}
-                                  </Link>
-                                );
-                              })}
+                        {/* Submenu */}
+                        {hasChildren && (
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateRows: expanded ? '1fr' : '0fr',
+                              opacity: expanded ? 1 : 0,
+                              transition: 'grid-template-rows 250ms ease, opacity 200ms ease',
+                            }}
+                          >
+                            <div className="overflow-hidden">
+                              <div className="ml-5 mt-0.5 flex flex-col gap-0.5 border-l-2 pl-4" style={{ borderColor: 'var(--color-border)' }}>
+                                {item.children!.map((child) => (
+                                  <ChildNavLink key={child.href} href={child.href} title={child.title} onClick={onToggleCollapse} />
+                                ))}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )} />
                   );
                 })}
               </nav>
@@ -362,4 +380,4 @@ export function AppSidebar({
       </div>
     </>
   );
-}
+});

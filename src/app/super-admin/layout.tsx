@@ -7,17 +7,18 @@ import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
 import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
 import { superAdminNav } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
+import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 
 export default function SuperAdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  useEffect(() => {
     const saved = localStorage.getItem('sidebar:super-admin:collapsed');
-    return saved !== null ? saved === 'true' : true;
-  });
+    if (saved === 'false') setSidebarCollapsed(false);
+  }, []);
   const { fullName, initials, user, isLoading } = useAuth();
 
   const toggleSidebar = () => {
@@ -33,6 +34,10 @@ export default function SuperAdminLayout({
       router.replace('/auth/login');
     }
   }, [user, isLoading, router]);
+
+  if (isLoading) {
+    return <LayoutSkeleton variant="super-admin" />;
+  }
 
   return (
     <TooltipProvider>

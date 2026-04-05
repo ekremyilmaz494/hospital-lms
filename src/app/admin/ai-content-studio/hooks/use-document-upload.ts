@@ -172,11 +172,16 @@ export function useDocumentUpload(): UseDocumentUploadReturn {
     setDocuments(prev => prev.filter(d => d.id !== id))
   }, [])
 
-  const startPollingAll = useCallback(() => {
-    if (pollingRef.current) clearInterval(pollingRef.current)
+  // Polling: processing belgeler için otomatik durum sorgulaması
+  // useRef ile stale closure sorununu çözer
+  const documentsRef = useRef(documents)
+  documentsRef.current = documents
 
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) return // Zaten çalışıyor
     pollingRef.current = setInterval(async () => {
-      const processing = documents.filter(d => d.status === 'processing')
+      const currentDocs = documentsRef.current
+      const processing = currentDocs.filter(d => d.status === 'processing')
       if (processing.length === 0) {
         if (pollingRef.current) clearInterval(pollingRef.current)
         pollingRef.current = null
@@ -199,7 +204,15 @@ export function useDocumentUpload(): UseDocumentUploadReturn {
         }
       }
     }, 3000)
-  }, [documents])
+  }, [])
+
+  // processing belge olduğunda polling otomatik başlar
+  useEffect(() => {
+    const hasProcessing = documents.some(d => d.status === 'processing')
+    if (hasProcessing) {
+      startPolling()
+    }
+  }, [documents, startPolling])
 
   const reset = useCallback(() => {
     if (pollingRef.current) clearInterval(pollingRef.current)
@@ -217,7 +230,7 @@ export function useDocumentUpload(): UseDocumentUploadReturn {
     uploadFiles,
     addSource,
     removeDocument,
-    startPollingAll,
+    startPollingAll: startPolling,
     reset,
     allReady: documents.length > 0 && documents.every(d => d.status === 'ready'),
     hasError: documents.some(d => d.status === 'error'),

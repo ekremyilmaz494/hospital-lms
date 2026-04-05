@@ -26,7 +26,7 @@ export async function POST() {
   }
 
   try {
-    const result = await verifyAuth()
+    const result = await verifyAuth(orgId)
 
     if (result.valid) {
       await prisma.aiGoogleConnection.update({

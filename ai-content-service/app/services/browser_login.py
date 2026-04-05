@@ -120,11 +120,12 @@ def _process_storage_state(org_id: str, storage_path: Path) -> dict:
             future = pool.submit(asyncio.run, fetch_tokens(cookies))
             csrf_token, session_id = future.result(timeout=30)
 
-        # Auth verisini oluştur
+        # Auth verisini oluştur — orijinal storage state de sakla (download için)
         auth_data = {
             "cookies": cookies,
             "csrf_token": csrf_token,
             "session_id": session_id,
+            "storage_state": storage_data,
         }
 
         # E-posta adresini cookie'den çıkar (varsa)

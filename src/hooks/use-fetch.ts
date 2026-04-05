@@ -16,8 +16,18 @@ interface UseFetchOptions {
 
 // In-memory cache: URL → { data, timestamp }
 const cache = new Map<string, { data: unknown; ts: number }>();
-const STALE_TIME = 30_000; // 30 saniye — bu süre içinde cache'den anında göster
+const inflight = new Map<string, Promise<unknown>>();
+const STALE_TIME = 60_000; // 60 saniye — geri navigasyonda anında gösterim
 const TIMEOUT_MS = 30_000; // 30 saniye — API timeout
+const MAX_CACHE_SIZE = 100;
+
+function cacheSet(url: string, data: unknown) {
+  cache.set(url, { data, ts: Date.now() });
+  if (cache.size > MAX_CACHE_SIZE) {
+    const firstKey = cache.keys().next().value;
+    if (firstKey) cache.delete(firstKey);
+  }
+}
 
 /** Clear cached data for a specific URL (use before useFetch to prevent stale flash) */
 export function clearFetchCache(url: string) {
@@ -58,31 +68,52 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
       if (!existing) setIsLoading(true);
     }
     if (!background) setError(null);
+    // Deduplication: aynı URL zaten fetch ediliyorsa sonucunu bekle
+    const existing = inflight.get(currentUrl);
+    if (existing) {
+      try {
+        const json = await existing;
+        if (urlRef.current === currentUrl) {
+          cacheSet(currentUrl, json);
+          setData(json as T);
+        }
+      } catch {
+        // Orijinal fetch hata handle ediyor
+      } finally {
+        if (urlRef.current === currentUrl) setIsLoading(false);
+      }
+      return;
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
     const bypassHttpCache = forceRef.current;
     forceRef.current = false;
-    try {
+
+    const fetchPromise = (async () => {
       const res = await fetch(currentUrl, {
         signal: controller.signal,
         ...(bypassHttpCache && { cache: 'reload' as RequestCache }),
       });
-      clearTimeout(timeout);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-      const json = await res.json();
+      return res.json();
+    })();
+
+    inflight.set(currentUrl, fetchPromise);
+
+    try {
+      const json = await fetchPromise;
       if (urlRef.current === currentUrl) {
-        cache.set(currentUrl, { data: json, ts: Date.now() });
+        cacheSet(currentUrl, json);
         setData(json);
       }
     } catch (err) {
       if (urlRef.current === currentUrl) {
-        // Background revalidation başarısız olursa mevcut cache'i koru, hata gösterme
         if (background) return;
 
-        // AbortError (timeout) — açıkça kontrol et
         if (err instanceof Error && err.name === 'AbortError') {
           console.warn(`[useFetch] Timeout: ${currentUrl} (>${TIMEOUT_MS}ms)`);
           setError('Sunucu yanıt vermedi, lütfen sayfayı yenileyin.');
@@ -107,6 +138,7 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
         }
       }
     } finally {
+      inflight.delete(currentUrl);
       clearTimeout(timeout);
       if (urlRef.current === currentUrl) {
         setIsLoading(false);
@@ -139,8 +171,31 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (!normalizedUrl || !intervalMs || intervalMs <= 0) return;
-    intervalRef.current = setInterval(() => fetchData(true), intervalMs);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+
+    const startPolling = () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(() => fetchData(true), intervalMs);
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      } else {
+        fetchData(true);
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [normalizedUrl, intervalMs, fetchData]);
 
   const refetch = useCallback(() => {

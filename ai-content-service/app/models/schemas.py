@@ -2,17 +2,13 @@ from pydantic import BaseModel
 from typing import Literal, Optional, List
 
 
+# ─── V1 Legacy Schemas (uyumluluk) ───
+
 class GenerateRequest(BaseModel):
     job_id: str
     format: Literal[
-        "AUDIO_OVERVIEW",
-        "VIDEO_OVERVIEW",
-        "STUDY_GUIDE",
-        "QUIZ",
-        "AUDIO_QUIZ",
-        "FLASHCARDS",
-        "INFOGRAPHIC",
-        "SLIDE_DECK",
+        "AUDIO_OVERVIEW", "VIDEO_OVERVIEW", "STUDY_GUIDE",
+        "QUIZ", "AUDIO_QUIZ", "FLASHCARDS", "INFOGRAPHIC", "SLIDE_DECK",
     ]
     audio_format: Literal["DEEP_DIVE", "BRIEF", "CRITIQUE", "DEBATE"] = "DEEP_DIVE"
     audio_length: Optional[str] = None
@@ -35,11 +31,13 @@ class GenerateResponse(BaseModel):
 class StatusResponse(BaseModel):
     job_id: str
     status: str
-    progress: int  # 0-100
-    result_type: Optional[str] = None  # audio | video | text | json
+    progress: int
+    result_type: Optional[str] = None
     result_path: Optional[str] = None
     error: Optional[str] = None
 
+
+# ─── Analyze ───
 
 class AnalyzeRequest(BaseModel):
     document_text: str

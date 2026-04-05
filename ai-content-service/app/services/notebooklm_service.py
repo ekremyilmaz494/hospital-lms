@@ -42,6 +42,44 @@ LIST_METHOD_MAP = {
 }
 
 
+async def _wait_for_media_url(
+    client, nb_id: str, fmt: str, timeout: int = 120
+) -> None:
+    """Medya artifact'ının URL'sinin populate olmasını bekler.
+    NotebookLM bazen artifact'ı 'completed' olarak işaretleyip URL'yi
+    sonradan ekliyor. Bu fonksiyon URL hazır olana kadar bekler."""
+    URL_FINDER_MAP = {
+        "INFOGRAPHIC": "_find_infographic_url",
+        "VIDEO_OVERVIEW": None,  # video farklı yapıda
+        "SLIDE_DECK": None,
+    }
+    finder_name = URL_FINDER_MAP.get(fmt)
+    if not finder_name:
+        return  # Bu format için URL bekleme gerekmiyor
+
+    TYPE_CODE_MAP = {"INFOGRAPHIC": 7, "VIDEO_OVERVIEW": 5, "SLIDE_DECK": 8}
+    type_code = TYPE_CODE_MAP.get(fmt)
+
+    start = asyncio.get_running_loop().time()
+    while True:
+        raw = await client.artifacts._list_raw(nb_id)
+        for item in raw:
+            if not isinstance(item, list) or len(item) <= 4:
+                continue
+            if item[2] != type_code or item[4] != 4:  # 4 = completed
+                continue
+            finder = getattr(client.artifacts, finder_name, None)
+            if finder and finder(item):
+                logger.info("Medya URL'si hazır: %s", fmt)
+                return
+
+        elapsed = asyncio.get_running_loop().time() - start
+        if elapsed > timeout:
+            logger.warning("Medya URL'si %ds içinde hazır olmadı, download denenecek", timeout)
+            return
+        await asyncio.sleep(5)
+
+
 async def _wait_for_artifact_via_list(
     client, nb_id: str, fmt: str, timeout: int = 600
 ) -> "GenerationStatus":
@@ -56,16 +94,20 @@ async def _wait_for_artifact_via_list(
     if not list_fn:
         return GS(task_id="", status="failed", error=f"list metodu mevcut değil: {list_method_name}")
 
+    # notebooklm-py status değerleri: integer (4=completed, 3=processing) veya string
+    COMPLETED_STATUSES = {"completed", 4}
+    PROCESSING_STATUSES = {"pending", "in_progress", "processing", 1, 2, 3}
+
     start = asyncio.get_running_loop().time()
     while True:
         artifacts = await list_fn(nb_id)
         if artifacts:
             # En son oluşturulan (completed) artifact'ı al
-            completed = [a for a in artifacts if a.status == "completed"]
+            completed = [a for a in artifacts if a.status in COMPLETED_STATUSES]
             if completed:
                 return GS(task_id=completed[-1].id, status="completed")
             # Henüz processing olan var mı?
-            processing = [a for a in artifacts if a.status in ("pending", "in_progress", "processing")]
+            processing = [a for a in artifacts if a.status in PROCESSING_STATUSES]
             if processing:
                 elapsed = asyncio.get_running_loop().time() - start
                 if elapsed > timeout:
@@ -79,29 +121,38 @@ async def _wait_for_artifact_via_list(
         await asyncio.sleep(5)
 
 
-def _set_download_cookies(raw_cookies: dict) -> None:
-    """Cookie dict'ini Playwright storage state formatına dönüştürüp
-    NOTEBOOKLM_AUTH_JSON env var'ına yazar. notebooklm-py'nin download
-    fonksiyonu bu env var'dan cookie okur."""
-    # Playwright storage state formatı: {"cookies": [{"name": ..., "value": ..., "domain": ...}]}
+def _set_download_cookies(raw_cookies: dict, storage_state: dict | None = None) -> None:
+    """Playwright storage state'i NOTEBOOKLM_AUTH_JSON env var'ına yazar.
+    notebooklm-py'nin download fonksiyonu bu env var'dan cookie okur.
+
+    storage_state varsa (orijinal Playwright formatı, domain bilgisiyle)
+    doğrudan kullanılır. Yoksa raw_cookies dict'inden oluşturulur."""
+    if storage_state and "cookies" in storage_state:
+        # Orijinal Playwright storage state — domain bilgisi korunur
+        os.environ["NOTEBOOKLM_AUTH_JSON"] = json.dumps(storage_state)
+        logger.info("Download cookie'leri ayarlandı (storage_state, %d cookie)", len(storage_state["cookies"]))
+        return
+
+    # Fallback: raw_cookies dict'inden oluştur (eski format uyumluluğu)
     pw_cookies = []
+    DOWNLOAD_DOMAINS = [
+        ".google.com",
+        ".googleusercontent.com",
+        "notebooklm.google.com",
+        "contribution.usercontent.google.com",
+    ]
     for name, value in raw_cookies.items():
-        # Google cookie'leri genellikle .google.com domain'inde
-        domain = ".google.com"
-        # __Secure- ve OSID cookie'leri notebooklm.google.com'a özel
-        if "OSID" in name or name in ("SID", "HSID", "SSID", "NID", "SIDCC"):
-            domain = ".google.com"
-        pw_cookies.append({
-            "name": name,
-            "value": value,
-            "domain": domain,
-            "path": "/",
-            "secure": True,
-            "httpOnly": True,
-        })
-    storage_state = json.dumps({"cookies": pw_cookies, "origins": []})
-    os.environ["NOTEBOOKLM_AUTH_JSON"] = storage_state
-    logger.info("Download cookie'leri ayarlandı (%d cookie)", len(pw_cookies))
+        for domain in DOWNLOAD_DOMAINS:
+            pw_cookies.append({
+                "name": name,
+                "value": value,
+                "domain": domain,
+                "path": "/",
+                "secure": True,
+                "httpOnly": True,
+            })
+    os.environ["NOTEBOOKLM_AUTH_JSON"] = json.dumps({"cookies": pw_cookies, "origins": []})
+    logger.info("Download cookie'leri ayarlandı (fallback, %d cookie × %d domain)", len(raw_cookies), len(DOWNLOAD_DOMAINS))
 
 
 def _load_cookie_for_generation(request: GenerateRequest) -> dict | None:
@@ -128,11 +179,13 @@ async def generate_content(
     from notebooklm import NotebookLMClient, AuthTokens
 
     # Auth bilgisini çöz — cookie store'dan org bazlı cookie oku
+    storage_state = None
     auth_raw = settings.notebooklm_auth_json
     if auth_raw:
         auth_data = json.loads(base64.b64decode(auth_raw))
         tokens = AuthTokens(**auth_data)
         raw_cookies = auth_data.get("cookies", {})
+        storage_state = auth_data.get("storage_state")
     else:
         cookie_data = _load_cookie_for_generation(request)
         if not cookie_data:
@@ -140,6 +193,7 @@ async def generate_content(
                 "NotebookLM bağlantısı bulunamadı. "
                 "Ayarlar sayfasından Google hesabınızı bağlayın."
             )
+        storage_state = cookie_data.get("storage_state")
         if "auth_state" in cookie_data:
             tokens = AuthTokens(**cookie_data["auth_state"])
             raw_cookies = cookie_data["auth_state"].get("cookies", {})
@@ -148,9 +202,9 @@ async def generate_content(
             raw_cookies = cookie_data.get("cookies", {})
 
     # notebooklm-py download fonksiyonu NOTEBOOKLM_AUTH_JSON env var'ından
-    # Playwright storage state formatında cookie okur. Cookie'leri bu formata
-    # dönüştürüp env var'a yazıyoruz ki download da çalışsın.
-    _set_download_cookies(raw_cookies)
+    # Playwright storage state formatında cookie okur. Orijinal storage_state
+    # varsa domain bilgisi korunur, yoksa raw_cookies'den oluşturulur.
+    _set_download_cookies(raw_cookies, storage_state)
 
     fmt_cfg = FORMAT_CONFIG.get(request.format)
     if not fmt_cfg:
@@ -258,6 +312,119 @@ def _safe_enum(enum_class: type, value: str | None, default=None):
         return enum_class[value]
     except (KeyError, TypeError):
         return default
+
+
+async def generate_from_notebook(
+    task_id: str,
+    client,
+    notebook_id: str,
+    artifact_type: str,
+    instructions: str | None,
+    settings: dict,
+    update_status: UpdateFn,
+) -> None:
+    """Mevcut notebook'tan artifact üretir (V2 — notebook-first yaklaşım).
+    Notebook ve kaynaklar önceden oluşturulmuş olmalıdır."""
+    # artifact_type mapping: TypeScript snake_case → Python UPPER_CASE
+    TYPE_MAP = {
+        "audio": "AUDIO_OVERVIEW",
+        "video": "VIDEO_OVERVIEW",
+        "slide_deck": "SLIDE_DECK",
+        "quiz": "QUIZ",
+        "flashcards": "FLASHCARDS",
+        "report": "STUDY_GUIDE",
+        "infographic": "INFOGRAPHIC",
+        "data_table": "SLIDE_DECK",  # fallback
+        "mind_map": "QUIZ",  # fallback
+    }
+    fmt = TYPE_MAP.get(artifact_type, "AUDIO_OVERVIEW")
+    fmt_cfg = FORMAT_CONFIG.get(fmt)
+    if not fmt_cfg:
+        raise ValueError(f"Bilinmeyen format: {artifact_type} → {fmt}")
+
+    generate_method, download_method, ext = fmt_cfg
+    out_path = TEMP_DIR / f"{task_id}.{ext}"
+
+    await update_status(task_id, "processing", 20)
+
+    # 1. Üretim başlat
+    gen_fn = getattr(client.artifacts, generate_method)
+    gen_kwargs: dict = {"notebook_id": notebook_id}
+
+    # generate_quiz ve generate_flashcards "language" parametresi almıyor
+    # generate_study_guide "extra_instructions" kullanıyor, "instructions" değil
+    METHODS_WITHOUT_LANGUAGE = {"generate_quiz", "generate_flashcards"}
+    METHODS_WITH_EXTRA_INSTRUCTIONS = {"generate_study_guide"}
+
+    if instructions:
+        if generate_method in METHODS_WITH_EXTRA_INSTRUCTIONS:
+            gen_kwargs["extra_instructions"] = instructions
+        else:
+            gen_kwargs["instructions"] = instructions
+
+    if generate_method not in METHODS_WITHOUT_LANGUAGE:
+        gen_kwargs["language"] = settings.get("language") or "tr"
+
+    gen_status = await gen_fn(**gen_kwargs)
+    await update_status(task_id, "processing", 50)
+
+    # 2. Tamamlanana dek bekle
+    if gen_status.is_failed and "no artifact_id" in (gen_status.error or ""):
+        gen_status = await _wait_for_artifact_via_list(client, notebook_id, fmt, timeout=600)
+
+    if gen_status.is_failed:
+        raise RuntimeError(gen_status.error or f"{artifact_type} üretimi başarısız oldu.")
+
+    if not gen_status.is_complete:
+        # Ses ve video üretimi 15-25 dk sürebilir
+        FMT_TIMEOUTS = {
+            "AUDIO_OVERVIEW": 1800,  # 30 dk
+            "AUDIO_QUIZ": 1800,
+            "VIDEO_OVERVIEW": 2400,  # 40 dk
+            "SLIDE_DECK": 1200,      # 20 dk
+            "INFOGRAPHIC": 900,      # 15 dk
+        }
+        fmt_timeout = FMT_TIMEOUTS.get(fmt, 900)
+        try:
+            final_status = await client.artifacts.wait_for_completion(
+                notebook_id, gen_status.task_id, timeout=fmt_timeout,
+            )
+            if final_status.is_failed:
+                raise RuntimeError(final_status.error or f"{artifact_type} tamamlanamadı.")
+        except TimeoutError:
+            # Timeout olursa list ile artifact'ı ara (5 dk daha bekle)
+            gen_status = await _wait_for_artifact_via_list(client, notebook_id, fmt, timeout=300)
+            if gen_status.is_failed:
+                raise RuntimeError(gen_status.error or f"{artifact_type} zaman aşımına uğradı.")
+
+    await update_status(task_id, "processing", 80)
+
+    # 3. Medya URL'si hazır olana kadar bekle (infographic, video gibi)
+    # NotebookLM artifact'ı "completed" olarak işaretliyor ama URL sonradan populate oluyor
+    if fmt in ("INFOGRAPHIC", "VIDEO_OVERVIEW", "SLIDE_DECK"):
+        await _wait_for_media_url(client, notebook_id, fmt, timeout=120)
+
+    # 4. İndir
+    if out_path.exists():
+        out_path.unlink()
+    dl_fn = getattr(client.artifacts, download_method)
+    dl_kwargs: dict = {"notebook_id": notebook_id, "output_path": str(out_path)}
+    if artifact_type in ("quiz", "flashcards", "mind_map"):
+        dl_kwargs["output_format"] = "json"
+
+    max_retries = 8
+    for attempt in range(max_retries):
+        try:
+            await dl_fn(**dl_kwargs)
+            break
+        except Exception as dl_err:
+            if attempt == max_retries - 1:
+                raise RuntimeError(f"İçerik indirilirken hata: {dl_err}")
+            logger.warning("Download attempt %d failed: %s — retrying in 15s", attempt + 1, dl_err)
+            await asyncio.sleep(15)
+
+    artifact_id = getattr(gen_status, "task_id", task_id)
+    await update_status(task_id, "completed", 100, result_path=str(out_path), artifact_id=artifact_id)
 
 
 def _build_generate_kwargs(nb_id: str, request: GenerateRequest) -> dict:

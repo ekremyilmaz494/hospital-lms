@@ -9,6 +9,7 @@ import { adminNav } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 import { AiGenerationPoller } from '@/components/providers/ai-generation-poller';
+import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 
 const roleLabels: Record<string, string> = {
   admin: 'Hastane Admin',
@@ -21,11 +22,11 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  useEffect(() => {
     const saved = localStorage.getItem('sidebar:admin:collapsed');
-    return saved !== null ? saved === 'true' : true;
-  });
+    if (saved === 'false') setSidebarCollapsed(false);
+  }, []);
   const { user, isLoading, fullName, initials } = useAuth();
 
   const toggleSidebar = () => {
@@ -41,7 +42,10 @@ export default function AdminLayout({
     }
   }, [user, isLoading, router]);
 
-  if (isLoading || !user || user.role !== 'admin') {
+  if (isLoading) {
+    return <LayoutSkeleton variant="admin" />;
+  }
+  if (!user || user.role !== 'admin') {
     return null;
   }
 

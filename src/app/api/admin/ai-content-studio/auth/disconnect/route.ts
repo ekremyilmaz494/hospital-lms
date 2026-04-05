@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await disconnectAuth()
+    await disconnectAuth(orgId)
   } catch (err) {
     logger.error('AI Disconnect', 'Sidecar cleanup hatası', err)
   }

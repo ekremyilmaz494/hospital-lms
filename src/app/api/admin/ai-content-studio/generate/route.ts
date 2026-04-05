@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       artifact_type: parsed.data.artifactType,
       instructions: parsed.data.instructions || '',
       settings: parsed.data.settings,
-    })
+    }, orgId)
 
     if (result.task_id) {
       // Normal asenkron üretim

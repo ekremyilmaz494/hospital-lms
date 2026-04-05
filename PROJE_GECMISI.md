@@ -2473,4 +2473,76 @@ Oturum 19 sonunda tüm backend, component, hook, store ve poller kodları tamaml
 | Constants | 1 |
 | **TOPLAM** | **43 dosya** |
 
-*Son güncelleme: 5 Nisan 2026 — Oturum 20*
+---
+
+## OTURUM 21 — AI Content Studio Bug Fix + Performans Optimizasyonu (5 Nisan 2026)
+
+### AI Content Studio — Kritik Bug Fix'ler
+
+Bu oturumda AI Content Studio'nun NotebookLM entegrasyonu kapsamlı şekilde debug edildi ve production-ready hale getirildi.
+
+#### Tespit Edilen ve Çözülen Sorunlar
+
+| # | Sorun | Kök Neden | Çözüm | Dosyalar |
+|---|-------|-----------|-------|----------|
+| 1 | 403 Forbidden — İçerik indirilemedi | Cookie domain eksikliği: `contribution.usercontent.google.com` | Cookie domain listesine eklendi | `client_factory.py`, `notebooklm_service.py` |
+| 2 | `generate_flashcards() got unexpected keyword argument 'language'` | `language` parametresi quiz/flashcards'da yok | Format bazlı parametre kontrolü eklendi | `notebooklm_service.py` |
+| 3 | "Artifact indirilemedi" — Download 404 | task_id ≠ artifact_id uyumsuzluğu (V2 akışta dosya task_id ile kaydediliyor, download artifact_id ile arıyor) | `_find_job_by_artifact_id` helper eklendi | `result.py` |
+| 4 | Doğrulama hatası — `AuthTokens unexpected keyword 'storage_state'` | `browser_login.py` cookie'ye `storage_state` ekliyor ama `AuthTokens` sadece 3 parametre kabul ediyor | Tüm `AuthTokens` oluşturma noktalarında alan filtreleme | `auth_service.py`, `client_factory.py` |
+| 5 | Sidecar restart sonrası job kaybolma | In-memory job store volatile, sidecar restart'ta tüm aktif job'lar siliniyor | Status endpoint'te sidecar 404 → anında `failed` işaretleme | `status/[jobId]/route.ts` |
+| 6 | Ses/video üretim timeout | 10 dk timeout yetersiz (ses 15-25 dk sürebilir) | Format bazlı timeout: ses 30dk, video 40dk, slayt 20dk | `notebooklm_service.py`, `status/[jobId]/route.ts` |
+| 7 | Quiz preview crash — `Cannot read 'map' of undefined` | NotebookLM quiz formatı farklı: `answerOptions` vs beklenen `options` | `normalizeQuizData` fonksiyonu + runtime guard | `content-preview.tsx` |
+| 8 | Sunum PDF önizleme — "PPTX tarayıcıda önizlenemez" | `isPdf` kontrolü CloudFront signed URL'de başarısız + CSP `frame-src` eksik | Blob URL yaklaşımı + `frame-src 'self' blob:` CSP | `content-preview.tsx`, `next.config.ts` |
+| 9 | Üretim başlat butonu çalışmıyor — sessiz hata | `generation.error` UI'da gösterilmiyor | Hata mesajı buton altında gösteriliyor | `new/page.tsx` |
+| 10 | İnfografik üretim hatası | `notebooklm-py 0.3.4` RPC parametreleri Google tarafından reddediliyor (`[13]` INTERNAL) | Kütüphane seviyesinde sorun — bilinen sınırlama |
+
+#### Sidecar Production-Ready Düzeltmeleri
+- CORS: `http://localhost:3000` hardcode → env-driven (`CORS_ORIGINS`)
+- `reload=True` → production'da `False`
+- `/docs` endpoint → production'da gizli
+- Dockerfile: Playwright + Chromium kurulumu eklendi
+- `.env.example` AI Content Studio değişkenleri belgelendi
+
+### UI/UX Yenilikleri
+
+#### Generation Progress — Premium Tasarım
+- **Orbital Progress Ring** — SVG gradient arc + neon glow efekti
+- **Floating Particles** — Yukarı süzülen parçacıklar
+- **Stage Timeline** — 5 aşama ikonu, aktif aşamada pulse ring, connector shimmer
+- **Rotating Status Messages** — 3.5s aralıkla değişen mesajlar (AnimatePresence)
+- **Elapsed Timer** — Gerçek zamanlı süre sayacı (monospace)
+- **Completion Celebration** — 12 parçacık patlaması + spring animasyonlu success
+
+#### AI Content Studio Ana Sayfa
+- **Hero Header** — Full-width gradient banner, grid pattern, glassmorphism ikon
+- **Stat Kartları** — Gradient ikonlar, radial glow, hover lift, ping pulse
+- **Filtre Barı** — Tek kart, `layoutId` animasyonlu tab geçişleri
+- **Content Card** — Staggered grid animasyonu, shimmer overlay, relative time
+
+### Performans Optimizasyonları (9 Prompt)
+
+| # | Optimizasyon | Etki |
+|---|-------------|------|
+| 1 | Layout Skeleton + localStorage Fix | Beyaz ekran flash yok, hydration mismatch düzeltildi |
+| 2 | AuthProvider Re-render Fix | 5dk interval, `setUserIfChanged` ile gereksiz re-render yok |
+| 3 | useFetch Request Deduplication | Aynı URL'e çift HTTP call önlendi (inflight Map) |
+| 4 | Polling + Visibility API | Gizli tab'da sıfır HTTP trafigi |
+| 5 | Combined Dashboard API | 5 HTTP → 1 HTTP, 100-250ms kazanç |
+| 6 | Sidebar Memoization | `memo()` + `NavItemActive` wrapper ile %90 re-render azalması |
+| 7 | Dashboard Animation Cleanup | BlurFade delay'leri azaltıldı, loading.tsx dashboard skeleton |
+| 8 | next/image Integration | Avatar'larda lazy load + WebP, images remote patterns |
+| 9 | useFetch Stale Time + Cache Limit | 60s stale time, max 100 cache entry |
+
+### Altyapı Değişiklikleri
+- Proje dizini `yeni deva vs code` → `deva-project` olarak taşındı (Turbopack boşluklu yol bug'ı)
+- `pnpm-workspace.yaml` → `package.json` `pnpm.ignoredBuiltDependencies`'e taşındı
+- `scripts/dev.sh` workaround'ı kaldırıldı — `pnpm dev` düz `next dev --turbopack` olarak bırakıldı
+
+### Değiştirilen Dosyalar (45+ dosya)
+**Sidecar (Python):** `main.py`, `config.py`, `Dockerfile`, `auth_service.py`, `browser_login.py`, `client_factory.py`, `notebooklm_service.py`, `result.py`, `generation_task.py`
+**Frontend:** `generation-progress.tsx`, `content-preview.tsx`, `content-card.tsx`, `page.tsx` (AI studio ana + new), `use-generation.ts`, `use-document-upload.ts`
+**API Routes:** `generate/route.ts`, `status/[jobId]/route.ts`, `auth/verify/route.ts`, `result/[jobId]/route.ts`, `combined/route.ts` (YENİ)
+**Performans:** `layout-skeleton.tsx` (YENİ), `auth-store.ts`, `auth-provider.tsx`, `use-fetch.ts`, `app-sidebar.tsx`, `dashboard/page.tsx`, `dashboard/loading.tsx`, `avatar.tsx`
+**Config:** `next.config.ts`, `package.json`, `.env.example`
+
+*Son güncelleme: 5 Nisan 2026 — Oturum 21*

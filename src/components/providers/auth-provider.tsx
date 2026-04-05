@@ -6,10 +6,10 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { usePresenceTracker } from '@/hooks/use-presence-tracker';
 
-const DB_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 dakika — deaktive kullanıcı penceresini daralt
+const DB_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 dakika — deaktive kullanıcı penceresi
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setLoading, setSessionTimeout } = useAuthStore();
+  const { setUser, setUserIfChanged, setLoading, setSessionTimeout } = useAuthStore();
   // G3.2 — Track this user's presence in the global active-users channel
   usePresenceTracker();
   const router = useRouter();
@@ -31,8 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
           }
 
-          setUser({
-            ...currentUser,
+          setUserIfChanged({
             role: data.user.role ?? currentUser.role,
             isActive: data.user.isActive ?? currentUser.isActive,
             department: data.user.department ?? currentUser.department,
@@ -47,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Sessizce devam et — JWT verileri fallback olarak kullanilir
     }
-  }, [setUser, setSessionTimeout, router]);
+  }, [setUser, setUserIfChanged, setSessionTimeout, router]);
 
   useEffect(() => {
     const supabase = createClient();

@@ -55,6 +55,12 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**.supabase.co' },
+      { protocol: 'https', hostname: '**.cloudfront.net' },
+    ],
+  },
   experimental: {
     proxyClientMaxBodySize: '512mb',
     optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion', 'date-fns', '@tanstack/react-table', '@tiptap/react'],
@@ -79,12 +85,21 @@ const nextConfig: NextConfig = {
             "font-src 'self' data:",
             "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net",
             "media-src 'self' https://*.cloudfront.net blob:",
+            "frame-src 'self' blob:",
             // Service worker ve PWA manifest için
             "worker-src 'self'",
             "manifest-src 'self'",
             "frame-ancestors 'none'",
           ].join('; ')
         },
+      ],
+    },
+    {
+      // AI Content Studio result endpoint — iframe ile PDF/medya önizleme için
+      source: '/api/admin/ai-content-studio/result/:path*',
+      headers: [
+        { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+        { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
       ],
     },
     {
