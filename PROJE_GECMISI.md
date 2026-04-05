@@ -2407,3 +2407,70 @@ AI İçerik Stüdyosu her ziyarette wizard'ın 4. adımına (son üretim) yönle
 - List API `sortBy` whitelist-based validation ile Prisma injection'a karşı korumalı
 
 *Son güncelleme: 4 Nisan 2026 — Oturum 19*
+
+---
+
+## OTURUM 20 — AI İçerik Stüdyosu: Frontend Sayfalar + Final Doğrulama (5 Nisan 2026)
+
+### Bağlam
+Oturum 19 sonunda tüm backend, component, hook, store ve poller kodları tamamlanmıştı. Ancak eski page.tsx (tek sayfalık wizard) silindikten sonra yeni sayfa dosyaları oluşturulmamıştı. Bu oturum Prompt 11 (sayfalar) ve Prompt 12 (final entegrasyon) ile sistemi tamamladı.
+
+### Yapılan Geliştirmeler
+
+#### Prompt 11: Frontend Sayfalar (4 dosya)
+
+| Sayfa | Route | Açıklama |
+|-------|-------|----------|
+| **Kütüphane** | `/admin/ai-content-studio` | İçerik listesi — 5 durum sekmesi, arama, format/sıralama filtresi, 3 kolonlu kart grid, sayfalama (12/sayfa), aktif üretim varsa 10s auto-refresh |
+| **Wizard** | `/admin/ai-content-studio/new` | 4 adımlı wizard — sol sidebar step indicator (desktop), mobil dot indicators, belge yükle → talimat yaz → format seç → özet + başlat |
+| **Detay** | `/admin/ai-content-studio/[jobId]` | Job yükleme + polling, progress bar, önizleme (2 kolon) + değerlendirme paneli (1 kolon), kütüphane kayıt modalı |
+| **Ayarlar** | `/admin/ai-content-studio/settings` | Google hesap bağlama/doğrulama/kesme, güvenlik bilgi kartı |
+
+#### Prompt 12: Final Entegrasyon Doğrulaması
+
+| Kontrol | Durum |
+|---------|-------|
+| Prisma ilişkileri (Organization, User, ContentLibrary) | ✅ 6/6 mevcut |
+| Sidebar Config (Sparkles + menü öğesi) | ✅ Mevcut |
+| App Sidebar Badge (store selectors + pulse animasyon) | ✅ Mevcut |
+| Admin Layout (AiGenerationPoller) | ✅ Mevcut |
+| Import tutarlılığı (4 sayfa + poller) | ✅ Tüm import'lar doğru |
+| Toast uyumluluğu (action: label + href) | ✅ Doğru imza |
+| Zod validasyon şemaları (6 şema + enum) | ✅ Tüm şemalar mevcut |
+| S3 fonksiyonları (upload/download/copy/delete) | ✅ Mevcut |
+| .env.example AI değişkenleri | ✅ Eklendi |
+
+### Build Sonuçları
+```
+✅ pnpm db:generate — başarılı (Prisma Client 7.5.0)
+✅ pnpm tsc --noEmit — 0 hata
+✅ pnpm lint — yeni dosyalarda 0 hata
+✅ pnpm build --webpack — başarılı (4 sayfa + 16 API route)
+```
+
+### Dosya Değişiklikleri
+| Kategori | Sayı |
+|----------|------|
+| Yeni sayfalar | 2 (new/page.tsx, [jobId]/page.tsx) |
+| Yeniden yazılan sayfalar | 2 (page.tsx, settings/page.tsx) |
+| Güncellenen dosyalar | 1 (.env.example) |
+| **Toplam** | **5 dosya** |
+
+### AI İçerik Stüdyosu v2 — Tamamlanma Özeti
+
+13 prompt ile sıfırdan inşa edilen modülün tam dosya sayısı:
+
+| Kategori | Sayı |
+|----------|------|
+| Sayfalar | 4 |
+| Componentler | 12 |
+| Hooks | 3 |
+| API Route'lar | 16 |
+| Lib dosyaları | 4 |
+| Store | 1 |
+| Provider (Poller) | 1 |
+| Types | 1 |
+| Constants | 1 |
+| **TOPLAM** | **43 dosya** |
+
+*Son güncelleme: 5 Nisan 2026 — Oturum 20*
