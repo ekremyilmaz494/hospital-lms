@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { setupWizardSchema } from '@/lib/validations'
+import { withCache, invalidateCache } from '@/lib/redis'
 
 /** GET /api/admin/setup — Kurulum durumunu döndür */
 export async function GET() {
@@ -10,14 +11,18 @@ export async function GET() {
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  const org = await prisma.organization.findUnique({
-    where: { id: dbUser!.organizationId! },
-    select: { setupCompleted: true, setupStep: true },
+  const orgId = dbUser!.organizationId!
+  const data = await withCache(`setup:${orgId}`, 60, async () => {
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { setupCompleted: true, setupStep: true },
+    })
+    return org ? { setupCompleted: org.setupCompleted, setupStep: org.setupStep } : null
   })
 
-  if (!org) return errorResponse('Kurum bulunamadı', 404)
+  if (!data) return errorResponse('Kurum bulunamadı', 404)
 
-  return jsonResponse({ setupCompleted: org.setupCompleted, setupStep: org.setupStep })
+  return jsonResponse(data)
 }
 
 /** PUT /api/admin/setup — Kurulum adımını kaydet */
@@ -113,6 +118,7 @@ export async function PUT(request: Request) {
       }
     }
 
+    await invalidateCache(`setup:${orgId}`)
     const updatedOrg = await prisma.organization.findUnique({
       where: { id: orgId },
       select: {

@@ -59,3 +59,6 @@ ai-content-service/auth_store/*.enc
 ai-content-service/temp/
 ai-content-service/.env
 ai-content-service/_auth_b64.txt
+
+# Claude Code hook logs
+.claude/command-log.txt

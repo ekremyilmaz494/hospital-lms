@@ -81,51 +81,75 @@ export async function clearExamTimer(attemptId: string) {
 }
 
 // ── API Response Cache ──
+// L1: in-memory (0ms), L2: Redis (~20-200ms depending on region)
 
 const memoryCache = new Map<string, { value: string; expiresAt: number }>()
+const MAX_MEMORY_CACHE = 200
+
+function memGet<T>(key: string): T | null {
+  const entry = memoryCache.get(key)
+  if (!entry || entry.expiresAt < Date.now()) {
+    if (entry) memoryCache.delete(key)
+    return null
+  }
+  return JSON.parse(entry.value) as T
+}
+
+function memSet(key: string, serialized: string, ttlSeconds: number) {
+  // LRU eviction: en eski entry'leri sil
+  if (memoryCache.size >= MAX_MEMORY_CACHE) {
+    const firstKey = memoryCache.keys().next().value
+    if (firstKey) memoryCache.delete(firstKey)
+  }
+  memoryCache.set(key, { value: serialized, expiresAt: Date.now() + ttlSeconds * 1000 })
+}
 
 /**
  * Get a cached value by key.
- * Returns null if not found, expired, or on Redis error.
+ * L1 (memory) → L2 (Redis) → null
  */
 export async function getCached<T>(key: string): Promise<T | null> {
+  // L1: in-memory check (0ms)
+  const mem = memGet<T>(key)
+  if (mem !== null) return mem
+
+  // L2: Redis
   const redis = getRedis()
   if (redis) {
     try {
       const raw = await redis.get<string>(key)
       if (raw == null) return null
-      return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T
+      const parsed = (typeof raw === 'string' ? JSON.parse(raw) : raw) as T
+      // Promote to L1 (use shorter TTL for memory — half of Redis TTL or 60s max)
+      memSet(key, typeof raw === 'string' ? raw : JSON.stringify(raw), 60)
+      return parsed
     } catch {
       resetRedis()
     }
   }
-  const entry = memoryCache.get(key)
-  if (!entry || entry.expiresAt < Date.now()) return null
-  return JSON.parse(entry.value) as T
+  return null
 }
 
 /**
  * Cache a value with TTL in seconds.
- * Falls back to in-memory if Redis is unavailable.
+ * Writes to both L1 (memory) and L2 (Redis).
  */
 export async function setCached(key: string, value: unknown, ttlSeconds: number): Promise<void> {
   const serialized = JSON.stringify(value)
+  // Always write to L1
+  memSet(key, serialized, Math.min(ttlSeconds, 120))
+  // Write to L2 (Redis) in background — don't await
   const redis = getRedis()
   if (redis) {
-    try {
-      await redis.set(key, serialized, { ex: ttlSeconds })
-      return
-    } catch {
-      resetRedis()
-    }
+    redis.set(key, serialized, { ex: ttlSeconds }).catch(() => resetRedis())
   }
-  memoryCache.set(key, { value: serialized, expiresAt: Date.now() + ttlSeconds * 1000 })
 }
 
 /**
  * Invalidate a cached key (e.g., after a write operation).
  */
 export async function invalidateCache(key: string): Promise<void> {
+  memoryCache.delete(key)
   const redis = getRedis()
   if (redis) {
     try {
@@ -134,7 +158,6 @@ export async function invalidateCache(key: string): Promise<void> {
       resetRedis()
     }
   }
-  memoryCache.delete(key)
 }
 
 /**
@@ -171,8 +194,8 @@ export async function invalidateOrgCache(orgId: string, entity: string): Promise
       resetRedis()
     }
   }
-  // In-memory fallback: clear matching keys
-  for (const k of memoryCache.keys()) {
+  // Clear L1 memory cache matching keys
+  for (const k of Array.from(memoryCache.keys())) {
     if (k.startsWith(prefix)) {
       memoryCache.delete(k)
     }

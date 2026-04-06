@@ -37,7 +37,14 @@ export function safePagination(params: URLSearchParams, maxLimit = 100) {
  * Uses getSession() (local JWT parse) instead of getUser() (HTTP round-trip)
  * because middleware already validates the token with getUser() on every request.
  * This eliminates a redundant Supabase Auth HTTP call per API route (~50-150ms).
+ *
+ * DB user + org status are cached in-memory for 30s to avoid repeated DB hits
+ * on rapid page navigations (sidebar triggers setup + in-progress-exams + page API).
  */
+
+// In-memory auth cache — keyed by user ID, 30s TTL
+const authCache = new Map<string, { dbUser: NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>; orgOk: boolean; expiresAt: number }>()
+
 export async function getAuthUser() {
   const supabase = await createClient()
   const { data: { session }, error } = await supabase.auth.getSession()
@@ -48,6 +55,15 @@ export async function getAuthUser() {
 
   const user = session.user
 
+  // Check in-memory cache first (0ms vs ~200-500ms DB)
+  const cached = authCache.get(user.id)
+  if (cached && cached.expiresAt > Date.now()) {
+    if (!cached.orgOk) {
+      return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
+    }
+    return { user, dbUser: cached.dbUser, error: null, organizationId: cached.dbUser.organizationId }
+  }
+
   const dbUser = await prisma.user.findUnique({ where: { id: user.id } })
 
   if (!dbUser || !dbUser.isActive) {
@@ -55,14 +71,26 @@ export async function getAuthUser() {
   }
 
   // Organization active check — super_admin is exempt
+  let orgOk = true
   if (dbUser.role !== 'super_admin' && dbUser.organizationId) {
     const org = await prisma.organization.findUnique({
       where: { id: dbUser.organizationId },
       select: { isActive: true, isSuspended: true },
     })
     if (!org || !org.isActive || org.isSuspended) {
-      return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
+      orgOk = false
     }
+  }
+
+  // Cache for 30s — LRU eviction
+  if (authCache.size > 50) {
+    const firstKey = authCache.keys().next().value
+    if (firstKey) authCache.delete(firstKey)
+  }
+  authCache.set(user.id, { dbUser, orgOk, expiresAt: Date.now() + 30_000 })
+
+  if (!orgOk) {
+    return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
   }
 
   return { user, dbUser, error: null, organizationId: dbUser.organizationId }
