@@ -8,10 +8,12 @@ import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight,
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Particles } from '@/components/ui/particles';
+import dynamic from 'next/dynamic';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { ShimmerButton } from '@/components/ui/shimmer-button';
-import { Ripple } from '@/components/ui/ripple';
+
+const Particles = dynamic(() => import('@/components/ui/particles').then(m => ({ default: m.Particles })), { ssr: false });
+const Ripple = dynamic(() => import('@/components/ui/ripple').then(m => ({ default: m.Ripple })), { ssr: false });
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { useOrgBranding } from '@/hooks/use-org-branding';
@@ -168,7 +170,7 @@ function LoginForm() {
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between h-full p-12 xl:p-16">
           {/* Logo */}
-          <BlurFade delay={0.1}>
+          <BlurFade delay={0.05} duration={0.3}>
             <div className="flex items-center gap-3">
               {branding?.logoUrl ? (
                 <Image src={branding.logoUrl} alt={branding.name} width={44} height={44} className="rounded-2xl object-contain" style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)' }} unoptimized />
@@ -188,18 +190,18 @@ function LoginForm() {
 
           {/* Hero text */}
           <div className="max-w-lg">
-            <BlurFade delay={0.2}>
+            <BlurFade delay={0.08} duration={0.3}>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] mb-6" style={{ color: '#34d399' }}>
                 Personel Eğitim Platformu
               </p>
             </BlurFade>
-            <BlurFade delay={0.3}>
+            <BlurFade delay={0.1} duration={0.3}>
               <h1 className="text-[2.75rem] xl:text-5xl font-bold text-white leading-[1.1] tracking-tight mb-6">
                 Eğitimi Yönet,<br />
                 <span style={{ color: '#34d399' }}>Başarıyı Ölç.</span>
               </h1>
             </BlurFade>
-            <BlurFade delay={0.4}>
+            <BlurFade delay={0.12} duration={0.3}>
               <p className="text-base text-white/50 leading-relaxed max-w-md">
                 Hastane personellerinize video tabanlı eğitimler atayın, sınav yapın ve performansı gerçek zamanlı takip edin.
               </p>
@@ -208,7 +210,7 @@ function LoginForm() {
             {/* Feature pills */}
             <div className="mt-10 space-y-3">
               {features.map((f, i) => (
-                <BlurFade key={f.title} delay={0.5 + i * 0.1}>
+                <BlurFade key={f.title} delay={0.15 + i * 0.05} duration={0.3}>
                   <div className="flex items-center gap-4 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(52, 211, 153, 0.1)' }}>
                       <f.icon className="h-5 w-5" style={{ color: '#34d399' }} />
@@ -224,7 +226,7 @@ function LoginForm() {
           </div>
 
           {/* Footer */}
-          <BlurFade delay={0.8}>
+          <BlurFade delay={0.2} duration={0.3}>
             <p className="text-xs text-white/30">&copy; 2026 {branding?.name || 'Hastane LMS Platformu'}</p>
           </BlurFade>
         </div>
@@ -243,7 +245,7 @@ function LoginForm() {
             <span className="text-xl font-bold font-heading">{branding?.name || 'Hastane LMS'}</span>
           </div>
 
-          <BlurFade delay={0.1}>
+          <BlurFade delay={0.05} duration={0.3}>
             <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-3" style={{ color: 'var(--color-primary)' }}>
               Giriş Yap
             </p>
@@ -277,7 +279,7 @@ function LoginForm() {
             </BlurFade>
           )}
 
-          <BlurFade delay={0.2}>
+          <BlurFade delay={0.08} duration={0.3}>
             <form onSubmit={handleLogin} className="space-y-5">
               <div>
                 <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>E-posta Adresi</Label>
@@ -374,7 +376,7 @@ function LoginForm() {
             </form>
           </BlurFade>
 
-          <BlurFade delay={0.4}>
+          <BlurFade delay={0.12} duration={0.3}>
             <div className="mt-10 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
               <p className="text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
                 &copy; 2026 Hastane LMS. Tüm hakları saklıdır.
