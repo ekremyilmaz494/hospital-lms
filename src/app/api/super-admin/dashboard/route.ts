@@ -83,27 +83,41 @@ export async function GET() {
     }
     const subscriptionData = Array.from(planCounts.entries()).map(([plan, counts]) => ({ plan, ...counts }))
 
-    // Monthly registration trend (last 6 months) — tüm sorgular paralel
+    // Monthly registration trend (last 6 months) — tek sorguda
     const now = new Date()
-    const months = Array.from({ length: 6 }, (_, i) => {
-      const idx = 5 - i
-      const date = new Date(now.getFullYear(), now.getMonth() - idx, 1)
-      const nextDate = new Date(now.getFullYear(), now.getMonth() - idx + 1, 1)
-      const monthName = date.toLocaleDateString('tr-TR', { month: 'short' })
-      return { date, nextDate, monthName }
-    })
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
 
-    const monthQueries = months.flatMap(m => [
-      prisma.organization.count({ where: { createdAt: { gte: m.date, lt: m.nextDate } } }),
-      prisma.user.count({ where: { createdAt: { gte: m.date, lt: m.nextDate } } }),
-    ])
+    const monthlyRaw = await prisma.$queryRaw<
+      { month_name: string; hastane: bigint; personel: bigint }[]
+    >`
+      SELECT
+        to_char(gs.month, 'Mon') AS month_name,
+        COALESCE(o.cnt, 0)::bigint AS hastane,
+        COALESCE(u.cnt, 0)::bigint AS personel
+      FROM generate_series(
+        date_trunc('month', ${sixMonthsAgo}::timestamptz),
+        date_trunc('month', now()),
+        interval '1 month'
+      ) AS gs(month)
+      LEFT JOIN (
+        SELECT date_trunc('month', created_at) AS m, COUNT(*) AS cnt
+        FROM organizations
+        WHERE created_at >= ${sixMonthsAgo}
+        GROUP BY m
+      ) o ON o.m = gs.month
+      LEFT JOIN (
+        SELECT date_trunc('month', created_at) AS m, COUNT(*) AS cnt
+        FROM users
+        WHERE created_at >= ${sixMonthsAgo}
+        GROUP BY m
+      ) u ON u.m = gs.month
+      ORDER BY gs.month
+    `
 
-    const monthResults = await Promise.all(monthQueries)
-
-    const monthlyData = months.map((m, i) => ({
-      month: m.monthName,
-      hastane: monthResults[i * 2],
-      personel: monthResults[i * 2 + 1],
+    const monthlyData = monthlyRaw.map((row) => ({
+      month: row.month_name,
+      hastane: Number(row.hastane),
+      personel: Number(row.personel),
     }))
 
     // Recent hospitals formatted

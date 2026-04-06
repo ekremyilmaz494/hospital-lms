@@ -90,11 +90,11 @@ export const createUserSchema = z.object({
   lastName: z.string().min(1).max(100),
   password: z.string().min(8).max(128),
   role: z.enum(['admin', 'staff']),
-  organizationId: z.string().uuid().optional(),
+  organizationId: z.string().uuid({ message: 'Geçersiz organizasyon kimliği' }).optional(),
   tcNo: z.string().length(11).refine(isValidTCKN, { message: 'Geçersiz TC kimlik numarası' }).optional(),
   phone: z.string().max(20).optional(),
   department: z.string().max(100).optional(),
-  departmentId: z.string().uuid().optional(),
+  departmentId: z.string().uuid({ message: 'Geçersiz departman kimliği' }).optional(),
   title: z.string().max(100).optional(),
 }).strict()
 
@@ -139,8 +139,9 @@ const trainingVideoInputSchema = z.object({
   title: z.string().max(500).optional(),
   url: z.string().optional(),
   durationSeconds: z.number().int().min(0).optional(),
-  contentType: z.enum(['video', 'pdf']).default('video'),
+  contentType: z.enum(['video', 'pdf', 'audio']).default('video'),
   pageCount: z.number().int().positive().optional(),
+  documentKey: z.string().optional(),
 })
 
 const trainingQuestionInputSchema = z.object({

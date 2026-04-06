@@ -118,14 +118,12 @@ export async function GET(request: Request) {
     // Monthly data (last 6 months from assignments)
     const now = new Date()
     const allAssignments = trainings.flatMap(t => t.assignments)
+    const assignmentsWithDates = allAssignments.map(a => ({ ...a, date: new Date(a.assignedAt) }))
     const monthlyData = []
     for (let i = 5; i >= 0; i--) {
       const start = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
-      const monthAssigns = allAssignments.filter(a => {
-        const d = new Date(a.assignedAt)
-        return d >= start && d < end
-      })
+      const monthAssigns = assignmentsWithDates.filter(a => a.date >= start && a.date < end)
       monthlyData.push({
         month: start.toLocaleDateString('tr-TR', { month: 'short' }),
         tamamlanan: monthAssigns.filter(a => a.status === 'passed').length,

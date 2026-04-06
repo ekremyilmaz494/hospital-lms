@@ -27,11 +27,19 @@ export async function GET(request: Request) {
         where,
         include: {
           training: {
-            include: {
+            select: {
+              title: true,
+              category: true,
+              maxAttempts: true,
+              endDate: true,
+              examOnly: true,
+              examDurationMinutes: true,
+              passingScore: true,
               _count: { select: { questions: true, videos: true } },
             },
           },
-          examAttempts: { orderBy: { attemptNumber: 'desc' } },
+          examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1 },
+          _count: { select: { examAttempts: true } },
         },
         orderBy: { assignedAt: 'desc' },
         skip,
@@ -48,9 +56,9 @@ export async function GET(request: Request) {
 
       // Calculate progress: 3 steps (pre-exam, videos, post-exam)
       let completedSteps = 0
-      const preExamDone = a.examAttempts.some(att => att.preExamCompletedAt !== null)
-      const videosDone = a.examAttempts.some(att => att.videosCompletedAt !== null)
-      const postExamDone = a.examAttempts.some(att => att.postExamCompletedAt !== null)
+      const preExamDone = latestAttempt?.preExamCompletedAt !== null
+      const videosDone = latestAttempt?.videosCompletedAt !== null
+      const postExamDone = latestAttempt?.postExamCompletedAt !== null
       if (preExamDone) completedSteps++
       if (videosDone) completedSteps++
       if (postExamDone) completedSteps++
@@ -72,7 +80,7 @@ export async function GET(request: Request) {
         title: t.title,
         category: t.category ?? '',
         status: a.status,
-        attempt: a.examAttempts.length,
+        attempt: (a as unknown as { _count: { examAttempts: number } })._count.examAttempts,
         maxAttempts: t.maxAttempts,
         deadline: deadline ? deadline.toLocaleDateString('tr-TR') : '',
         progress,

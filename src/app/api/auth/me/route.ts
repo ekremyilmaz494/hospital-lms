@@ -50,6 +50,6 @@ export async function GET() {
         sessionTimeout: dbUser.organization?.sessionTimeout ?? 30,
       },
     },
-    { headers: { 'Cache-Control': 'private, max-age=30' } }
+    { headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=60' } }
   )
 }

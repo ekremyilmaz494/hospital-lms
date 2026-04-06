@@ -10,7 +10,7 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
-import { useState, useEffect, type ReactNode } from 'react';
+import React, { useState, useEffect, useMemo, memo, type ReactNode } from 'react';
 import { ArrowUpDown, ChevronLeft, ChevronRight, Search, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import {
   Table,
@@ -51,7 +51,7 @@ function useMobileView(): boolean {
   return isMobile;
 }
 
-export function DataTable<TData, TValue>({
+export const DataTable = memo(function DataTable<TData, TValue>({
   columns,
   data,
   searchKey,
@@ -62,10 +62,13 @@ export function DataTable<TData, TValue>({
   const [globalFilter, setGlobalFilter] = useState('');
   const isMobile = useMobileView();
 
+  const stableData = useMemo(() => data, [data]);
+  const stableColumns = useMemo(() => columns, [columns]);
+
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
-    data,
-    columns,
+    data: stableData,
+    columns: stableColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -376,4 +379,4 @@ export function DataTable<TData, TValue>({
       </div>
     </div>
   );
-}
+}) as <TData, TValue>(props: DataTableProps<TData, TValue>) => React.JSX.Element;

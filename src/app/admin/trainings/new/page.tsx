@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, Info, Video, FileQuestion, Users, Check, Plus, Trash2,
   GripVertical, Upload, Clock, Award, Calendar, Target, Sparkles, BookOpen, CheckCircle2,
-  ShieldCheck, RefreshCw, Building2, FileText, Layers
+  ShieldCheck, RefreshCw, Building2, FileText, Layers, Music, ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,9 +49,14 @@ export default function NewTrainingPage() {
   const [excludedStaff, setExcludedStaff] = useState<string[]>([]);
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<Record<number, number>>({});
-  const [videos, setVideos] = useState<{ id: number; title: string; url: string; file?: File; contentType: 'video' | 'pdf'; pageCount?: number }[]>([
+  const [videos, setVideos] = useState<{
+    id: number; title: string; url: string; file?: File;
+    contentType: 'video' | 'pdf' | 'audio'; pageCount?: number; durationSeconds?: number;
+    documentKey?: string; documentFile?: File; documentUploading?: boolean;
+  }[]>([
     { id: 1, title: '', url: '', contentType: 'video' },
   ]);
+  const [contentTypeMenu, setContentTypeMenu] = useState(false);
   const [questions, setQuestions] = useState([
     { id: 1, text: '', points: 10, options: ['', '', '', ''], correct: -1 },
   ]);
@@ -84,7 +89,10 @@ export default function NewTrainingPage() {
     );
   };
 
-  const addVideo = () => setVideos(prev => [...prev, { id: Date.now(), title: '', url: '', contentType: 'video' }]);
+  const addContent = (type: 'video' | 'audio') => {
+    setVideos(prev => [...prev, { id: Date.now(), title: '', url: '', contentType: type }]);
+    setContentTypeMenu(false);
+  };
   const removeVideo = (id: number) => setVideos(prev => prev.filter(v => v.id !== id));
 
   const addQuestion = () => setQuestions(prev => [...prev, { id: Date.now(), text: '', points: 10, options: ['', '', '', ''], correct: -1 }]);
@@ -432,7 +440,7 @@ export default function NewTrainingPage() {
             </div>
           )}
 
-          {/* Step 2: Content (Video + PDF) */}
+          {/* Step 2: Content (Video + PDF + Audio) */}
           {currentStep === 2 && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -443,17 +451,45 @@ export default function NewTrainingPage() {
                   <div>
                     <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Eğitim İçerikleri</h3>
                     <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      {videos.filter(v => v.contentType === 'video').length} video, {videos.filter(v => v.contentType === 'pdf').length} doküman eklendi
+                      {videos.filter(v => v.contentType === 'video').length} video, {videos.filter(v => v.contentType === 'audio').length} ses, {videos.filter(v => v.contentType === 'pdf').length} doküman eklendi
                     </p>
                   </div>
                 </div>
-                <Button
-                  onClick={addVideo}
-                  className="gap-2 font-semibold text-white rounded-xl"
-                  style={{ background: 'var(--color-primary)', transition: 'opacity var(--transition-fast)' }}
-                >
-                  <Plus className="h-4 w-4" /> İçerik Ekle
-                </Button>
+                <div className="relative">
+                  <Button
+                    onClick={() => setContentTypeMenu(prev => !prev)}
+                    className="gap-2 font-semibold text-white rounded-xl"
+                    style={{ background: 'var(--color-primary)', transition: 'opacity var(--transition-fast)' }}
+                  >
+                    <Plus className="h-4 w-4" /> İçerik Ekle <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                  {contentTypeMenu && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setContentTypeMenu(false)} />
+                      <div
+                        className="absolute right-0 top-full mt-1 z-50 rounded-xl border shadow-lg overflow-hidden"
+                        style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', minWidth: 220 }}
+                      >
+                        <button
+                          onClick={() => addContent('video')}
+                          className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-left hover:bg-[var(--color-surface-hover)]"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          <Video className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+                          Video Ekle
+                        </button>
+                        <button
+                          onClick={() => addContent('audio')}
+                          className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-left hover:bg-[var(--color-surface-hover)]"
+                          style={{ color: 'var(--color-text-primary)', borderTop: '1px solid var(--color-border)' }}
+                        >
+                          <Music className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
+                          Ses + Doküman Ekle
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -467,31 +503,42 @@ export default function NewTrainingPage() {
                       transition: 'border-color var(--transition-fast)',
                     }}
                   >
-                    {/* Video header */}
+                    {/* Content header */}
                     <div className="flex items-center gap-4 px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
                       <GripVertical className="h-5 w-5 shrink-0 cursor-grab" style={{ color: 'var(--color-text-muted)' }} />
                       <div
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-                        style={{ background: 'var(--color-primary)', color: 'white' }}
+                        style={{ background: video.contentType === 'audio' ? 'var(--color-accent)' : 'var(--color-primary)', color: 'white' }}
                       >
-                        {idx + 1}
+                        {video.contentType === 'audio' ? <Music className="h-4 w-4" /> : idx + 1}
                       </div>
                       <Input
-                        placeholder="Video başlığı girin..."
+                        placeholder={video.contentType === 'audio' ? 'Ses başlığı girin...' : 'Video başlığı girin...'}
+                        value={video.title}
+                        onChange={(e) => setVideos(prev => prev.map(v => v.id === video.id ? { ...v, title: e.target.value } : v))}
                         className="flex-1 h-9 border-0 bg-transparent text-sm font-medium focus-visible:ring-0 px-0"
                         style={{ color: 'var(--color-text-primary)' }}
                       />
-                      {videos.length > 1 && (
-                        <button
-                          onClick={() => removeVideo(video.id)}
-                          className="rounded-lg p-2 opacity-0 group-hover:opacity-100"
-                          style={{ color: 'var(--color-error)', transition: 'opacity var(--transition-fast)' }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {video.contentType === 'audio' && video.durationSeconds ? (
+                          <span className="text-xs px-2 py-1 rounded-md" style={{ background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>
+                            {Math.floor(video.durationSeconds / 60)}:{String(video.durationSeconds % 60).padStart(2, '0')} dk
+                          </span>
+                        ) : null}
+                        {videos.length > 1 && (
+                          <button
+                            onClick={() => removeVideo(video.id)}
+                            className="rounded-lg p-2 opacity-0 group-hover:opacity-100"
+                            style={{ color: 'var(--color-error)', transition: 'opacity var(--transition-fast)' }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    {/* Upload area per video */}
+
+                    {/* Upload area — video/pdf */}
+                    {video.contentType !== 'audio' && (
                     <div
                       className="flex items-center gap-4 px-5 py-5 relative"
                       style={{ background: 'var(--color-surface)' }}
@@ -659,6 +706,247 @@ export default function NewTrainingPage() {
                         {video.file ? 'Değiştir' : 'Dosya Seç'}
                       </Button>
                     </div>
+                    )}
+
+                    {/* Upload area — audio + optional document */}
+                    {video.contentType === 'audio' && (
+                    <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                      {/* Audio upload */}
+                      <div
+                        className="flex items-center gap-4 px-5 py-5 relative"
+                        style={{ background: 'var(--color-surface)' }}
+                      >
+                        <input
+                          type="file"
+                          accept="audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/aac"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 200 * 1024 * 1024) {
+                                toast('Ses dosyası boyutu 200MB sınırını aşıyor', 'error');
+                                return;
+                              }
+                              setVideos(prev => prev.map(v => v.id === video.id ? { ...v, file, url: '' } : v));
+                              setUploadProgress(prev => ({ ...prev, [video.id]: 0 }));
+
+                              // HTML5 Audio ile süre tespiti
+                              try {
+                                const objectUrl = URL.createObjectURL(file);
+                                const audioEl = new Audio(objectUrl);
+                                audioEl.onloadedmetadata = () => {
+                                  setVideos(prev => prev.map(v => v.id === video.id
+                                    ? { ...v, durationSeconds: Math.round(audioEl.duration) } : v));
+                                  URL.revokeObjectURL(objectUrl);
+                                };
+                                audioEl.onerror = () => URL.revokeObjectURL(objectUrl);
+                              } catch {
+                                // Süre alınamazsa devam et
+                              }
+
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              const xhr = new XMLHttpRequest();
+                              let s3Phase = false;
+                              xhr.upload.onprogress = (ev) => {
+                                if (ev.lengthComputable && !s3Phase) {
+                                  const pct = Math.round((ev.loaded / ev.total) * 80);
+                                  setUploadProgress(prev => ({ ...prev, [video.id]: pct }));
+                                }
+                              };
+                              xhr.upload.onload = () => {
+                                s3Phase = true;
+                                setUploadProgress(prev => ({ ...prev, [video.id]: 82 }));
+                                const tick = setInterval(() => {
+                                  setUploadProgress(prev => {
+                                    const cur = prev[video.id] ?? 82;
+                                    if (cur >= 95) { clearInterval(tick); return prev; }
+                                    return { ...prev, [video.id]: cur + 1 };
+                                  });
+                                }, 400);
+                                (xhr as unknown as Record<string, unknown>)._s3Tick = tick;
+                              };
+                              xhr.onload = () => {
+                                const tick = (xhr as unknown as Record<string, unknown>)._s3Tick as ReturnType<typeof setInterval> | undefined;
+                                if (tick) clearInterval(tick);
+                                if (xhr.status >= 200 && xhr.status < 300) {
+                                  setUploadProgress(prev => ({ ...prev, [video.id]: 100 }));
+                                  try {
+                                    const { key } = JSON.parse(xhr.responseText);
+                                    setTimeout(() => {
+                                      setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: key, file } : v));
+                                      setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
+                                    }, 500);
+                                    toast('Ses dosyası yüklendi', 'success');
+                                  } catch {
+                                    toast('Yanıt işlenemedi', 'error');
+                                    setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
+                                  }
+                                } else {
+                                  try {
+                                    const err = JSON.parse(xhr.responseText);
+                                    toast(err.error || 'Ses dosyası yüklenemedi', 'error');
+                                  } catch {
+                                    toast('Ses dosyası yüklenemedi', 'error');
+                                  }
+                                  setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
+                                  setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
+                                }
+                              };
+                              xhr.onerror = () => {
+                                const tick = (xhr as unknown as Record<string, unknown>)._s3Tick as ReturnType<typeof setInterval> | undefined;
+                                if (tick) clearInterval(tick);
+                                toast('Ses dosyası yüklenemedi — bağlantı hatası', 'error');
+                                setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
+                                setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
+                              };
+                              xhr.open('POST', '/api/upload/content');
+                              xhr.send(formData);
+                            }
+                          }}
+                        />
+                        <div
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                          style={{ background: video.file ? 'var(--color-success-bg)' : 'var(--color-accent-light)' }}
+                        >
+                          {video.file ? (
+                            <Music className="h-5 w-5" style={{ color: 'var(--color-success)' }} />
+                          ) : (
+                            <Music className="h-5 w-5" style={{ color: 'var(--color-accent)' }} />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          {video.file ? (
+                            <>
+                              <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                                {video.file.name}
+                              </p>
+                              {uploadProgress[video.id] !== undefined ? (
+                                <div className="mt-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                                      <div
+                                        className="h-full rounded-full"
+                                        style={{
+                                          width: `${uploadProgress[video.id]}%`,
+                                          background: 'var(--color-accent)',
+                                          transition: 'width 0.2s ease',
+                                        }}
+                                      />
+                                    </div>
+                                    <span className="text-xs font-bold shrink-0" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', minWidth: 36, textAlign: 'right' }}>
+                                      {uploadProgress[video.id]}%
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                                    {(video.file.size / (1024 * 1024)).toFixed(1)} MB • {uploadProgress[video.id] < 80 ? 'Dosya gönderiliyor...' : uploadProgress[video.id] < 100 ? 'S3\'e yükleniyor...' : 'Tamamlandı!'}
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-xs mt-0.5" style={{ color: video.url ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
+                                  Ses · {(video.file.size / (1024 * 1024)).toFixed(2)} MB
+                                  {video.durationSeconds ? ` · ${Math.floor(video.durationSeconds / 60)}:${String(video.durationSeconds % 60).padStart(2, '0')} dk` : ''}
+                                  {video.url ? ' · Yüklendi ✓' : ''}
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                                Ses dosyasını sürükleyin veya tıklayıp seçin
+                              </p>
+                              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                                MP3, WAV, M4A, OGG, AAC — Maks. 200MB
+                              </p>
+                            </>
+                          )}
+                        </div>
+                        <Button
+                          variant={video.file ? 'default' : 'outline'}
+                          size="sm"
+                          type="button"
+                          className="rounded-lg text-xs gap-1.5 pointer-events-none"
+                          style={video.file ? { background: 'var(--color-surface-hover)', color: 'var(--color-text-primary)' } : { borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                        >
+                          {video.file ? <Check className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
+                          {video.file ? 'Değiştir' : 'Ses Seç'}
+                        </Button>
+                      </div>
+
+                      {/* Optional document upload for audio */}
+                      <div
+                        className="flex items-center gap-4 px-5 py-4 relative"
+                        style={{ background: 'var(--color-bg)' }}
+                      >
+                        <input
+                          type="file"
+                          accept="application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 100 * 1024 * 1024) {
+                                toast('Doküman boyutu 100MB sınırını aşıyor', 'error');
+                                return;
+                              }
+                              setVideos(prev => prev.map(v => v.id === video.id ? { ...v, documentFile: file, documentKey: '', documentUploading: true } : v));
+
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              try {
+                                const res = await fetch('/api/upload/content', { method: 'POST', body: formData });
+                                if (res.ok) {
+                                  const { key } = await res.json();
+                                  setVideos(prev => prev.map(v => v.id === video.id ? { ...v, documentKey: key, documentUploading: false } : v));
+                                  toast('Doküman yüklendi', 'success');
+                                } else {
+                                  const err = await res.json().catch(() => ({}));
+                                  toast(err.error || 'Doküman yüklenemedi', 'error');
+                                  setVideos(prev => prev.map(v => v.id === video.id ? { ...v, documentFile: undefined, documentKey: undefined, documentUploading: false } : v));
+                                }
+                              } catch {
+                                toast('Doküman yüklenemedi — bağlantı hatası', 'error');
+                                setVideos(prev => prev.map(v => v.id === video.id ? { ...v, documentFile: undefined, documentKey: undefined, documentUploading: false } : v));
+                              }
+                            }
+                          }}
+                        />
+                        <div
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                          style={{ background: video.documentFile ? 'var(--color-success-bg)' : 'var(--color-surface-hover)' }}
+                        >
+                          <FileText className="h-4 w-4" style={{ color: video.documentFile ? 'var(--color-success)' : 'var(--color-text-muted)' }} />
+                        </div>
+                        <div className="flex-1">
+                          {video.documentFile ? (
+                            <p className="text-sm" style={{ color: video.documentKey ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
+                              {video.documentFile.name}
+                              {video.documentUploading ? ' — Yükleniyor...' : video.documentKey ? ' ✓' : ''}
+                            </p>
+                          ) : (
+                            <>
+                              <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                                Eşlik eden doküman ekle (opsiyonel)
+                              </p>
+                              <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                                PDF veya PPTX — Maks. 100MB
+                              </p>
+                            </>
+                          )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          className="rounded-lg text-xs gap-1.5 pointer-events-none"
+                          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          {video.documentFile ? 'Değiştir' : 'Doküman Seç'}
+                        </Button>
+                      </div>
+                    </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1030,7 +1318,7 @@ export default function NewTrainingPage() {
                       complianceDeadline: isCompulsory && complianceDeadline ? new Date(complianceDeadline).toISOString() : null,
                       regulatoryBody: isCompulsory && regulatoryBody ? regulatoryBody : null,
                       renewalPeriodMonths: isCompulsory && renewalPeriodMonths !== '' ? Number(renewalPeriodMonths) : null,
-                      videos: videos.filter(v => v.url).map(v => ({ title: v.title || v.file?.name || (v.contentType === 'pdf' ? 'Doküman' : 'Video'), url: v.url, contentType: v.contentType, pageCount: v.pageCount })),
+                      videos: videos.filter(v => v.url).map(v => ({ title: v.title || v.file?.name || (v.contentType === 'audio' ? 'Ses' : v.contentType === 'pdf' ? 'Doküman' : 'Video'), url: v.url, contentType: v.contentType, pageCount: v.pageCount, durationSeconds: v.durationSeconds, documentKey: v.documentKey })),
                       questions,
                       selectedDepts,
                       excludedStaff,

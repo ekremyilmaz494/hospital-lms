@@ -11,10 +11,11 @@ import type { LiveExamAttempt } from '@/hooks/use-realtime-exams';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
-// Chart'lar aynı modülden — webpack tek chunk olarak birleştirir
-const TrendChart = dynamic(() => import('@/components/shared/charts/admin-dashboard-charts').then(m => ({ default: m.TrendChart })), { ssr: false, loading: () => <ChartSkeletonInline /> });
-const StatusDonut = dynamic(() => import('@/components/shared/charts/admin-dashboard-charts').then(m => ({ default: m.StatusDonut })), { ssr: false, loading: () => <ChartSkeletonInline /> });
-const DepartmentBar = dynamic(() => import('@/components/shared/charts/admin-dashboard-charts').then(m => ({ default: m.DepartmentBar })), { ssr: false, loading: () => <ChartSkeletonInline /> });
+// Chart'lar aynı modülden — tek shared import ile webpack dedup
+const chartImport = () => import('@/components/shared/charts/admin-dashboard-charts')
+const TrendChart = dynamic(() => chartImport().then(m => ({ default: m.TrendChart })), { ssr: false, loading: () => <ChartSkeletonInline /> })
+const StatusDonut = dynamic(() => chartImport().then(m => ({ default: m.StatusDonut })), { ssr: false, loading: () => <ChartSkeletonInline /> })
+const DepartmentBar = dynamic(() => chartImport().then(m => ({ default: m.DepartmentBar })), { ssr: false, loading: () => <ChartSkeletonInline /> })
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
 import { PageHeader } from '@/components/shared/page-header';

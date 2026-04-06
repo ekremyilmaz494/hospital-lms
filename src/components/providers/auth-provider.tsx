@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { usePresenceTracker } from '@/hooks/use-presence-tracker';
 
-const DB_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 dakika — deaktive kullanıcı penceresi
+const DB_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 dakika — deaktive kullanıcı penceresi
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setUserIfChanged, setLoading, setSessionTimeout } = useAuthStore();

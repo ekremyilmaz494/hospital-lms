@@ -148,12 +148,15 @@ export async function POST(request: Request) {
 
   const parsed = createUserSchema.safeParse({ ...body as object, role: 'staff', organizationId: dbUser!.organizationId! })
   if (!parsed.success) {
+    logger.error('Admin Staff', 'Validation failed', parsed.error.issues)
     const msg = parsed.error.issues.map(i => {
       const field = i.path.join('.')
       if (field === 'email') return 'Geçerli bir e-posta adresi girin'
       if (field === 'password') return 'Şifre en az 8 karakter olmalıdır'
       if (field === 'firstName') return 'Ad zorunludur'
       if (field === 'lastName') return 'Soyad zorunludur'
+      if (field === 'departmentId') return 'Geçersiz departman seçimi'
+      if (field === 'organizationId') return 'Organizasyon hatası — lütfen tekrar giriş yapın'
       return i.message
     }).join(', ')
     return errorResponse(msg)

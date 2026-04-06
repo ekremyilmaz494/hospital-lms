@@ -121,7 +121,7 @@ export async function updateSession(request: NextRequest) {
   // Sadece authenticated kullanıcıyı login sayfasından dashboard'a yönlendirmek için kullanılır.
   if (isPublicRoute(pathname)) {
     try {
-      const sessionResult = await withTimeout(supabase.auth.getSession(), 4000)
+      const sessionResult = await withTimeout(supabase.auth.getSession(), 2500)
       if (sessionResult?.data?.session?.user && (pathname === '/auth/login' || pathname === '/')) {
         const role = sanitizeRole(sessionResult.data.session.user.user_metadata?.role)
         return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
@@ -138,7 +138,7 @@ export async function updateSession(request: NextRequest) {
   // getSession() local JWT parse ile çalışır — token refresh cookie handler'da olur.
   // Güvenlik notu: JWT zaten Supabase tarafından imzalanmış, manipüle edilemez.
   try {
-    const sessionResult = await withTimeout(supabase.auth.getSession(), 4000)
+    const sessionResult = await withTimeout(supabase.auth.getSession(), 2500)
     const user = sessionResult?.data?.session?.user ?? null
 
     // Unauthenticated veya timeout → login'e yönlendir

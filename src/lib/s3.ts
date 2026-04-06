@@ -17,12 +17,18 @@ const ALLOWED_CONTENT_TYPES = [
   'video/webm',
   'video/ogg',
   'application/pdf',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/mp4',
+  'audio/ogg',
+  'audio/aac',
 ]
 
 /** Generate presigned URL for uploading video to S3 */
 export async function getUploadUrl(key: string, contentType: string) {
   if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
-    throw new Error(`İzin verilmeyen dosya türü: ${contentType}. Sadece video dosyaları yüklenebilir.`)
+    throw new Error(`İzin verilmeyen dosya türü: ${contentType}. Sadece video, PDF, PPTX ve ses dosyaları yüklenebilir.`)
   }
 
   const command = new PutObjectCommand({
@@ -129,7 +135,8 @@ export function backupKey(orgId: string) {
 }
 
 const ALLOWED_VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'ogg']
-const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf']
+const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'pptx']
+const ALLOWED_AUDIO_EXTENSIONS = ['mp3', 'wav', 'm4a', 'ogg', 'aac']
 
 /** Generate video storage key using a random UUID — avoids path traversal and filename guessing */
 export function videoKey(orgId: string, trainingId: string, filename: string) {
@@ -141,7 +148,7 @@ export function videoKey(orgId: string, trainingId: string, filename: string) {
   return `videos/${orgId}/${trainingId}/${id}.${ext}`
 }
 
-/** Generate document storage key (PDF) */
+/** Generate document storage key (PDF, PPTX) */
 export function documentKey(orgId: string, trainingId: string, filename: string) {
   const ext = filename.split('.').pop()?.toLowerCase() ?? ''
   if (!ALLOWED_DOCUMENT_EXTENSIONS.includes(ext)) {
@@ -149,4 +156,14 @@ export function documentKey(orgId: string, trainingId: string, filename: string)
   }
   const id = crypto.randomUUID()
   return `documents/${orgId}/${trainingId}/${id}.${ext}`
+}
+
+/** Generate audio storage key */
+export function audioKey(orgId: string, trainingId: string, filename: string) {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  if (!ALLOWED_AUDIO_EXTENSIONS.includes(ext)) {
+    throw new Error(`İzin verilmeyen dosya uzantısı: .${ext}`)
+  }
+  const id = crypto.randomUUID()
+  return `audio/${orgId}/${trainingId}/${id}.${ext}`
 }

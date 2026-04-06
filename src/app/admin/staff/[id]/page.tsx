@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, Shield, RotateCcw, Plus } from 'lucide-react';
+import { AssignTrainingModal } from '../assign-training-modal';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
@@ -40,6 +42,7 @@ export default function StaffDetailPage() {
   const id = typeof params?.id === 'string' ? params.id : null;
   const { toast } = useToast();
   const { data: staff, isLoading, error, refetch } = useFetch<StaffDetail>(id ? `/api/admin/staff/${id}` : null);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
 
   if (isLoading) {
     return <PageLoading />;
@@ -201,17 +204,24 @@ export default function StaffDetailPage() {
                     <GraduationCap className="h-6 w-6" style={{ color: 'var(--color-info)' }} />
                   </div>
                   <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Henüz eğitim atanmamış</p>
-                  <Link href={`/admin/trainings/new?staffId=${staff.id}`}>
-                    <Button variant="outline" size="sm" className="gap-2 rounded-lg" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
-                      <Plus className="h-3.5 w-3.5" /> Eğitim Ata
-                    </Button>
-                  </Link>
+                  <Button variant="outline" size="sm" className="gap-2 rounded-lg" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }} onClick={() => setAssignModalOpen(true)}>
+                    <Plus className="h-3.5 w-3.5" /> Eğitim Ata
+                  </Button>
                 </div>
               )}
             </div>
           </MagicCard>
         </BlurFade>
       </div>
+      {staff && (
+        <AssignTrainingModal
+          staffId={staff.id}
+          staffName={staff.name}
+          open={assignModalOpen}
+          onOpenChange={setAssignModalOpen}
+          onSuccess={refetch}
+        />
+      )}
     </div>
   );
 }

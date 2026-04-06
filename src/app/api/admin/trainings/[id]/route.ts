@@ -24,12 +24,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           user: { select: { id: true, firstName: true, lastName: true, email: true, departmentRel: { select: { name: true } } } },
           examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1 },
         },
+        orderBy: { assignedAt: 'desc' },
+        take: 20,
       },
       _count: { select: { assignments: true, questions: true, videos: true } },
     },
   })
 
   if (!training) return errorResponse('Training not found', 404)
+
+  // Batch S3 URL generation (parallel instead of sequential waterfall)
+  const streamUrls = await Promise.all(
+    training.videos.map(v => (v.videoKey ? getStreamUrl(v.videoKey) : Promise.resolve(null)))
+  )
 
   // Transform for frontend
   const assignedStaff = training.assignments.map(a => {
@@ -92,13 +99,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     videoCount: training._count.videos,
     questionCount: training._count.questions,
     assignedStaff,
-    videos: await Promise.all(training.videos.map(async v => ({
+    videos: training.videos.map((v, i) => ({
       id: v.id,
       title: v.title,
-      videoUrl: v.videoKey ? await getStreamUrl(v.videoKey) : v.videoUrl,
+      videoUrl: streamUrls[i] ?? v.videoUrl,
       duration: `${Math.floor(v.durationSeconds / 60)}:${String(v.durationSeconds % 60).padStart(2, '0')}`,
       order: v.sortOrder,
-    }))),
+    })),
     questions: training.questions.map(q => ({
       id: q.id,
       text: q.questionText,

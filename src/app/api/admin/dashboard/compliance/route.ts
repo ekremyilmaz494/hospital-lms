@@ -4,7 +4,7 @@ import { getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
 const CACHE_TTL = 180 // 3 dakika
-const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' }
+const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=60' }
 
 export async function GET() {
   const { dbUser, error } = await getAuthUser()

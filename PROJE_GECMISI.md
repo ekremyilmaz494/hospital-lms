@@ -2623,3 +2623,269 @@ SATISA-HAZIRLIK-PROMPTLARI.md dosyasindaki 28 maddelik satisa hazirlik plani tam
 **Export:** admin/export/route.ts, admin/backups/route.ts, admin/staff/route.ts, admin/staff/[id]/route.ts (maskeTcNo)
 
 *Son guncelleme: 6 Nisan 2026 — Oturum 22*
+
+---
+
+## OTURUM 23 — Performans Optimizasyonu + Supabase Bölge Taşıma (6 Nisan 2026)
+
+### Bağlam
+Uygulama performansı iki ana sorundan etkileniyordu: (1) Dashboard API'lerinde N+1 sorgular ve in-memory aggregation, (2) Supabase projesinin Güney Kore (ap-northeast-2) bölgesinde olması — Türkiye'den her DB sorgusuna ~250-400ms ağ gecikmesi ekliyordu.
+
+### Performans Optimizasyonları (9 Madde)
+
+#### KRİTİK — Hemen Düzeltilen
+
+| # | Sorun | Çözüm | Etki |
+|---|-------|-------|------|
+| 1 | **Charts API N+1** — 500+ kayıt çekip JS'de groupBy | `$queryRaw` ile 2 SQL aggregation sorgusu (`COUNT(*) FILTER`, `LATERAL JOIN`) | 500+ satır fetch → ~10 satır sonuç |
+| 2 | **Training Detail sınırsız include** — assignments limit yok | `take: 20, orderBy: assignedAt desc` eklendi | Sınırsız → max 20 kayıt |
+| 3 | **Staff My-Trainings tüm examAttempts** — `.some()` ile JS filtreleme | `take: 1` + `_count: { select: { examAttempts: true } }` | N kayıt → 1 kayıt/assignment |
+| 4 | **Dashboard Activity `.take()` yok** — zaten düzeltilmiş | SKIP — `take: 20` ve `take: 5` mevcut | — |
+| 5 | **Super-Admin 12 ayrı count** — 6 ay × 2 tablo | `$queryRaw` + `generate_series` ile tek sorgu | 12 sorgu → 1 sorgu |
+
+#### YÜKSEK — Schema Index'leri
+
+| Index | Tablo | Açıklama |
+|-------|-------|----------|
+| `idx_attempts_user_status` | exam_attempts | `[userId, status]` composite |
+| `idx_trainings_org_start_end` | trainings | `[organizationId, startDate, endDate]` 3'lü composite |
+
+**Not:** `TrainingAssignment.@@index([organizationId, status])` eklenemedi — model'de `organizationId` direkt alan yok (training relation üzerinden join).
+
+#### ORTA — Frontend Optimizasyonları
+
+| # | Sorun | Çözüm |
+|---|-------|-------|
+| 7 | Cache key orgId eksik | SKIP — zaten `cache:${orgId}:staff:...` formatında |
+| 8 | Chart component'leri memo'suz | `React.memo()` ile sarıldı (TrendChart, StatusDonut, DepartmentBar) |
+| 9 | Data table virtualization yok | Ertelendi — pageSize:10 ile pagination yeterli |
+
+### Supabase Bağlantı & Auth Performansı (7 Madde)
+
+| # | Değişiklik | Dosya | Etki |
+|---|-----------|-------|------|
+| 1 | Connection pool `connection_limit=10&pool_timeout=20` | `.env.local` | Gereksiz bağlantı açma/kapatma azalır |
+| 2 | Login MFA — session metadata'dan kontrol | `login/route.ts` | ~100-200ms tasarruf |
+| 3 | Auth/me cache `max-age=120, stale-while-revalidate=60` | `me/route.ts` | 2dk cache, arka plan yenileme |
+| 4 | DB refresh interval 5dk → 10dk | `auth-provider.tsx` | %50 daha az arka plan sorgusu |
+| 5 | Prisma slow query logging (>200ms sarı uyarı) | `prisma.ts` | Dev modda yavaş sorgular görünür |
+| 6 | Dashboard prefetch — zaten combined endpoint | — | SKIP |
+| 7 | Middleware timeout 4s → 2.5s | `middleware.ts` | Yavaş ağda daha hızlı fallback |
+
+### Supabase Bölge Taşıma
+
+**Eski:** `ap-northeast-2` (Seul, Güney Kore) — Türkiye'den ~250-400ms gecikme
+**Yeni:** `eu-central-1` (Frankfurt, Almanya) — Türkiye'den ~30-50ms gecikme
+
+- Yeni Supabase projesi oluşturuldu: `pkkkyyajfmusurcoovwt`
+- Schema migration Supabase MCP aracıyla 3 adımda uygulandı (PgBouncer `db push`'ı blokluyor):
+  1. `create_all_tables` — 44 tablo
+  2. `create_indexes_and_constraints` — tüm unique/composite index'ler
+  3. `create_foreign_keys` — 76 foreign key
+- `.env.local` güncellemeleri: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `DIRECT_URL`
+- **Tahmini kazanç:** Her DB sorgusunda ~200-300ms, login akışında (3-4 sorgu) ~800ms-1.2s
+
+### Teknik Notlar
+- `$queryRaw` tagged template literal'ı otomatik parametre binding yapar — SQL injection güvenli
+- PostgreSQL `COUNT(*) FILTER (WHERE ...)`: Tek taramada birden fazla koşullu sayım
+- `LEFT JOIN LATERAL ... LIMIT 1`: N+1 patternlerini tek sorguda çözer
+- `generate_series`: Veri olmayan aylar için bile satır üretir — JS'de boş ay doldurma gereksiz
+- PgBouncer transaction-mode DDL komutlarını desteklemiyor — migration'lar DIRECT_URL veya MCP ile yapılmalı
+- `React.memo` + named function: DevTools'ta component adını korur
+- `data-table.tsx` syntax fix: `memo()` generic component cast'ı düzeltildi
+
+### Değiştirilen Dosyalar
+| Kategori | Dosyalar |
+|----------|---------|
+| **API Routes** | `charts/route.ts`, `trainings/[id]/route.ts`, `my-trainings/route.ts`, `super-admin/dashboard/route.ts`, `auth/login/route.ts`, `auth/me/route.ts` |
+| **Schema** | `prisma/schema.prisma` (2 yeni index) |
+| **Lib** | `prisma.ts` (slow query logging, pg Pool), `supabase/middleware.ts` (timeout 2.5s) |
+| **Components** | `admin-dashboard-charts.tsx` (React.memo), `data-table.tsx` (syntax fix), `auth-provider.tsx` (10dk interval) |
+| **Config** | `.env.local` (yeni Supabase EU, pool params) |
+| **Migration** | `prisma/full-schema.sql` (44 tablo DDL) |
+
+*Son güncelleme: 6 Nisan 2026 — Oturum 23*
+
+---
+
+## Oturum 24 — Supabase Frankfurt Migration & Performans Optimizasyonu (6 Nisan 2026, 2. oturum)
+
+### Amaç
+Supabase projesini Seul'den (ap-northeast-2) Frankfurt'a (eu-central-1) taşıma. DB latency ~370ms → ~73ms.
+
+### Migration Adımları
+1. **Yeni Supabase projesi** oluşturuldu (MCP tool ile, `hospital-lms-eu`, ID: `pkkkyyajfmusurcoovwt`)
+2. **`.env.local`** güncellendi — 5 Supabase satırı değişti (URL, anon key, service_role, DATABASE_URL, DIRECT_URL)
+3. **43 tablo** MCP `apply_migration` ve `execute_sql` ile oluşturuldu (pooler DDL sorunu nedeniyle Prisma CLI kullanılamadı)
+4. **97 RLS policy** uygulandı + `notifications` realtime publication eklendi
+5. **Seed data:** 3 demo kullanıcı (Auth), organizasyon, plan, abonelik — `gen_random_uuid()` ile gerçek UUID'ler
+6. **Eski Seul projesi** pause edildi (geri dönülebilir)
+
+### Karşılaşılan 11 Sorun ve Çözümleri
+
+| # | Sorun | Çözüm |
+|---|-------|-------|
+| 1 | Pooler hostname yanlış (`aws-0` vs `aws-1`) | Dashboard'dan doğru hostname kopyalandı |
+| 2 | Prisma migration pooler üzerinden çalışmıyor | MCP `apply_migration` tool kullanıldı |
+| 3 | DB şifresi MCP'den döndürülmüyor | Dashboard'dan manual reset |
+| 4 | Schema vs migration farkı (43 vs 28 tablo) | `prisma migrate diff` ile tam SQL üretilip uygulandı |
+| 5 | Fake UUID Zod v4 validation'dan geçemedi | `gen_random_uuid()` ile gerçek UUID'ler |
+| 6 | Eski JWT token cookie'lerde kaldı | Tarayıcı cookie'leri temizlendi |
+| 7 | PrismaPg prepared statement hatası | `pg.Pool` instance geçirildi |
+| 8 | "Invalid UUID" ham hata mesajı | Zod mesajları Türkçeleştirildi + error mapping |
+| 9 | Dev mode yavaşlık (7-30s) | Production build ile test (3-7ms) |
+| 10 | "Eğitim Ata" yanlış yönlendirme | Link → AssignTrainingModal |
+| 11 | Build hatası (kullanılmayan Prisma import) | Import kaldırıldı |
+
+### Performans Optimizasyonları (8 adet)
+
+| Optimizasyon | Dosya | Etki |
+|-------------|-------|------|
+| PrismaPg: connectionString → pg Pool + warm start | `src/lib/prisma.ts` | Prepared statement fix + bağlantı overhead azaldı |
+| Redis: keepAlive + pipeline | `src/lib/redis.ts` | Rate limit: 800ms → 400ms |
+| S3 waterfall → Promise.all batch | `src/app/api/admin/trainings/[id]/route.ts` | Video URL paralel üretim |
+| include → select | `src/app/api/staff/my-trainings/route.ts` | Gereksiz veri transferi kaldırıldı |
+| Date parse: 6×N → N | `src/app/api/admin/reports/route.ts` | 30000+ gereksiz Date() kaldırıldı |
+| Cache-Control: max-age=300 | 3 dashboard route | 5 dk browser cache |
+| DataTable: React.memo + useMemo | `src/components/shared/data-table.tsx` | Gereksiz re-render önlendi |
+| Chart: shared dynamic import | `src/app/admin/dashboard/page.tsx` | Webpack chunk dedup |
+
+### Sonuç
+
+| Metrik | Önce (Seul) | Sonra (Frankfurt) |
+|--------|------------|-------------------|
+| DB latency (kullanıcı) | ~370ms | ~73ms |
+| Production API yanıt | — | 3-7ms |
+| Rate limit overhead | ~800ms | ~400ms |
+| Vercel ↔ DB (production) | ~300ms | ~1-5ms |
+
+### Değiştirilen Dosyalar (14)
+- `.env.local` — Supabase connection (5 satır)
+- `src/lib/prisma.ts` — pg Pool + warm start
+- `src/lib/redis.ts` — keepAlive + pipeline
+- `src/lib/validations.ts` — UUID Türkçe hata mesajları
+- `src/app/api/admin/staff/route.ts` — Zod error mapping
+- `src/app/api/admin/trainings/[id]/route.ts` — S3 waterfall fix
+- `src/app/api/staff/my-trainings/route.ts` — select optimization
+- `src/app/api/admin/reports/route.ts` — Date parse optimization
+- `src/app/api/admin/dashboard/charts/route.ts` — Cache-Control + unused import fix
+- `src/app/api/admin/dashboard/compliance/route.ts` — Cache-Control
+- `src/app/api/admin/dashboard/activity/route.ts` — Cache-Control
+- `src/components/shared/data-table.tsx` — React.memo + useMemo
+- `src/app/admin/dashboard/page.tsx` — shared chart import
+- `src/app/admin/staff/[id]/page.tsx` — Eğitim Ata modal fix
+
+### Oluşturulan Dosyalar
+- `PERFORMANCE_RULES.md` — Performans ve geliştirme kuralları (10 bölüm)
+- `PROJE_GECMISI.md` — Bu bölüm eklendi
+
+### Bilinen Açık Sorunlar
+- Eğitim detayında video oynatma sorunu — S3 presigned URL üretiliyor ama tarayıcıda oynatılamıyor (CORS veya frontend rendering sorunu araştırılacak)
+- AI Content Studio ses dosyası oynatma hatası — AI Content Service (localhost:8100) çalışıyor ama ses stream URL'i geçersiz olabilir
+
+---
+
+## OTURUM 25 — Ses İçerik Desteği (Audio Content Type)
+
+**Tarih:** 6 Nisan 2026
+**Amaç:** TrainingVideo modeline ses (audio) içerik tipi ve PPTX doküman desteği eklemek
+
+### Prompt 1 — Prisma Schema + Migration
+
+**Dosya:** `prisma/schema.prisma`
+
+| Değişiklik | Detay |
+|-----------|-------|
+| Yorum güncelleme | `(Video + PDF)` → `(Video + PDF + Audio)` |
+| Yeni alan | `documentKey String? @map("document_key") @db.Text` — ses ile birlikte yüklenen PDF/PPTX referansı |
+| contentType yorumu | `// 'video' \| 'pdf' \| 'audio'` eklendi |
+
+**Migration:** `pnpm db:migrate dev --name add_audio_content_type` — Supabase uzak DB bağlantısı timeout verdi (ağ/VPN sorunu), migration dosyası oluşmadı. Schema değişiklikleri hazır, DB bağlantısı sağlandığında tekrar çalıştırılacak.
+
+### Prompt 2 — S3 Helper + Upload Route
+
+#### `src/lib/s3.ts` Değişiklikleri
+
+| Değişiklik | Detay |
+|-----------|-------|
+| `ALLOWED_CONTENT_TYPES` | 6 yeni MIME eklendi: `audio/mpeg`, `audio/wav`, `audio/mp4`, `audio/ogg`, `audio/aac`, PPTX MIME |
+| `ALLOWED_DOCUMENT_EXTENSIONS` | `['pdf']` → `['pdf', 'pptx']` |
+| `ALLOWED_AUDIO_EXTENSIONS` | Yeni sabit: `['mp3', 'wav', 'm4a', 'ogg', 'aac']` |
+| `audioKey()` | Yeni fonksiyon — `audio/{orgId}/{trainingId}/{uuid}.{ext}` pattern'i |
+| `getUploadUrl` hata mesajı | Ses ve PPTX tipleri eklendi |
+
+#### `src/app/api/upload/content/route.ts` Değişiklikleri
+
+| Değişiklik | Detay |
+|-----------|-------|
+| Import | `audioKey` eklendi |
+| `MAX_AUDIO_SIZE` | `200 * 1024 * 1024` (200MB) |
+| `DOCUMENT_TYPES` | PPTX MIME eklendi |
+| `AUDIO_TYPES` | Yeni dizi: 5 ses MIME tipi |
+| `detectContentType` | Return tipi `'video' \| 'pdf' \| 'audio'` — ses MIME → `'audio'`, PPTX → `'pdf'` |
+| `maxSize` logic | Üçlü: video=500MB, audio=200MB, document=100MB |
+| S3 key üretimi | Üçlü: video → `videoKey()`, audio → `audioKey()`, document → `documentKey()` |
+
+### Prompt 3 — Validations
+
+**Dosya:** `src/lib/validations.ts`
+
+| Değişiklik | Detay |
+|-----------|-------|
+| `contentType` enum | `['video', 'pdf']` → `['video', 'pdf', 'audio']` |
+| `documentKey` | `z.string().optional()` alanı eklendi |
+
+### Prompt 4 — Admin Wizard Step 2 (UI)
+
+**Dosya:** `src/app/admin/trainings/new/page.tsx` — En büyük değişiklik
+
+#### State Genişletme
+```typescript
+// Önceki
+{ id, title, url, file?, contentType: 'video' | 'pdf', pageCount? }
+
+// Sonraki
+{ id, title, url, file?, contentType: 'video' | 'pdf' | 'audio',
+  pageCount?, durationSeconds?, documentKey?, documentFile?, documentUploading? }
+```
+
+#### Yeni Özellikler
+
+| Özellik | Detay |
+|---------|-------|
+| İçerik tipi seçim dropdown | "Video Ekle" / "Ses + Doküman Ekle" — overlay pattern ile kapanır |
+| Ses upload alanı | `audio/*` MIME kabul, 200MB limit, XHR ile progress bar (accent renk) |
+| HTML5 Audio süre tespiti | `new Audio(objectURL)` → `loadedmetadata` event → `durationSeconds` state'e yazılır, `revokeObjectURL` ile temizlenir |
+| Opsiyonel doküman upload | Ses kartının alt bölümünde PDF/PPTX alanı, 100MB limit, `fetch()` ile upload |
+| Süre badge | Header'da `X:XX dk` formatında accent renkli badge |
+| İkonlar | Ses = `Music` (lucide), Video = numara badge |
+| Başlık input | Controlled hale getirildi (`value` + `onChange`) |
+| Submit payload | `documentKey` ve `durationSeconds` dahil edildi |
+| Counter text | "X video, Y ses, Z doküman eklendi" |
+
+#### Mimari Kararlar
+- **XHR vs fetch:** Ses upload'unda XHR kullanıldı (progress bar için), doküman upload'unda fetch yeterli (küçük dosya)
+- **PPTX → 'pdf' mapping:** PPTX, `detectContentType`'da `'pdf'` olarak map'lenir — aynı document viewer kullanılacak
+- **audio/ogg vs video/ogg:** MIME type'a göre ayrım (extension değil), çakışma yok
+
+### Doğrulama Sonuçları
+
+```
+✅ TypeScript — temiz (değiştirilen 4 dosyada hata yok)
+✅ ESLint — temiz (değiştirilen dosyalarda hata/warning yok)
+⏳ Migration — Supabase DB bağlantı timeout (tekrar çalıştırılacak)
+```
+
+### Değiştirilen Dosyalar (4)
+1. `prisma/schema.prisma` — TrainingVideo modeline `documentKey` + audio yorum
+2. `src/lib/s3.ts` — `audioKey()` fonksiyonu + ses/PPTX MIME desteği
+3. `src/app/api/upload/content/route.ts` — Audio upload desteği + PPTX
+4. `src/lib/validations.ts` — `contentType` enum + `documentKey` alanı
+5. `src/app/admin/trainings/new/page.tsx` — Step 2 UI: ses upload, çift alan, dropdown menü
+
+### Öğrenilen Dersler
+- **S3 key namespace isolation:** Her içerik tipi kendi prefix'inde (`videos/`, `documents/`, `audio/`) — lifecycle policy ve IAM izinleri prefix bazında yönetilebilir
+- **URL.createObjectURL memory management:** Ses metadata okunduktan sonra `revokeObjectURL` çağrılmalı — 200MB dosyalarda memory leak riski
+- **Supabase pooler vs direct connection:** Migration için pooler (port 6543) timeout verebilir, direct connection (port 5432) daha güvenilir
+
+*Son güncelleme: 6 Nisan 2026 — Oturum 25*

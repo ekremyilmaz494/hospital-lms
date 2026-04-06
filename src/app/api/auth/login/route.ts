@@ -83,9 +83,22 @@ export async function POST(request: NextRequest) {
 
     const role = data.user?.user_metadata?.role as string | undefined
 
-    // Check if user has MFA enrolled
-    const { data: factors } = await supabase.auth.mfa.listFactors()
-    const activeFactor = factors?.totp?.find(f => f.status === 'verified')
+    // Check if user has MFA enrolled — önce session'daki AAL seviyesinden kontrol et
+    // AAL1 = şifre ile giriş yapıldı, AAL2 = MFA tamamlandı
+    // Session'da factors bilgisi varsa HTTP call'a gerek yok
+    const sessionFactors = data.session?.user?.factors
+    let activeFactor: { id: string } | undefined
+
+    if (sessionFactors?.length) {
+      // Session metadata'dan MFA durumunu kontrol et (HTTP call yok)
+      activeFactor = sessionFactors.find(
+        (f: { factor_type: string; status: string }) => f.factor_type === 'totp' && f.status === 'verified'
+      ) as { id: string } | undefined
+    } else {
+      // Fallback: session'da factor bilgisi yoksa API'den al
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+      activeFactor = factors?.totp?.find(f => f.status === 'verified')
+    }
 
     if (activeFactor) {
       logger.info('auth:login', 'MFA gerekli', { userId: data.user?.id, role })

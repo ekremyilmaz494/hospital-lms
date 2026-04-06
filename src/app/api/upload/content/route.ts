@@ -1,18 +1,22 @@
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
-import { uploadBuffer, videoKey, documentKey } from '@/lib/s3'
+import { uploadBuffer, videoKey, documentKey, audioKey } from '@/lib/s3'
 import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
 
-/** Video: max 500MB, PDF: max 100MB */
+/** Video: max 500MB, PDF/PPTX: max 100MB, Audio: max 200MB */
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024
 const MAX_DOCUMENT_SIZE = 100 * 1024 * 1024
+const MAX_AUDIO_SIZE = 200 * 1024 * 1024
 
 const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
-const DOCUMENT_TYPES = ['application/pdf']
-const ALL_ALLOWED_TYPES = [...VIDEO_TYPES, ...DOCUMENT_TYPES]
+const DOCUMENT_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.presentationml.presentation']
+const AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/ogg', 'audio/aac']
+const ALL_ALLOWED_TYPES = [...VIDEO_TYPES, ...DOCUMENT_TYPES, ...AUDIO_TYPES]
 
-function detectContentType(mimeType: string): 'video' | 'pdf' {
-  return DOCUMENT_TYPES.includes(mimeType) ? 'pdf' : 'video'
+function detectContentType(mimeType: string): 'video' | 'pdf' | 'audio' {
+  if (AUDIO_TYPES.includes(mimeType)) return 'audio'
+  if (DOCUMENT_TYPES.includes(mimeType)) return 'pdf'
+  return 'video'
 }
 
 /**
@@ -39,11 +43,15 @@ export async function POST(request: Request) {
     }
 
     if (!ALL_ALLOWED_TYPES.includes(file.type)) {
-      return errorResponse('İzin verilmeyen dosya türü. MP4, WebM ve PDF kabul edilir.', 400)
+      return errorResponse('İzin verilmeyen dosya türü. MP4, WebM, PDF, PPTX ve ses dosyaları (MP3, WAV, M4A, OGG, AAC) kabul edilir.', 400)
     }
 
     const contentType = detectContentType(file.type)
-    const maxSize = contentType === 'video' ? MAX_VIDEO_SIZE : MAX_DOCUMENT_SIZE
+    const maxSize = contentType === 'video'
+      ? MAX_VIDEO_SIZE
+      : contentType === 'audio'
+        ? MAX_AUDIO_SIZE
+        : MAX_DOCUMENT_SIZE
 
     if (file.size > maxSize) {
       const limitMB = maxSize / (1024 * 1024)
@@ -57,7 +65,9 @@ export async function POST(request: Request) {
 
     const key = contentType === 'video'
       ? videoKey(organizationId, 'drafts', file.name)
-      : documentKey(organizationId, 'drafts', file.name)
+      : contentType === 'audio'
+        ? audioKey(organizationId, 'drafts', file.name)
+        : documentKey(organizationId, 'drafts', file.name)
 
     const buffer = Buffer.from(await file.arrayBuffer())
     await uploadBuffer(key, buffer, file.type)

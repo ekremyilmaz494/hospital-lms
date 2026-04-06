@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -24,7 +25,7 @@ interface TrendChartProps {
   data: { month: string; tamamlanan: number; atanan: number; basarisiz: number }[]
 }
 
-export function TrendChart({ data }: TrendChartProps) {
+export const TrendChart = React.memo(function TrendChart({ data }: TrendChartProps) {
   return (
     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
       <AreaChart data={data} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
@@ -45,14 +46,14 @@ export function TrendChart({ data }: TrendChartProps) {
       </AreaChart>
     </ResponsiveContainer>
   )
-}
+})
 
 interface StatusDonutProps {
   data: { name: string; value: number; color: string }[]
   total: number
 }
 
-export function StatusDonut({ data, total }: StatusDonutProps) {
+export const StatusDonut = React.memo(function StatusDonut({ data, total }: StatusDonutProps) {
   return (
     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
       <PieChart>
@@ -65,13 +66,13 @@ export function StatusDonut({ data, total }: StatusDonutProps) {
       </PieChart>
     </ResponsiveContainer>
   )
-}
+})
 
 interface DepartmentBarProps {
   data: { dept: string; oran: number; puan: number }[]
 }
 
-export function DepartmentBar({ data }: DepartmentBarProps) {
+export const DepartmentBar = React.memo(function DepartmentBar({ data }: DepartmentBarProps) {
   return (
     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
       <BarChart data={data} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
@@ -83,4 +84,4 @@ export function DepartmentBar({ data }: DepartmentBarProps) {
       </BarChart>
     </ResponsiveContainer>
   )
-}
+})

@@ -8,7 +8,7 @@ export function getRedis(): Redis | null {
   const token = process.env.REDIS_TOKEN
   // Placeholder veya boş değerler varsa Redis'i atla
   if (!url || !token || url.includes('your-redis') || token.includes('your-redis')) return null
-  _redis = new Redis({ url, token })
+  _redis = new Redis({ url, token, keepAlive: true })
   return _redis
 }
 
@@ -186,8 +186,11 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
   if (redis) {
     try {
       const k = `ratelimit:${key}`
-      await redis.set(k, 0, { nx: true, ex: windowSeconds })
-      const current = await redis.incr(k)
+      const pipeline = redis.pipeline()
+      pipeline.set(k, 0, { nx: true, ex: windowSeconds })
+      pipeline.incr(k)
+      const results = await pipeline.exec()
+      const current = results[1] as number
       return current <= maxRequests
     } catch {
       // Redis unreachable — fall through to in-memory fallback

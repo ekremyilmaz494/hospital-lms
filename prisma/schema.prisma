@@ -325,10 +325,11 @@ model Training {
   @@index([organizationId, publishStatus], map: "idx_trainings_org_publish_status")
   @@index([organizationId, isCompulsory], map: "idx_trainings_org_compulsory")
   @@index([organizationId, createdAt], map: "idx_trainings_org_created")
+  @@index([organizationId, startDate, endDate], map: "idx_trainings_org_start_end")
   @@map("trainings")
 }
 
-// ── EĞİTİM İÇERİKLERİ (Video + PDF) ──
+// ── EĞİTİM İÇERİKLERİ (Video + PDF + Audio) ──
 model TrainingVideo {
   id              String   @id @default(uuid()) @db.Uuid
   trainingId      String   @map("training_id") @db.Uuid
@@ -336,8 +337,9 @@ model TrainingVideo {
   description     String?  @db.Text
   videoUrl        String   @map("video_url") @db.Text
   videoKey        String   @map("video_key") @db.Text
+  documentKey     String?  @map("document_key") @db.Text
   durationSeconds Int      @map("duration_seconds")
-  contentType     String   @default("video") @map("content_type") @db.VarChar(20)
+  contentType     String   @default("video") @map("content_type") @db.VarChar(20) // 'video' | 'pdf' | 'audio'
   pageCount       Int?     @map("page_count")
   sortOrder       Int      @default(0) @map("sort_order")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -443,7 +445,7 @@ model ExamAttempt {
   @@index([trainingId], map: "idx_attempts_training")
   @@index([trainingId, status], map: "idx_attempts_training_status")
   @@index([userId, trainingId], map: "idx_attempts_user_training")
-  // Performance: composite index for assignment status lookups
+  @@index([userId, status], map: "idx_attempts_user_status")
   @@index([assignmentId, status], map: "idx_attempts_assignment_status")
   @@map("exam_attempts")
 }
