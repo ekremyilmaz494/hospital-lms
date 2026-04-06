@@ -198,6 +198,7 @@ function MarketingFooter() {
         { label: "Kullanim Sartlari", href: "/terms" },
         { label: "Gizlilik Politikasi", href: "/privacy" },
         { label: "KVKK Aydinlatma", href: "/kvkk" },
+        { label: "Veri Saklama Politikasi", href: "/data-retention" },
       ],
     },
     {

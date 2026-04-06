@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/shared/toast";
 import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
+import { CookieConsent } from "@/components/shared/cookie-consent";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -66,6 +67,7 @@ export default function RootLayout({
                 <ErrorBoundary>
                   {children}
                   <PWAInstallPrompt />
+                  <CookieConsent />
                 </ErrorBoundary>
               </ToastProvider>
             </SessionTimeoutProvider>

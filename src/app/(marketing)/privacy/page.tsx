@@ -269,13 +269,47 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* 9. Iletisim */}
+        {/* 9. VERBIS Kayit Bilgileri */}
+        <section>
+          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
+            9. VERBIS Kayit Bilgileri
+          </h2>
+          <p>
+            6698 sayili Kanun&apos;un 16. maddesi uyarinca, Hastane LMS Veri Sorumlusu olarak
+            Veri Sorumlulari Sicil Bilgi Sistemi&apos;ne (VERBIS) kayitlidir.
+          </p>
+          <ul className="mt-3 space-y-1">
+            <li>
+              <strong>Veri Sorumlusu:</strong> Hastane LMS Yazilim Teknolojileri
+            </li>
+            <li>
+              <strong>VERBIS Kayit Numarasi:</strong> [Kayit tamamlaninca eklenecektir]
+            </li>
+            <li>
+              <strong>Kayit Tarihi:</strong> [Kayit tamamlaninca eklenecektir]
+            </li>
+          </ul>
+          <p className="mt-3 text-sm" style={{ color: "var(--color-text-muted)" }}>
+            VERBIS kaydi hakkinda detayli bilgi icin:{" "}
+            <a
+              href="https://verbis.kvkk.gov.tr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold underline"
+              style={{ color: "var(--color-primary)" }}
+            >
+              verbis.kvkk.gov.tr
+            </a>
+          </p>
+        </section>
+
+        {/* 10. Iletisim */}
         <section
           className="rounded-2xl p-6"
           style={{ backgroundColor: "var(--color-surface-alt, #f8fafc)", border: "1px solid var(--color-border)" }}
         >
           <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            9. Iletisim
+            10. Iletisim
           </h2>
           <p>
             Gizlilik politikamiz ve kisisel verilerinizin korunmasi hakkindaki tum soru
