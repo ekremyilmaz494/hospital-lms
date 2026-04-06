@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { getAttemptStatus } from '@/lib/exam-helpers'
+import { getStreamUrl } from '@/lib/s3'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -62,12 +63,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const progressMap = new Map(progress.map(p => [p.videoId, p]))
 
-  const videoList = videos.map((v) => {
+  const videoList = await Promise.all(videos.map(async (v) => {
     const p = progressMap.get(v.id)
     // S3 content → proxy through our API (avoids CORS issues)
     // Legacy /uploads videos → use path directly
     const hasS3Key = v.videoKey && !v.videoKey.startsWith('/uploads')
     const url = hasS3Key ? `/api/stream/${v.id}` : v.videoUrl
+    const documentUrl = v.documentKey ? await getStreamUrl(v.documentKey) : undefined
     return {
       id: v.id,
       title: v.title,
@@ -77,8 +79,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       pageCount: v.pageCount,
       completed: p?.isCompleted ?? false,
       lastPosition: p?.lastPositionSeconds ?? 0,
+      documentUrl,
     }
-  })
+  }))
 
   return jsonResponse({
     trainingTitle: training.title,

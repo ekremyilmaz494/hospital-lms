@@ -141,6 +141,7 @@ export async function POST(request: Request) {
               durationSeconds: v.durationSeconds || (ct === 'video' ? 300 : 0),
               contentType: ct,
               pageCount: v.pageCount ?? null,
+              documentKey: v.documentKey ?? null,
               sortOrder: idx,
             }
           })

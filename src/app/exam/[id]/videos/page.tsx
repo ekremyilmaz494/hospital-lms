@@ -9,6 +9,11 @@ const PdfViewer = dynamic(
   () => import('@/components/exam/pdf-viewer').then(m => ({ default: m.PdfViewer })),
   { ssr: false, loading: () => <div className="flex items-center justify-center h-64"><div className="h-8 w-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} /></div> }
 );
+
+const AudioPlayer = dynamic(
+  () => import('@/components/exam/audio-player').then(m => ({ default: m.AudioPlayer })),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-64"><div className="h-8 w-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} /></div> }
+);
 import { Button } from '@/components/ui/button';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -18,8 +23,9 @@ interface VideoItem {
   title: string;
   url: string;
   duration: number;
-  contentType?: 'video' | 'pdf';
+  contentType?: 'video' | 'pdf' | 'audio';
   pageCount?: number | null;
+  documentUrl?: string;
   completed: boolean;
   lastPosition?: number;
 }
@@ -317,7 +323,46 @@ export default function VideoPlayerPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
           {/* Content Player Area */}
           <div className="lg:col-span-3">
-            {currentVideo.contentType === 'pdf' ? (
+            {currentVideo.contentType === 'audio' ? (
+              /* ── Audio Player ── */
+              <div className="rounded-xl border overflow-hidden p-6" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
+                <AudioPlayer
+                  src={currentVideo.url}
+                  documentUrl={currentVideo.documentUrl}
+                  title={currentVideo.title}
+                  duration={currentVideo.duration}
+                  lastPosition={currentVideo.lastPosition}
+                  onProgress={(watchedTime, position) => {
+                    fetch(`/api/exam/${id}/videos`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ videoId: currentVideo.id, watchedTime, position }),
+                    }).catch(() => setHeartbeatErrors(prev => prev + 1));
+                  }}
+                  onComplete={() => {
+                    const vids = videosRef.current;
+                    setLocalCompleted(prev => new Set(prev).add(currentVideo.id));
+                    videosRef.current = vids.map(v => v.id === currentVideo.id ? { ...v, completed: true } : v);
+
+                    fetch(`/api/exam/${id}/videos`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ videoId: currentVideo.id, watchedTime: currentVideo.duration, position: currentVideo.duration, completed: true }),
+                    }).then(async res => {
+                      if (!res.ok) throw new Error('Server error');
+                      const data = await res.json();
+                      if (data.allVideosCompleted) {
+                        setTimeout(() => router.push(`/exam/${id}/transition?from=videos`), 800);
+                      }
+                    }).catch(() => {
+                      setLocalCompleted(prev => { const next = new Set(prev); next.delete(currentVideo.id); return next; });
+                      videosRef.current = vids;
+                      setHeartbeatErrors(prev => prev + 1);
+                    });
+                  }}
+                />
+              </div>
+            ) : currentVideo.contentType === 'pdf' ? (
               /* ── PDF Viewer ── */
               <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--color-border)', height: 'calc(100vh - 180px)' }}>
                 <PdfViewer
@@ -483,7 +528,7 @@ export default function VideoPlayerPage() {
                     }}
                   >
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: v.completed ? 'var(--color-success)' : isCurrent ? 'var(--color-primary)' : 'var(--color-border)' }}>
-                      {v.completed ? <CheckCircle className="h-4 w-4 text-white" /> : isLocked ? <Lock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} /> : v.contentType === 'pdf' ? <FileText className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} /> : <Play className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} />}
+                      {v.completed ? <CheckCircle className="h-4 w-4 text-white" /> : isLocked ? <Lock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} /> : v.contentType === 'pdf' ? <FileText className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} /> : v.contentType === 'audio' ? <Volume2 className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} /> : <Play className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-xs font-medium" style={{ color: isCurrent ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>{v.title}</p>
