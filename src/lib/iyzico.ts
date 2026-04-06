@@ -92,8 +92,8 @@ export async function verifyIyzicoCallback(token: string): Promise<{ status: str
   }
 }
 
-/** Fatura numarası üretici: INV-2026-000001 formatı */
+/** Fatura numarasi uretici: HLM-2026-00001 formati */
 export function generateInvoiceNumber(sequence: number): string {
   const year = new Date().getFullYear()
-  return `INV-${year}-${String(sequence).padStart(6, '0')}`
+  return `HLM-${year}-${String(sequence).padStart(5, '0')}`
 }

@@ -11,6 +11,6 @@ export const config = {
      * Static dosyalar ve internal Next.js route'larını hariç tut.
      * Bu route'larda proxy çalışmasına gerek yok.
      */
-    '/((?!_next/|__nextjs/|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot)$).*)',
+    '/((?!_next/|__nextjs/|favicon\\.ico|manifest\\.json|robots\\.txt|sitemap\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot)$).*)',
   ],
 }

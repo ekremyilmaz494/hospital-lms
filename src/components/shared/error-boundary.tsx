@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 
 /** ErrorBoundary bileseninin props tipleri */
 interface ErrorBoundaryProps {
@@ -49,7 +48,7 @@ export class ErrorBoundary extends React.Component<
   }
 
   private handleReset = (): void => {
-    this.setState({ hasError: false, error: null });
+    window.location.reload();
   };
 
   render(): React.ReactNode {
@@ -188,7 +187,7 @@ export class ErrorBoundary extends React.Component<
               Yeniden dene
             </button>
 
-            <Link
+            <a
               href="/"
               className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold"
               style={{
@@ -221,7 +220,7 @@ export class ErrorBoundary extends React.Component<
                 <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
               Ana sayfaya dön
-            </Link>
+            </a>
           </div>
         </div>
       </div>

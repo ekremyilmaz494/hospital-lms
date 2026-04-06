@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, Info, Video, FileQuestion, Users, Check, Plus, Trash2,
   GripVertical, Upload, Clock, Award, Calendar, Target, Sparkles, BookOpen, CheckCircle2,
-  ShieldCheck, RefreshCw, Building2
+  ShieldCheck, RefreshCw, Building2, FileText, Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,7 @@ import { useToast } from '@/components/shared/toast';
 
 const steps = [
   { id: 1, title: 'Temel Bilgiler', description: 'Eğitim detayları', icon: Info },
-  { id: 2, title: 'Videolar', description: 'İçerik yükleme', icon: Video },
+  { id: 2, title: 'İçerikler', description: 'Video & Doküman', icon: Layers },
   { id: 3, title: 'Sınav Soruları', description: 'Soru bankası', icon: FileQuestion },
   { id: 4, title: 'Personel Atama', description: 'Hedef kitle', icon: Users },
 ];
@@ -49,8 +49,8 @@ export default function NewTrainingPage() {
   const [excludedStaff, setExcludedStaff] = useState<string[]>([]);
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<Record<number, number>>({});
-  const [videos, setVideos] = useState<{ id: number; title: string; url: string; file?: File }[]>([
-    { id: 1, title: '', url: '' },
+  const [videos, setVideos] = useState<{ id: number; title: string; url: string; file?: File; contentType: 'video' | 'pdf'; pageCount?: number }[]>([
+    { id: 1, title: '', url: '', contentType: 'video' },
   ]);
   const [questions, setQuestions] = useState([
     { id: 1, text: '', points: 10, options: ['', '', '', ''], correct: -1 },
@@ -84,7 +84,7 @@ export default function NewTrainingPage() {
     );
   };
 
-  const addVideo = () => setVideos(prev => [...prev, { id: Date.now(), title: '', url: '' }]);
+  const addVideo = () => setVideos(prev => [...prev, { id: Date.now(), title: '', url: '', contentType: 'video' }]);
   const removeVideo = (id: number) => setVideos(prev => prev.filter(v => v.id !== id));
 
   const addQuestion = () => setQuestions(prev => [...prev, { id: Date.now(), text: '', points: 10, options: ['', '', '', ''], correct: -1 }]);
@@ -432,17 +432,19 @@ export default function NewTrainingPage() {
             </div>
           )}
 
-          {/* Step 2: Videos */}
+          {/* Step 2: Content (Video + PDF) */}
           {currentStep === 2 && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
-                    <Video className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+                    <Layers className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Eğitim Videoları</h3>
-                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{videos.length} video eklendi</p>
+                    <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Eğitim İçerikleri</h3>
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      {videos.filter(v => v.contentType === 'video').length} video, {videos.filter(v => v.contentType === 'pdf').length} doküman eklendi
+                    </p>
                   </div>
                 </div>
                 <Button
@@ -450,7 +452,7 @@ export default function NewTrainingPage() {
                   className="gap-2 font-semibold text-white rounded-xl"
                   style={{ background: 'var(--color-primary)', transition: 'opacity var(--transition-fast)' }}
                 >
-                  <Plus className="h-4 w-4" /> Video Ekle
+                  <Plus className="h-4 w-4" /> İçerik Ekle
                 </Button>
               </div>
 
@@ -496,30 +498,46 @@ export default function NewTrainingPage() {
                     >
                       <input
                         type="file"
-                        accept="video/mp4,video/webm"
+                        accept="video/mp4,video/webm,application/pdf"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            if (file.size > 500 * 1024 * 1024) {
-                              toast('Dosya boyutu 500MB sınırını aşıyor', 'error');
+                            const isPdf = file.type === 'application/pdf';
+                            const maxSize = isPdf ? 100 * 1024 * 1024 : 500 * 1024 * 1024;
+                            const maxLabel = isPdf ? '100MB' : '500MB';
+                            if (file.size > maxSize) {
+                              toast(`Dosya boyutu ${maxLabel} sınırını aşıyor`, 'error');
                               return;
                             }
-                            setVideos(prev => prev.map(v => v.id === video.id ? { ...v, file, url: '' } : v));
+                            const detectedType: 'video' | 'pdf' = isPdf ? 'pdf' : 'video';
+                            setVideos(prev => prev.map(v => v.id === video.id ? { ...v, file, url: '', contentType: detectedType } : v));
                             setUploadProgress(prev => ({ ...prev, [video.id]: 0 }));
+
+                            // PDF sayfa sayısını client-side çıkar
+                            if (isPdf) {
+                              try {
+                                const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
+                                GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs`;
+                                const arrayBuf = await file.arrayBuffer();
+                                const pdf = await getDocument({ data: new Uint8Array(arrayBuf) }).promise;
+                                setVideos(prev => prev.map(v => v.id === video.id ? { ...v, pageCount: pdf.numPages } : v));
+                              } catch {
+                                // Sayfa sayısı alınamazsa devam et
+                              }
+                            }
+
                             const formData = new FormData();
                             formData.append('file', file);
                             const xhr = new XMLHttpRequest();
                             let s3Phase = false;
                             xhr.upload.onprogress = (ev) => {
                               if (ev.lengthComputable && !s3Phase) {
-                                // 0-80%: dosya server'a gidiyor
                                 const pct = Math.round((ev.loaded / ev.total) * 80);
                                 setUploadProgress(prev => ({ ...prev, [video.id]: pct }));
                               }
                             };
                             xhr.upload.onload = () => {
-                              // Server'a gitti, şimdi S3'e yükleniyor (80-95 arası animasyon)
                               s3Phase = true;
                               setUploadProgress(prev => ({ ...prev, [video.id]: 82 }));
                               const tick = setInterval(() => {
@@ -542,7 +560,7 @@ export default function NewTrainingPage() {
                                     setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: key, file } : v));
                                     setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
                                   }, 500);
-                                  toast('Video yüklendi', 'success');
+                                  toast(isPdf ? 'Doküman yüklendi' : 'Video yüklendi', 'success');
                                 } catch {
                                   toast('Yanıt işlenemedi', 'error');
                                   setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
@@ -550,9 +568,9 @@ export default function NewTrainingPage() {
                               } else {
                                 try {
                                   const err = JSON.parse(xhr.responseText);
-                                  toast(err.error || 'Video yüklenemedi', 'error');
+                                  toast(err.error || 'Dosya yüklenemedi', 'error');
                                 } catch {
-                                  toast('Video yüklenemedi', 'error');
+                                  toast('Dosya yüklenemedi', 'error');
                                 }
                                 setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
                                 setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
@@ -561,11 +579,11 @@ export default function NewTrainingPage() {
                             xhr.onerror = () => {
                               const tick = (xhr as unknown as Record<string, unknown>)._s3Tick as ReturnType<typeof setInterval> | undefined;
                               if (tick) clearInterval(tick);
-                              toast('Video yüklenemedi — bağlantı hatası', 'error');
+                              toast('Dosya yüklenemedi — bağlantı hatası', 'error');
                               setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
                               setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
                             };
-                            xhr.open('POST', '/api/upload/video');
+                            xhr.open('POST', '/api/upload/content');
                             xhr.send(formData);
                           }
                         }}
@@ -575,7 +593,11 @@ export default function NewTrainingPage() {
                         style={{ background: video.file ? 'var(--color-success-bg)' : 'var(--color-primary-light)' }}
                       >
                         {video.file ? (
-                          <Video className="h-5 w-5" style={{ color: 'var(--color-success)' }} />
+                          video.contentType === 'pdf' ? (
+                            <FileText className="h-5 w-5" style={{ color: 'var(--color-success)' }} />
+                          ) : (
+                            <Video className="h-5 w-5" style={{ color: 'var(--color-success)' }} />
+                          )
                         ) : (
                           <Upload className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
                         )}
@@ -609,17 +631,19 @@ export default function NewTrainingPage() {
                               </div>
                             ) : (
                               <p className="text-xs mt-0.5" style={{ color: video.url ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
-                                {(video.file.size / (1024 * 1024)).toFixed(2)} MB {video.url ? '• Yüklendi ✓' : ''}
+                                {(video.file.size / (1024 * 1024)).toFixed(2)} MB
+                                {video.contentType === 'pdf' && video.pageCount ? ` • ${video.pageCount} sayfa` : ''}
+                                {video.url ? ' • Yüklendi ✓' : ''}
                               </p>
                             )}
                           </>
                         ) : (
                           <>
                             <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                              Video dosyasını sürükleyin veya tıklayıp seçin
+                              Dosyayı sürükleyin veya tıklayıp seçin
                             </p>
                             <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                              MP4, WebM — Maks. 500MB
+                              Video (MP4, WebM — Maks. 500MB) veya PDF (Maks. 100MB)
                             </p>
                           </>
                         )}
@@ -1006,7 +1030,7 @@ export default function NewTrainingPage() {
                       complianceDeadline: isCompulsory && complianceDeadline ? new Date(complianceDeadline).toISOString() : null,
                       regulatoryBody: isCompulsory && regulatoryBody ? regulatoryBody : null,
                       renewalPeriodMonths: isCompulsory && renewalPeriodMonths !== '' ? Number(renewalPeriodMonths) : null,
-                      videos: videos.filter(v => v.url).map(v => ({ title: v.title || v.file?.name || `Video`, url: v.url })),
+                      videos: videos.filter(v => v.url).map(v => ({ title: v.title || v.file?.name || (v.contentType === 'pdf' ? 'Doküman' : 'Video'), url: v.url, contentType: v.contentType, pageCount: v.pageCount })),
                       questions,
                       selectedDepts,
                       excludedStaff,

@@ -2545,4 +2545,81 @@ Bu oturumda AI Content Studio'nun NotebookLM entegrasyonu kapsamlı şekilde deb
 **Performans:** `layout-skeleton.tsx` (YENİ), `auth-store.ts`, `auth-provider.tsx`, `use-fetch.ts`, `app-sidebar.tsx`, `dashboard/page.tsx`, `dashboard/loading.tsx`, `avatar.tsx`
 **Config:** `next.config.ts`, `package.json`, `.env.example`
 
-*Son güncelleme: 5 Nisan 2026 — Oturum 21*
+---
+
+## OTURUM 22 — SATISA HAZIRLIK (28 Madde Tam Kapsamli Uygulama)
+
+**Tarih:** 6 Nisan 2026
+**Sure:** ~6 saat
+**Yontem:** Paralel agent mimarisi (4-7 agent esanli calisti)
+
+### Ozet
+SATISA-HAZIRLIK-PROMPTLARI.md dosyasindaki 28 maddelik satisa hazirlik plani tam kapsamli olarak uygulanmistir. Guvenlik, ozellik kilitleme, faturalama, pazarlama, test ve dokumantasyon dahil tum maddeler tamamlanmistir.
+
+### Tamamlanan 28 Madde
+
+#### Guvenlik (Madde 1-4)
+1. **Middleware Duzeltmesi** — Rol bazli erisim kontrolu duzeltildi (super_admin admin sayfalarına erisebilir, admin staff sayfalarına erisebilir). Next.js 16'da proxy.ts zaten dogru konumda.
+2. **Guvenlik Aciklari** — `maskeTcNo()` utility olusturuldu (TC: "123****8901" formati). Tum export noktalarinda (Excel, PDF, backup, staff API) uygulandı. Open redirect, $queryRaw, DELETE IDOR, S3 ContentType zaten guvenliydi.
+3. **Rate Limiting Genisletme** — 6 endpoint'e rate limit eklendi: video upload (IP 10/saat), exam start (user 10/saat), exam submit (user 20/saat), staff create (IP 50/saat), notification send (user 100/saat), forgot-password (IP 5/15dk + email 3/saat). Tum 429 response'larda Retry-After header.
+4. **RLS Policy Tamamlama** — 4 AI tablosuna RLS eklendi: ai_notebooks, ai_notebook_sources (nested org check), ai_generations, ai_google_connections. Supabase'e uygulandı.
+
+#### Ozellik Gelistirme (Madde 5-14)
+5. **Setup Wizard** — 4 adimli kurulum sihirbazi: hastane bilgileri, departman yapilandirmasi, egitim varsayilanlari, ozet. API: PUT /api/admin/setup. Admin layout'ta guard.
+6. **Seed Script** — prisma/seed.ts: 1 demo hastane, 5 departman, 1 admin, 10 staff, 5 egitim, sorular, atamalar, sinav kayitlari, 2 sertifika, departman kurallari. Idempotent (upsert).
+7. **Hastane Olusturma Akisi** — Super admin POST API: org + subscription + auth user + DB user + gecici sifre + hosgeldin emaili + audit log. mustChangePassword alani, /auth/change-password sayfasi.
+8. **Feature Gating** — 9 boolean feature flag (SubscriptionPlan'da). checkFeature/checkLimit helper (Redis cache 5dk). useSubscription hook. UpgradeModal component.
+9. **Subscription Yonetimi** — checkSubscriptionStatus helper (trial/active/grace/expired/suspended). Cron: /api/cron/subscription-reminders (gunluk 08:00 UTC). 4 email sablonu. SubscriptionBanner component. checkWritePermission ile expired orglarda write engeli.
+10. **Fatura Sistemi** — Invoice modeli (status, taxRate, companyName, sentAt, paidAt). generateInvoiceNumber (HLM-YYYY-NNNNN). PDF olusturma (jsPDF). Email gonderme. Odeme sonrasi otomatik fatura.
+11. **White-Label** — brandColor, secondaryColor, loginBannerUrl alanlari. CSS custom properties. Login sayfasinda ?org=slug branding. Sidebar'da hastane logosu. Topbar'da hastane adi.
+12. **Subdomain Destegi** — slug, customDomain alanlari. extractSubdomain middleware'de. slugify helper (Turkce transliteration). Redis cache (1 saat). Wildcard DNS dokumantasyonu.
+13. **Landing Page** — Marketing layout (header+footer). Hero, 8 ozellik, nasil calisir, istatistikler, 10 SSS, CTA. Fiyatlandirma (3 plan). Demo talep formu. Iletisim. sitemap.ts + robots.ts.
+14. **Self-Service Kayit** — 2 adimli form (hastane + admin bilgileri). Rate limit (IP 3/saat, email 1/24saat). 30 gun trial. Email dogrulama. Zod validation (sifre guc kontrolu).
+
+#### Altyapi & Izleme (Madde 15-18)
+15. **Sentry** — @sentry/nextjs kurulu. Client/server/edge config. Global error boundary + route error boundary. PII filtering (password, token, tcNo). withSentryConfig wrapper.
+16. **Sistem Sagligi** — GET /api/super-admin/system-health: PostgreSQL, Redis, S3, SMTP, Supabase kontrolleri. Metrikler (aktif kullanicilar, toplam org, toplam user). Auto-refresh 30sn. Sidebar'a eklendi.
+17. **DB Index** — 10 composite index eklendi: users (org+active, org+dept, org+role), trainings (org+status, org+compulsory, org+date), exam_attempts, notifications, audit_logs, video_progress.
+18. **API Cache** — withCache<T> wrapper. invalidateOrgCache helper. Staff liste (2dk), trainings liste (2dk), certificates (10dk) cache. Write sonrasi invalidation. Static asset Cache-Control: immutable.
+
+#### Test & Dokumantasyon (Madde 19-23)
+19. **E2E Testleri** — 7 Playwright suite, 41 test: auth, training CRUD, staff management, exam flow, reports, settings, role access. 2 helper (auth, seed).
+20. **API Testleri** — 7 Vitest suite, 118 test: auth, trainings, staff, exam, feature-gate, subscription, multi-tenant. Mock setup ile.
+21. **Admin Kilavuzu** — docs/admin-guide.md: 10 bolum, Turkce, son kullanici perspektifi.
+22. **Deploy Rehberi** — docs/deployment-guide.md: 11 bolum, tum env degiskenleri, komutlar, checklist.
+23. **Swagger/OpenAPI** — OpenAPI 3.0.3 spec (15 tag, 20+ endpoint). Swagger UI /docs'ta (CDN). /api/docs JSON endpoint.
+
+#### Yasal & Son Islemler (Madde 24-28)
+24. **Yasal Sayfalar** — /terms (Kullanim Sartlari), /privacy (Gizlilik Politikasi, KVKK uyumlu). termsAccepted/termsAcceptedAt alanlari. TermsModal component. PUT /api/auth/accept-terms.
+25. **Yedekleme & DR** — Backup verification (fileSize, verified alanlari). docs/disaster-recovery.md (RPO 24h, RTO 4h, 4 senaryo). Restore endpoint (AES-256-GCM decrypt, preview + confirm).
+26. **PWA & Mobil** — PWA install prompt. Touch-friendly CSS (44x44px). Button min-h-11 mobilde. Data-table mobile card view. Pagination responsive.
+27. **i18n Altyapisi** — messages/tr.json + messages/en.json. useTranslations hook. Organization.language alani.
+28. **Go-Live Checklist** — docs/go-live-checklist.md: 11 bolum (A-K), checkbox formati.
+
+### Kritik Bug Fix
+- **Edge Runtime Prisma Import Bug** — Middleware'de `import { extractSubdomain } from '@/lib/organization'` tum sayfayari kilitliyordu (organization.ts Prisma+Redis import ediyordu, Edge Runtime'da calismaz). Cozum: Pure fonksiyonlar `organization-utils.ts`'e tasindirildi.
+- **setupCompleted Default** — Mevcut demo hastane `setupCompleted=false` olarak kaldi (yeni alan default'u). DB'de `UPDATE organizations SET setup_completed = true` ile duzeltildi.
+
+### Yeni Dosyalar (50+ dosya olusturuldu)
+**API Routes:** setup, forgot-password, change-password, accept-terms, demo-request, public/organization/[slug], public/register, auth/org-branding, cron/subscription-reminders, super-admin/system-health, super-admin/restore, admin/invoices/[id]/pdf, admin/invoices/[id]/send
+**Sayfalar:** admin/setup, auth/change-password, (marketing)/page, pricing, demo, contact, register, terms, privacy, super-admin/system-health, docs
+**Lib:** feature-gate.ts, subscription-guard.ts, invoice.ts, organization.ts, organization-utils.ts, i18n/config.ts, i18n/use-translations.ts
+**Hooks:** use-subscription.ts, use-org-branding.ts, use-layout-branding.ts
+**Components:** upgrade-modal.tsx, subscription-banner.tsx, terms-modal.tsx, pwa-install-prompt.tsx
+**Config:** sentry.client.config.ts, sentry.server.config.ts, sentry.edge.config.ts, messages/tr.json, messages/en.json
+**Docs:** admin-guide.md, deployment-guide.md, disaster-recovery.md, go-live-checklist.md
+**Tests:** 7 E2E + 7 API integration test dosyasi, 2 E2E helper
+**DB:** supabase-rls.sql (4 AI tablo policy), prisma/seed.ts
+
+### Degistirilen Dosyalar (30+ dosya)
+**Schema:** prisma/schema.prisma (setupCompleted, setupStep, mustChangePassword, termsAccepted, termsAcceptedAt, feature flags x9, brandColor, secondaryColor, loginBannerUrl, slug, customDomain, language, fileSize, verified, Invoice alanlari, 10 index)
+**Middleware:** src/lib/supabase/middleware.ts (rol duzeltme, PUBLIC_ROUTES genisletme, subdomain detection, organization-utils import)
+**API Helpers:** src/lib/api-helpers.ts (getAuthUserWithWriteGuard, checkWritePermission)
+**Security:** src/lib/utils.ts (maskeTcNo), rate limit guncellemeleri (6 endpoint)
+**Cache:** src/lib/redis.ts (withCache, invalidateOrgCache), next.config.ts (static asset caching, Sentry wrapper)
+**Email:** src/lib/email.ts (6+ yeni email sablonu)
+**UI:** button.tsx (mobil 44px touch target), data-table.tsx (mobil pagination), globals.css (CSS custom properties, touch styles)
+**Branding:** admin/layout.tsx, staff/layout.tsx, auth/login/page.tsx, sidebar, topbar
+**Export:** admin/export/route.ts, admin/backups/route.ts, admin/staff/route.ts, admin/staff/[id]/route.ts (maskeTcNo)
+
+*Son guncelleme: 6 Nisan 2026 — Oturum 22*

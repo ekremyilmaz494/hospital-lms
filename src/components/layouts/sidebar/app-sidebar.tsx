@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, memo, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { ChevronDown, HelpCircle, LogOut, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -70,6 +71,7 @@ interface AppSidebarProps {
   onToggleCollapse?: () => void;
   orgName?: string;
   orgCode?: string;
+  orgLogoUrl?: string;
   userName?: string;
   userRole?: string;
   userAvatar?: string;
@@ -82,18 +84,44 @@ export const AppSidebar = memo(function AppSidebar({
   onToggleCollapse,
   orgName = 'Hastane LMS',
   orgCode,
+  orgLogoUrl,
   userName = 'Kullanıcı',
   userRole = 'Admin',
   userAvatar,
   userInitials = 'KL',
 }: AppSidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [isHovered, setIsHovered] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const toggleExpand = useCallback((href: string) => {
     setExpandedItems((prev) =>
       prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href]
     );
   }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => setIsHovered(true), 400);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => setIsHovered(false), 500);
+  }, []);
+
+  /** Nav link tıklandığında sidebar'ı hemen kapat */
+  const closeSidebar = useCallback(() => {
+    clearTimeout(hoverTimerRef.current);
+    setIsHovered(false);
+  }, []);
+
+  useEffect(() => {
+    return () => { clearTimeout(hoverTimerRef.current); };
+  }, []);
+
+  /** Panel yalnızca hover ile kontrol edilir */
+  const showExpanded = isHovered;
 
   /* ────────────────────────────────────────────
      Collapsed rail (72 px) — always visible
@@ -111,20 +139,32 @@ export const AppSidebar = memo(function AppSidebar({
           background: 'var(--color-surface)',
           borderColor: 'var(--color-border)',
         }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* Logo */}
         <div className="flex h-16 items-center justify-center shrink-0">
-          <button
-            onClick={onToggleCollapse}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white active:scale-90"
-            style={{
-              background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f4a35 100%)',
-              boxShadow: '0 2px 8px rgba(13,150,104,0.3)',
-              transition: 'transform 100ms ease',
-            }}
-          >
-            H
-          </button>
+          {orgLogoUrl ? (
+            <button
+              onClick={onToggleCollapse}
+              className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden active:scale-90"
+              style={{ transition: 'transform 100ms ease' }}
+            >
+              <Image src={orgLogoUrl} alt={orgName} width={40} height={40} className="object-contain" unoptimized />
+            </button>
+          ) : (
+            <button
+              onClick={onToggleCollapse}
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white active:scale-90"
+              style={{
+                background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f4a35 100%)',
+                boxShadow: '0 2px 8px rgba(13,150,104,0.3)',
+                transition: 'transform 100ms ease',
+              }}
+            >
+              H
+            </button>
+          )}
         </div>
 
         <div className="h-px w-10 shrink-0" style={{ background: 'var(--color-border)' }} />
@@ -193,46 +233,48 @@ export const AppSidebar = memo(function AppSidebar({
         </div>
       </aside>
 
-      {/* ── Expanded Panel (slides from left) ── */}
-      {/* Backdrop — sadece tıklama alanı, görsel overlay yok */}
-      {!collapsed && (
-        <div
-          onClick={onToggleCollapse}
-          className="fixed inset-0 z-[55]"
-        />
-      )}
-
-      {/* Panel */}
+      {/* ── Expanded Panel (slides from left, hover ile açılır) ── */}
       <div
         className="fixed top-0 left-0 z-[60] h-screen overflow-hidden flex flex-col border-r"
         style={{
           width: 280,
           background: 'var(--color-surface)',
           borderColor: 'var(--color-border)',
-          boxShadow: collapsed ? 'none' : '4px 0 25px rgba(0,0,0,0.08)',
-          transform: collapsed ? 'translateX(-100%)' : 'translateX(0)',
-          transition: 'transform 350ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 350ms ease',
+          boxShadow: showExpanded ? '4px 0 25px rgba(0,0,0,0.08)' : 'none',
+          transform: showExpanded ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 500ms cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 500ms ease',
         }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* Header */}
         <div className="flex h-16 items-center gap-3 px-4 shrink-0">
-          <button
-            onClick={onToggleCollapse}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white"
-            style={{
-              background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f4a35 100%)',
-              boxShadow: '0 2px 8px rgba(13,150,104,0.3)',
-            }}
-          >
-            H
-          </button>
+          {orgLogoUrl ? (
+            <button
+              onClick={onToggleCollapse}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl overflow-hidden"
+            >
+              <Image src={orgLogoUrl} alt={orgName} width={40} height={40} className="object-contain" unoptimized />
+            </button>
+          ) : (
+            <button
+              onClick={onToggleCollapse}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white"
+              style={{
+                background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f4a35 100%)',
+                boxShadow: '0 2px 8px rgba(13,150,104,0.3)',
+              }}
+            >
+              H
+            </button>
+          )}
           <div className="flex flex-1 items-center justify-between min-w-0">
             <div className="min-w-0">
               <p className="text-sm font-bold truncate">{orgName}</p>
               {orgCode && <p className="text-[10px] font-mono" style={{ color: 'var(--color-text-muted)' }}>{orgCode}</p>}
             </div>
             <button
-              onClick={onToggleCollapse}
+              onClick={closeSidebar}
               className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg icon-btn"
               style={{ color: 'var(--color-text-muted)' }}
             >
@@ -285,7 +327,7 @@ export const AppSidebar = memo(function AppSidebar({
                         ) : (
                           <Link
                             href={item.href}
-                            onClick={onToggleCollapse}
+                            onClick={closeSidebar}
                             className="nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium active:scale-[0.98] active:duration-75"
                             data-active={active}
                             style={{
@@ -319,7 +361,7 @@ export const AppSidebar = memo(function AppSidebar({
                             <div className="overflow-hidden">
                               <div className="ml-5 mt-0.5 flex flex-col gap-0.5 border-l-2 pl-4" style={{ borderColor: 'var(--color-border)' }}>
                                 {item.children!.map((child) => (
-                                  <ChildNavLink key={child.href} href={child.href} title={child.title} onClick={onToggleCollapse} />
+                                  <ChildNavLink key={child.href} href={child.href} title={child.title} onClick={closeSidebar} />
                                 ))}
                               </div>
                             </div>

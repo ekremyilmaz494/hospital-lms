@@ -13,7 +13,8 @@ const s3 = new S3Client({
 
 /**
  * GET /api/stream/[videoId]
- * Proxy video from S3 — supports Range requests for seeking.
+ * Proxy content from S3 — supports Range requests for video seeking,
+ * and inline display for PDF documents.
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ videoId: string }> }) {
   const { videoId } = await params
@@ -25,15 +26,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     include: { training: { select: { organizationId: true } } },
   })
 
-  if (!video) return errorResponse('Video bulunamadı', 404)
+  if (!video) return errorResponse('İçerik bulunamadı', 404)
   if (video.training.organizationId !== dbUser!.organizationId) return errorResponse('Yetkisiz', 403)
 
   const key = video.videoKey || video.videoUrl
   if (!key || key.startsWith('/uploads')) {
-    return errorResponse('Video dosyası S3\'te bulunamadı', 404)
+    return errorResponse('Dosya S3\'te bulunamadı', 404)
   }
 
-  const range = request.headers.get('range')
+  const isPdf = video.contentType === 'pdf'
+  const range = !isPdf ? request.headers.get('range') : null
 
   const command = new GetObjectCommand({
     Bucket: process.env.AWS_S3_BUCKET!,
@@ -43,6 +45,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const s3Response = await s3.send(command)
+
+    if (isPdf) {
+      const headers = new Headers({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'inline',
+        'Cache-Control': 'private, max-age=3600',
+      })
+      if (s3Response.ContentLength !== undefined) {
+        headers.set('Content-Length', String(s3Response.ContentLength))
+      }
+      const stream = s3Response.Body as ReadableStream
+      return new Response(stream as unknown as BodyInit, { status: 200, headers })
+    }
+
+    // Video streaming with Range support
     const headers = new Headers({
       'Content-Type': s3Response.ContentType || 'video/mp4',
       'Accept-Ranges': 'bytes',
@@ -62,6 +79,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       headers,
     })
   } catch {
-    return errorResponse('Video stream hatası', 500)
+    return errorResponse('İçerik stream hatası', 500)
   }
 }

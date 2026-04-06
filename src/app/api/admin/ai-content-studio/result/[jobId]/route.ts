@@ -42,8 +42,9 @@ export async function GET(
     return errorResponse('İçerik henüz hazır değil', 425)
   }
 
-  // Meta mode — return file metadata without streaming content
   const { searchParams } = new URL(request.url)
+
+  // Meta mode — return file metadata without streaming content
   if (searchParams.get('meta') === 'true') {
     return jsonResponse({
       url: `/api/admin/ai-content-studio/result/${jobId}`,
@@ -54,6 +55,13 @@ export async function GET(
         CONTENT_TYPE_MAP[generation.outputFileType || ''] ||
         'application/octet-stream',
     })
+  }
+
+  // Stream mode — return presigned S3 URL for direct browser streaming (audio/video)
+  // S3 natively supports Range requests, enabling proper seek without proxy overhead
+  if (searchParams.get('stream') === 'true' && generation.outputS3Key) {
+    const streamUrl = await getDownloadUrl(generation.outputS3Key)
+    return jsonResponse({ streamUrl })
   }
 
   // JSON shortcut — serve contentData directly for structured artifact types

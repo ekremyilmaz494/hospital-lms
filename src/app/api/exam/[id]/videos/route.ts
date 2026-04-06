@@ -64,7 +64,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const videoList = videos.map((v) => {
     const p = progressMap.get(v.id)
-    // S3 videos → proxy through our API (avoids CORS issues)
+    // S3 content → proxy through our API (avoids CORS issues)
     // Legacy /uploads videos → use path directly
     const hasS3Key = v.videoKey && !v.videoKey.startsWith('/uploads')
     const url = hasS3Key ? `/api/stream/${v.id}` : v.videoUrl
@@ -73,6 +73,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       title: v.title,
       url,
       duration: v.durationSeconds,
+      contentType: v.contentType || 'video',
+      pageCount: v.pageCount,
       completed: p?.isCompleted ?? false,
       lastPosition: p?.lastPositionSeconds ?? 0,
     }
@@ -93,7 +95,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
-  const body = await parseBody<{ videoId: string; watchedTime?: number; position?: number; completed?: boolean }>(request)
+  const body = await parseBody<{ videoId: string; watchedTime?: number; position?: number; completed?: boolean; currentPage?: number }>(request)
   if (!body?.videoId) return errorResponse('videoId required')
 
   // Find attempt — try assignmentId first, then trainingId
@@ -110,9 +112,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const video = await prisma.trainingVideo.findUnique({ where: { id: body.videoId } })
   if (!video) return errorResponse('Video not found', 404)
 
-  const watchedSeconds = Math.min(Math.max(Math.round(body.watchedTime ?? body.position ?? 0), 0), video.durationSeconds)
-  const lastPositionSeconds = Math.min(Math.max(Math.round(body.position ?? 0), 0), video.durationSeconds)
-  const isCompleted = body.completed === true || watchedSeconds >= video.durationSeconds
+  const isPdfContent = video.contentType === 'pdf'
+  let watchedSeconds: number
+  let lastPositionSeconds: number
+  let isCompleted: boolean
+
+  if (isPdfContent) {
+    // PDF: currentPage = mevcut sayfa, lastPositionSeconds = sayfa numarası
+    const currentPage = Math.max(body.currentPage ?? 0, 0)
+    const totalPages = video.pageCount ?? 1
+    watchedSeconds = Math.min(currentPage, totalPages)
+    lastPositionSeconds = currentPage
+    isCompleted = body.completed === true || currentPage >= totalPages
+  } else {
+    // Video: mevcut davranış
+    watchedSeconds = Math.min(Math.max(Math.round(body.watchedTime ?? body.position ?? 0), 0), video.durationSeconds)
+    lastPositionSeconds = Math.min(Math.max(Math.round(body.position ?? 0), 0), video.durationSeconds)
+    isCompleted = body.completed === true || watchedSeconds >= video.durationSeconds
+  }
 
   // Upsert video progress
   await prisma.videoProgress.upsert({

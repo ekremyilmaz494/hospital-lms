@@ -1,7 +1,31 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { extractSubdomain } from '@/lib/organization-utils'
 
-const PUBLIC_ROUTES = ['/', '/kvkk', '/auth/login', '/auth/callback', '/auth/forgot-password', '/auth/reset-password', '/auth/mfa-verify', '/auth/mfa-setup', '/api/health', '/api/docs', '/api/cron/', '/api/payments/callback', '/help', '/certificates/verify']
+const PUBLIC_ROUTES = [
+  '/',
+  '/kvkk',
+  '/pricing',
+  '/demo',
+  '/contact',
+  '/auth/login',
+  '/auth/callback',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/mfa-verify',
+  '/auth/mfa-setup',
+  '/api/health',
+  '/api/docs',
+  '/docs',
+  '/api/cron/',
+  '/api/payments/callback',
+  '/terms',
+  '/privacy',
+  '/help',
+  '/register',
+  '/certificates/verify',
+  '/api/public/',
+]
 
 function isPublicRoute(pathname: string): boolean {
   return pathname === '/' || PUBLIC_ROUTES.some((route) => route !== '/' && pathname.startsWith(route))
@@ -29,6 +53,41 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const { pathname } = request.nextUrl
+
+  // ── Subdomain / Custom Domain Algılama ──
+  // Performans notu: DB sorgusu YOK — sadece host header parse + cookie/header set.
+  // Gerçek org doğrulaması login sayfasında ve API route'larında yapılır.
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || ''
+  const host = request.headers.get('host') || ''
+
+  const subdomain = baseDomain ? extractSubdomain(host, baseDomain) : null
+  const existingOrgSlug = request.cookies.get('x-org-slug')?.value
+
+  if (subdomain) {
+    // Subdomain tespit edildi — cookie ve header olarak downstream'e ilet
+    supabaseResponse.headers.set('x-org-slug', subdomain)
+    supabaseResponse.cookies.set('x-org-slug', subdomain, {
+      path: '/',
+      httpOnly: false,
+      sameSite: 'lax',
+      maxAge: 86400, // 1 gün
+    })
+
+    // Login sayfasına gidiliyorsa ve ?org parametresi yoksa otomatik ekle
+    if (pathname === '/auth/login' && !request.nextUrl.searchParams.has('org')) {
+      const url = request.nextUrl.clone()
+      url.searchParams.set('org', subdomain)
+      return NextResponse.redirect(url)
+    }
+  } else if (existingOrgSlug && !subdomain) {
+    // Ana domain'e dönüldüyse org cookie'sini temizle
+    // (Kullanıcı subdomain'den ana domain'e geçtiyse)
+    const hostWithoutPort = host.split(':')[0]
+    const baseWithoutPort = baseDomain.split(':')[0]
+    if (hostWithoutPort === baseWithoutPort || hostWithoutPort === 'localhost') {
+      supabaseResponse.cookies.delete('x-org-slug')
+    }
+  }
 
   // ── API route'ları: middleware'de auth yapma ──
   // Her API route kendi getAuthUser() (getSession → local JWT parse) ile doğrulama yapıyor.
@@ -95,16 +154,20 @@ export async function updateSession(request: NextRequest) {
     // Role-based access control — enum doğrulaması ile manipülasyonu engelle
     const role = sanitizeRole(user.user_metadata?.role)
 
+    // /super-admin/* → sadece super_admin
     if (pathname.startsWith('/super-admin') && role !== 'super_admin') {
       return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
     }
-    if (pathname.startsWith('/admin') && role !== 'admin') {
+    // /admin/* → admin veya super_admin
+    if (pathname.startsWith('/admin') && !(['admin', 'super_admin'] as ValidRole[]).includes(role)) {
       return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
     }
-    if (pathname.startsWith('/staff') && role !== 'staff') {
+    // /staff/* → staff, admin veya super_admin (tum roller)
+    if (pathname.startsWith('/staff') && !VALID_ROLES.includes(role)) {
       return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
     }
-    if (pathname.startsWith('/exam') && role !== 'staff') {
+    // /exam/* → staff veya ustu
+    if (pathname.startsWith('/exam') && !VALID_ROLES.includes(role)) {
       return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
     }
 

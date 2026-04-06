@@ -1,75 +1,67 @@
 import { prisma } from '@/lib/prisma'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
-import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
-import { z } from 'zod'
-
-const registerSchema = z.object({
-  hospitalName: z.string().min(2).max(255),
-  hospitalCode: z.string().min(2).max(50).regex(/^[a-zA-Z0-9-]+$/),
-  adminEmail: z.string().email(),
-  adminPassword: z.string().min(8).regex(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
-    'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir'
-  ),
-  adminFirstName: z.string().min(1).max(100),
-  adminLastName: z.string().min(1).max(100),
-  planSlug: z.string().optional(),
-})
+import { selfRegisterSchema } from '@/lib/validations'
+import { sendSelfRegistrationEmail } from '@/lib/email'
 
 export async function POST(request: Request) {
-  // Rate limiting — IP bazlı (x-vercel-forwarded-for trusted on Vercel; fallback for other environments)
+  // Rate limiting — IP bazlı: 3 istek / saat
   const clientIp =
     request.headers.get('x-vercel-forwarded-for') ||
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     'unknown'
-  const allowed = await checkRateLimit(`register:${clientIp}`, 5, 3600)
-  if (!allowed) return errorResponse('Çok fazla kayıt denemesi. Lütfen bir saat sonra tekrar deneyin.', 429)
+  const ipAllowed = await checkRateLimit(`register:ip:${clientIp}`, 3, 3600)
+  if (!ipAllowed) return errorResponse('Çok fazla kayıt denemesi. Lütfen bir saat sonra tekrar deneyin.', 429)
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek verisi')
 
-  const parsed = registerSchema.safeParse(body)
+  const parsed = selfRegisterSchema.safeParse(body)
   if (!parsed.success) {
     return errorResponse(parsed.error.issues.map(i => i.message).join(', '))
   }
 
-  const { hospitalName, hospitalCode, adminEmail, adminPassword, adminFirstName, adminLastName, planSlug } = parsed.data
+  const { hospitalName, hospitalCode, address, phone, firstName, lastName, email, password } = parsed.data
 
-  // Email bazlı rate limit
-  const emailAllowed = await checkRateLimit(`register:${adminEmail.toLowerCase()}`, 3, 3600)
-  if (!emailAllowed) return errorResponse('Bu e-posta ile çok fazla kayıt denemesi yapıldı.', 429)
+  // Email bazlı rate limit: 1 istek / 24 saat
+  const emailAllowed = await checkRateLimit(`register:email:${email.toLowerCase()}`, 1, 86400)
+  if (!emailAllowed) return errorResponse('Bu e-posta ile son 24 saat içinde kayıt denemesi yapılmış. Lütfen daha sonra tekrar deneyin.', 429)
 
-  // Kod benzersizliği
-  const existingOrg = await prisma.organization.findUnique({ where: { code: hospitalCode } })
+  // Kod ve email benzersizlik kontrolleri — paralel
+  const [existingOrg, existingUser] = await Promise.all([
+    prisma.organization.findUnique({ where: { code: hospitalCode } }),
+    prisma.user.findUnique({ where: { email } }),
+  ])
+
   if (existingOrg) return errorResponse('Bu hastane kodu zaten kullanılıyor')
-
-  // Email benzersizliği
-  const existingUser = await prisma.user.findUnique({ where: { email: adminEmail } })
   if (existingUser) return errorResponse('Bu e-posta adresi zaten kayıtlı')
 
-  // Plan bul
-  const plan = planSlug
-    ? await prisma.subscriptionPlan.findUnique({ where: { slug: planSlug } })
-    : await prisma.subscriptionPlan.findFirst({ where: { isActive: true }, orderBy: { priceMonthly: 'asc' } })
-
+  // En ucuz aktif planı bul (trial için)
+  const plan = await prisma.subscriptionPlan.findFirst({
+    where: { isActive: true },
+    orderBy: { priceMonthly: 'asc' },
+  })
   if (!plan) return errorResponse('Abonelik planı bulunamadı')
 
   let org
   try {
-    // Organization oluştur
+    // Organization oluştur — setupCompleted: false
     org = await prisma.organization.create({
       data: {
         name: hospitalName,
         code: hospitalCode,
-        email: adminEmail,
+        address: address || null,
+        phone: phone || null,
+        email,
+        setupCompleted: false,
       },
     })
 
-    // Trial abonelik
+    // 30 günlük trial abonelik
     const trialEndsAt = new Date()
-    trialEndsAt.setDate(trialEndsAt.getDate() + 14)
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30)
 
     await prisma.organizationSubscription.create({
       data: {
@@ -81,47 +73,65 @@ export async function POST(request: Request) {
       },
     })
 
-    // Admin kullanıcı oluştur
+    // Supabase Auth kullanıcı oluştur — email doğrulama gerektirir
     const supabase = await createServiceClient()
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email: adminEmail,
-      password: adminPassword,
-      email_confirm: true,
+      email,
+      password,
+      email_confirm: false, // Kullanıcı e-postasını doğrulamalı
       user_metadata: {
-        first_name: adminFirstName,
-        last_name: adminLastName,
+        first_name: firstName,
+        last_name: lastName,
         role: 'admin',
         organization_id: org.id,
       },
     })
 
     if (authError) {
-      // Rollback org
       await prisma.organization.delete({ where: { id: org.id } }).catch(() => {})
       logger.error('Register', 'Supabase auth hatasi', authError.message)
       return errorResponse('Kullanıcı oluşturulamadı. Lütfen farklı bir e-posta deneyin.')
     }
 
+    // Prisma User kaydı
     await prisma.user.create({
       data: {
         id: authUser.user.id,
-        email: adminEmail,
-        firstName: adminFirstName,
-        lastName: adminLastName,
+        email,
+        firstName,
+        lastName,
         role: 'admin',
         organizationId: org.id,
       },
     })
 
-    logger.info('Register', 'Yeni hastane kaydi', { orgId: org.id, hospitalName, adminEmail })
+    // Audit log
+    await createAuditLog({
+      userId: authUser.user.id,
+      organizationId: org.id,
+      action: 'self_register',
+      entityType: 'organization',
+      entityId: org.id,
+      newData: { hospitalName, hospitalCode, email },
+      request,
+    })
+
+    // Hoş geldiniz e-postası (arka planda, hata kayıt akışını engellemesin)
+    sendSelfRegistrationEmail({
+      to: email,
+      adminName: `${firstName} ${lastName}`,
+      hospitalName,
+    }).catch((err) => {
+      logger.error('Register', 'Hos geldiniz e-postasi gonderilemedi', (err as Error).message)
+    })
+
+    logger.info('Register', 'Yeni hastane kaydi (self-service)', { orgId: org.id, hospitalName, email })
 
     return jsonResponse({
       success: true,
-      message: 'Hastane başarıyla oluşturuldu. 14 günlük deneme süresi başlamıştır.',
-      redirectUrl: '/auth/login',
+      message: 'Hastane başarıyla oluşturuldu. Lütfen e-postanızı kontrol ederek hesabınızı doğrulayın.',
     }, 201)
   } catch (err) {
-    // Rollback
     if (org) await prisma.organization.delete({ where: { id: org.id } }).catch(() => {})
     logger.error('Register', 'Kayit hatasi', (err as Error).message)
     return errorResponse('Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.')

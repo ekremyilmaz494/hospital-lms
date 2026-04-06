@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
-import { getUploadUrl, videoKey, deleteObject } from '@/lib/s3'
+import { getUploadUrl, videoKey, documentKey, deleteObject } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -42,31 +42,38 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     description?: string
     durationSeconds: number
     sortOrder?: number
+    mediaType?: 'video' | 'pdf'
+    pageCount?: number
   }>(request)
 
   if (!body?.filename || !body?.contentType || !body?.title) {
     return errorResponse('filename, contentType, title required')
   }
 
-  const key = videoKey(dbUser!.organizationId!, id, body.filename)
+  const mediaType = body.mediaType || 'video'
+  const key = mediaType === 'pdf'
+    ? documentKey(dbUser!.organizationId!, id, body.filename)
+    : videoKey(dbUser!.organizationId!, id, body.filename)
 
   // Get upload URL first — if S3 fails, no orphan DB record
   let uploadUrl: string
   try {
     uploadUrl = await getUploadUrl(key, body.contentType)
   } catch {
-    return errorResponse('Video yükleme URL\'si alınamadı. S3 yapılandırmasını kontrol edin.', 503)
+    return errorResponse('Dosya yükleme URL\'si alınamadı. S3 yapılandırmasını kontrol edin.', 503)
   }
 
-  // Create video record only after successful upload URL
+  // Create record only after successful upload URL
   const video = await prisma.trainingVideo.create({
     data: {
       trainingId: id,
       title: body.title,
       description: body.description,
-      videoUrl: `${process.env.AWS_CLOUDFRONT_DOMAIN}/${key}`,
+      videoUrl: mediaType === 'video' ? `${process.env.AWS_CLOUDFRONT_DOMAIN}/${key}` : key,
       videoKey: key,
       durationSeconds: body.durationSeconds,
+      contentType: mediaType,
+      pageCount: body.pageCount ?? null,
       sortOrder: body.sortOrder ?? 0,
     },
   })

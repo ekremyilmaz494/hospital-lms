@@ -7,6 +7,7 @@ import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
 import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
 import { staffNav } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
+import { useLayoutBranding } from '@/hooks/use-layout-branding';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 import { MobileBottomNav } from '@/components/layouts/mobile-bottom-nav';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
@@ -23,6 +24,7 @@ export default function StaffLayout({
   }, []);
   const [isMd, setIsMd] = useState(false);
   const { user, isLoading, fullName, initials } = useAuth();
+  const branding = useLayoutBranding();
 
   useEffect(() => {
     const check = () => setIsMd(window.innerWidth >= 768);
@@ -57,7 +59,9 @@ export default function StaffLayout({
             navGroups={staffNav}
             collapsed={sidebarCollapsed}
             onToggleCollapse={toggleSidebar}
-            orgName={user?.department ?? ''}
+            orgName={branding?.orgName || user?.department || ''}
+            orgCode={branding?.orgCode || ''}
+            orgLogoUrl={branding?.orgLogoUrl ?? undefined}
             userName={fullName}
             userRole="Personel"
             userInitials={initials}
@@ -66,14 +70,12 @@ export default function StaffLayout({
         {/* Ana içerik: masaüstünde sidebar durumuna göre kayar, mobilde sabit */}
         <main
           className="min-h-screen pb-16 md:pb-0"
-          style={{
-            marginLeft: isMd ? (sidebarCollapsed ? 72 : 280) : 0,
-            transition: 'margin-left 350ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
+          style={{ marginLeft: isMd ? 72 : 0 }}
         >
           <ImpersonationBanner />
           <AppTopbar
             title=""
+            orgName={branding?.orgName}
             onToggleSidebar={toggleSidebar}
             userName={fullName}
             userRole="Personel"

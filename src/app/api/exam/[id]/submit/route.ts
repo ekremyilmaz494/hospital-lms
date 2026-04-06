@@ -13,9 +13,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  // Rate limit: kullanıcı başına dakikada 10 submit
-  const allowed = await checkRateLimit(`exam-submit:${dbUser!.id}`, 10, 60)
-  if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
+  // User bazlı rate limit: 20 submit / 1 saat
+  const allowed = await checkRateLimit(`exam-submit:${dbUser!.id}`, 20, 3600)
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: 'Çok fazla gönderim. Lütfen 60 dakika sonra tekrar deneyin.' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
+    })
+  }
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')

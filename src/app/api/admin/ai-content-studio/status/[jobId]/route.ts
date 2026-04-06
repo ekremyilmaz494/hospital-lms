@@ -53,13 +53,8 @@ export async function GET(
     return buildResponse(generation, currentStatus, currentProgress, currentErrorMessage)
   }
 
-  // If downloading, return current status (download is in progress)
-  if (currentStatus === 'downloading') {
-    return buildResponse(generation, currentStatus, currentProgress, currentErrorMessage)
-  }
-
-  // If queued or processing, poll sidecar for status
-  if ((currentStatus === 'queued' || currentStatus === 'processing') && generation.taskLmId) {
+  // If queued, processing, or downloading (sidecar still working), poll sidecar for status
+  if (['queued', 'processing', 'downloading'].includes(currentStatus) && generation.taskLmId) {
     try {
       const sidecarResult = await getTaskStatus(
         generation.notebook.notebookLmId,
@@ -85,6 +80,15 @@ export async function GET(
 
         currentStatus = 'downloading'
         currentProgress = 90
+      } else if (sidecarResult.status === 'downloading') {
+        // NotebookLM üretimi tamamlandı, sidecar dosyayı indiriyor
+        await prisma.aiGeneration.update({
+          where: { id: generation.id },
+          data: { status: 'downloading', progress: sidecarResult.progress },
+        })
+
+        currentStatus = 'downloading'
+        currentProgress = sidecarResult.progress
       } else if (sidecarResult.status === 'failed') {
         await prisma.aiGeneration.update({
           where: { id: generation.id },

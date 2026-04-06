@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { checkSubscriptionStatus } from '@/lib/subscription-guard'
 
 /**
  * Returns the application base URL. Throws in production if NEXT_PUBLIC_APP_URL
@@ -64,7 +65,37 @@ export async function getAuthUser() {
     }
   }
 
-  return { user, dbUser, error: null }
+  return { user, dbUser, error: null, organizationId: dbUser.organizationId }
+}
+
+/**
+ * getAuthUser + otomatik subscription write guard.
+ * Write isteklerinde (POST/PUT/PATCH/DELETE) subscription durumunu kontrol eder.
+ * Expired/suspended ise 403 döner. GET istekleri her zaman serbest.
+ * Super admin exempt.
+ */
+export async function getAuthUserWithWriteGuard(request: Request) {
+  const result = await getAuthUser()
+  if (result.error) return result
+
+  const { dbUser } = result
+  if (!dbUser) return result
+
+  // Super admin exempt
+  if (dbUser.role === 'super_admin') return result
+
+  // Write method kontrolü
+  const method = request.method.toUpperCase()
+  const writeMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
+  if (!writeMethods.includes(method)) return result
+
+  // Subscription check
+  if (dbUser.organizationId) {
+    const writeBlock = await checkWritePermission(dbUser.organizationId, method)
+    if (writeBlock) return { ...result, error: writeBlock }
+  }
+
+  return result
 }
 
 /**
@@ -104,6 +135,62 @@ export class ApiError extends Error {
   toResponse(): Response {
     return errorResponse(this.message, this.status)
   }
+}
+
+/**
+ * Aboneliği sona ermiş veya askıya alınmış organizasyonların yazma işlemlerini engeller.
+ * Sadece POST, PUT, PATCH, DELETE metodlarını bloklar (GET serbest).
+ * Redis-cached subscription check kullanır (2 dk TTL).
+ *
+ * @returns null — yazma izni var, devam et
+ * @returns Response — 403 hata yanıtı, yazma engellendi
+ */
+export async function checkWritePermission(
+  organizationId: string,
+  method: string,
+): Promise<Response | null> {
+  // GET istekleri her zaman serbest
+  const writeMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
+  if (!writeMethods.includes(method.toUpperCase())) {
+    return null
+  }
+
+  const subStatus = await checkSubscriptionStatus(organizationId)
+
+  if (subStatus.isExpired) {
+    return NextResponse.json(
+      {
+        error: 'Aboneliğiniz sona ermiştir. Yeni kayıt oluşturma kısıtlanmıştır. Lütfen aboneliğinizi yenileyin.',
+        subscriptionStatus: subStatus.status,
+      },
+      { status: 403 },
+    )
+  }
+
+  if (subStatus.isGracePeriod) {
+    // Grace period — yazmaya izin ver ama uyarı header'ı ekle
+    return null
+  }
+
+  // trial veya active — serbest
+  return null
+}
+
+/**
+ * checkWritePermission ile aynı kontrol, ancak grace period durumunda
+ * response'a uyarı header'ı eklemek isteyen route'lar için yardımcı.
+ * Grace period uyarı header key'i: X-Subscription-Warning
+ */
+export async function getSubscriptionWarningHeaders(
+  organizationId: string,
+): Promise<Record<string, string>> {
+  const subStatus = await checkSubscriptionStatus(organizationId)
+  if (subStatus.isGracePeriod) {
+    return {
+      'X-Subscription-Warning': `Aboneliğinizin süresi dolmuştur. ${subStatus.daysLeft} gün içinde yenilenmezse erişiminiz kısıtlanacaktır.`,
+    }
+  }
+  return {}
 }
 
 /** Parse JSON body safely */
@@ -164,6 +251,7 @@ export async function createAuditLog(params: {
     })
   } catch (err) {
     // Audit log hatasi ana is akisini durdurmasin — log'la ve devam et
+    try { const Sentry = await import('@sentry/nextjs'); Sentry.captureException(err); } catch { /* Sentry not configured */ }
     if (process.env.NODE_ENV === 'development') {
       console.error('[AuditLog] Failed to create audit log:', err)
     } else {

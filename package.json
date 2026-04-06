@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --webpack",
+    "dev:turbo": "next dev --turbopack",
+    "dev:clean": "rm -rf .next && next dev --webpack",
     "build": "prisma generate && next build --webpack",
     "postinstall": "prisma generate",
     "start": "next start",
@@ -19,8 +21,20 @@
     "db:seed": "node scripts/seed-demo.js",
     "prepare": "husky"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "pnpm": {
-    "ignoredBuiltDependencies": ["sharp", "unrs-resolver"]
+    "ignoredBuiltDependencies": [
+      "core-js",
+      "msw",
+      "sharp",
+      "unrs-resolver"
+    ],
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "prisma"
+    ]
   },
   "lint-staged": {
     "*": [
@@ -36,6 +50,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
+    "@sentry/nextjs": "^10.47.0",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.100.0",
     "@tanstack/react-table": "^8.21.3",
@@ -58,12 +73,14 @@
     "next": "16.2.1",
     "next-themes": "^0.4.6",
     "nodemailer": "^8.0.3",
+    "pdfjs-dist": "^5.6.205",
     "pg": "^8.20.0",
     "prisma": "^7.5.0",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.72.0",
+    "react-pdf": "^10.4.1",
     "recharts": "^3.8.0",
     "shadcn": "^4.1.0",
     "tailwind-merge": "^3.5.0",
@@ -91,6 +108,7 @@
     "lint-staged": "^16.4.0",
     "playwright": "^1.58.2",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.1"
   }

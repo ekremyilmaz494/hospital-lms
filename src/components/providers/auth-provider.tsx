@@ -53,7 +53,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Get initial session — use getSession() (local JWT parse, no HTTP round-trip).
     // Middleware already validates the token server-side via getUser().
-    setLoading(true);
+    // Login sayfası store'u önceden doldurduysa loading gösterme (flash önlenir)
+    const hasExistingUser = !!useAuthStore.getState().user;
+    if (!hasExistingUser) setLoading(true);
     supabase.auth.getSession().then(({ data: { session } }) => {
       const user = session?.user ?? null;
       if (user) {

@@ -58,6 +58,10 @@
 }
 
 :root {
+  /* ── WHITE-LABEL BRANDING (JS tarafindan dinamik override edilir) ── */
+  --brand-primary: #0F172A;
+  --brand-secondary: #3B82F6;
+
   /* ── AYDINLIK TEMA ── */
   --color-primary: #0d9668;
   --color-primary-hover: #087a54;
@@ -684,4 +688,57 @@ select:focus-visible {
 .mock-ui:hover {
   transform: translateY(-2px);
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08), 0 8px 16px rgba(15, 23, 42, 0.06);
+}
+
+/* ── TOUCH DEVICE — Enforce 44x44px on coarse pointers regardless of screen size ── */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a[role="button"],
+  [data-slot="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ── MOBILE TOUCH-FRIENDLY — Minimum 44x44px hit targets (WCAG 2.5.5) ── */
+@media (max-width: 768px) {
+  button,
+  [role="button"],
+  a,
+  input[type="checkbox"],
+  input[type="radio"],
+  select,
+  .clickable-card,
+  .clickable-row,
+  .icon-btn,
+  .nav-item,
+  .interactive-badge {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Larger tap targets for table rows on mobile */
+  .premium-table td {
+    padding: 16px;
+  }
+
+  /* Comfortable spacing for form elements */
+  input,
+  textarea,
+  select {
+    min-height: 44px;
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+
+  /* Ensure link buttons also get touch targets */
+  a[role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Safe area padding for PWA bottom bar */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }

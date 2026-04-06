@@ -2,6 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -11,9 +12,9 @@ import { Particles } from '@/components/ui/particles';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { ShimmerButton } from '@/components/ui/shimmer-button';
 import { Ripple } from '@/components/ui/ripple';
-import { BorderBeam } from '@/components/ui/border-beam';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
+import { useOrgBranding } from '@/hooks/use-org-branding';
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/super-admin/dashboard',
@@ -43,6 +44,10 @@ function LoginForm() {
   // Prevent open redirect — only allow relative paths starting with /
   const redirectTo = rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : null;
   const isTimeout = searchParams.get('reason') === 'timeout';
+
+  // White-label branding: ?org=slug parametresiyle hastane markasi yuklenir
+  const orgSlug = searchParams.get('org');
+  const { branding } = useOrgBranding(orgSlug);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,11 +96,10 @@ function LoginForm() {
       const role = data.user?.role as string;
       const target = redirectTo && redirectTo !== '/' ? redirectTo : ROLE_ROUTES[role] || '/staff/dashboard';
 
-      // Sunucu cookie set etti; browser client'ı session'ı okuyarak store'u önceden
-      // dolduralım — böylece admin layout mount olduğunda user zaten mevcut olur.
-      try {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
+      // Store'u session'dan önceden doldur — layout mount olduğunda user mevcut olur,
+      // AuthProvider loading skeleton göstermez.
+      const supabase = createClient();
+      supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
           const u = session.user;
           useAuthStore.getState().setUser({
@@ -118,10 +122,9 @@ function LoginForm() {
             updatedAt: u.updated_at ?? u.created_at,
           });
         }
-      } catch {
-        // Fallback: store doldurulamazsa AuthProvider onAuthStateChange ile yakalar
-      }
+      });
 
+      // Navigasyonu getSession'ı beklemeden hemen başlat
       router.push(target);
     } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
@@ -134,10 +137,24 @@ function LoginForm() {
       {/* ── Left Panel: Branding ── */}
       <div
         className="relative hidden lg:flex lg:w-[55%] flex-col justify-between overflow-hidden"
-        style={{ background: 'linear-gradient(160deg, #064e3b 0%, #0a3d2e 35%, #051c14 100%)' }}
+        style={{
+          background: branding?.loginBannerUrl
+            ? undefined
+            : branding?.brandColor
+              ? `linear-gradient(160deg, ${branding.brandColor} 0%, ${branding.brandColor}dd 35%, ${branding.brandColor}99 100%)`
+              : 'linear-gradient(160deg, #064e3b 0%, #0a3d2e 35%, #051c14 100%)',
+        }}
       >
+        {/* Login banner (varsa tam ekran arka plan) */}
+        {branding?.loginBannerUrl && (
+          <div className="absolute inset-0 z-0">
+            <Image src={branding.loginBannerUrl} alt="" fill className="object-cover" unoptimized />
+            <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.5)' }} />
+          </div>
+        )}
+
         {/* Particles */}
-        <Particles className="absolute inset-0 z-0" quantity={80} staticity={20} color="#34d399" size={0.3} />
+        <Particles className="absolute inset-0 z-0" quantity={80} staticity={20} color={branding?.secondaryColor || '#34d399'} size={0.3} />
 
         {/* Ripple center accent */}
         <div className="absolute inset-0 z-0 flex items-center justify-center opacity-20">
@@ -153,13 +170,19 @@ function LoginForm() {
           {/* Logo */}
           <BlurFade delay={0.1}>
             <div className="flex items-center gap-3">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-2xl text-lg font-bold font-heading"
-                style={{ background: 'rgba(52, 211, 153, 0.15)', backdropFilter: 'blur(12px)', border: '1px solid rgba(52, 211, 153, 0.2)', color: '#34d399' }}
-              >
-                H
-              </div>
-              <span className="text-xl font-bold text-white/90 font-heading tracking-tight">Hastane LMS</span>
+              {branding?.logoUrl ? (
+                <Image src={branding.logoUrl} alt={branding.name} width={44} height={44} className="rounded-2xl object-contain" style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)' }} unoptimized />
+              ) : (
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl text-lg font-bold font-heading"
+                  style={{ background: 'rgba(52, 211, 153, 0.15)', backdropFilter: 'blur(12px)', border: '1px solid rgba(52, 211, 153, 0.2)', color: '#34d399' }}
+                >
+                  H
+                </div>
+              )}
+              <span className="text-xl font-bold text-white/90 font-heading tracking-tight">
+                {branding?.name || 'Hastane LMS'}
+              </span>
             </div>
           </BlurFade>
 
@@ -202,7 +225,7 @@ function LoginForm() {
 
           {/* Footer */}
           <BlurFade delay={0.8}>
-            <p className="text-xs text-white/30">&copy; 2026 Hastane LMS Platformu</p>
+            <p className="text-xs text-white/30">&copy; 2026 {branding?.name || 'Hastane LMS Platformu'}</p>
           </BlurFade>
         </div>
       </div>
@@ -212,8 +235,12 @@ function LoginForm() {
         <div className="w-full max-w-105">
           {/* Mobile logo */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white font-heading" style={{ background: 'var(--color-primary)' }}>H</div>
-            <span className="text-xl font-bold font-heading">Hastane LMS</span>
+            {branding?.logoUrl ? (
+              <Image src={branding.logoUrl} alt={branding.name} width={40} height={40} className="rounded-xl object-contain" unoptimized />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white font-heading" style={{ background: 'var(--color-primary)' }}>H</div>
+            )}
+            <span className="text-xl font-bold font-heading">{branding?.name || 'Hastane LMS'}</span>
           </div>
 
           <BlurFade delay={0.1}>
@@ -338,7 +365,7 @@ function LoginForm() {
                 shimmerColor="rgba(255,255,255,0.15)"
                 shimmerSize="0.08em"
                 borderRadius="12px"
-                background="linear-gradient(135deg, #0d9668 0%, #065f46 100%)"
+                background={branding?.brandColor ? `linear-gradient(135deg, ${branding.brandColor} 0%, ${branding.brandColor}cc 100%)` : 'linear-gradient(135deg, #0d9668 0%, #065f46 100%)'}
               >
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
                 {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}

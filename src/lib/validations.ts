@@ -21,6 +21,26 @@ function isValidTCKN(tc: string): boolean {
   return d[10] === totalSum % 10
 }
 
+// ── Self-Service Kayıt ──
+export const selfRegisterSchema = z.object({
+  hospitalName: z.string().min(2, 'Hastane adı en az 2 karakter olmalıdır').max(255, 'Hastane adı en fazla 255 karakter olabilir'),
+  hospitalCode: z.string()
+    .min(3, 'Hastane kodu en az 3 karakter olmalıdır')
+    .max(20, 'Hastane kodu en fazla 20 karakter olabilir')
+    .regex(/^[a-z0-9-]+$/, 'Hastane kodu sadece küçük harf, rakam ve tire içerebilir'),
+  address: z.string().max(500, 'Adres en fazla 500 karakter olabilir').optional(),
+  phone: z.string().max(20, 'Telefon en fazla 20 karakter olabilir').optional(),
+  firstName: z.string().min(2, 'Ad en az 2 karakter olmalıdır').max(100, 'Ad en fazla 100 karakter olabilir'),
+  lastName: z.string().min(2, 'Soyad en az 2 karakter olmalıdır').max(100, 'Soyad en fazla 100 karakter olabilir'),
+  email: z.email('Geçerli bir e-posta adresi girin'),
+  password: z.string()
+    .min(8, 'Şifre en az 8 karakter olmalıdır')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
+      'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir'
+    ),
+})
+
 // ── Organization ──
 export const createOrganizationSchema = z.object({
   name: z.string().min(2).max(255),
@@ -34,11 +54,24 @@ export const createOrganizationSchema = z.object({
   trialDays: z.number().int().min(0).max(365).default(14),
 })
 
+/** Super Admin hastane + admin hesabı oluşturma */
+export const createHospitalWithAdminSchema = createOrganizationSchema.extend({
+  adminFirstName: z.string().min(1, 'Admin adı zorunludur').max(100),
+  adminLastName: z.string().min(1, 'Admin soyadı zorunludur').max(100),
+  adminEmail: z.string().min(1).max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
+  adminPassword: z.string().min(8, 'Şifre en az 8 karakter olmalıdır').max(128).optional(),
+})
+
 export const updateOrganizationSchema = createOrganizationSchema.partial().extend({
   isActive: z.boolean().optional(),
   isSuspended: z.boolean().optional(),
   suspendedReason: z.string().max(500).optional(),
+  slug: z.string().min(3).max(50).regex(/^[a-z0-9-]+$/, 'Sadece küçük harf, rakam ve tire kullanılabilir').optional(),
+  customDomain: z.string().min(3).max(255).optional(),
 })
+
+/** Slug doğrulama şeması — sadece küçük harf, rakam ve tire */
+export const slugSchema = z.string().min(3).max(50).regex(/^[a-z0-9-]+$/, 'Sadece küçük harf, rakam ve tire kullanılabilir')
 
 // ── Department ──
 export const createDepartmentSchema = z.object({
@@ -105,7 +138,9 @@ export const updateTrainingSchema = trainingBaseSchema.partial().refine(
 const trainingVideoInputSchema = z.object({
   title: z.string().max(500).optional(),
   url: z.string().optional(),
-  durationSeconds: z.number().int().positive().optional(),
+  durationSeconds: z.number().int().min(0).optional(),
+  contentType: z.enum(['video', 'pdf']).default('video'),
+  pageCount: z.number().int().positive().optional(),
 })
 
 const trainingQuestionInputSchema = z.object({
@@ -450,4 +485,23 @@ export const aiApproveSchema = z.object({
 
 export const aiBulkDeleteSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(50),
+})
+
+// ── Hastane Kurulum Sihirbazı ──
+export const setupWizardSchema = z.object({
+  step: z.number().int().min(1).max(4),
+  // Step 1: Hospital info
+  name: z.string().min(2).max(255).optional(),
+  code: z.string().min(2).max(50).optional(),
+  address: z.string().max(500).optional(),
+  phone: z.string().max(20).optional(),
+  email: z.email().optional(),
+  // Step 2: Departments
+  departments: z.array(z.string().min(1).max(100)).min(1).optional(),
+  // Step 3: Training defaults
+  defaultPassingScore: z.number().int().min(1).max(100).optional(),
+  defaultMaxAttempts: z.number().int().min(1).max(10).optional(),
+  defaultExamDuration: z.number().int().min(5).max(180).optional(),
+  // Step 4: Complete
+  complete: z.boolean().optional(),
 })

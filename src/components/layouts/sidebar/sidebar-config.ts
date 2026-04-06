@@ -25,6 +25,7 @@ import {
   ClipboardList,
   Tags,
   Sparkles,
+  Activity,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -64,6 +65,7 @@ export const superAdminNav: NavGroup[] = [
   {
     label: 'SİSTEM',
     items: [
+      { title: 'Sistem Sağlığı', href: '/super-admin/system-health', icon: Activity },
       { title: 'Ayarlar', href: '/super-admin/settings', icon: Settings },
     ],
   },

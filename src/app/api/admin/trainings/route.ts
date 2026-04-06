@@ -1,9 +1,10 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, checkWritePermission } from '@/lib/api-helpers'
 import { createTrainingBodySchema } from '@/lib/validations'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
+import { withCache, invalidateOrgCache } from '@/lib/redis'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -18,56 +19,63 @@ export async function GET(request: Request) {
   const isActive = searchParams.get('isActive')
   const publishStatus = searchParams.get('publishStatus') // draft | published | archived
 
-  const where: Record<string, unknown> = {
-    organizationId: dbUser!.organizationId!,
-  }
+  const orgId = dbUser!.organizationId!
+  const cacheKey = `cache:${orgId}:trainings:${page}:${limit}:${search}:${category || ''}:${isActive || ''}:${publishStatus || ''}`
 
-  if (search) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
-    ]
-  }
-  if (category) where.category = category
-  if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
-  if (publishStatus) where.publishStatus = publishStatus
-
-  const [trainings, total] = await Promise.all([
-    prisma.training.findMany({
-      where,
-      include: {
-        videos: { select: { id: true, title: true, durationSeconds: true, sortOrder: true } },
-        assignments: { select: { status: true } },
-        _count: { select: { assignments: true, questions: true, videos: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
-    }),
-    prisma.training.count({ where }),
-  ])
-
-  const mapped = trainings.map(t => {
-    const assignedCount = t._count.assignments
-    const completedCount = t.assignments.filter(a => a.status === 'passed').length
-    const completionRate = assignedCount > 0 ? Math.round((completedCount / assignedCount) * 100) : 0
-    return {
-      id: t.id,
-      title: t.title,
-      category: t.category ?? '',
-      assignedCount,
-      completedCount,
-      completionRate,
-      passingScore: t.passingScore,
-      publishStatus: t.publishStatus,
-      status: t.publishStatus === 'published' ? 'Yayında' : t.publishStatus === 'draft' ? 'Taslak' : 'Arşivlendi',
-      startDate: t.startDate?.toISOString() ?? '',
-      endDate: t.endDate?.toISOString() ?? '',
-      createdBy: '',
+  const data = await withCache(cacheKey, 120, async () => {
+    const where: Record<string, unknown> = {
+      organizationId: orgId,
     }
+
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ]
+    }
+    if (category) where.category = category
+    if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
+    if (publishStatus) where.publishStatus = publishStatus
+
+    const [trainings, total] = await Promise.all([
+      prisma.training.findMany({
+        where,
+        include: {
+          videos: { select: { id: true, title: true, durationSeconds: true, sortOrder: true } },
+          assignments: { select: { status: true } },
+          _count: { select: { assignments: true, questions: true, videos: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.training.count({ where }),
+    ])
+
+    const mapped = trainings.map(t => {
+      const assignedCount = t._count.assignments
+      const completedCount = t.assignments.filter(a => a.status === 'passed').length
+      const completionRate = assignedCount > 0 ? Math.round((completedCount / assignedCount) * 100) : 0
+      return {
+        id: t.id,
+        title: t.title,
+        category: t.category ?? '',
+        assignedCount,
+        completedCount,
+        completionRate,
+        passingScore: t.passingScore,
+        publishStatus: t.publishStatus,
+        status: t.publishStatus === 'published' ? 'Yayında' : t.publishStatus === 'draft' ? 'Taslak' : 'Arşivlendi',
+        startDate: t.startDate?.toISOString() ?? '',
+        endDate: t.endDate?.toISOString() ?? '',
+        createdBy: '',
+      }
+    })
+
+    return { trainings: mapped, total, page, limit, totalPages: Math.ceil(total / limit) }
   })
 
-  return jsonResponse({ trainings: mapped, total, page, limit, totalPages: Math.ceil(total / limit) })
+  return jsonResponse(data)
 }
 
 export async function POST(request: Request) {
@@ -76,6 +84,9 @@ export async function POST(request: Request) {
 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
+
+  const writeBlock = await checkWritePermission(dbUser!.organizationId!, 'POST')
+  if (writeBlock) return writeBlock
 
   // Abonelik limit kontrolu
   const limitError = await checkSubscriptionLimit(dbUser!.organizationId!, 'training')
@@ -118,14 +129,18 @@ export async function POST(request: Request) {
       if (videos && videos.length > 0) {
         for (const [idx, v] of videos.entries()) {
           if (!v.url) continue;
-          const videoTitle = v.title || v.url.split('/').pop()?.replace(/\.[^.]+$/, '') || `Video ${idx + 1}`;
+          const ct = v.contentType || 'video'
+          const defaultTitle = v.url.split('/').pop()?.replace(/\.[^.]+$/, '') || (ct === 'pdf' ? `Doküman ${idx + 1}` : `Video ${idx + 1}`)
+          const videoTitle = v.title || defaultTitle
           await tx.trainingVideo.create({
             data: {
               trainingId: t.id,
               title: videoTitle,
               videoUrl: v.url,
               videoKey: v.url,
-              durationSeconds: v.durationSeconds || 300,
+              durationSeconds: v.durationSeconds || (ct === 'video' ? 300 : 0),
+              contentType: ct,
+              pageCount: v.pageCount ?? null,
               sortOrder: idx,
             }
           })
@@ -201,6 +216,7 @@ export async function POST(request: Request) {
     revalidatePath('/admin/trainings')
 
     try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
+    try { await invalidateOrgCache(dbUser!.organizationId!, 'trainings') } catch {}
 
     return jsonResponse(training, 201)
   } catch (err: unknown) {

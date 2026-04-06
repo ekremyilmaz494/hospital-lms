@@ -137,6 +137,48 @@ export async function invalidateCache(key: string): Promise<void> {
   memoryCache.delete(key)
 }
 
+/**
+ * Generic cache-aside wrapper: check cache first, on miss execute fetchFn,
+ * cache the result with the given TTL, and return.
+ */
+export async function withCache<T>(key: string, ttlSeconds: number, fetchFn: () => Promise<T>): Promise<T> {
+  const cached = await getCached<T>(key)
+  if (cached !== null) return cached
+  const result = await fetchFn()
+  await setCached(key, result, ttlSeconds)
+  return result
+}
+
+/**
+ * Invalidate all cache keys matching pattern "cache:{orgId}:{entity}:*".
+ * Uses Redis SCAN for production; clears matching in-memory keys as fallback.
+ */
+export async function invalidateOrgCache(orgId: string, entity: string): Promise<void> {
+  const prefix = `cache:${orgId}:${entity}:`
+  const redis = getRedis()
+  if (redis) {
+    try {
+      let cursor = '0'
+      do {
+        const result: [string, string[]] = await redis.scan(cursor, { match: `${prefix}*`, count: 100 })
+        cursor = result[0]
+        const keys = result[1]
+        if (keys.length > 0) {
+          await Promise.all(keys.map((k: string) => redis.del(k)))
+        }
+      } while (cursor !== '0')
+    } catch {
+      resetRedis()
+    }
+  }
+  // In-memory fallback: clear matching keys
+  for (const k of memoryCache.keys()) {
+    if (k.startsWith(prefix)) {
+      memoryCache.delete(k)
+    }
+  }
+}
+
 // ── Rate Limiting ──
 
 export async function checkRateLimit(key: string, maxRequests: number, windowSeconds: number): Promise<boolean> {

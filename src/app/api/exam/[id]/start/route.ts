@@ -11,8 +11,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
-  const allowed = await checkRateLimit(`exam-start:${dbUser!.id}`, 5, 60)
-  if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
+  // User bazlı rate limit: 10 başlangıç / 1 saat
+  const allowed = await checkRateLimit(`exam-start:${dbUser!.id}`, 10, 3600)
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: 'Çok fazla sınav başlangıcı. Lütfen 60 dakika sonra tekrar deneyin.' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
+    })
+  }
 
   const assignment = await prisma.trainingAssignment.findFirst({
     where: {

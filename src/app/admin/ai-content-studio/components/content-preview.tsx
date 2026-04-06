@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Download,
   Loader2,
@@ -14,6 +14,12 @@ import {
   X,
   Eye,
   EyeOff,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  SkipBack,
+  SkipForward,
 } from 'lucide-react'
 import type {
   GenerationJob,
@@ -136,12 +142,265 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry?: () => voi
   )
 }
 
-// ── 1. AudioPreview ──
+// ── 1. AudioPreview (custom player with S3 direct streaming) ──
+
+function formatTime(sec: number): string {
+  if (!isFinite(sec) || sec < 0) return '0:00'
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 
 function AudioPreview({ url, title }: { url: string; title: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const progressRef = useRef<HTMLDivElement>(null)
+  const [streamUrl, setStreamUrl] = useState<string | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [volume, setVolume] = useState(1)
+  const [isMuted, setIsMuted] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+
+  // S3 presigned URL al — dogrudan S3'ten stream (Range request destekli)
+  useEffect(() => {
+    const separator = url.includes('?') ? '&' : '?'
+    fetch(`${url}${separator}stream=true`)
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error('Stream URL alinamadi')))
+      .then((data) => setStreamUrl(data.streamUrl))
+      .catch(() => setStreamUrl(url)) // fallback: proxy URL
+  }, [url])
+
+  // Audio event listeners
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    const onLoadedMetadata = () => {
+      setDuration(audio.duration)
+      setIsLoading(false)
+    }
+    const onTimeUpdate = () => {
+      if (!isDragging) setCurrentTime(audio.currentTime)
+    }
+    const onPlay = () => setIsPlaying(true)
+    const onPause = () => setIsPlaying(false)
+    const onEnded = () => { setIsPlaying(false); setCurrentTime(0) }
+    const onWaiting = () => setIsLoading(true)
+    const onCanPlay = () => setIsLoading(false)
+    const onError = () => {
+      setIsLoading(false)
+      setError('Ses dosyasi yuklenemedi. Tekrar deneyin.')
+    }
+
+    audio.addEventListener('loadedmetadata', onLoadedMetadata)
+    audio.addEventListener('timeupdate', onTimeUpdate)
+    audio.addEventListener('play', onPlay)
+    audio.addEventListener('pause', onPause)
+    audio.addEventListener('ended', onEnded)
+    audio.addEventListener('waiting', onWaiting)
+    audio.addEventListener('canplay', onCanPlay)
+    audio.addEventListener('error', onError)
+
+    return () => {
+      audio.removeEventListener('loadedmetadata', onLoadedMetadata)
+      audio.removeEventListener('timeupdate', onTimeUpdate)
+      audio.removeEventListener('play', onPlay)
+      audio.removeEventListener('pause', onPause)
+      audio.removeEventListener('ended', onEnded)
+      audio.removeEventListener('waiting', onWaiting)
+      audio.removeEventListener('canplay', onCanPlay)
+      audio.removeEventListener('error', onError)
+    }
+  }, [streamUrl, isDragging])
+
+  const togglePlay = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (audio.paused) { audio.play().catch(() => {}) } else { audio.pause() }
+  }, [])
+
+  const skip = useCallback((seconds: number) => {
+    const audio = audioRef.current
+    if (!audio || !isFinite(audio.duration)) return
+    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds))
+  }, [])
+
+  const toggleMute = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.muted = !audio.muted
+    setIsMuted(!isMuted)
+  }, [isMuted])
+
+  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const audio = audioRef.current
+    if (!audio) return
+    const v = parseFloat(e.target.value)
+    audio.volume = v
+    setVolume(v)
+    if (v > 0 && audio.muted) { audio.muted = false; setIsMuted(false) }
+  }, [])
+
+  // Seek via click/drag on progress bar
+  const seekToPosition = useCallback((clientX: number) => {
+    const audio = audioRef.current
+    const bar = progressRef.current
+    if (!audio || !bar || !isFinite(audio.duration)) return
+    const rect = bar.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    const time = ratio * audio.duration
+    audio.currentTime = time
+    setCurrentTime(time)
+  }, [])
+
+  const handleProgressMouseDown = useCallback((e: React.MouseEvent) => {
+    setIsDragging(true)
+    seekToPosition(e.clientX)
+
+    const onMove = (ev: MouseEvent) => seekToPosition(ev.clientX)
+    const onUp = () => {
+      setIsDragging(false)
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [seekToPosition])
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
+
   return (
     <PreviewCard title={title} icon="🎙️" url={url}>
-      <audio controls preload="metadata" className="w-full" src={url} />
+      {streamUrl && <audio ref={audioRef} src={streamUrl} preload="auto" />}
+
+      {error ? (
+        <ErrorBlock
+          message={error}
+          onRetry={() => {
+            setError(null)
+            setIsLoading(true)
+            const audio = audioRef.current
+            if (audio) { audio.load(); audio.play().catch(() => {}) }
+          }}
+        />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {/* Progress bar */}
+          <div
+            ref={progressRef}
+            className="group relative h-2 cursor-pointer rounded-full"
+            style={{ background: 'var(--color-border)' }}
+            onMouseDown={handleProgressMouseDown}
+          >
+            {/* Buffered */}
+            <div
+              className="absolute inset-y-0 left-0 rounded-full"
+              style={{ background: 'var(--color-primary-light)', width: `${progress}%` }}
+            />
+            {/* Played */}
+            <div
+              className="absolute inset-y-0 left-0 rounded-full"
+              style={{
+                background: 'var(--color-primary)',
+                width: `${progress}%`,
+                transition: isDragging ? 'none' : 'width 150ms linear',
+              }}
+            />
+            {/* Thumb */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full opacity-0 group-hover:opacity-100"
+              style={{
+                background: 'var(--color-primary)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                left: `calc(${progress}% - 8px)`,
+                transition: isDragging ? 'none' : 'left 150ms linear, opacity 200ms ease',
+              }}
+            />
+          </div>
+
+          {/* Time */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono" style={{ color: 'var(--color-text-muted)' }}>
+              {formatTime(currentTime)}
+            </span>
+            <span className="text-xs font-mono" style={{ color: 'var(--color-text-muted)' }}>
+              {formatTime(duration)}
+            </span>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center justify-center gap-2">
+            {/* Volume */}
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="flex h-9 w-9 items-center justify-center rounded-xl"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              {isMuted || volume === 0 ? <VolumeX className="h-4.5 w-4.5" /> : <Volume2 className="h-4.5 w-4.5" />}
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={isMuted ? 0 : volume}
+              onChange={handleVolumeChange}
+              className="h-1 w-16 cursor-pointer accent-[var(--color-primary)]"
+            />
+
+            <div className="flex-1" />
+
+            {/* Skip back */}
+            <button
+              type="button"
+              onClick={() => skip(-10)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl icon-btn"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              <SkipBack className="h-4.5 w-4.5" />
+            </button>
+
+            {/* Play/Pause */}
+            <button
+              type="button"
+              onClick={togglePlay}
+              disabled={isLoading && !isPlaying}
+              className="flex h-12 w-12 items-center justify-center rounded-full text-white"
+              style={{
+                background: 'var(--color-primary)',
+                boxShadow: '0 2px 8px rgba(13,150,104,0.3)',
+                opacity: isLoading && !isPlaying ? 0.6 : 1,
+                transition: 'opacity 200ms ease, transform 100ms ease',
+              }}
+            >
+              {isLoading && !isPlaying ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : isPlaying ? (
+                <Pause className="h-5 w-5" />
+              ) : (
+                <Play className="h-5 w-5 ml-0.5" />
+              )}
+            </button>
+
+            {/* Skip forward */}
+            <button
+              type="button"
+              onClick={() => skip(10)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl icon-btn"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              <SkipForward className="h-4.5 w-4.5" />
+            </button>
+
+            <div className="flex-1" />
+            <div className="w-[88px]" /> {/* Volume alanı ile simetri */}
+          </div>
+        </div>
+      )}
     </PreviewCard>
   )
 }

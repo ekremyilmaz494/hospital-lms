@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, CopyObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getSignedUrl as getCloudfrontSignedUrl } from '@aws-sdk/cloudfront-signer'
 
@@ -16,6 +16,7 @@ const ALLOWED_CONTENT_TYPES = [
   'video/mp4',
   'video/webm',
   'video/ogg',
+  'application/pdf',
 ]
 
 /** Generate presigned URL for uploading video to S3 */
@@ -80,6 +81,25 @@ export async function uploadBuffer(key: string, body: Buffer, contentType: strin
   }))
 }
 
+/** Download an S3 object as Buffer (for server-side operations like restore) */
+export async function downloadBuffer(key: string): Promise<Buffer> {
+  const response = await s3.send(new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+  }))
+
+  if (!response.Body) {
+    throw new Error(`S3 object body is empty: ${key}`)
+  }
+
+  const chunks: Uint8Array[] = []
+  // @ts-expect-error -- S3 Body is a Readable stream in Node.js runtime
+  for await (const chunk of response.Body) {
+    chunks.push(chunk as Uint8Array)
+  }
+  return Buffer.concat(chunks)
+}
+
 /** Copy an S3 object to a new key (same bucket) */
 export async function copyObject(sourceKey: string, destinationKey: string) {
   await s3.send(new CopyObjectCommand({
@@ -89,12 +109,27 @@ export async function copyObject(sourceKey: string, destinationKey: string) {
   }))
 }
 
+/** Verify an S3 object exists and has size > 0. Returns content length in bytes or null if invalid. */
+export async function verifyS3Object(key: string): Promise<number | null> {
+  try {
+    const response = await s3.send(new HeadObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+    }))
+    const size = response.ContentLength ?? 0
+    return size > 0 ? size : null
+  } catch {
+    return null
+  }
+}
+
 /** Generate backup storage key */
 export function backupKey(orgId: string) {
   return `backups/${orgId}/${Date.now()}.json`
 }
 
 const ALLOWED_VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'ogg']
+const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf']
 
 /** Generate video storage key using a random UUID — avoids path traversal and filename guessing */
 export function videoKey(orgId: string, trainingId: string, filename: string) {
@@ -104,4 +139,14 @@ export function videoKey(orgId: string, trainingId: string, filename: string) {
   }
   const id = crypto.randomUUID()
   return `videos/${orgId}/${trainingId}/${id}.${ext}`
+}
+
+/** Generate document storage key (PDF) */
+export function documentKey(orgId: string, trainingId: string, filename: string) {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  if (!ALLOWED_DOCUMENT_EXTENSIONS.includes(ext)) {
+    throw new Error(`İzin verilmeyen dosya uzantısı: .${ext}`)
+  }
+  const id = crypto.randomUUID()
+  return `documents/${orgId}/${trainingId}/${id}.${ext}`
 }

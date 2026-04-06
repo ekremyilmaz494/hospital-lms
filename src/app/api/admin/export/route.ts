@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
+import { maskeTcNo } from '@/lib/utils'
 import ExcelJS from 'exceljs'
 
 const XLSX_MAX_ROWS = 5000
@@ -53,8 +54,8 @@ export async function GET(request: Request) {
         firstName: sanitizeCell(s.firstName ?? ''),
         lastName: sanitizeCell(s.lastName ?? ''),
         email: sanitizeCell(s.email),
-        // KVKK: TC No maskeleme — sadece son 4 hane göster
-        tcNo: s.tcNo ? `*******${s.tcNo.slice(-4)}` : '',
+        // KVKK: TC No maskeleme — ilk 3 + **** + son 4
+        tcNo: maskeTcNo(s.tcNo),
         // KVKK: Telefon maskeleme — sadece son 3 hane göster
         phone: s.phone ? `***${s.phone.slice(-3)}` : '',
         department: sanitizeCell(s.departmentId ?? ''),

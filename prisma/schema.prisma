@@ -9,125 +9,143 @@ datasource db {
 
 // ── ABONELIK PLANLARI ──
 model SubscriptionPlan {
-  id              String   @id @default(uuid()) @db.Uuid
-  name            String   @db.VarChar(100)
-  slug            String   @unique @db.VarChar(50)
-  description     String?  @db.Text
-  maxStaff        Int?     @map("max_staff")
-  maxTrainings    Int?     @map("max_trainings")
-  maxStorageGb    Int      @default(10) @map("max_storage_gb")
-  priceMonthly    Decimal? @db.Decimal(10, 2) @map("price_monthly")
-  priceAnnual     Decimal? @db.Decimal(10, 2) @map("price_annual")
-  features        Json     @default("[]")
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                     String   @id @default(uuid()) @db.Uuid
+  name                   String   @db.VarChar(100)
+  slug                   String   @unique @db.VarChar(50)
+  description            String?  @db.Text
+  maxStaff               Int?     @map("max_staff")
+  maxTrainings           Int?     @map("max_trainings")
+  maxStorageGb           Int      @default(10) @map("max_storage_gb")
+  priceMonthly           Decimal? @map("price_monthly") @db.Decimal(10, 2)
+  priceAnnual            Decimal? @map("price_annual") @db.Decimal(10, 2)
+  features               Json     @default("[]")
+  isActive               Boolean  @default(true) @map("is_active")
+  // Feature gates
+  hasAiContentStudio     Boolean  @default(false) @map("has_ai_content_studio")
+  hasScormSupport        Boolean  @default(false) @map("has_scorm_support")
+  hasHisIntegration      Boolean  @default(false) @map("has_his_integration")
+  hasAdvancedReports     Boolean  @default(false) @map("has_advanced_reports")
+  hasSsoSupport          Boolean  @default(false) @map("has_sso_support")
+  hasCompetencyModule    Boolean  @default(false) @map("has_competency_module")
+  hasAccreditationModule Boolean  @default(false) @map("has_accreditation_module")
+  hasBulkImport          Boolean  @default(false) @map("has_bulk_import")
+  hasCustomCertificates  Boolean  @default(false) @map("has_custom_certificates")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  subscriptions   OrganizationSubscription[]
+  subscriptions OrganizationSubscription[]
 
   @@map("subscription_plans")
 }
 
 // ── HASTANELER ──
 model Organization {
-  id              String   @id @default(uuid()) @db.Uuid
-  name            String   @db.VarChar(255)
-  code            String   @unique @db.VarChar(50)
-  address         String?  @db.Text
-  phone           String?  @db.VarChar(20)
-  email           String?  @db.VarChar(255)
-  logoUrl         String?  @db.Text @map("logo_url")
-  isActive        Boolean  @default(true) @map("is_active")
-  isSuspended     Boolean  @default(false) @map("is_suspended")
-  suspendedReason String?  @db.Text @map("suspended_reason")
-  suspendedAt     DateTime? @map("suspended_at") @db.Timestamptz
-  sessionTimeout  Int      @default(30) @map("session_timeout")
-  defaultPassingScore     Int @default(70) @map("default_passing_score")
-  defaultMaxAttempts      Int @default(3) @map("default_max_attempts")
-  defaultExamDuration     Int @default(30) @map("default_exam_duration")
+  id                  String    @id @default(uuid()) @db.Uuid
+  name                String    @db.VarChar(255)
+  code                String    @unique @db.VarChar(50)
+  slug                String?   @unique @map("slug") @db.VarChar(50)
+  customDomain        String?   @unique @map("custom_domain") @db.VarChar(255)
+  address             String?   @db.Text
+  phone               String?   @db.VarChar(20)
+  email               String?   @db.VarChar(255)
+  logoUrl             String?   @map("logo_url") @db.Text
+  brandColor          String    @default("#0F172A") @map("brand_color") @db.VarChar(9)
+  secondaryColor      String    @default("#3B82F6") @map("secondary_color") @db.VarChar(9)
+  loginBannerUrl      String?   @map("login_banner_url") @db.Text
+  isActive            Boolean   @default(true) @map("is_active")
+  isSuspended         Boolean   @default(false) @map("is_suspended")
+  suspendedReason     String?   @map("suspended_reason") @db.Text
+  suspendedAt         DateTime? @map("suspended_at") @db.Timestamptz
+  sessionTimeout      Int       @default(30) @map("session_timeout")
+  defaultPassingScore Int       @default(70) @map("default_passing_score")
+  defaultMaxAttempts  Int       @default(3) @map("default_max_attempts")
+  defaultExamDuration Int       @default(30) @map("default_exam_duration")
   // SSO / SAML Configuration
-  ssoEnabled         Boolean  @default(false) @map("sso_enabled")
-  ssoProvider        String?  @db.VarChar(50) @map("sso_provider")
-  ssoEmailDomain     String?  @db.VarChar(255) @map("sso_email_domain")
-  samlEntryPoint     String?  @db.Text @map("saml_entry_point")
-  samlIssuer         String?  @db.Text @map("saml_issuer")
-  samlCert           String?  @db.Text @map("saml_cert")
-  oidcDiscoveryUrl   String?  @db.Text @map("oidc_discovery_url")
-  oidcClientId       String?  @db.VarChar(255) @map("oidc_client_id")
-  oidcClientSecret   String?  @db.Text @map("oidc_client_secret")
-  ssoAutoProvision   Boolean  @default(true) @map("sso_auto_provision")
-  ssoDefaultRole     String   @default("staff") @db.VarChar(20) @map("sso_default_role")
+  ssoEnabled          Boolean   @default(false) @map("sso_enabled")
+  ssoProvider         String?   @map("sso_provider") @db.VarChar(50)
+  ssoEmailDomain      String?   @map("sso_email_domain") @db.VarChar(255)
+  samlEntryPoint      String?   @map("saml_entry_point") @db.Text
+  samlIssuer          String?   @map("saml_issuer") @db.Text
+  samlCert            String?   @map("saml_cert") @db.Text
+  oidcDiscoveryUrl    String?   @map("oidc_discovery_url") @db.Text
+  oidcClientId        String?   @map("oidc_client_id") @db.VarChar(255)
+  oidcClientSecret    String?   @map("oidc_client_secret") @db.Text
+  ssoAutoProvision    Boolean   @default(true) @map("sso_auto_provision")
+  ssoDefaultRole      String    @default("staff") @map("sso_default_role") @db.VarChar(20)
+  setupCompleted      Boolean   @default(false) @map("setup_completed")
+  setupStep           Int       @default(0) @map("setup_step")
+  language            String    @default("tr") @map("language") @db.VarChar(5)
 
-  createdBy       String?  @db.Uuid @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  users           User[]
-  departments     Department[]
-  trainings       Training[]
-  notifications   Notification[]
-  auditLogs       AuditLog[]
-  dbBackups       DbBackup[]
-  subscription    OrganizationSubscription?
-  kvkkRequests    KvkkRequest[]
-  smgActivities   SmgActivity[]
-  smgPeriods      SmgPeriod[]
+  users                  User[]
+  departments            Department[]
+  trainings              Training[]
+  notifications          Notification[]
+  auditLogs              AuditLog[]
+  dbBackups              DbBackup[]
+  subscription           OrganizationSubscription?
+  kvkkRequests           KvkkRequest[]
+  smgActivities          SmgActivity[]
+  smgPeriods             SmgPeriod[]
   contentLibraryInstalls OrganizationContentLibrary[]
-  hisIntegrations      HisIntegration[]
-  competencyForms      CompetencyForm[]
-  syncLogs             SyncLog[]
-  accreditationReports AccreditationReport[]
-  trainingCategories   TrainingCategory[]
-  questionBank         QuestionBank[]
+  hisIntegrations        HisIntegration[]
+  competencyForms        CompetencyForm[]
+  syncLogs               SyncLog[]
+  accreditationReports   AccreditationReport[]
+  trainingCategories     TrainingCategory[]
+  questionBank           QuestionBank[]
   // AI İçerik Stüdyosu
-  aiNotebooks          AiNotebook[]
-  aiGenerations        AiGeneration[]
-  aiGoogleConnection   AiGoogleConnection?
+  aiNotebooks            AiNotebook[]
+  aiGenerations          AiGeneration[]
+  aiGoogleConnection     AiGoogleConnection?
 
   @@map("organizations")
 }
 
 // ── HASTANE ABONELİKLERİ ──
 model OrganizationSubscription {
-  id              String   @id @default(uuid()) @db.Uuid
-  organizationId  String   @unique @db.Uuid @map("organization_id")
-  planId          String   @db.Uuid @map("plan_id")
-  status          String   @default("trial") @db.VarChar(20)
-  billingCycle    String?  @db.VarChar(10) @map("billing_cycle")
-  trialEndsAt     DateTime? @map("trial_ends_at") @db.Timestamptz
-  startedAt       DateTime @default(now()) @map("started_at") @db.Timestamptz
-  expiresAt       DateTime? @map("expires_at") @db.Timestamptz
-  notes           String?  @db.Text
-  createdBy       String?  @db.Uuid @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @unique @map("organization_id") @db.Uuid
+  planId         String    @map("plan_id") @db.Uuid
+  status         String    @default("trial") @db.VarChar(20)
+  billingCycle   String?   @map("billing_cycle") @db.VarChar(10)
+  trialEndsAt    DateTime? @map("trial_ends_at") @db.Timestamptz
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz
+  notes          String?   @db.Text
+  createdBy      String?   @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  plan            SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
-  payments        Payment[]
-  invoices        Invoice[]
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  payments     Payment[]
+  invoices     Invoice[]
 
   @@map("organization_subscriptions")
 }
 
 // ── ÖDEMELER ──
 model Payment {
-  id                  String    @id @default(uuid()) @db.Uuid
-  subscriptionId      String    @db.Uuid @map("subscription_id")
-  organizationId      String    @db.Uuid @map("organization_id")
-  amount              Decimal   @db.Decimal(10, 2)
-  currency            String    @default("TRY") @db.VarChar(3)
-  status              String    @default("pending") @db.VarChar(20)
-  paymentMethod       String?   @db.VarChar(30) @map("payment_method")
-  iyzicoPaymentId     String?   @db.VarChar(100) @map("iyzico_payment_id")
-  iyzicoConversationId String?  @db.VarChar(100) @map("iyzico_conversation_id")
-  cardLastFour        String?   @db.VarChar(4) @map("card_last_four")
-  cardBrand           String?   @db.VarChar(20) @map("card_brand")
-  errorMessage        String?   @db.Text @map("error_message")
-  paidAt              DateTime? @map("paid_at") @db.Timestamptz
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  id                   String    @id @default(uuid()) @db.Uuid
+  subscriptionId       String    @map("subscription_id") @db.Uuid
+  organizationId       String    @map("organization_id") @db.Uuid
+  amount               Decimal   @db.Decimal(10, 2)
+  currency             String    @default("TRY") @db.VarChar(3)
+  status               String    @default("pending") @db.VarChar(20)
+  paymentMethod        String?   @map("payment_method") @db.VarChar(30)
+  iyzicoPaymentId      String?   @map("iyzico_payment_id") @db.VarChar(100)
+  iyzicoConversationId String?   @map("iyzico_conversation_id") @db.VarChar(100)
+  cardLastFour         String?   @map("card_last_four") @db.VarChar(4)
+  cardBrand            String?   @map("card_brand") @db.VarChar(20)
+  errorMessage         String?   @map("error_message") @db.Text
+  paidAt               DateTime? @map("paid_at") @db.Timestamptz
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  subscription        OrganizationSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  invoice             Invoice?
+  subscription OrganizationSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  invoice      Invoice?
 
   @@index([organizationId], map: "idx_payments_org")
   @@index([organizationId, status], map: "idx_payments_org_status")
@@ -137,46 +155,52 @@ model Payment {
 
 // ── FATURALAR ──
 model Invoice {
-  id                String    @id @default(uuid()) @db.Uuid
-  paymentId         String    @unique @db.Uuid @map("payment_id")
-  subscriptionId    String    @db.Uuid @map("subscription_id")
-  organizationId    String    @db.Uuid @map("organization_id")
-  invoiceNumber     String    @unique @db.VarChar(30) @map("invoice_number")
-  amount            Decimal   @db.Decimal(10, 2)
-  taxAmount         Decimal   @default(0) @db.Decimal(10, 2) @map("tax_amount")
-  totalAmount       Decimal   @db.Decimal(10, 2) @map("total_amount")
-  currency          String    @default("TRY") @db.VarChar(3)
-  billingName       String    @db.VarChar(255) @map("billing_name")
-  billingAddress    String?   @db.Text @map("billing_address")
-  taxNumber         String?   @db.VarChar(20) @map("tax_number")
-  taxOffice         String?   @db.VarChar(100) @map("tax_office")
-  periodStart       DateTime  @map("period_start") @db.Timestamptz
-  periodEnd         DateTime  @map("period_end") @db.Timestamptz
-  issuedAt          DateTime  @default(now()) @map("issued_at") @db.Timestamptz
+  id             String    @id @default(uuid()) @db.Uuid
+  paymentId      String    @unique @map("payment_id") @db.Uuid
+  subscriptionId String    @map("subscription_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  invoiceNumber  String    @unique @map("invoice_number") @db.VarChar(30)
+  status         String    @default("draft") @db.VarChar(20)
+  amount         Decimal   @db.Decimal(10, 2)
+  taxRate        Float     @default(20) @map("tax_rate")
+  taxAmount      Decimal   @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  totalAmount    Decimal   @map("total_amount") @db.Decimal(10, 2)
+  currency       String    @default("TRY") @db.VarChar(3)
+  billingName    String    @map("billing_name") @db.VarChar(255)
+  companyName    String?   @map("company_name") @db.VarChar(255)
+  billingAddress String?   @map("billing_address") @db.Text
+  taxNumber      String?   @map("tax_number") @db.VarChar(20)
+  taxOffice      String?   @map("tax_office") @db.VarChar(100)
+  periodStart    DateTime  @map("period_start") @db.Timestamptz
+  periodEnd      DateTime  @map("period_end") @db.Timestamptz
+  issuedAt       DateTime  @default(now()) @map("issued_at") @db.Timestamptz
+  sentAt         DateTime? @map("sent_at") @db.Timestamptz
+  paidAt         DateTime? @map("paid_at") @db.Timestamptz
 
-  payment           Payment  @relation(fields: [paymentId], references: [id])
-  subscription      OrganizationSubscription @relation(fields: [subscriptionId], references: [id])
+  payment      Payment                  @relation(fields: [paymentId], references: [id])
+  subscription OrganizationSubscription @relation(fields: [subscriptionId], references: [id])
 
   @@index([organizationId], map: "idx_invoices_org")
   @@index([invoiceNumber], map: "idx_invoices_number")
+  @@index([organizationId, status], map: "idx_invoices_org_status")
   @@map("invoices")
 }
 
 // ── DEPARTMANLAR ──
 model Department {
-  id              String   @id @default(uuid()) @db.Uuid
-  organizationId  String   @db.Uuid @map("organization_id")
-  name            String   @db.VarChar(100)
-  description     String?  @db.Text
-  color           String   @default("#0d9668") @db.VarChar(7)
-  sortOrder       Int      @default(0) @map("sort_order")
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(100)
+  description    String?  @db.Text
+  color          String   @default("#0d9668") @db.VarChar(7)
+  sortOrder      Int      @default(0) @map("sort_order")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  users           User[]
-  trainingRules   DepartmentTrainingRule[]
+  organization  Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users         User[]
+  trainingRules DepartmentTrainingRule[]
 
   @@unique([organizationId, name])
   @@index([organizationId], map: "idx_departments_org")
@@ -185,128 +209,141 @@ model Department {
 
 // ── KULLANICILAR ──
 model User {
-  id              String   @id @db.Uuid
-  organizationId  String?  @db.Uuid @map("organization_id")
-  email           String   @unique @db.VarChar(255)
-  firstName       String   @db.VarChar(100) @map("first_name")
-  lastName        String   @db.VarChar(100) @map("last_name")
-  tcNo            String?  @db.VarChar(11) @map("tc_no")
-  phone           String?  @db.VarChar(20)
-  departmentId    String?  @db.Uuid @map("department_id")
-  title           String?  @db.VarChar(100)
-  role            String   @db.VarChar(20)
-  avatarUrl       String?  @db.Text @map("avatar_url")
-  isActive        Boolean  @default(true) @map("is_active")
-  kvkkConsent     Boolean  @default(false) @map("kvkk_consent")
-  kvkkConsentDate DateTime? @map("kvkk_consent_date") @db.Timestamptz
-  hisExternalId   String?  @db.VarChar(100) @map("his_external_id")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id                 String    @id @db.Uuid
+  organizationId     String?   @map("organization_id") @db.Uuid
+  email              String    @unique @db.VarChar(255)
+  firstName          String    @map("first_name") @db.VarChar(100)
+  lastName           String    @map("last_name") @db.VarChar(100)
+  tcNo               String?   @map("tc_no") @db.VarChar(11)
+  phone              String?   @db.VarChar(20)
+  departmentId       String?   @map("department_id") @db.Uuid
+  title              String?   @db.VarChar(100)
+  role               String    @db.VarChar(20)
+  avatarUrl          String?   @map("avatar_url") @db.Text
+  isActive           Boolean   @default(true) @map("is_active")
+  kvkkConsent        Boolean   @default(false) @map("kvkk_consent")
+  kvkkConsentDate    DateTime? @map("kvkk_consent_date") @db.Timestamptz
+  hisExternalId      String?   @map("his_external_id") @db.VarChar(100)
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  termsAccepted      Boolean   @default(false) @map("terms_accepted")
+  termsAcceptedAt    DateTime? @map("terms_accepted_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization    Organization? @relation(fields: [organizationId], references: [id])
-  departmentRel   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  createdTrainings Training[]   @relation("TrainingCreator")
-  assignments     TrainingAssignment[] @relation("AssignedUser")
-  assignedBy      TrainingAssignment[] @relation("AssignedByUser")
-  examAttempts    ExamAttempt[]
-  videoProgress   VideoProgress[]
-  notifications   Notification[]
-  auditLogs       AuditLog[]
-  certificates    Certificate[]
-  kvkkRequests    KvkkRequest[] @relation("KvkkRequester")
-  kvkkResponses   KvkkRequest[] @relation("KvkkResponder")
-  scormAttempts   ScormAttempt[]
-  smgActivities   SmgActivity[] @relation("UserSmgActivities")
-  smgApprovals    SmgActivity[] @relation("SmgApprovals")
-  createdContentLibraries  ContentLibrary[]             @relation("ContentLibraryCreator")
-  contentLibraryInstalls   OrganizationContentLibrary[] @relation("ContentLibraryInstaller")
-  subjectEvaluations   CompetencyEvaluation[] @relation("EvaluationSubject")
-  evaluatorEvaluations CompetencyEvaluation[] @relation("EvaluationEvaluator")
-  pushSubscriptions    PushSubscription[]
-  accreditationReports AccreditationReport[]
+  organization            Organization?                @relation(fields: [organizationId], references: [id])
+  departmentRel           Department?                  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdTrainings        Training[]                   @relation("TrainingCreator")
+  assignments             TrainingAssignment[]         @relation("AssignedUser")
+  assignedBy              TrainingAssignment[]         @relation("AssignedByUser")
+  examAttempts            ExamAttempt[]
+  videoProgress           VideoProgress[]
+  notifications           Notification[]
+  auditLogs               AuditLog[]
+  certificates            Certificate[]
+  kvkkRequests            KvkkRequest[]                @relation("KvkkRequester")
+  kvkkResponses           KvkkRequest[]                @relation("KvkkResponder")
+  scormAttempts           ScormAttempt[]
+  smgActivities           SmgActivity[]                @relation("UserSmgActivities")
+  smgApprovals            SmgActivity[]                @relation("SmgApprovals")
+  createdContentLibraries ContentLibrary[]             @relation("ContentLibraryCreator")
+  contentLibraryInstalls  OrganizationContentLibrary[] @relation("ContentLibraryInstaller")
+  subjectEvaluations      CompetencyEvaluation[]       @relation("EvaluationSubject")
+  evaluatorEvaluations    CompetencyEvaluation[]       @relation("EvaluationEvaluator")
+  pushSubscriptions       PushSubscription[]
+  accreditationReports    AccreditationReport[]
   // AI İçerik Stüdyosu
-  aiGenerations        AiGeneration[]       @relation("UserAiGenerations")
-  aiEvaluations        AiGeneration[]       @relation("AiEvaluator")
-  aiGoogleConnections  AiGoogleConnection[]
+  aiGenerations           AiGeneration[]               @relation("UserAiGenerations")
+  aiEvaluations           AiGeneration[]               @relation("AiEvaluator")
+  aiGoogleConnections     AiGoogleConnection[]
 
   @@unique([organizationId, tcNo])
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
   @@index([departmentId], map: "idx_users_department")
   @@index([hisExternalId], map: "idx_users_his_external_id")
+  // Performance: composite indexes for filtered queries
+  @@index([organizationId, isActive], map: "idx_users_org_active")
+  @@index([organizationId, departmentId], map: "idx_users_org_department")
+  @@index([organizationId, role], map: "idx_users_org_role")
   @@map("users")
 }
 
 // ── EĞİTİMLER ──
 model Training {
-  id                   String    @id @default(uuid()) @db.Uuid
-  organizationId       String    @db.Uuid @map("organization_id")
-  title                String    @db.VarChar(500)
-  description          String?   @db.Text
-  category             String?   @db.VarChar(100)
-  thumbnailUrl         String?   @db.Text @map("thumbnail_url")
-  passingScore         Int       @default(70) @map("passing_score")
-  maxAttempts          Int       @default(3) @map("max_attempts")
-  examDurationMinutes  Int       @default(30) @map("exam_duration_minutes")
-  startDate            DateTime  @map("start_date") @db.Timestamptz
-  endDate              DateTime  @map("end_date") @db.Timestamptz
-  isActive             Boolean   @default(true) @map("is_active")
+  id                  String    @id @default(uuid()) @db.Uuid
+  organizationId      String    @map("organization_id") @db.Uuid
+  title               String    @db.VarChar(500)
+  description         String?   @db.Text
+  category            String?   @db.VarChar(100)
+  thumbnailUrl        String?   @map("thumbnail_url") @db.Text
+  passingScore        Int       @default(70) @map("passing_score")
+  maxAttempts         Int       @default(3) @map("max_attempts")
+  examDurationMinutes Int       @default(30) @map("exam_duration_minutes")
+  startDate           DateTime  @map("start_date") @db.Timestamptz
+  endDate             DateTime  @map("end_date") @db.Timestamptz
+  isActive            Boolean   @default(true) @map("is_active")
   // G5.4 — Yayın durumu: draft | published | archived
-  publishStatus        String    @default("published") @db.VarChar(20) @map("publish_status")
+  publishStatus       String    @default("published") @map("publish_status") @db.VarChar(20)
   // Compliance / Uyum Alanları
-  isCompulsory         Boolean   @default(false) @map("is_compulsory")
-  complianceDeadline   DateTime? @map("compliance_deadline") @db.Timestamptz
-  regulatoryBody       String?   @db.VarChar(200) @map("regulatory_body")
-  renewalPeriodMonths  Int?      @map("renewal_period_months")
-  createdById          String?   @db.Uuid @map("created_by")
-  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  isCompulsory        Boolean   @default(false) @map("is_compulsory")
+  complianceDeadline  DateTime? @map("compliance_deadline") @db.Timestamptz
+  regulatoryBody      String?   @map("regulatory_body") @db.VarChar(200)
+  renewalPeriodMonths Int?      @map("renewal_period_months")
+  createdById         String?   @map("created_by") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // SCORM alanları
-  scormManifestPath   String?   @db.Text @map("scorm_manifest_path")
-  scormEntryPoint     String?   @db.Text @map("scorm_entry_point")
-  scormVersion        String?   @db.VarChar(10) @map("scorm_version")
+  scormManifestPath String? @map("scorm_manifest_path") @db.Text
+  scormEntryPoint   String? @map("scorm_entry_point") @db.Text
+  scormVersion      String? @map("scorm_version") @db.VarChar(10)
 
   // Bağımsız Sınav
-  examOnly             Boolean   @default(false) @map("exam_only")
-  randomizeQuestions   Boolean   @default(false) @map("randomize_questions")
-  randomQuestionCount  Int?      @map("random_question_count")
+  examOnly            Boolean @default(false) @map("exam_only")
+  randomizeQuestions  Boolean @default(false) @map("randomize_questions")
+  randomQuestionCount Int?    @map("random_question_count")
 
   // İçerik Kütüphanesi
-  isFromLibrary       Boolean   @default(false) @map("is_from_library")
-  sourceLibraryId     String?   @db.Uuid @map("source_library_id")
+  isFromLibrary   Boolean @default(false) @map("is_from_library")
+  sourceLibraryId String? @map("source_library_id") @db.Uuid
 
-  organization        Organization    @relation(fields: [organizationId], references: [id])
-  sourceLibrary       ContentLibrary? @relation("TrainingFromLibrary", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
-  createdBy           User?        @relation("TrainingCreator", fields: [createdById], references: [id])
-  videos              TrainingVideo[]
-  questions           Question[]
-  assignments         TrainingAssignment[]
-  examAttempts        ExamAttempt[]
-  notifications       Notification[]
-  certificates        Certificate[]
-  scormAttempts       ScormAttempt[]
-  departmentRules     DepartmentTrainingRule[]
+  organization    Organization             @relation(fields: [organizationId], references: [id])
+  sourceLibrary   ContentLibrary?          @relation("TrainingFromLibrary", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
+  createdBy       User?                    @relation("TrainingCreator", fields: [createdById], references: [id])
+  videos          TrainingVideo[]
+  questions       Question[]
+  assignments     TrainingAssignment[]
+  examAttempts    ExamAttempt[]
+  notifications   Notification[]
+  certificates    Certificate[]
+  scormAttempts   ScormAttempt[]
+  departmentRules DepartmentTrainingRule[]
 
   @@index([organizationId], map: "idx_trainings_org")
   @@index([startDate, endDate], map: "idx_trainings_dates")
+  // Performance: composite indexes for filtered queries
+  @@index([organizationId, publishStatus], map: "idx_trainings_org_publish_status")
+  @@index([organizationId, isCompulsory], map: "idx_trainings_org_compulsory")
+  @@index([organizationId, createdAt], map: "idx_trainings_org_created")
   @@map("trainings")
 }
 
-// ── EĞİTİM VİDEOLARI ──
+// ── EĞİTİM İÇERİKLERİ (Video + PDF) ──
 model TrainingVideo {
   id              String   @id @default(uuid()) @db.Uuid
-  trainingId      String   @db.Uuid @map("training_id")
+  trainingId      String   @map("training_id") @db.Uuid
   title           String   @db.VarChar(500)
   description     String?  @db.Text
-  videoUrl        String   @db.Text @map("video_url")
-  videoKey        String   @db.Text @map("video_key")
+  videoUrl        String   @map("video_url") @db.Text
+  videoKey        String   @map("video_key") @db.Text
   durationSeconds Int      @map("duration_seconds")
+  contentType     String   @default("video") @map("content_type") @db.VarChar(20)
+  pageCount       Int?     @map("page_count")
   sortOrder       Int      @default(0) @map("sort_order")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  training        Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  videoProgress   VideoProgress[]
+  training      Training        @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  videoProgress VideoProgress[]
 
   @@index([trainingId], map: "idx_training_videos_training")
   @@map("training_videos")
@@ -314,17 +351,17 @@ model TrainingVideo {
 
 // ── SORULAR ──
 model Question {
-  id              String   @id @default(uuid()) @db.Uuid
-  trainingId      String   @db.Uuid @map("training_id")
-  questionText    String   @db.Text @map("question_text")
-  questionType    String   @default("multiple_choice") @db.VarChar(20) @map("question_type")
-  points          Int      @default(10)
-  sortOrder       Int      @default(0) @map("sort_order")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id           String   @id @default(uuid()) @db.Uuid
+  trainingId   String   @map("training_id") @db.Uuid
+  questionText String   @map("question_text") @db.Text
+  questionType String   @default("multiple_choice") @map("question_type") @db.VarChar(20)
+  points       Int      @default(10)
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  training        Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  options         QuestionOption[]
-  examAnswers     ExamAnswer[]
+  training    Training         @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  options     QuestionOption[]
+  examAnswers ExamAnswer[]
 
   @@index([trainingId], map: "idx_questions_training")
   @@map("questions")
@@ -332,14 +369,14 @@ model Question {
 
 // ── ŞIKLAR ──
 model QuestionOption {
-  id              String   @id @default(uuid()) @db.Uuid
-  questionId      String   @db.Uuid @map("question_id")
-  optionText      String   @db.Text @map("option_text")
-  isCorrect       Boolean  @default(false) @map("is_correct")
-  sortOrder       Int      @default(0) @map("sort_order")
+  id         String  @id @default(uuid()) @db.Uuid
+  questionId String  @map("question_id") @db.Uuid
+  optionText String  @map("option_text") @db.Text
+  isCorrect  Boolean @default(false) @map("is_correct")
+  sortOrder  Int     @default(0) @map("sort_order")
 
-  question        Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  examAnswers     ExamAnswer[]
+  question    Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  examAnswers ExamAnswer[]
 
   @@index([questionId], map: "idx_question_options_question")
   @@map("question_options")
@@ -347,20 +384,20 @@ model QuestionOption {
 
 // ── EĞİTİM ATAMALARI ──
 model TrainingAssignment {
-  id              String    @id @default(uuid()) @db.Uuid
-  trainingId      String    @db.Uuid @map("training_id")
-  userId          String    @db.Uuid @map("user_id")
-  status          String    @default("assigned") @db.VarChar(30)
-  currentAttempt  Int       @default(0) @map("current_attempt")
-  maxAttempts     Int       @default(3) @map("max_attempts")
-  assignedById    String?   @db.Uuid @map("assigned_by")
-  assignedAt      DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
-  completedAt     DateTime? @map("completed_at") @db.Timestamptz
+  id             String    @id @default(uuid()) @db.Uuid
+  trainingId     String    @map("training_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  status         String    @default("assigned") @db.VarChar(30)
+  currentAttempt Int       @default(0) @map("current_attempt")
+  maxAttempts    Int       @default(3) @map("max_attempts")
+  assignedById   String?   @map("assigned_by") @db.Uuid
+  assignedAt     DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz
 
-  training        Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  user            User     @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
-  assignedBy      User?    @relation("AssignedByUser", fields: [assignedById], references: [id])
-  examAttempts    ExamAttempt[]
+  training     Training      @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  user         User          @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy   User?         @relation("AssignedByUser", fields: [assignedById], references: [id])
+  examAttempts ExamAttempt[]
 
   @@unique([trainingId, userId])
   @@index([userId], map: "idx_assignments_user")
@@ -373,32 +410,32 @@ model TrainingAssignment {
 
 // ── SINAV DENEMELERİ ──
 model ExamAttempt {
-  id                    String    @id @default(uuid()) @db.Uuid
-  assignmentId          String    @db.Uuid @map("assignment_id")
-  userId                String    @db.Uuid @map("user_id")
-  trainingId            String    @db.Uuid @map("training_id")
-  attemptNumber         Int       @map("attempt_number")
-  preExamScore          Decimal?  @db.Decimal(5, 2) @map("pre_exam_score")
-  postExamScore         Decimal?  @db.Decimal(5, 2) @map("post_exam_score")
-  preExamStartedAt      DateTime? @map("pre_exam_started_at") @db.Timestamptz
-  preExamCompletedAt    DateTime? @map("pre_exam_completed_at") @db.Timestamptz
-  postExamStartedAt     DateTime? @map("post_exam_started_at") @db.Timestamptz
-  postExamCompletedAt   DateTime? @map("post_exam_completed_at") @db.Timestamptz
-  videosCompletedAt     DateTime? @map("videos_completed_at") @db.Timestamptz
-  isPassed              Boolean   @default(false) @map("is_passed")
-  status                String    @default("pre_exam") @db.VarChar(30)
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  signedAt              DateTime? @map("signed_at") @db.Timestamptz
-  signatureData         String?   @db.Text    @map("signature_data")
-  signatureIp           String?   @db.VarChar(45) @map("signature_ip")
-  signatureMethod       String?   @db.VarChar(20) @map("signature_method")
+  id                  String    @id @default(uuid()) @db.Uuid
+  assignmentId        String    @map("assignment_id") @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  trainingId          String    @map("training_id") @db.Uuid
+  attemptNumber       Int       @map("attempt_number")
+  preExamScore        Decimal?  @map("pre_exam_score") @db.Decimal(5, 2)
+  postExamScore       Decimal?  @map("post_exam_score") @db.Decimal(5, 2)
+  preExamStartedAt    DateTime? @map("pre_exam_started_at") @db.Timestamptz
+  preExamCompletedAt  DateTime? @map("pre_exam_completed_at") @db.Timestamptz
+  postExamStartedAt   DateTime? @map("post_exam_started_at") @db.Timestamptz
+  postExamCompletedAt DateTime? @map("post_exam_completed_at") @db.Timestamptz
+  videosCompletedAt   DateTime? @map("videos_completed_at") @db.Timestamptz
+  isPassed            Boolean   @default(false) @map("is_passed")
+  status              String    @default("pre_exam") @db.VarChar(30)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  signedAt            DateTime? @map("signed_at") @db.Timestamptz
+  signatureData       String?   @map("signature_data") @db.Text
+  signatureIp         String?   @map("signature_ip") @db.VarChar(45)
+  signatureMethod     String?   @map("signature_method") @db.VarChar(20)
 
-  assignment            TrainingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  user                  User               @relation(fields: [userId], references: [id])
-  training              Training           @relation(fields: [trainingId], references: [id])
-  examAnswers           ExamAnswer[]
-  videoProgress         VideoProgress[]
-  certificates          Certificate[]
+  assignment    TrainingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user          User               @relation(fields: [userId], references: [id])
+  training      Training           @relation(fields: [trainingId], references: [id])
+  examAnswers   ExamAnswer[]
+  videoProgress VideoProgress[]
+  certificates  Certificate[]
 
   @@unique([assignmentId, attemptNumber])
   @@index([assignmentId], map: "idx_attempts_assignment")
@@ -406,22 +443,24 @@ model ExamAttempt {
   @@index([trainingId], map: "idx_attempts_training")
   @@index([trainingId, status], map: "idx_attempts_training_status")
   @@index([userId, trainingId], map: "idx_attempts_user_training")
+  // Performance: composite index for assignment status lookups
+  @@index([assignmentId, status], map: "idx_attempts_assignment_status")
   @@map("exam_attempts")
 }
 
 // ── SINAV CEVAPLARI ──
 model ExamAnswer {
   id               String   @id @default(uuid()) @db.Uuid
-  attemptId        String   @db.Uuid @map("attempt_id")
-  questionId       String   @db.Uuid @map("question_id")
-  selectedOptionId String?  @db.Uuid @map("selected_option_id")
+  attemptId        String   @map("attempt_id") @db.Uuid
+  questionId       String   @map("question_id") @db.Uuid
+  selectedOptionId String?  @map("selected_option_id") @db.Uuid
   isCorrect        Boolean? @map("is_correct")
-  examPhase        String   @db.VarChar(10) @map("exam_phase")
+  examPhase        String   @map("exam_phase") @db.VarChar(10)
   answeredAt       DateTime @default(now()) @map("answered_at") @db.Timestamptz
 
-  attempt          ExamAttempt    @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question         Question       @relation(fields: [questionId], references: [id])
-  selectedOption   QuestionOption? @relation(fields: [selectedOptionId], references: [id])
+  attempt        ExamAttempt     @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question       Question        @relation(fields: [questionId], references: [id])
+  selectedOption QuestionOption? @relation(fields: [selectedOptionId], references: [id])
 
   @@unique([attemptId, questionId, examPhase])
   @@index([attemptId], map: "idx_exam_answers_attempt")
@@ -431,9 +470,9 @@ model ExamAnswer {
 // ── VİDEO İZLEME TAKİBİ ──
 model VideoProgress {
   id                  String    @id @default(uuid()) @db.Uuid
-  attemptId           String    @db.Uuid @map("attempt_id")
-  videoId             String    @db.Uuid @map("video_id")
-  userId              String    @db.Uuid @map("user_id")
+  attemptId           String    @map("attempt_id") @db.Uuid
+  videoId             String    @map("video_id") @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
   watchedSeconds      Int       @default(0) @map("watched_seconds")
   totalSeconds        Int       @map("total_seconds")
   isCompleted         Boolean   @default(false) @map("is_completed")
@@ -441,72 +480,80 @@ model VideoProgress {
   completedAt         DateTime? @map("completed_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  attempt             ExamAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  video               TrainingVideo @relation(fields: [videoId], references: [id])
-  user                User          @relation(fields: [userId], references: [id])
+  attempt ExamAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  video   TrainingVideo @relation(fields: [videoId], references: [id])
+  user    User          @relation(fields: [userId], references: [id])
 
   @@unique([attemptId, videoId])
+  // Performance: composite index for user video progress lookups
+  @@index([userId, videoId], map: "idx_video_progress_user_video")
   @@map("video_progress")
 }
 
 // ── BİLDİRİMLER ──
 model Notification {
   id                String   @id @default(uuid()) @db.Uuid
-  userId            String   @db.Uuid @map("user_id")
-  organizationId    String?  @db.Uuid @map("organization_id")
+  userId            String   @map("user_id") @db.Uuid
+  organizationId    String?  @map("organization_id") @db.Uuid
   title             String   @db.VarChar(500)
   message           String   @db.Text
   type              String   @db.VarChar(50)
-  relatedTrainingId String?  @db.Uuid @map("related_training_id")
+  relatedTrainingId String?  @map("related_training_id") @db.Uuid
   isRead            Boolean  @default(false) @map("is_read")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization      Organization? @relation(fields: [organizationId], references: [id])
-  relatedTraining   Training?     @relation(fields: [relatedTrainingId], references: [id])
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  relatedTraining Training?     @relation(fields: [relatedTrainingId], references: [id])
 
   @@index([userId, isRead], map: "idx_notifications_user")
   @@index([userId, createdAt], map: "idx_notifications_user_date")
   @@index([organizationId, isRead, createdAt], map: "idx_notifications_org_read_date")
+  // Performance: composite index for org-wide notification queries sorted by date
+  @@index([organizationId, createdAt], map: "idx_notifications_org_date")
   @@map("notifications")
 }
 
 // ── DENETİM KAYITLARI ──
 model AuditLog {
-  id              String   @id @default(uuid()) @db.Uuid
-  userId          String?  @db.Uuid @map("user_id")
-  organizationId  String?  @db.Uuid @map("organization_id")
-  action          String   @db.VarChar(100)
-  entityType      String   @db.VarChar(50) @map("entity_type")
-  entityId        String?  @db.Uuid @map("entity_id")
-  oldData         Json?    @map("old_data")
-  newData         Json?    @map("new_data")
-  ipAddress       String?  @db.VarChar(45) @map("ip_address")
-  userAgent       String?  @db.Text @map("user_agent")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  action         String   @db.VarChar(100)
+  entityType     String   @map("entity_type") @db.VarChar(50)
+  entityId       String?  @map("entity_id") @db.Uuid
+  oldData        Json?    @map("old_data")
+  newData        Json?    @map("new_data")
+  ipAddress      String?  @map("ip_address") @db.VarChar(45)
+  userAgent      String?  @map("user_agent") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  user            User?         @relation(fields: [userId], references: [id])
-  organization    Organization? @relation(fields: [organizationId], references: [id])
+  user         User?         @relation(fields: [userId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
 
   @@index([userId], map: "idx_audit_logs_user")
   @@index([entityType, entityId], map: "idx_audit_logs_entity")
   @@index([createdAt], map: "idx_audit_logs_date")
   @@index([organizationId, createdAt], map: "idx_audit_logs_org_date")
+  // Performance: composite index for user activity timeline
+  @@index([userId, createdAt], map: "idx_audit_logs_user_date")
   @@map("audit_logs")
 }
 
 // ── VERİTABANI YEDEKLERİ ──
 model DbBackup {
-  id              String   @id @default(uuid()) @db.Uuid
-  organizationId  String?  @db.Uuid @map("organization_id")
-  backupType      String   @db.VarChar(20) @map("backup_type")
-  fileUrl         String   @db.Text @map("file_url")
-  fileSizeMb      Decimal? @db.Decimal(10, 2) @map("file_size_mb")
-  status          String   @default("completed") @db.VarChar(20)
-  createdById     String?  @db.Uuid @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  backupType     String   @map("backup_type") @db.VarChar(20)
+  fileUrl        String   @map("file_url") @db.Text
+  fileSizeMb     Decimal? @map("file_size_mb") @db.Decimal(10, 2)
+  fileSize       Int?     @map("file_size")
+  verified       Boolean  @default(false) @map("verified")
+  status         String   @default("completed") @db.VarChar(20)
+  createdById    String?  @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  organization    Organization? @relation(fields: [organizationId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
 
   @@map("db_backups")
 }
@@ -514,16 +561,16 @@ model DbBackup {
 // ── SERTİFİKALAR ──
 model Certificate {
   id              String    @id @default(uuid()) @db.Uuid
-  userId          String    @db.Uuid @map("user_id")
-  trainingId      String    @db.Uuid @map("training_id")
-  attemptId       String    @unique @db.Uuid @map("attempt_id")
-  certificateCode String    @unique @db.VarChar(50) @map("certificate_code")
+  userId          String    @map("user_id") @db.Uuid
+  trainingId      String    @map("training_id") @db.Uuid
+  attemptId       String    @unique @map("attempt_id") @db.Uuid
+  certificateCode String    @unique @map("certificate_code") @db.VarChar(50)
   issuedAt        DateTime  @default(now()) @map("issued_at") @db.Timestamptz
   expiresAt       DateTime? @map("expires_at") @db.Timestamptz
 
-  user            User         @relation(fields: [userId], references: [id])
-  training        Training     @relation(fields: [trainingId], references: [id])
-  attempt         ExamAttempt  @relation(fields: [attemptId], references: [id])
+  user     User        @relation(fields: [userId], references: [id])
+  training Training    @relation(fields: [trainingId], references: [id])
+  attempt  ExamAttempt @relation(fields: [attemptId], references: [id])
 
   @@index([userId], map: "idx_certificates_user")
   @@index([trainingId], map: "idx_certificates_training")
@@ -532,20 +579,20 @@ model Certificate {
 
 // ── KVKK BAŞVURULARI ──
 model KvkkRequest {
-  id              String    @id @default(uuid()) @db.Uuid
-  organizationId  String    @db.Uuid @map("organization_id")
-  userId          String    @db.Uuid @map("user_id")
-  requestType     String    @db.VarChar(30) @map("request_type")
-  status          String    @default("pending") @db.VarChar(20)
-  description     String    @db.Text
-  responseNote    String?   @db.Text @map("response_note")
-  respondedById   String?   @db.Uuid @map("responded_by")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  completedAt     DateTime? @map("completed_at") @db.Timestamptz
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  requestType    String    @map("request_type") @db.VarChar(30)
+  status         String    @default("pending") @db.VarChar(20)
+  description    String    @db.Text
+  responseNote   String?   @map("response_note") @db.Text
+  respondedById  String?   @map("responded_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz
 
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  user            User      @relation("KvkkRequester", fields: [userId], references: [id])
-  respondedBy     User?     @relation("KvkkResponder", fields: [respondedById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation("KvkkRequester", fields: [userId], references: [id])
+  respondedBy  User?        @relation("KvkkResponder", fields: [respondedById], references: [id])
 
   @@index([organizationId, status], map: "idx_kvkk_requests_org_status")
   @@index([userId], map: "idx_kvkk_requests_user")
@@ -554,23 +601,23 @@ model KvkkRequest {
 
 // ── SCORM DENEMELERİ ──
 model ScormAttempt {
-  id                String    @id @default(uuid()) @db.Uuid
-  organizationId    String    @db.Uuid @map("organization_id")
-  userId            String    @db.Uuid @map("user_id")
-  trainingId        String    @db.Uuid @map("training_id")
-  attemptId         String    @unique @default(uuid()) @db.Uuid @map("attempt_id")
-  suspendData       String?   @db.Text @map("suspend_data")
-  lessonStatus      String?   @db.VarChar(30) @map("lesson_status")
-  score             Float?
-  totalTime         String?   @db.VarChar(50) @map("total_time")
-  launchData        String?   @db.Text @map("launch_data")
-  completionStatus  String?   @db.VarChar(30) @map("completion_status")
-  successStatus     String?   @db.VarChar(30) @map("success_status")
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  trainingId       String   @map("training_id") @db.Uuid
+  attemptId        String   @unique @default(uuid()) @map("attempt_id") @db.Uuid
+  suspendData      String?  @map("suspend_data") @db.Text
+  lessonStatus     String?  @map("lesson_status") @db.VarChar(30)
+  score            Float?
+  totalTime        String?  @map("total_time") @db.VarChar(50)
+  launchData       String?  @map("launch_data") @db.Text
+  completionStatus String?  @map("completion_status") @db.VarChar(30)
+  successStatus    String?  @map("success_status") @db.VarChar(30)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  training          Training  @relation(fields: [trainingId], references: [id])
-  user              User      @relation(fields: [userId], references: [id])
+  training Training @relation(fields: [trainingId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
 
   @@index([userId, trainingId], map: "idx_scorm_attempts_user_training")
   @@map("scorm_attempts")
@@ -579,14 +626,14 @@ model ScormAttempt {
 // ── DEPARTMAN EĞİTİM KURALLARI ──
 model DepartmentTrainingRule {
   id             String   @id @default(uuid()) @db.Uuid
-  departmentId   String   @db.Uuid @map("department_id")
-  trainingId     String   @db.Uuid @map("training_id")
-  organizationId String   @db.Uuid @map("organization_id")
+  departmentId   String   @map("department_id") @db.Uuid
+  trainingId     String   @map("training_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
   isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  department     Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  training       Training   @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  training   Training   @relation(fields: [trainingId], references: [id], onDelete: Cascade)
 
   @@unique([departmentId, trainingId])
   @@index([organizationId], map: "idx_dept_training_rules_org")
@@ -596,24 +643,24 @@ model DepartmentTrainingRule {
 // ── SMG AKTİVİTELERİ ──
 model SmgActivity {
   id             String    @id @default(uuid()) @db.Uuid
-  userId         String    @db.Uuid @map("user_id")
-  organizationId String    @db.Uuid @map("organization_id")
-  activityType   String    @db.VarChar(50) @map("activity_type")
+  userId         String    @map("user_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  activityType   String    @map("activity_type") @db.VarChar(50)
   // COURSE_COMPLETION | EXTERNAL_TRAINING | CONFERENCE | PUBLICATION
   title          String    @db.VarChar(255)
   provider       String?   @db.VarChar(255)
   completionDate DateTime  @map("completion_date") @db.Date
   smgPoints      Int       @map("smg_points")
-  certificateUrl String?   @db.VarChar(1000) @map("certificate_url")
-  approvalStatus String    @default("PENDING") @db.VarChar(20) @map("approval_status")
+  certificateUrl String?   @map("certificate_url") @db.VarChar(1000)
+  approvalStatus String    @default("PENDING") @map("approval_status") @db.VarChar(20)
   // PENDING | APPROVED | REJECTED
-  approvedBy     String?   @db.Uuid @map("approved_by")
+  approvedBy     String?   @map("approved_by") @db.Uuid
   approvedAt     DateTime? @map("approved_at") @db.Timestamptz
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  user           User         @relation("UserSmgActivities", fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  approver       User?        @relation("SmgApprovals", fields: [approvedBy], references: [id], onDelete: SetNull)
+  user         User         @relation("UserSmgActivities", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  approver     User?        @relation("SmgApprovals", fields: [approvedBy], references: [id], onDelete: SetNull)
 
   @@index([userId], map: "idx_smg_activities_user")
   @@index([organizationId], map: "idx_smg_activities_org")
@@ -623,7 +670,7 @@ model SmgActivity {
 // ── SMG DÖNEMLERİ ──
 model SmgPeriod {
   id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @db.Uuid @map("organization_id")
+  organizationId String   @map("organization_id") @db.Uuid
   name           String   @db.VarChar(255)
   startDate      DateTime @map("start_date") @db.Date
   endDate        DateTime @map("end_date") @db.Date
@@ -631,7 +678,7 @@ model SmgPeriod {
   isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId], map: "idx_smg_periods_org")
   @@map("smg_periods")
@@ -646,20 +693,20 @@ model ContentLibrary {
   // INFECTION_CONTROL | FIRE_SAFETY | PATIENT_RIGHTS | KVKK |
   // OCCUPATIONAL_HEALTH | FIRST_AID | MEDICAL_WASTE | HAND_HYGIENE |
   // WORKPLACE_VIOLENCE | EMERGENCY_PROCEDURES
-  thumbnailUrl String?  @db.Text @map("thumbnail_url")
-  duration     Int      // dakika
+  thumbnailUrl String?  @map("thumbnail_url") @db.Text
+  duration     Int // dakika
   smgPoints    Int      @default(0) @map("smg_points")
   difficulty   String   @db.VarChar(20) // BASIC | INTERMEDIATE | ADVANCED
   targetRoles  Json     @map("target_roles") // ["doctor","nurse","all"]
   isActive     Boolean  @default(true) @map("is_active")
-  createdById  String?  @db.Uuid @map("created_by")
+  createdById  String?  @map("created_by") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  createdBy User?                      @relation("ContentLibraryCreator", fields: [createdById], references: [id])
-  installs  OrganizationContentLibrary[]
-  trainings Training[]                 @relation("TrainingFromLibrary")
+  createdBy     User?                        @relation("ContentLibraryCreator", fields: [createdById], references: [id])
+  installs      OrganizationContentLibrary[]
+  trainings     Training[]                   @relation("TrainingFromLibrary")
   // AI İçerik Stüdyosu
-  aiGenerations AiGeneration[]         @relation("AiToLibrary")
+  aiGenerations AiGeneration[]               @relation("AiToLibrary")
 
   @@index([category], map: "idx_content_library_category")
   @@map("content_library")
@@ -668,10 +715,10 @@ model ContentLibrary {
 // ── KURUM İÇERİK KÜTÜPHANESİ (kurulum takibi) ──
 model OrganizationContentLibrary {
   id               String   @id @default(uuid()) @db.Uuid
-  organizationId   String   @db.Uuid @map("organization_id")
-  contentLibraryId String   @db.Uuid @map("content_library_id")
+  organizationId   String   @map("organization_id") @db.Uuid
+  contentLibraryId String   @map("content_library_id") @db.Uuid
   installedAt      DateTime @default(now()) @map("installed_at") @db.Timestamptz
-  installedBy      String?  @db.Uuid @map("installed_by")
+  installedBy      String?  @map("installed_by") @db.Uuid
 
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   contentLibrary ContentLibrary @relation(fields: [contentLibraryId], references: [id], onDelete: Cascade)
@@ -685,21 +732,21 @@ model OrganizationContentLibrary {
 // ── HIS ENTEGRASYONU ──
 model HisIntegration {
   id             String    @id @default(uuid()) @db.Uuid
-  organizationId String    @db.Uuid @map("organization_id")
+  organizationId String    @map("organization_id") @db.Uuid
   name           String    @db.VarChar(255)
-  baseUrl        String    @db.VarChar(500) @map("base_url")
-  authType       String    @db.VarChar(20) @map("auth_type")
+  baseUrl        String    @map("base_url") @db.VarChar(500)
+  authType       String    @map("auth_type") @db.VarChar(20)
   credentials    Json
   isActive       Boolean   @default(true) @map("is_active")
   lastSyncAt     DateTime? @map("last_sync_at") @db.Timestamptz
   syncInterval   Int       @default(60) @map("sync_interval")
   fieldMapping   Json      @default("{}") @map("field_mapping")
-  webhookToken   String    @unique @db.VarChar(128) @map("webhook_token")
+  webhookToken   String    @unique @map("webhook_token") @db.VarChar(128)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  syncLogs       SyncLog[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  syncLogs     SyncLog[]
 
   @@index([organizationId], map: "idx_his_integrations_org")
   @@index([isActive], map: "idx_his_integrations_active")
@@ -709,9 +756,9 @@ model HisIntegration {
 // ── SENKRONIZASYON LOGLARI ──
 model SyncLog {
   id               String    @id @default(uuid()) @db.Uuid
-  organizationId   String    @db.Uuid @map("organization_id")
-  integrationId    String    @db.Uuid @map("integration_id")
-  syncType         String    @db.VarChar(30) @map("sync_type")
+  organizationId   String    @map("organization_id") @db.Uuid
+  integrationId    String    @map("integration_id") @db.Uuid
+  syncType         String    @map("sync_type") @db.VarChar(30)
   status           String    @default("RUNNING") @db.VarChar(20)
   totalRecords     Int       @default(0) @map("total_records")
   processedRecords Int       @default(0) @map("processed_records")
@@ -719,8 +766,8 @@ model SyncLog {
   startedAt        DateTime  @default(now()) @map("started_at") @db.Timestamptz
   completedAt      DateTime? @map("completed_at") @db.Timestamptz
 
-  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  integration      HisIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  integration  HisIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId], map: "idx_sync_logs_org")
   @@index([integrationId], map: "idx_sync_logs_integration")
@@ -731,44 +778,44 @@ model SyncLog {
 // ── 360° YETKİNLİK DEĞERLENDİRME ──
 
 model CompetencyForm {
-  id             String    @id @default(uuid()) @db.Uuid
-  organizationId String    @db.Uuid @map("organization_id")
-  title          String    @db.VarChar(255)
-  description    String?   @db.Text
-  targetRole     String?   @db.VarChar(100) @map("target_role")
-  periodStart    DateTime  @map("period_start") @db.Date
-  periodEnd      DateTime  @map("period_end") @db.Date
-  isActive       Boolean   @default(true) @map("is_active")
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  title          String   @db.VarChar(255)
+  description    String?  @db.Text
+  targetRole     String?  @map("target_role") @db.VarChar(100)
+  periodStart    DateTime @map("period_start") @db.Date
+  periodEnd      DateTime @map("period_end") @db.Date
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  categories     CompetencyCategory[]
-  evaluations    CompetencyEvaluation[]
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  categories   CompetencyCategory[]
+  evaluations  CompetencyEvaluation[]
 
   @@index([organizationId], map: "idx_comp_forms_org")
   @@map("competency_forms")
 }
 
 model CompetencyCategory {
-  id      String  @id @default(uuid()) @db.Uuid
-  formId  String  @db.Uuid @map("form_id")
-  name    String  @db.VarChar(255)
-  weight  Int     @default(0)
-  order   Int     @default(0)
+  id     String @id @default(uuid()) @db.Uuid
+  formId String @map("form_id") @db.Uuid
+  name   String @db.VarChar(255)
+  weight Int    @default(0)
+  order  Int    @default(0)
 
-  form    CompetencyForm   @relation(fields: [formId], references: [id], onDelete: Cascade)
-  items   CompetencyItem[]
+  form  CompetencyForm   @relation(fields: [formId], references: [id], onDelete: Cascade)
+  items CompetencyItem[]
 
   @@index([formId], map: "idx_comp_categories_form")
   @@map("competency_categories")
 }
 
 model CompetencyItem {
-  id           String  @id @default(uuid()) @db.Uuid
-  categoryId   String  @db.Uuid @map("category_id")
-  text         String  @db.VarChar(500)
-  description  String? @db.Text
-  order        Int     @default(0)
+  id          String  @id @default(uuid()) @db.Uuid
+  categoryId  String  @map("category_id") @db.Uuid
+  text        String  @db.VarChar(500)
+  description String? @db.Text
+  order       Int     @default(0)
 
   category CompetencyCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   answers  CompetencyAnswer[]
@@ -778,21 +825,21 @@ model CompetencyItem {
 }
 
 model CompetencyEvaluation {
-  id             String    @id @default(uuid()) @db.Uuid
-  formId         String    @db.Uuid @map("form_id")
-  subjectId      String    @db.Uuid @map("subject_id")
-  evaluatorId    String    @db.Uuid @map("evaluator_id")
-  evaluatorType  String    @db.VarChar(20) @map("evaluator_type")
+  id            String    @id @default(uuid()) @db.Uuid
+  formId        String    @map("form_id") @db.Uuid
+  subjectId     String    @map("subject_id") @db.Uuid
+  evaluatorId   String    @map("evaluator_id") @db.Uuid
+  evaluatorType String    @map("evaluator_type") @db.VarChar(20)
   // SELF | MANAGER | PEER | SUBORDINATE
-  status         String    @default("PENDING") @db.VarChar(20)
+  status        String    @default("PENDING") @db.VarChar(20)
   // PENDING | COMPLETED
-  overallScore   Decimal?  @db.Decimal(4, 2) @map("overall_score")
-  completedAt    DateTime? @map("completed_at") @db.Timestamptz
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  overallScore  Decimal?  @map("overall_score") @db.Decimal(4, 2)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  form      CompetencyForm      @relation(fields: [formId], references: [id], onDelete: Cascade)
-  subject   User                @relation("EvaluationSubject", fields: [subjectId], references: [id], onDelete: Cascade)
-  evaluator User                @relation("EvaluationEvaluator", fields: [evaluatorId], references: [id], onDelete: Cascade)
+  form      CompetencyForm     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  subject   User               @relation("EvaluationSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+  evaluator User               @relation("EvaluationEvaluator", fields: [evaluatorId], references: [id], onDelete: Cascade)
   answers   CompetencyAnswer[]
 
   @@unique([formId, subjectId, evaluatorId])
@@ -804,8 +851,8 @@ model CompetencyEvaluation {
 
 model CompetencyAnswer {
   id           String  @id @default(uuid()) @db.Uuid
-  evaluationId String  @db.Uuid @map("evaluation_id")
-  itemId       String  @db.Uuid @map("item_id")
+  evaluationId String  @map("evaluation_id") @db.Uuid
+  itemId       String  @map("item_id") @db.Uuid
   score        Int
   comment      String? @db.Text
 
@@ -820,7 +867,7 @@ model CompetencyAnswer {
 // ── WEB PUSH ABONELİKLERİ ──
 model PushSubscription {
   id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid @map("user_id")
+  userId    String   @map("user_id") @db.Uuid
   endpoint  String   @db.Text
   p256dh    String   @db.Text
   auth      String   @db.Text
@@ -835,15 +882,15 @@ model PushSubscription {
 
 // ── AKREDİTASYON STANDARTLARI (global — organizasyona bağlı değil) ──
 model AccreditationStandard {
-  id                        String   @id @default(uuid()) @db.Uuid
-  code                      String   @unique @db.VarChar(50)
-  title                     String   @db.VarChar(500)
-  description               String?  @db.Text
-  standardBody              String   @db.VarChar(20) @map("standard_body")
-  requiredTrainingCategories Json    @default("[]") @map("required_training_categories")
-  requiredCompletionRate    Int      @default(80) @map("required_completion_rate")
-  isActive                  Boolean  @default(true) @map("is_active")
-  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                         String   @id @default(uuid()) @db.Uuid
+  code                       String   @unique @db.VarChar(50)
+  title                      String   @db.VarChar(500)
+  description                String?  @db.Text
+  standardBody               String   @map("standard_body") @db.VarChar(20)
+  requiredTrainingCategories Json     @default("[]") @map("required_training_categories")
+  requiredCompletionRate     Int      @default(80) @map("required_completion_rate")
+  isActive                   Boolean  @default(true) @map("is_active")
+  createdAt                  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([standardBody], map: "idx_accreditation_standards_body")
   @@map("accreditation_standards")
@@ -852,16 +899,16 @@ model AccreditationStandard {
 // ── AKREDİTASYON RAPORLARI ──
 model AccreditationReport {
   id                    String   @id @default(uuid()) @db.Uuid
-  organizationId        String   @db.Uuid @map("organization_id")
+  organizationId        String   @map("organization_id") @db.Uuid
   title                 String   @db.VarChar(500)
-  standardBody          String   @db.VarChar(20) @map("standard_body")
+  standardBody          String   @map("standard_body") @db.VarChar(20)
   generatedAt           DateTime @default(now()) @map("generated_at") @db.Timestamptz
-  generatedBy           String   @db.Uuid @map("generated_by")
+  generatedBy           String   @map("generated_by") @db.Uuid
   periodStart           DateTime @map("period_start") @db.Timestamptz
   periodEnd             DateTime @map("period_end") @db.Timestamptz
-  overallComplianceRate Decimal  @default(0) @db.Decimal(5, 2) @map("overall_compliance_rate")
+  overallComplianceRate Decimal  @default(0) @map("overall_compliance_rate") @db.Decimal(5, 2)
   findings              Json     @default("[]")
-  reportUrl             String?  @db.Text @map("report_url")
+  reportUrl             String?  @map("report_url") @db.Text
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -875,16 +922,16 @@ model AccreditationReport {
 
 // ── EĞİTİM KATEGORİLERİ ──
 model TrainingCategory {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid @map("organization_id")
-  value          String       @db.VarChar(100)
-  label          String       @db.VarChar(100)
-  icon           String       @db.VarChar(30)
-  order          Int          @default(0)
-  isDefault      Boolean      @default(false) @map("is_default")
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  value          String   @db.VarChar(100)
+  label          String   @db.VarChar(100)
+  icon           String   @db.VarChar(30)
+  order          Int      @default(0)
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, value])
   @@index([organizationId, order], map: "idx_training_categories_org_order")
@@ -893,31 +940,31 @@ model TrainingCategory {
 
 // ── SORU BANKASI ──
 model QuestionBank {
-  id             String               @id @default(uuid()) @db.Uuid
-  organizationId String               @db.Uuid @map("organization_id")
-  text           String               @db.Text
-  category       String               @db.VarChar(100)
-  difficulty     String               @default("medium") @db.VarChar(10)
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  text           String   @db.Text
+  category       String   @db.VarChar(100)
+  difficulty     String   @default("medium") @db.VarChar(10)
   tags           String[]
-  points         Int                  @default(1)
-  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  points         Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization   Organization         @relation(fields: [organizationId], references: [id])
-  options        QuestionBankOption[]
+  organization Organization         @relation(fields: [organizationId], references: [id])
+  options      QuestionBankOption[]
 
   @@index([organizationId], map: "idx_question_bank_org")
   @@map("question_bank")
 }
 
 model QuestionBankOption {
-  id             String       @id @default(uuid()) @db.Uuid
-  questionBankId String       @db.Uuid @map("question_bank_id")
-  text           String       @db.Text
-  isCorrect      Boolean      @map("is_correct")
+  id             String  @id @default(uuid()) @db.Uuid
+  questionBankId String  @map("question_bank_id") @db.Uuid
+  text           String  @db.Text
+  isCorrect      Boolean @map("is_correct")
   order          Int
 
-  question       QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
+  question QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
 
   @@map("question_bank_options")
 }
@@ -925,77 +972,77 @@ model QuestionBankOption {
 // ── AI İÇERİK STÜDYOSU v2 ──
 
 model AiNotebook {
-  id               String   @id @default(uuid()) @db.Uuid
-  organizationId   String   @db.Uuid @map("organization_id")
-  notebookLmId     String   @map("notebooklm_id") @db.VarChar(100)
-  title            String   @db.VarChar(500)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  notebookLmId   String   @map("notebooklm_id") @db.VarChar(100)
+  title          String   @db.VarChar(500)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization     Organization       @relation(fields: [organizationId], references: [id])
-  sources          AiNotebookSource[]
-  generations      AiGeneration[]
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  sources      AiNotebookSource[]
+  generations  AiGeneration[]
 
   @@index([organizationId])
   @@map("ai_notebooks")
 }
 
 model AiNotebookSource {
-  id             String   @id @default(uuid()) @db.Uuid
-  notebookId     String   @db.Uuid @map("notebook_id")
-  sourceLmId     String?  @map("source_lm_id") @db.VarChar(100)
-  fileName       String   @map("file_name") @db.VarChar(500)
-  fileType       String   @map("file_type") @db.VarChar(50)
-  fileSize       Int      @map("file_size")
-  s3Key          String?  @map("s3_key") @db.Text
-  sourceType     String   @map("source_type") @db.VarChar(30)
-  sourceUrl      String?  @map("source_url") @db.Text
-  status         String   @default("uploading") @db.VarChar(30)
-  summary        String?  @db.Text
-  keyTopics      Json?    @map("key_topics")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  notebookId String   @map("notebook_id") @db.Uuid
+  sourceLmId String?  @map("source_lm_id") @db.VarChar(100)
+  fileName   String   @map("file_name") @db.VarChar(500)
+  fileType   String   @map("file_type") @db.VarChar(50)
+  fileSize   Int      @map("file_size")
+  s3Key      String?  @map("s3_key") @db.Text
+  sourceType String   @map("source_type") @db.VarChar(30)
+  sourceUrl  String?  @map("source_url") @db.Text
+  status     String   @default("uploading") @db.VarChar(30)
+  summary    String?  @db.Text
+  keyTopics  Json?    @map("key_topics")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  notebook       AiNotebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  notebook AiNotebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
 
   @@index([notebookId])
   @@map("ai_notebook_sources")
 }
 
 model AiGeneration {
-  id              String    @id @default(uuid()) @db.Uuid
-  organizationId  String    @db.Uuid @map("organization_id")
-  userId          String    @db.Uuid @map("user_id")
-  notebookId      String    @db.Uuid @map("notebook_id")
-  title           String    @db.VarChar(500)
-  artifactType    String    @map("artifact_type") @db.VarChar(30)
-  artifactLmId    String?   @map("artifact_lm_id") @db.VarChar(100)
-  taskLmId        String?   @map("task_lm_id") @db.VarChar(100)
-  instructions    String?   @db.Text
-  settings        Json      @default("{}")
-  status          String    @default("pending") @db.VarChar(30)
-  progress        Int       @default(0)
-  outputS3Key     String?   @map("output_s3_key") @db.Text
-  outputFileType  String?   @map("output_file_type") @db.VarChar(20)
-  outputSize      Int?      @map("output_size")
-  transcript      String?   @db.Text
-  contentData     Json?     @map("content_data")
-  metadata        Json      @default("{}")
-  errorMessage    String?   @map("error_message") @db.Text
-  evaluation      String?   @db.VarChar(20)
-  evaluationNote  String?   @map("evaluation_note") @db.Text
-  evaluatedAt     DateTime? @map("evaluated_at") @db.Timestamptz
-  evaluatedById   String?   @db.Uuid @map("evaluated_by_id")
-  savedToLibrary    Boolean   @default(false) @map("saved_to_library")
-  contentLibraryId  String?   @db.Uuid @map("content_library_id")
-  savedAt           DateTime? @map("saved_at") @db.Timestamptz
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id               String    @id @default(uuid()) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  notebookId       String    @map("notebook_id") @db.Uuid
+  title            String    @db.VarChar(500)
+  artifactType     String    @map("artifact_type") @db.VarChar(30)
+  artifactLmId     String?   @map("artifact_lm_id") @db.VarChar(100)
+  taskLmId         String?   @map("task_lm_id") @db.VarChar(100)
+  instructions     String?   @db.Text
+  settings         Json      @default("{}")
+  status           String    @default("pending") @db.VarChar(30)
+  progress         Int       @default(0)
+  outputS3Key      String?   @map("output_s3_key") @db.Text
+  outputFileType   String?   @map("output_file_type") @db.VarChar(20)
+  outputSize       Int?      @map("output_size")
+  transcript       String?   @db.Text
+  contentData      Json?     @map("content_data")
+  metadata         Json      @default("{}")
+  errorMessage     String?   @map("error_message") @db.Text
+  evaluation       String?   @db.VarChar(20)
+  evaluationNote   String?   @map("evaluation_note") @db.Text
+  evaluatedAt      DateTime? @map("evaluated_at") @db.Timestamptz
+  evaluatedById    String?   @map("evaluated_by_id") @db.Uuid
+  savedToLibrary   Boolean   @default(false) @map("saved_to_library")
+  contentLibraryId String?   @map("content_library_id") @db.Uuid
+  savedAt          DateTime? @map("saved_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization    Organization    @relation(fields: [organizationId], references: [id])
-  user            User            @relation("UserAiGenerations", fields: [userId], references: [id])
-  notebook        AiNotebook      @relation(fields: [notebookId], references: [id])
-  evaluatedBy     User?           @relation("AiEvaluator", fields: [evaluatedById], references: [id])
-  contentLibrary  ContentLibrary? @relation("AiToLibrary", fields: [contentLibraryId], references: [id])
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  user           User            @relation("UserAiGenerations", fields: [userId], references: [id])
+  notebook       AiNotebook      @relation(fields: [notebookId], references: [id])
+  evaluatedBy    User?           @relation("AiEvaluator", fields: [evaluatedById], references: [id])
+  contentLibrary ContentLibrary? @relation("AiToLibrary", fields: [contentLibraryId], references: [id])
 
   @@index([organizationId])
   @@index([userId])
@@ -1007,11 +1054,11 @@ model AiGeneration {
 
 model AiGoogleConnection {
   id              String    @id @default(uuid()) @db.Uuid
-  organizationId  String    @unique @db.Uuid @map("organization_id")
-  userId          String    @db.Uuid @map("user_id")
+  organizationId  String    @unique @map("organization_id") @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
   email           String
   status          String    @default("pending")
-  encryptedCookie String?   @db.Text @map("encrypted_cookie")
+  encryptedCookie String?   @map("encrypted_cookie") @db.Text
   lastVerifiedAt  DateTime? @map("last_verified_at") @db.Timestamptz
   lastUsedAt      DateTime? @map("last_used_at") @db.Timestamptz
   expiresAt       DateTime? @map("expires_at") @db.Timestamptz
@@ -1019,10 +1066,9 @@ model AiGoogleConnection {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  user            User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
 
   @@index([status])
   @@map("ai_google_connections")
 }
-

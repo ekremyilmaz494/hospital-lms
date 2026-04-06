@@ -35,21 +35,21 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.trim().toLowerCase()
     const ip = getTrustedIp(request)
 
-    // ── IP-based rate limiting ──
-    const ipAllowed = await checkRateLimit(`login-ip:${ip}`, 20, 900)
+    // ── Rate limiting (paralel) ──
+    const [ipAllowed, emailAllowed] = await Promise.all([
+      checkRateLimit(`login-ip:${ip}`, 20, 900),
+      checkRateLimit(`login:${normalizedEmail}`, 5, 900),
+    ])
     if (!ipAllowed) {
       logger.warn('auth:login', 'IP rate limit aşıldı', { ip })
       return errorResponse('Çok fazla giriş denemesi. 15 dakika bekleyin.', 429)
     }
-
-    // ── Email-based rate limiting ──
-    const emailAllowed = await checkRateLimit(`login:${normalizedEmail}`, 5, 900)
     if (!emailAllowed) {
       logger.warn('auth:login', 'E-posta rate limit aşıldı', { email: normalizedEmail })
       return errorResponse('Çok fazla giriş denemesi. 15 dakika bekleyin.', 429)
     }
 
-    // ── Supabase auth ──
+    // ── Supabase auth + client oluşturma paralel ──
     const supabase = await createClient()
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,

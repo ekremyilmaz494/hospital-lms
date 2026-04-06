@@ -1,8 +1,9 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
-import { checkRateLimit } from '@/lib/redis'
+import { getAuthUser, getAuthUserWithWriteGuard, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
+import { maskeTcNo } from '@/lib/utils'
 import { z } from 'zod/v4'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -40,7 +41,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       lastName: staff.lastName,
       email: staff.email,
       phone: staff.phone ?? '',
-      tcNo: staff.tcNo ? `*******${staff.tcNo.slice(-4)}` : '',
+      tcNo: maskeTcNo(staff.tcNo),
       department: departmentName,
       departmentId: staff.departmentId,
       title: staff.title ?? '',
@@ -88,7 +89,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     firstName: staff.firstName,
     lastName: staff.lastName,
     email: staff.email,
-    tcNo: staff.tcNo ? `*******${staff.tcNo.slice(-4)}` : '',
+    tcNo: maskeTcNo(staff.tcNo),
     department: departmentName,
     departmentId: staff.departmentId,
     title: staff.title ?? '',
@@ -123,7 +124,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserWithWriteGuard(request)
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['admin'])
@@ -178,13 +179,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   revalidatePath('/admin/staff')
 
   try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
+  try { await invalidateOrgCache(dbUser!.organizationId!, 'staff') } catch {}
 
   return jsonResponse(staff)
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserWithWriteGuard(request)
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['admin'])
@@ -221,6 +223,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   revalidatePath('/admin/staff')
 
   try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
+  try { await invalidateOrgCache(dbUser!.organizationId!, 'staff') } catch {}
 
   return jsonResponse({ success: true })
 }

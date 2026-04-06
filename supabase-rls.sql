@@ -233,3 +233,76 @@ CREATE POLICY "staff_accreditation_reports_select" ON accreditation_reports
   FOR SELECT USING (
     organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
   );
+
+-- ══════════════════════════════════════════════════════════════
+-- YENI POLICY'LER — AI Modulu Tablolari
+-- ══════════════════════════════════════════════════════════════
+
+-- AI NOTEBOOKS
+ALTER TABLE ai_notebooks ENABLE ROW LEVEL SECURITY;
+-- super_admin: tum kayitlara full erisim
+CREATE POLICY "super_admin_ai_notebooks_all" ON ai_notebooks
+  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+-- admin: sadece kendi organizasyonunun kayitlari
+CREATE POLICY "admin_ai_notebooks_all" ON ai_notebooks
+  FOR ALL USING (
+    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+-- staff: sadece kendi organizasyonunun kayitlarini gorebilir
+CREATE POLICY "staff_ai_notebooks_select" ON ai_notebooks
+  FOR SELECT USING (
+    organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+
+-- AI NOTEBOOK SOURCES (organizationId yok, notebook uzerinden filtrelenir)
+ALTER TABLE ai_notebook_sources ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_ai_notebook_sources_all" ON ai_notebook_sources
+  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_ai_notebook_sources_all" ON ai_notebook_sources
+  FOR ALL USING (
+    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    AND notebook_id IN (
+      SELECT id FROM ai_notebooks
+      WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+    )
+  );
+CREATE POLICY "staff_ai_notebook_sources_select" ON ai_notebook_sources
+  FOR SELECT USING (
+    notebook_id IN (
+      SELECT id FROM ai_notebooks
+      WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+    )
+  );
+
+-- AI GENERATIONS
+ALTER TABLE ai_generations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_ai_generations_all" ON ai_generations
+  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_ai_generations_all" ON ai_generations
+  FOR ALL USING (
+    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+-- staff: sadece kendi olusturdugu kayitlar (userId = auth.uid()) ve kendi org'u
+CREATE POLICY "staff_ai_generations_select" ON ai_generations
+  FOR SELECT USING (
+    user_id = auth.uid()
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+
+-- AI GOOGLE CONNECTIONS
+ALTER TABLE ai_google_connections ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_ai_google_connections_all" ON ai_google_connections
+  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_ai_google_connections_all" ON ai_google_connections
+  FOR ALL USING (
+    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+-- staff: sadece kendi baglantisini gorebilir
+CREATE POLICY "staff_ai_google_connections_own" ON ai_google_connections
+  FOR SELECT USING (
+    user_id = auth.uid()
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );

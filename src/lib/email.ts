@@ -150,6 +150,51 @@ export function welcomeEmail(name: string, email: string, resetLink: string) {
   `
 }
 
+/**
+ * Super Admin tarafından hastane oluşturulduğunda admin kullanıcıya gönderilen hoş geldiniz e-postası.
+ * Geçici şifre içerir ve ilk girişte şifre değiştirme zorunluluğunu belirtir.
+ */
+export async function sendHospitalWelcomeEmail(params: {
+  to: string
+  hospitalName: string
+  loginUrl: string
+  tempPassword: string
+  adminName: string
+}) {
+  const { to, hospitalName, loginUrl, tempPassword, adminName } = params
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Hastane Hesabınız Oluşturuldu</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #1e293b; margin-top: 0;">Hoş Geldiniz!</h2>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(adminName)},</p>
+        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> hastanesi için yönetici hesabınız oluşturulmuştur.</p>
+        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #475569;"><strong>E-posta:</strong> ${escapeHtml(to)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Geçici Şifre:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${escapeHtml(tempPassword)}</code></p>
+        </div>
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
+          <p style="margin: 0; color: #92400e; font-size: 13px;"><strong>Önemli:</strong> İlk girişinizde şifrenizi değiştirmeniz gerekmektedir.</p>
+        </div>
+        <a href="${escapeHtml(loginUrl)}"
+           style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Sisteme Giriş Yap
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir. Hesabınız ile ilgili sorunuz varsa sistem yöneticinize başvurunuz.</p>
+      </div>
+    </div>
+  `
+
+  await sendEmail({
+    to,
+    subject: 'Hastane LMS Hesabınız Oluşturuldu',
+    html,
+  })
+}
+
 // Yaklaşan eğitim deadline hatırlatması (3/1 gün kala)
 export function upcomingTrainingReminderEmail(staffName: string, trainingTitle: string, dueDate: string, daysLeft: number) {
   const urgencyColor = daysLeft <= 1 ? '#dc2626' : '#f59e0b'
@@ -210,6 +255,222 @@ export function certificateExpiryReminderEmail(staffName: string, trainingTitle:
       </div>
     </div>
   `
+}
+
+// ── Fatura E-posta Gonderimi ──
+
+/** Faturayı PDF eki ile e-posta olarak gonderir */
+export async function sendInvoiceEmail(params: {
+  to: string
+  invoiceNumber: string
+  billingName: string
+  totalAmount: string
+  currency: string
+  periodStart: string
+  periodEnd: string
+  pdfBuffer: Buffer
+}) {
+  const { to, invoiceNumber, billingName, totalAmount, currency, periodStart, periodEnd, pdfBuffer } = params
+  const currencySymbol = currency === 'TRY' ? 'TL' : currency
+
+  const recipientList = Array.isArray(to) ? to : [to]
+
+  // Rate limit kontrolleri
+  const globalOk = await checkRateLimit('email:global', EMAIL_GLOBAL_LIMIT, EMAIL_WINDOW_SECONDS)
+  if (!globalOk) {
+    throw new Error('Global e-posta rate limiti asildi (saatte 200). Lutfen daha sonra tekrar deneyin.')
+  }
+
+  for (const recipient of recipientList) {
+    const key = `email:recipient:${recipient.toLowerCase()}`
+    const recipientOk = await checkRateLimit(key, EMAIL_PER_RECIPIENT_LIMIT, EMAIL_WINDOW_SECONDS)
+    if (!recipientOk) {
+      throw new Error(`"${recipient}" adresine saatte ${EMAIL_PER_RECIPIENT_LIMIT} e-postadan fazla gonderilemez.`)
+    }
+  }
+
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Fatura Bildirimi</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #1e293b; margin-top: 0;">Faturaniz Hazir</h2>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(billingName)},</p>
+        <p style="color: #64748b;">Asagidaki faturaniz ekte yer almaktadir:</p>
+        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #475569;"><strong>Fatura No:</strong> ${escapeHtml(invoiceNumber)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Toplam:</strong> ${escapeHtml(totalAmount)} ${escapeHtml(currencySymbol)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Donem:</strong> ${escapeHtml(periodStart)} - ${escapeHtml(periodEnd)}</p>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gonderilmistir. Sorulariniz icin destek ekibimize ulasiniz.</p>
+      </div>
+    </div>
+  `
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM ?? 'Hastane LMS <noreply@hastanelms.com>',
+    to: recipientList.join(', '),
+    subject: `Fatura - ${invoiceNumber}`,
+    html,
+    attachments: [
+      {
+        filename: `fatura-${invoiceNumber}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      },
+    ],
+  })
+}
+
+// ── Abonelik / Trial E-posta Şablonları ──
+
+/** Deneme suresi dolmak uzere (7, 3, 1 gun kala) */
+export async function sendTrialExpiringEmail(to: string, hospitalName: string, daysLeft: number) {
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #f59e0b, #92400e); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Deneme Suresi Uyarisi</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+          <p style="margin: 0; font-weight: bold; color: #92400e;">${daysLeft} gun kaldi!</p>
+        </div>
+        <h2 style="color: #1e293b; margin-top: 0;">Deneme Sureniz Dolmak Uzere</h2>
+        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> icin deneme surenizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
+        <p style="color: #64748b;">Hizmet kesintisi yasamamamak icin lutfen bir abonelik plani secin.</p>
+        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
+           style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Plan Secin
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Deneme suresi doldugunda yeni egitim ve personel ekleyemezsiniz. Mevcut verileriniz silinmez.</p>
+      </div>
+    </div>
+  `
+  await sendEmail({ to, subject: `Hastane LMS — Deneme surenizin bitmesine ${daysLeft} gun`, html })
+}
+
+/** Deneme suresi doldu */
+export async function sendTrialExpiredEmail(to: string, hospitalName: string) {
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Deneme Suresi Sona Erdi</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+          <p style="margin: 0; font-weight: bold; color: #dc2626;">Deneme suresi doldu</p>
+        </div>
+        <h2 style="color: #1e293b; margin-top: 0;">Deneme Sureniz Sona Erdi</h2>
+        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> icin ucretsiz deneme sureniz sona ermistir.</p>
+        <p style="color: #64748b;">Yeni kayit olusturma kisitlanmistir. Mevcut verilerinize erismeye devam edebilirsiniz.</p>
+        <p style="color: #64748b;">Hizmeti kesintisiz kullanmak icin lutfen bir abonelik plani satin alin.</p>
+        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
+           style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Simdi Abone Ol
+        </a>
+      </div>
+    </div>
+  `
+  await sendEmail({ to, subject: 'Hastane LMS — Deneme sureniz sona erdi', html })
+}
+
+/** Abonelik suresi dolmak uzere (7, 3, 1 gun kala) */
+export async function sendSubscriptionExpiringEmail(to: string, hospitalName: string, daysLeft: number) {
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #f59e0b, #92400e); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Yenileme Hatirlatmasi</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+          <p style="margin: 0; font-weight: bold; color: #92400e;">${daysLeft} gun kaldi!</p>
+        </div>
+        <h2 style="color: #1e293b; margin-top: 0;">Aboneliginiz Yenilenmeyi Bekliyor</h2>
+        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> aboneliginizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
+        <p style="color: #64748b;">Hizmet kesintisi yasamamamak icin lutfen aboneliginizi yenileyin.</p>
+        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
+           style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Aboneligi Yenile
+        </a>
+      </div>
+    </div>
+  `
+  await sendEmail({ to, subject: `Hastane LMS — Aboneliginizin bitmesine ${daysLeft} gun`, html })
+}
+
+/** Abonelik suresi doldu */
+export async function sendSubscriptionExpiredEmail(to: string, hospitalName: string) {
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Sona Erdi</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+          <p style="margin: 0; font-weight: bold; color: #dc2626;">Abonelik sona erdi</p>
+        </div>
+        <h2 style="color: #1e293b; margin-top: 0;">Aboneliginiz Sona Ermistir</h2>
+        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> aboneliginiz sona ermistir.</p>
+        <p style="color: #64748b;">Yeni kayit olusturma kisitlanmistir. Mevcut verilerinize erismeye devam edebilirsiniz.</p>
+        <p style="color: #64748b;">Hizmeti tekrar aktif hale getirmek icin lutfen aboneliginizi yenileyin.</p>
+        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
+           style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Simdi Yenile
+        </a>
+      </div>
+    </div>
+  `
+  await sendEmail({ to, subject: 'Hastane LMS — Aboneliginiz sona erdi', html })
+}
+
+/**
+ * Self-service kayıt sonrası admin kullanıcıya gönderilen hoş geldiniz e-postası.
+ * E-posta doğrulama linki Supabase tarafından ayrıca gönderilir;
+ * bu e-posta bilgilendirme amaçlıdır.
+ */
+export async function sendSelfRegistrationEmail(params: {
+  to: string
+  adminName: string
+  hospitalName: string
+}) {
+  const { to, adminName, hospitalName } = params
+  const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Hoş Geldiniz!</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #1e293b; margin-top: 0;">Kaydınız Başarılı</h2>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(adminName)},</p>
+        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> hastanesi için hesabınız başarıyla oluşturulmuştur.</p>
+        <div style="background: #f0fdf4; border-left: 4px solid #0d9668; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
+          <p style="margin: 0; color: #166534; font-size: 14px;"><strong>30 günlük ücretsiz deneme</strong> süreniz başlamıştır. Bu süre içinde tüm özellikleri kullanabilirsiniz.</p>
+        </div>
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
+          <p style="margin: 0; color: #92400e; font-size: 13px;"><strong>Önemli:</strong> Sisteme giriş yapabilmek için önce e-posta adresinizi doğrulamanız gerekmektedir. Lütfen gelen kutunuzu kontrol edin.</p>
+        </div>
+        <a href="${escapeHtml(loginUrl)}"
+           style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Giriş Sayfasına Git
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
+      </div>
+    </div>
+  `
+
+  await sendEmail({
+    to,
+    subject: 'Hastane LMS — Kaydınız Başarılı',
+    html,
+  })
 }
 
 // Gecikmiş eğitim hatırlatması (manuel veya otomatik)

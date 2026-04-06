@@ -1,10 +1,11 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, checkWritePermission } from '@/lib/api-helpers'
 import { createUserSchema } from '@/lib/validations'
 import { createServiceClient } from '@/lib/supabase/server'
+import { maskeTcNo } from '@/lib/utils'
 import { logger } from '@/lib/logger'
-import { checkRateLimit } from '@/lib/redis'
+import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 
 export async function GET(request: Request) {
@@ -19,97 +20,104 @@ export async function GET(request: Request) {
   const department = searchParams.get('department')
   const isActive = searchParams.get('isActive')
 
-  const where: Record<string, unknown> = {
-    organizationId: dbUser!.organizationId!,
-    role: 'staff',
-  }
+  const orgId = dbUser!.organizationId!
+  const cacheKey = `cache:${orgId}:staff:${page}:${limit}:${search}:${department || ''}:${isActive || ''}`
 
-  if (search) {
-    where.OR = [
-      { firstName: { contains: search, mode: 'insensitive' } },
-      { lastName: { contains: search, mode: 'insensitive' } },
-      { email: { contains: search, mode: 'insensitive' } },
-    ]
-  }
-  if (department) where.department = department
-  if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
+  const data = await withCache(cacheKey, 120, async () => {
+    const where: Record<string, unknown> = {
+      organizationId: orgId,
+      role: 'staff',
+    }
 
-  const [staff, total, rawDepartments, activeStaff] = await Promise.all([
-    prisma.user.findMany({
-      where,
-      include: {
-        _count: { select: { assignments: true, examAttempts: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
-    }),
-    prisma.user.count({ where }),
-    prisma.department.findMany({
-      where: { organizationId: dbUser!.organizationId! },
-      include: { _count: { select: { users: true } } },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    }),
-    prisma.user.count({ where: { organizationId: dbUser!.organizationId!, role: 'staff', isActive: true } }),
-  ])
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ]
+    }
+    if (department) where.department = department
+    if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 
-  // Staff ID'leri ile toplu olarak completed count ve avg score hesapla (N+1 yerine 2 sorgu)
-  const staffIds = staff.map(s => s.id)
-  const [completedCounts, avgScores] = staffIds.length > 0 ? await Promise.all([
-    prisma.trainingAssignment.groupBy({
-      by: ['userId'],
-      where: { userId: { in: staffIds }, status: 'passed' },
-      _count: true,
-    }),
-    prisma.examAttempt.groupBy({
-      by: ['userId'],
-      where: { userId: { in: staffIds }, isPassed: true },
-      _avg: { postExamScore: true },
-    }),
-  ]) : [[], []]
+    const [staff, total, rawDepartments, activeStaff] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        include: {
+          _count: { select: { assignments: true, examAttempts: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.user.count({ where }),
+      prisma.department.findMany({
+        where: { organizationId: orgId },
+        include: { _count: { select: { users: true } } },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      }),
+      prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
+    ])
 
-  const completedMap = new Map(completedCounts.map(c => [c.userId, c._count]))
-  const avgScoreMap = new Map(avgScores.map(a => [a.userId, Math.round(Number(a._avg.postExamScore ?? 0))]))
+    // Staff ID'leri ile toplu olarak completed count ve avg score hesapla (N+1 yerine 2 sorgu)
+    const staffIds = staff.map(s => s.id)
+    const [completedCounts, avgScores] = staffIds.length > 0 ? await Promise.all([
+      prisma.trainingAssignment.groupBy({
+        by: ['userId'],
+        where: { userId: { in: staffIds }, status: 'passed' },
+        _count: true,
+      }),
+      prisma.examAttempt.groupBy({
+        by: ['userId'],
+        where: { userId: { in: staffIds }, isPassed: true },
+        _avg: { postExamScore: true },
+      }),
+    ]) : [[], []]
 
-  const departments = rawDepartments.map(d => ({
-    id: d.id,
-    name: d.name,
-    color: d.color,
-    description: d.description || '',
-    staffCount: d._count.users,
-  }))
+    const completedMap = new Map(completedCounts.map(c => [c.userId, c._count]))
+    const avgScoreMap = new Map(avgScores.map(a => [a.userId, Math.round(Number(a._avg.postExamScore ?? 0))]))
 
-  // Overall avg score (tüm org için)
-  const allAvgScores = avgScores.map(a => Number(a._avg.postExamScore ?? 0)).filter(s => s > 0)
-  const overallAvgScore = allAvgScores.length > 0
-    ? Math.round(allAvgScores.reduce((sum, sc) => sum + sc, 0) / allAvgScores.length)
-    : 0
+    const departments = rawDepartments.map(d => ({
+      id: d.id,
+      name: d.name,
+      color: d.color,
+      description: d.description || '',
+      staffCount: d._count.users,
+    }))
 
-  const stats = {
-    totalStaff: total,
-    activeStaff,
-    departmentCount: rawDepartments.length,
-    avgScore: overallAvgScore
-  }
+    // Overall avg score (tüm org için)
+    const allAvgScores = avgScores.map(a => Number(a._avg.postExamScore ?? 0)).filter(s => s > 0)
+    const overallAvgScore = allAvgScores.length > 0
+      ? Math.round(allAvgScores.reduce((sum, sc) => sum + sc, 0) / allAvgScores.length)
+      : 0
 
-  const formattedStaff = staff.map(s => ({
-    id: s.id,
-    name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
-    email: s.email,
-    // KVKK: TC No maskeleme — sadece son 4 hane göster
-    tcNo: s.tcNo ? `*******${s.tcNo.slice(-4)}` : '',
-    department: departments.find(d => d.id === s.departmentId)?.name || '',
-    departmentId: s.departmentId,
-    title: s.title || '',
-    assignedTrainings: s._count.assignments || 0,
-    completedTrainings: completedMap.get(s.id) ?? 0,
-    avgScore: avgScoreMap.get(s.id) ?? 0,
-    status: s.isActive ? 'Aktif' : 'Pasif',
-    initials: `${s.firstName?.[0] || ''}${s.lastName?.[0] || ''}`.toUpperCase()
-  }))
+    const stats = {
+      totalStaff: total,
+      activeStaff,
+      departmentCount: rawDepartments.length,
+      avgScore: overallAvgScore
+    }
+
+    const formattedStaff = staff.map(s => ({
+      id: s.id,
+      name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+      email: s.email,
+      // KVKK: TC No maskeleme — sadece son 4 hane göster
+      tcNo: maskeTcNo(s.tcNo),
+      department: departments.find(d => d.id === s.departmentId)?.name || '',
+      departmentId: s.departmentId,
+      title: s.title || '',
+      assignedTrainings: s._count.assignments || 0,
+      completedTrainings: completedMap.get(s.id) ?? 0,
+      avgScore: avgScoreMap.get(s.id) ?? 0,
+      status: s.isActive ? 'Aktif' : 'Pasif',
+      initials: `${s.firstName?.[0] || ''}${s.lastName?.[0] || ''}`.toUpperCase()
+    }))
+
+    return { staff: formattedStaff, departments, stats, total, page, limit, totalPages: Math.ceil(total / limit) }
+  })
 
   return jsonResponse(
-    { staff: formattedStaff, departments, stats, total, page, limit, totalPages: Math.ceil(total / limit) },
+    data,
     200,
     { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
   )
@@ -122,9 +130,18 @@ export async function POST(request: Request) {
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  // Rate limit: admin başına dakikada 5 personel oluşturma
-  const allowed = await checkRateLimit(`staff-create:${dbUser!.id}`, 5, 60)
-  if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
+  const writeBlock = await checkWritePermission(dbUser!.organizationId!, 'POST')
+  if (writeBlock) return writeBlock
+
+  // IP bazlı rate limit: 50 oluşturma / 1 saat
+  const ip = request.headers.get('x-vercel-forwarded-for') || request.headers.get('x-forwarded-for') || 'unknown'
+  const allowed = await checkRateLimit(`staff-create:ip:${ip}`, 50, 3600)
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: 'Çok fazla istek gönderdiniz. Lütfen 60 dakika sonra tekrar deneyin.' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
+    })
+  }
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek verisi')
@@ -228,6 +245,7 @@ export async function POST(request: Request) {
   revalidatePath('/admin/staff')
 
   try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
+  try { await invalidateOrgCache(dbUser!.organizationId!, 'staff') } catch {}
 
   return jsonResponse(user, 201)
 }

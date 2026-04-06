@@ -91,3 +91,9 @@ export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + '...';
 }
+
+/** TC Kimlik numarasini maskeler: "12345678901" → "123****8901" */
+export function maskeTcNo(tcNo: string | null | undefined): string {
+  if (!tcNo || tcNo.length !== 11) return '';
+  return `${tcNo.slice(0, 3)}****${tcNo.slice(-4)}`;
+}

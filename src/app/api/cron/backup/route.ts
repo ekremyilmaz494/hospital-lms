@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { uploadBuffer, backupKey } from '@/lib/s3'
+import { uploadBuffer, backupKey, verifyS3Object } from '@/lib/s3'
 
 /** Daily auto-backup cron job — runs at 03:15 UTC (after cleanup at 03:00) */
 export async function GET(request: Request) {
@@ -59,18 +59,24 @@ export async function GET(request: Request) {
 
       await uploadBuffer(key, buffer, 'application/json')
 
+      // Verify the uploaded backup: check file exists and size > 0
+      const verifiedSize = await verifyS3Object(key)
+      const isVerified = verifiedSize !== null && verifiedSize > 0
+
       await prisma.dbBackup.create({
         data: {
           organizationId: org.id,
           backupType: 'auto',
           fileUrl: key,
           fileSizeMb: Math.round(sizeMb * 100) / 100,
-          status: 'completed',
+          fileSize: buffer.byteLength,
+          verified: isVerified,
+          status: isVerified ? 'completed' : 'verification_failed',
           createdById: null,
         },
       })
 
-      results.push({ orgId: org.id, status: 'completed', sizeMb: Math.round(sizeMb * 100) / 100 })
+      results.push({ orgId: org.id, status: isVerified ? 'completed' : 'verification_failed', sizeMb: Math.round(sizeMb * 100) / 100 })
     } catch {
       await prisma.dbBackup.create({
         data: {

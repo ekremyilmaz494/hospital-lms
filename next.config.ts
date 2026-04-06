@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
+import { withSentryConfig } from '@sentry/nextjs';
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -83,7 +84,7 @@ const nextConfig: NextConfig = {
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: https: blob:",
             "font-src 'self' data:",
-            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net",
+            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.sentry.io https://*.ingest.sentry.io",
             "media-src 'self' https://*.cloudfront.net blob:",
             "frame-src 'self' blob:",
             // Service worker ve PWA manifest için
@@ -103,6 +104,12 @@ const nextConfig: NextConfig = {
       ],
     },
     {
+      source: '/_next/static/(.*)',
+      headers: [
+        { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+      ],
+    },
+    {
       source: '/api/:path*',
       headers: [
         { key: 'Access-Control-Allow-Origin', value: appUrl },
@@ -114,4 +121,9 @@ const nextConfig: NextConfig = {
   ],
 };
 
-export default withPWA(nextConfig);
+export default withSentryConfig(withPWA(nextConfig), {
+  silent: true,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+});

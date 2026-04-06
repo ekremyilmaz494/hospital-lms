@@ -274,7 +274,7 @@ async def generate_content(
                     if gen_status.is_failed:
                         raise RuntimeError(gen_status.error or f"{request.format} üretimi zaman aşımına uğradı.")
 
-            await update_status(job_id, "processing", 80)
+            await update_status(job_id, "downloading", 85)
 
             # 5. Dosyayı indir — retry ile (media hazır olmayabilir)
             if out_path.exists():
@@ -397,7 +397,7 @@ async def generate_from_notebook(
             if gen_status.is_failed:
                 raise RuntimeError(gen_status.error or f"{artifact_type} zaman aşımına uğradı.")
 
-    await update_status(task_id, "processing", 80)
+    await update_status(task_id, "downloading", 85)
 
     # 3. Medya URL'si hazır olana kadar bekle (infographic, video gibi)
     # NotebookLM artifact'ı "completed" olarak işaretliyor ama URL sonradan populate oluyor

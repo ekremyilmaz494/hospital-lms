@@ -90,13 +90,17 @@ export async function POST(request: Request) {
             subscriptionId: payment.subscriptionId,
             organizationId: payment.organizationId,
             invoiceNumber: nextInvoiceNumber,
+            status: 'paid',
             amount: payment.amount,
+            taxRate: 20,
             taxAmount: Number(payment.amount) * 0.20,
             totalAmount: Number(payment.amount) * 1.20,
             currency: 'TRY',
             billingName: org?.name ?? '',
+            companyName: org?.name ?? null,
             periodStart: now,
             periodEnd: expiresAt,
+            paidAt: now,
           },
         })
       })

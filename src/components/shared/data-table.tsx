@@ -10,7 +10,7 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
-import { useState } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { ArrowUpDown, ChevronLeft, ChevronRight, Search, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import {
   Table,
@@ -23,11 +23,32 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+/** Custom renderer for mobile card view. Receives the row data and returns a ReactNode. */
+type MobileCardRenderer<TData> = (row: TData) => ReactNode;
+
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   searchKey?: string;
   searchPlaceholder?: string;
+  /** Optional custom card renderer for mobile view. If omitted, columns are auto-rendered as label/value pairs. */
+  mobileCardRenderer?: MobileCardRenderer<TData>;
+}
+
+/** Hook that returns true when viewport is below the md breakpoint (768px). */
+function useMobileView(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    // Set initial value via handler to avoid calling setState directly in effect
+    handler({ matches: mql.matches } as MediaQueryListEvent);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  return isMobile;
 }
 
 export function DataTable<TData, TValue>({
@@ -35,9 +56,11 @@ export function DataTable<TData, TValue>({
   data,
   searchKey,
   searchPlaceholder = 'Ara...',
+  mobileCardRenderer,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const isMobile = useMobileView();
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -58,7 +81,7 @@ export function DataTable<TData, TValue>({
       {/* Search */}
       {searchKey !== undefined && (
         <div className="mb-5 flex items-center gap-3">
-          <div className="relative max-w-sm flex-1">
+          <div className="relative max-w-sm md:max-w-sm max-md:max-w-none flex-1">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4"
               style={{ color: 'var(--color-text-muted)' }}
@@ -79,105 +102,187 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      {/* Table */}
-      <div
-        className="overflow-x-auto rounded-xl border"
-        style={{ borderColor: 'var(--color-border)' }}
-      >
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow
-                key={headerGroup.id}
-                style={{
-                  background: 'var(--color-surface-hover)',
-                  borderColor: 'var(--color-border)',
-                  borderBottomWidth: '2px',
-                }}
-              >
-                {headerGroup.headers.map((header) => {
-                  const isActionsCol = header.column.id === 'actions';
-                  return (
-                  <TableHead
-                    key={header.id}
-                    className={`text-[11px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap${isActionsCol ? ' w-px' : ''}`}
+      {/* Mobile Card View */}
+      {isMobile ? (
+        <div className="flex flex-col gap-3">
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => {
+              if (mobileCardRenderer) {
+                return (
+                  <div
+                    key={row.id}
+                    className="rounded-xl border p-4"
                     style={{
-                      color: 'var(--color-text-muted)',
-                      fontFamily: 'var(--font-body)',
-                      padding: isActionsCol ? '14px 4px' : '14px 16px',
-                      ...(header.getSize() !== 150 ? { width: header.getSize(), minWidth: header.getSize() } : {}),
+                      background: 'var(--color-surface)',
+                      borderColor: 'var(--color-border)',
                     }}
                   >
-                    {header.isPlaceholder ? null : (
-                      <div
-                        className={
-                          header.column.getCanSort()
-                            ? 'flex cursor-pointer select-none items-center gap-1.5'
-                            : ''
-                        }
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getCanSort() && (
-                          <ArrowUpDown className="h-3 w-3" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
-                        )}
-                      </div>
-                    )}
-                  </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
+                    {mobileCardRenderer(row.original)}
+                  </div>
+                );
+              }
+
+              // Auto-detect: render each column as a label/value pair
+              return (
+                <div
                   key={row.id}
-                  className="clickable-row"
-                  style={{ borderColor: 'var(--color-border)' }}
+                  className="rounded-xl border p-4"
+                  style={{
+                    background: 'var(--color-surface)',
+                    borderColor: 'var(--color-border)',
+                  }}
                 >
-                  {row.getVisibleCells().map((cell) => {
-                    const isActionsCell = cell.column.id === 'actions';
+                  <div className="flex flex-col gap-2.5">
+                    {row.getVisibleCells().map((cell) => {
+                      if (cell.column.id === 'actions') {
+                        return (
+                          <div
+                            key={cell.id}
+                            className="flex items-center gap-2 pt-2 mt-1"
+                            style={{ borderTop: '1px solid var(--color-border)' }}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </div>
+                        );
+                      }
+
+                      const headerContent = cell.column.columnDef.header;
+                      const label =
+                        typeof headerContent === 'string' ? headerContent : cell.column.id;
+
+                      return (
+                        <div key={cell.id} className="flex items-start justify-between gap-3">
+                          <span
+                            className="text-[11px] font-semibold uppercase tracking-[0.08em] shrink-0"
+                            style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-body)' }}
+                          >
+                            {label}
+                          </span>
+                          <span
+                            className="text-sm text-right"
+                            style={{ color: 'var(--color-text-primary)' }}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div
+              className="flex flex-col items-center gap-2 py-12"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              <Search className="h-8 w-8 opacity-30" />
+              <p className="text-sm font-medium">Kayıt bulunamadı</p>
+              <p className="text-xs">Arama kriterlerinizi değiştirmeyi deneyin</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Desktop Table View */
+        <div
+          className="overflow-x-auto rounded-xl border"
+          style={{ borderColor: 'var(--color-border)' }}
+        >
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow
+                  key={headerGroup.id}
+                  style={{
+                    background: 'var(--color-surface-hover)',
+                    borderColor: 'var(--color-border)',
+                    borderBottomWidth: '2px',
+                  }}
+                >
+                  {headerGroup.headers.map((header) => {
+                    const isActionsCol = header.column.id === 'actions';
                     return (
-                    <TableCell
-                      key={cell.id}
-                      className={isActionsCell ? 'w-px' : ''}
+                    <TableHead
+                      key={header.id}
+                      className={`text-[11px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap${isActionsCol ? ' w-px' : ''}`}
                       style={{
-                        color: 'var(--color-text-primary)',
-                        padding: isActionsCell ? '14px 4px' : '14px 16px',
-                        fontSize: '14px',
-                        ...(cell.column.getSize() !== 150 ? { width: cell.column.getSize(), minWidth: cell.column.getSize() } : {}),
+                        color: 'var(--color-text-muted)',
+                        fontFamily: 'var(--font-body)',
+                        padding: isActionsCol ? '14px 4px' : '14px 16px',
+                        ...(header.getSize() !== 150 ? { width: header.getSize(), minWidth: header.getSize() } : {}),
                       }}
                     >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+                      {header.isPlaceholder ? null : (
+                        <div
+                          className={
+                            header.column.getCanSort()
+                              ? 'flex cursor-pointer select-none items-center gap-1.5'
+                              : ''
+                          }
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {header.column.getCanSort() && (
+                            <ArrowUpDown className="h-3 w-3" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
+                          )}
+                        </div>
+                      )}
+                    </TableHead>
                     );
                   })}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-32 text-center"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <Search className="h-8 w-8 opacity-30" />
-                    <p className="text-sm font-medium">Kayıt bulunamadı</p>
-                    <p className="text-xs">Arama kriterlerinizi değiştirmeyi deneyin</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className="clickable-row"
+                    style={{ borderColor: 'var(--color-border)' }}
+                  >
+                    {row.getVisibleCells().map((cell) => {
+                      const isActionsCell = cell.column.id === 'actions';
+                      return (
+                      <TableCell
+                        key={cell.id}
+                        className={isActionsCell ? 'w-px' : ''}
+                        style={{
+                          color: 'var(--color-text-primary)',
+                          padding: isActionsCell ? '14px 4px' : '14px 16px',
+                          fontSize: '14px',
+                          ...(cell.column.getSize() !== 150 ? { width: cell.column.getSize(), minWidth: cell.column.getSize() } : {}),
+                        }}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-32 text-center"
+                    style={{ color: 'var(--color-text-muted)' }}
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <Search className="h-8 w-8 opacity-30" />
+                      <p className="text-sm font-medium">Kayıt bulunamadı</p>
+                      <p className="text-xs">Arama kriterlerinizi değiştirmeyi deneyin</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* Pagination */}
-      <div className="mt-5 flex items-center justify-between">
-        <p className="text-xs" style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+      <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <p className="text-xs text-center md:text-left" style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
           <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
             {table.getFilteredRowModel().rows.length}
           </span>{' '}
@@ -192,7 +297,7 @@ export function DataTable<TData, TValue>({
           arası
         </p>
         {table.getPageCount() > 1 && (
-          <div className="flex items-center gap-1.5" role="navigation" aria-label="Sayfa gezintisi">
+          <div className="flex items-center justify-center gap-1.5" role="navigation" aria-label="Sayfa gezintisi">
             <Button
               variant="outline"
               size="sm"
@@ -216,11 +321,13 @@ export function DataTable<TData, TValue>({
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
 
-            {/* Page numbers */}
-            {Array.from({ length: Math.min(table.getPageCount(), 5) }, (_, i) => {
+            {/* Page numbers — show fewer on mobile to prevent overflow */}
+            {Array.from({ length: Math.min(table.getPageCount(), isMobile ? 3 : 5) }, (_, i) => {
               const pageIdx = table.getState().pagination.pageIndex;
+              const maxVisible = isMobile ? 3 : 5;
+              const halfVisible = Math.floor(maxVisible / 2);
               let pageNum = i;
-              if (pageIdx > 2) pageNum = pageIdx - 2 + i;
+              if (pageIdx > halfVisible) pageNum = pageIdx - halfVisible + i;
               if (pageNum >= table.getPageCount()) return null;
               const isActive = pageNum === pageIdx;
               return (

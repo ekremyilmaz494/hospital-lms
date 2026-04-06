@@ -20,8 +20,15 @@ export async function POST(request: Request) {
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  const allowed = await checkRateLimit(`upload:${dbUser!.id}`, 20, 3600)
-  if (!allowed) return errorResponse('Çok fazla yükleme işlemi. Lütfen bir saat bekleyin.', 429)
+  // IP bazlı rate limit: 10 upload / 1 saat
+  const ip = request.headers.get('x-vercel-forwarded-for') || request.headers.get('x-forwarded-for') || 'unknown'
+  const allowed = await checkRateLimit(`upload:ip:${ip}`, 10, 3600)
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: 'Çok fazla yükleme işlemi. Lütfen 60 dakika sonra tekrar deneyin.' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
+    })
+  }
 
   try {
     const formData = await request.formData()

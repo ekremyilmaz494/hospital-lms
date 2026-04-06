@@ -139,7 +139,7 @@ export interface GenerateResponse {
 
 export interface StatusResponse {
   task_id: string
-  status: 'processing' | 'completed' | 'failed'
+  status: 'processing' | 'downloading' | 'completed' | 'failed'
   progress: number
   artifact_id?: string
   error?: string

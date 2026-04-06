@@ -1,7 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
-import { checkRateLimit } from '@/lib/redis'
+import { getAuthUser, getAuthUserWithWriteGuard, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { updateTrainingSchema } from '@/lib/validations'
 import { getStreamUrl } from '@/lib/s3'
@@ -115,7 +115,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserWithWriteGuard(request)
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['admin'])
@@ -156,13 +156,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   revalidatePath('/admin/trainings')
 
   try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
+  try { await invalidateOrgCache(dbUser!.organizationId!, 'trainings') } catch {}
 
   return jsonResponse(training)
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserWithWriteGuard(request)
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['admin'])
@@ -230,6 +231,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   revalidatePath('/admin/trainings')
 
   try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
+  try { await invalidateOrgCache(dbUser!.organizationId!, 'trainings') } catch {}
 
   return jsonResponse({ success: true })
 }

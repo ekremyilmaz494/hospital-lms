@@ -26,6 +26,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 interface AppTopbarProps {
   title: string;
   subtitle?: string;
+  orgName?: string;
   onToggleSidebar?: () => void;
   userName?: string;
   userRole?: string;
@@ -37,6 +38,7 @@ interface AppTopbarProps {
 export function AppTopbar({
   title,
   subtitle,
+  orgName,
   onToggleSidebar,
   userName = 'Kullanıcı',
   userRole = 'Admin',
@@ -81,17 +83,35 @@ export function AppTopbar({
           <Menu className="h-5 w-5" />
         </Button>
 
-        {title && (
-          <div>
-            <p
-              className="text-xs font-medium"
-              style={{
-                fontFamily: 'var(--font-body)',
-                color: 'var(--color-text-muted)',
-              }}
-            >
-              {title}
-            </p>
+        {(orgName || title) && (
+          <div className="flex items-center gap-2">
+            {orgName && (
+              <>
+                <p
+                  className="text-sm font-semibold hidden sm:block"
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    color: 'var(--brand-primary, var(--color-text-primary))',
+                  }}
+                >
+                  {orgName}
+                </p>
+                {title && (
+                  <span className="hidden sm:block text-xs" style={{ color: 'var(--color-text-muted)' }}>/</span>
+                )}
+              </>
+            )}
+            {title && (
+              <p
+                className="text-xs font-medium"
+                style={{
+                  fontFamily: 'var(--font-body)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                {title}
+              </p>
+            )}
           </div>
         )}
       </div>

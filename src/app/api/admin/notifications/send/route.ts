@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, checkWritePermission } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { sendEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
@@ -62,9 +62,17 @@ export async function POST(request: Request) {
   const orgId = dbUser!.organizationId
   if (!orgId) return errorResponse('Organizasyon bulunamadı', 403)
 
-  // Rate limit: dakikada 5 toplu bildirim
-  const allowed = await checkRateLimit(`notif-send:${orgId}`, 5, 60)
-  if (!allowed) return errorResponse('Çok fazla bildirim gönderimi. Lütfen bir dakika bekleyin.', 429)
+  const writeBlock = await checkWritePermission(orgId, 'POST')
+  if (writeBlock) return writeBlock
+
+  // User bazlı rate limit: 100 bildirim / 1 saat
+  const allowed = await checkRateLimit(`notif-send:${dbUser!.id}`, 100, 3600)
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: 'Çok fazla bildirim gönderdiniz. Lütfen 60 dakika sonra tekrar deneyin.' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
+    })
+  }
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek verisi', 400)
