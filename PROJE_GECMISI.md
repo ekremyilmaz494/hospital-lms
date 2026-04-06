@@ -2889,3 +2889,138 @@ Supabase projesini Seul'den (ap-northeast-2) Frankfurt'a (eu-central-1) taşıma
 - **Supabase pooler vs direct connection:** Migration için pooler (port 6543) timeout verebilir, direct connection (port 5432) daha güvenilir
 
 *Son güncelleme: 6 Nisan 2026 — Oturum 25*
+
+---
+
+## OTURUM 26 — Ses İçerik Desteği (Prompt 5-7) + Performans + KVKK Tam Uyum (6 Nisan 2026)
+
+**Tarih:** 6 Nisan 2026
+**Sure:** ~4 saat
+**Yontem:** Sıralı prompt uygulaması + performans optimizasyonu + KVKK eksik tamamlama
+
+### Ses İçerik Desteği (Prompt 5-7)
+
+#### Prompt 5 — Training Creation API
+- `src/app/api/admin/trainings/route.ts` — `trainingVideo.create` bloğuna `documentKey: v.documentKey ?? null` eklendi
+
+#### Prompt 6 — AudioPlayer Komponenti
+- **Yeni dosya:** `src/components/exam/audio-player.tsx`
+- HTML5 `<audio>` ref ile no-seek enforcement (video player ile aynı mantık)
+- `lastAllowedTime` ref: currentTime > lastAllowedTime + 2 ise geri sar
+- UI: Oynat/Duraklat, süre göstergesi, readonly ilerleme çubuğu, ses seviyesi kontrolü
+- Heartbeat: 15 saniyede bir `onProgress` callback
+- `documentUrl` varsa altında PdfViewer gösterir
+- Tamamlanınca yeşil "Dinleme Tamamlandı" banner
+
+#### Prompt 7 — Staff Exam Player (Ses Tipi Desteği)
+- `src/app/exam/[id]/videos/page.tsx`:
+  - `AudioPlayer` dynamic import eklendi
+  - `VideoItem` tipine `contentType: 'audio'` ve `documentUrl` eklendi
+  - Player render: `audio` → AudioPlayer, `pdf` → PdfViewer, `video` → video element
+  - Sidebar'da audio ikonu (Volume2) eklendi
+- `src/app/api/exam/[id]/videos/route.ts`:
+  - `getStreamUrl` import eklendi
+  - `documentUrl: v.documentKey ? await getStreamUrl(v.documentKey) : undefined` eklendi
+  - `videos.map` → `Promise.all(videos.map(async ...))` (paralel URL üretimi)
+
+### Vercel Build Fix
+- `@types/pg` devDependency eklendi — Vercel'de `src/lib/prisma.ts:3:22` "Could not find declaration file for module 'pg'" hatası çözüldü
+
+### Performans Optimizasyonları (4 Madde)
+
+#### 1. Dev Server: Webpack → Turbopack
+- **Sorun:** `pnpm dev` komutu `--webpack` flag'i ile çalışıyordu. `.next` cache olmadığında landing page derlenmesi **~7 dakika** sürüyordu (beyaz ekran)
+- **Çözüm:** `package.json` → `"dev": "next dev --turbopack"` olarak değiştirildi
+- **Sonuç:** Cold start **7 dakika → <1 saniye**
+- PWA dev'de zaten `disable: true` olduğundan Turbopack sorunsuz çalışır
+- Build hala `--webpack` kullanıyor (PWA uyumluluğu için)
+
+#### 2. L1 In-Memory Cache (redis.ts)
+- **Sorun:** Her `getCached()` çağrısı Redis'e HTTP request yapıyor (~210ms Türkiye → EU-WEST-1)
+- **Çözüm:** `getCached` ve `setCached` fonksiyonlarına L1 memory cache katmanı eklendi
+  - L1 hit: 0ms (memory'den)
+  - L1 miss → L2 (Redis) → L1'e promote (60s TTL)
+  - `setCached`: Redis'e fire-and-forget (await yok)
+- **Sonuç:** `dashboard/combined` ikinci çağrı: **1627ms → 204ms**
+
+#### 3. getAuthUser() Memory Cache
+- **Sorun:** Her API çağrısında `prisma.user.findUnique` + `prisma.organization.findUnique` = **~400ms** (2 DB sorgusu)
+- **Çözüm:** `api-helpers.ts`'de `authCache` Map eklendi (user ID → dbUser + orgOk, 30s TTL)
+- **Sonuç:** Ardışık sayfa geçişlerinde auth overhead **~400ms → 0ms**
+
+#### 4. Layout API'leri Cache
+- `setup/route.ts` → `withCache` 60s TTL (her sayfa geçişinde çağrılıyordu): **728ms → 5ms**
+- `in-progress-exams/route.ts` → `withCache` 30s TTL: **958ms → 55ms**
+
+### Supabase Proje Değişikliği
+- Eski proje (`bzvunibntyewobkdsoow`, Seul) duraklatılmıştı
+- Yeni proje (`pkkkyyajfmusurcoovwt`, Frankfurt EU-CENTRAL-1) aktif edildi
+- `.env` güncellendi: DATABASE_URL, DIRECT_URL, SUPABASE_URL, ANON_KEY, SERVICE_ROLE_KEY
+- `prisma db push` ile schema senkronize edildi (direct connection port 5432 kullanıldı — pooler timeout veriyor)
+- `prisma/seed.ts` ile demo veriler oluşturuldu (5 departman, 10 personel, 5 eğitim)
+- `super@demo.com` kullanıcısı users tablosuna eklendi, `setup_completed = true` güncellendi
+
+### Login Sayfası Geçiş İyileştirmesi
+- `src/app/auth/login/loading.tsx` — PageLoading spinner → layout skeleton (sol koyu + sağ açık bg)
+- `src/app/auth/login/page.tsx`:
+  - `Particles` ve `Ripple` → `dynamic` import (`ssr: false`) ile lazy-load
+  - BlurFade delay'leri azaltıldı: sol panel 0.1-0.8s → 0.05-0.3s, sağ panel 0.1-0.4s → 0.05-0.15s
+  - Duration 0.4s → 0.3s (daha hızlı animasyon)
+
+### KVKK Tam Uyum (5 Eksik Tamamlandı)
+
+| # | Eksik | Çözüm | Dosya |
+|---|-------|-------|-------|
+| 1 | **Çerez Onay Banner'ı** | Zorunlu/İşlevsel/Analitik ayrımlı banner, localStorage'da tercih saklama | `src/components/shared/cookie-consent.tsx` + `src/app/layout.tsx` |
+| 2 | **KVKK Hak Talebi** | Staff panelinde 9 talep tipli form + API (GET+POST), 30 gün yasal süre bildirimi | `src/app/staff/kvkk/page.tsx` + `src/app/api/staff/kvkk-requests/route.ts` |
+| 3 | **Saklama ve İmha Politikası** | 8 bölümlük detaylı sayfa: veri kategorileri tablosu, imha yöntemleri, periyodik imha takvimi | `src/app/(marketing)/data-retention/page.tsx` |
+| 4 | **VERBİS Bilgilendirmesi** | Gizlilik politikasına VERBİS kayıt numarası bölümü eklendi | `src/app/(marketing)/privacy/page.tsx` |
+| 5 | **Otomatik Karar İtirazı** | Talep formunda "objection" tipi mevcut (Madde 11/g) | KVKK talep API'sinde |
+
+### Landing Page Komponentleri Lazy-Load
+- `src/app/(marketing)/home-client.tsx` — 5 landing bölümü `next/dynamic` ile lazy import (webpack bundle azaltma)
+
+### Değiştirilen/Oluşturulan Dosyalar (20+)
+
+**Yeni Dosyalar:**
+- `src/components/exam/audio-player.tsx`
+- `src/components/shared/cookie-consent.tsx`
+- `src/app/staff/kvkk/page.tsx`
+- `src/app/api/staff/kvkk-requests/route.ts`
+- `src/app/(marketing)/data-retention/page.tsx`
+
+**Değiştirilen Dosyalar:**
+- `src/app/api/admin/trainings/route.ts` (documentKey)
+- `src/app/api/exam/[id]/videos/route.ts` (documentUrl + getStreamUrl)
+- `src/app/exam/[id]/videos/page.tsx` (AudioPlayer + audio tipi)
+- `src/lib/redis.ts` (L1 memory cache)
+- `src/lib/api-helpers.ts` (getAuthUser cache)
+- `src/app/api/admin/setup/route.ts` (withCache)
+- `src/app/api/admin/in-progress-exams/route.ts` (withCache)
+- `src/app/auth/login/page.tsx` (lazy imports + hızlı animasyon)
+- `src/app/auth/login/loading.tsx` (skeleton)
+- `src/app/(marketing)/home-client.tsx` (dynamic imports)
+- `src/app/(marketing)/privacy/page.tsx` (VERBİS bölümü)
+- `src/app/(marketing)/layout.tsx` (footer link)
+- `src/app/layout.tsx` (CookieConsent)
+- `package.json` (turbopack, @types/pg)
+- `next.config.ts` (@types/pg)
+- `.env` (yeni Supabase bağlantı bilgileri)
+
+### Performans Özet Tablosu
+
+| Metrik | Önce | Sonra |
+|--------|------|-------|
+| Dev cold start (landing) | ~7 dakika | <1 saniye |
+| dashboard/combined (2. çağrı) | 1627ms | 204ms |
+| setup GET (2. çağrı) | 728ms | 5ms |
+| in-progress-exams (2. çağrı) | 958ms | 55ms |
+| getAuthUser overhead | ~400ms/istek | 0ms (30s cache) |
+| Redis cache hit | ~210ms | 0ms (L1 memory) |
+
+### Bilinen Açık Sorunlar / Sıradaki İşler
+- **Eğitim detay sayfasında personel başarı listesi + PDF/Excel export** — Admin istediği eğitimin detayında personellerin geçti/kaldı durumunu görebilmeli, profesyonel PDF (imza alanı ile) ve Excel indirebilmeli
+- **Signature modal kaldırılacak** — Sağlık Bakanlığı "okudum anladım" onayını yeterli bulmadı; sınav baraj puanını geçen otomatik başarılı sayılacak
+- Dev modda API yanıt süreleri ~200-500ms (Türkiye → Frankfurt ağ gecikmesi) — Production'da (Vercel Frankfurt ↔ Supabase Frankfurt) ~1-5ms olacak
+
+*Son güncelleme: 6 Nisan 2026 — Oturum 26*
