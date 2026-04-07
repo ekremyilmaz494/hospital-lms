@@ -1,27 +1,10 @@
 "use client";
 
-import dynamic from "next/dynamic";
-
-const HeroSection = dynamic(
-  () => import("@/components/landing/hero-section").then((m) => ({ default: m.HeroSection })),
-  { ssr: true }
-);
-const StatsSection = dynamic(
-  () => import("@/components/landing/stats-section").then((m) => ({ default: m.StatsSection })),
-  { ssr: true }
-);
-const FeaturesSection = dynamic(
-  () => import("@/components/landing/features-section").then((m) => ({ default: m.FeaturesSection })),
-  { ssr: true }
-);
-const CtaSection = dynamic(
-  () => import("@/components/landing/cta-section").then((m) => ({ default: m.CtaSection })),
-  { ssr: true }
-);
-const TestimonialsSection = dynamic(
-  () => import("@/components/landing/testimonials-section").then((m) => ({ default: m.TestimonialsSection })),
-  { ssr: true }
-);
+import { HeroSection } from "@/components/landing/hero-section";
+import { StatsSection } from "@/components/landing/stats-section";
+import { FeaturesSection } from "@/components/landing/features-section";
+import { CtaSection } from "@/components/landing/cta-section";
+import { TestimonialsSection } from "@/components/landing/testimonials-section";
 
 export function MarketingHomeClient() {
   return (

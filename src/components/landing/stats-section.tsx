@@ -9,7 +9,7 @@ export function StatsSection() {
     <>
       {/* ── STATS BAR ── */}
       <section id="hakkinda" style={{ backgroundColor: "#1a3a28" }}>
-        <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-2 md:grid-cols-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 grid grid-cols-2 md:grid-cols-4">
           {[
             { prefix: "",   num: 500, suffix: "+", label: "Aktif Personel" },
             { prefix: "",   num: 120, suffix: "+", label: "Eğitim Modülü" },
@@ -18,8 +18,7 @@ export function StatsSection() {
           ].map(({ prefix, num, suffix, label }, i) => (
             <div
               key={label}
-              className="text-center py-2 px-4"
-              style={{ borderRight: i < 3 ? "1px solid rgba(255,255,255,0.1)" : "none" }}
+              className="text-center py-2 px-3 sm:px-4 border-b md:border-b-0 border-r border-white/10 last:border-r-0 nth-2:border-r-0 md:nth-2:border-r nth-3:border-b-0 nth-4:border-b-0"
             >
               <p className="text-3xl font-black text-white tabular-nums">
                 {prefix}
@@ -37,8 +36,8 @@ export function StatsSection() {
       </section>
 
       {/* ── FEATURED TRAININGS ── */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <div className="flex items-end justify-between mb-10">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 sm:mb-10 gap-3">
           <div>
             <p
               className="text-xs font-bold tracking-widest uppercase mb-2"
@@ -46,7 +45,7 @@ export function StatsSection() {
             >
               Öne Çıkanlar
             </p>
-            <h2 className="text-3xl font-black" style={{ color: "#1a3a28" }}>
+            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: "#1a3a28" }}>
               Bu Hafta Önerilen Eğitimler
             </h2>
           </div>
@@ -62,7 +61,7 @@ export function StatsSection() {
         <div className="grid md:grid-cols-2 gap-6">
           {/* Card 1 */}
           <div
-            className="relative rounded-3xl p-8 overflow-hidden group"
+            className="relative rounded-3xl p-5 sm:p-8 overflow-hidden group"
             style={{ backgroundColor: "#1a3a28" }}
           >
             <div
@@ -90,7 +89,7 @@ export function StatsSection() {
                 Hastane ortamında enfeksiyonun önlenmesi için kritik protokoller
                 ve uygulamalı prosedürler.
               </p>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-4">
                   <div
                     className="flex items-center gap-1.5 text-sm"
@@ -109,7 +108,7 @@ export function StatsSection() {
                 </div>
                 <Link
                   href="/auth/login"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-transform hover:scale-105"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-transform hover:scale-105 w-full sm:w-auto justify-center"
                   style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
                 >
                   <GraduationCap className="w-4 h-4" /> Başla
@@ -139,7 +138,7 @@ export function StatsSection() {
               <span className="text-base font-black leading-none">4.9</span>
               <span className="text-[10px] font-bold uppercase tracking-wide mt-0.5">puan</span>
             </div>
-            <div className="relative p-8">
+            <div className="relative p-5 sm:p-8">
               <span
                 className="inline-block text-[11px] font-black tracking-widest uppercase px-3 py-1.5 rounded-full border mb-5"
                 style={{ color: "#0d9668", borderColor: "#0d9668" }}
@@ -156,7 +155,7 @@ export function StatsSection() {
                 Hayat kurtaran acil müdahale teknikleri, CPR ve temel yaşam
                 desteği protokolleri. Sertifika dahil.
               </p>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-4">
                   <div
                     className="flex items-center gap-1.5 text-sm"
@@ -175,7 +174,7 @@ export function StatsSection() {
                 </div>
                 <Link
                   href="/auth/login"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-transform hover:scale-105"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-transform hover:scale-105 w-full sm:w-auto justify-center"
                   style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
                 >
                   <GraduationCap className="w-4 h-4" /> Başla

@@ -6,7 +6,7 @@ import { NumberTicker } from "@/components/ui/number-ticker";
 
 export function CtaSection() {
   return (
-    <section id="guvenlik" className="max-w-7xl mx-auto px-6 py-20">
+    <section id="guvenlik" className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
       <div
         className="rounded-3xl overflow-hidden grid md:grid-cols-2 relative"
         style={{ backgroundColor: "#1a3a28" }}
@@ -26,7 +26,7 @@ export function CtaSection() {
         />
 
         {/* Left stats grid */}
-        <div className="relative grid grid-cols-2 gap-3 p-6">
+        <div className="relative grid grid-cols-2 gap-2 sm:gap-3 p-4 sm:p-6">
           {[
             { label: "Toplam Eğitim", num: 120, prefix: "", suffix: "+", icon: BookOpen,    bar: 80, color: "#0d9668" },
             { label: "Tamamlanma",    num: 94,  prefix: "%", suffix: "", icon: CheckCircle, bar: 94, color: "#4ade80" },
@@ -35,25 +35,25 @@ export function CtaSection() {
           ].map(({ label, num, prefix, suffix, icon: Icon, bar, color }, i) => (
             <div
               key={label}
-              className="rounded-2xl p-5 flex flex-col gap-0 relative overflow-hidden border"
+              className="rounded-2xl p-3 sm:p-5 flex flex-col gap-0 relative overflow-hidden border"
               style={{
                 backgroundColor: "#0d2818",
                 borderColor: "rgba(255,255,255,0.06)",
               }}
             >
               {/* Icon */}
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-2 sm:mb-4">
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center"
                   style={{
                     backgroundColor: `${color}22`,
                     boxShadow: `0 0 16px ${color}33`,
                   }}
                 >
-                  <Icon className="w-5 h-5" style={{ color }} />
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color }} />
                 </div>
                 <span
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full"
                   style={{ backgroundColor: `${color}20`, color }}
                 >
                   {bar}%
@@ -61,12 +61,12 @@ export function CtaSection() {
               </div>
 
               {/* Value */}
-              <p className="text-2xl font-black text-white tabular-nums leading-none mb-1">
+              <p className="text-xl sm:text-2xl font-black text-white tabular-nums leading-none mb-1">
                 {prefix}
-                <NumberTicker value={num} delay={i * 0.12} className="text-2xl font-black text-white" />
+                <NumberTicker value={num} delay={i * 0.12} className="text-xl sm:text-2xl font-black text-white" />
                 {suffix}
               </p>
-              <p className="text-xs mb-4" style={{ color: "#6dba92" }}>{label}</p>
+              <p className="text-[11px] sm:text-xs mb-2 sm:mb-4" style={{ color: "#6dba92" }}>{label}</p>
 
               {/* Progress bar */}
               <div
@@ -83,25 +83,25 @@ export function CtaSection() {
         </div>
 
         {/* Right text */}
-        <div className="relative p-10 flex flex-col justify-center">
+        <div className="relative p-5 sm:p-10 flex flex-col justify-center">
           <p
             className="text-xs font-bold tracking-widest uppercase mb-4"
             style={{ color: "#0d9668" }}
           >
             İhtiyacınız Olan Her Şey
           </p>
-          <h2 className="text-3xl font-black text-white leading-tight mb-6">
+          <h2 className="text-2xl sm:text-3xl font-black text-white leading-tight mb-5 sm:mb-6">
             Sağlıklı Personel,
             <br />
             <span style={{ color: "#0d9668" }}>Güçlü Hastane.</span>
           </h2>
-          <p className="text-sm leading-relaxed mb-8" style={{ color: "#6dba92" }}>
+          <p className="text-sm leading-relaxed mb-5 sm:mb-8" style={{ color: "#6dba92" }}>
             Video eğitimden sertifikaya, raporlamadan bildirimlere — tüm
             eğitim altyapısı tek platformda.
           </p>
 
           {/* Feature bullets */}
-          <ul className="space-y-2.5 mb-8">
+          <ul className="space-y-2.5 mb-5 sm:mb-8">
             {[
               "7/24 kesintisiz erişim",
               "KVKK & GDPR uyumlu güvenli altyapı",

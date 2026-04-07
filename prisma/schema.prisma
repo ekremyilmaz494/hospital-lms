@@ -447,6 +447,7 @@ model ExamAttempt {
   @@index([userId, trainingId], map: "idx_attempts_user_training")
   @@index([userId, status], map: "idx_attempts_user_status")
   @@index([assignmentId, status], map: "idx_attempts_assignment_status")
+  @@index([userId, isPassed], map: "idx_attempts_user_passed")
   @@map("exam_attempts")
 }
 
@@ -489,6 +490,7 @@ model VideoProgress {
   @@unique([attemptId, videoId])
   // Performance: composite index for user video progress lookups
   @@index([userId, videoId], map: "idx_video_progress_user_video")
+  @@index([userId, isCompleted], map: "idx_video_progress_user_completed")
   @@map("video_progress")
 }
 

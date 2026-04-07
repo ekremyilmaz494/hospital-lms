@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   ChevronRight,
@@ -10,24 +11,27 @@ import {
   Users,
   Award,
   Bell,
+  Menu,
+  X,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 function HeroVisual() {
   return (
-    <div className="relative flex items-center justify-center select-none">
+    <div className="relative flex items-center justify-center select-none w-full max-w-[420px] mx-auto">
       {/* Soft glow rings */}
       <div
-        className="absolute w-[480px] h-[480px] rounded-full border opacity-[0.07]"
+        className="absolute w-[115%] aspect-square rounded-full border opacity-[0.07]"
         style={{ borderColor: "#0d9668" }}
       />
       <div
-        className="absolute w-[380px] h-[380px] rounded-full border opacity-[0.12]"
+        className="absolute w-[90%] aspect-square rounded-full border opacity-[0.12]"
         style={{ borderColor: "#0d9668" }}
       />
 
       {/* Organic blob */}
       <div
-        className="relative w-[420px] h-[420px] flex-shrink-0"
+        className="relative w-full aspect-square flex-shrink-0"
         style={{
           borderRadius: "62% 38% 70% 30% / 45% 58% 42% 55%",
           background: "linear-gradient(145deg, #1a3a28 0%, #0d2010 100%)",
@@ -131,22 +135,22 @@ function HeroVisual() {
 
       {/* Badge */}
       <div
-        className="absolute top-0 right-10 w-[72px] h-[72px] rounded-full flex flex-col items-center justify-center text-center z-10 pointer-events-none"
+        className="absolute top-0 right-4 sm:right-10 w-14 h-14 sm:w-18 sm:h-18 rounded-full flex flex-col items-center justify-center text-center z-10 pointer-events-none"
         style={{
           backgroundColor: "#f59e0b",
           color: "#1a3a28",
           boxShadow: "0 4px 20px rgba(245,158,11,0.45)",
         }}
       >
-        <span className="text-xl font-black leading-none">7/24</span>
-        <span className="text-[10px] font-bold uppercase tracking-wide mt-0.5">
+        <span className="text-base sm:text-xl font-black leading-none">7/24</span>
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide mt-0.5">
           Erişim
         </span>
       </div>
 
       {/* Floating testimonial bubble */}
       <div
-        className="absolute -left-2 top-12 bg-white rounded-2xl px-3 py-2.5 shadow-xl flex items-center gap-2.5 z-10"
+        className="absolute -left-2 top-12 bg-white rounded-2xl px-3 py-2.5 shadow-xl hidden sm:flex items-center gap-2.5 z-10"
         style={{ maxWidth: 195 }}
       >
         <div
@@ -162,7 +166,7 @@ function HeroVisual() {
 
       {/* Floating notification pill */}
       <div
-        className="absolute bottom-10 -right-2 bg-white rounded-full px-3 py-2 shadow-lg flex items-center gap-2 z-10"
+        className="absolute bottom-10 -right-2 bg-white rounded-full px-3 py-2 shadow-lg hidden sm:flex items-center gap-2 z-10"
       >
         <div
           className="w-5 h-5 rounded-full flex items-center justify-center"
@@ -182,7 +186,16 @@ function HeroVisual() {
   );
 }
 
+const HERO_NAV = [
+  { label: "Hakkında",   href: "#hakkinda"   },
+  { label: "Özellikler", href: "#ozellikler" },
+  { label: "Güvenlik",   href: "#guvenlik"   },
+  { label: "SSS",        href: "#sss"        },
+];
+
 export function HeroSection() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
     <>
       {/* ── NAVBAR ── */}
@@ -193,7 +206,7 @@ export function HeroSection() {
           borderColor: "rgba(26,58,40,0.08)",
         }}
       >
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-lg"
@@ -215,12 +228,7 @@ export function HeroSection() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">
-            {[
-              { label: "Hakkında",   href: "#hakkinda"   },
-              { label: "Özellikler", href: "#ozellikler" },
-              { label: "Güvenlik",   href: "#guvenlik"   },
-              { label: "SSS",        href: "#sss"        },
-            ].map(({ label, href }) => (
+            {HERO_NAV.map(({ label, href }) => (
               <a
                 key={label}
                 href={href}
@@ -232,18 +240,71 @@ export function HeroSection() {
             ))}
           </nav>
 
-          <Link
-            href="/auth/login"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105"
-            style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
-          >
-            Giriş Yap <ChevronRight className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/auth/login"
+              className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105"
+              style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
+            >
+              Giriş Yap <ChevronRight className="w-4 h-4" />
+            </Link>
+
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="md:hidden p-2 -mr-1 rounded-xl transition-colors hover:bg-black/5 cursor-pointer"
+              style={{ color: "#1a3a28" }}
+              aria-label={mobileOpen ? "Menüyü kapat" : "Menüyü aç"}
+            >
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile menu */}
+        <AnimatePresence>
+          {mobileOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              className="md:hidden mx-4 mb-3 rounded-2xl p-4"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.95)",
+                backdropFilter: "blur(20px)",
+                border: "1px solid rgba(0,0,0,0.06)",
+                boxShadow: "0 8px 40px rgba(0,0,0,0.08)",
+              }}
+            >
+              {HERO_NAV.map(({ label, href }) => (
+                <a
+                  key={label}
+                  href={href}
+                  onClick={() => setMobileOpen(false)}
+                  className="block text-sm font-medium py-2.5 px-3 rounded-xl transition-colors hover:bg-black/5"
+                  style={{ color: "#1a3a28" }}
+                >
+                  {label}
+                </a>
+              ))}
+              <div className="border-t mt-2 pt-3" style={{ borderColor: "rgba(0,0,0,0.05)" }}>
+                <Link
+                  href="/auth/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="block text-sm font-black text-center py-2.5 rounded-xl uppercase tracking-wide"
+                  style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
+                >
+                  Giriş Yap
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* ── HERO ── */}
-      <section className="max-w-7xl mx-auto px-6 py-16 xl:py-24 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-16 xl:py-24 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
         {/* Left text */}
         <div>
           <span
@@ -258,7 +319,7 @@ export function HeroSection() {
           </span>
 
           <h1
-            className="text-[2.75rem] xl:text-[3.5rem] font-black leading-[1.0] mb-6 tracking-tight"
+            className="text-[2rem] sm:text-[2.75rem] xl:text-[3.5rem] font-black leading-none mb-5 sm:mb-6 tracking-tight"
             style={{ color: "#1a3a28" }}
           >
             <span
@@ -274,17 +335,17 @@ export function HeroSection() {
           </h1>
 
           <p
-            className="text-base leading-relaxed max-w-[400px] mb-10"
+            className="text-sm sm:text-base leading-relaxed max-w-[400px] mb-8 sm:mb-10"
             style={{ color: "#4a7060" }}
           >
             Hastane personellerinize video tabanlı eğitimler atayın, sınav
             yapın ve performansı gerçek zamanlı takip edin.
           </p>
 
-          <div className="flex flex-wrap items-center gap-4 mb-12">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8 sm:mb-12">
             <Link
               href="/auth/login"
-              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105 shadow-lg"
+              className="inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105 shadow-lg"
               style={{
                 backgroundColor: "#f59e0b",
                 color: "#1a3a28",

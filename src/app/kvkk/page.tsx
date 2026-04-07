@@ -76,55 +76,56 @@ const sections = [
 
 export default function KVKKPage() {
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
+    <div className="min-h-screen" style={{ background: '#f5f0e6' }}>
       {/* Header */}
       <header
         className="sticky top-0 z-30 border-b"
         style={{
-          background: 'color-mix(in srgb, var(--color-bg) 85%, transparent)',
+          background: 'rgba(245, 240, 230, 0.85)',
           backdropFilter: 'blur(12px)',
-          borderColor: 'var(--color-border)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderColor: 'rgba(26, 58, 40, 0.08)',
         }}
       >
-        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 sm:px-6">
           <Link
-            href="/auth/login"
+            href="/"
             className="flex items-center gap-2 text-sm font-semibold transition-colors duration-150"
-            style={{ color: 'var(--color-primary)' }}
+            style={{ color: '#0d9668' }}
           >
             <ArrowLeft className="h-4 w-4" />
             Giriş Sayfasına Dön
           </Link>
           <div className="flex items-center gap-2.5">
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold font-heading"
-              style={{ background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)' }}
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-sm font-bold text-white"
+              style={{ background: 'linear-gradient(135deg, #0d9668, #1a3a28)' }}
             >
               H
             </div>
-            <span className="text-sm font-semibold font-heading">Hastane LMS</span>
+            <span className="text-sm font-semibold" style={{ color: '#1a3a28' }}>Hastane LMS</span>
           </div>
         </div>
       </header>
 
       {/* Content */}
-      <main className="mx-auto max-w-3xl px-6 py-12">
+      <main className="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-12">
         <BlurFade delay={0.1}>
           <div className="mb-10">
             <div
               className="mb-4 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold"
               style={{
-                background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)',
-                color: 'var(--color-primary)',
+                background: 'rgba(13, 150, 104, 0.1)',
+                color: '#0d9668',
               }}
             >
               <Shield className="h-3.5 w-3.5" />
               6698 Sayılı Kanun
             </div>
-            <h1 className="text-3xl font-bold tracking-tight mb-3">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3" style={{ color: '#1a3a28' }}>
               KVKK Aydınlatma Metni
             </h1>
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-sm leading-relaxed" style={{ color: '#4a7060' }}>
               Kişisel Verilerin Korunması Kanunu kapsamında veri işleme faaliyetlerimize ilişkin aydınlatma metni.
             </p>
           </div>
@@ -134,28 +135,27 @@ export default function KVKKPage() {
           {sections.map((section, i) => (
             <BlurFade key={section.title} delay={0.15 + i * 0.05}>
               <section
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-5 sm:p-6 bg-white"
                 style={{
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
+                  border: '1px solid rgba(26, 58, 40, 0.08)',
                 }}
               >
                 <div className="mb-4 flex items-center gap-3">
                   <div
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
                     style={{
-                      background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)',
+                      background: 'rgba(13, 150, 104, 0.1)',
                     }}
                   >
-                    <section.icon className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
+                    <section.icon className="h-4.5 w-4.5" style={{ color: '#0d9668' }} />
                   </div>
-                  <h2 className="text-lg font-bold tracking-tight">{section.title}</h2>
+                  <h2 className="text-lg font-bold tracking-tight" style={{ color: '#1a3a28' }}>{section.title}</h2>
                 </div>
 
                 {section.content && (
                   <p
                     className="text-sm leading-relaxed mb-3"
-                    style={{ color: 'var(--color-text-secondary)' }}
+                    style={{ color: '#4a7060' }}
                   >
                     {section.content}
                   </p>
@@ -164,10 +164,10 @@ export default function KVKKPage() {
                 {section.items && (
                   <ul className="space-y-2 ml-1">
                     {section.items.map((item) => (
-                      <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                      <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#4a7060' }}>
                         <span
                           className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ background: 'var(--color-primary)' }}
+                          style={{ background: '#0d9668' }}
                         />
                         {item}
                       </li>
@@ -178,7 +178,7 @@ export default function KVKKPage() {
                 {section.footer && (
                   <p
                     className="mt-4 text-sm font-medium"
-                    style={{ color: 'var(--color-text-secondary)' }}
+                    style={{ color: '#1a3a28' }}
                   >
                     {section.footer}
                   </p>
@@ -190,7 +190,7 @@ export default function KVKKPage() {
 
         <BlurFade delay={0.6}>
           <div className="mt-12 text-center">
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-xs" style={{ color: '#4a7060' }}>
               Son güncelleme: Mart 2026 &middot; &copy; 2026 Hastane LMS Platformu
             </p>
           </div>

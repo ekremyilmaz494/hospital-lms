@@ -143,8 +143,8 @@ export function FeaturesSection() {
   const [activeCategory, setActiveCategory] = useState("Video Eğitimler");
 
   return (
-    <section id="ozellikler" className="py-20" style={{ backgroundColor: "#ece7d7" }}>
-      <div className="max-w-7xl mx-auto px-6">
+    <section id="ozellikler" className="py-12 sm:py-20" style={{ backgroundColor: "#ece7d7" }}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-12 gap-4">
           <div>
             <p
@@ -153,7 +153,7 @@ export function FeaturesSection() {
             >
               Platform Özellikleri
             </p>
-            <h2 className="text-3xl font-black" style={{ color: "#1a3a28" }}>
+            <h2 className="text-2xl sm:text-3xl font-black" style={{ color: "#1a3a28" }}>
               Neden Hastane LMS?
             </h2>
           </div>
@@ -168,15 +168,15 @@ export function FeaturesSection() {
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Category sidebar */}
-          <div className="lg:w-48 flex lg:flex-col gap-1.5 overflow-x-auto pb-2 lg:pb-0 flex-shrink-0">
+          <div className="lg:w-48 flex lg:flex-col gap-2 lg:gap-1.5 overflow-x-auto pb-2 lg:pb-0 shrink-0 -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
             {Object.keys(categoryFeatures).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
                 className={[
-                  "text-sm font-semibold px-4 py-2.5 rounded-full text-left whitespace-nowrap",
+                  "text-sm font-semibold px-4 py-2.5 rounded-full text-left whitespace-nowrap shrink-0",
                   "cursor-pointer select-none",
-                  "transition-colors transition-transform",
+                  "transition-all",
                   "active:scale-95",
                   activeCategory === cat
                     ? "text-white shadow-md"
@@ -194,7 +194,7 @@ export function FeaturesSection() {
           </div>
 
           {/* Feature cards — changes with active category */}
-          <div className="flex-1 grid sm:grid-cols-3 gap-4">
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4">
             {categoryFeatures[activeCategory].map(({ icon: Icon, title, desc, badge }) => (
               <div
                 key={title}

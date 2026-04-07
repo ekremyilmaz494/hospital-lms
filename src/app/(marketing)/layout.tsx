@@ -282,7 +282,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
   // Landing page (/) has its own navbar and footer baked into its section components
   if (isHomePage) {
     return (
-      <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#f5f0e6" }}>
+      <div className="min-h-screen flex flex-col overflow-x-hidden" style={{ backgroundColor: "#f5f0e6" }}>
         <main className="flex-1">{children}</main>
       </div>
     );

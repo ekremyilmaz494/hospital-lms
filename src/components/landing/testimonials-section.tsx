@@ -7,16 +7,16 @@ export function TestimonialsSection() {
   return (
     <>
       {/* ── TESTIMONIAL ── */}
-      <section id="sss" className="py-16" style={{ backgroundColor: "#ece7d7" }}>
-        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+      <section id="sss" className="py-10 sm:py-16" style={{ backgroundColor: "#ece7d7" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-8 sm:gap-12 items-center">
           <div>
             <p
-              className="text-[80px] font-black leading-none -mb-4 select-none"
+              className="text-[50px] sm:text-[80px] font-black leading-none -mb-2 sm:-mb-4 select-none"
               style={{ color: "#1a3a28", opacity: 0.1 }}
             >
               &#8220;
             </p>
-            <h3 className="text-2xl font-black mb-6" style={{ color: "#1a3a28" }}>
+            <h3 className="text-xl sm:text-2xl font-black mb-4 sm:mb-6" style={{ color: "#1a3a28" }}>
               Kullanıcılarımızdan
               <br />
               Değerlendirmeler
@@ -43,7 +43,7 @@ export function TestimonialsSection() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-8 shadow-sm">
+          <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-sm">
             <div className="flex items-center gap-3 mb-5">
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
@@ -75,9 +75,9 @@ export function TestimonialsSection() {
       </section>
 
       {/* ── FOOTER ── */}
-      <footer className="py-12" style={{ backgroundColor: "#1a3a28" }}>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
+      <footer className="py-10 sm:py-12" style={{ backgroundColor: "#1a3a28" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 mb-10">
             {/* Newsletter */}
             <div>
               <h4 className="font-bold text-white text-sm mb-3">

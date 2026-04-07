@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
 
     // ── Rate limiting (paralel) ──
     const [ipAllowed, emailAllowed] = await Promise.all([
-      checkRateLimit(`login-ip:${ip}`, 20, 900),
-      checkRateLimit(`login:${normalizedEmail}`, 5, 900),
+      checkRateLimit(`login-ip:${ip}`, 5, 900),
+      checkRateLimit(`login:${normalizedEmail}`, 3, 900),
     ])
     if (!ipAllowed) {
       logger.warn('auth:login', 'IP rate limit aşıldı', { ip })

@@ -16,7 +16,5 @@ export async function POST() {
   return jsonResponse({
     factorId: data.id,
     qrCode: data.totp.qr_code,
-    secret: data.totp.secret,
-    uri: data.totp.uri,
   })
 }
