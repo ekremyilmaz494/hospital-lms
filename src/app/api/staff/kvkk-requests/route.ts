@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
 
 const REQUEST_TYPES = [
@@ -24,21 +26,26 @@ export async function GET() {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const requests = await prisma.kvkkRequest.findMany({
-    where: { userId: dbUser!.id },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      requestType: true,
-      status: true,
-      description: true,
-      responseNote: true,
-      createdAt: true,
-      completedAt: true,
-    },
-  })
+  try {
+    const requests = await prisma.kvkkRequest.findMany({
+      where: { userId: dbUser!.id },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        requestType: true,
+        status: true,
+        description: true,
+        responseNote: true,
+        createdAt: true,
+        completedAt: true,
+      },
+    })
 
-  return jsonResponse({ requests })
+    return jsonResponse({ requests }, 200, { 'Cache-Control': 'private, max-age=30' })
+  } catch (err) {
+    logger.error('KVKKRequests', 'Talepler listelenemedi', err)
+    return errorResponse('Talepler yüklenirken hata oluştu', 500)
+  }
 }
 
 /** POST /api/staff/kvkk-requests — Yeni KVKK hak talebi olustur */
@@ -50,6 +57,9 @@ export async function POST(request: Request) {
     return errorResponse('Kurum bilgisi bulunamadi', 403)
   }
 
+  const allowed = await checkRateLimit(`kvkk:create:${dbUser!.id}`, 5, 300)
+  if (!allowed) return errorResponse('Çok fazla talep gönderildi. Lütfen bekleyin.', 429)
+
   const body = await parseBody<unknown>(request)
   if (!body) return errorResponse('Gecersiz istek', 400)
 
@@ -58,37 +68,42 @@ export async function POST(request: Request) {
     return errorResponse(parsed.error.issues.map(i => i.message).join(', '), 400)
   }
 
-  // Ayni tipte bekleyen talep varsa engelle
-  const existing = await prisma.kvkkRequest.findFirst({
-    where: {
-      userId: dbUser!.id,
-      requestType: parsed.data.requestType,
-      status: 'pending',
-    },
-  })
+  try {
+    // Ayni tipte bekleyen talep varsa engelle
+    const existing = await prisma.kvkkRequest.findFirst({
+      where: {
+        userId: dbUser!.id,
+        requestType: parsed.data.requestType,
+        status: 'pending',
+      },
+    })
 
-  if (existing) {
-    return errorResponse('Bu tipte bekleyen bir talebiniz zaten mevcut. Lutfen sonuclanmasini bekleyin.', 409)
+    if (existing) {
+      return errorResponse('Bu tipte bekleyen bir talebiniz zaten mevcut. Lutfen sonuclanmasini bekleyin.', 409)
+    }
+
+    const kvkkRequest = await prisma.kvkkRequest.create({
+      data: {
+        userId: dbUser!.id,
+        organizationId: dbUser!.organizationId,
+        requestType: parsed.data.requestType,
+        description: parsed.data.description,
+        status: 'pending',
+      },
+      select: {
+        id: true,
+        requestType: true,
+        status: true,
+        createdAt: true,
+      },
+    })
+
+    return jsonResponse({
+      message: 'KVKK hak talebiniz basariyla olusturuldu. Yasal sure icinde (30 gun) talebiniz degerlendirilecektir.',
+      request: kvkkRequest,
+    }, 201)
+  } catch (err) {
+    logger.error('KVKKRequests', 'Talep oluşturulamadı', err)
+    return errorResponse('Talep oluşturulurken hata oluştu', 500)
   }
-
-  const kvkkRequest = await prisma.kvkkRequest.create({
-    data: {
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId,
-      requestType: parsed.data.requestType,
-      description: parsed.data.description,
-      status: 'pending',
-    },
-    select: {
-      id: true,
-      requestType: true,
-      status: true,
-      createdAt: true,
-    },
-  })
-
-  return jsonResponse({
-    message: 'KVKK hak talebiniz basariyla olusturuldu. Yasal sure icinde (30 gun) talebiniz degerlendirilecektir.',
-    request: kvkkRequest,
-  }, 201)
 }

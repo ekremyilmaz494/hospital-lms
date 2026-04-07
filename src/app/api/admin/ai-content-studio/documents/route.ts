@@ -4,7 +4,7 @@ import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, creat
 import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
 import { uploadBuffer } from '@/lib/s3'
-import { createNotebook, addFileSource, addSource } from '@/app/admin/ai-content-studio/lib/ai-service-client'
+import { createNotebook, addFileSource, addSource, AiServiceError } from '@/app/admin/ai-content-studio/lib/ai-service-client'
 import { aiSourceAddSchema } from '@/lib/validations'
 
 const ALLOWED_MIME_TYPES = [
@@ -195,6 +195,16 @@ export async function POST(request: Request) {
 
     return errorResponse('Desteklenmeyen Content-Type', 400)
   } catch (err) {
+    if (err instanceof AiServiceError) {
+      logger.warn('AI Documents', `Sidecar hatası: ${err.message}`, { code: err.code, status: err.status })
+      if (err.code === 'connection_error') {
+        return errorResponse('AI içerik servisi çalışmıyor. Lütfen servisi başlatın veya daha sonra tekrar deneyin.', 503)
+      }
+      if (err.code === 'timeout') {
+        return errorResponse('AI servisi yanıt vermedi. Lütfen tekrar deneyin.', 504)
+      }
+      return errorResponse(err.message, err.status)
+    }
     logger.error('AI Documents', 'Beklenmeyen hata', err)
     return errorResponse('İşlem sırasında bir hata oluştu', 500)
   }

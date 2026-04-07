@@ -39,7 +39,7 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
           className="transition-transform hover:scale-110"
         >
           <Star
-            className="h-8 w-8"
+            className="h-10 w-10 sm:h-8 sm:w-8"
             fill={(hovered || value) >= n ? 'var(--color-warning)' : 'none'}
             style={{ color: (hovered || value) >= n ? 'var(--color-warning)' : 'var(--color-border)' }}
           />
@@ -150,7 +150,7 @@ export default function EvaluationWizardPage() {
     <div className="max-w-2xl mx-auto space-y-6">
       <BlurFade delay={0}>
         {/* Header */}
-        <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+        <div className="rounded-2xl border p-4 sm:p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-muted)' }}>
@@ -181,7 +181,7 @@ export default function EvaluationWizardPage() {
                 <button
                   key={cat.id}
                   onClick={() => setCurrentCatIdx(i)}
-                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium transition-all"
+                  className="flex items-center gap-1 text-xs px-2.5 py-1.5 sm:py-1 rounded-full font-medium transition-all min-h-[36px] sm:min-h-0"
                   style={{
                     background: i === currentCatIdx ? 'var(--color-primary)' : catComplete ? 'var(--color-success-bg)' : 'var(--color-surface-2)',
                     color: i === currentCatIdx ? 'white' : catComplete ? 'var(--color-success)' : 'var(--color-text-secondary)',
@@ -210,7 +210,7 @@ export default function EvaluationWizardPage() {
             {currentCat.items.map((item, itemIdx) => {
               const ans = answers[item.id];
               return (
-                <div key={item.id} className="px-5 py-4">
+                <div key={item.id} className="px-4 py-4 sm:px-5">
                   <div className="flex items-start gap-3 mb-3">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mt-0.5"
                       style={{ background: ans?.score ? 'var(--color-success-bg)' : 'var(--color-surface-2)', color: ans?.score ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
@@ -222,7 +222,7 @@ export default function EvaluationWizardPage() {
                     </div>
                   </div>
 
-                  <div className="ml-9 space-y-2">
+                  <div className="ml-0 sm:ml-9 space-y-2 mt-2 sm:mt-0">
                     <StarRating value={ans?.score ?? 0} onChange={score => setItemScore(item.id, score)} />
                     <textarea
                       value={ans?.comment ?? ''}
@@ -242,22 +242,22 @@ export default function EvaluationWizardPage() {
 
       {/* Navigation */}
       <BlurFade delay={0.1}>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <Button
             variant="outline"
             onClick={() => setCurrentCatIdx(i => i - 1)}
             disabled={currentCatIdx === 0}
-            className="gap-1.5 rounded-xl"
+            className="gap-1.5 rounded-xl w-full sm:w-auto min-h-[44px] sm:min-h-0"
           >
             <ChevronLeft className="h-4 w-4" /> Önceki
           </Button>
 
           {!isLastCat ? (
-            <Button onClick={handleNext} className="gap-1.5 rounded-xl">
+            <Button onClick={handleNext} className="gap-1.5 rounded-xl w-full sm:w-auto min-h-[44px] sm:min-h-0">
               Kaydet ve Devam <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={handleSubmit} disabled={submitting} className="gap-1.5 rounded-xl"
+            <Button onClick={handleSubmit} disabled={submitting} className="gap-1.5 rounded-xl w-full sm:w-auto min-h-[44px] sm:min-h-0"
               style={{ background: 'var(--color-success)' }}>
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               <CheckCircle className="h-4 w-4" /> Değerlendirmeyi Tamamla

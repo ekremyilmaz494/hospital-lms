@@ -113,6 +113,17 @@ export function AudioPlayer({
     }
   }, [isMuted])
 
+  // Sekme degistiginde sesi durdur — personel baska sekmede oyalanmasin
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden && audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
   // Heartbeat — 15 saniyede bir onProgress çağır
   useEffect(() => {
     if (!isPlaying) return

@@ -124,24 +124,24 @@ export default function StaffSmgPage() {
   return (
     <div className="space-y-6">
       <BlurFade delay={0}>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <PageHeader title="SMG Puanlarım" subtitle="Sürekli Mesleki Gelişim aktiviteleriniz ve puanlarınız" />
           <div className="flex items-center gap-2">
             {periods.length > 0 && (
-              <div className="relative">
+              <div className="relative flex-1 sm:flex-none">
                 <select
                   value={selectedPeriodId}
                   onChange={e => setSelectedPeriodId(e.target.value)}
-                  className="text-sm rounded-xl px-3 py-2 pr-7 border appearance-none outline-none cursor-pointer"
+                  className="text-sm rounded-xl px-3 py-2 pr-7 border appearance-none outline-none cursor-pointer w-full min-h-[44px] sm:min-h-0 sm:w-auto"
                   style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}
                 >
                   <option value="">Aktif Dönem</option>
                   {periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <ChevronDown className="absolute right-2 top-2.5 h-3.5 w-3.5 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
               </div>
             )}
-            <Button onClick={() => setModalOpen(true)} size="sm" className="gap-1.5 rounded-xl">
+            <Button onClick={() => setModalOpen(true)} size="sm" className="gap-1.5 rounded-xl w-full sm:w-auto min-h-[44px] sm:min-h-0">
               <Plus className="h-4 w-4" /> Aktivite Ekle
             </Button>
           </div>
@@ -194,7 +194,7 @@ export default function StaffSmgPage() {
         </BlurFade>
 
         {/* Stat Cards */}
-        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 content-start">
+        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 content-start">
           {[
             { title: 'Onaylı Puan', value: approved, icon: Star, accentColor: 'var(--color-success)' },
             { title: 'Bekleyen Aktivite', value: data?.pendingActivities.length ?? 0, icon: Loader2, accentColor: 'var(--color-warning)' },
@@ -204,7 +204,7 @@ export default function StaffSmgPage() {
           ))}
 
           {/* Aktiviteler listesi */}
-          <BlurFade delay={0.2} className="sm:col-span-3">
+          <BlurFade delay={0.2} className="sm:col-span-2 md:col-span-3">
             <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
               <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Aktivitelerim</h3>

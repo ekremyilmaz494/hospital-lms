@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, Info, Video, FileQuestion, Users, Check, Plus, Trash2,
   GripVertical, Upload, Clock, Award, Calendar, Target, Sparkles, BookOpen, CheckCircle2,
-  ShieldCheck, RefreshCw, Building2, FileText, Layers, Music, ChevronDown
+  ShieldCheck, RefreshCw, Building2, FileText, Layers, Music, ChevronDown, Library
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,7 @@ const steps = [
 
 import { TRAINING_CATEGORIES } from '@/lib/training-categories';
 import { CategoryIcon } from '@/components/shared/category-icon';
+import { ContentLibraryModal, type SelectedContent } from './content-library-modal';
 
 interface DeptStaff { id: string; name: string; title: string; initials: string; }
 interface Dept { id: string; name: string; count: number; color: string; staff: DeptStaff[]; }
@@ -57,6 +58,7 @@ export default function NewTrainingPage() {
     { id: 1, title: '', url: '', contentType: 'video' },
   ]);
   const [contentTypeMenu, setContentTypeMenu] = useState(false);
+  const [libraryModalOpen, setLibraryModalOpen] = useState(false);
   const [questions, setQuestions] = useState([
     { id: 1, text: '', points: 10, options: ['', '', '', ''], correct: -1 },
   ]);
@@ -92,6 +94,25 @@ export default function NewTrainingPage() {
   const addContent = (type: 'video' | 'audio') => {
     setVideos(prev => [...prev, { id: Date.now(), title: '', url: '', contentType: type }]);
     setContentTypeMenu(false);
+  };
+  const addFromLibrary = (items: SelectedContent[]) => {
+    setVideos(prev => {
+      // Boş satırları kaldır (url ve title yok)
+      const filled = prev.filter(v => v.url || v.title);
+      // Kütüphaneden seçilenleri ekle
+      const newItems = items.map(item => ({
+        id: item.id,
+        title: item.title,
+        url: item.url,
+        contentType: item.contentType,
+        durationSeconds: item.durationSeconds,
+        pageCount: item.pageCount,
+        documentKey: item.documentKey,
+      }));
+      return filled.length === 0 && newItems.length === 0
+        ? [{ id: Date.now(), title: '', url: '', contentType: 'video' as const }]
+        : [...filled, ...newItems];
+    });
   };
   const removeVideo = (id: number) => setVideos(prev => prev.filter(v => v.id !== id));
 
@@ -455,40 +476,53 @@ export default function NewTrainingPage() {
                     </p>
                   </div>
                 </div>
-                <div className="relative">
+                <div className="flex items-center gap-2">
+                  {/* Yeni Yükle — dropdown: Video / Ses */}
+                  <div className="relative">
+                    <Button
+                      onClick={() => setContentTypeMenu(prev => !prev)}
+                      variant="outline"
+                      className="gap-2 font-semibold rounded-xl"
+                      style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                    >
+                      <Plus className="h-4 w-4" /> Yeni Yükle <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                    {contentTypeMenu && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setContentTypeMenu(false)} />
+                        <div
+                          className="absolute right-0 top-full mt-1 z-50 rounded-xl border shadow-lg overflow-hidden"
+                          style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', minWidth: 180 }}
+                        >
+                          <button
+                            onClick={() => addContent('video')}
+                            className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-left hover:bg-[var(--color-surface-hover)]"
+                            style={{ color: 'var(--color-text-primary)' }}
+                          >
+                            <Video className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+                            Video
+                          </button>
+                          <button
+                            onClick={() => addContent('audio')}
+                            className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-left hover:bg-[var(--color-surface-hover)]"
+                            style={{ color: 'var(--color-text-primary)', borderTop: '1px solid var(--color-border)' }}
+                          >
+                            <Music className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
+                            Ses Dosyası
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Kütüphaneden Seç — doğrudan modal */}
                   <Button
-                    onClick={() => setContentTypeMenu(prev => !prev)}
+                    onClick={() => setLibraryModalOpen(true)}
                     className="gap-2 font-semibold text-white rounded-xl"
-                    style={{ background: 'var(--color-primary)', transition: 'opacity var(--transition-fast)' }}
+                    style={{ background: 'var(--color-primary)' }}
                   >
-                    <Plus className="h-4 w-4" /> İçerik Ekle <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                    <Library className="h-4 w-4" /> Kütüphaneden Seç
                   </Button>
-                  {contentTypeMenu && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setContentTypeMenu(false)} />
-                      <div
-                        className="absolute right-0 top-full mt-1 z-50 rounded-xl border shadow-lg overflow-hidden"
-                        style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', minWidth: 220 }}
-                      >
-                        <button
-                          onClick={() => addContent('video')}
-                          className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-left hover:bg-[var(--color-surface-hover)]"
-                          style={{ color: 'var(--color-text-primary)' }}
-                        >
-                          <Video className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
-                          Video Ekle
-                        </button>
-                        <button
-                          onClick={() => addContent('audio')}
-                          className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-left hover:bg-[var(--color-surface-hover)]"
-                          style={{ color: 'var(--color-text-primary)', borderTop: '1px solid var(--color-border)' }}
-                        >
-                          <Music className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
-                          Ses + Doküman Ekle
-                        </button>
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
 
@@ -537,8 +571,38 @@ export default function NewTrainingPage() {
                       </div>
                     </div>
 
+                    {/* Kütüphaneden seçilmiş içerik göstergesi */}
+                    {video.url && !video.file && (
+                      <div
+                        className="flex items-center gap-4 px-5 py-4"
+                        style={{ background: 'var(--color-success-bg)' }}
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--color-primary-light)' }}>
+                          <Library className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium" style={{ color: 'var(--color-success)' }}>
+                            Kütüphaneden eklendi
+                          </p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                            {video.durationSeconds ? `${Math.floor(video.durationSeconds / 60)}:${String(video.durationSeconds % 60).padStart(2, '0')} dk` : video.contentType === 'pdf' ? 'Doküman' : video.contentType === 'audio' ? 'Ses dosyası' : 'Video'}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          className="rounded-lg text-xs gap-1.5"
+                          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                          onClick={() => setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v))}
+                        >
+                          Değiştir
+                        </Button>
+                      </div>
+                    )}
+
                     {/* Upload area — video/pdf */}
-                    {video.contentType !== 'audio' && (
+                    {video.contentType !== 'audio' && !(video.url && !video.file) && (
                     <div
                       className="flex items-center gap-4 px-5 py-5 relative"
                       style={{ background: 'var(--color-surface)' }}
@@ -695,21 +759,36 @@ export default function NewTrainingPage() {
                           </>
                         )}
                       </div>
-                      <Button
-                        variant={video.file ? 'default' : 'outline'}
-                        size="sm"
-                        type="button"
-                        className="rounded-lg text-xs gap-1.5 pointer-events-none"
-                        style={video.file ? { background: 'var(--color-surface-hover)', color: 'var(--color-text-primary)' } : { borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
-                      >
-                        {video.file ? <Check className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
-                        {video.file ? 'Değiştir' : 'Dosya Seç'}
-                      </Button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          variant={video.file ? 'default' : 'outline'}
+                          size="sm"
+                          type="button"
+                          className="rounded-lg text-xs gap-1.5 pointer-events-none"
+                          style={video.file ? { background: 'var(--color-surface-hover)', color: 'var(--color-text-primary)' } : { borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                        >
+                          {video.file ? <Check className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
+                          {video.file ? 'Değiştir' : 'Dosya Seç'}
+                        </Button>
+                        {!video.file && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            type="button"
+                            className="rounded-lg text-xs gap-1.5 relative z-10"
+                            style={{ color: 'var(--color-primary)' }}
+                            onClick={(e) => { e.stopPropagation(); setLibraryModalOpen(true); }}
+                          >
+                            <Library className="h-3.5 w-3.5" />
+                            Kütüphane
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     )}
 
                     {/* Upload area — audio + optional document */}
-                    {video.contentType === 'audio' && (
+                    {video.contentType === 'audio' && !(video.url && !video.file) && (
                     <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
                       {/* Audio upload */}
                       <div
@@ -861,16 +940,31 @@ export default function NewTrainingPage() {
                             </>
                           )}
                         </div>
-                        <Button
-                          variant={video.file ? 'default' : 'outline'}
-                          size="sm"
-                          type="button"
-                          className="rounded-lg text-xs gap-1.5 pointer-events-none"
-                          style={video.file ? { background: 'var(--color-surface-hover)', color: 'var(--color-text-primary)' } : { borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
-                        >
-                          {video.file ? <Check className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
-                          {video.file ? 'Değiştir' : 'Ses Seç'}
-                        </Button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            variant={video.file ? 'default' : 'outline'}
+                            size="sm"
+                            type="button"
+                            className="rounded-lg text-xs gap-1.5 pointer-events-none"
+                            style={video.file ? { background: 'var(--color-surface-hover)', color: 'var(--color-text-primary)' } : { borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                          >
+                            {video.file ? <Check className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
+                            {video.file ? 'Değiştir' : 'Ses Seç'}
+                          </Button>
+                          {!video.file && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              type="button"
+                              className="rounded-lg text-xs gap-1.5 relative z-10"
+                              style={{ color: 'var(--color-primary)' }}
+                              onClick={(e) => { e.stopPropagation(); setLibraryModalOpen(true); }}
+                            >
+                              <Library className="h-3.5 w-3.5" />
+                              Kütüphane
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Optional document upload for audio */}
@@ -950,6 +1044,13 @@ export default function NewTrainingPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Content Library Modal */}
+              <ContentLibraryModal
+                open={libraryModalOpen}
+                onClose={() => setLibraryModalOpen(false)}
+                onSelect={addFromLibrary}
+              />
             </div>
           )}
 

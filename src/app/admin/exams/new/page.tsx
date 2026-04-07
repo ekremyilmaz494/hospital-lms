@@ -369,38 +369,6 @@ export default function NewExamPage() {
                     />
                   </div>
                   <div>
-                    <Label>Kategori</Label>
-                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {categories.map((cat) => (
-                        <button
-                          key={cat.value}
-                          onClick={() => setSelectedCategory(selectedCategory === cat.value ? '' : cat.value)}
-                          className="flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-sm"
-                          style={{
-                            borderColor:
-                              selectedCategory === cat.value ? 'var(--color-primary)' : 'var(--color-border)',
-                            background:
-                              selectedCategory === cat.value ? 'var(--color-primary-light)' : 'var(--color-bg)',
-                            transition: 'border-color var(--transition-fast), background var(--transition-fast)',
-                          }}
-                        >
-                          <span className="text-lg">{cat.icon}</span>
-                          <span
-                            style={{
-                              color:
-                                selectedCategory === cat.value
-                                  ? 'var(--color-primary)'
-                                  : 'var(--color-text-secondary)',
-                              fontWeight: selectedCategory === cat.value ? 600 : 400,
-                            }}
-                          >
-                            {cat.label}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
                     <Label>Açıklama</Label>
                     <div className="mt-1">
                       <RichTextEditor

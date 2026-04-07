@@ -10,7 +10,8 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
-import React, { useState, useEffect, useMemo, memo, type ReactNode } from 'react';
+import React, { useState, useMemo, memo, type ReactNode } from 'react';
+import { useMobile } from '@/hooks/use-mobile';
 import { ArrowUpDown, ChevronLeft, ChevronRight, Search, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import {
   Table,
@@ -35,21 +36,8 @@ interface DataTableProps<TData, TValue> {
   mobileCardRenderer?: MobileCardRenderer<TData>;
 }
 
-/** Hook that returns true when viewport is below the md breakpoint (768px). */
-function useMobileView(): boolean {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia('(max-width: 767px)');
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    // Set initial value via handler to avoid calling setState directly in effect
-    handler({ matches: mql.matches } as MediaQueryListEvent);
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }, []);
-
-  return isMobile;
-}
+/** @deprecated Use useMobile() from @/hooks/use-mobile instead */
+const useMobileView = useMobile;
 
 export const DataTable = memo(function DataTable<TData, TValue>({
   columns,

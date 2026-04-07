@@ -2,6 +2,8 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 
 function formatDate(d: Date | string | null | undefined): string {
   if (!d) return '-'
@@ -51,6 +53,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
+
+  const allowed = await checkRateLimit(`report:pdf:${dbUser!.id}`, 5, 60)
+  if (!allowed) return errorResponse('Çok fazla rapor isteği. Lütfen bekleyin.', 429)
+
+  try {
 
   const training = await prisma.training.findFirst({
     where: { id, organizationId: dbUser!.organizationId! },
@@ -343,4 +350,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       'Cache-Control': 'no-store',
     },
   })
+
+  } catch (err) {
+    logger.error('CompletionReportPDF', 'Rapor oluşturulamadı', err)
+    return errorResponse('Rapor oluşturulurken hata oluştu', 500)
+  }
 }

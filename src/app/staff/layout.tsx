@@ -8,9 +8,13 @@ import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
 import { staffNav } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
 import { useLayoutBranding } from '@/hooks/use-layout-branding';
+import { useMobile } from '@/hooks/use-mobile';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 import { MobileBottomNav } from '@/components/layouts/mobile-bottom-nav';
+import { MobileSidebarDrawer } from '@/components/layouts/mobile-sidebar-drawer';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
+import { createClient } from '@/lib/supabase/client';
+import { useAuthStore } from '@/store/auth-store';
 
 export default function StaffLayout({
   children,
@@ -18,27 +22,33 @@ export default function StaffLayout({
   children: React.ReactNode;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const isMobile = useMobile();
+  const { user, isLoading, fullName, initials } = useAuth();
+  const branding = useLayoutBranding();
+  const router = useRouter();
+
   useEffect(() => {
     const saved = localStorage.getItem('sidebar:staff:collapsed');
     if (saved === 'false') setSidebarCollapsed(false);
   }, []);
-  const [isMd, setIsMd] = useState(false);
-  const { user, isLoading, fullName, initials } = useAuth();
-  const branding = useLayoutBranding();
-
-  useEffect(() => {
-    const check = () => setIsMd(window.innerWidth >= 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
 
   const toggleSidebar = () => {
+    if (isMobile) {
+      setMobileDrawerOpen(true);
+      return;
+    }
     const next = !sidebarCollapsed;
     setSidebarCollapsed(next);
     localStorage.setItem('sidebar:staff:collapsed', String(next));
   };
-  const router = useRouter();
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    useAuthStore.getState().setUser(null);
+    router.push('/auth/login');
+  };
 
   // Auth guard: redirect non-staff users
   useEffect(() => {
@@ -67,10 +77,24 @@ export default function StaffLayout({
             userInitials={initials}
           />
         </div>
+
+        {/* Mobil sidebar drawer */}
+        <MobileSidebarDrawer
+          open={mobileDrawerOpen}
+          onClose={() => setMobileDrawerOpen(false)}
+          navGroups={staffNav}
+          orgName={branding?.orgName || user?.department || ''}
+          orgLogoUrl={branding?.orgLogoUrl ?? undefined}
+          userName={fullName}
+          userRole="Personel"
+          userInitials={initials}
+          onLogout={handleLogout}
+        />
+
         {/* Ana içerik: masaüstünde sidebar durumuna göre kayar, mobilde sabit */}
         <main
           className="min-h-screen pb-16 md:pb-0"
-          style={{ marginLeft: isMd ? 72 : 0 }}
+          style={{ marginLeft: isMobile ? 0 : 72 }}
         >
           <ImpersonationBanner />
           <AppTopbar
@@ -83,8 +107,9 @@ export default function StaffLayout({
           />
           <div className="p-4 md:p-8">{children}</div>
         </main>
+
         {/* Mobil alt navigasyon */}
-        <MobileBottomNav />
+        <MobileBottomNav onMorePress={() => setMobileDrawerOpen(true)} />
       </div>
     </TooltipProvider>
   );

@@ -114,10 +114,10 @@ export default function TrainingDetailPage() {
           <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, white 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
           <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full opacity-5" style={{ background: 'radial-gradient(circle, white 0%, transparent 70%)', transform: 'translate(-20%, 20%)' }} />
 
-          <div className="relative px-8 py-7">
+          <div className="relative px-4 py-5 sm:px-8 sm:py-7">
             {/* Top row */}
             <div className="flex items-center justify-between mb-5">
-              <button onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center rounded-xl text-white" style={{ background: 'rgba(255,255,255,0.12)' }}>
+              <button onClick={() => router.back()} className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-xl text-white" style={{ background: 'rgba(255,255,255,0.12)' }}>
                 <ArrowLeft className="h-4 w-4" />
               </button>
               <div className="flex items-center gap-2">
@@ -128,7 +128,7 @@ export default function TrainingDetailPage() {
             </div>
 
             {/* Title */}
-            <h1 className="text-2xl font-bold text-white tracking-tight mb-2" style={{ fontFamily: 'var(--font-display)' }}>
+            <h1 className="text-lg sm:text-2xl font-bold text-white tracking-tight mb-2" style={{ fontFamily: 'var(--font-display)' }}>
               {training.title}
             </h1>
             {training.description && (
@@ -183,7 +183,7 @@ export default function TrainingDetailPage() {
       {/* Steps */}
       <BlurFade delay={0.05}>
         <div className="mt-6 mb-6">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             {steps.map((step, idx) => {
               const isCurrent = idx === currentStep;
               const isDone = step.done;
@@ -224,7 +224,7 @@ export default function TrainingDetailPage() {
                     </div>
                   </div>
                   {idx < steps.length - 1 && (
-                    <ChevronRight className="h-4 w-4 shrink-0" style={{ color: isDone ? 'var(--color-success)' : 'var(--color-border)' }} />
+                    <ChevronRight className="hidden sm:block h-4 w-4 shrink-0" style={{ color: isDone ? 'var(--color-success)' : 'var(--color-border)' }} />
                   )}
                 </div>
               );
@@ -240,7 +240,7 @@ export default function TrainingDetailPage() {
             className="rounded-2xl border p-6 mb-6"
             style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
           >
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
                   <Video className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
@@ -303,7 +303,7 @@ export default function TrainingDetailPage() {
             </div>
 
             {training.videosCompleted && !training.postExamCompleted && (
-              <div className="mt-5 pt-5 flex items-center justify-between rounded-xl p-4" style={{ borderTop: '1px solid var(--color-border)', background: 'var(--color-warning-bg)' }}>
+              <div className="mt-5 pt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl p-4" style={{ borderTop: '1px solid var(--color-border)', background: 'var(--color-warning-bg)' }}>
                 <div className="flex items-center gap-3">
                   <Award className="h-5 w-5" style={{ color: 'var(--color-warning)' }} />
                   <div>
@@ -327,7 +327,7 @@ export default function TrainingDetailPage() {
         <BlurFade delay={0.15}>
           <Link href={ctaHref} className="block">
             <div
-              className="flex items-center justify-center gap-3 rounded-2xl py-4 text-[15px] font-semibold text-white transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99]"
+              className="flex items-center justify-center gap-3 rounded-2xl py-4 text-[15px] font-semibold text-white transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99] w-full"
               style={{
                 background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
                 boxShadow: '0 6px 20px rgba(13, 150, 104, 0.3)',

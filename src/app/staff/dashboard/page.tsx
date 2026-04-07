@@ -83,7 +83,7 @@ function CountdownWidget({ training }: { training: Training }) {
   return (
     <BlurFade delay={0.08}>
       <div
-        className="relative overflow-hidden rounded-2xl px-6 py-5"
+        className="relative overflow-hidden rounded-2xl px-4 py-4 sm:px-6 sm:py-5"
         style={{ background: 'var(--color-surface)', border: `1px solid ${accentColor}30`, boxShadow: `0 4px 20px ${accentColor}15` }}
       >
         <div className="flex items-center justify-between gap-4">
@@ -105,11 +105,11 @@ function CountdownWidget({ training }: { training: Training }) {
           </div>
 
           {/* Countdown digits */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
             {days > 0 && (
               <>
                 <div className="text-center">
-                  <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[20px] font-bold font-mono" style={{ background: accentBg, color: accentColor }}>
+                  <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[16px] sm:text-[20px] font-bold font-mono" style={{ background: accentBg, color: accentColor }}>
                     {pad(days)}
                   </div>
                   <p className="text-[9px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: 'var(--color-text-muted)' }}>gün</p>
@@ -118,21 +118,21 @@ function CountdownWidget({ training }: { training: Training }) {
               </>
             )}
             <div className="text-center">
-              <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[20px] font-bold font-mono" style={{ background: accentBg, color: accentColor }}>
+              <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[16px] sm:text-[20px] font-bold font-mono" style={{ background: accentBg, color: accentColor }}>
                 {pad(hours)}
               </div>
               <p className="text-[9px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: 'var(--color-text-muted)' }}>saat</p>
             </div>
             <span className="text-lg font-bold mb-3" style={{ color: 'var(--color-text-muted)' }}>:</span>
             <div className="text-center">
-              <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[20px] font-bold font-mono" style={{ background: accentBg, color: accentColor }}>
+              <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[16px] sm:text-[20px] font-bold font-mono" style={{ background: accentBg, color: accentColor }}>
                 {pad(minutes)}
               </div>
               <p className="text-[9px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: 'var(--color-text-muted)' }}>dk</p>
             </div>
             <span className="text-lg font-bold mb-3" style={{ color: 'var(--color-text-muted)' }}>:</span>
             <div className="text-center">
-              <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[20px] font-bold font-mono transition-colors duration-500" style={{ background: accentBg, color: accentColor }}>
+              <div className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg px-2 text-[16px] sm:text-[20px] font-bold font-mono transition-colors duration-500" style={{ background: accentBg, color: accentColor }}>
                 {pad(seconds)}
               </div>
               <p className="text-[9px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: 'var(--color-text-muted)' }}>sn</p>
@@ -174,7 +174,7 @@ export default function StaffDashboard() {
       {/* Greeting Banner */}
       <BlurFade delay={0}>
         <div
-          className="relative overflow-hidden rounded-2xl p-6"
+          className="relative overflow-hidden rounded-2xl p-4 sm:p-6"
           style={{
             background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f4a35 60%, #071f18 100%)',
             boxShadow: '0 8px 30px rgba(13, 150, 104, 0.2)',
@@ -186,7 +186,7 @@ export default function StaffDashboard() {
               <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(209, 250, 229, 0.7)' }}>
                 {new Date().getHours() < 12 ? 'Günaydın' : new Date().getHours() < 18 ? 'İyi günler' : 'İyi akşamlar'}
               </p>
-              <h2 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: 'var(--font-display)' }}>
+              <h2 className="text-xl sm:text-2xl font-bold text-white mb-1" style={{ fontFamily: 'var(--font-display)' }}>
                 Hoş geldin, {user?.firstName ?? 'Kullanıcı'}
               </h2>
               <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>

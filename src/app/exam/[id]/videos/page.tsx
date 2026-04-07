@@ -197,6 +197,17 @@ export default function VideoPlayerPage() {
     return () => clearInterval(heartbeat);
   }, [isPlaying, currentVideo?.id, currentTime, id]);
 
+  // Sekme degistiginde videoyu durdur — personel baska sekmede oyalanmasin
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden && videoRef.current && !videoRef.current.paused) {
+        videoRef.current.pause();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
   // Video degistiginde currentTime'i lastPosition ile baslat
   useEffect(() => {
     const pos = currentVideo?.lastPosition ?? 0;

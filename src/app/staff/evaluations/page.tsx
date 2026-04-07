@@ -45,7 +45,7 @@ export default function StaffEvaluationsPage() {
       {/* Bekleyen Değerlendirmeler */}
       <BlurFade delay={0.05}>
         <div className="rounded-2xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-          <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div className="flex items-center gap-2 px-4 py-4 sm:px-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
             <Clock className="h-4 w-4" style={{ color: 'var(--color-warning)' }} />
             <h2 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Bekleyen Değerlendirmelerim</h2>
             {pending.length > 0 && (
@@ -57,7 +57,7 @@ export default function StaffEvaluationsPage() {
           ) : (
             <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
               {pending.map(ev => (
-                <div key={ev.id} className="flex items-center justify-between px-5 py-4 gap-4">
+                <div key={ev.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 sm:px-5 sm:gap-4">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
                       {ev.subject.firstName} {ev.subject.lastName}
@@ -70,7 +70,7 @@ export default function StaffEvaluationsPage() {
                     </p>
                   </div>
                   <Link href={`/staff/evaluations/${ev.id}`}
-                    className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 transition-colors"
+                    className="flex items-center justify-center gap-1 text-xs font-semibold px-3 min-h-[44px] sm:min-h-0 py-1.5 rounded-lg flex-shrink-0 transition-colors w-full sm:w-auto"
                     style={{ background: 'var(--color-primary)', color: 'white' }}>
                     Başla <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
@@ -84,7 +84,7 @@ export default function StaffEvaluationsPage() {
       {/* Hakkımdaki Değerlendirmeler */}
       <BlurFade delay={0.1}>
         <div className="rounded-2xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-          <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div className="flex items-center gap-2 px-4 py-4 sm:px-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
             <Award className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
             <h2 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Hakkımdaki Değerlendirmeler</h2>
           </div>
@@ -93,7 +93,7 @@ export default function StaffEvaluationsPage() {
           ) : (
             <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
               {mySubjectEvals.map(ev => (
-                <div key={ev.id} className="flex items-center justify-between px-5 py-4 gap-4">
+                <div key={ev.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-4 py-4 sm:px-5 sm:gap-4">
                   <div>
                     <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>{ev.form.title}</p>
                     <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>

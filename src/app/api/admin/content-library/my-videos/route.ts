@@ -43,6 +43,10 @@ export async function GET(request: Request) {
           durationSeconds: true,
           sortOrder: true,
           videoUrl: true,
+          videoKey: true,
+          contentType: true,
+          pageCount: true,
+          documentKey: true,
           description: true,
           createdAt: true,
         },
@@ -73,11 +77,16 @@ export async function GET(request: Request) {
         title: v.title,
         durationSeconds: v.durationSeconds,
         sortOrder: v.sortOrder,
+        videoUrl: v.videoUrl,
+        videoKey: v.videoKey,
+        contentType: v.contentType ?? 'video',
+        pageCount: v.pageCount,
+        documentKey: v.documentKey,
         description: v.description,
         createdAt: v.createdAt.toISOString(),
       })),
     }
   })
 
-  return jsonResponse({ trainings: result })
+  return jsonResponse({ trainings: result }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }

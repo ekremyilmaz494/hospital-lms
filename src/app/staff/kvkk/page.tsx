@@ -85,7 +85,7 @@ export default function StaffKvkkPage() {
 
       {/* Bilgilendirme */}
       <div
-        className="rounded-2xl p-5"
+        className="rounded-2xl p-4 sm:p-5"
         style={{ background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 15%, transparent)' }}
       >
         <div className="flex gap-3">
@@ -107,10 +107,10 @@ export default function StaffKvkkPage() {
       </div>
 
       {/* Yeni Talep */}
-      <div className="rounded-2xl p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+      <div className="rounded-2xl p-4 sm:p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center justify-between w-full"
+          className="flex items-center justify-between w-full min-h-[44px]"
         >
           <div className="flex items-center gap-2">
             <Send className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
@@ -132,7 +132,7 @@ export default function StaffKvkkPage() {
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="w-full rounded-xl px-4 py-3 text-sm"
+                className="w-full rounded-xl px-4 py-3 text-sm min-h-[44px]"
                 style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
                 required
               >
@@ -184,7 +184,7 @@ export default function StaffKvkkPage() {
             <Button
               type="submit"
               disabled={submitting || !selectedType || description.length < 10}
-              className="gap-2 text-white"
+              className="gap-2 text-white w-full sm:w-auto min-h-[44px]"
               style={{ background: 'var(--color-primary)' }}
             >
               <Send className="h-4 w-4" />
@@ -195,7 +195,7 @@ export default function StaffKvkkPage() {
       </div>
 
       {/* Mevcut Talepler */}
-      <div className="rounded-2xl p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+      <div className="rounded-2xl p-4 sm:p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
         <div className="flex items-center gap-2 mb-4">
           <FileText className="h-4 w-4" style={{ color: 'var(--color-text-secondary)' }} />
           <h3 className="text-sm font-bold">Taleplerim</h3>
@@ -219,7 +219,7 @@ export default function StaffKvkkPage() {
                   className="rounded-xl p-4"
                   style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="text-xs font-bold" style={{ color: 'var(--color-text-primary)' }}>
