@@ -214,7 +214,7 @@ export default function StaffCertificatesPage() {
             <Award className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
               Sertifikalarım
             </h1>
             <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
@@ -225,7 +225,7 @@ export default function StaffCertificatesPage() {
       </BlurFade>
 
       {certificates.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {certificates.map((cert, i) => {
             const scoreColor = cert.score >= 90 ? 'var(--color-success)' : cert.score >= 70 ? 'var(--color-primary)' : 'var(--color-warning)';
             return (
@@ -248,7 +248,7 @@ export default function StaffCertificatesPage() {
                     }}
                   />
 
-                  <div className="p-5">
+                  <div className="p-4 sm:p-5">
                     {/* Status badge */}
                     <div className="flex items-center justify-between mb-4">
                       <div
@@ -290,8 +290,8 @@ export default function StaffCertificatesPage() {
                       <code className="flex-1 text-[11px] font-mono font-semibold truncate" style={{ color: 'var(--color-primary)' }}>
                         {cert.certificateCode}
                       </code>
-                      <button onClick={() => copyCode(cert.certificateCode)} className="shrink-0 p-1 rounded hover:bg-[var(--color-surface-hover)]">
-                        <Copy className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
+                      <button onClick={() => copyCode(cert.certificateCode)} className="shrink-0 p-2 sm:p-1 rounded-lg sm:rounded hover:bg-[var(--color-surface-hover)]">
+                        <Copy className="h-4 w-4 sm:h-3.5 sm:w-3.5" style={{ color: 'var(--color-text-muted)' }} />
                       </button>
                     </div>
 

@@ -38,7 +38,18 @@ export async function GET(request: Request) {
               _count: { select: { questions: true, videos: true } },
             },
           },
-          examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1 },
+          examAttempts: {
+            select: {
+              preExamCompletedAt: true,
+              videosCompletedAt: true,
+              postExamCompletedAt: true,
+              postExamScore: true,
+              attemptNumber: true,
+              status: true,
+            },
+            orderBy: { attemptNumber: 'desc' },
+            take: 1,
+          },
           _count: { select: { examAttempts: true } },
         },
         orderBy: { assignedAt: 'desc' },
@@ -99,7 +110,7 @@ export async function GET(request: Request) {
       limit,
       totalCount,
       totalPages: Math.ceil(totalCount / limit),
-    })
+    }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('Staff MyTrainings', 'Eğitimler yüklenemedi', err)
     return errorResponse('Eğitimler yüklenemedi', 503)

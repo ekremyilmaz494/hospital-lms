@@ -42,7 +42,7 @@ export async function GET(request: Request) {
   // Redis cache: 5 dk TTL
   const cacheKey = `standalone-exams:${dbUser!.organizationId!}:${page}:${search ?? ''}:${category ?? ''}`
   const cached = await getCached<object>(cacheKey)
-  if (cached) return jsonResponse(cached)
+  if (cached) return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 
   try {
     const [exams, total] = await Promise.all([
@@ -106,7 +106,7 @@ export async function GET(request: Request) {
     }
 
     await setCached(cacheKey, responseData, 300) // 5 dk TTL
-    return jsonResponse(responseData)
+    return jsonResponse(responseData, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('StandaloneExams', 'Sınavlar yüklenirken hata', err)
     return errorResponse('Sınavlar yüklenirken hata oluştu', 500)

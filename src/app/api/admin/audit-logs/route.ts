@@ -27,5 +27,5 @@ export async function GET(request: Request) {
     prisma.auditLog.count({ where }),
   ])
 
-  return jsonResponse({ logs, total, page, limit, totalPages: Math.ceil(total / limit) })
+  return jsonResponse({ logs, total, page, limit, totalPages: Math.ceil(total / limit) }, 200, { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' })
 }

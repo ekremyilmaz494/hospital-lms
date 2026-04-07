@@ -15,7 +15,7 @@ export async function GET() {
   if (roleError) return roleError
 
   const organizationId = dbUser!.organizationId
-  if (!organizationId) return jsonResponse({ attempts: [] })
+  if (!organizationId) return jsonResponse({ attempts: [] }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 
   const data = await withCache(`in-progress-exams:${organizationId}`, 30, async () => {
     const IN_PROGRESS_STATUSES = ['pre_exam', 'watching_videos', 'post_exam']
@@ -73,5 +73,5 @@ export async function GET() {
     }
   })
 
-  return jsonResponse(data)
+  return jsonResponse(data, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }

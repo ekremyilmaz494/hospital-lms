@@ -131,7 +131,7 @@ export default function StaffNotificationsPage() {
               )}
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
                 Bildirimler
               </h1>
               <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
@@ -142,7 +142,7 @@ export default function StaffNotificationsPage() {
           <button
             onClick={handleMarkAllRead}
             disabled={markingAll || unreadCount === 0}
-            className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 min-h-[44px] text-[13px] font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background: unreadCount > 0 ? 'var(--color-primary-light)' : 'var(--color-bg)',
               color: unreadCount > 0 ? 'var(--color-primary)' : 'var(--color-text-muted)',
@@ -268,7 +268,7 @@ export default function StaffNotificationsPage() {
                     <button
                       onClick={() => handleMarkRead(n.id)}
                       disabled={isMarking}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-50"
+                      className="flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-50"
                       style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
                       title="Okundu olarak işaretle"
                     >

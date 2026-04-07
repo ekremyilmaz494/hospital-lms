@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     page,
     limit,
     totalPages: Math.ceil(total / limit),
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }
 
 export async function POST(request: Request) {

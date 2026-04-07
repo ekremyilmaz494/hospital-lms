@@ -40,5 +40,5 @@ export async function GET() {
     }),
   ])
 
-  return jsonResponse({ pending, mySubjectEvals })
+  return jsonResponse({ pending, mySubjectEvals }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }

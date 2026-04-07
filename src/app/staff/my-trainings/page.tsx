@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import {
   BookOpen, Clock, CheckCircle, XCircle, Lock, Play, Target, Award,
@@ -52,6 +52,37 @@ export default function MyTrainingsPage() {
   const [activeTab, setActiveTab] = useState<'trainings' | 'exams'>('trainings');
   const completedRef = useRef<HTMLDivElement>(null);
 
+  const allItems: Training[] = useMemo(
+    () => Array.isArray(rawData) ? rawData : (rawData as { data: Training[] })?.data ?? [],
+    [rawData]
+  );
+
+  const { trainingList, examCount, trainingCount, activeTrainings, exhaustedTrainings, completedTrainings, stats } = useMemo(() => {
+    const list = allItems.filter((t) => activeTab === 'exams' ? t.examOnly : !t.examOnly);
+    const isExhaustedFailed = (t: Training) => t.status === 'failed' && t.attempt >= t.maxAttempts;
+    const active = list.filter(t => (t.status === 'assigned' || t.status === 'in_progress' || t.status === 'failed') && !isExhaustedFailed(t));
+    const exhausted = list.filter(t => isExhaustedFailed(t));
+    const completed = list.filter(t => t.status === 'passed' || t.status === 'locked');
+    const passedCount = list.filter(t => t.status === 'passed').length;
+    const scores = list.filter(t => t.score).map(t => t.score!);
+    const avgScore = scores.length ? `%${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)}` : '—';
+
+    return {
+      trainingList: list,
+      examCount: allItems.filter((t) => t.examOnly).length,
+      trainingCount: allItems.filter((t) => !t.examOnly).length,
+      activeTrainings: active,
+      exhaustedTrainings: exhausted,
+      completedTrainings: completed,
+      stats: [
+        { label: 'Toplam Eğitim', value: list.length, icon: BookOpen, color: 'var(--color-primary)' },
+        { label: 'Devam Eden', value: active.length, icon: Zap, color: 'var(--color-warning)' },
+        { label: 'Tamamlanan', value: passedCount, icon: TrendingUp, color: 'var(--color-success)' },
+        { label: 'Ortalama', value: avgScore, icon: BarChart3, color: 'var(--color-info)' },
+      ],
+    };
+  }, [allItems, activeTab]);
+
   if (isLoading) return <PageLoading />;
 
   if (error) {
@@ -62,27 +93,11 @@ export default function MyTrainingsPage() {
     );
   }
 
-  const allItems: Training[] = Array.isArray(rawData) ? rawData : (rawData as { data: Training[] })?.data ?? [];
-  const trainingList = allItems.filter((t) => activeTab === 'exams' ? t.examOnly : !t.examOnly);
-  const examCount = allItems.filter((t) => t.examOnly).length;
-  const trainingCount = allItems.filter((t) => !t.examOnly).length;
-  const isExhaustedFailed = (t: Training) => t.status === 'failed' && t.attempt >= t.maxAttempts;
-  const activeTrainings = trainingList.filter(t => (t.status === 'assigned' || t.status === 'in_progress' || t.status === 'failed') && !isExhaustedFailed(t));
-  const exhaustedTrainings = trainingList.filter(t => isExhaustedFailed(t));
-  const completedTrainings = trainingList.filter(t => t.status === 'passed' || t.status === 'locked');
-
-  const stats = [
-    { label: 'Toplam Eğitim', value: trainingList.length, icon: BookOpen, color: 'var(--color-primary)' },
-    { label: 'Devam Eden', value: activeTrainings.length, icon: Zap, color: 'var(--color-warning)' },
-    { label: 'Tamamlanan', value: trainingList.filter(t => t.status === 'passed').length, icon: TrendingUp, color: 'var(--color-success)' },
-    { label: 'Ortalama', value: (() => { const scores = trainingList.filter(t => t.score).map(t => t.score!); return scores.length ? `%${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)}` : '—'; })(), icon: BarChart3, color: 'var(--color-info)' },
-  ];
-
   return (
     <div>
       {/* Header */}
       <BlurFade delay={0}>
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-center gap-4 mb-5 sm:mb-8">
           <div
             className="flex h-12 w-12 items-center justify-center rounded-2xl"
             style={{
@@ -93,7 +108,7 @@ export default function MyTrainingsPage() {
             <BookOpen className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
               Eğitimlerim
             </h1>
             <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
@@ -143,7 +158,7 @@ export default function MyTrainingsPage() {
 
       {/* Stats */}
       <BlurFade delay={0.03}>
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5 sm:mb-8">
           {stats.map((s) => (
             <div
               key={s.label}
@@ -196,7 +211,7 @@ export default function MyTrainingsPage() {
           <BlurFade delay={0.06}>
             <div className="flex items-center gap-2 mb-4">
               <Zap className="h-4 w-4" style={{ color: 'var(--color-warning)' }} />
-              <h2 className="text-[14px] font-bold">Aktif Eğitimler</h2>
+              <h2 className="text-sm sm:text-base font-bold">Aktif Eğitimler</h2>
               <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white" style={{ background: 'var(--color-warning)' }}>
                 {activeTrainings.length}
               </span>
@@ -221,7 +236,7 @@ export default function MyTrainingsPage() {
                       {/* Left accent */}
                       <div className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl" style={{ background: `linear-gradient(180deg, ${catColor}, ${catColor}80)` }} />
 
-                      <div className="flex items-center gap-6 p-6 pl-8">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 p-4 sm:p-6 pl-6 sm:pl-8">
                         {/* Icon */}
                         <div
                           className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-transform duration-200 group-hover:scale-105"
@@ -246,7 +261,7 @@ export default function MyTrainingsPage() {
                             </span>
                           </div>
                           <h3 className="text-[15px] font-bold mb-2">{t.title}</h3>
-                          <div className="flex items-center gap-5 text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-5 text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
                             {t.examOnly && (
                               <span className="flex items-center gap-1">
                                 <ClipboardCheck className="h-3 w-3" />
@@ -270,9 +285,9 @@ export default function MyTrainingsPage() {
                         </div>
 
                         {/* CTA */}
-                        <div className="flex items-center shrink-0">
+                        <div className="flex items-center shrink-0 w-full sm:w-auto">
                           <div
-                            className="flex items-center gap-2 rounded-xl px-5 py-3 text-[13px] font-semibold text-white transition-transform duration-200 group-hover:scale-[1.03]"
+                            className="flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[13px] font-semibold text-white transition-transform duration-200 group-hover:scale-[1.03] w-full sm:w-auto"
                             style={{
                               background: `linear-gradient(135deg, ${catColor}, ${catColor}cc)`,
                               boxShadow: `0 4px 12px ${catColor}30`,

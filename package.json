@@ -40,6 +40,12 @@
   "lint-staged": {
     "*": [
       "node scripts/secret-scanner.js"
+    ],
+    "src/app/api/**/route.ts": [
+      "node scripts/perf-check.js"
+    ],
+    "src/app/**/page.{ts,tsx}": [
+      "node scripts/perf-check.js"
     ]
   },
   "dependencies": {

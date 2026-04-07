@@ -193,8 +193,8 @@ export default function ProfilePage() {
       toast('Mevcut şifrenizi girin', 'error');
       return;
     }
-    if (!newPassword || newPassword.length < 6) {
-      toast('Yeni şifre en az 6 karakter olmalı', 'error');
+    if (!newPassword || newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      toast('Şifre en az 8 karakter, bir büyük harf ve bir rakam içermelidir', 'error');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -256,7 +256,7 @@ export default function ProfilePage() {
             <User className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
               Profilim
             </h1>
             <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
@@ -306,11 +306,11 @@ export default function ProfilePage() {
                     onChange={handleAvatarUpload}
                   />
                   <button
-                    className="absolute bottom-0 left-16 flex h-8 w-8 items-center justify-center rounded-full border-2 shadow-md transition-transform duration-200 hover:scale-110 active:scale-95"
+                    className="absolute bottom-0 left-16 flex h-10 w-10 sm:h-8 sm:w-8 items-center justify-center rounded-full border-2 shadow-md transition-transform duration-200 hover:scale-110 active:scale-95"
                     style={{ background: 'var(--color-primary)', borderColor: 'var(--color-surface)', color: 'white' }}
                     onClick={() => avatarInputRef.current?.click()}
                   >
-                    <Camera className="h-3.5 w-3.5" />
+                    <Camera className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                   </button>
                 </div>
 
@@ -408,7 +408,7 @@ export default function ProfilePage() {
               style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
             >
               <div
-                className="flex items-center justify-between px-6 py-4"
+                className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between px-6 py-4"
                 style={{ borderBottom: '1px solid var(--color-border)' }}
               >
                 <div className="flex items-center gap-3">
@@ -423,7 +423,7 @@ export default function ProfilePage() {
                 <button
                   onClick={handleSaveProfile}
                   disabled={savingProfile}
-                  className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
+                  className="hidden sm:flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
                   style={{
                     background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
                     boxShadow: '0 4px 12px rgba(13, 150, 104, 0.2)',
@@ -435,7 +435,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="p-6 space-y-5">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
                       <User className="h-3 w-3" /> Ad
@@ -487,6 +487,19 @@ export default function ProfilePage() {
                     placeholder="+90 (___) ___ __ __"
                   />
                 </div>
+                {/* Mobile save button — at bottom of form */}
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={savingProfile}
+                  className="flex sm:hidden w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[14px] font-semibold text-white transition-all duration-200 active:scale-[0.98] disabled:opacity-60"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
+                    boxShadow: '0 4px 12px rgba(13, 150, 104, 0.2)',
+                  }}
+                >
+                  {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {savingProfile ? 'Kaydediliyor...' : 'Kaydet'}
+                </button>
               </div>
             </div>
           </BlurFade>
@@ -498,7 +511,7 @@ export default function ProfilePage() {
               style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
             >
               <div
-                className="flex items-center justify-between px-6 py-4"
+                className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-4"
                 style={{ borderBottom: '1px solid var(--color-border)' }}
               >
                 <div className="flex items-center gap-3">
@@ -513,7 +526,7 @@ export default function ProfilePage() {
                 <button
                   onClick={handleChangePassword}
                   disabled={savingPassword || (!currentPassword && !newPassword)}
-                  className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{
                     background: (currentPassword && newPassword) ? 'var(--color-warning-bg)' : 'var(--color-bg)',
                     color: (currentPassword && newPassword) ? 'var(--color-warning)' : 'var(--color-text-muted)',
@@ -550,7 +563,7 @@ export default function ProfilePage() {
                     </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
                       <Lock className="h-3 w-3" /> Yeni Şifre

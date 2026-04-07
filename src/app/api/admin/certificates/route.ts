@@ -87,7 +87,7 @@ export async function GET(request: Request) {
       })),
       stats: { totalCerts, activeCerts, expiredCerts, expiringSoon },
       trainings,
-    })
+    }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('Admin Certificates', 'Sertifikalar yüklenemedi', err)
     return errorResponse('Sertifikalar yüklenemedi', 503)

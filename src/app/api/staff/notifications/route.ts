@@ -26,17 +26,18 @@ export async function GET(request: Request) {
     }
     if (unreadOnly) where.isRead = false
 
-    const notifications = await prisma.notification.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    })
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      prisma.notification.count({
+        where: { userId: dbUser!.id, organizationId: dbUser!.organizationId, isRead: false },
+      }),
+    ])
 
-    const unreadCount = await prisma.notification.count({
-      where: { userId: dbUser!.id, organizationId: dbUser!.organizationId, isRead: false },
-    })
-
-    return jsonResponse({ notifications, unreadCount })
+    return jsonResponse({ notifications, unreadCount }, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
   } catch (err) {
     logger.error('Staff Notifications', 'Bildirimler yüklenemedi', err)
     return errorResponse('Bildirimler yüklenemedi', 503)

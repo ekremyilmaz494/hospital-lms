@@ -59,7 +59,7 @@ export async function GET(request: Request) {
       eventType: a.training.examOnly ? 'exam' as const : 'training' as const,
     }))
 
-    return jsonResponse({ events, total, page, limit })
+    return jsonResponse({ events, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('Staff Calendar', 'Takvim yüklenemedi', err)
     return errorResponse('Takvim yüklenemedi', 503)

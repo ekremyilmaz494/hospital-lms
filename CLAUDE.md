@@ -238,6 +238,49 @@ Bu projede asagidaki GitHub repolarindaki skill ve rehberlerden faydalanilmaktad
 
 ---
 
+## API Route Performans Checklist (ZORUNLU)
+
+Her yeni API route yazarken asagidaki kurallar ZORUNLUDUR. `scripts/perf-check.js` pre-commit hook'u bu kurallari otomatik kontrol eder.
+
+1. **Auth:** `getAuthUser()` kullan (asla `supabase.auth.getUser()` cagirma — HTTP round-trip yapar)
+2. **Paralellestirme:** Bagimsiz Prisma sorgularini `Promise.all` ile calistir, ardisik `await` YASAK
+3. **Select:** `include` yerine `select` kullan — sadece gereken alanlari cek
+4. **Cache-Control:** GET handler'larinda `jsonResponse(data, 200, { 'Cache-Control': 'private, max-age=N' })` ekle
+5. **Rate Limiting:** Write endpoint'lerinde (POST/PUT/DELETE) `checkRateLimit()` kullan (`@/lib/redis`)
+6. **Error Handling:** Prisma cagrilarini `try/catch` ile sar, hatalari `logger.error()` ile logla
+7. **Redis Cache:** Yogun GET route'larinda `getCached`/`setCached` kullan (`@/lib/redis`)
+8. **Perf Logging:** Kritik route'lari `withPerfLogging()` ile sar (`@/lib/api-perf`) — >1s suren istekleri loglar
+
+### Pre-commit Guard
+`scripts/perf-check.js` — commit sirasinda API route dosyalarinda otomatik calisir:
+- `supabase.auth.getUser()` tespit → **COMMIT ENGELLENIR**
+- 5+ ardisik `await prisma` → **COMMIT ENGELLENIR**
+- 3+ ardisik `await prisma` → **UYARI**
+- GET handler'da `Cache-Control` eksik → **COMMIT ENGELLENIR**
+- Nested `include` içinde `select` eksik → **UYARI**
+- Client page'de 4+ memoize edilmemiş filter/map/reduce → **UYARI**
+- False positive icin: `// perf-check-disable-line` satir yorumu ekle
+
+---
+
+## Client-Side Performans Kuralları (ZORUNLU)
+
+Her yeni sayfa veya component değişikliğinde aşağıdaki kurallar ZORUNLUDUR:
+
+1. **useMemo:** 3+ filter/map/reduce/sort zinciri varsa `useMemo` ile sar
+2. **Hesaplama karmaşıklığı:** O(n*m) nested loop YASAK — Map/Set ile O(n+m) hash lookup kullan
+3. **Provider'da API çağrısı:** AuthProvider mount'unda ağır API çağrısı yapma, `setTimeout` ile geciktir
+4. **Gereksiz re-render:** `setInterval(fn, 1000)` gibi timer'lar ayrı memoized component'e taşınmalı
+5. **useFetch:** Her `useFetch` çağrısının `isLoading` ve `error` state'leri kontrol edilmeli
+6. **include vs select:** Prisma `include` kullanırken mutlaka `select` ile sadece gereken alanları çek
+7. **Cache-Control:** Her GET API route'unda `Cache-Control` header ZORUNLU:
+   - Sık değişen (bildirimler): `private, max-age=10, stale-while-revalidate=30`
+   - Normal (eğitimler, takvim): `private, max-age=30, stale-while-revalidate=60`
+   - Nadir değişen (profil, SMG): `private, max-age=60, stale-while-revalidate=120`
+8. **Promise.all:** Bağımsız Prisma sorguları MUTLAKA `Promise.all` ile paralel çalıştırılmalı
+
+---
+
 ## Otomatik Doğrulama Kuralı
 
 Her kod değişikliğinden sonra aşağıdaki adımları sırayla uygula.

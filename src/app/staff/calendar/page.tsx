@@ -129,21 +129,31 @@ export default function CalendarPage() {
     return cells;
   }, [year, month]);
 
-  // Map events to dates
+  // Map events to dates — O(n*k) where k = avg event duration in days
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     if (!events) return map;
+    // Calendar range boundaries for early exit
+    const firstDay = calendarDays[0]?.date;
+    const lastDay = calendarDays[calendarDays.length - 1]?.date;
+    if (!firstDay || !lastDay) return map;
+
     events.forEach(evt => {
       const start = new Date(evt.start);
       const end = new Date(evt.end);
-      // For each day of the calendar, check if event overlaps
-      calendarDays.forEach(cell => {
-        if (isDateInRange(cell.date, start, end)) {
-          const key = cell.date.toDateString();
-          if (!map.has(key)) map.set(key, []);
-          map.get(key)!.push(evt);
-        }
-      });
+      // Clamp to visible calendar range
+      const rangeStart = start < firstDay ? firstDay : start;
+      const rangeEnd = end > lastDay ? lastDay : end;
+      // Iterate each day the event spans (typically 1-5 days)
+      const cursor = new Date(rangeStart);
+      cursor.setHours(0, 0, 0, 0);
+      const endTime = rangeEnd.getTime();
+      while (cursor.getTime() <= endTime) {
+        const key = cursor.toDateString();
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(evt);
+        cursor.setDate(cursor.getDate() + 1);
+      }
     });
     return map;
   }, [events, calendarDays]);
@@ -211,7 +221,7 @@ export default function CalendarPage() {
               <CalendarIcon className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
                 Eğitim Takvimi
               </h1>
               <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
@@ -238,7 +248,7 @@ export default function CalendarPage() {
 
       {/* Stats Row */}
       <BlurFade delay={0.03}>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Bu Ay', value: monthStats.total, icon: Layers, color: 'var(--color-primary)' },
             { label: 'Bekleyen', value: monthStats.upcoming, icon: BookOpen, color: 'var(--color-info)' },
@@ -280,7 +290,7 @@ export default function CalendarPage() {
             >
               <button
                 onClick={goToPrevMonth}
-                className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors duration-150"
+                className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-xl transition-colors duration-150"
                 style={{ color: 'var(--color-text-secondary)' }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-hover)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
@@ -294,7 +304,7 @@ export default function CalendarPage() {
               </div>
               <button
                 onClick={goToNextMonth}
-                className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors duration-150"
+                className="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-xl transition-colors duration-150"
                 style={{ color: 'var(--color-text-secondary)' }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-hover)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
@@ -304,7 +314,7 @@ export default function CalendarPage() {
             </div>
 
             {/* Day Headers */}
-            <div className="grid grid-cols-7 px-3 pt-3">
+            <div className="grid grid-cols-7 px-1 pt-2 sm:px-3 sm:pt-3">
               {DAYS_TR.map(d => (
                 <div
                   key={d}
@@ -317,7 +327,7 @@ export default function CalendarPage() {
             </div>
 
             {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-px px-3 pb-3">
+            <div className="grid grid-cols-7 gap-px px-1 pb-1 sm:px-3 sm:pb-3">
               {calendarDays.map((cell, i) => {
                 const isToday = cell.isCurrentMonth && isSameDay(cell.date, today);
                 const isSelected = cell.isCurrentMonth && cell.day === selectedDay;
@@ -330,9 +340,8 @@ export default function CalendarPage() {
                     key={i}
                     onClick={() => cell.isCurrentMonth && setSelectedDay(cell.day === selectedDay ? null : cell.day)}
                     disabled={!cell.isCurrentMonth}
-                    className="group relative flex flex-col items-start rounded-xl p-1.5 text-left transition-all duration-150"
+                    className="calendar-day-btn group relative flex flex-col items-start rounded-xl p-1 sm:p-1.5 text-left transition-all duration-150 min-w-0 min-h-[60px] sm:min-h-[80px]"
                     style={{
-                      minHeight: '80px',
                       opacity: cell.isCurrentMonth ? (isPast ? 0.55 : 1) : 0.25,
                       background: isSelected
                         ? 'var(--color-primary-light)'
@@ -380,37 +389,52 @@ export default function CalendarPage() {
                       />
                     )}
 
-                    {/* Event pills (max 2 + overflow) */}
+                    {/* Event indicators — dots on mobile, pills on desktop */}
                     {cell.isCurrentMonth && dayEvents.length > 0 && (
-                      <div className="mt-1 flex flex-col gap-0.5 w-full min-w-0">
-                        {dayEvents.slice(0, 2).map(evt => {
-                          const rawStatus = evt.status as string;
-                          const statusKey = (rawStatus === 'passed' ? 'completed' : rawStatus) as keyof typeof STATUS_CONFIG;
-                          const cfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.assigned;
-                          const pillColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
-                          const PillIcon = evt.eventType === 'exam' ? ClipboardList : BookOpen;
-                          return (
-                            <div
-                              key={evt.id}
-                              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 w-full min-w-0"
-                              style={{ background: `${pillColor}12` }}
-                            >
-                              <PillIcon className="h-2.5 w-2.5 shrink-0" style={{ color: pillColor }} />
-                              <span
-                                className="truncate text-[9px] font-semibold leading-tight"
-                                style={{ color: pillColor }}
+                      <>
+                        {/* Mobile: colored dots */}
+                        <div className="mt-1 flex items-center gap-1 sm:hidden">
+                          {dayEvents.slice(0, 3).map(evt => {
+                            const rawSt = evt.status as string;
+                            const stKey = (rawSt === 'passed' ? 'completed' : rawSt) as keyof typeof STATUS_CONFIG;
+                            const dotColor = evt.eventType === 'exam' ? 'var(--color-accent)' : (STATUS_CONFIG[stKey] ?? STATUS_CONFIG.assigned).color;
+                            return <span key={evt.id} className="h-1.5 w-1.5 rounded-full" style={{ background: dotColor }} />;
+                          })}
+                          {dayEvents.length > 3 && (
+                            <span className="text-[8px] font-bold" style={{ color: 'var(--color-text-muted)' }}>+{dayEvents.length - 3}</span>
+                          )}
+                        </div>
+                        {/* Desktop: full pills */}
+                        <div className="mt-1 hidden sm:flex flex-col gap-0.5 w-full min-w-0">
+                          {dayEvents.slice(0, 2).map(evt => {
+                            const rawStatus = evt.status as string;
+                            const statusKey = (rawStatus === 'passed' ? 'completed' : rawStatus) as keyof typeof STATUS_CONFIG;
+                            const cfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.assigned;
+                            const pillColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
+                            const PillIcon = evt.eventType === 'exam' ? ClipboardList : BookOpen;
+                            return (
+                              <div
+                                key={evt.id}
+                                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 w-full min-w-0"
+                                style={{ background: `${pillColor}12` }}
                               >
-                                {evt.title}
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {dayEvents.length > 2 && (
-                          <span className="text-[9px] font-bold px-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                            +{dayEvents.length - 2} daha
-                          </span>
-                        )}
-                      </div>
+                                <PillIcon className="h-2.5 w-2.5 shrink-0" style={{ color: pillColor }} />
+                                <span
+                                  className="truncate text-[9px] font-semibold leading-tight"
+                                  style={{ color: pillColor }}
+                                >
+                                  {evt.title}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {dayEvents.length > 2 && (
+                            <span className="text-[9px] font-bold px-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                              +{dayEvents.length - 2} daha
+                            </span>
+                          )}
+                        </div>
+                      </>
                     )}
                   </button>
                 );
@@ -501,7 +525,9 @@ export default function CalendarPage() {
                     </div>
                   ) : (
                     selectedDayEvents.map(evt => {
-                      const cfg = STATUS_CONFIG[evt.status];
+                      const rawSt = evt.status as string;
+                      const statusKey = (rawSt === 'passed' ? 'completed' : rawSt) as keyof typeof STATUS_CONFIG;
+                      const cfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.assigned;
                       const Icon = evt.eventType === 'exam' ? ClipboardList : cfg.icon;
                       const iconBg = evt.eventType === 'exam' ? 'var(--color-accent-light)' : cfg.bg;
                       const iconColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
@@ -598,7 +624,9 @@ export default function CalendarPage() {
                 ) : (
                   upcomingDeadlines.map(evt => {
                     const days = daysUntil(evt.end);
-                    const cfg = STATUS_CONFIG[evt.status];
+                    const rawSt2 = evt.status as string;
+                    const statusKey2 = (rawSt2 === 'passed' ? 'completed' : rawSt2) as keyof typeof STATUS_CONFIG;
+                    const cfg = STATUS_CONFIG[statusKey2] ?? STATUS_CONFIG.assigned;
                     const urgency = days <= 3 ? 'var(--color-error)' : days <= 7 ? 'var(--color-warning)' : 'var(--color-text-muted)';
                     return (
                       <Link

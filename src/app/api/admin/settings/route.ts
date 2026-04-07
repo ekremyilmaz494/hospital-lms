@@ -40,7 +40,7 @@ export async function GET() {
     phone: org?.phone ?? '',
     address: org?.address ?? '',
     sessionTimeout: org?.sessionTimeout ?? 30,
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }
 
 // PUT /api/admin/settings — Hastane ayarlarını güncelle

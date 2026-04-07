@@ -75,7 +75,7 @@ export async function GET(request: Request) {
     return { trainings: mapped, total, page, limit, totalPages: Math.ceil(total / limit) }
   })
 
-  return jsonResponse(data)
+  return jsonResponse(data, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }
 
 export async function POST(request: Request) {

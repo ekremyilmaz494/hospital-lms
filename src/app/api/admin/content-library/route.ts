@@ -42,5 +42,5 @@ export async function GET(request: Request) {
       targetRoles: item.targetRoles as string[],
       isInstalled: installedSet.has(item.id),
     })),
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }

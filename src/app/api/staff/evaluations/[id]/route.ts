@@ -41,5 +41,5 @@ export async function GET(
   const answeredItems = evaluation.answers.length
   const progress = totalItems > 0 ? Math.round((answeredItems / totalItems) * 100) : 0
 
-  return jsonResponse({ evaluation, totalItems, answeredItems, progress })
+  return jsonResponse({ evaluation, totalItems, answeredItems, progress }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }

@@ -36,7 +36,7 @@ export async function GET() {
       certificates: profile._count.certificates,
     },
     createdAt: profile.createdAt,
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }
 
 interface PatchBody {
@@ -99,22 +99,23 @@ export async function PATCH(request: Request) {
       oldData[key] = currentProfile?.[key as keyof typeof currentProfile] ?? null
     }
 
-    await prisma.user.update({
+    // DB update + Supabase metadata sync in parallel
+    const dbUpdate = prisma.user.update({
       where: { id: dbUser!.id },
       data: updateData,
     })
 
-    // Sync name to Supabase user_metadata
-    if (body.firstName || body.lastName) {
-      const supabase = await createClient()
-      await supabase.auth.updateUser({
-        data: {
-          ...(body.firstName && { first_name: body.firstName.trim() }),
-          ...(body.lastName && { last_name: body.lastName.trim() }),
-          ...(body.phone && { phone: body.phone.trim() }),
-        },
-      })
-    }
+    const supabaseSync = (body.firstName || body.lastName)
+      ? createClient().then(supabase => supabase.auth.updateUser({
+          data: {
+            ...(body.firstName && { first_name: body.firstName.trim() }),
+            ...(body.lastName && { last_name: body.lastName.trim() }),
+            ...(body.phone && { phone: body.phone.trim() }),
+          },
+        }))
+      : Promise.resolve()
+
+    await Promise.all([dbUpdate, supabaseSync])
 
     await createAuditLog({
       userId: dbUser!.id,

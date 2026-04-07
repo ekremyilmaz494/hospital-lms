@@ -47,7 +47,7 @@ export async function GET() {
     }))
   }))
 
-  return jsonResponse(formatted)
+  return jsonResponse(formatted, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }
 
 // POST /api/admin/departments — Yeni departman oluştur

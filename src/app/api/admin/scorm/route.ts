@@ -34,7 +34,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     })
 
-    return jsonResponse(trainings)
+    return jsonResponse(trainings, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('SCORM List', 'SCORM icerikleri yuklenemedi', err)
     return errorResponse('SCORM icerikleri yuklenemedi', 503)

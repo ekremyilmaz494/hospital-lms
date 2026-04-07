@@ -22,7 +22,7 @@ export async function GET() {
   // Redis cache: 5 dk TTL
   const cacheKey = `effectiveness:${orgId}`
   const cached = await getCached<object>(cacheKey)
-  if (cached) return jsonResponse(cached)
+  if (cached) return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 
   try {
     // Bağımsız sorgular paralel — DB round-trip: 2 → 1
@@ -240,7 +240,7 @@ export async function GET() {
     }
 
     await setCached(cacheKey, responseData, 300) // 5 dk TTL
-    return jsonResponse(responseData)
+    return jsonResponse(responseData, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('Effectiveness', 'Etkinlik analizi alınamadı', err)
     return errorResponse('Etkinlik analizi alınamadı', 503)

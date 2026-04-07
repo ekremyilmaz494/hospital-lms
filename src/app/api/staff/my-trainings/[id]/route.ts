@@ -26,11 +26,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     include: {
       training: {
         include: {
-          videos: { orderBy: { sortOrder: 'asc' } },
+          videos: {
+            select: { id: true, title: true, durationSeconds: true, sortOrder: true },
+            orderBy: { sortOrder: 'asc' },
+          },
         },
       },
       examAttempts: {
-        include: { videoProgress: true },
+        select: {
+          attemptNumber: true,
+          status: true,
+          isPassed: true,
+          preExamScore: true,
+          postExamScore: true,
+          preExamCompletedAt: true,
+          videosCompletedAt: true,
+          postExamCompletedAt: true,
+          videoProgress: { select: { videoId: true, isCompleted: true } },
+        },
         orderBy: { attemptNumber: 'desc' },
       },
     },
@@ -46,11 +59,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       include: {
         training: {
           include: {
-            videos: { orderBy: { sortOrder: 'asc' } },
+            videos: {
+              select: { id: true, title: true, durationSeconds: true, sortOrder: true },
+              orderBy: { sortOrder: 'asc' },
+            },
           },
         },
         examAttempts: {
-          include: { videoProgress: true },
+          select: {
+            attemptNumber: true,
+            status: true,
+            isPassed: true,
+            preExamScore: true,
+            postExamScore: true,
+            preExamCompletedAt: true,
+            videosCompletedAt: true,
+            postExamCompletedAt: true,
+            videoProgress: { select: { videoId: true, isCompleted: true } },
+          },
           orderBy: { attemptNumber: 'desc' },
         },
       },
@@ -147,5 +173,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       duration: `${Math.floor(v.durationSeconds / 60)}:${String(v.durationSeconds % 60).padStart(2, '0')}`,
       completed: isRetryPending ? false : (videoProgressMap.get(v.id)?.isCompleted ?? false),
     })),
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' })
 }

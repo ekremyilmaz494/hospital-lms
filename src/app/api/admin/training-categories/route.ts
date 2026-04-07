@@ -40,11 +40,13 @@ export async function GET() {
         icon: cat.icon,
         order: i,
         isDefault: true,
-      }))
+      })),
+      200,
+      { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' }
     )
   }
 
-  return jsonResponse(categories)
+  return jsonResponse(categories, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }
 
 export async function POST(request: Request) {

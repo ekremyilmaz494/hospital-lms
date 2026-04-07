@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   // Redis cache: 10 dk TTL (filtre parametreleri cache key'e dahil)
   const cacheKey = `reports:${orgId}:${fromParam ?? 'all'}:${toParam ?? 'all'}:${departmentId ?? 'all'}`
   const cached = await getCached<object>(cacheKey)
-  if (cached) return jsonResponse(cached)
+  if (cached) return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   const dateFrom = fromParam ? new Date(fromParam) : undefined
   const dateTo = toParam ? new Date(toParam) : undefined
 
@@ -242,7 +242,7 @@ export async function GET(request: Request) {
     }
 
     await setCached(cacheKey, responseData, 600) // 10 dk TTL
-    return jsonResponse(responseData)
+    return jsonResponse(responseData, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('Admin Reports', 'Rapor verileri alınamadı', err)
     return errorResponse('Rapor verileri alınamadı', 503)

@@ -42,7 +42,7 @@ export async function GET() {
     return jsonResponse({
       hasSubscription: false,
       organization: org?.name ?? '',
-    })
+    }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   }
 
   const plan = subscription.plan
@@ -99,5 +99,5 @@ export async function GET() {
       where: { isActive: true },
       orderBy: { priceMonthly: 'asc' },
     }),
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }

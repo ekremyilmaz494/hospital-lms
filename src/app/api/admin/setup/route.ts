@@ -22,7 +22,7 @@ export async function GET() {
 
   if (!data) return errorResponse('Kurum bulunamadı', 404)
 
-  return jsonResponse(data)
+  return jsonResponse(data, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }
 
 /** PUT /api/admin/setup — Kurulum adımını kaydet */

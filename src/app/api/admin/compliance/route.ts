@@ -138,7 +138,7 @@ export async function GET() {
       trainingCompliance,
       urgentDeadlines,
       departmentCompliance,
-    })
+    }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('Admin Compliance', 'Uyum raporu alınamadı', err)
     return errorResponse('Uyum raporu alınamadı', 503)

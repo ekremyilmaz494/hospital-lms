@@ -718,6 +718,11 @@ select:focus-visible {
     min-width: 44px;
   }
 
+  /* Calendar grid cells — override min-width for 7-column layout */
+  .calendar-day-btn {
+    min-width: 0 !important;
+  }
+
   /* Larger tap targets for table rows on mobile */
   .premium-table td {
     padding: 16px;

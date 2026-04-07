@@ -70,5 +70,5 @@ export async function GET(request: Request) {
     progress: requiredPoints > 0 ? Math.min(100, Math.round((approvedPoints / requiredPoints) * 100)) : 0,
     approvedActivities,
     pendingActivities,
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }

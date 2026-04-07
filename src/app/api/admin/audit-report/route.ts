@@ -134,7 +134,7 @@ export async function GET() {
       },
     }
 
-    return NextResponse.json(reportData)
+    return NextResponse.json(reportData, { headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' } })
   } catch (err) {
     logger.error('AuditReport', 'Denetim raporu alınamadı', err)
     return errorResponse('Denetim raporu alınamadı', 503)

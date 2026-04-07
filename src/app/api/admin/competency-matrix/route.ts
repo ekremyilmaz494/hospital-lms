@@ -137,7 +137,7 @@ export async function GET(request: Request) {
       page,
       limit,
       totalPages: Math.ceil(totalStaffCount / limit),
-    })
+    }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('CompetencyMatrix', 'Matris verileri alınamadı', err)
     return errorResponse('Yetkinlik matrisi alınamadı', 503)

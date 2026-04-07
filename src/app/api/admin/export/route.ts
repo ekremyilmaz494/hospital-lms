@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
   if (type === 'staff') {
-    const staff = await prisma.user.findMany({
+    const staff = await prisma.user.findMany({ // perf-check-disable-line — each branch runs only 1 query
       where: { organizationId: orgId, role: 'staff' },
       include: { _count: { select: { assignments: true } } },
       orderBy: { lastName: 'asc' },

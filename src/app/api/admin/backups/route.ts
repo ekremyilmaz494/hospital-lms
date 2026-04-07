@@ -75,7 +75,7 @@ export async function GET(_request: Request) {
       totalSize: totalSize > 0 ? `${totalSize.toFixed(2)} MB` : '-',
       nextAuto: 'Her gün 03:15 UTC',
     },
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' })
 }
 
 export async function POST(request: Request) {
