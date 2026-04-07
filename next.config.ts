@@ -81,7 +81,7 @@ const nextConfig: NextConfig = {
           value: [
             "default-src 'self'",
             // TODO: unsafe-inline'ı nonce-based CSP ile değiştir (middleware.ts'de nonce üretimi gerekli)
-            `script-src 'self'${process.env.NODE_ENV === 'development' ? " 'unsafe-inline' 'unsafe-eval'" : ''}`,
+            `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: https: blob:",
             "font-src 'self' data:",
