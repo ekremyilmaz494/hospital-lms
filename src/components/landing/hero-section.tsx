@@ -403,7 +403,7 @@ export function HeroSection() {
         </div>
 
         {/* Right — static dashboard mockup */}
-        <div className="flex justify-center lg:justify-end">
+        <div className="flex justify-center lg:justify-end overflow-hidden">
           <HeroVisual />
         </div>
       </section>

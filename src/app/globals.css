@@ -205,6 +205,7 @@
 /* ── GLOBAL STYLES ── */
 html {
   /* scroll-behavior managed via data attribute for Next.js route transitions */
+  overflow-x: hidden;
 }
 
 body {
