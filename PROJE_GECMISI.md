@@ -3019,8 +3019,62 @@ Supabase projesini Seul'den (ap-northeast-2) Frankfurt'a (eu-central-1) taşıma
 | Redis cache hit | ~210ms | 0ms (L1 memory) |
 
 ### Bilinen Açık Sorunlar / Sıradaki İşler
-- **Eğitim detay sayfasında personel başarı listesi + PDF/Excel export** — Admin istediği eğitimin detayında personellerin geçti/kaldı durumunu görebilmeli, profesyonel PDF (imza alanı ile) ve Excel indirebilmeli
-- **Signature modal kaldırılacak** — Sağlık Bakanlığı "okudum anladım" onayını yeterli bulmadı; sınav baraj puanını geçen otomatik başarılı sayılacak
 - Dev modda API yanıt süreleri ~200-500ms (Türkiye → Frankfurt ağ gecikmesi) — Production'da (Vercel Frankfurt ↔ Supabase Frankfurt) ~1-5ms olacak
 
 *Son güncelleme: 6 Nisan 2026 — Oturum 26*
+
+---
+
+## Oturum 27 — 6 Nisan 2026
+
+### Yapılan İşler
+
+#### 1. "Okudum Anladım" Onay Kutusu Kaldırıldı
+- **Sebep:** Sağlık Bakanlığı bu mekanizmayı yeterli bulmadı
+- **Değişiklik:** Sınav baraj puanını geçen personel otomatik olarak "başarılı" sayılıyor
+- **Teknik:** `src/app/exam/[id]/transition/page.tsx` dosyasından `SignatureModal` çağrısı, `signed` state ve `attemptId` fetch logic kaldırıldı
+- **Backend etkisi yok:** `submit` API zaten `isPassed=true` olduğunda `TrainingAssignment.status='passed'` yapıyor ve sertifika oluşturuyordu — imza adımı sadece frontend'de ek bir kapıydı
+- **Geriye uyumluluk:** Sign API (`/api/exam/[id]/sign`) ve `signature-modal.tsx` bileşeni silinmedi, sadece artık çağrılmıyor. Eski imza verileri DB'de korunuyor.
+
+#### 2. Profesyonel PDF Tamamlama Raporu
+- **Yeni API:** `src/app/api/admin/trainings/[id]/completion-report/route.ts`
+- **Tasarım:** Mevcut `signature-report` stilini temel alıyor — jsPDF + jspdf-autotable
+- **İçerik:**
+  - Header: Kurum adı, eğitim başlığı, oluşturma tarihi (yeşil gradient)
+  - Info band: Kategori, eğitim süresi, baraj puanı
+  - Stat kartları: Toplam, Başarılı, Başarısız, Devam Eden
+  - Tablo: #, Ad Soyad, Departman, Ünvan, Durum, Puan, Tarih, İmza
+  - **İmza sütunu:** Başarılı personel için boş dikdörtgen kutu (fiziksel imza için), başarısız/devam eden için kırmızı "X"
+  - Footer: Kurum adı, eğitim adı, sayfa numarası
+- **Türkçe karakter:** ASCII transliteration (Ğ→G, Ş→S, vb.) — jsPDF Helvetica sınırlaması
+
+#### 3. Excel Tamamlama Raporu
+- **Yeni API:** `src/app/api/admin/trainings/[id]/completion-report/excel/route.ts`
+- **Kütüphane:** ExcelJS (server-side)
+- **İçerik:** PDF ile aynı kolonlar, stilli başlık satırı, renk kodlu durum/puan hücreleri
+- **İmza sütunu:** Başarılı → boş (yazdırıp imzalatmak için), başarısız → X
+- **Satır yüksekliği:** İmza için 28px
+
+#### 4. Admin Eğitim Detay Sayfası Güncellendi
+- **Dosya:** `src/app/admin/trainings/[id]/page.tsx`
+- Eski "İmza Raporu" butonu kaldırıldı
+- Yerine "PDF Rapor" ve "Excel Rapor" butonları eklendi
+- Her iki buton da indirme sırasında "Hazırlanıyor..." loading state gösteriyor
+
+### Değiştirilen / Oluşturulan Dosyalar
+| Dosya | İşlem |
+|-------|-------|
+| `src/app/exam/[id]/transition/page.tsx` | SignatureModal kaldırıldı |
+| `src/app/admin/trainings/[id]/page.tsx` | PDF/Excel butonları eklendi |
+| `src/app/api/admin/trainings/[id]/completion-report/route.ts` | **Yeni** — PDF rapor API |
+| `src/app/api/admin/trainings/[id]/completion-report/excel/route.ts` | **Yeni** — Excel rapor API |
+
+### Doğrulama
+- ✅ TypeScript — temiz (yeni dosyalarda hata yok)
+- ✅ Lint — temiz
+- ✅ Build — başarılı (`pnpm build --webpack`)
+
+### Bilinen Açık Sorunlar / Sıradaki İşler
+- Dev modda API yanıt süreleri ~200-500ms (Türkiye → Frankfurt ağ gecikmesi) — Production'da (Vercel Frankfurt ↔ Supabase Frankfurt) ~1-5ms olacak
+
+*Son güncelleme: 6 Nisan 2026 — Oturum 27*

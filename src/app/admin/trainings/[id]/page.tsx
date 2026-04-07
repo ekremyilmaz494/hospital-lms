@@ -56,7 +56,7 @@ export default function TrainingDetailPage() {
   const [activeTab, setActiveTab] = useState('staff');
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [downloadingReport, setDownloadingReport] = useState(false);
+  const [downloadingCompletion, setDownloadingCompletion] = useState<'pdf' | 'excel' | null>(null);
 
   if (!id) {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitim bulunamadı</div></div>;
@@ -119,24 +119,47 @@ export default function TrainingDetailPage() {
             variant="outline"
             className="gap-2 rounded-xl"
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
-            disabled={downloadingReport}
+            disabled={downloadingCompletion === 'pdf'}
             onClick={async () => {
-              setDownloadingReport(true);
+              setDownloadingCompletion('pdf');
               try {
-                const res = await fetch(`/api/admin/trainings/${id}/signature-report`);
+                const res = await fetch(`/api/admin/trainings/${id}/completion-report`);
                 if (!res.ok) throw new Error('Rapor oluşturulamadı');
                 const blob = await res.blob();
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'imza_raporu.pdf';
+                a.download = 'tamamlama_raporu.pdf';
                 a.click();
                 URL.revokeObjectURL(url);
-              } catch { toast('İmza raporu indirilemedi', 'error'); }
-              finally { setDownloadingReport(false); }
+              } catch { toast('PDF raporu indirilemedi', 'error'); }
+              finally { setDownloadingCompletion(null); }
             }}
           >
-            <FileDown className="h-4 w-4" /> {downloadingReport ? 'Hazırlanıyor...' : 'İmza Raporu'}
+            <FileDown className="h-4 w-4" /> {downloadingCompletion === 'pdf' ? 'Hazırlanıyor...' : 'PDF Rapor'}
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2 rounded-xl"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            disabled={downloadingCompletion === 'excel'}
+            onClick={async () => {
+              setDownloadingCompletion('excel');
+              try {
+                const res = await fetch(`/api/admin/trainings/${id}/completion-report/excel`);
+                if (!res.ok) throw new Error('Rapor oluşturulamadı');
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'tamamlama_raporu.xlsx';
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch { toast('Excel raporu indirilemedi', 'error'); }
+              finally { setDownloadingCompletion(null); }
+            }}
+          >
+            <Download className="h-4 w-4" /> {downloadingCompletion === 'excel' ? 'Hazırlanıyor...' : 'Excel Rapor'}
           </Button>
           <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => router.push(`/admin/trainings/${id}/edit`)}>
             <Edit className="h-4 w-4" /> Düzenle
