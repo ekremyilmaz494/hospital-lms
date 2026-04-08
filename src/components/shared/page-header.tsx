@@ -14,6 +14,7 @@ interface PageHeaderProps {
     icon?: LucideIcon;
     onClick?: () => void;
     href?: string;
+    loading?: boolean;
   };
   secondaryAction?: {
     label: string;
@@ -87,13 +88,14 @@ export function PageHeader({ title, subtitle, badge, action, secondaryAction }: 
               ) : (
                 <button
                   onClick={action.onClick}
-                  className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+                  disabled={action.loading}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-[transform,box-shadow,opacity] duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 disabled:opacity-70 disabled:pointer-events-none"
                   style={{
                     background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
                     boxShadow: '0 4px 14px rgba(var(--color-primary-rgb), 0.3)',
                   }}
                 >
-                  {action.icon && <action.icon className="h-4 w-4" />}
+                  {action.icon && <action.icon className={`h-4 w-4${action.loading ? ' animate-spin' : ''}`} />}
                   {action.label}
                 </button>
               )

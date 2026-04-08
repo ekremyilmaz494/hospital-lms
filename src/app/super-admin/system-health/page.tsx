@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useCallback } from 'react'
 import { useFetch } from '@/hooks/use-fetch'
 import { PageHeader } from '@/components/shared/page-header'
 import { PageLoading } from '@/components/shared/page-loading'
@@ -119,9 +120,13 @@ function ServiceCard({ service }: { service: ServiceStatus }) {
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Durum</span>
-          <Badge variant={getStatusVariant(service.status)}>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+            style={{ background: `color-mix(in srgb, ${getStatusColor(service.status)} 12%, transparent)`, color: getStatusColor(service.status) }}
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: getStatusColor(service.status) }} />
             {getStatusLabel(service.status)}
-          </Badge>
+          </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Yanit Suresi</span>
@@ -186,6 +191,12 @@ export default function SystemHealthPage() {
     '/api/super-admin/system-health',
     { interval: 30_000 }
   )
+  const [refreshing, setRefreshing] = useState(false)
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
+    refetch()
+    setTimeout(() => setRefreshing(false), 1500)
+  }, [refetch])
 
   if (isLoading && !data) {
     return <PageLoading />
@@ -213,7 +224,8 @@ export default function SystemHealthPage() {
           action={{
             label: 'Yenile',
             icon: RotateCcw,
-            onClick: refetch,
+            onClick: handleRefresh,
+            loading: refreshing,
           }}
         />
       </BlurFade>
