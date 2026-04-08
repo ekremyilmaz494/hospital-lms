@@ -27,7 +27,6 @@ function sanitizeUsersForBackup(users: Array<Record<string, unknown>>): Array<Re
 function encryptBackup(plaintext: string): { encrypted: string; isEncrypted: boolean } {
   const key = process.env.BACKUP_ENCRYPTION_KEY
   if (!key || key.length !== 64) {
-    // Anahtar yoksa sifrelenmeden devam et (uyari logla)
     logger.warn('Backup', 'BACKUP_ENCRYPTION_KEY tanimlanmamis veya gecersiz — backup sifrelenmeden kaydedilecek')
     return { encrypted: plaintext, isEncrypted: false }
   }
@@ -39,6 +38,38 @@ function encryptBackup(plaintext: string): { encrypted: string; isEncrypted: boo
 
   const result = `${iv.toString('hex')}:${authTag.toString('hex')}:${encryptedBuf.toString('hex')}`
   return { encrypted: result, isEncrypted: true }
+}
+
+/**
+ * AES-256-GCM ile sifrelenmiş backup verisini çözer.
+ * Format: iv(12 byte hex) + ':' + authTag(16 byte hex) + ':' + ciphertext(hex)
+ * Sifrelenmemis veriyi olduğu gibi döndürür.
+ */
+export function decryptBackup(data: string): string {
+  const key = process.env.BACKUP_ENCRYPTION_KEY
+  if (!key || key.length !== 64) return data
+
+  // Sifrelenmis format kontrolü: iv:authTag:ciphertext (hex:hex:hex)
+  const parts = data.split(':')
+  if (parts.length !== 3 || parts[0].length !== 24) {
+    // Sifrelenmemis data — olduğu gibi dön
+    return data
+  }
+
+  try {
+    const [ivHex, authTagHex, ciphertextHex] = parts
+    const iv = Buffer.from(ivHex, 'hex')
+    const authTag = Buffer.from(authTagHex, 'hex')
+    const ciphertext = Buffer.from(ciphertextHex, 'hex')
+
+    const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(key, 'hex'), iv)
+    decipher.setAuthTag(authTag)
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()])
+    return decrypted.toString('utf8')
+  } catch {
+    // Decrypt başarısız — muhtemelen sifrelenmemis data, olduğu gibi dön
+    return data
+  }
 }
 
 export async function GET(_request: Request) {

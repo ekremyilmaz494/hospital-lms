@@ -10,10 +10,16 @@ export async function GET() {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['staff'])
+  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
   if (roleError) return roleError
 
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+  if (!dbUser!.organizationId) {
+    // super_admin'in organizationId'si olmayabilir — boş dashboard dön
+    return jsonResponse({
+      stats: { assigned: 0, inProgress: 0, completed: 0, failed: 0, overallProgress: 0 },
+      upcomingTrainings: [], urgentTraining: null, notifications: [], recentActivity: [],
+    }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+  }
 
   const userId = dbUser!.id
 

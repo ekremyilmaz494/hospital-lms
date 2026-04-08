@@ -6,7 +6,7 @@ export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['staff'])
+  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
   if (roleError) return roleError
 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)

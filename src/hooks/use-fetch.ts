@@ -121,10 +121,37 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
         }
 
         const msg = err instanceof Error ? err.message : 'Bir hata oluştu';
-        if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('403')) {
+        // 401 = session expired → login'e yönlendir (agresif loop korumalı)
+        // 403 = authenticated ama yetkisiz → login'e yönlendirME, hata mesajı göster
+        if (msg.includes('401') || msg.includes('Unauthorized')) {
           if (typeof window !== 'undefined') {
+            // Loop koruması: 30 saniye içinde 2+ redirect → döngü tespit, durdur
+            const now = Date.now();
+            const lastRedirect = Number(sessionStorage.getItem('auth_redirect_at') || '0');
+            const redirectCount = Number(sessionStorage.getItem('auth_redirect_count') || '0');
+
+            if (now - lastRedirect < 30000) {
+              // 30s içinde tekrar 401 aldık
+              if (redirectCount >= 1) {
+                // 2. kez → döngü tespit edildi, redirect YAPMA
+                console.error('[useFetch] Auth redirect loop tespit edildi — durduruldu');
+                sessionStorage.removeItem('auth_redirect_count');
+                setError('Oturum doğrulanamadı. Lütfen sayfayı yenileyin veya tekrar giriş yapın.');
+                return;
+              }
+              sessionStorage.setItem('auth_redirect_count', String(redirectCount + 1));
+            } else {
+              // 30s geçmiş — sayacı sıfırla
+              sessionStorage.setItem('auth_redirect_count', '1');
+            }
+
+            sessionStorage.setItem('auth_redirect_at', String(now));
             window.location.href = '/auth/login?reason=session_expired';
           }
+          return;
+        }
+        if (msg.includes('403')) {
+          setError('Bu sayfaya erişim yetkiniz bulunmuyor.');
           return;
         }
         if (msg.includes('404')) {
@@ -153,7 +180,8 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
     }
     const existing = cache.get(normalizedUrl);
     if (existing) {
-      setData(existing.data as T);
+      // Aynı data reference'ı koruyarak gereksiz re-render önle
+      setData(prev => prev === existing.data ? prev : existing.data as T);
       setIsLoading(false);
       if (Date.now() - existing.ts > STALE_TIME) {
         fetchData(true);
@@ -162,7 +190,8 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
       setData(null);
       fetchData();
     }
-  }, [normalizedUrl, fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedUrl]);
 
   // Interval-based background polling
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -196,7 +225,8 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
       if (intervalRef.current) clearInterval(intervalRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [normalizedUrl, intervalMs, fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedUrl, intervalMs]);
 
   const refetch = useCallback(() => {
     if (normalizedUrl) cache.delete(normalizedUrl);

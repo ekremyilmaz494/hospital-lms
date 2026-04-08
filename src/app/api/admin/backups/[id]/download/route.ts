@@ -1,9 +1,10 @@
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { decryptBackup } from '@/app/api/admin/backups/route'
 import { logger } from '@/lib/logger'
 
-export async function GET(
+export async function GET( // perf-check-disable-line — dosya indirme, Cache-Control gereksiz
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -30,7 +31,7 @@ export async function GET(
     'Content-Disposition': `attachment; filename="yedek-${dateStr}.json"`,
   }
 
-  // S3'te kayıtlı yedek — S3'ten indir
+  // S3'te kayıtlı yedek — S3'ten indir + decrypt
   if (backup.fileUrl !== 'local') {
     try {
       const s3 = new S3Client({
@@ -45,7 +46,13 @@ export async function GET(
         Key: backup.fileUrl,
       })
       const s3Response = await s3.send(command)
-      return new Response(s3Response.Body as ReadableStream, { headers })
+      const rawBody = await s3Response.Body?.transformToString('utf-8')
+
+      if (rawBody) {
+        // Şifreli veya düz — decrypt otomatik algılar
+        const decrypted = decryptBackup(rawBody)
+        return new Response(decrypted, { headers })
+      }
     } catch (s3Error) {
       logger.error('Backup Download', 'S3 yedek indirme başarısız, DB yedeklemesine geçiliyor', {
         backupId: id,

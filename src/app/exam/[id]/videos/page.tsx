@@ -309,18 +309,18 @@ export default function VideoPlayerPage() {
         </div>
       )}
       {/* Header */}
-      <div className="border-b px-6 py-3" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="border-b px-3 py-2.5 sm:px-6 sm:py-3" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <Button variant="ghost" size="icon" onClick={() => router.back()} style={{ color: 'var(--color-text-secondary)' }}><ArrowLeft className="h-5 w-5" /></Button>
-            <div>
-              <h3 className="text-sm font-bold">{trainingTitle}</h3>
-              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>İçerik {currentVideoIdx + 1} / {videosData.length}</p>
+            <div className="min-w-0">
+              <h3 className="text-[13px] sm:text-sm font-bold truncate">{trainingTitle}</h3>
+              <p className="text-[11px] sm:text-xs" style={{ color: 'var(--color-text-muted)' }}>İçerik {currentVideoIdx + 1} / {videosData.length}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {currentVideo?.contentType !== 'pdf' && (
-              <div className="flex items-center gap-1 rounded-full px-3 py-1" style={{ background: 'var(--color-warning-bg)' }}>
+              <div className="hidden sm:flex items-center gap-1 rounded-full px-3 py-1" style={{ background: 'var(--color-warning-bg)' }}>
                 <AlertTriangle className="h-3.5 w-3.5" style={{ color: 'var(--color-warning)' }} />
                 <span className="text-[11px] font-semibold" style={{ color: 'var(--color-warning)' }}>Hızlandırma Engelli</span>
               </div>
@@ -330,13 +330,13 @@ export default function VideoPlayerPage() {
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-6xl p-6">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+      <div className="mx-auto max-w-6xl px-0 py-3 sm:p-6">
+        <div className="grid grid-cols-1 gap-3 sm:gap-6 lg:grid-cols-4">
           {/* Content Player Area */}
           <div className="lg:col-span-3">
             {currentVideo.contentType === 'audio' ? (
               /* ── Audio Player ── */
-              <div className="rounded-xl border overflow-hidden p-6" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
+              <div className="rounded-none sm:rounded-xl border-y sm:border overflow-hidden p-4 sm:p-6" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
                 <AudioPlayer
                   src={currentVideo.url}
                   documentUrl={currentVideo.documentUrl}
@@ -375,7 +375,7 @@ export default function VideoPlayerPage() {
               </div>
             ) : currentVideo.contentType === 'pdf' ? (
               /* ── PDF Viewer ── */
-              <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--color-border)', height: 'calc(100vh - 180px)' }}>
+              <div className="rounded-none sm:rounded-xl border-y sm:border overflow-hidden" style={{ borderColor: 'var(--color-border)', height: 'calc(100vh - 140px)' }}>
                 <PdfViewer
                   url={currentVideo.url}
                   pageCount={currentVideo.pageCount}
@@ -414,7 +414,7 @@ export default function VideoPlayerPage() {
             ) : (
               /* ── Video Player ── */
               <>
-                <div className="relative aspect-video rounded-xl overflow-hidden" style={{ background: '#0c0f14' }}
+                <div className="relative aspect-video rounded-none sm:rounded-xl overflow-hidden" style={{ background: '#0c0f14' }}
                   onContextMenu={(e) => e.preventDefault()}>
                   {videoError ? (
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -479,35 +479,38 @@ export default function VideoPlayerPage() {
                 </div>
 
                 {/* Custom Controls */}
-                <div className="mt-3 rounded-xl border p-4" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-                  <div className="mb-3 h-1.5 w-full rounded-full cursor-not-allowed" style={{ background: 'var(--color-border)' }}>
+                <div className="mt-1.5 sm:mt-3 rounded-none sm:rounded-xl border-y sm:border px-3 py-3 sm:p-4" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+                  {/* Progress bar — mobilde daha kalın */}
+                  <div className="mb-3 h-2 sm:h-1.5 w-full rounded-full cursor-not-allowed" style={{ background: 'var(--color-border)' }}>
                     <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'var(--color-primary)', transition: 'width 0.3s linear' }} />
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <button onClick={togglePlay} className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: 'var(--color-primary)' }}>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <button onClick={togglePlay} className="flex h-12 w-12 sm:h-10 sm:w-10 items-center justify-center rounded-full" style={{ background: 'var(--color-primary)', boxShadow: '0 2px 8px rgba(13,150,104,0.3)' }}>
                         {isPlaying ? <Pause className="h-5 w-5 text-white" /> : <Play className="h-5 w-5 text-white ml-0.5" />}
                       </button>
-                      <button onClick={toggleMute} className="rounded-md p-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      <button onClick={toggleMute} className="flex h-10 w-10 sm:h-auto sm:w-auto items-center justify-center rounded-full sm:rounded-md sm:p-2" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg)' }}>
                         {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                       </button>
-                      <span className="text-sm font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>
+                      <span className="text-xs sm:text-sm font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>
                         {formatTime(currentTime)} / {formatTime(duration || currentVideo.duration)}
                       </span>
-                      {currentVideo.completed && currentVideoIdx < videosData.length - 1 && (
-                        <button onClick={goToNextVideo} className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-                          <SkipForward className="h-3.5 w-3.5" /> Sonraki
-                        </button>
-                      )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <Lock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-                      <span style={{ color: 'var(--color-text-muted)' }}>1.0x (sabit)</span>
-                      <span style={{ color: 'var(--color-text-muted)' }}>•</span>
-                      <span style={{ color: 'var(--color-text-muted)' }}>İleri sarma kapalı</span>
-                      <span style={{ color: 'var(--color-text-muted)' }}>•</span>
-                      <span style={{ color: 'var(--color-text-muted)' }}>İndirme kapalı</span>
-                    </div>
+                    {/* Sonraki butonu — sağ tarafa */}
+                    {currentVideo.completed && currentVideoIdx < videosData.length - 1 && (
+                      <button onClick={goToNextVideo} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+                        <SkipForward className="h-4 w-4" /> <span className="hidden sm:inline">Sonraki</span>
+                      </button>
+                    )}
+                  </div>
+                  {/* Kısıtlama bilgileri — sadece desktop */}
+                  <div className="hidden sm:flex items-center gap-2 text-xs mt-2">
+                    <Lock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
+                    <span style={{ color: 'var(--color-text-muted)' }}>1.0x (sabit)</span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>•</span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>İleri sarma kapalı</span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>•</span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>İndirme kapalı</span>
                   </div>
                 </div>
               </>
@@ -515,9 +518,14 @@ export default function VideoPlayerPage() {
           </div>
 
           {/* Video List Sidebar */}
-          <div className="rounded-xl border p-4" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <h4 className="mb-3 text-sm font-bold">İçerik Listesi</h4>
-            <div className="space-y-2">
+          <div className="rounded-none sm:rounded-xl border-y sm:border px-3 py-3 sm:p-4" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <h4 className="text-xs sm:text-sm font-bold">İçerik Listesi</h4>
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+                {videosData.filter(v => v.completed).length}/{videosData.length}
+              </span>
+            </div>
+            <div className="space-y-1.5 sm:space-y-2">
               {videosData.map((v, i) => {
                 const isCurrent = i === currentVideoIdx;
                 const isLocked = !v.completed && i > (videosData.findIndex(x => !x.completed));
@@ -530,7 +538,7 @@ export default function VideoPlayerPage() {
                       }
                     }}
                     disabled={isLocked}
-                    className="flex w-full items-center gap-3 rounded-lg p-2.5 text-left"
+                    className="flex w-full items-center gap-2.5 sm:gap-3 rounded-lg p-2 sm:p-2.5 text-left"
                     style={{
                       background: isCurrent ? 'var(--color-primary-light)' : 'transparent',
                       borderLeft: isCurrent ? '3px solid var(--color-primary)' : '3px solid transparent',
@@ -538,11 +546,11 @@ export default function VideoPlayerPage() {
                       transition: 'background var(--transition-fast)',
                     }}
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: v.completed ? 'var(--color-success)' : isCurrent ? 'var(--color-primary)' : 'var(--color-border)' }}>
+                    <div className="flex h-9 w-9 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full" style={{ background: v.completed ? 'var(--color-success)' : isCurrent ? 'var(--color-primary)' : 'var(--color-border)' }}>
                       {v.completed ? <CheckCircle className="h-4 w-4 text-white" /> : isLocked ? <Lock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} /> : v.contentType === 'pdf' ? <FileText className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} /> : v.contentType === 'audio' ? <Volume2 className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} /> : <Play className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="truncate text-xs font-medium" style={{ color: isCurrent ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>{v.title}</p>
+                      <p className="truncate text-[13px] sm:text-xs font-medium" style={{ color: isCurrent ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>{v.title}</p>
                       <p className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>
                         {v.contentType === 'pdf' ? `${v.pageCount ?? '?'} sayfa` : (isCurrent && duration > 0 ? formatTime(duration) : formatTime(v.duration))}
                       </p>
@@ -553,7 +561,7 @@ export default function VideoPlayerPage() {
             </div>
 
             {/* Next Action */}
-            <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
               {allCompleted ? (
                 <Button onClick={() => router.push(`/exam/${id}/transition?from=videos`)} className="w-full gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)' }}>
                   Son Sınava Git <ArrowRight className="h-4 w-4" />
@@ -563,7 +571,11 @@ export default function VideoPlayerPage() {
                   <p className="text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>
                     Tüm içerikleri tamamlayınca son sınav açılır
                   </p>
-                  <p className="text-xs text-center mt-1 font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>
+                  {/* Mini progress bar */}
+                  <div className="mt-2 mx-auto max-w-[200px] h-1.5 rounded-full" style={{ background: 'var(--color-border)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${(videosData.filter(v => v.completed).length / videosData.length) * 100}%`, background: 'var(--color-primary)', transition: 'width 0.5s ease' }} />
+                  </div>
+                  <p className="text-[11px] text-center mt-1.5 font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>
                     {videosData.filter(v => v.completed).length}/{videosData.length} tamamlandı
                   </p>
                 </div>

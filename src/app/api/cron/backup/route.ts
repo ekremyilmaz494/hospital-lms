@@ -1,6 +1,37 @@
+import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { uploadBuffer, backupKey, verifyS3Object } from '@/lib/s3'
+import { maskeTcNo } from '@/lib/utils'
+import { sendEmail } from '@/lib/email'
+import { logger } from '@/lib/logger'
+
+/**
+ * KVKK uyumlu PII maskeleme — cron yedeklerde de hassas alanları maskeler.
+ */
+function sanitizeUsers(users: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  return users.map(u => ({
+    ...u,
+    tcNo: typeof u.tcNo === 'string' ? maskeTcNo(u.tcNo) || null : u.tcNo ?? null,
+    phone: typeof u.phone === 'string' && u.phone.length > 3
+      ? `${'*'.repeat(u.phone.length - 3)}${u.phone.slice(-3)}`
+      : u.phone ?? null,
+  }))
+}
+
+/**
+ * AES-256-GCM şifreleme — manuel backup ile aynı format.
+ */
+function encryptIfKeyExists(plaintext: string): { data: string; isEncrypted: boolean } {
+  const key = process.env.BACKUP_ENCRYPTION_KEY
+  if (!key || key.length !== 64) return { data: plaintext, isEncrypted: false }
+
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(key, 'hex'), iv)
+  const encryptedBuf = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+  const authTag = cipher.getAuthTag()
+  return { data: `${iv.toString('hex')}:${authTag.toString('hex')}:${encryptedBuf.toString('hex')}`, isEncrypted: true }
+}
 
 /** Daily auto-backup cron job — runs at 03:15 UTC (after cleanup at 03:00) */
 export async function GET(request: Request) {
@@ -19,6 +50,7 @@ export async function GET(request: Request) {
   })
 
   const results: Array<{ orgId: string; status: string; sizeMb?: number }> = []
+  const failures: string[] = []
 
   for (const org of organizations) {
     try {
@@ -37,8 +69,11 @@ export async function GET(request: Request) {
         prisma.certificate.findMany({ where: { training: { organizationId: org.id } } }),
       ])
 
+      // KVKK: PII maskeleme — cron yedekler de güvenli
+      const sanitizedUsers = sanitizeUsers(users as unknown as Array<Record<string, unknown>>)
+
       const backupData = {
-        users,
+        users: sanitizedUsers,
         departments,
         trainings,
         assignments,
@@ -53,13 +88,16 @@ export async function GET(request: Request) {
       }
 
       const jsonBlob = JSON.stringify(backupData)
-      const buffer = Buffer.from(jsonBlob, 'utf-8')
+
+      // AES-256-GCM şifreleme (BACKUP_ENCRYPTION_KEY varsa)
+      const { data: finalData, isEncrypted } = encryptIfKeyExists(jsonBlob)
+      const buffer = Buffer.from(finalData, 'utf-8')
       const sizeMb = buffer.byteLength / (1024 * 1024)
       const key = backupKey(org.id)
 
-      await uploadBuffer(key, buffer, 'application/json')
+      await uploadBuffer(key, buffer, isEncrypted ? 'application/octet-stream' : 'application/json')
 
-      // Verify the uploaded backup: check file exists and size > 0
+      // Verify the uploaded backup
       const verifiedSize = await verifyS3Object(key)
       const isVerified = verifiedSize !== null && verifiedSize > 0
 
@@ -77,7 +115,15 @@ export async function GET(request: Request) {
       })
 
       results.push({ orgId: org.id, status: isVerified ? 'completed' : 'verification_failed', sizeMb: Math.round(sizeMb * 100) / 100 })
-    } catch {
+
+      if (!isVerified) {
+        failures.push(`${org.name} (${org.id}): verification_failed`)
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Bilinmeyen hata'
+      logger.error('Cron Backup', `Yedekleme başarısız: ${org.name}`, { orgId: org.id, error: errorMsg })
+      failures.push(`${org.name} (${org.id}): ${errorMsg}`)
+
       await prisma.dbBackup.create({
         data: {
           organizationId: org.id,
@@ -93,9 +139,27 @@ export async function GET(request: Request) {
     }
   }
 
+  // Başarısız yedekler varsa admin'e email gönder
+  if (failures.length > 0) {
+    const adminEmail = process.env.ADMIN_ALERT_EMAIL
+    if (adminEmail) {
+      sendEmail({
+        to: adminEmail,
+        subject: `[Yedekleme Uyarısı] ${failures.length} kurum yedeklemesi başarısız`,
+        html: `<h3>Günlük Otomatik Yedekleme Raporu</h3>
+          <p><strong>Tarih:</strong> ${new Date().toLocaleString('tr-TR')}</p>
+          <p><strong>Toplam kurum:</strong> ${organizations.length}</p>
+          <p><strong>Başarısız:</strong> ${failures.length}</p>
+          <ul>${failures.map(f => `<li>${f}</li>`).join('')}</ul>
+          <p>Lütfen S3 erişimi ve veritabanı bağlantısını kontrol edin.</p>`,
+      }).catch(() => { /* Email hatası cron'u durdurmasın */ })
+    }
+  }
+
   return NextResponse.json({
-    success: true,
+    success: failures.length === 0,
     organizationsProcessed: organizations.length,
+    failedCount: failures.length,
     results,
     timestamp: new Date().toISOString(),
   })

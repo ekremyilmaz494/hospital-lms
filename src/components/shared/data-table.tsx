@@ -34,6 +34,8 @@ interface DataTableProps<TData, TValue> {
   searchPlaceholder?: string;
   /** Optional custom card renderer for mobile view. If omitted, columns are auto-rendered as label/value pairs. */
   mobileCardRenderer?: MobileCardRenderer<TData>;
+  /** Called when a row is clicked (excluding actions column). Receives the row data. */
+  onRowClick?: (row: TData) => void;
 }
 
 /** @deprecated Use useMobile() from @/hooks/use-mobile instead */
@@ -45,6 +47,7 @@ export const DataTable = memo(function DataTable<TData, TValue>({
   searchKey,
   searchPlaceholder = 'Ara...',
   mobileCardRenderer,
+  onRowClick,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
@@ -229,8 +232,9 @@ export const DataTable = memo(function DataTable<TData, TValue>({
                 table.getRowModel().rows.map((row) => (
                   <TableRow
                     key={row.id}
-                    className="clickable-row"
+                    className={onRowClick ? 'clickable-row cursor-pointer hover:bg-black/[0.02] transition-colors' : 'clickable-row'}
                     style={{ borderColor: 'var(--color-border)' }}
+                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                   >
                     {row.getVisibleCells().map((cell) => {
                       const isActionsCell = cell.column.id === 'actions';
@@ -238,6 +242,7 @@ export const DataTable = memo(function DataTable<TData, TValue>({
                       <TableCell
                         key={cell.id}
                         className={isActionsCell ? 'w-px' : ''}
+                        onClick={isActionsCell && onRowClick ? (e) => e.stopPropagation() : undefined}
                         style={{
                           color: 'var(--color-text-primary)',
                           padding: isActionsCell ? '14px 4px' : '14px 16px',

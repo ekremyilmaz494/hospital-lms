@@ -65,15 +65,23 @@ function TransitionContent() {
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          navigate();
+          // navigate() burada çağırma — render sırasında router.push() React hatası verir.
+          // Bunun yerine 0'a düşünce ayrı bir effect tetikler.
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [shouldCountdown]);
+
+  // timeLeft 0 olunca navigate et — render dışında, effect içinde güvenli
+  useEffect(() => {
+    if (timeLeft === 0 && shouldCountdown) {
+      navigate();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [timeLeft]);
 
   // G7.5 — Load per-question results from sessionStorage (written by post-exam page on submit)
   useEffect(() => {

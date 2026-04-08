@@ -281,6 +281,21 @@ Her yeni sayfa veya component değişikliğinde aşağıdaki kurallar ZORUNLUDUR
 
 ---
 
+## Auth & Redirect Döngüsü Önleme Kuralları (KRİTİK)
+
+Bu kurallar geçmişte yaşanan sonsuz yenilenme döngülerinden çıkarılmıştır. MUTLAKA uyulmalıdır:
+
+1. **Supabase cookie kontrolü:** `endsWith('-auth-token')` YASAK! Supabase SSR chunked cookie kullanır (`sb-xxx-auth-token.0`). Her zaman `includes('-auth-token')` kullan.
+2. **useFetch 401 vs 403:** 401 = session expired (login'e yönlendir). 403 = yetkisiz (hata mesajı göster, redirect YAPMA). Bu iki durum ASLA karıştırılmamalı.
+3. **Staff API route'ları:** `requireRole(dbUser.role, ['staff'])` YASAK! Middleware tüm rollere (`staff`, `admin`, `super_admin`) staff paneli erişimi verir → API da aynı rolleri kabul etmeli: `requireRole(dbUser.role, ['staff', 'admin', 'super_admin'])`.
+4. **Layout auth guard:** Staff layout guard'ı middleware ile TUTARLI olmalı. Middleware izin veriyorsa layout engellemeMELİ.
+5. **onAuthStateChange:** `TOKEN_REFRESHED` event'inde `setUser()` çağırma — gereksiz re-render döngüsü yaratır. Sadece `SIGNED_IN`, `SIGNED_OUT`, `USER_UPDATED` event'lerine tepki ver.
+6. **useEffect dependency:** `fetchData` gibi callback'ler `useCallback(fn, [])` ile stabil olsa bile, useEffect dependency array'ine eklenmemeli — React Strict Mode'da döngü oluşturabilir.
+7. **Loop guard:** `useFetch`'teki 401 redirect'i mutlaka loop guard içermeli: 30 saniyede 2+ redirect → döngü tespit → durdur.
+8. **window.location vs router.push:** Login sonrası navigasyonda `window.location.href` kullan (full reload), `router.push` kullanma (SPA geçişi onAuthStateChange ile race condition yaratır).
+
+---
+
 ## Otomatik Doğrulama Kuralı
 
 Her kod değişikliğinden sonra aşağıdaki adımları sırayla uygula.

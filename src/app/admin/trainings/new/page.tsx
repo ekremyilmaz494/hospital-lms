@@ -797,7 +797,7 @@ export default function NewTrainingPage() {
                       >
                         <input
                           type="file"
-                          accept="audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/aac"
+                          accept=".mp3,.wav,.m4a,.ogg,.aac,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/ogg,audio/aac"
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                           onChange={async (e) => {
                             const file = e.target.files?.[0];

@@ -10,7 +10,7 @@ const MAX_AUDIO_SIZE = 200 * 1024 * 1024
 
 const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
 const DOCUMENT_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.presentationml.presentation']
-const AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/ogg', 'audio/aac']
+const AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/mp4', 'audio/x-m4a', 'audio/m4a', 'audio/ogg', 'audio/aac', 'audio/x-aac']
 const ALL_ALLOWED_TYPES = [...VIDEO_TYPES, ...DOCUMENT_TYPES, ...AUDIO_TYPES]
 
 function detectContentType(mimeType: string): 'video' | 'pdf' | 'audio' {

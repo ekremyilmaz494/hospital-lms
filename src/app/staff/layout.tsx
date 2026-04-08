@@ -50,9 +50,10 @@ export default function StaffLayout({
     router.push('/auth/login');
   };
 
-  // Auth guard: redirect non-staff users
+  // Auth guard: staff paneline sadece staff, admin ve super_admin erişebilir.
+  // Admin ve super_admin da staff sayfalarını görebilir (middleware ile uyumlu).
   useEffect(() => {
-    if (!isLoading && user && user.role !== 'staff') {
+    if (!isLoading && user && !['staff', 'admin', 'super_admin'].includes(user.role)) {
       router.replace('/auth/login');
     }
   }, [user, isLoading, router]);

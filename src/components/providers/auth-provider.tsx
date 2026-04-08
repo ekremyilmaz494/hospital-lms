@@ -91,35 +91,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Periyodik DB kontrolu (deaktive edilmis kullaniciyi yakala)
     const interval = setInterval(refreshFromDB, DB_REFRESH_INTERVAL);
 
-    // Listen for auth state changes
+    // Listen for auth state changes — sadece SIGNED_OUT ve SIGNED_IN'e tepki ver.
+    // TOKEN_REFRESHED event'ini YOKSAY: her ~60s'de tetiklenir ve setUser() çağırmak
+    // tüm sayfayı gereksiz re-render eder (useFetch re-trigger → dashboard reload döngüsü).
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
         router.push('/auth/login');
-      } else if (session?.user) {
-        const u = session.user;
-        setUser({
-          id: u.id,
-          email: u.email ?? '',
-          firstName: u.user_metadata?.first_name ?? '',
-          lastName: u.user_metadata?.last_name ?? '',
-          role: u.user_metadata?.role ?? 'staff',
-          organizationId: u.user_metadata?.organization_id ?? null,
-          tcNo: u.user_metadata?.tc_no ?? null,
-          phone: u.user_metadata?.phone ?? null,
-          departmentId: u.user_metadata?.department_id ?? null,
-          department: u.user_metadata?.department ?? null,
-          title: u.user_metadata?.title ?? null,
-          avatarUrl: u.user_metadata?.avatar_url ?? null,
-          isActive: u.user_metadata?.is_active !== false,
-          kvkkConsent: u.user_metadata?.kvkk_consent ?? false,
-          kvkkConsentDate: u.user_metadata?.kvkk_consent_date ?? null,
-          createdAt: u.created_at,
-          updatedAt: u.updated_at ?? u.created_at,
-        });
+      } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        if (session?.user) {
+          const u = session.user;
+          // setUserIfChanged: sadece gerçekten değişen alanlar varsa store güncellenir.
+          // Aynı veriyle setUser() çağırmak yeni object → gereksiz re-render tetikler.
+          const currentUser = useAuthStore.getState().user;
+          if (!currentUser) {
+            // İlk kez set ediliyor
+            setUser({
+              id: u.id,
+              email: u.email ?? '',
+              firstName: u.user_metadata?.first_name ?? '',
+              lastName: u.user_metadata?.last_name ?? '',
+              role: u.user_metadata?.role ?? 'staff',
+              organizationId: u.user_metadata?.organization_id ?? null,
+              tcNo: u.user_metadata?.tc_no ?? null,
+              phone: u.user_metadata?.phone ?? null,
+              departmentId: u.user_metadata?.department_id ?? null,
+              department: u.user_metadata?.department ?? null,
+              title: u.user_metadata?.title ?? null,
+              avatarUrl: u.user_metadata?.avatar_url ?? null,
+              isActive: u.user_metadata?.is_active !== false,
+              kvkkConsent: u.user_metadata?.kvkk_consent ?? false,
+              kvkkConsentDate: u.user_metadata?.kvkk_consent_date ?? null,
+              createdAt: u.created_at,
+              updatedAt: u.updated_at ?? u.created_at,
+            });
+          } else {
+            // Mevcut user var — sadece değişen alanları güncelle
+            setUserIfChanged({
+              role: u.user_metadata?.role ?? currentUser.role,
+              isActive: u.user_metadata?.is_active !== false,
+              avatarUrl: u.user_metadata?.avatar_url ?? currentUser.avatarUrl,
+            });
+          }
+        }
       }
+      // TOKEN_REFRESHED: session cookie yenilenir ama store'a dokunmaya gerek yok
     });
 
     return () => {

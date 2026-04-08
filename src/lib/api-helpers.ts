@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { checkSubscriptionStatus } from '@/lib/subscription-guard'
@@ -46,6 +47,17 @@ export function safePagination(params: URLSearchParams, maxLimit = 100) {
 const authCache = new Map<string, { dbUser: NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>; orgOk: boolean; expiresAt: number }>()
 
 export async function getAuthUser() {
+  // Fast-path: auth cookie yoksa Supabase client oluşturmadan anında 401 dön.
+  // ⚠️ CRITICAL: `includes` kullan, `endsWith` DEĞİL!
+  // Supabase SSR büyük JWT'leri chunked cookie'lere böler:
+  //   sb-xxx-auth-token.0, sb-xxx-auth-token.1, ...
+  // `endsWith('-auth-token')` chunked cookie'leri KAÇIRIR → 401 döngüsü!
+  const cookieStore = await cookies()
+  const hasAuthCookie = cookieStore.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+  if (!hasAuthCookie) {
+    return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
+  }
+
   const supabase = await createClient()
   const { data: { session }, error } = await supabase.auth.getSession()
 

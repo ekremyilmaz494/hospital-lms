@@ -790,7 +790,7 @@ export default function StaffPage() {
             </div>
 
             <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-              <DataTable columns={columns} data={filteredStaff} searchKey="name" searchPlaceholder="Bu departmanda ara..." />
+              <DataTable columns={columns} data={filteredStaff} searchKey="name" searchPlaceholder="Bu departmanda ara..." onRowClick={(staff) => router.push(`/admin/staff/${(staff as { id: string }).id}`)} />
             </div>
           </div>
         </BlurFade>
@@ -800,7 +800,7 @@ export default function StaffPage() {
       {activeView === 'all' && (
         <BlurFade delay={0.05}>
           <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <DataTable columns={columns} data={allStaff} searchKey="name" searchPlaceholder="Personel ara (isim, TC, e-posta)..." />
+            <DataTable columns={columns} data={allStaff} searchKey="name" searchPlaceholder="Personel ara (isim, TC, e-posta)..." onRowClick={(staff) => router.push(`/admin/staff/${(staff as { id: string }).id}`)} />
             <div className="flex items-center justify-between pt-4 mt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
               <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                 Toplam {data?.total ?? allStaff.length} personel{(data?.totalPages ?? 1) > 1 ? ` — Sayfa ${currentPage}/${data?.totalPages}` : ''}
