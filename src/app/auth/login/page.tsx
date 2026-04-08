@@ -9,15 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import dynamic from 'next/dynamic';
+import { BlurFade } from '@/components/ui/blur-fade';
 import { ShimmerButton } from '@/components/ui/shimmer-button';
 
-const BlurFade = dynamic(() => import('@/components/ui/blur-fade').then(m => ({ default: m.BlurFade })), {
-  ssr: false,
-  loading: () => <div />,
-});
 const Particles = dynamic(() => import('@/components/ui/particles').then(m => ({ default: m.Particles })), { ssr: false });
 const Ripple = dynamic(() => import('@/components/ui/ripple').then(m => ({ default: m.Ripple })), { ssr: false });
-const MobileLayout = dynamic(() => import('./mobile-layout'), { ssr: false, loading: () => <div className="lg:hidden min-h-screen" style={{ background: '#021a12' }} /> });
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { useOrgBranding } from '@/hooks/use-org-branding';
@@ -237,33 +233,10 @@ function LoginForm() {
       </div>
 
       {/* ── Right Panel: Login Form ── */}
-      <div className="flex flex-1 flex-col lg:items-center lg:justify-center" style={{ background: 'var(--color-bg)' }}>
-
-        {/* ── MOBILE LAYOUT (lazy-loaded) ── */}
-        <MobileLayout
-          branding={branding}
-          email={email}
-          setEmail={setEmail}
-          password={password}
-          setPassword={setPassword}
-          showPassword={showPassword}
-          setShowPassword={setShowPassword}
-          kvkkAccepted={kvkkAccepted}
-          setKvkkAccepted={setKvkkAccepted}
-          kvkkError={kvkkError}
-          setKvkkError={setKvkkError}
-          rememberMe={rememberMe}
-          setRememberMe={setRememberMe}
-          loading={loading}
-          error={error}
-          isTimeout={isTimeout}
-          handleLogin={handleLogin}
-        />
-
-        {/* ── DESKTOP LAYOUT (unchanged) ── */}
-        <div className="hidden lg:flex flex-1 items-center justify-center p-6 sm:p-8">
+      <div className="flex flex-1 items-center justify-center p-6 sm:p-8" style={{ background: 'var(--color-bg)' }}>
         <div className="w-full max-w-105">
-          <div className="mb-10 flex items-center gap-3">
+          {/* Mobile logo */}
+          <div className="mb-10 flex items-center gap-3 lg:hidden">
             {branding?.logoUrl ? (
               <Image src={branding.logoUrl} alt={branding.name} width={40} height={40} className="rounded-xl object-contain" unoptimized />
             ) : (
@@ -411,8 +384,6 @@ function LoginForm() {
             </div>
           </BlurFade>
         </div>
-        </div>
-      {/* End right panel */}
       </div>
     </div>
   );
