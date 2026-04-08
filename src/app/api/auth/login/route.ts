@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
-import { checkRateLimit } from '@/lib/redis'
+import { checkRateLimit, getRedis } from '@/lib/redis'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
@@ -35,10 +35,13 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.trim().toLowerCase()
     const ip = getTrustedIp(request)
 
-    // ── Rate limiting (paralel) ──
-    const [ipAllowed, emailAllowed] = await Promise.all([
-      checkRateLimit(`login-ip:${ip}`, 5, 900),
-      checkRateLimit(`login:${normalizedEmail}`, 3, 900),
+    // ── Rate limiting + Supabase client oluşturma PARALEL ──
+    // createClient() cookie parse'ı rate limit kontrolüyle eşzamanlı çalışır.
+    // signInWithPassword() rate limit geçerse hemen başlar — ~200ms tasarruf.
+    const [ipAllowed, emailAllowed, supabase] = await Promise.all([
+      checkRateLimit(`login-ip:${ip}`, 15, 900),
+      checkRateLimit(`login:${normalizedEmail}`, 8, 900),
+      createClient(),
     ])
     if (!ipAllowed) {
       logger.warn('auth:login', 'IP rate limit aşıldı', { ip })
@@ -49,8 +52,6 @@ export async function POST(request: NextRequest) {
       return errorResponse('Çok fazla giriş denemesi. 15 dakika bekleyin.', 429)
     }
 
-    // ── Supabase auth + client oluşturma paralel ──
-    const supabase = await createClient()
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
@@ -59,23 +60,27 @@ export async function POST(request: NextRequest) {
     if (authError) {
       logger.info('auth:login', 'Başarısız giriş denemesi', { email: normalizedEmail, ip })
 
-      // Track consecutive failures for this email to alert admin at threshold
-      const failKey = `login-fail:${normalizedEmail}`
-      const { getRedis } = await import('@/lib/redis')
+      // Track consecutive failures — fire-and-forget (response'u bekletme)
       const redis = getRedis()
       if (redis) {
-        await redis.set(failKey, 0, { nx: true, ex: 900 })
-        const failCount = await redis.incr(failKey)
-        if (failCount === ALERT_THRESHOLD) {
-          const adminEmail = process.env.ADMIN_ALERT_EMAIL
-          if (adminEmail) {
-            sendEmail({
-              to: adminEmail,
-              subject: `[Güvenlik Uyarısı] ${normalizedEmail} için ${ALERT_THRESHOLD} başarısız giriş denemesi`,
-              html: `<p>IP: <strong>${ip}</strong><br>E-posta: <strong>${normalizedEmail}</strong><br>Zaman: ${new Date().toLocaleString('tr-TR')}</p><p>Bu kişi hesabına erişmeye çalışıyor olabilir. Lütfen kontrol edin.</p>`,
-            }).catch(() => {}) // Email hatası login akışını bozmasın
-          }
-        }
+        const failKey = `login-fail:${normalizedEmail}`
+        // Background: Redis ops + alert email — response'u bloklamaz
+        void (async () => {
+          try {
+            await redis.set(failKey, 0, { nx: true, ex: 900 })
+            const failCount = await redis.incr(failKey)
+            if (failCount === ALERT_THRESHOLD) {
+              const adminEmail = process.env.ADMIN_ALERT_EMAIL
+              if (adminEmail) {
+                sendEmail({
+                  to: adminEmail,
+                  subject: `[Güvenlik Uyarısı] ${normalizedEmail} için ${ALERT_THRESHOLD} başarısız giriş denemesi`,
+                  html: `<p>IP: <strong>${ip}</strong><br>E-posta: <strong>${normalizedEmail}</strong><br>Zaman: ${new Date().toLocaleString('tr-TR')}</p><p>Bu kişi hesabına erişmeye çalışıyor olabilir. Lütfen kontrol edin.</p>`,
+                }).catch(() => {})
+              }
+            }
+          } catch { /* Redis failure tracking is best-effort */ }
+        })()
       }
 
       return errorResponse('E-posta veya şifre hatalı.', 401)
@@ -83,26 +88,16 @@ export async function POST(request: NextRequest) {
 
     const role = data.user?.user_metadata?.role as string | undefined
 
-    // Check if user has MFA enrolled — önce session'daki AAL seviyesinden kontrol et
-    // AAL1 = şifre ile giriş yapıldı, AAL2 = MFA tamamlandı
-    // Session'da factors bilgisi varsa HTTP call'a gerek yok
+    // MFA check — session'daki factors bilgisinden kontrol et (HTTP call YOK).
+    // signInWithPassword() response'unda user.factors her zaman döner.
+    // Fallback API call'ı kaldırıldı — gereksiz ~400-800ms HTTP round-trip.
     const sessionFactors = data.session?.user?.factors
-    let activeFactor: { id: string } | undefined
-
-    if (sessionFactors?.length) {
-      // Session metadata'dan MFA durumunu kontrol et (HTTP call yok)
-      activeFactor = sessionFactors.find(
-        (f: { factor_type: string; status: string }) => f.factor_type === 'totp' && f.status === 'verified'
-      ) as { id: string } | undefined
-    } else {
-      // Fallback: session'da factor bilgisi yoksa API'den al
-      const { data: factors } = await supabase.auth.mfa.listFactors()
-      activeFactor = factors?.totp?.find(f => f.status === 'verified')
-    }
+    const activeFactor = sessionFactors?.find(
+      (f: { factor_type: string; status: string }) => f.factor_type === 'totp' && f.status === 'verified'
+    ) as { id: string } | undefined
 
     if (activeFactor) {
       logger.info('auth:login', 'MFA gerekli', { userId: data.user?.id, role })
-      // MFA tamamlanmadan kullanıcı bilgisi sızdırılmaz — sadece factorId döndür
       return jsonResponse({
         mfaRequired: true,
         factorId: activeFactor.id,
