@@ -100,6 +100,7 @@ model Organization {
   aiNotebooks            AiNotebook[]
   aiGenerations          AiGeneration[]
   aiGoogleConnection     AiGoogleConnection?
+  orgContentLibrary      ContentLibrary[]      @relation("OrgContentLibrary")
 
   @@map("organizations")
 }
@@ -309,7 +310,7 @@ model Training {
 
   organization    Organization             @relation(fields: [organizationId], references: [id])
   sourceLibrary   ContentLibrary?          @relation("TrainingFromLibrary", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
-  createdBy       User?                    @relation("TrainingCreator", fields: [createdById], references: [id])
+  createdBy       User?                    @relation("TrainingCreator", fields: [createdById], references: [id], onDelete: SetNull)
   videos          TrainingVideo[]
   questions       Question[]
   assignments     TrainingAssignment[]
@@ -407,6 +408,7 @@ model TrainingAssignment {
   @@index([status], map: "idx_assignments_status")
   @@index([userId, status], map: "idx_assignments_user_status")
   @@index([trainingId, status], map: "idx_assignments_training_status")
+  @@index([completedAt], map: "idx_assignments_completed_at")
   @@map("training_assignments")
 }
 
@@ -564,13 +566,15 @@ model DbBackup {
 
 // ── SERTİFİKALAR ──
 model Certificate {
-  id              String    @id @default(uuid()) @db.Uuid
-  userId          String    @map("user_id") @db.Uuid
-  trainingId      String    @map("training_id") @db.Uuid
-  attemptId       String    @unique @map("attempt_id") @db.Uuid
-  certificateCode String    @unique @map("certificate_code") @db.VarChar(50)
-  issuedAt        DateTime  @default(now()) @map("issued_at") @db.Timestamptz
-  expiresAt       DateTime? @map("expires_at") @db.Timestamptz
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  trainingId       String    @map("training_id") @db.Uuid
+  attemptId        String    @unique @map("attempt_id") @db.Uuid
+  certificateCode  String    @unique @map("certificate_code") @db.VarChar(50)
+  issuedAt         DateTime  @default(now()) @map("issued_at") @db.Timestamptz
+  expiresAt        DateTime? @map("expires_at") @db.Timestamptz
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+  revocationReason String?   @map("revocation_reason") @db.VarChar(500)
 
   user     User        @relation(fields: [userId], references: [id])
   training Training    @relation(fields: [trainingId], references: [id])
@@ -690,29 +694,38 @@ model SmgPeriod {
 
 // ── İÇERİK KÜTÜPHANESİ ──
 model ContentLibrary {
-  id           String   @id @default(uuid()) @db.Uuid
-  title        String   @db.VarChar(500)
-  description  String?  @db.Text
-  category     String   @db.VarChar(50)
+  id             String   @id @default(uuid()) @db.Uuid
+  title          String   @db.VarChar(500)
+  description    String?  @db.Text
+  category       String   @db.VarChar(50)
   // INFECTION_CONTROL | FIRE_SAFETY | PATIENT_RIGHTS | KVKK |
   // OCCUPATIONAL_HEALTH | FIRST_AID | MEDICAL_WASTE | HAND_HYGIENE |
   // WORKPLACE_VIOLENCE | EMERGENCY_PROCEDURES
-  thumbnailUrl String?  @map("thumbnail_url") @db.Text
-  duration     Int // dakika
-  smgPoints    Int      @default(0) @map("smg_points")
-  difficulty   String   @db.VarChar(20) // BASIC | INTERMEDIATE | ADVANCED
-  targetRoles  Json     @map("target_roles") // ["doctor","nurse","all"]
-  isActive     Boolean  @default(true) @map("is_active")
-  createdById  String?  @map("created_by") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  thumbnailUrl   String?  @map("thumbnail_url") @db.Text
+  duration       Int // dakika
+  smgPoints      Int      @default(0) @map("smg_points")
+  difficulty     String   @db.VarChar(20) // BASIC | INTERMEDIATE | ADVANCED
+  targetRoles    Json     @map("target_roles") // ["doctor","nurse","all"]
+  isActive       Boolean  @default(true) @map("is_active")
+  createdById    String?  @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  // AI İçerik alanları
+  contentType    String?  @map("content_type") @db.VarChar(30) // video | audio | pdf | quiz | flashcards | report | infographic
+  s3Key          String?  @map("s3_key") @db.Text
+  fileType       String?  @map("file_type") @db.VarChar(20) // mp3 | mp4 | pdf | json | png | md | pptx
+  contentData    Json?    @map("content_data") // quiz/flashcards JSON verisi
+  organizationId String?  @map("organization_id") @db.Uuid
 
   createdBy     User?                        @relation("ContentLibraryCreator", fields: [createdById], references: [id])
+  organization  Organization?                @relation("OrgContentLibrary", fields: [organizationId], references: [id], onDelete: SetNull)
   installs      OrganizationContentLibrary[]
   trainings     Training[]                   @relation("TrainingFromLibrary")
   // AI İçerik Stüdyosu
   aiGenerations AiGeneration[]               @relation("AiToLibrary")
 
   @@index([category], map: "idx_content_library_category")
+  @@index([contentType], map: "idx_content_library_content_type")
+  @@index([organizationId], map: "idx_content_library_org_id")
   @@map("content_library")
 }
 

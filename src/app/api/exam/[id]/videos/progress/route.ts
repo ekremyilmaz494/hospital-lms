@@ -11,7 +11,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
-  const allowed = await checkRateLimit(`video-progress:${dbUser!.id}`, 30, 60)
+  const allowed = await checkRateLimit(`video-progress:${dbUser!.id}`, 60, 60)
   if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
 
   const body = await parseBody<{ videoId: string; watchedSeconds: number; lastPositionSeconds: number }>(request)

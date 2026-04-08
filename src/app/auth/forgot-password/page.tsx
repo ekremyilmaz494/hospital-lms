@@ -6,8 +6,9 @@ import { Mail, ArrowLeft, Loader2, CheckCircle, ChevronRight } from 'lucide-reac
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
-import { BlurFade } from '@/components/ui/blur-fade';
-import { ShimmerButton } from '@/components/ui/shimmer-button';
+import dynamic from 'next/dynamic';
+const BlurFade = dynamic(() => import('@/components/ui/blur-fade').then(m => ({ default: m.BlurFade })), { ssr: false, loading: () => <div /> });
+const ShimmerButton = dynamic(() => import('@/components/ui/shimmer-button').then(m => ({ default: m.ShimmerButton })), { ssr: false, loading: () => <button className="w-full h-11 rounded-xl" style={{ background: 'var(--color-primary)' }} /> });
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');

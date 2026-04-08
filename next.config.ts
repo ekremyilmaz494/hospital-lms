@@ -80,7 +80,6 @@ const nextConfig: NextConfig = {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
-            // TODO: unsafe-inline'ı nonce-based CSP ile değiştir (middleware.ts'de nonce üretimi gerekli)
             `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: https: blob:",
@@ -88,7 +87,6 @@ const nextConfig: NextConfig = {
             "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.sentry.io https://*.ingest.sentry.io",
             "media-src 'self' https://*.cloudfront.net blob:",
             "frame-src 'self' blob:",
-            // Service worker ve PWA manifest için
             "worker-src 'self'",
             "manifest-src 'self'",
             "frame-ancestors 'none'",

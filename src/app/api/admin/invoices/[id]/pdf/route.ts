@@ -225,6 +225,7 @@ export async function GET(
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${fileName}"`,
         'Content-Length': String(pdfBuffer.length),
+        'Cache-Control': 'private, no-store',
       },
     })
   } catch (err) {

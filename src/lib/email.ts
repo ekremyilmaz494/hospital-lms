@@ -496,3 +496,144 @@ export function overdueTrainingReminderEmail(staffName: string, trainingTitle: s
     </div>
   `
 }
+
+// ── Ek E-posta Şablonları ──
+
+/** Şifre değişikliği bildirimi */
+export async function passwordChangedEmail(email: string) {
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Güvenlik Bildirimi</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #1e293b; margin-top: 0;">Şifre Değiştirildi</h2>
+        <p style="color: #64748b;">Hesabınızın şifresi başarıyla değiştirilmiştir.</p>
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
+          <p style="margin: 0; color: #92400e; font-size: 13px;"><strong>Önemli:</strong> Bu işlemi siz yapmadıysanız, lütfen derhal sistem yöneticinize başvurunuz.</p>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
+      </div>
+    </div>
+  `
+  await sendEmail({ to: email, subject: 'Hastane LMS — Şifre Değiştirildi', html })
+}
+
+/** Yeni giriş algılandığında güvenlik uyarısı */
+export async function loginAlertEmail(email: string, ipAddress: string, userAgent: string, loginTime: string) {
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Güvenlik Bildirimi</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #1e293b; margin-top: 0;">Yeni Giriş Algılandı</h2>
+        <p style="color: #64748b;">Hesabınıza yeni bir cihazdan giriş yapılmıştır. Detaylar aşağıdadır:</p>
+        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #475569;"><strong>IP Adresi:</strong> ${escapeHtml(ipAddress)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Tarayıcı:</strong> ${escapeHtml(userAgent)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Giriş Zamanı:</strong> ${escapeHtml(loginTime)}</p>
+        </div>
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
+          <p style="margin: 0; color: #92400e; font-size: 13px;"><strong>Önemli:</strong> Bu giriş size ait değilse, lütfen derhal şifrenizi değiştirin.</p>
+        </div>
+        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/auth/forgot-password"
+           style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Şifremi Değiştir
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
+      </div>
+    </div>
+  `
+  await sendEmail({ to: email, subject: 'Hastane LMS — Yeni Giriş Algılandı', html })
+}
+
+/** Eğitim sertifikası hazır bildirimi */
+export async function certificateIssuedEmail(email: string, staffName: string, trainingTitle: string, certificateCode: string) {
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Sertifika Bildirimi</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #1e293b; margin-top: 0;">Sertifikanız Hazır</h2>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(staffName)},</p>
+        <p style="color: #64748b;">Tebrikler! <strong>"${escapeHtml(trainingTitle)}"</strong> eğitimini başarıyla tamamladınız. Sertifikanız indirilmeye hazırdır.</p>
+        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #475569;"><strong>Eğitim:</strong> ${escapeHtml(trainingTitle)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Sertifika Kodu:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${escapeHtml(certificateCode)}</code></p>
+        </div>
+        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/staff/certificates"
+           style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Sertifikamı İndir
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
+      </div>
+    </div>
+  `
+  await sendEmail({ to: email, subject: 'Hastane LMS — Sertifikanız Hazır', html })
+}
+
+/** Abonelik süresi dolmak üzere uyarısı (plan detayları ile) */
+export async function subscriptionExpiryEmail(email: string, hospitalName: string, planName: string, expiryDate: string, daysRemaining: number) {
+  const urgencyColor = daysRemaining <= 3 ? '#dc2626' : '#f59e0b'
+  const urgencyBg = daysRemaining <= 3 ? '#fef2f2' : '#fffbeb'
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, ${urgencyColor}, ${daysRemaining <= 3 ? '#7f1d1d' : '#92400e'}); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Uyarısı</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <div style="background: ${urgencyBg}; border-left: 4px solid ${urgencyColor}; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+          <p style="margin: 0; font-weight: bold; color: ${urgencyColor};">${daysRemaining} gün kaldı!</p>
+        </div>
+        <h2 style="color: #1e293b; margin-top: 0;">Abonelik Süresi Dolmak Üzere</h2>
+        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> aboneliğinizin süresinin dolmasına <strong>${daysRemaining} gün</strong> kalmıştır.</p>
+        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #475569;"><strong>Plan:</strong> ${escapeHtml(planName)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Bitiş Tarihi:</strong> ${escapeHtml(expiryDate)}</p>
+        </div>
+        <p style="color: #64748b;">Hizmet kesintisi yaşamamak için lütfen aboneliğinizi yenileyin.</p>
+        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
+           style="display: inline-block; background: ${urgencyColor}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Aboneliği Yenile
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
+      </div>
+    </div>
+  `
+  await sendEmail({ to: email, subject: `Hastane LMS — Abonelik Süresi Dolmak Üzere (${daysRemaining} gün)`, html })
+}
+
+/** KVKK veri talebi yanıt bildirimi */
+export async function kvkkResponseEmail(email: string, requestType: 'access' | 'delete' | 'rectification', status: string) {
+  const requestTypeLabels: Record<string, string> = {
+    access: 'Veri Erişim Talebi',
+    delete: 'Veri Silme Talebi',
+    rectification: 'Veri Düzeltme Talebi',
+  }
+  const requestLabel = requestTypeLabels[requestType] ?? escapeHtml(requestType)
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">KVKK Bilgilendirme</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #1e293b; margin-top: 0;">KVKK Talep Yanıtı</h2>
+        <p style="color: #64748b;">6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında ilettiğiniz talep işleme alınmıştır.</p>
+        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #475569;"><strong>Talep Türü:</strong> ${escapeHtml(requestLabel)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Durum:</strong> ${escapeHtml(status)}</p>
+        </div>
+        <p style="color: #64748b;">Talebiniz ile ilgili detaylı bilgi almak için sistem yöneticinize başvurabilirsiniz.</p>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta 6698 sayılı KVKK kapsamında otomatik olarak gönderilmiştir.</p>
+      </div>
+    </div>
+  `
+  await sendEmail({ to: email, subject: 'Hastane LMS — KVKK Talep Yanıtı', html })
+}

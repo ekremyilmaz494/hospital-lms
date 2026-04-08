@@ -123,5 +123,5 @@ export async function GET(
     completedCount,
     totalCount,
     completionRate,
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }

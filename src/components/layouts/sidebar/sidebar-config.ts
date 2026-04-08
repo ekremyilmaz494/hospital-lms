@@ -9,7 +9,6 @@ import {
   Users,
   Bell,
   History,
-  Database,
   Award,
   Calendar,
   UserCircle,
@@ -59,7 +58,6 @@ export const superAdminNav: NavGroup[] = [
       { title: 'İçerik Kütüphanesi', href: '/super-admin/content-library', icon: Library },
       { title: 'Raporlar', href: '/super-admin/reports', icon: BarChart3 },
       { title: 'Audit Log', href: '/super-admin/audit-logs', icon: Shield },
-      { title: 'Yedekleme', href: '/super-admin/backups', icon: Database },
     ],
   },
   {

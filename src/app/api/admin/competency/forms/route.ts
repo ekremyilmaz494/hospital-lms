@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     prisma.competencyForm.count({ where }),
   ])
 
-  return jsonResponse({ forms, total, page, limit })
+  return jsonResponse({ forms, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }
 
 export async function POST(request: Request) {

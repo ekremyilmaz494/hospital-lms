@@ -37,5 +37,5 @@ export async function GET(request: Request) {
     prisma.smgActivity.count({ where }),
   ])
 
-  return jsonResponse({ activities, total, page, limit })
+  return jsonResponse({ activities, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }

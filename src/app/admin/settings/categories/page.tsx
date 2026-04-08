@@ -75,6 +75,10 @@ export default function CategoriesPage() {
   }
 
   function openDelete(cat: CategoryItem) {
+    if (cat.isDefault) {
+      toast('Varsayılan kategoriler silinemez', 'error');
+      return;
+    }
     setDeleteTarget(cat);
     setDeleteDialogOpen(true);
   }
@@ -224,14 +228,16 @@ export default function CategoriesPage() {
                   </button>
                 </div>
 
-                {/* Sil */}
-                <button
-                  onClick={() => openDelete(cat)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--color-error-bg)]"
-                  aria-label="Sil"
-                >
-                  <Trash2 className="h-3.5 w-3.5" style={{ color: 'var(--color-error)' }} />
-                </button>
+                {/* Sil — varsayılan kategorilerde gizle */}
+                {!cat.isDefault && (
+                  <button
+                    onClick={() => openDelete(cat)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--color-error-bg)]"
+                    aria-label="Sil"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" style={{ color: 'var(--color-error)' }} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

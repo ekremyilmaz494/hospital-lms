@@ -15,8 +15,8 @@ const RESULT_TYPE_MAP: Record<string, string> = {
   md: 'document',
 }
 
-/** Timeout threshold in milliseconds (45 minutes — ses/video uzun sürebilir) */
-const GENERATION_TIMEOUT_MS = 45 * 60 * 1000
+/** Timeout threshold in milliseconds (75 minutes — video üretimi 60+ dk sürebilir) */
+const GENERATION_TIMEOUT_MS = 75 * 60 * 1000
 
 export async function GET(
   request: Request,
@@ -112,7 +112,7 @@ export async function GET(
       const is404 = err instanceof AiServiceError && err.status === 404
 
       // Sidecar 404 = job store'da yok (restart sonrası kaybolmuş)
-      // veya 15 dk timeout aşılmış — her iki durumda da failed yap
+      // veya 75 dk timeout aşılmış — her iki durumda da failed yap
       if (is404 || age > GENERATION_TIMEOUT_MS) {
         const failMessage = is404
           ? 'Üretim servisi yeniden başlatıldı, üretim kayboldu. Lütfen tekrar deneyin.'

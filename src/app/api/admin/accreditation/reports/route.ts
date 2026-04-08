@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     return jsonResponse({
       reports,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    })
+    }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch {
     return errorResponse('Raporlar getirilemedi', 500)
   }

@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
-import { startGeneration, AiServiceError } from '@/app/admin/ai-content-studio/lib/ai-service-client'
+import { startGeneration, refreshAuth, AiServiceError } from '@/app/admin/ai-content-studio/lib/ai-service-client'
 import { downloadAndSaveArtifact } from '@/app/admin/ai-content-studio/lib/download-helper'
 import { aiGenerateSchema } from '@/lib/validations'
 
@@ -39,6 +39,24 @@ export async function POST(request: Request) {
   })
   if (!googleConnection || googleConnection.status !== 'connected') {
     return errorResponse('Google hesabı bağlı değil. Lütfen önce bağlantı kurun.', 403)
+  }
+
+  // Cookie süresi dolmuşsa sessiz yenileme dene
+  if (googleConnection.expiresAt && new Date(googleConnection.expiresAt) < new Date()) {
+    try {
+      const refreshResult = await refreshAuth(orgId)
+      if (refreshResult.refreshed) {
+        await prisma.aiGoogleConnection.update({
+          where: { organizationId: orgId },
+          data: {
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            lastVerifiedAt: new Date(),
+          },
+        })
+      }
+    } catch {
+      // Yenileme başarısız olsa da üretimi dene — cookie hâlâ çalışıyor olabilir
+    }
   }
 
   // Notebook varlık kontrolü

@@ -150,6 +150,55 @@ def _process_storage_state(org_id: str, storage_path: Path) -> dict:
         return {"success": False, "error": f"Cookie işleme hatası: {e}"}
 
 
+def refresh_cookies(org_id: str) -> dict:
+    """Mevcut browser profili ile headless cookie yenileme.
+    Profildeki session cookie'ler tarayıcı açıldığında Google tarafından
+    otomatik yenilenir. Kullanıcı müdahalesi gerekmez."""
+    profile_dir = _get_profile_dir(org_id)
+    if not profile_dir.exists() or not any(profile_dir.iterdir()):
+        return {"success": False, "error": "Browser profili bulunamadı. Lütfen önce Google hesabı bağlayın."}
+
+    storage_path = TEMP_DIR / f"{org_id}_refresh.json"
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=str(profile_dir),
+                headless=True,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--password-store=basic",
+                ],
+                ignore_default_args=["--enable-automation"],
+            )
+
+            page = context.pages[0] if context.pages else context.new_page()
+            page.goto(NOTEBOOKLM_URL, wait_until="load", timeout=30000)
+            page.wait_for_timeout(3000)
+
+            current_url = page.url
+            if "signin" in current_url or "accounts.google" in current_url:
+                context.close()
+                return {"success": False, "error": "Oturum süresi dolmuş, tekrar giriş gerekli."}
+
+            # Cookie'ler hâlâ geçerli — yenile ve kaydet
+            page.goto(GOOGLE_ACCOUNTS_URL, wait_until="load")
+            page.goto(NOTEBOOKLM_URL, wait_until="load")
+            page.wait_for_timeout(1000)
+
+            context.storage_state(path=str(storage_path))
+            context.close()
+
+            return _process_storage_state(org_id, storage_path)
+
+    except Exception as e:
+        return {"success": False, "error": f"Cookie yenileme hatası: {e}"}
+    finally:
+        if storage_path.exists():
+            storage_path.unlink(missing_ok=True)
+
+
 def get_session_status(org_id: str) -> dict:
     """Aktif login session durumunu döner."""
     return _active_sessions.get(org_id, {"status": "none"})

@@ -68,7 +68,7 @@ async function fetchStats(orgId: string) {
     statusDistribution,
   }
 
-  await setCached(cacheKey, data, 120)
+  await setCached(cacheKey, data, 300)
   return data
 }
 
@@ -214,7 +214,7 @@ async function fetchActivity(orgId: string) {
     })),
   }
 
-  await setCached(cacheKey, data, 120)
+  await setCached(cacheKey, data, 300)
   return data
 }
 

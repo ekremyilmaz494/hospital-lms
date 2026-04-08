@@ -37,7 +37,7 @@ export async function GET() {
     oidcClientId: org?.oidcClientId ?? '',
     ssoAutoProvision: org?.ssoAutoProvision ?? true,
     ssoDefaultRole: org?.ssoDefaultRole ?? 'staff',
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }
 
 export async function PUT(request: Request) {

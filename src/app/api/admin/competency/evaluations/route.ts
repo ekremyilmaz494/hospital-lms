@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     prisma.competencyEvaluation.count({ where }),
   ])
 
-  return jsonResponse({ evaluations, total, page, limit })
+  return jsonResponse({ evaluations, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }
 
 export async function POST(request: Request) {

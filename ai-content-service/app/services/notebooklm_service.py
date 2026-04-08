@@ -249,7 +249,7 @@ async def generate_content(
 
             if not gen_status.is_complete:
                 fmt_timeout = {
-                    "VIDEO_OVERVIEW": 900,
+                    "VIDEO_OVERVIEW": 3600,
                     "AUDIO_OVERVIEW": 600,
                     "AUDIO_QUIZ": 600,
                     "INFOGRAPHIC": 600,
@@ -269,7 +269,7 @@ async def generate_content(
                 except TimeoutError:
                     # Timeout olursa list_* ile artifact'ı ara
                     gen_status = await _wait_for_artifact_via_list(
-                        client, nb_id, request.format, timeout=120
+                        client, nb_id, request.format, timeout=600
                     )
                     if gen_status.is_failed:
                         raise RuntimeError(gen_status.error or f"{request.format} üretimi zaman aşımına uğradı.")
@@ -380,7 +380,7 @@ async def generate_from_notebook(
         FMT_TIMEOUTS = {
             "AUDIO_OVERVIEW": 1800,  # 30 dk
             "AUDIO_QUIZ": 1800,
-            "VIDEO_OVERVIEW": 2400,  # 40 dk
+            "VIDEO_OVERVIEW": 3600,  # 60 dk
             "SLIDE_DECK": 1200,      # 20 dk
             "INFOGRAPHIC": 900,      # 15 dk
         }
@@ -392,8 +392,8 @@ async def generate_from_notebook(
             if final_status.is_failed:
                 raise RuntimeError(final_status.error or f"{artifact_type} tamamlanamadı.")
         except TimeoutError:
-            # Timeout olursa list ile artifact'ı ara (5 dk daha bekle)
-            gen_status = await _wait_for_artifact_via_list(client, notebook_id, fmt, timeout=300)
+            # Timeout olursa list ile artifact'ı ara (10 dk daha bekle)
+            gen_status = await _wait_for_artifact_via_list(client, notebook_id, fmt, timeout=600)
             if gen_status.is_failed:
                 raise RuntimeError(gen_status.error or f"{artifact_type} zaman aşımına uğradı.")
 

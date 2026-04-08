@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     orderBy: { sortOrder: 'asc' },
   })
 
-  return jsonResponse(videos)
+  return jsonResponse(videos, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }
 
 /** Get presigned upload URL */

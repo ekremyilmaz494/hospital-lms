@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       orderBy: [{ standardBody: 'asc' }, { code: 'asc' }],
     })
 
-    return jsonResponse({ standards })
+    return jsonResponse({ standards }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
   } catch {
     return errorResponse('Standartlar getirilemedi', 500)
   }

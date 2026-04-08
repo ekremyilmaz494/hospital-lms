@@ -152,18 +152,22 @@ export async function PATCH(
 
       if (!existingCert) {
         // We need an ExamAttempt to link the certificate. Find or skip.
-        const examAttempt = await prisma.examAttempt.findFirst({
-          where: {
-            trainingId,
-            userId: dbUser!.id,
-          },
-          orderBy: { createdAt: 'desc' },
-        })
+        const [examAttempt, training] = await Promise.all([
+          prisma.examAttempt.findFirst({
+            where: { trainingId, userId: dbUser!.id },
+            orderBy: { createdAt: 'desc' },
+          }),
+          prisma.training.findUnique({
+            where: { id: trainingId },
+            select: { renewalPeriodMonths: true },
+          }),
+        ])
 
         if (examAttempt) {
           const certCode = `SCORM-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-          const expiresAt = new Date()
-          expiresAt.setFullYear(expiresAt.getFullYear() + 1)
+          const expiresAt = training?.renewalPeriodMonths
+            ? new Date(Date.now() + training.renewalPeriodMonths * 30 * 24 * 60 * 60 * 1000)
+            : null
 
           const cert = await prisma.certificate.create({
             data: {

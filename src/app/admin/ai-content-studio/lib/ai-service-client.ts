@@ -263,6 +263,15 @@ export async function startGeneration(params: {
   })
 }
 
+/** Mevcut cookie'leri headless tarayıcı ile sessizce yenile. */
+export async function refreshAuth(orgId?: string): Promise<{ refreshed: boolean; error?: string }> {
+  return sidecarFetch<{ refreshed: boolean; error?: string }>('/auth/refresh', {
+    method: 'POST',
+    timeout: TIMEOUTS.auth,
+    orgId,
+  })
+}
+
 /** Üretim durumunu sorgula. */
 export async function getTaskStatus(
   notebookId: string,

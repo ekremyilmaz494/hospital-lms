@@ -93,7 +93,6 @@ export default function ExamResultsPage() {
 
   const [attemptFilter, setAttemptFilter] = useState<AttemptFilter>('all');
   const [attemptSearch, setAttemptSearch] = useState('');
-  const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
 
   const exam = data?.exam;
@@ -171,10 +170,6 @@ export default function ExamResultsPage() {
   }
 
   const sortedDepts = [...departmentStats].sort((a, b) => b.passRate - a.passRate);
-  const sortedQuestions = [...questionStats].sort(
-    (a, b) => a.correctAnswerRate - b.correctAnswerRate,
-  );
-
   const attemptColumns: ColumnDef<Attempt>[] = [
     {
       accessorKey: 'userFullName',
@@ -407,87 +402,6 @@ export default function ExamResultsPage() {
         </div>
       </div>
 
-      {/* Soru Analizi */}
-      <div
-        className="rounded-2xl border p-6"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-      >
-        <h3 className="text-sm font-bold mb-4">Soru Analizi — En Zor Sorular</h3>
-        {sortedQuestions.length === 0 ? (
-          <p className="text-sm text-center py-6" style={{ color: 'var(--color-text-muted)' }}>
-            Henüz cevap verisi yok
-          </p>
-        ) : (
-          <div className="space-y-1">
-            {sortedQuestions.map((q, idx) => {
-              const isExpanded = expandedQuestionId === q.questionId;
-              const rateColor =
-                q.correctAnswerRate >= 70
-                  ? 'var(--color-success)'
-                  : q.correctAnswerRate >= 40
-                    ? 'var(--color-warning)'
-                    : 'var(--color-error)';
-              return (
-                <div key={q.questionId}>
-                  <button
-                    onClick={() => setExpandedQuestionId(isExpanded ? null : q.questionId)}
-                    className="flex w-full items-center gap-4 rounded-lg px-3 py-2.5 text-left hover:bg-[var(--color-surface-hover)]"
-                    style={{ transition: 'background var(--transition-fast)' }}
-                  >
-                    <span
-                      className="text-xs font-bold shrink-0 w-6 text-center"
-                      style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
-                    >
-                      {idx + 1}
-                    </span>
-                    <span className="flex-1 text-xs truncate" style={{ color: 'var(--color-text-primary)' }}>
-                      {q.questionText.slice(0, 80)}
-                      {q.questionText.length > 80 ? '...' : ''}
-                    </span>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="flex items-center gap-2 w-32">
-                        <div className="h-1.5 flex-1 rounded-full" style={{ background: 'var(--color-border)' }}>
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${q.correctAnswerRate}%`, background: rateColor }}
-                          />
-                        </div>
-                        <span
-                          className="text-[11px] font-bold w-8 text-right"
-                          style={{ fontFamily: 'var(--font-mono)', color: rateColor }}
-                        >
-                          {q.correctAnswerRate}%
-                        </span>
-                      </div>
-                      <span className="text-[10px] w-12 text-right" style={{ color: 'var(--color-text-muted)' }}>
-                        {q.totalAnswers} cevap
-                      </span>
-                      {isExpanded ? (
-                        <ChevronUp className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-                      ) : (
-                        <ChevronDown className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-                      )}
-                    </div>
-                  </button>
-                  {isExpanded && (
-                    <div
-                      className="ml-10 mb-2 rounded-lg p-3"
-                      style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
-                    >
-                      <p className="text-xs mb-2" style={{ color: 'var(--color-text-primary)' }}>
-                        {q.questionText}
-                      </p>
-                      <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-                        Doğru yanıt oranı: %{q.correctAnswerRate} ({q.totalAnswers} cevap)
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* Katılımcı Tablosu */}
       <div

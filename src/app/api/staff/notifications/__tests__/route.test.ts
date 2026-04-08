@@ -179,7 +179,12 @@ describe('PATCH /api/staff/notifications', () => {
     mockGetAuthUser.mockResolvedValue(staffUser)
     mockRequireRole.mockReturnValue(null)
 
-    mockNotificationUpdateMany.mockResolvedValue({ count: 5 } as never)
+    // Snapshot-based mark-all: route first fetches unread IDs, then updates by ID list
+    mockNotificationFindMany.mockResolvedValue([
+      { id: 'notif-1' },
+      { id: 'notif-2' },
+    ] as never)
+    mockNotificationUpdateMany.mockResolvedValue({ count: 2 } as never)
 
     const response = await PATCH(createRequest('PATCH'))
     const data = await response.json()
@@ -187,12 +192,19 @@ describe('PATCH /api/staff/notifications', () => {
     expect(response.status).toBe(200)
     expect(data.success).toBe(true)
 
-    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+    // Verify findMany was called to get unread notification IDs
+    expect(mockNotificationFindMany).toHaveBeenCalledWith({
       where: {
         userId: 'staff-1',
         organizationId: 'org-1',
         isRead: false,
       },
+      select: { id: true },
+    })
+
+    // Verify updateMany was called with the fetched IDs
+    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['notif-1', 'notif-2'] } },
       data: { isRead: true },
     })
   })

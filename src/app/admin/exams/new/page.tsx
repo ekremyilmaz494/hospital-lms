@@ -88,7 +88,6 @@ export default function NewExamPage() {
   // Step 1: Basic info
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(
     new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
@@ -98,7 +97,6 @@ export default function NewExamPage() {
   const [examDurationMinutes, setExamDurationMinutes] = useState(30);
   const [isCompulsory, setIsCompulsory] = useState(false);
   const [randomizeQuestions, setRandomizeQuestions] = useState(false);
-  const [randomQuestionCount, setRandomQuestionCount] = useState<number | ''>('');
 
   // Department & staff assignment
   const { data: departments } = useFetch<{ id: string; name: string; color: string | null; count: number; staff: { id: string; name: string; title: string; initials: string }[] }[]>('/api/admin/departments');
@@ -238,7 +236,6 @@ export default function NewExamPage() {
         body: JSON.stringify({
           title,
           description,
-          category: selectedCategory || undefined,
           passingScore: Number(passingScore) || 70,
           maxAttempts: Number(maxAttempts) || 3,
           examDurationMinutes: Number(examDurationMinutes) || 30,
@@ -246,7 +243,6 @@ export default function NewExamPage() {
           endDate: new Date(endDate).toISOString(),
           isCompulsory,
           randomizeQuestions,
-          randomQuestionCount: randomizeQuestions && randomQuestionCount ? Number(randomQuestionCount) : undefined,
           selectedDepts: selectedDepts.size > 0 ? Array.from(selectedDepts) : undefined,
           excludedStaff: excludedStaff.size > 0 ? Array.from(excludedStaff) : undefined,
           questions: (publishStatus === 'published' ? validQuestions : questions.filter((q) => q.text.length > 0)).map(
@@ -481,22 +477,6 @@ export default function NewExamPage() {
                   </button>
                 </div>
 
-                {randomizeQuestions && (
-                  <div className="mt-3">
-                    <Label>Rastgele Soru Sayısı (boş = tümü)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={questions.length}
-                      value={randomQuestionCount}
-                      onChange={(e) =>
-                        setRandomQuestionCount(e.target.value ? Number(e.target.value) : '')
-                      }
-                      placeholder={`Toplam ${questions.length} sorudan kaçı sorulsun?`}
-                      className="mt-1 max-w-xs"
-                    />
-                  </div>
-                )}
               </div>
 
               {/* Kart 4: Departman & Personel Atama */}

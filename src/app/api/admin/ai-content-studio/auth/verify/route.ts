@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
-import { verifyAuth, AiServiceError } from '@/app/admin/ai-content-studio/lib/ai-service-client'
+import { verifyAuth, refreshAuth, AiServiceError } from '@/app/admin/ai-content-studio/lib/ai-service-client'
 
 /**
  * POST /api/admin/ai-content-studio/auth/verify
@@ -31,9 +31,36 @@ export async function POST() {
     if (result.valid) {
       await prisma.aiGoogleConnection.update({
         where: { organizationId: orgId },
-        data: { status: 'connected', lastVerifiedAt: new Date(), errorMessage: null },
+        data: {
+          status: 'connected',
+          lastVerifiedAt: new Date(),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          errorMessage: null,
+        },
       })
       return jsonResponse({ valid: true, status: 'connected' })
+    }
+
+    // Doğrulama başarısız — sessiz cookie yenileme dene
+    try {
+      const refreshResult = await refreshAuth(orgId)
+      if (refreshResult.refreshed) {
+        const retryResult = await verifyAuth(orgId)
+        if (retryResult.valid) {
+          await prisma.aiGoogleConnection.update({
+            where: { organizationId: orgId },
+            data: {
+              status: 'connected',
+              lastVerifiedAt: new Date(),
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              errorMessage: null,
+            },
+          })
+          return jsonResponse({ valid: true, status: 'connected', refreshed: true })
+        }
+      }
+    } catch {
+      // Yenileme başarısız — aşağıda expired olarak işaretle
     }
 
     await prisma.aiGoogleConnection.update({

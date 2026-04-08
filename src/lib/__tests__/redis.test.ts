@@ -101,19 +101,19 @@ describe('checkRateLimit', () => {
     expect(result).toBe(true)
   })
 
-  it('applies stricter limits in production mode', async () => {
+  it('applies same limits in production mode (no halving)', async () => {
     const originalEnv = process.env.NODE_ENV
-    Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true, configurable: true })
+    process.env.NODE_ENV = 'production'
 
     try {
       const key = `test:prod:${Date.now()}`
-      // maxRequests = 4 => effectiveMax = 2 in production
+      // maxRequests = 4 => effectiveMax = 4 (no halving)
       await checkRateLimit(key, 4, 60)
       await checkRateLimit(key, 4, 60)
       const result = await checkRateLimit(key, 4, 60)
-      expect(result).toBe(false)
+      expect(result).toBe(true) // 3rd request still within limit of 4
     } finally {
-      Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, writable: true, configurable: true })
+      process.env.NODE_ENV = originalEnv
     }
   })
 })

@@ -123,8 +123,9 @@ describe('exportExcel', () => {
       const text = await (capturedBlob as unknown as { text: () => Promise<string> }).text()
       // BOM character at the start
       expect(text.charCodeAt(0)).toBe(0xFEFF)
-      // Headers and data present
-      expect(text).toContain('"Baslik"')
+      // Headers present (headers are plain, not wrapped in csvCell)
+      expect(text).toContain('Baslik')
+      // Row data is wrapped in quotes by csvCell
       expect(text).toContain('"Veri1"')
     })
 

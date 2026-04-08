@@ -1,13 +1,18 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { ShieldCheck, AlertTriangle, Clock, CheckCircle, Building2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { PageHeader } from '@/components/shared/page-header';
 import { ChartCard } from '@/components/shared/chart-card';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { StatCard } from '@/components/shared/stat-card';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
+
+const ComplianceChart = dynamic(() => import('./compliance-chart'), {
+  ssr: false,
+  loading: () => <div className="h-64 animate-pulse rounded-lg" style={{ background: 'var(--color-surface)' }} />,
+});
 
 interface TrainingComp {
   id: string; title: string; regulatoryBody: string | null; complianceDeadline: string | null; deadlineStatus: string;
@@ -20,7 +25,6 @@ interface CompData {
   departmentCompliance: { dept: string; rate: number }[];
 }
 
-const tooltipStyle = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', fontSize: '12px' };
 const deadlineColors: Record<string, { color: string; bg: string; label: string }> = {
   overdue: { color: 'var(--color-error)', bg: 'var(--color-error-bg)', label: 'Süresi Geçti' },
   critical: { color: 'var(--color-error)', bg: 'var(--color-error-bg)', label: 'Kritik' },
@@ -80,19 +84,7 @@ export default function CompliancePage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <BlurFade delay={0.2}>
           <ChartCard title="Departman Uyumu" icon={<Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
-            {deptCompliance.length > 0 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                  <BarChart data={deptCompliance} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} unit="%" />
-                    <YAxis dataKey="dept" type="category" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={false} tickLine={false} width={80} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="rate" name="Uyum %" fill="var(--color-primary)" radius={[0, 4, 4, 0]} barSize={16} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : <div className="text-sm py-8 text-center" style={{ color: 'var(--color-text-muted)' }}>Departman verisi yok</div>}
+            <ComplianceChart data={deptCompliance} />
           </ChartCard>
         </BlurFade>
 

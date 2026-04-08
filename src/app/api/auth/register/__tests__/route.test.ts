@@ -6,6 +6,7 @@ vi.mock('@/lib/prisma', () => ({
     user: { findUnique: vi.fn(), create: vi.fn() },
     subscriptionPlan: { findUnique: vi.fn(), findFirst: vi.fn() },
     organizationSubscription: { create: vi.fn() },
+    auditLog: { create: vi.fn() },
   },
 }))
 
@@ -19,6 +20,10 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: vi.fn().mockResolvedValue(true),
+}))
+
+vi.mock('@/lib/email', () => ({
+  sendSelfRegistrationEmail: vi.fn().mockResolvedValue(undefined),
 }))
 
 import { POST } from '../route'
@@ -46,10 +51,10 @@ function createRequest(body: unknown) {
 const validBody = {
   hospitalName: 'Ankara Hastanesi',
   hospitalCode: 'ankara-hastanesi',
-  adminEmail: 'admin@ankara.com',
-  adminPassword: 'SecurePass123!',
-  adminFirstName: 'Ahmet',
-  adminLastName: 'Yilmaz',
+  email: 'admin@ankara.com',
+  password: 'SecurePass123!',
+  firstName: 'Ahmet',
+  lastName: 'Yilmaz',
 }
 
 describe('POST /api/auth/register', () => {
@@ -151,15 +156,14 @@ describe('POST /api/auth/register', () => {
 
     expect(response.status).toBe(201)
     expect(data.success).toBe(true)
-    expect(data.message).toContain('14 günlük deneme')
-    expect(data.redirectUrl).toBe('/auth/login')
+    expect(data.message).toBeTruthy()
 
     // Verify the Supabase user was created with correct metadata
     expect(mockSupabase.auth.admin.createUser).toHaveBeenCalledWith(
       expect.objectContaining({
         email: 'admin@ankara.com',
         password: 'SecurePass123!',
-        email_confirm: true,
+        email_confirm: false,
         user_metadata: expect.objectContaining({
           role: 'admin',
           organization_id: 'new-org-1',

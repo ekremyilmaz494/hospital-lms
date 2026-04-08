@@ -1069,13 +1069,23 @@ export default function NewTrainingPage() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  onClick={addQuestion}
-                  className="gap-2 font-semibold text-white rounded-xl"
-                  style={{ background: 'var(--color-accent)', transition: 'opacity var(--transition-fast)' }}
-                >
-                  <Plus className="h-4 w-4" /> Soru Ekle
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    disabled
+                    variant="outline"
+                    className="gap-2 font-semibold rounded-xl"
+                    title="Soru kütüphanesi yakında eklenecek"
+                  >
+                    <BookOpen className="h-4 w-4" /> Kütüphaneden Ekle
+                  </Button>
+                  <Button
+                    onClick={addQuestion}
+                    className="gap-2 font-semibold text-white rounded-xl"
+                    style={{ background: 'var(--color-accent)', transition: 'opacity var(--transition-fast)' }}
+                  >
+                    <Plus className="h-4 w-4" /> Soru Ekle
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -1456,6 +1466,7 @@ export default function NewTrainingPage() {
           </Button>
         )}
       </div>
+
     </div>
   );
 }

@@ -4,6 +4,21 @@ import { logger } from '@/lib/logger'
 import { aiApproveSchema } from '@/lib/validations'
 import { copyObject, getDownloadUrl } from '@/lib/s3'
 
+function mapArtifactToContentType(artifactType: string): string {
+  const map: Record<string, string> = {
+    audio: 'audio',
+    video: 'video',
+    slide_deck: 'pdf',
+    quiz: 'quiz',
+    flashcards: 'flashcards',
+    report: 'report',
+    infographic: 'infographic',
+    data_table: 'data_table',
+    mind_map: 'mind_map',
+  }
+  return map[artifactType] ?? artifactType
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ jobId: string }> }
@@ -65,6 +80,11 @@ export async function POST(
           thumbnailUrl,
           isActive: true,
           createdById: dbUser!.id,
+          s3Key: destKey,
+          contentType: mapArtifactToContentType(generation.artifactType),
+          fileType: ext,
+          contentData: generation.contentData ?? undefined,
+          organizationId: orgId,
         },
       })
 

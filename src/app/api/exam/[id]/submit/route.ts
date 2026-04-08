@@ -215,14 +215,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Auto-generate certificate
   if (isPassed) {
-    // B6.1/G6.1 — Kriptografik olarak güvenli sertifika kodu (önceki: Date.now()+Math.random, ~16M kombinasyon)
     const code = `CERT-${randomBytes(16).toString('hex').toUpperCase()}`
+    // Otomatik geçerlilik süresi: training.renewalPeriodMonths varsa hesapla
+    const expiresAt = attempt.training.renewalPeriodMonths
+      ? new Date(Date.now() + attempt.training.renewalPeriodMonths * 30 * 24 * 60 * 60 * 1000)
+      : null
     await prisma.certificate.create({
       data: {
         userId: dbUser!.id,
         trainingId: attempt.trainingId,
         attemptId: attempt.id,
         certificateCode: code,
+        expiresAt,
       },
     })
   }

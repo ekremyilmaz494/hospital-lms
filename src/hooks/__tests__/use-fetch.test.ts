@@ -137,7 +137,7 @@ describe('useFetch — fetch davranışı', () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 403,
-      json: () => Promise.resolve({ error: 'Forbidden' }),
+      json: () => Promise.resolve({}),
     })
 
     const { useFetch } = await import('@/hooks/use-fetch')

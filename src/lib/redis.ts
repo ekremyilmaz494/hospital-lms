@@ -62,8 +62,8 @@ export async function getExamTimeRemaining(attemptId: string): Promise<number | 
 
 export async function isExamExpired(attemptId: string): Promise<boolean> {
   const remaining = await getExamTimeRemaining(attemptId)
-  // Timer yoksa (hiç başlatılmamışsa) expired DEĞİL — submit'i engellemesin
-  if (remaining === null) return false
+  // Timer yoksa (hiç başlatılmamışsa veya temizlenmişse) expired kabul et
+  if (remaining === null) return true
   return remaining <= 0
 }
 
@@ -204,7 +204,17 @@ export async function invalidateOrgCache(orgId: string, entity: string): Promise
 
 // ── Rate Limiting ──
 
+/** Validates rate limit keys to reject unsafe characters (injection prevention) */
+const SAFE_KEY_PATTERN = /^[a-zA-Z0-9:._@-]+$/
+
 export async function checkRateLimit(key: string, maxRequests: number, windowSeconds: number): Promise<boolean> {
+  // Key sanitization: reject keys with unsafe characters
+  if (!SAFE_KEY_PATTERN.test(key)) {
+    throw new Error('Invalid rate limit key: contains unsafe characters')
+  }
+
+  const effectiveMax = maxRequests
+
   const redis = getRedis()
   if (redis) {
     try {
@@ -214,9 +224,9 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
       pipeline.incr(k)
       const results = await pipeline.exec()
       const current = results[1] as number
-      return current <= maxRequests
+      return current <= effectiveMax
     } catch {
-      // Redis unreachable — fall through to in-memory fallback
+      // Redis unreachable: fall through to in-memory fallback
       resetRedis()
     }
   }
@@ -230,5 +240,5 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
     return true
   }
   entry.count++
-  return entry.count <= maxRequests
+  return entry.count <= effectiveMax
 }

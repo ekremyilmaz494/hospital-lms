@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       standardBody: standardBodyParam as StandardBody,
     })
 
-    return jsonResponse({ compliance })
+    return jsonResponse({ compliance }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Uyumluluk hesaplanamadı'
     return errorResponse(message, 500)

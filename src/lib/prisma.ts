@@ -17,8 +17,8 @@ function createPrismaClient() {
   }
   const pool = new Pool({
     connectionString,
-    max: 10,
-    min: 2,
+    max: 25,
+    min: 5,
     idleTimeoutMillis: 60000,
     connectionTimeoutMillis: 15000,
     allowExitOnIdle: false,

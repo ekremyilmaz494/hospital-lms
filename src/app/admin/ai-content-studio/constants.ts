@@ -21,7 +21,7 @@ export const POLL_NORMAL_THRESHOLD = 5 * 60_000
 
 // ── Genel ──
 
-export const GENERATION_TIMEOUT_MS = 15 * 60 * 1000
+export const GENERATION_TIMEOUT_MS = 75 * 60 * 1000
 export const ITEMS_PER_PAGE = 12
 export const MAX_INSTRUCTIONS_LENGTH = 2000
 export const MAX_TITLE_LENGTH = 500

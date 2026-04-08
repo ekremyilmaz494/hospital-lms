@@ -14,7 +14,7 @@ from typing import Optional
 
 from app.security import verify_internal_key
 from app.services import auth_service
-from app.services.browser_login import start_browser_login, get_session_status
+from app.services.browser_login import start_browser_login, refresh_cookies, get_session_status
 
 router = APIRouter(dependencies=[Depends(verify_internal_key)])
 _executor = ThreadPoolExecutor(max_workers=2)
@@ -46,6 +46,18 @@ async def verify(x_org_id: str = Header(...)):
     if result.get("connected"):
         return {"valid": True}
     return {"valid": False, "error": result.get("error", "Doğrulama başarısız")}
+
+
+@router.post("/auth/refresh")
+async def refresh(x_org_id: str = Header(...)):
+    """Mevcut browser profili ile cookie'leri sessizce yeniler (headless).
+    TypeScript client: refreshAuth() → POST /api/auth/refresh"""
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(_executor, refresh_cookies, x_org_id)
+
+    if not result.get("success"):
+        return {"refreshed": False, "error": result.get("error", "Yenileme başarısız.")}
+    return {"refreshed": True}
 
 
 @router.post("/auth/disconnect")

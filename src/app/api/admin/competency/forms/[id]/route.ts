@@ -25,7 +25,7 @@ export async function GET(
   })
 
   if (!form) return errorResponse('Form bulunamadı', 404)
-  return jsonResponse(form)
+  return jsonResponse(form, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }
 
 export async function PUT(

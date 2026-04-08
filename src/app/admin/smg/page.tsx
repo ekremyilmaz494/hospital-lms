@@ -72,7 +72,9 @@ export default function AdminSmgPage() {
   const { data: periodsData } = useFetch<PeriodsData>('/api/admin/smg/periods');
   const reportUrl = `/api/admin/smg/report${selectedPeriodId ? `?periodId=${selectedPeriodId}` : ''}`;
   const { data: reportData, isLoading: reportLoading } = useFetch<ReportData>(reportUrl);
-  const { data: activitiesData, isLoading: activitiesLoading, refetch: refetchActivities } = useFetch<ActivitiesData>('/api/admin/smg/activities?status=PENDING');
+  // Defer activities fetch until user clicks the "Bekleyen Onaylar" tab
+  const activitiesUrl = activeTab === 'pending' ? '/api/admin/smg/activities?status=PENDING' : null;
+  const { data: activitiesData, isLoading: activitiesLoading, refetch: refetchActivities } = useFetch<ActivitiesData>(activitiesUrl);
 
   const periods = periodsData?.periods ?? [];
   const report = reportData?.report ?? [];

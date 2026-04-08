@@ -49,16 +49,19 @@ export async function GET(
     const isExpired = certificate.expiresAt
       ? new Date(certificate.expiresAt) < new Date()
       : false
+    const isRevoked = !!certificate.revokedAt
 
     const maskedFirst = maskName(certificate.user.firstName)
     const maskedLast = maskName(certificate.user.lastName)
 
     return jsonResponse({
-      isValid: !isExpired,
+      isValid: !isExpired && !isRevoked,
+      isRevoked,
       holderName: `${maskedFirst} ${maskedLast}`,
       trainingTitle: certificate.training.title,
       issuedAt: certificate.issuedAt.toISOString(),
       expiresAt: certificate.expiresAt?.toISOString() ?? null,
+      revokedAt: certificate.revokedAt?.toISOString() ?? null,
       organizationName: org?.name ?? null,
     })
   } catch (err) {

@@ -84,5 +84,5 @@ export async function GET(request: Request) {
       completedCount,
       completionRate: staff.length > 0 ? Math.round((completedCount / staff.length) * 100) : 0,
     },
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }

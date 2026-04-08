@@ -19,7 +19,7 @@ const cache = new Map<string, { data: unknown; ts: number }>();
 const inflight = new Map<string, Promise<unknown>>();
 const STALE_TIME = 60_000; // 60 saniye — geri navigasyonda anında gösterim
 const TIMEOUT_MS = 30_000; // 30 saniye — API timeout
-const MAX_CACHE_SIZE = 100;
+const MAX_CACHE_SIZE = 300;
 
 function cacheSet(url: string, data: unknown) {
   cache.set(url, { data, ts: Date.now() });

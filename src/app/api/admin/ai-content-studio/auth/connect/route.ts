@@ -39,12 +39,14 @@ export async function POST(request: Request) {
         email: parsed.data.email,
         status: 'connected',
         lastVerifiedAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
       update: {
         userId: dbUser!.id,
         email: parsed.data.email,
         status: 'connected',
         lastVerifiedAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         errorMessage: null,
       },
     })

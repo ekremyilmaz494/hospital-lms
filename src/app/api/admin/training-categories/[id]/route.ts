@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { updateTrainingCategorySchema } from '@/lib/validations'
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -13,6 +15,7 @@ export async function PATCH(
   if (roleError) return roleError
 
   const { id } = await params
+  if (!UUID_REGEX.test(id)) return errorResponse('Geçersiz kategori ID', 400)
 
   const category = await prisma.trainingCategory.findUnique({
     where: { id },
@@ -63,6 +66,7 @@ export async function DELETE(
   if (roleError) return roleError
 
   const { id } = await params
+  if (!UUID_REGEX.test(id)) return errorResponse('Geçersiz kategori ID', 400)
 
   const category = await prisma.trainingCategory.findUnique({
     where: { id },

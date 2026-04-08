@@ -190,6 +190,7 @@ export async function GET(
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename=${safeTitle}.pdf`,
+      'Cache-Control': 'private, no-store',
     },
   })
 }
