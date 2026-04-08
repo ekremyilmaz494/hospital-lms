@@ -141,19 +141,29 @@ export default function CalendarPage() {
     events.forEach(evt => {
       const start = new Date(evt.start);
       const end = new Date(evt.end);
-      // Clamp to visible calendar range
-      const rangeStart = start < firstDay ? firstDay : start;
-      const rangeEnd = end > lastDay ? lastDay : end;
-      // Iterate each day the event spans (typically 1-5 days)
-      const cursor = new Date(rangeStart);
-      cursor.setHours(0, 0, 0, 0);
-      const endTime = rangeEnd.getTime();
-      while (cursor.getTime() <= endTime) {
-        const key = cursor.toDateString();
-        if (!map.has(key)) map.set(key, []);
-        map.get(key)!.push(evt);
-        cursor.setDate(cursor.getDate() + 1);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+
+      // Show events on key dates only (not every day in range):
+      // - Exams: only on the end date (deadline)
+      // - Trainings: on start date + end date
+      const keyDates: Date[] = [];
+      if (evt.eventType === 'exam') {
+        keyDates.push(end);
+      } else {
+        keyDates.push(start);
+        if (start.getTime() !== end.getTime()) {
+          keyDates.push(end);
+        }
       }
+
+      keyDates.forEach(d => {
+        if (d >= firstDay && d <= lastDay) {
+          const key = d.toDateString();
+          if (!map.has(key)) map.set(key, []);
+          map.get(key)!.push(evt);
+        }
+      });
     });
     return map;
   }, [events, calendarDays]);
