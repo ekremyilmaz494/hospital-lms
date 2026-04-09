@@ -410,6 +410,7 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
 
 // ── Main Page ──
 export default function StaffPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const { data, isLoading, refetch } = useFetch<StaffPageData>(`/api/admin/staff?page=${currentPage}&limit=20`);
