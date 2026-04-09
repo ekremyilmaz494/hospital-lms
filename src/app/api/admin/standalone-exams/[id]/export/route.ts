@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs'
 import { jsPDF } from 'jspdf'
-import 'jspdf-autotable'
+import { autoTable } from 'jspdf-autotable'
 import { prisma } from '@/lib/prisma'
 import {
   getAuthUser,
@@ -277,7 +277,7 @@ export async function GET(
         r.completedAt || '-',
       ])
 
-      ;(doc as unknown as { autoTable: (opts: Record<string, unknown>) => void }).autoTable({
+      autoTable(doc, {
         startY: 33,
         head: [['Ad Soyad', 'Departman', 'Durum', 'Puan', 'Deneme', 'Sure', 'Tamamlanma']],
         body: participantBody,
@@ -293,22 +293,21 @@ export async function GET(
           5: { cellWidth: 20 },
           6: { cellWidth: 35 },
         },
-        didParseCell: (data: Record<string, unknown>) => {
-          const cellData = data as { section: string; column: { index: number }; cell: { styles: Record<string, unknown>; text: string[] } }
-          if (cellData.section === 'body' && cellData.column.index === 2) {
-            const text = cellData.cell.text[0]
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 2) {
+            const text = data.cell.text[0]
             if (text === 'Gecti') {
-              cellData.cell.styles.fillColor = [212, 237, 218]
-              cellData.cell.styles.textColor = [21, 87, 36]
+              data.cell.styles.fillColor = [212, 237, 218]
+              data.cell.styles.textColor = [21, 87, 36]
             } else if (text === 'Kaldi') {
-              cellData.cell.styles.fillColor = [248, 215, 218]
-              cellData.cell.styles.textColor = [114, 28, 36]
+              data.cell.styles.fillColor = [248, 215, 218]
+              data.cell.styles.textColor = [114, 28, 36]
             } else if (text === 'Devam Ediyor') {
-              cellData.cell.styles.fillColor = [255, 243, 205]
-              cellData.cell.styles.textColor = [133, 100, 4]
+              data.cell.styles.fillColor = [255, 243, 205]
+              data.cell.styles.textColor = [133, 100, 4]
             } else if (text === 'Baslamadi') {
-              cellData.cell.styles.fillColor = [226, 232, 240]
-              cellData.cell.styles.textColor = [71, 85, 105]
+              data.cell.styles.fillColor = [226, 232, 240]
+              data.cell.styles.textColor = [71, 85, 105]
             }
           }
         },
