@@ -13,6 +13,15 @@ import { logger } from '@/lib/logger'
 
 // ── Helpers ──
 
+/** jsPDF Helvetica fontu Türkçe karakterleri desteklemediği için ASCII'ye dönüştür */
+const TR_MAP: Record<string, string> = {
+  'ğ': 'g', 'Ğ': 'G', 'ü': 'u', 'Ü': 'U', 'ş': 's', 'Ş': 'S',
+  'ı': 'i', 'İ': 'I', 'ö': 'o', 'Ö': 'O', 'ç': 'c', 'Ç': 'C',
+}
+function tr(text: string): string {
+  return text.replace(/[ğĞüÜşŞıİöÖçÇ]/g, (c) => TR_MAP[c] ?? c)
+}
+
 function styleHeader(ws: ExcelJS.Worksheet, color = 'FF0D9668') {
   const headerRow = ws.getRow(1)
   headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
@@ -223,7 +232,7 @@ export async function GET(request: Request) {
       // ── Page 1: Kapak + Ozet ──
       doc.setFontSize(22)
       doc.setTextColor(13, 150, 104)
-      doc.text(orgName, pw / 2, 30, { align: 'center' })
+      doc.text(tr(orgName), pw / 2, 30, { align: 'center' })
       doc.setFontSize(16)
       doc.setTextColor(50)
       doc.text('Egitim Performans Raporu', pw / 2, 42, { align: 'center' })
@@ -260,11 +269,14 @@ export async function GET(request: Request) {
       autoTable(doc, {
         startY: 22,
         head: [['Egitim', 'Atanan', 'Tamamlayan', 'Basarisiz', 'Ort. Puan', 'Basari %']],
-        body: trainingRows.map(t => [
-          t.title.length > 40 ? t.title.slice(0, 40) + '...' : t.title,
-          String(t.assigned), String(t.completed), String(t.failed),
-          String(t.avgScore), `%${t.rate}`,
-        ]),
+        body: trainingRows.map(t => {
+          const title = tr(t.title)
+          return [
+            title.length > 40 ? title.slice(0, 40) + '...' : title,
+            String(t.assigned), String(t.completed), String(t.failed),
+            String(t.avgScore), `%${t.rate}`,
+          ]
+        }),
         theme: 'striped',
         headStyles: { fillColor: [13, 150, 104], fontSize: 8 },
         styles: { fontSize: 7, cellPadding: 2 },
@@ -290,7 +302,7 @@ export async function GET(request: Request) {
         startY: 22,
         head: [['Ad Soyad', 'Departman', 'Atanan', 'Basarili', 'Basarisiz', 'Ort. Puan', 'Durum']],
         body: staffRows.map(s => [
-          s.name, s.dept,
+          tr(s.name), tr(s.dept),
           String(s.totalAssigned), String(s.completed), String(s.failed),
           String(s.avgScore), s.status,
         ]),
@@ -317,7 +329,7 @@ export async function GET(request: Request) {
       autoTable(doc, {
         startY: 22,
         head: [['Departman', 'Personel', 'Basarili', 'Basarisiz', 'Basari Orani']],
-        body: deptRows.map(d => [d.name, String(d.personel), String(d.passed), String(d.failed), `%${d.rate}`]),
+        body: deptRows.map(d => [tr(d.name), String(d.personel), String(d.passed), String(d.failed), `%${d.rate}`]),
         theme: 'striped',
         headStyles: { fillColor: [13, 150, 104], fontSize: 9 },
         styles: { fontSize: 8, cellPadding: 3 },
@@ -342,7 +354,10 @@ export async function GET(request: Request) {
         autoTable(doc, {
           startY: 22,
           head: [['Ad Soyad', 'Departman', 'Egitim', 'Deneme', 'Son Puan']],
-          body: failureRows.map(f => [f.name, f.dept, f.training.length > 35 ? f.training.slice(0, 35) + '...' : f.training, String(f.attempts), String(f.lastScore)]),
+          body: failureRows.map(f => {
+            const training = tr(f.training)
+            return [tr(f.name), tr(f.dept), training.length > 35 ? training.slice(0, 35) + '...' : training, String(f.attempts), String(f.lastScore)]
+          }),
           theme: 'striped',
           headStyles: { fillColor: [220, 38, 38], fontSize: 8 },
           styles: { fontSize: 7, cellPadding: 2 },
@@ -360,12 +375,14 @@ export async function GET(request: Request) {
         autoTable(doc, {
           startY: 22,
           head: [['Egitim', 'On Sinav', 'Son Sinav', 'Gelisim', 'Orneklem']],
-          body: scoreComparison.map(s => [
-            s.title.length > 40 ? s.title.slice(0, 40) + '...' : s.title,
+          body: scoreComparison.map(s => {
+            const title = tr(s.title)
+            return [
+            title.length > 40 ? title.slice(0, 40) + '...' : title,
             `%${s.preScore}`, `%${s.postScore}`,
             `${s.improvement >= 0 ? '+' : ''}${s.improvement}%`,
             String(s.sampleSize),
-          ]),
+          ]}),
           theme: 'striped',
           headStyles: { fillColor: [13, 150, 104], fontSize: 8 },
           styles: { fontSize: 7, cellPadding: 2 },
@@ -388,7 +405,7 @@ export async function GET(request: Request) {
         doc.setFontSize(8)
         doc.setTextColor(150)
         const ph = doc.internal.pageSize.getHeight()
-        doc.text(`${orgName} — Egitim Performans Raporu`, 14, ph - 8)
+        doc.text(`${tr(orgName)} — Egitim Performans Raporu`, 14, ph - 8)
         doc.text(`Sayfa ${i}/${totalPages}`, pw - 14, ph - 8, { align: 'right' })
         doc.text(dateLabel, pw / 2, ph - 8, { align: 'center' })
       }

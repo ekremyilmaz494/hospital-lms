@@ -23,6 +23,15 @@ function styleHeader(ws: ExcelJS.Worksheet) {
   headerRow.height = 24
 }
 
+/** jsPDF Helvetica fontu Türkçe karakterleri desteklemediği için ASCII'ye dönüştür */
+const TR_MAP: Record<string, string> = {
+  'ğ': 'g', 'Ğ': 'G', 'ü': 'u', 'Ü': 'U', 'ş': 's', 'Ş': 'S',
+  'ı': 'i', 'İ': 'I', 'ö': 'o', 'Ö': 'O', 'ç': 'c', 'Ç': 'C',
+}
+function tr(text: string): string {
+  return text.replace(/[ğĞüÜşŞıİöÖçÇ]/g, (c) => TR_MAP[c] ?? c)
+}
+
 /** Prevent formula injection */
 function sanitizeCell(value: unknown): string | number {
   if (typeof value === 'number') return value
@@ -248,7 +257,7 @@ export async function GET(
 
       // Header
       doc.setFontSize(16)
-      doc.text(sanitizeCell(exam.title) as string, 14, 15)
+      doc.text(tr(sanitizeCell(exam.title) as string), 14, 15)
       doc.setFontSize(10)
       doc.setTextColor(100)
       doc.text(
@@ -268,9 +277,9 @@ export async function GET(
       // Participants table — TÜM personel
       doc.setTextColor(0)
       const participantBody = personRows.map((r) => [
-        r.name,
-        r.dept,
-        r.status,
+        tr(r.name),
+        tr(r.dept),
+        tr(r.status),
         r.score !== null ? String(r.score) : '-',
         r.attemptNumber > 0 ? String(r.attemptNumber) : '-',
         r.durationMinutes > 0 ? `${r.durationMinutes} dk` : '-',
