@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     })
   }
 
-  const [approvedActivities, pendingActivities, allPeriods] = await Promise.all([
+  const [approvedActivities, pendingActivities, rejectedActivities, allPeriods] = await Promise.all([
     prisma.smgActivity.findMany({
       where: {
         userId,
@@ -43,6 +43,27 @@ export async function GET(request: Request) {
     prisma.smgActivity.findMany({
       where: { userId, organizationId: orgId, approvalStatus: 'PENDING' },
       orderBy: { createdAt: 'desc' },
+    }),
+    prisma.smgActivity.findMany({
+      where: {
+        userId,
+        organizationId: orgId,
+        approvalStatus: 'REJECTED',
+        ...(period
+          ? { completionDate: { gte: period.startDate, lte: period.endDate } }
+          : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        activityType: true,
+        completionDate: true,
+        smgPoints: true,
+        approvalStatus: true,
+        provider: true,
+        rejectionReason: true,
+      },
     }),
     prisma.smgPeriod.findMany({
       where: { organizationId: orgId },
@@ -70,5 +91,6 @@ export async function GET(request: Request) {
     progress: requiredPoints > 0 ? Math.min(100, Math.round((approvedPoints / requiredPoints) * 100)) : 0,
     approvedActivities,
     pendingActivities,
+    rejectedActivities,
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }

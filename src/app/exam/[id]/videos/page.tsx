@@ -49,13 +49,21 @@ export default function VideoPlayerPage() {
   // Ensure an active exam attempt exists BEFORE fetching videos (prevents race condition
   // where GET /videos resolves before POST /start, finding a completed attempt and redirecting away)
   const [startReady, setStartReady] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const startCalled = useRef(false);
   useEffect(() => {
     if (!id || startCalled.current) return;
     startCalled.current = true;
     fetch(`/api/exam/${id}/start`, { method: 'POST' })
-      .then(() => setStartReady(true))
-      .catch(() => setStartReady(true));
+      .then(async (res) => {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setStartError(data?.error || 'Sınav başlatılamadı');
+          return;
+        }
+        setStartReady(true);
+      })
+      .catch(() => setStartError('Sınav başlatılamadı. Lütfen tekrar deneyin.'));
   }, [id]);
 
   const { data, isLoading, error, refetch } = useFetch<VideosResponse>(startReady ? `/api/exam/${id}/videos` : null);
@@ -240,8 +248,8 @@ export default function VideoPlayerPage() {
   }, [data?.attemptStatus, id, router]);
 
   // Show loading while start is pending OR video data is loading
-  if (!startReady || isLoading) return <PageLoading />;
-  if (error) return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  if ((!startReady && !startError) || isLoading) return <PageLoading />;
+  if (startError || error) return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{startError || error}</div></div>;
   if (data?.attemptStatus === 'pre_exam' || data?.attemptStatus === 'completed') return <PageLoading />;
 
   if (videosData.length === 0) {

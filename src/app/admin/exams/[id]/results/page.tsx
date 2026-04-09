@@ -17,6 +17,7 @@ import {
 import dynamic from 'next/dynamic';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/shared/toast';
 
 const ChartSkeleton = () => (
   <div className="h-64 rounded-2xl animate-pulse" style={{ background: 'var(--color-surface)' }} />
@@ -94,6 +95,7 @@ export default function ExamResultsPage() {
   const [attemptFilter, setAttemptFilter] = useState<AttemptFilter>('all');
   const [attemptSearch, setAttemptSearch] = useState('');
   const [downloading, setDownloading] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const exam = data?.exam;
   const summary = data?.summary;
@@ -152,7 +154,7 @@ export default function ExamResultsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      // silently fail
+      toast('Dosya indirilemedi. Lütfen tekrar deneyin.', 'error');
     } finally {
       setDownloading(null);
     }

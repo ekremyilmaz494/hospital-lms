@@ -232,16 +232,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   // Eğitim tamamlandığında otomatik SMG aktivitesi (fire-and-forget)
-  if (isPassed) {
+  if (isPassed && attempt.training.smgPoints > 0) {
     prisma.smgActivity.create({
       data: {
         userId: dbUser!.id,
         organizationId: attempt.training.organizationId,
         activityType: 'COURSE_COMPLETION',
         title: attempt.training.title,
-        provider: 'Devakent LMS',
+        provider: 'Hastane LMS',
         completionDate: new Date(),
-        smgPoints: 10,
+        smgPoints: attempt.training.smgPoints,
         approvalStatus: 'APPROVED',
         approvedAt: new Date(),
       },

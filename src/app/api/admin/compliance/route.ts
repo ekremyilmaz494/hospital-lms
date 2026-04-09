@@ -93,9 +93,12 @@ export async function GET() {
     // Genel uyum özeti
     const totalCompulsory = compulsoryTrainings.length
     const fullyCompliant = trainingCompliance.filter(t => t.stats.complianceRate === 100).length
-    const overallComplianceRate = totalCompulsory > 0
-      ? Math.round(trainingCompliance.reduce((sum, t) => sum + t.stats.complianceRate, 0) / totalCompulsory)
-      : 100
+    // Weighted average: toplam atama sayısına göre ağırlıklı uyum oranı
+    const totalAssigned = trainingCompliance.reduce((sum, t) => sum + t.stats.totalAssigned, 0)
+    const totalPassed = trainingCompliance.reduce((sum, t) => sum + t.stats.passed, 0)
+    const overallComplianceRate = totalAssigned > 0
+      ? Math.round((totalPassed / totalAssigned) * 100)
+      : 0
 
     // Yaklaşan deadline'lar (30 gün içinde)
     const urgentDeadlines = trainingCompliance

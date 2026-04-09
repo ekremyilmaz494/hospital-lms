@@ -10,7 +10,7 @@ async function fetchStats(orgId: string) {
   const cached = await getCached<object>(cacheKey)
   if (cached) return cached
 
-  const [staffCount, activeStaffCount, trainingCount, activeTrainingCount, statusCounts, compulsoryTrainings] = await Promise.all([
+  const [staffCount, activeStaffCount, trainingCount, activeTrainingCount, statusCounts, compulsoryTrainings, overdueCount] = await Promise.all([
     prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
     prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
     prisma.training.count({ where: { organizationId: orgId } }),
@@ -19,6 +19,13 @@ async function fetchStats(orgId: string) {
     prisma.training.findMany({
       where: { organizationId: orgId, isCompulsory: true, isActive: true },
       select: { id: true, title: true, complianceDeadline: true, regulatoryBody: true, assignments: { select: { status: true } } },
+    }),
+    // Geciken eğitim: süresi dolmuş ama tamamlanmamış atamalar
+    prisma.trainingAssignment.count({
+      where: {
+        training: { organizationId: orgId, endDate: { lt: new Date() } },
+        status: { notIn: ['passed'] },
+      },
     }),
   ])
 
@@ -61,7 +68,7 @@ async function fetchStats(orgId: string) {
       { title: 'Toplam Personel', value: staffCount, icon: 'Users', accentColor: 'var(--color-primary)', trend: { value: activeStaffCount, label: 'aktif', isPositive: true } },
       { title: 'Aktif Egitim', value: activeTrainingCount, icon: 'GraduationCap', accentColor: 'var(--color-info)', trend: { value: trainingCount, label: 'toplam', isPositive: true } },
       { title: 'Tamamlanma Orani', value: `%${completionRate}`, icon: 'TrendingUp', accentColor: 'var(--color-success)', trend: { value: completedCount, label: 'tamamlanan', isPositive: true } },
-      { title: 'Geciken Egitim', value: failedCount, icon: 'AlertTriangle', accentColor: 'var(--color-error)', trend: { value: failedCount, label: 'basarisiz', isPositive: false } },
+      { title: 'Geciken Egitim', value: overdueCount, icon: 'AlertTriangle', accentColor: 'var(--color-error)', trend: { value: failedCount, label: 'basarisiz', isPositive: false } },
       { title: 'Uyum Orani', value: `%${complianceRate}`, icon: 'ShieldCheck', accentColor: complianceRate >= 80 ? 'var(--color-success)' : complianceRate >= 60 ? 'var(--color-warning)' : 'var(--color-error)', trend: { value: compulsoryTrainings.length, label: 'zorunlu egitim', isPositive: complianceRate >= 80 } },
     ],
     complianceAlerts,

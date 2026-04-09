@@ -32,6 +32,9 @@ export async function PUT(
       approvalStatus: parsed.data.status,
       approvedBy: dbUser!.id,
       approvedAt: new Date(),
+      ...(parsed.data.status === 'REJECTED' && parsed.data.rejectionReason
+        ? { rejectionReason: parsed.data.rejectionReason }
+        : {}),
     },
   })
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  Award, Download, CheckCircle2, AlertTriangle, Copy, Eye, X, Shield, Star,
+  Award, Download, CheckCircle2, AlertTriangle, Copy, Eye, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BlurFade } from '@/components/ui/blur-fade';
@@ -22,134 +22,225 @@ interface Certificate {
   user?: { firstName?: string; lastName?: string; organization?: { name?: string } };
 }
 
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+/** Greek key corner ornament SVG */
+function CornerOrnament({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 60 60" className={className} fill="#1e1e1e">
+      {/* Outer frame */}
+      <rect x="0" y="0" width="60" height="7" />
+      <rect x="0" y="0" width="7" height="60" />
+      <rect x="0" y="53" width="60" height="7" />
+      <rect x="53" y="0" width="7" height="60" />
+      {/* Inner key */}
+      <rect x="14" y="18" width="32" height="5" />
+      <rect x="22" y="14" width="5" height="32" />
+      {/* Center block */}
+      <rect x="23" y="23" width="14" height="14" />
+    </svg>
+  );
 }
 
-/** Premium HTML certificate preview */
+/** Gold seal SVG */
+function GoldSeal() {
+  const points = 24;
+  const outerR = 28;
+  const innerR = 24;
+  let d = '';
+  for (let i = 0; i < points; i++) {
+    const a1 = (i * 2 * Math.PI) / points;
+    const a2 = ((i + 0.5) * 2 * Math.PI) / points;
+    const a3 = ((i + 1) * 2 * Math.PI) / points;
+    const cmd = i === 0 ? 'M' : 'L';
+    d += `${cmd}${30 + outerR * Math.cos(a1)},${30 + outerR * Math.sin(a1)} `;
+    d += `L${30 + innerR * Math.cos(a2)},${30 + innerR * Math.sin(a2)} `;
+    if (i === points - 1) d += `L${30 + outerR * Math.cos(a3)},${30 + outerR * Math.sin(a3)} Z`;
+  }
+
+  return (
+    <svg viewBox="0 0 60 60" className="h-14 w-14 sm:h-16 sm:w-16">
+      <path d={d} fill="#B48C32" />
+      <circle cx="30" cy="30" r="20" fill="#966E1E" />
+      <circle cx="30" cy="30" r="17" fill="#B48C32" />
+      <circle cx="30" cy="30" r="13" fill="#966E1E" />
+      {/* Star */}
+      <polygon
+        points="30,19 32.5,26 40,26 34,30.5 36,38 30,33.5 24,38 26,30.5 20,26 27.5,26"
+        fill="#B48C32"
+      />
+      <text x="30" y="46" textAnchor="middle" fill="white" fontSize="4" fontWeight="bold" fontFamily="sans-serif">BASARI</text>
+    </svg>
+  );
+}
+
+/** Premium HTML certificate preview — professional design */
 function CertificatePreview({ cert }: { cert: Certificate }) {
   const fullName = cert.user ? `${cert.user.firstName ?? ''} ${cert.user.lastName ?? ''}`.trim() : '';
   const orgName = cert.user?.organization?.name ?? 'Hastane LMS';
-  const scoreColor = cert.score >= 90 ? '#059669' : cert.score >= 70 ? '#0d9668' : '#f59e0b';
 
   return (
     <div
       className="relative w-full overflow-hidden select-none"
       style={{
-        background: 'linear-gradient(145deg, #f0fdf4 0%, #ecfdf5 40%, #f8fafc 100%)',
-        border: '3px solid #059669',
-        borderRadius: '16px',
+        background: `
+          repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(200,210,220,0.15) 6px, rgba(200,210,220,0.15) 7px),
+          repeating-linear-gradient(-45deg, transparent, transparent 6px, rgba(200,210,220,0.15) 6px, rgba(200,210,220,0.15) 7px),
+          #fcfdfe
+        `,
+        borderRadius: '4px',
         fontFamily: 'Georgia, "Times New Roman", serif',
         aspectRatio: '1.414 / 1',
         minHeight: '280px',
       }}
     >
-      {/* Corner decorations */}
-      {[
-        'top-0 left-0',
-        'top-0 right-0 rotate-90',
-        'bottom-0 left-0 -rotate-90',
-        'bottom-0 right-0 rotate-180',
-      ].map((pos, i) => (
-        <div key={i} className={`absolute ${pos} w-10 h-10`}>
-          <svg viewBox="0 0 40 40" fill="none">
-            <path d="M0 0 L20 0 L20 4 L4 4 L4 20 L0 20 Z" fill="#059669" opacity="0.5" />
-            <path d="M0 0 L12 0 L12 2 L2 2 L2 12 L0 12 Z" fill="#059669" />
-          </svg>
-        </div>
-      ))}
-
-      {/* Top accent line */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 rounded-b-full" style={{ background: 'linear-gradient(90deg, transparent, #059669, transparent)' }} />
-
-      {/* Watermark */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ opacity: 0.03 }}>
-        <Award style={{ width: '60%', height: '60%', color: '#059669' }} />
+      {/* Top-left diagonal stripes */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
+        <div
+          className="absolute"
+          style={{
+            top: 0, left: 0,
+            width: '40%', height: '45%',
+            background: '#0d9668',
+            clipPath: 'polygon(0 0, 100% 0, 0 100%)',
+          }}
+        />
+        <div
+          className="absolute"
+          style={{
+            top: 0, left: 0,
+            width: '33%', height: '38%',
+            background: '#1e1e1e',
+            clipPath: 'polygon(0 0, 100% 0, 0 100%)',
+          }}
+        />
+        <div
+          className="absolute"
+          style={{
+            top: 0, left: 0,
+            width: '23%', height: '26%',
+            background: '#0d9668',
+            clipPath: 'polygon(0 0, 100% 0, 0 100%)',
+          }}
+        />
       </div>
 
-      <div className="relative h-full flex flex-col items-center justify-between px-8 py-5">
-        {/* Header */}
-        <div className="flex flex-col items-center gap-1 w-full">
-          <div className="flex items-center gap-2">
-            <div className="h-px flex-1" style={{ background: 'linear-gradient(90deg, transparent, #059669)' }} />
-            <span className="text-[9px] font-sans font-bold tracking-[0.3em] uppercase" style={{ color: '#059669' }}>
-              {orgName}
-            </span>
-            <div className="h-px flex-1" style={{ background: 'linear-gradient(90deg, #059669, transparent)' }} />
-          </div>
+      {/* Bottom-right diagonal stripes */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
+        <div
+          className="absolute"
+          style={{
+            bottom: 0, right: 0,
+            width: '40%', height: '45%',
+            background: '#1e1e1e',
+            clipPath: 'polygon(100% 100%, 0 100%, 100% 0)',
+          }}
+        />
+        <div
+          className="absolute"
+          style={{
+            bottom: 0, right: 0,
+            width: '30%', height: '35%',
+            background: '#0d9668',
+            clipPath: 'polygon(100% 100%, 0 100%, 100% 0)',
+          }}
+        />
+        <div
+          className="absolute"
+          style={{
+            bottom: 0, right: 0,
+            width: '19%', height: '22%',
+            background: '#065f46',
+            clipPath: 'polygon(100% 100%, 0 100%, 100% 0)',
+          }}
+        />
+      </div>
 
-          <div className="flex items-center gap-2 mt-1">
-            <Star className="h-3 w-3 fill-current" style={{ color: '#f59e0b' }} />
-            <h1 className="text-[15px] font-bold tracking-widest uppercase" style={{ color: '#0d9668', letterSpacing: '0.2em' }}>
-              Başarı Sertifikası
-            </h1>
-            <Star className="h-3 w-3 fill-current" style={{ color: '#f59e0b' }} />
-          </div>
+      {/* Corner ornaments */}
+      <CornerOrnament className="absolute top-2 left-2 w-8 h-8 sm:w-10 sm:h-10" />
+      <CornerOrnament className="absolute top-2 right-2 w-8 h-8 sm:w-10 sm:h-10 -scale-x-100" />
+      <CornerOrnament className="absolute bottom-2 left-2 w-8 h-8 sm:w-10 sm:h-10 -scale-y-100" />
+      <CornerOrnament className="absolute bottom-2 right-2 w-8 h-8 sm:w-10 sm:h-10 -scale-x-100 -scale-y-100" />
+
+      {/* Content */}
+      <div className="relative h-full flex flex-col items-center justify-between px-8 py-5 sm:px-12 sm:py-6">
+        {/* Header */}
+        <div className="flex flex-col items-center gap-0.5 w-full">
+          {/* Green diamond logo */}
+          <div
+            className="w-4 h-4 sm:w-5 sm:h-5 rotate-45 mb-1"
+            style={{ background: '#0d9668' }}
+          />
+          <span className="text-[8px] sm:text-[9px] font-sans font-bold tracking-[0.3em] uppercase" style={{ color: '#94a3b8' }}>
+            {orgName}
+          </span>
+
+          <h1 className="text-[18px] sm:text-[22px] font-bold tracking-[0.15em] uppercase mt-1" style={{ color: '#0d9668' }}>
+            SERTİFİKA
+          </h1>
+          <span className="text-[10px] sm:text-[11px] font-sans tracking-[0.2em] uppercase" style={{ color: '#1e1e1e' }}>
+            BAŞARI BELGESİ
+          </span>
+
+          {/* Separator */}
+          <div className="h-px w-20 mt-1" style={{ background: 'linear-gradient(90deg, transparent, #0d9668, transparent)' }} />
         </div>
 
         {/* Body */}
-        <div className="flex flex-col items-center gap-2 text-center">
-          <p className="text-[9px] font-sans tracking-widest uppercase" style={{ color: '#64748b', letterSpacing: '0.15em' }}>
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <p className="text-[8px] sm:text-[9px] font-sans tracking-[0.15em] uppercase" style={{ color: '#94a3b8' }}>
             Bu sertifika aşağıdaki kişiye verilmiştir
           </p>
           {fullName && (
-            <p className="text-[18px] font-bold" style={{ color: '#0f172a', fontStyle: 'italic', textShadow: '0 1px 2px rgba(0,0,0,0.08)' }}>
+            <p className="text-[16px] sm:text-[20px] font-bold italic" style={{ color: '#0f172a' }}>
               {fullName}
             </p>
           )}
+          {/* Name underline */}
+          <div className="h-px w-32 sm:w-40" style={{ background: '#0d9668' }} />
 
-          <div className="h-px w-24 mt-0.5" style={{ background: 'linear-gradient(90deg, transparent, #059669, transparent)' }} />
-
-          <p className="text-[8px] font-sans tracking-widest uppercase mt-1" style={{ color: '#64748b' }}>
+          <p className="text-[8px] font-sans tracking-widest uppercase mt-1" style={{ color: '#94a3b8' }}>
             Eğitim
           </p>
-          <p className="text-[13px] font-bold max-w-[200px] leading-snug" style={{ color: '#059669' }}>
+          <p className="text-[11px] sm:text-[13px] font-bold max-w-[200px] leading-snug" style={{ color: '#0d9668' }}>
             {cert.training.title}
           </p>
+
+          {cert.score != null && (
+            <div className="mt-1">
+              <span className="text-[8px] font-sans tracking-wider uppercase" style={{ color: '#94a3b8' }}>Puan: </span>
+              <span className="text-[12px] font-bold font-mono" style={{ color: '#0f172a' }}>{cert.score}%</span>
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
+        {/* Footer: Date | Seal | Signature */}
         <div className="w-full flex items-end justify-between">
-          {/* Score */}
-          <div className="flex flex-col items-center">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-full border-2"
-              style={{ borderColor: scoreColor, background: `${scoreColor}10` }}
-            >
-              <span className="text-[13px] font-bold font-mono" style={{ color: scoreColor }}>{cert.score}%</span>
-            </div>
-            <span className="text-[8px] font-sans mt-0.5" style={{ color: '#64748b' }}>Puan</span>
-          </div>
-
-          {/* Center bottom */}
-          <div className="flex flex-col items-center gap-1">
-            <Shield className="h-5 w-5" style={{ color: '#059669' }} />
-            <div className="text-center">
-              <p className="text-[7px] font-sans tracking-wider" style={{ color: '#94a3b8' }}>SERTİFİKA KODU</p>
-              <p className="text-[9px] font-mono font-bold" style={{ color: '#059669' }}>{cert.certificateCode.slice(0, 20)}</p>
-            </div>
-          </div>
-
           {/* Date */}
-          <div className="flex flex-col items-center">
-            <div
-              className="flex flex-col items-center justify-center rounded-lg px-3 py-1.5"
-              style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}
-            >
-              <span className="text-[8px] font-sans" style={{ color: '#64748b' }}>Tarih</span>
-              <span className="text-[9px] font-bold font-mono" style={{ color: '#0f172a' }}>
-                {new Date(cert.issuedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
-              </span>
-            </div>
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-[8px] font-sans tracking-wider uppercase" style={{ color: '#94a3b8' }}>Tarih</span>
+            <div className="h-px w-16" style={{ background: '#1e1e1e' }} />
+            <span className="text-[9px] font-bold font-mono" style={{ color: '#0f172a' }}>
+              {new Date(cert.issuedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </span>
             {cert.isExpired && (
-              <span className="text-[8px] font-sans mt-0.5" style={{ color: '#dc2626' }}>Süresi Dolmuş</span>
+              <span className="text-[7px] font-sans" style={{ color: '#dc2626' }}>Süresi Dolmuş</span>
             )}
+          </div>
+
+          {/* Gold seal */}
+          <div className="flex flex-col items-center -mb-1">
+            <GoldSeal />
+            <p className="text-[7px] font-mono mt-0.5" style={{ color: '#94a3b8' }}>
+              {cert.certificateCode.slice(0, 18)}
+            </p>
+          </div>
+
+          {/* Signature */}
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-[8px] font-sans tracking-wider uppercase" style={{ color: '#94a3b8' }}>İmza</span>
+            <div className="h-px w-16" style={{ background: '#1e1e1e' }} />
           </div>
         </div>
       </div>
-
-      {/* Bottom accent line */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-0.5 rounded-t-full" style={{ background: 'linear-gradient(90deg, transparent, #059669, transparent)' }} />
     </div>
   );
 }

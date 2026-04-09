@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,7 +23,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
   "include": [
@@ -28,7 +34,14 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "/tmp/hospital-lms-next/types/**/*.ts",
+    "/tmp/hospital-lms-next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "prisma.config.ts", "worker", "src/generated"]
+  "exclude": [
+    "node_modules",
+    "prisma.config.ts",
+    "worker",
+    "src/generated"
+  ]
 }

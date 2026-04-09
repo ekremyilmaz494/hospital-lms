@@ -1,6 +1,7 @@
 'use client';
 
-import { TrendingUp, BarChart3, Award, Target, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { useState } from 'react';
+import { TrendingUp, BarChart3, Award, Target, ArrowUpRight, ArrowDownRight, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { PageHeader } from '@/components/shared/page-header';
 import { ChartCard } from '@/components/shared/chart-card';
@@ -20,7 +21,8 @@ interface EffData {
 const tooltipStyle = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', fontSize: '12px' };
 
 export default function EffectivenessPage() {
-  const { data, isLoading } = useFetch<EffData>('/api/admin/effectiveness');
+  const [period, setPeriod] = useState<'monthly' | 'weekly'>('monthly');
+  const { data, isLoading } = useFetch<EffData>(`/api/admin/effectiveness?period=${period}`);
   if (isLoading) return <PageLoading />;
 
   const summary = data?.summary;
@@ -45,7 +47,27 @@ export default function EffectivenessPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <BlurFade delay={0.2} className="lg:col-span-2">
-          <ChartCard title="Aylık Başarı Trendi" icon={<TrendingUp className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
+          <ChartCard title={period === 'monthly' ? 'Aylık Başarı Trendi' : 'Haftalık Başarı Trendi'} icon={<TrendingUp className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}
+            action={
+              <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: 'var(--color-bg)' }}>
+                {([['monthly', 'Aylık'], ['weekly', 'Haftalık']] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setPeriod(key)}
+                    className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all"
+                    style={{
+                      background: period === key ? 'var(--color-surface)' : 'transparent',
+                      color: period === key ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                      boxShadow: period === key ? 'var(--shadow-sm)' : 'none',
+                    }}
+                  >
+                    <Calendar className="h-3 w-3" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            }
+          >
             <div className="h-64">
               {globalTrend.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>

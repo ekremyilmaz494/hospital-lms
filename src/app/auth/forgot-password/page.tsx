@@ -34,7 +34,15 @@ export default function ForgotPasswordPage() {
       });
 
       if (resetError) {
-        setError('Şifre sıfırlama bağlantısı gönderilemedi. Lütfen tekrar deneyin.');
+        console.error('[forgot-password]', resetError.message, resetError.status);
+        if (resetError.message?.includes('rate') || resetError.status === 429) {
+          setError('Çok fazla deneme yaptınız. Lütfen birkaç dakika bekleyin.');
+        } else if (resetError.message?.includes('not found') || resetError.message?.includes('User not found')) {
+          // Güvenlik: kullanıcı var/yok bilgisi sızdırma
+          setSent(true);
+        } else {
+          setError(`Bağlantı gönderilemedi: ${resetError.message}`);
+        }
         setLoading(false);
         return;
       }

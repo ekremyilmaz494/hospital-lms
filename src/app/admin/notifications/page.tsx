@@ -219,6 +219,7 @@ export default function NotificationsPage() {
 
   const filtered = notifications.filter(n => {
     if (filter === 'all') return true;
+    if (filter === 'unread') return !n.isRead;
     return n.type === filter;
   });
 

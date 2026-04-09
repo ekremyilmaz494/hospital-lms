@@ -290,6 +290,7 @@ model Training {
   complianceDeadline  DateTime? @map("compliance_deadline") @db.Timestamptz
   regulatoryBody      String?   @map("regulatory_body") @db.VarChar(200)
   renewalPeriodMonths Int?      @map("renewal_period_months")
+  smgPoints           Int       @default(10) @map("smg_points")
   createdById         String?   @map("created_by") @db.Uuid
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -662,14 +663,16 @@ model SmgActivity {
   certificateUrl String?   @map("certificate_url") @db.VarChar(1000)
   approvalStatus String    @default("PENDING") @map("approval_status") @db.VarChar(20)
   // PENDING | APPROVED | REJECTED
-  approvedBy     String?   @map("approved_by") @db.Uuid
-  approvedAt     DateTime? @map("approved_at") @db.Timestamptz
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  approvedBy      String?   @map("approved_by") @db.Uuid
+  approvedAt      DateTime? @map("approved_at") @db.Timestamptz
+  rejectionReason String?   @map("rejection_reason") @db.VarChar(500)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   user         User         @relation("UserSmgActivities", fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   approver     User?        @relation("SmgApprovals", fields: [approvedBy], references: [id], onDelete: SetNull)
 
+  @@unique([userId, activityType, title, completionDate], map: "idx_smg_activities_unique")
   @@index([userId], map: "idx_smg_activities_user")
   @@index([organizationId], map: "idx_smg_activities_org")
   @@map("smg_activities")

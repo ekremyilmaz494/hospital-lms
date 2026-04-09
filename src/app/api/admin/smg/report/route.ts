@@ -27,6 +27,16 @@ export async function GET(request: Request) {
     })
   }
 
+  if (!period) {
+    const staffCount = await prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } })
+    return jsonResponse({
+      period: null,
+      report: [],
+      stats: { totalStaff: staffCount, completedCount: 0, completionRate: 0 },
+      warning: 'Aktif SMG dönemi tanımlanmamış. Lütfen Ayarlar > SMG bölümünden dönem oluşturun.',
+    }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
+  }
+
   const [staff, allActivities] = await Promise.all([
     prisma.user.findMany({
       where: { organizationId: orgId, role: 'staff', isActive: true },

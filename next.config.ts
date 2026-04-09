@@ -28,13 +28,13 @@ const withPWA = withPWAInit({
           cacheableResponse: { statuses: [0, 200] },
         },
       },
-      // Statik varlıklar: önce cache
+      // Statik varlıklar: cache ama arka planda güncelle (eski chunk sorunu önlenir)
       {
         urlPattern: /\/_next\/static\/.*/i,
-        handler: "CacheFirst",
+        handler: "StaleWhileRevalidate",
         options: {
           cacheName: "static-cache",
-          expiration: { maxEntries: 200, maxAgeSeconds: 86400 * 30 },
+          expiration: { maxEntries: 200, maxAgeSeconds: 86400 * 7 },
         },
       },
       // Görseller: önce cache
@@ -50,10 +50,13 @@ const withPWA = withPWAInit({
   },
   reloadOnOnline: true,
   cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
+  aggressiveFrontEndNavCaching: false,
 });
 
 const nextConfig: NextConfig = {
+  // macOS provenance/file-provider attribute'leri Turbopack SST yazımını engelliyor.
+  // .next dizinini /tmp altına taşıyarak bu sorunu önlüyoruz.
+  distDir: process.env.NODE_ENV === 'development' ? '/tmp/hospital-lms-next' : '.next',
   compress: true,
   poweredByHeader: false,
   images: {

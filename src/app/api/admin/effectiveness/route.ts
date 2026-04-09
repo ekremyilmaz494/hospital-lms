@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger'
  * GET /api/admin/effectiveness
  * Eğitim etkinlik analizi: pre/post sınav karşılaştırma, öğrenme kazanımı, trend
  */
-export async function GET() {
+export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
@@ -15,12 +15,13 @@ export async function GET() {
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId!
+  const { searchParams } = new URL(request.url)
+  const period = searchParams.get('period') === 'weekly' ? 'weekly' : 'monthly'
 
   const allowed = await checkRateLimit(`effectiveness:${orgId}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
-  // Redis cache: 5 dk TTL
-  const cacheKey = `effectiveness:${orgId}`
+  const cacheKey = `effectiveness:${orgId}:${period}`
   const cached = await getCached<object>(cacheKey)
   if (cached) return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 
@@ -168,35 +169,46 @@ export async function GET() {
     const overallPassRate =
       allAttempts.length > 0 ? Math.round((allPassCount / allAttempts.length) * 100) : 0
 
-    // Son 6 ay trend — tüm eğitimler için
-    const globalMonthly: Record<
+    // Trend hesaplama — aylık veya haftalık
+    function getGroupKey(date: Date): string {
+      if (period === 'weekly') {
+        // ISO hafta: Pazartesi başlangıç
+        const d = new Date(date)
+        d.setDate(d.getDate() - ((d.getDay() + 6) % 7)) // Pazartesiye git
+        return d.toISOString().slice(0, 10) // "YYYY-MM-DD"
+      }
+      return date.toISOString().slice(0, 7) // "YYYY-MM"
+    }
+    const sliceCount = period === 'weekly' ? 12 : 6
+
+    const globalGrouped: Record<
       string,
       { pass: number; total: number; sumPost: number; sumGain: number; gainCount: number }
     > = {}
 
     for (const a of allAttempts) {
       if (!a.postExamCompletedAt) continue
-      const month = a.postExamCompletedAt.toISOString().slice(0, 7)
-      if (!globalMonthly[month]) globalMonthly[month] = { pass: 0, total: 0, sumPost: 0, sumGain: 0, gainCount: 0 }
-      const gm = globalMonthly[month]
+      const key = getGroupKey(a.postExamCompletedAt)
+      if (!globalGrouped[key]) globalGrouped[key] = { pass: 0, total: 0, sumPost: 0, sumGain: 0, gainCount: 0 }
+      const gm = globalGrouped[key]
       gm.total++
       gm.sumPost += Number(a.postExamScore)
       if (a.isPassed) gm.pass++
     }
     for (const a of attempts) {
       if (!a.postExamCompletedAt) continue
-      const month = a.postExamCompletedAt.toISOString().slice(0, 7)
-      if (!globalMonthly[month]) continue
-      const gm = globalMonthly[month]
+      const key = getGroupKey(a.postExamCompletedAt)
+      if (!globalGrouped[key]) continue
+      const gm = globalGrouped[key]
       gm.sumGain += Number(a.postExamScore) - Number(a.preExamScore)
       gm.gainCount++
     }
 
-    const globalTrend = Object.entries(globalMonthly)
+    const globalTrend = Object.entries(globalGrouped)
       .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-6) // son 6 ay
-      .map(([month, gm]) => ({
-        month,
+      .slice(-sliceCount)
+      .map(([key, gm]) => ({
+        month: key,
         passRate: gm.total > 0 ? Math.round((gm.pass / gm.total) * 100) : 0,
         avgPostScore: gm.total > 0 ? Math.round((gm.sumPost / gm.total) * 10) / 10 : 0,
         avgGain: gm.gainCount > 0 ? Math.round((gm.sumGain / gm.gainCount) * 10) / 10 : null,

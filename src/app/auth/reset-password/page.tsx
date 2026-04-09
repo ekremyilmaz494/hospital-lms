@@ -20,16 +20,33 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Yönlendirme timer'ını unmount'ta temizle
-  useEffect(() => () => {
-    if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+  const [sessionReady, setSessionReady] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    // PASSWORD_RECOVERY event'i ile session otomatik oluşur
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+        setSessionReady(true);
+      }
+    });
+
+    // Zaten session varsa direkt hazır
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setSessionReady(true);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Merkezi şifre politikası (validations.ts)
     const result = passwordSchema.safeParse(password);
     if (!result.success) {
       setError(result.error.issues[0]?.message ?? 'Geçersiz şifre.');
@@ -50,8 +67,10 @@ export default function ResetPasswordPage() {
       if (updateError) {
         if (updateError.message?.includes('same password')) {
           setError('Yeni şifre eski şifrenizle aynı olamaz.');
+        } else if (updateError.message?.includes('session')) {
+          setError('Oturumunuz sona ermiş. Lütfen şifre sıfırlama bağlantısını tekrar kullanın.');
         } else {
-          setError('Şifre güncellenemedi. Bağlantının süresi dolmuş olabilir.');
+          setError(`Şifre güncellenemedi: ${updateError.message}`);
         }
         setLoading(false);
         return;

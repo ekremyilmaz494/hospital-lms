@@ -23,6 +23,7 @@ interface SmgActivity {
   smgPoints: number;
   approvalStatus: string;
   provider: string | null;
+  rejectionReason: string | null;
 }
 
 interface MyPointsData {
@@ -36,6 +37,7 @@ interface MyPointsData {
   progress: number;
   approvedActivities: SmgActivity[];
   pendingActivities: SmgActivity[];
+  rejectedActivities: SmgActivity[];
 }
 
 const activityTypeLabels: Record<string, string> = {
@@ -116,7 +118,7 @@ export default function StaffSmgPage() {
 
   const donutColors = ['var(--color-success)', 'var(--color-warning)', 'var(--color-border)'];
 
-  const allActivities = [...(data?.approvedActivities ?? []), ...(data?.pendingActivities ?? [])]
+  const allActivities = [...(data?.approvedActivities ?? []), ...(data?.pendingActivities ?? []), ...(data?.rejectedActivities ?? [])]
     .sort((a, b) => new Date(b.completionDate).getTime() - new Date(a.completionDate).getTime());
 
   const periods = data?.periods ?? [];
@@ -216,17 +218,24 @@ export default function StaffSmgPage() {
                   {allActivities.map(a => {
                     const s = statusConfig[a.approvalStatus] ?? statusConfig.PENDING;
                     return (
-                      <div key={a.id} className="px-4 py-3 flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>{a.title}</p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                            {activityTypeLabels[a.activityType] ?? a.activityType} · {new Date(a.completionDate).toLocaleDateString('tr-TR')}
+                      <div key={a.id} className="px-4 py-3 flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>{a.title}</p>
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                              {activityTypeLabels[a.activityType] ?? a.activityType} · {new Date(a.completionDate).toLocaleDateString('tr-TR')}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-sm font-bold" style={{ color: 'var(--color-primary)' }}>{a.smgPoints} p</span>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: s.bg, color: s.color }}>{s.label}</span>
+                          </div>
+                        </div>
+                        {a.approvalStatus === 'REJECTED' && a.rejectionReason && (
+                          <p className="text-xs mt-0.5 pl-0.5" style={{ color: 'var(--color-error)' }}>
+                            Red nedeni: {a.rejectionReason}
                           </p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-sm font-bold" style={{ color: 'var(--color-primary)' }}>{a.smgPoints} p</span>
-                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: s.bg, color: s.color }}>{s.label}</span>
-                        </div>
+                        )}
                       </div>
                     );
                   })}

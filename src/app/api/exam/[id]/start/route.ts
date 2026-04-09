@@ -11,15 +11,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
-  // User bazlı rate limit: 10 başlangıç / 1 saat
-  const allowed = await checkRateLimit(`exam-start:${dbUser!.id}`, 10, 3600)
-  if (!allowed) {
-    return new Response(JSON.stringify({ error: 'Çok fazla sınav başlangıcı. Lütfen 60 dakika sonra tekrar deneyin.' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
-    })
-  }
-
   const assignment = await prisma.trainingAssignment.findFirst({
     where: {
       id: assignmentId,
@@ -46,12 +37,40 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return errorResponse('Maksimum deneme sayısına ulaştınız')
   }
 
+  // Mevcut aktif attempt varsa dogrudan don — rate limit gereksiz
+  const existing = await prisma.examAttempt.findFirst({
+    where: {
+      assignmentId,
+      userId: dbUser!.id,
+      status: { not: 'completed' },
+    },
+    include: { videoProgress: true },
+  })
+
+  if (existing) {
+    const examOnly = assignment.training.examOnly === true
+    return jsonResponse({
+      ...existing,
+      examOnly,
+      redirectTo: examOnly ? 'post-exam' : undefined,
+    })
+  }
+
+  // Rate limit SADECE yeni attempt olusturma icin — resume islemleri haric
+  const allowed = await checkRateLimit(`exam-start:${dbUser!.id}`, 10, 3600)
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: 'Çok fazla sınav başlangıcı. Lütfen 60 dakika sonra tekrar deneyin.' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
+    })
+  }
+
   // B7.5 — Transaction hatalarını yakala; MAX_ATTEMPTS dışındaki hatalar 500 döndürmesin
   let attempt: Awaited<ReturnType<typeof prisma.examAttempt.findFirst>> | null = null
   try {
   attempt = await prisma.$transaction(async (tx) => {
-    // Check for active (incomplete) attempt
-    const existing = await tx.examAttempt.findFirst({
+    // Double-check inside transaction (prevent race condition between check above and create)
+    const existingInTx = await tx.examAttempt.findFirst({
       where: {
         assignmentId,
         userId: dbUser!.id,
@@ -60,7 +79,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       include: { videoProgress: true },
     })
 
-    if (existing) return existing
+    if (existingInTx) return existingInTx
 
     // Create new attempt
     const newAttemptNumber = assignment.currentAttempt + 1
