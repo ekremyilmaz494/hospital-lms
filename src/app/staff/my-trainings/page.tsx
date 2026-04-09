@@ -359,7 +359,7 @@ export default function MyTrainingsPage() {
                         )}
                       </div>
                       <p className="mt-2 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                        Yöneticinizden ek deneme hakkı talep edebilirsiniz.
+                        Ek deneme hakkı için eğitim yöneticinize başvurun.
                       </p>
                     </div>
                   </Link>

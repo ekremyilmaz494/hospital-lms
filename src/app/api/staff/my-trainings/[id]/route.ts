@@ -150,6 +150,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const firstAttempt = assignment.examAttempts[assignment.examAttempts.length - 1]
   const preExamScore = firstAttempt?.preExamScore ? Number(firstAttempt.preExamScore) : undefined
 
+  // Son deneme puanı (retry banner'da gösterilecek)
+  const lastAttemptScore = latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : undefined
+
+  // Eğitim süresi dolmuş mu?
+  const isExpired = t.endDate ? new Date() > new Date(t.endDate) : false
+
   return jsonResponse({
     id: t.id,
     assignmentId: assignment.id,
@@ -163,6 +169,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     currentAttempt,
     deadline: t.endDate ? t.endDate.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
     preExamScore,
+    lastAttemptScore,
+    examOnly: t.examOnly === true,
+    isExpired,
     preExamCompleted,
     videosCompleted,
     postExamCompleted,

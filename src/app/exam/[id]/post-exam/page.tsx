@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Clock, ChevronRight, AlertTriangle, Lock } from 'lucide-react';
+import { Clock, ChevronRight, AlertTriangle, Lock, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -33,7 +33,9 @@ export default function PostExamPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const { data: examData, isLoading, error } = useFetch<ExamData>(`/api/exam/${id}/questions?phase=post`);
+  const [startReady, setStartReady] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const { data: examData, isLoading, error } = useFetch<ExamData>(startReady ? `/api/exam/${id}/questions?phase=post` : null);
   const [currentQ, setCurrentQ] = useState(0);
   const [maxReachedQ, setMaxReachedQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -63,9 +65,15 @@ export default function PostExamPage() {
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/exam/${id}/start`, { method: 'POST' })
-      .then(res => res.json())
-      .then(attempt => {
+      .then(async (res) => {
+        const attempt = await res.json();
         if (cancelled) return;
+        // Start API hata kontrolu
+        if (!res.ok) {
+          setStartError(attempt?.error || 'Sınav başlatılamadı');
+          setPhaseChecked(true);
+          return;
+        }
         if (attempt.status !== 'post_exam') {
           if (attempt.status === 'pre_exam') router.replace(`/exam/${id}/pre-exam`);
           else if (attempt.status === 'watching_videos') router.replace(`/exam/${id}/videos`);
@@ -74,9 +82,15 @@ export default function PostExamPage() {
         }
         setAttemptId(attempt.id);
         if (attempt.examOnly) setIsExamOnly(true);
+        setStartReady(true);
         setPhaseChecked(true);
       })
-      .catch(() => setPhaseChecked(true));
+      .catch(() => {
+        if (!cancelled) {
+          setStartError('Sınav başlatılamadı. Lütfen tekrar deneyin.');
+          setPhaseChecked(true);
+        }
+      });
     return () => { cancelled = true; };
   }, [id, router]);
 
@@ -225,8 +239,8 @@ export default function PostExamPage() {
     return <PageLoading />;
   }
 
-  if (error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  if (startError || error) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{startError || error}</div></div>;
   }
 
   if (!examData || (examData.questions ?? []).length === 0) {
@@ -264,9 +278,18 @@ export default function PostExamPage() {
             <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--color-accent-light)', color: 'var(--color-accent)' }}>{isExamOnly ? 'Sınav' : (examData.examType ?? 'Son Sınav')}</span>
             <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Soru {currentQ + 1}/{questions.length}</span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: 'var(--color-surface-hover)' }}>
-            <Clock className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
-            <span className="text-base font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: displayTime < 300 ? 'var(--color-error-bg)' : 'var(--color-surface-hover)' }}>
+              <Clock className="h-4 w-4" style={{ color: displayTime < 300 ? 'var(--color-error)' : 'var(--color-text-muted)' }} />
+              <span className="text-base font-bold" style={{ fontFamily: 'var(--font-mono)', color: displayTime < 300 ? 'var(--color-error)' : 'var(--color-text-primary)' }}>{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}</span>
+            </div>
+            <button
+              onClick={() => { if (confirm('Sınavdan çıkmak istediğinize emin misiniz? Cevaplarınız kaydedilmiştir.')) router.push('/staff/my-trainings'); }}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150 hover:opacity-80"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              <LogOut className="h-3.5 w-3.5" /> Çık
+            </button>
           </div>
         </div>
         <div className="mt-2 h-1 w-full rounded-full" style={{ background: 'var(--color-border)' }}>

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Clock, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Clock, ChevronLeft, ChevronRight, AlertTriangle, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageLoading } from '@/components/shared/page-loading';
 
@@ -54,6 +54,12 @@ export default function PreExamPage() {
           body: JSON.stringify({ examType: 'pre' }),
         });
         const attempt = await startRes.json();
+
+        // Start API hata kontrolu — gercek hatayi goster
+        if (!startRes.ok) {
+          if (!cancelled) setError(attempt?.error || 'Sınav başlatılamadı');
+          return;
+        }
 
         // Phase guard: redirect if attempt is past pre-exam or examOnly
         if (attempt?.examOnly || attempt?.status === 'post_exam') {
@@ -164,17 +170,18 @@ export default function PreExamPage() {
   const q = questions[currentQ];
   const answeredCount = Object.keys(answers).length;
 
-  const handleFinish = async () => {
+  const handleFinish = useCallback(async () => {
     if (submitting) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
       // BUG #1 FIX: answers key'leri q.id ile saklanıyor, idx değil
+      const qs = examData?.questions ?? [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const formattedAnswers = questions.map((q: any) => {
+      const formattedAnswers = qs.map((q: any) => {
         const questionId = q.questionId ?? q.id ?? '';
         const options = q.options ?? [];
-        const selectedAnswer = answers[q.id];  // ✅ q.id ile oku
+        const selectedAnswer = answers[q.id];  // q.id ile oku
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const selectedOption = options.find((o: any) => o.id === selectedAnswer);
         return selectedOption ? { questionId: String(questionId), selectedOptionId: selectedOption.optionId ?? selectedOption.id } : null;
@@ -199,7 +206,14 @@ export default function PreExamPage() {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [id, answers, examData, router, submitting]);
+
+  // Auto-submit when timer hits zero
+  const handleFinishRef = useRef<() => void>(undefined);
+  handleFinishRef.current = handleFinish;
+  useEffect(() => {
+    if (timeLeft === 0 && handleFinishRef.current) handleFinishRef.current();
+  }, [timeLeft]);
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
@@ -211,13 +225,20 @@ export default function PreExamPage() {
             <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--color-info-bg)', color: 'var(--color-info)' }}>{examData.examType ?? 'Ön Sınav'}</span>
             <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Soru {currentQ + 1}/{questions.length}</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: currentTimeLeft < 300 ? 'var(--color-error-bg)' : 'var(--color-surface-hover)' }}>
               <Clock className="h-4 w-4" style={{ color: currentTimeLeft < 300 ? 'var(--color-error)' : 'var(--color-text-muted)' }} />
               <span className="text-base font-bold" style={{ fontFamily: 'var(--font-mono)', color: currentTimeLeft < 300 ? 'var(--color-error)' : 'var(--color-text-primary)' }}>
                 {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
               </span>
             </div>
+            <button
+              onClick={() => { if (confirm('Sınavdan çıkmak istediğinize emin misiniz? Cevaplarınız kaydedilmiştir.')) router.push('/staff/my-trainings'); }}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150 hover:opacity-80"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              <LogOut className="h-3.5 w-3.5" /> Çık
+            </button>
           </div>
         </div>
         {/* Progress Bar */}

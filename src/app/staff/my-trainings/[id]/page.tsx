@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft, Video, FileQuestion, CheckCircle, Clock, Play, Target,
-  Calendar, BookOpen, Award, ChevronRight, Lock,
+  Calendar, BookOpen, Award, ChevronRight, Lock, AlertTriangle,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch, clearFetchCache } from '@/hooks/use-fetch';
@@ -31,6 +31,9 @@ interface TrainingDetail {
   deadline: string;
   videos: TrainingVideo[];
   preExamScore?: number;
+  lastAttemptScore?: number;
+  examOnly?: boolean;
+  isExpired?: boolean;
   preExamCompleted: boolean;
   videosCompleted: boolean;
   postExamCompleted: boolean;
@@ -61,26 +64,32 @@ export default function TrainingDetailPage() {
   const completedVideos = videos.filter(v => v.completed).length;
   const videoProgress = videos.length > 0 ? Math.round((completedVideos / videos.length) * 100) : 0;
 
+  const isExamOnly = training.examOnly === true;
   // 2+ denemelerde ön sınav atlanır (needsRetry = retry bekliyor, henüz start çağrılmamış)
-  const isRetry = (training.currentAttempt ?? 0) > 1 || !!training.needsRetry;
+  const isRetry = !isExamOnly && ((training.currentAttempt ?? 0) > 1 || !!training.needsRetry);
 
-  // Current step index (matches the steps array below)
+  // Current step index
+  // examOnly: 0=Son Sınav, 1=done
   // Retry: 0=Video, 1=Son Sınav, 2=done
   // Normal: 0=Ön Sınav, 1=Video, 2=Son Sınav, 3=done
-  const currentStep = isRetry
-    ? (!training.videosCompleted ? 0 : !training.postExamCompleted ? 1 : 2)
-    : (!training.preExamCompleted ? 0 : !training.videosCompleted ? 1 : !training.postExamCompleted ? 2 : 3);
-  const totalSteps = isRetry ? 2 : 3;
+  const currentStep = isExamOnly
+    ? (!training.postExamCompleted ? 0 : 1)
+    : isRetry
+      ? (!training.videosCompleted ? 0 : !training.postExamCompleted ? 1 : 2)
+      : (!training.preExamCompleted ? 0 : !training.videosCompleted ? 1 : !training.postExamCompleted ? 2 : 3);
+  const totalSteps = isExamOnly ? 1 : isRetry ? 2 : 3;
   const completedSteps = currentStep;
   const overallProgress = Math.round((completedSteps / totalSteps) * 100);
-  const allDone = isRetry ? currentStep >= 2 : currentStep >= 3;
+  const allDone = isExamOnly ? currentStep >= 1 : isRetry ? currentStep >= 2 : currentStep >= 3;
 
   // CTA
   const examId = training.assignmentId || training.id;
-  let ctaHref = isRetry ? `/exam/${examId}/videos` : `/exam/${examId}/pre-exam`;
-  let ctaLabel = isRetry ? 'Videoları İzle' : 'Ön Sınava Başla';
-  let ctaIcon = isRetry ? Play : FileQuestion;
-  if (isRetry) {
+  let ctaHref = `/exam/${examId}/post-exam`;
+  let ctaLabel = 'Sınava Başla';
+  let ctaIcon: typeof Play = Award;
+  if (isExamOnly) {
+    ctaHref = `/exam/${examId}/post-exam`; ctaLabel = 'Sınava Başla'; ctaIcon = Award;
+  } else if (isRetry) {
     if (currentStep === 0) { ctaHref = `/exam/${examId}/videos`; ctaLabel = 'Videoları İzle'; ctaIcon = Play; }
     else if (currentStep === 1) { ctaHref = `/exam/${examId}/post-exam`; ctaLabel = 'Son Sınava Başla'; ctaIcon = Award; }
   } else {
@@ -89,7 +98,11 @@ export default function TrainingDetailPage() {
     else if (currentStep === 2) { ctaHref = `/exam/${examId}/post-exam`; ctaLabel = 'Son Sınava Başla'; ctaIcon = Award; }
   }
 
-  const steps = isRetry
+  const steps = isExamOnly
+    ? [
+        { label: 'Sınav', desc: 'Değerlendirme sınavı', icon: Award, done: training.postExamCompleted },
+      ]
+    : isRetry
     ? [
         { label: 'Eğitim Videoları', desc: `${videos.length} video`, icon: Video, done: training.videosCompleted },
         { label: 'Son Sınav', desc: 'Değerlendirme sınavı', icon: Award, done: training.postExamCompleted },
@@ -138,7 +151,7 @@ export default function TrainingDetailPage() {
             {/* Meta chips */}
             <div className="flex flex-wrap gap-2 mb-5">
               {[
-                { icon: Target, text: `Deneme ${training.currentAttempt ?? 0}/${training.maxAttempts ?? 3}` },
+                { icon: Target, text: `Deneme ${Math.max(training.currentAttempt ?? 0, 1)}/${training.maxAttempts ?? 3}` },
                 { icon: Calendar, text: training.deadline },
                 { icon: Clock, text: `${training.examDuration ?? 30} dk sınav` },
                 { icon: Award, text: `Geçme: ${training.passingScore ?? 70}` },
@@ -160,8 +173,28 @@ export default function TrainingDetailPage() {
         </div>
       </BlurFade>
 
+      {/* Expired banner */}
+      {training.isExpired && !allDone && (
+        <BlurFade delay={0.03}>
+          <div
+            className="mt-4 flex items-center gap-3 rounded-xl px-5 py-3"
+            style={{ background: 'var(--color-error-bg)', border: '1px solid rgba(220, 38, 38, 0.2)' }}
+          >
+            <AlertTriangle className="h-5 w-5 shrink-0" style={{ color: 'var(--color-error)' }} />
+            <div>
+              <p className="text-[13px] font-semibold" style={{ color: 'var(--color-error)' }}>
+                Bu eğitimin süresi dolmuş
+              </p>
+              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                Eğitim süresi {training.deadline} tarihinde sona erdi. Sınava giriş yapılamaz.
+              </p>
+            </div>
+          </div>
+        </BlurFade>
+      )}
+
       {/* Retry banner — only when not failed */}
-      {isRetry && training.status !== 'failed' && (
+      {isRetry && training.status !== 'failed' && !training.isExpired && (
         <BlurFade delay={0.03}>
           <div
             className="mt-4 flex items-center gap-3 rounded-xl px-5 py-3"
@@ -173,6 +206,7 @@ export default function TrainingDetailPage() {
                 {training.currentAttempt}. Deneme Hakkındasınız
               </p>
               <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                {training.lastAttemptScore !== undefined && `Önceki deneme puanı: %${training.lastAttemptScore}. `}
                 Ön sınav atlandı. Videoları izleyip son sınava girebilirsiniz. (Toplam {training.maxAttempts} hak)
               </p>
             </div>
@@ -323,7 +357,7 @@ export default function TrainingDetailPage() {
       )}
 
       {/* CTA */}
-      {!allDone && (
+      {!allDone && !training.isExpired && (
         <BlurFade delay={0.15}>
           <Link href={ctaHref} className="block">
             <div
@@ -365,7 +399,7 @@ export default function TrainingDetailPage() {
             </div>
             <p className="text-[15px] font-bold" style={{ color: 'var(--color-error)' }}>Tüm Deneme Hakları Tükendi</p>
             <p className="text-[12px] text-center max-w-sm" style={{ color: 'var(--color-text-muted)' }}>
-              {training.maxAttempts} deneme hakkınızın tamamını kullandınız. Bu eğitimi geçemediniz.
+              {training.maxAttempts} deneme hakkınızın tamamını kullandınız. Ek deneme hakkı için eğitim yöneticinize başvurun.
             </p>
             <Link href="/staff/my-trainings" className="text-[12px] font-semibold" style={{ color: 'var(--color-primary)' }}>
               ← Eğitimlerime Dön
