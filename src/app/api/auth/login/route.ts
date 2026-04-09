@@ -39,17 +39,17 @@ export async function POST(request: NextRequest) {
     // createClient() cookie parse'ı rate limit kontrolüyle eşzamanlı çalışır.
     // signInWithPassword() rate limit geçerse hemen başlar — ~200ms tasarruf.
     const [ipAllowed, emailAllowed, supabase] = await Promise.all([
-      checkRateLimit(`login-ip:${ip}`, 15, 900),
-      checkRateLimit(`login:${normalizedEmail}`, 8, 900),
+      checkRateLimit(`login-ip:${ip}`, 50, 300),
+      checkRateLimit(`login:${normalizedEmail}`, 20, 300),
       createClient(),
     ])
     if (!ipAllowed) {
       logger.warn('auth:login', 'IP rate limit aşıldı', { ip })
-      return errorResponse('Çok fazla giriş denemesi. 15 dakika bekleyin.', 429)
+      return errorResponse('Çok fazla giriş denemesi. 5 dakika bekleyin.', 429)
     }
     if (!emailAllowed) {
       logger.warn('auth:login', 'E-posta rate limit aşıldı', { email: normalizedEmail })
-      return errorResponse('Çok fazla giriş denemesi. 15 dakika bekleyin.', 429)
+      return errorResponse('Çok fazla giriş denemesi. 5 dakika bekleyin.', 429)
     }
 
     const { data, error: authError } = await supabase.auth.signInWithPassword({

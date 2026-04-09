@@ -299,6 +299,15 @@ export const createSmgActivitySchema = z.object({
 
 export const approveSmgActivitySchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED']),
+  rejectionReason: z.string().max(500).optional(),
+})
+
+export const updateSmgPeriodSchema = z.object({
+  name: z.string().min(2).max(255).optional(),
+  startDate: z.string().date().optional(),
+  endDate: z.string().date().optional(),
+  requiredPoints: z.coerce.number().int().min(1).max(9999).optional(),
+  isActive: z.boolean().optional(),
 })
 
 // ── HIS Entegrasyon ──
