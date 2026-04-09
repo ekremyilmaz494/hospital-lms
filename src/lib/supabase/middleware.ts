@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { extractSubdomain } from '@/lib/organization-utils'
+import { isDemoMode, parseDemoSession, DEMO_SESSION_COOKIE } from '@/lib/demo-auth'
 
 const PUBLIC_ROUTES = [
   '/',
@@ -93,6 +94,46 @@ export async function updateSession(request: NextRequest) {
   // Her API route kendi getAuthUser() (getSession → local JWT parse) ile doğrulama yapıyor.
   // Middleware'de getUser() HTTP call'ı gereksiz (~100-150ms tasarruf per API request).
   if (pathname.startsWith('/api/')) {
+    return supabaseResponse
+  }
+
+  // ── Demo mode: Supabase yapılandırılmamışsa demo-session cookie ile giriş kontrolü ──
+  if (isDemoMode()) {
+    const demoCookie = request.cookies.get(DEMO_SESSION_COOKIE)?.value
+    const demoUser = demoCookie ? parseDemoSession(demoCookie) : null
+
+    if (isPublicRoute(pathname)) {
+      if (demoUser && (pathname === '/auth/login' || pathname === '/')) {
+        const role = sanitizeRole(demoUser.role)
+        return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+      }
+      return supabaseResponse
+    }
+
+    // Protected route — demo session gerekli
+    if (!demoUser) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      if (pathname && pathname.startsWith('/') && !pathname.startsWith('//')) {
+        url.searchParams.set('redirectTo', pathname)
+      }
+      return NextResponse.redirect(url)
+    }
+
+    const role = sanitizeRole(demoUser.role)
+    if (pathname.startsWith('/super-admin') && role !== 'super_admin') {
+      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+    }
+    if (pathname.startsWith('/admin') && !(['admin', 'super_admin'] as ValidRole[]).includes(role)) {
+      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+    }
+    if (pathname.startsWith('/staff') && !VALID_ROLES.includes(role)) {
+      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+    }
+    if (pathname.startsWith('/exam') && !VALID_ROLES.includes(role)) {
+      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+    }
+
     return supabaseResponse
   }
 

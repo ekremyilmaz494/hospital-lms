@@ -4,7 +4,7 @@ import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight, Clock } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight, Clock, UserCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -126,8 +126,9 @@ function LoginForm() {
         }
       });
 
-      // Navigasyonu getSession'ı beklemeden hemen başlat
-      router.push(target);
+      // Demo modda window.location.href kullan (full reload — cookie'lerin okunması için)
+      // Normal modda router.push kullan (SPA geçişi — Supabase session zaten cookie'de)
+      window.location.href = target;
     } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
       setLoading(false);
@@ -376,8 +377,39 @@ function LoginForm() {
             </form>
           </BlurFade>
 
+          {/* Demo giriş butonları */}
+          <BlurFade delay={0.1} duration={0.3}>
+            <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--color-border)' }}>
+              <p className="text-xs font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>Demo Hesaplarıyla Hızlı Giriş</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Super Admin', email: 'super@demo.com', color: '#dc2626' },
+                  { label: 'Hastane Admin', email: 'admin@demo.com', color: '#0d9668' },
+                  { label: 'Personel', email: 'staff@demo.com', color: '#2563eb' },
+                ].map((demo) => (
+                  <button
+                    key={demo.email}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setEmail(demo.email);
+                      setPassword('demo123456');
+                      setKvkkAccepted(true);
+                      setKvkkError(false);
+                    }}
+                    className="flex flex-col items-center gap-1.5 rounded-xl px-3 py-3 text-xs font-medium transition-all duration-150 hover:scale-[1.02]"
+                    style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+                  >
+                    <UserCircle className="h-5 w-5" style={{ color: demo.color }} />
+                    <span>{demo.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </BlurFade>
+
           <BlurFade delay={0.12} duration={0.3}>
-            <div className="mt-10 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
               <p className="text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
                 &copy; 2026 Hastane LMS. Tüm hakları saklıdır.
               </p>

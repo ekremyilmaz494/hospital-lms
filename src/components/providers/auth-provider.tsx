@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Login sayfası store'u önceden doldurduysa loading gösterme (flash önlenir)
     const hasExistingUser = !!useAuthStore.getState().user;
     if (!hasExistingUser) setLoading(true);
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       const user = session?.user ?? null;
       if (user) {
         setUser({
@@ -82,7 +82,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 3 saniye geciktir — kritik render path'i bloklamadan kontrol et
         setTimeout(refreshFromDB, 3000);
       } else {
-        setUser(null);
+        // Supabase session yok — demo mode olabilir, /api/auth/me ile kontrol et
+        try {
+          const res = await fetch('/api/auth/me');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.user) {
+              setUser({
+                id: data.user.id,
+                email: data.user.email ?? '',
+                firstName: data.user.firstName ?? '',
+                lastName: data.user.lastName ?? '',
+                role: data.user.role ?? 'staff',
+                organizationId: data.user.organizationId ?? null,
+                tcNo: data.user.tcNo ?? null,
+                phone: data.user.phone ?? null,
+                departmentId: data.user.departmentId ?? null,
+                department: data.user.department ?? null,
+                title: data.user.title ?? null,
+                avatarUrl: data.user.avatarUrl ?? null,
+                isActive: data.user.isActive !== false,
+                kvkkConsent: data.user.kvkkConsent ?? false,
+                kvkkConsentDate: data.user.kvkkConsentDate ?? null,
+                createdAt: data.user.createdAt ?? new Date().toISOString(),
+                updatedAt: data.user.updatedAt ?? new Date().toISOString(),
+              });
+            } else {
+              setUser(null);
+            }
+          } else {
+            setUser(null);
+          }
+        } catch {
+          setUser(null);
+        }
       }
     }).finally(() => {
       setLoading(false);

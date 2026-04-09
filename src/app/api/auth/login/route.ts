@@ -1,9 +1,10 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { checkRateLimit, getRedis } from '@/lib/redis'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
+import { isDemoMode, authenticateDemoUser, createDemoSessionValue, DEMO_SESSION_COOKIE } from '@/lib/demo-auth'
 
 /**
  * Trusted IP extraction for Vercel deployments.
@@ -34,6 +35,30 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.trim().toLowerCase()
     const ip = getTrustedIp(request)
+
+    // ── Demo mode: Supabase yapılandırılmamışsa demo kullanıcılarla giriş ──
+    if (isDemoMode()) {
+      const demoUser = authenticateDemoUser(normalizedEmail, password)
+      if (demoUser) {
+        logger.info('auth:login', 'Demo giriş başarılı', { email: normalizedEmail, role: demoUser.role })
+        const response = NextResponse.json({
+          user: {
+            id: demoUser.id,
+            email: demoUser.email,
+            role: demoUser.role,
+          },
+        })
+        response.cookies.set(DEMO_SESSION_COOKIE, createDemoSessionValue(demoUser), {
+          path: '/',
+          httpOnly: true,
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24, // 1 gün
+          secure: process.env.NODE_ENV === 'production',
+        })
+        return response
+      }
+      return errorResponse('E-posta veya şifre hatalı. Demo bilgileri: super@demo.com / admin@demo.com / staff@demo.com — Şifre: demo123456', 401)
+    }
 
     // ── Rate limiting + Supabase client oluşturma PARALEL ──
     // createClient() cookie parse'ı rate limit kontrolüyle eşzamanlı çalışır.

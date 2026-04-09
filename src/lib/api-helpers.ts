@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { checkSubscriptionStatus } from '@/lib/subscription-guard'
+import { isDemoMode, parseDemoSession, DEMO_SESSION_COOKIE } from '@/lib/demo-auth'
 
 /**
  * Returns the application base URL. Throws in production if NEXT_PUBLIC_APP_URL
@@ -47,12 +48,44 @@ export function safePagination(params: URLSearchParams, maxLimit = 100) {
 const authCache = new Map<string, { dbUser: NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>; orgOk: boolean; expiresAt: number }>()
 
 export async function getAuthUser() {
+  const cookieStore = await cookies()
+
+  // ── Demo mode: Supabase yoksa demo-session cookie'den kullanıcı bilgisi al ──
+  if (isDemoMode()) {
+    const demoCookie = cookieStore.get(DEMO_SESSION_COOKIE)?.value
+    const demoUser = demoCookie ? parseDemoSession(demoCookie) : null
+    if (!demoUser) {
+      return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
+    }
+    // Demo kullanıcıyı dbUser formatına dönüştür
+    const fakeDbUser = {
+      id: demoUser.id,
+      email: demoUser.email,
+      firstName: demoUser.firstName,
+      lastName: demoUser.lastName,
+      role: demoUser.role,
+      organizationId: demoUser.organizationId,
+      departmentId: demoUser.departmentId,
+      department: demoUser.department,
+      title: demoUser.title,
+      phone: demoUser.phone,
+      tcNo: demoUser.tcNo,
+      avatarUrl: demoUser.avatarUrl,
+      isActive: demoUser.isActive,
+      kvkkConsent: demoUser.kvkkConsent,
+      kvkkConsentDate: demoUser.kvkkConsentDate ? new Date(demoUser.kvkkConsentDate) : null,
+      createdAt: new Date(demoUser.createdAt),
+      updatedAt: new Date(demoUser.updatedAt),
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { user: { id: demoUser.id, email: demoUser.email, user_metadata: { role: demoUser.role } } as any, dbUser: fakeDbUser as any, error: null, organizationId: demoUser.organizationId }
+  }
+
   // Fast-path: auth cookie yoksa Supabase client oluşturmadan anında 401 dön.
   // ⚠️ CRITICAL: `includes` kullan, `endsWith` DEĞİL!
   // Supabase SSR büyük JWT'leri chunked cookie'lere böler:
   //   sb-xxx-auth-token.0, sb-xxx-auth-token.1, ...
   // `endsWith('-auth-token')` chunked cookie'leri KAÇIRIR → 401 döngüsü!
-  const cookieStore = await cookies()
   const hasAuthCookie = cookieStore.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
   if (!hasAuthCookie) {
     return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
