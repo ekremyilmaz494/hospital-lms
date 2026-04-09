@@ -779,7 +779,7 @@ function MyVideosTab() {
           </div>
           <div className="text-center">
             <p className="text-sm font-bold" style={{ color: 'var(--color-text-secondary)' }}>
-              {categoryFilter ? 'Bu kategoride video bulunamadı' : 'Henüz yüklenen video yok'}
+              {categoryFilter ? 'Bu kategoride video bulunamadı' : 'İçerik kütüphanesine video yüklemek için "Video Yükle" butonunu kullanın.'}
             </p>
             <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
               {categoryFilter
@@ -990,7 +990,7 @@ function PlatformLibraryTab() {
             <p className="text-sm font-bold" style={{ color: 'var(--color-text-secondary)' }}>
               {searchQuery ? `"${searchQuery}" için sonuç bulunamadı`
                 : categoryFilter ? 'Bu kategoride içerik bulunamadı'
-                  : 'Henüz içerik kütüphanesi hazırlanmamış'}
+                  : 'Super Admin tarafından içerik kütüphanesi hazırlandıkça burada görünecek.'}
             </p>
             <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
               {searchQuery ? 'Farklı bir arama deneyin'

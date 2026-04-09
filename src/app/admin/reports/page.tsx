@@ -5,7 +5,7 @@ import {
   BarChart3, Download, FileText, Users, GraduationCap, Building2, AlertTriangle, Clock, Printer,
   TrendingDown, Target, Award, Filter, X,
 } from 'lucide-react';
-import { exportExcel, printPage } from '@/lib/export';
+import { printPage } from '@/lib/export';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart,
 } from 'recharts';
@@ -61,16 +61,32 @@ export default function ReportsPage() {
 
   const { data, isLoading, error, refetch } = useFetch<ReportsData>(`/api/admin/reports${filterQuery}`);
 
-  const handlePDFExport = async () => {
-    const res = await fetch('/api/admin/export/pdf?type=training-report');
-    if (!res.ok) { toast('PDF oluşturulamadı', 'error'); return; }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'rapor.pdf';
-    a.click();
-    URL.revokeObjectURL(url);
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const handleExport = async (format: 'pdf' | 'xlsx') => {
+    setDownloading(format);
+    try {
+      const params = new URLSearchParams({ format });
+      if (dateFrom) params.set('from', new Date(dateFrom).toISOString());
+      if (dateTo) params.set('to', new Date(dateTo + 'T23:59:59').toISOString());
+      const res = await fetch(`/api/admin/reports/export?${params.toString()}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error ?? 'Dışa aktarma başarısız');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rapor-${new Date().toISOString().slice(0, 10)}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast(`${format.toUpperCase()} raporu indirildi`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Dışa aktarma başarısız', 'error');
+    } finally {
+      setDownloading(null);
+    }
   };
 
   if (isLoading) {
@@ -94,8 +110,8 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between">
         <PageHeader title="Raporlar" subtitle="Eğitim performansını analiz edin" />
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => exportExcel(data ? { headers: ['Eğitim', 'Atanan', 'Tamamlayan', 'Başarılı', 'Başarısız', 'Ort. Puan'], rows: data.trainingData.map(t => [t.name, t.atanan, t.tamamlayan, t.basarili, t.basarisiz, t.ort]) } : undefined)}><Download className="h-3.5 w-3.5" /> Excel</Button>
-          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={handlePDFExport}><FileText className="h-3.5 w-3.5" /> PDF</Button>
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => handleExport('xlsx')} disabled={downloading === 'xlsx'}><Download className="h-3.5 w-3.5" /> {downloading === 'xlsx' ? 'İndiriliyor...' : 'Excel'}</Button>
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => handleExport('pdf')} disabled={downloading === 'pdf'}><FileText className="h-3.5 w-3.5" /> {downloading === 'pdf' ? 'İndiriliyor...' : 'PDF'}</Button>
           <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={printPage}><Printer className="h-3.5 w-3.5" /> Yazdır</Button>
         </div>
       </div>
@@ -233,7 +249,7 @@ export default function ReportsPage() {
                   </tbody>
                 </table>
               </div>
-            ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>}
+            ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Eğitim ve sınav verileri oluştukça raporlar burada görünecek.</p>}
           </div>
         </BlurFade>
       )}
@@ -262,7 +278,7 @@ export default function ReportsPage() {
                   </tbody>
                 </table>
               </div>
-            ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>}
+            ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Eğitim ve sınav verileri oluştukça raporlar burada görünecek.</p>}
           </div>
         </BlurFade>
       )}
@@ -307,7 +323,7 @@ export default function ReportsPage() {
                 </div>
               </BlurFade>
             </>
-          ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>}
+          ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Eğitim ve sınav verileri oluştukça raporlar burada görünecek.</p>}
         </div>
       )}
 
@@ -425,7 +441,7 @@ export default function ReportsPage() {
           ) : (
             <div className="flex flex-col items-center justify-center rounded-2xl border py-16" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
               <TrendingUp className="h-8 w-8 mb-3" style={{ color: 'var(--color-text-muted)' }} />
-              <p className="text-sm font-semibold mb-1">Henüz skor verisi yok</p>
+              <p className="text-sm font-semibold mb-1">Sınavlar tamamlandıkça skor verileri burada görünecek.</p>
               <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>En az bir sınav tamamlandığında karşılaştırma grafiği burada görünecek</p>
             </div>
           )}
@@ -452,7 +468,7 @@ export default function ReportsPage() {
                 </div>
               </ChartCard>
             </BlurFade>
-          ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz süre verisi yok</p>}
+          ) : <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Eğitim süre verileri sınavlar tamamlandıkça burada görünecek.</p>}
         </div>
       )}
     </div>

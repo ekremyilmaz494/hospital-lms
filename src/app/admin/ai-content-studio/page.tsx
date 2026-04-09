@@ -446,7 +446,7 @@ export default function AIContentStudioPage() {
             >
               {search || statusFilter !== 'all' || formatFilter !== 'all'
                 ? 'Eşleşen içerik bulunamadı'
-                : 'Henüz içerik oluşturulmadı'}
+                : 'AI ile içerik oluşturmak için "Yeni İçerik" butonunu kullanın.'}
             </h3>
             <p className="text-[13px] mb-6 max-w-sm mx-auto" style={{ color: 'var(--color-text-muted)' }}>
               {search || statusFilter !== 'all' || formatFilter !== 'all'
