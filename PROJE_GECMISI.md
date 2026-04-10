@@ -3573,4 +3573,29 @@ Admin ayarlar sayfasına **"Marka"** sekmesi eklendi:
 - ✅ DB schema senkronize
 - ✅ Canlı Vercel p95: 195ms
 
-*Son güncelleme: 9 Nisan 2026 — Oturum 32*
+---
+
+## OTURUM 33 — Vercel Build Fix & Deployment (10 Nisan 2026)
+
+### 1. Vercel Build ENOENT Hatası Çözümü
+- **Sorun:** `ENOENT: no such file or directory, lstat '.next/server/app/(marketing)/page_client-reference-manifest.js'`
+- **Kök Neden:** Next.js 16.2.1 webpack, `"use client"` page'ler için `page_client-reference-manifest.js` referansını NFT (Node File Trace) dosyasına ekliyor ama dosyayı oluşturmuyor. Local build'de fark edilmiyor, Vercel deploy sırasında `lstat` kontrolünde ENOENT veriyor.
+- **Çözüm:** `scripts/fix-nft-manifests.js` post-build scripti oluşturuldu. Tüm NFT dosyalarını tarayıp eksik manifest'leri boş RSC manifest olarak oluşturuyor.
+- **Build script güncellendi:** `next build --webpack && node scripts/fix-nft-manifests.js`
+
+### 2. Marketing Page Düzeltmesi
+- `src/app/(marketing)/page.tsx` Server Component'ten Client Component'e dönüştürüldü
+- `home-client.tsx` içeriği doğrudan `page.tsx`'e taşındı (ayrı import kaldırıldı)
+- Metadata export kaldırıldı (root layout'taki genel metadata yeterli)
+
+### 3. Git Push Sorunu Çözümü
+- **Sorun:** `tmp/hospital-lms-next/` dizini (Turbopack dev cache, 3500+ dosya, ~2.9M satır) yanlışlıkla commit'e dahil olmuş — push 408 timeout veriyordu
+- **Çözüm:** `.gitignore`'a `tmp/` eklendi, commit geri alınıp `tmp/` hariç temiz commit yapıldı
+- **Kural:** `git add -A` kullanırken her zaman `git status` ile kontrol et
+
+### Doğrulama
+- ✅ Local build başarılı
+- ✅ Vercel deploy başarılı
+- ✅ Git push temiz (101 dosya, 7056 satır)
+
+*Son güncelleme: 10 Nisan 2026 — Oturum 33*
