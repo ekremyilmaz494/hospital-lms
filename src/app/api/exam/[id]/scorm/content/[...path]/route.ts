@@ -2,16 +2,9 @@ import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
+import { s3 } from '@/lib/s3'
+import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { Readable } from 'stream'
-
-const s3 = new S3Client({
-  region: process.env.AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-})
 
 const BUCKET = process.env.AWS_S3_BUCKET!
 

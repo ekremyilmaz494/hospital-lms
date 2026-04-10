@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:ci": "playwright test",
     "setup": "node scripts/setup.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -124,6 +125,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
-    "vitest": "^4.1.1"
+    "vitest": "^4.1.1",
+    "wait-on": "^9.0.5"
   }
 }

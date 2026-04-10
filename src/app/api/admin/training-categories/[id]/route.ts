@@ -92,7 +92,8 @@ export async function DELETE(
     )
   }
 
-  await prisma.trainingCategory.delete({ where: { id } })
+  const deleted = await prisma.trainingCategory.deleteMany({ where: { id, organizationId: dbUser!.organizationId! } })
+  if (deleted.count === 0) return errorResponse('Kategori bulunamadi veya yetkiniz yok', 404)
 
   await createAuditLog({
     userId: dbUser!.id,

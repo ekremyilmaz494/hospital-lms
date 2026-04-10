@@ -1,5 +1,5 @@
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
-import { getUploadUrl, videoKey, documentKey, audioKey } from '@/lib/s3'
+import { getUploadUrl, videoKey, documentKey, audioKey, checkStorageQuota } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 
 /**
@@ -28,6 +28,10 @@ export async function POST(request: Request) {
     if (!fileName || !contentType) {
       return errorResponse('fileName ve contentType gerekli', 400)
     }
+
+    // Storage quota kontrolu
+    const quotaError = await checkStorageQuota(orgId)
+    if (quotaError) return errorResponse(quotaError, 403)
 
     const tid = trainingId || 'drafts'
 

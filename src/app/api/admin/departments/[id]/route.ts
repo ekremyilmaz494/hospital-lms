@@ -79,10 +79,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (duplicate) return errorResponse('Bu isimde bir departman zaten mevcut', 409)
   }
 
-  const department = await prisma.department.update({
-    where: { id },
-    data: parsed.data,
-    include: { _count: { select: { users: true } } },
+  const department = await prisma.$transaction(async (tx) => {
+    const verified = await tx.department.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+    if (!verified) throw new Error('NOT_FOUND')
+    return tx.department.update({
+      where: { id },
+      data: parsed.data,
+      include: { _count: { select: { users: true } } },
+    })
   })
 
   await createAuditLog({
@@ -119,13 +123,13 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   const allowed = await checkRateLimit(`dept-delete:${dbUser!.id}`, 10, 3600)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
-  // Personellerin departmentId'sini null yap, sonra departmanı sil
+  // Personellerin departmentId'sini null yap, sonra departmanı sil (multi-tenant güvenli)
   await prisma.$transaction([
     prisma.user.updateMany({
-      where: { departmentId: id },
+      where: { departmentId: id, organizationId: dbUser!.organizationId! },
       data: { departmentId: null },
     }),
-    prisma.department.delete({ where: { id } }),
+    prisma.department.deleteMany({ where: { id, organizationId: dbUser!.organizationId! } }),
   ])
 
   await createAuditLog({

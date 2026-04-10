@@ -202,10 +202,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!existing) return errorResponse('Personel bulunamadı', 404)
 
-  // B4.4 — Soft delete: deactivate + aktif sınavları iptal et
+  // B4.4 — Soft delete: deactivate + aktif sınavları iptal et (multi-tenant güvenli)
   await prisma.$transaction([
-    prisma.user.update({ where: { id }, data: { isActive: false } }),
-    // Devam eden sınav girişimlerini iptal et — orphan kalmaları önler
+    prisma.user.updateMany({ where: { id, organizationId: dbUser!.organizationId! }, data: { isActive: false } }),
     prisma.examAttempt.updateMany({
       where: {
         userId: id,

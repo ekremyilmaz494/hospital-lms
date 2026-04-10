@@ -48,14 +48,18 @@ export async function PUT(
   const body = await request.json().catch(() => null) as Record<string, unknown> | null
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
-  const updated = await prisma.competencyForm.update({
-    where: { id },
-    data: {
-      ...(typeof body.title === 'string' && { title: body.title }),
-      ...(typeof body.description === 'string' && { description: body.description }),
-      ...(typeof body.targetRole === 'string' && { targetRole: body.targetRole }),
-      ...(typeof body.isActive === 'boolean' && { isActive: body.isActive }),
-    },
+  const updated = await prisma.$transaction(async (tx) => {
+    const verified = await tx.competencyForm.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+    if (!verified) throw new Error('NOT_FOUND')
+    return tx.competencyForm.update({
+      where: { id },
+      data: {
+        ...(typeof body.title === 'string' && { title: body.title }),
+        ...(typeof body.description === 'string' && { description: body.description }),
+        ...(typeof body.targetRole === 'string' && { targetRole: body.targetRole }),
+        ...(typeof body.isActive === 'boolean' && { isActive: body.isActive }),
+      },
+    })
   })
 
   await createAuditLog({
@@ -89,7 +93,8 @@ export async function DELETE(
   })
   if (!form) return errorResponse('Form bulunamadı', 404)
 
-  await prisma.competencyForm.delete({ where: { id } })
+  const deleted = await prisma.competencyForm.deleteMany({ where: { id, organizationId: dbUser!.organizationId! } })
+  if (deleted.count === 0) return errorResponse('Form bulunamadi veya yetkiniz yok', 404)
 
   await createAuditLog({
     userId: dbUser!.id,

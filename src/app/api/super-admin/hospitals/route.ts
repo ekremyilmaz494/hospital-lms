@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { sendHospitalWelcomeEmail } from '@/lib/email'
 import { TRAINING_CATEGORIES } from '@/lib/training-categories'
 import { slugify } from '@/lib/organization'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -186,8 +187,9 @@ export async function POST(request: Request) {
     request,
   })
 
-  // Hoş geldiniz e-postası gönder (hata olursa hastane yine de oluşmuş olur)
+  // Hoş geldiniz e-postası gönder
   const loginUrl = `${getAppUrl()}/auth/login`
+  let emailSent = true
   try {
     await sendHospitalWelcomeEmail({
       to: adminEmail,
@@ -196,10 +198,15 @@ export async function POST(request: Request) {
       tempPassword,
       adminName: `${adminFirstName} ${adminLastName}`,
     })
-  } catch {
-    // E-posta gönderilemezse log tut ama hastane oluşumunu engelleme
-    console.error(`Hoş geldiniz e-postası gönderilemedi: ${adminEmail}`)
+  } catch (emailErr) {
+    emailSent = false
+    logger.error('hospital-create', 'Welcome email failed', { adminEmail, error: (emailErr as Error).message })
   }
 
-  return jsonResponse(hospital, 201)
+  return jsonResponse({
+    ...hospital,
+    emailSent,
+    // Email başarısızsa şifreyi response'da göster (admin UI'da modal ile gösterilecek)
+    ...(!emailSent ? { tempPassword } : {}),
+  }, 201)
 }

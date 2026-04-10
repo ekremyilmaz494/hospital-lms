@@ -101,6 +101,8 @@ model Organization {
   aiGenerations          AiGeneration[]
   aiGoogleConnection     AiGoogleConnection?
   orgContentLibrary      ContentLibrary[]      @relation("OrgContentLibrary")
+  examAttempts           ExamAttempt[]
+  certificates           Certificate[]
 
   @@map("organizations")
 }
@@ -302,6 +304,7 @@ model Training {
 
   // Bağımsız Sınav
   examOnly            Boolean @default(false) @map("exam_only")
+  requirePreExamOnRetry Boolean @default(true) @map("require_pre_exam_on_retry")
   randomizeQuestions  Boolean @default(false) @map("randomize_questions")
   randomQuestionCount Int?    @map("random_question_count")
 
@@ -343,6 +346,7 @@ model TrainingVideo {
   durationSeconds Int      @map("duration_seconds")
   contentType     String   @default("video") @map("content_type") @db.VarChar(20) // 'video' | 'pdf' | 'audio'
   pageCount       Int?     @map("page_count")
+  fileSizeBytes   BigInt?  @map("file_size_bytes")
   sortOrder       Int      @default(0) @map("sort_order")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 
@@ -434,10 +438,12 @@ model ExamAttempt {
   signatureData       String?   @map("signature_data") @db.Text
   signatureIp         String?   @map("signature_ip") @db.VarChar(45)
   signatureMethod     String?   @map("signature_method") @db.VarChar(20)
+  organizationId      String?   @map("organization_id") @db.Uuid
 
   assignment    TrainingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   user          User               @relation(fields: [userId], references: [id])
   training      Training           @relation(fields: [trainingId], references: [id])
+  organization  Organization?      @relation(fields: [organizationId], references: [id])
   examAnswers   ExamAnswer[]
   videoProgress VideoProgress[]
   certificates  Certificate[]
@@ -451,6 +457,7 @@ model ExamAttempt {
   @@index([userId, status], map: "idx_attempts_user_status")
   @@index([assignmentId, status], map: "idx_attempts_assignment_status")
   @@index([userId, isPassed], map: "idx_attempts_user_passed")
+  @@index([organizationId], map: "idx_attempts_organization")
   @@map("exam_attempts")
 }
 
@@ -578,13 +585,16 @@ model Certificate {
   expiresAt        DateTime? @map("expires_at") @db.Timestamptz
   revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
   revocationReason String?   @map("revocation_reason") @db.VarChar(500)
+  organizationId   String?   @map("organization_id") @db.Uuid
 
-  user     User        @relation(fields: [userId], references: [id])
-  training Training    @relation(fields: [trainingId], references: [id])
-  attempt  ExamAttempt @relation(fields: [attemptId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+  training     Training      @relation(fields: [trainingId], references: [id])
+  attempt      ExamAttempt   @relation(fields: [attemptId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
 
   @@index([userId], map: "idx_certificates_user")
   @@index([trainingId], map: "idx_certificates_training")
+  @@index([organizationId], map: "idx_certificates_organization")
   @@map("certificates")
 }
 

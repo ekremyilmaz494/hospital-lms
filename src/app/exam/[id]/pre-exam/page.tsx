@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Clock, ChevronLeft, ChevronRight, AlertTriangle, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageLoading } from '@/components/shared/page-loading';
+import { useToast } from '@/components/shared/toast';
 
 interface Option {
   id: string;
@@ -40,6 +41,8 @@ export default function PreExamPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const { toast } = useToast();
 
   // 1. Once attempt baslat, sonra sorulari cek, timer'i Redis'ten al
   useEffect(() => {
@@ -150,6 +153,32 @@ export default function PreExamPage() {
     return () => window.removeEventListener('beforeunload', saveOnExit);
   }, [id, examData, currentQ, answers]);
 
+  // Anti-cheat: Tab switch detection (tüm sınavlarda)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setTabSwitchCount((prev) => {
+          const next = prev + 1;
+          if (next >= 3) {
+            toast('3. ihlal: Sinaviniz otomatik sonlandirildi', 'error');
+          } else {
+            toast(`Uyari: Sekme degistirme tespit edildi (${next}/3)`, 'warning');
+          }
+          return next;
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [toast]);
+
+  // Force submit on 3rd tab switch violation
+  useEffect(() => {
+    if (tabSwitchCount >= 3 && handleFinishRef.current) {
+      handleFinishRef.current();
+    }
+  }, [tabSwitchCount]);
+
   if (isLoading) {
     return <PageLoading />;
   }
@@ -216,7 +245,7 @@ export default function PreExamPage() {
   }, [timeLeft]);
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
+    <div className="min-h-screen" style={{ background: 'var(--color-bg)' }} onContextMenu={(e) => e.preventDefault()} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()}>
       {/* Exam Header */}
       <div className="sticky top-0 z-50 border-b px-6 py-3" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
         <div className="flex items-center justify-between">

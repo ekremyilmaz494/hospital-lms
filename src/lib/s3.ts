@@ -1,8 +1,10 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, CopyObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getSignedUrl as getCloudfrontSignedUrl } from '@aws-sdk/cloudfront-signer'
+import { logger } from '@/lib/logger'
+import { prisma } from '@/lib/prisma'
 
-const s3 = new S3Client({
+export const s3 = new S3Client({
   region: process.env.AWS_REGION!,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
@@ -43,7 +45,7 @@ export async function getUploadUrl(key: string, contentType: string) {
     ContentType: contentType,
   })
 
-  const url = await getSignedUrl(s3, command, { expiresIn: 3600 })
+  const url = await getSignedUrl(s3, command, { expiresIn: 1800 })
   return url
 }
 
@@ -73,7 +75,7 @@ export async function getStreamUrl(key: string) {
       url: cfUrl,
       keyPairId,
       privateKey: privateKey.replace(/\\n/g, '\n'),
-      dateLessThan: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+      dateLessThan: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     })
   }
 
@@ -86,9 +88,13 @@ export async function getStreamUrl(key: string) {
   return getDownloadUrl(key)
 }
 
-/** Delete object from S3 */
+/** Delete object from S3 — hata fırlatmaz, orphan key'i loglar */
 export async function deleteObject(key: string) {
-  await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
+  try {
+    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
+  } catch (err) {
+    logger.warn('s3-delete', `S3 silme basarisiz (orphan olabilir): ${key}`, err)
+  }
 }
 
 /** Upload a buffer directly to S3 (for server-side operations like backups) */
@@ -192,4 +198,32 @@ export function audioKey(orgId: string, trainingId: string, filename: string) {
   }
   const id = crypto.randomUUID()
   return `audio/${orgId}/${trainingId}/${id}.${ext}`
+}
+
+/** Organizasyonun toplam storage kullanımını byte cinsinden hesapla */
+export async function getOrgStorageBytes(orgId: string): Promise<number> {
+  const result = await prisma.trainingVideo.aggregate({
+    where: { training: { organizationId: orgId } },
+    _sum: { fileSizeBytes: true },
+  })
+  return Number(result._sum.fileSizeBytes ?? 0)
+}
+
+/** Storage quota kontrolü — limit aşılmışsa hata mesajı döner, yoksa null */
+export async function checkStorageQuota(orgId: string, additionalBytes = 0): Promise<string | null> {
+  const subscription = await prisma.organizationSubscription.findFirst({
+    where: { organizationId: orgId },
+    include: { plan: { select: { maxStorageGb: true } } },
+  })
+
+  const maxBytes = (subscription?.plan?.maxStorageGb ?? 10) * 1024 * 1024 * 1024
+  const usedBytes = await getOrgStorageBytes(orgId)
+
+  if (usedBytes + additionalBytes > maxBytes) {
+    const usedGb = (usedBytes / (1024 * 1024 * 1024)).toFixed(1)
+    const maxGb = subscription?.plan?.maxStorageGb ?? 10
+    return `Depolama limitinize ulastiniz (${usedGb}GB / ${maxGb}GB). Plan yukseltmek icin yoneticinize basin.`
+  }
+
+  return null
 }

@@ -5,6 +5,7 @@ import { submitExamSchema } from '@/lib/validations'
 import { checkRateLimit, clearExamTimer } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { logger } from '@/lib/logger'
+import { sendEmail, certificateIssuedEmail } from '@/lib/email'
 
 
 /** Submit pre-exam or post-exam answers */
@@ -213,22 +214,35 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
   })
 
-  // Auto-generate certificate
+  // Auto-generate certificate (duplicate koruması ile)
   if (isPassed) {
-    const code = `CERT-${randomBytes(16).toString('hex').toUpperCase()}`
-    // Otomatik geçerlilik süresi: training.renewalPeriodMonths varsa hesapla
-    const expiresAt = attempt.training.renewalPeriodMonths
-      ? new Date(Date.now() + attempt.training.renewalPeriodMonths * 30 * 24 * 60 * 60 * 1000)
-      : null
-    await prisma.certificate.create({
-      data: {
-        userId: dbUser!.id,
-        trainingId: attempt.trainingId,
-        attemptId: attempt.id,
-        certificateCode: code,
-        expiresAt,
-      },
+    const existingCert = await prisma.certificate.findFirst({
+      where: { attemptId: attempt.id },
     })
+    if (!existingCert) {
+      const code = `CERT-${randomBytes(16).toString('hex').toUpperCase()}`
+      const expiresAt = attempt.training.renewalPeriodMonths
+        ? new Date(Date.now() + attempt.training.renewalPeriodMonths * 30 * 24 * 60 * 60 * 1000)
+        : null
+      await prisma.certificate.create({
+        data: {
+          userId: dbUser!.id,
+          trainingId: attempt.trainingId,
+          attemptId: attempt.id,
+          organizationId: dbUser!.organizationId,
+          certificateCode: code,
+          expiresAt,
+        },
+      })
+
+      // Sertifika bildirimi (fire-and-forget)
+      certificateIssuedEmail(
+        dbUser!.email,
+        `${dbUser!.firstName ?? ''} ${dbUser!.lastName ?? ''}`.trim(),
+        attempt.training.title,
+        code,
+      ).catch(err => logger.warn('CertEmail', 'Sertifika emaili gonderilemedi', (err as Error).message))
+    }
   }
 
   // Eğitim tamamlandığında otomatik SMG aktivitesi (fire-and-forget)

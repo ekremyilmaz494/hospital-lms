@@ -88,7 +88,8 @@ export async function DELETE(
     )
   }
 
-  await prisma.smgPeriod.delete({ where: { id } })
+  const deleted = await prisma.smgPeriod.deleteMany({ where: { id, organizationId: dbUser!.organizationId! } })
+  if (deleted.count === 0) return errorResponse('Donem bulunamadi veya yetkiniz yok', 404)
 
   await createAuditLog({
     userId: dbUser!.id,

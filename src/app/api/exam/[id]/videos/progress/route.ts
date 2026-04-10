@@ -50,7 +50,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ? Math.max(safeWatchedSeconds, existing.watchedSeconds)
     : safeWatchedSeconds
 
-  const isCompleted = finalWatchedSeconds >= video.durationSeconds
+  // Minimum %80 izleme zorunlu — 1 saniye açıp kapatma engellenir
+  const MIN_WATCH_PERCENT = 0.80
+  const isCompleted = finalWatchedSeconds >= (video.durationSeconds * MIN_WATCH_PERCENT)
 
   const progress = await prisma.videoProgress.upsert({
     where: { attemptId_videoId: { attemptId, videoId: body.videoId } },

@@ -116,20 +116,27 @@ export async function POST(request: Request) {
       request,
     })
 
-    // Hoş geldiniz e-postası (arka planda, hata kayıt akışını engellemesin)
-    sendSelfRegistrationEmail({
-      to: email,
-      adminName: `${firstName} ${lastName}`,
-      hospitalName,
-    }).catch((err) => {
+    // Hoş geldiniz e-postası
+    let emailSent = true
+    try {
+      await sendSelfRegistrationEmail({
+        to: email,
+        adminName: `${firstName} ${lastName}`,
+        hospitalName,
+      })
+    } catch (err) {
+      emailSent = false
       logger.error('Register', 'Hos geldiniz e-postasi gonderilemedi', (err as Error).message)
-    })
+    }
 
     logger.info('Register', 'Yeni hastane kaydi (self-service)', { orgId: org.id, hospitalName, email })
 
     return jsonResponse({
       success: true,
-      message: 'Hastane başarıyla oluşturuldu. Lütfen e-postanızı kontrol ederek hesabınızı doğrulayın.',
+      emailSent,
+      message: emailSent
+        ? 'Hastane başarıyla oluşturuldu. Lütfen e-postanızı kontrol ederek hesabınızı doğrulayın.'
+        : 'Hastane oluşturuldu ancak e-posta gönderilemedi. Lütfen yöneticinize başvurun.',
     }, 201)
   } catch (err) {
     if (org) await prisma.organization.delete({ where: { id: org.id } }).catch(() => {})

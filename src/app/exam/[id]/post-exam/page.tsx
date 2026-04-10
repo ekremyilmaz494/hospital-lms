@@ -138,9 +138,8 @@ export default function PostExamPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [timeLeft !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Anti-cheat: Tab visibility detection (examOnly)
+  // Anti-cheat: Tab visibility detection (tüm sınavlarda aktif)
   useEffect(() => {
-    if (!isExamOnly) return;
     const handleVisibilityChange = () => {
       if (document.hidden) {
         setTabSwitchCount((prev) => {
@@ -156,7 +155,7 @@ export default function PostExamPage() {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isExamOnly, toast]);
+  }, [toast]);
 
   // Force submit on 3rd tab switch violation
   useEffect(() => {
@@ -164,6 +163,22 @@ export default function PostExamPage() {
       handleFinishRef.current();
     }
   }, [tabSwitchCount]);
+
+  // Anti-cheat: Fullscreen zorunluluğu (examOnly sınavlarda)
+  useEffect(() => {
+    if (!isExamOnly) return;
+    document.documentElement.requestFullscreen?.().catch(() => {
+      toast('Tam ekran moduna gecin', 'warning');
+    });
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        toast('Tam ekran modundan cikmayiniz', 'warning');
+        document.documentElement.requestFullscreen?.().catch(() => {});
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [isExamOnly, toast]);
 
   // Auto-submit when timer hits zero
   const handleFinishRef = useRef<() => void>(undefined);
@@ -259,8 +274,9 @@ export default function PostExamPage() {
     <div
       className="min-h-screen"
       style={{ background: 'var(--color-bg)' }}
-      onContextMenu={isExamOnly ? (e) => e.preventDefault() : undefined}
-      onCopy={isExamOnly ? (e) => e.preventDefault() : undefined}
+      onContextMenu={(e) => e.preventDefault()}
+      onCopy={(e) => e.preventDefault()}
+      onCut={(e) => e.preventDefault()}
     >
       {/* Tab switch warning banner */}
       {isExamOnly && tabSwitchCount > 0 && (

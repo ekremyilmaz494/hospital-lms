@@ -42,66 +42,57 @@ export async function POST(request: Request) {
       },
     })
 
+    // Trial email'lerini hazırla
+    type EmailTask = { fn: () => Promise<void>; orgId: string }
+    const emailTasks: EmailTask[] = []
+
     for (const sub of trialSubscriptions) {
       const adminEmail = sub.organization.email
       if (!adminEmail) continue
-
       const trialEnd = sub.trialEndsAt!
       const daysLeft = Math.ceil((trialEnd.getTime() - now) / DAY_MS)
 
-      try {
-        if (daysLeft <= 0) {
-          // Trial suresi dolmus
-          await sendTrialExpiredEmail(adminEmail, sub.organization.name)
-          sentCount++
-        } else if (REMINDER_DAYS.includes(daysLeft as 7 | 3 | 1)) {
-          // Suresi dolmak uzere
-          await sendTrialExpiringEmail(adminEmail, sub.organization.name, daysLeft)
-          sentCount++
-        }
-      } catch (err) {
-        errorCount++
-        logger.error('cron:sub-reminders', 'Trial hatirlatma e-postasi gonderilemedi', {
-          organizationId: sub.organizationId,
-          error: err instanceof Error ? err.message : String(err),
-        })
+      if (daysLeft <= 0) {
+        emailTasks.push({ fn: () => sendTrialExpiredEmail(adminEmail, sub.organization.name), orgId: sub.organizationId })
+      } else if (REMINDER_DAYS.includes(daysLeft as 7 | 3 | 1)) {
+        emailTasks.push({ fn: () => sendTrialExpiringEmail(adminEmail, sub.organization.name, daysLeft), orgId: sub.organizationId })
       }
     }
 
     // Aktif abonelikler (paid)
     const activeSubscriptions = await prisma.organizationSubscription.findMany({
-      where: {
-        status: 'active',
-        expiresAt: { not: null },
-      },
-      include: {
-        organization: { select: { name: true, email: true } },
-      },
+      where: { status: 'active', expiresAt: { not: null } },
+      include: { organization: { select: { name: true, email: true } } },
     })
 
     for (const sub of activeSubscriptions) {
       const adminEmail = sub.organization.email
       if (!adminEmail) continue
-
       const expiresAt = sub.expiresAt!
       const daysLeft = Math.ceil((expiresAt.getTime() - now) / DAY_MS)
 
-      try {
-        if (daysLeft <= 0) {
-          // Abonelik suresi dolmus
-          await sendSubscriptionExpiredEmail(adminEmail, sub.organization.name)
+      if (daysLeft <= 0) {
+        emailTasks.push({ fn: () => sendSubscriptionExpiredEmail(adminEmail, sub.organization.name), orgId: sub.organizationId })
+      } else if (REMINDER_DAYS.includes(daysLeft as 7 | 3 | 1)) {
+        emailTasks.push({ fn: () => sendSubscriptionExpiringEmail(adminEmail, sub.organization.name, daysLeft), orgId: sub.organizationId })
+      }
+    }
+
+    // Batch processing: 20'li gruplar halinde gönder
+    const EMAIL_BATCH = 20
+    for (let i = 0; i < emailTasks.length; i += EMAIL_BATCH) {
+      const batch = emailTasks.slice(i, i + EMAIL_BATCH)
+      const results = await Promise.allSettled(batch.map(t => t.fn()))
+      for (let j = 0; j < results.length; j++) {
+        if (results[j].status === 'fulfilled') {
           sentCount++
-        } else if (REMINDER_DAYS.includes(daysLeft as 7 | 3 | 1)) {
-          // Suresi dolmak uzere
-          await sendSubscriptionExpiringEmail(adminEmail, sub.organization.name, daysLeft)
-          sentCount++
+        } else {
+          errorCount++
+          logger.warn('cron:sub-reminders', 'Email gonderilemedi', {
+            orgId: batch[j].orgId,
+            error: (results[j] as PromiseRejectedResult).reason?.message,
+          })
         }
-      } catch (err) {
-        errorCount++
-        logger.error('cron:sub-reminders', 'Abonelik hatirlatma e-postasi gonderilemedi', {
-          organizationId: sub.organizationId,
-          error: err instanceof Error ? err.message : String(err),
-        })
       }
     }
 

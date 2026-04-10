@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
-import { getUploadUrl, videoKey, documentKey, deleteObject } from '@/lib/s3'
+import { getUploadUrl, videoKey, documentKey, deleteObject, checkStorageQuota } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -34,6 +34,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!training) return errorResponse('Training not found', 404)
+
+  // Storage quota kontrolu
+  const quotaError = await checkStorageQuota(dbUser!.organizationId!)
+  if (quotaError) return errorResponse(quotaError, 403)
 
   const body = await parseBody<{
     filename: string
@@ -114,8 +118,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!video) return errorResponse('Video not found', 404)
 
   try {
-    // 1. Önce DB sil (başarısız olursa S3'e dokunulmaz)
-    await prisma.trainingVideo.delete({ where: { id: videoId } })
+    // 1. Önce DB sil (multi-tenant güvenli: trainingId üzerinden org doğrulanmış)
+    const delResult = await prisma.trainingVideo.deleteMany({ where: { id: videoId, trainingId: id } })
+    if (delResult.count === 0) return errorResponse('Video bulunamadi veya yetkiniz yok', 404)
 
     // 2. Sonra S3 sil (best-effort; orphan nesneler cron ile temizlenebilir)
     try {

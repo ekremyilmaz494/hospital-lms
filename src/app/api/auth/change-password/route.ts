@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod/v4'
+import { passwordChangedEmail } from '@/lib/email'
+import { logger } from '@/lib/logger'
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Mevcut şifre zorunludur'),
@@ -51,6 +53,10 @@ export async function POST(request: Request) {
       data: { mustChangePassword: false },
     })
   }
+
+  // Şifre değişikliği bildirimi (fire-and-forget)
+  passwordChangedEmail(dbUser!.email)
+    .catch(err => logger.warn('PwdEmail', 'Sifre degistirme emaili gonderilemedi', (err as Error).message))
 
   return jsonResponse({ message: 'Şifreniz başarıyla güncellendi' })
 }

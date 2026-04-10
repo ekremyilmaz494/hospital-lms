@@ -62,8 +62,9 @@ export async function getExamTimeRemaining(attemptId: string): Promise<number | 
 
 export async function isExamExpired(attemptId: string): Promise<boolean> {
   const remaining = await getExamTimeRemaining(attemptId)
-  // Timer yoksa (hiç başlatılmamışsa veya temizlenmişse) expired kabul et
-  if (remaining === null) return true
+  // Timer yoksa (henüz başlatılmamış veya Redis flush) → expired DEĞİL
+  // Haksız zaman aşımı önlenir; timer/route.ts yeni timer başlatır (recovery)
+  if (remaining === null) return false
   return remaining <= 0
 }
 

@@ -180,6 +180,8 @@ export async function POST(request: Request) {
     .filter(r => r.status === 'error')
     .map(r => `Satır ${r.rowIndex} (${r.email}): ${r.reason}`)
 
+  const results: { email: string; name: string; status: 'created' | 'failed'; tempPassword?: string; error?: string }[] = []
+
   for (const row of validRows) {
     try {
       const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
@@ -191,7 +193,9 @@ export async function POST(request: Request) {
 
       if (authError) {
         failed++
-        importErrors.push(`${row.email}: ${authError.message?.includes('already registered') ? 'Bu e-posta zaten kayıtlı' : authError.message}`)
+        const errMsg = authError.message?.includes('already registered') ? 'Bu e-posta zaten kayıtlı' : authError.message
+        importErrors.push(`${row.email}: ${errMsg}`)
+        results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'failed', error: errMsg })
         continue
       }
 
@@ -211,9 +215,11 @@ export async function POST(request: Request) {
       })
 
       created++
+      results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'created', tempPassword: row.password })
     } catch (err) {
       failed++
       importErrors.push(`${row.email}: Veritabanı hatası`)
+      results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'failed', error: 'Veritabanı hatası' })
       logger.error('Bulk Import', `DB insert failed for ${row.email}`, err)
     }
   }
@@ -228,7 +234,7 @@ export async function POST(request: Request) {
   })
 
   return jsonResponse(
-    { created, failed, total: rows.length, errors: importErrors.slice(0, 20) },
+    { created, failed, total: rows.length, errors: importErrors.slice(0, 20), results },
     created > 0 ? 201 : 400,
   )
 }

@@ -5,7 +5,7 @@ import { checkRateLimit } from '@/lib/redis'
  * Escapes HTML special characters to prevent HTML injection in email templates.
  * Must be applied to all user-provided or database-sourced values before interpolation.
  */
-function escapeHtml(unsafe: string): string {
+export function escapeHtml(unsafe: string): string {
   return unsafe
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -22,6 +22,12 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100,
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 30000,
 })
 
 interface EmailOptions {
@@ -55,6 +61,7 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
 
   await transporter.sendMail({
     from: process.env.SMTP_FROM ?? 'Hastane LMS <noreply@hastanelms.com>',
+    replyTo: process.env.SMTP_REPLY_TO ?? process.env.SMTP_FROM ?? 'destek@hastanelms.com',
     to: recipientList.join(', '),
     subject,
     html,
@@ -106,25 +113,7 @@ export function examResultEmail(staffName: string, trainingTitle: string, score:
   `
 }
 
-export function forgotPasswordEmail(name: string, resetLink: string) {
-  return `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Şifre Sıfırlama</h2>
-        <p style="color: #64748b;">Merhaba ${escapeHtml(name)},</p>
-        <p style="color: #64748b;">Hesabınız için bir şifre sıfırlama isteği aldık. Aşağıdaki butona tıklayarak yeni şifrenizi belirleyebilirsiniz:</p>
-        <a href="${escapeHtml(resetLink)}"
-           style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Şifremi Sıfırla
-        </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu link 1 saat içerisinde geçerliliğini yitirecektir. Eğer siz bu isteği yapmadıysanız bu e-postayı göz ardı edebilirsiniz.</p>
-      </div>
-    </div>
-  `
-}
+// forgotPasswordEmail silindi — Supabase Auth kendi sifre sifirlama emailini gonderiyor (resetPasswordForEmail)
 
 export function welcomeEmail(name: string, email: string, resetLink: string) {
   return `
@@ -565,7 +554,9 @@ export async function passwordChangedEmail(email: string) {
   await sendEmail({ to: email, subject: 'Hastane LMS — Şifre Değiştirildi', html })
 }
 
-/** Yeni giriş algılandığında güvenlik uyarısı */
+/** Yeni giriş algılandığında güvenlik uyarısı
+ * TODO: Henüz entegre edilmedi. Yeni cihaz/IP tespiti implement edildiğinde
+ * login/route.ts'de çağrılacak (son login IP karşılaştırması gerekli). */
 export async function loginAlertEmail(email: string, ipAddress: string, userAgent: string, loginTime: string) {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -622,7 +613,10 @@ export async function certificateIssuedEmail(email: string, staffName: string, t
   await sendEmail({ to: email, subject: 'Hastane LMS — Sertifikanız Hazır', html })
 }
 
-/** Abonelik süresi dolmak üzere uyarısı (plan detayları ile) */
+/** Abonelik süresi dolmak üzere uyarısı (plan detayları ile)
+ * NOT: cron/subscription-reminders sendSubscriptionExpiringEmail kullanıyor.
+ * Bu fonksiyon daha detaylı (plan adı + bitiş tarihi). Admin panelinden
+ * manuel bildirim göndermek için kullanılabilir. */
 export async function subscriptionExpiryEmail(email: string, hospitalName: string, planName: string, expiryDate: string, daysRemaining: number) {
   const urgencyColor = daysRemaining <= 3 ? '#dc2626' : '#f59e0b'
   const urgencyBg = daysRemaining <= 3 ? '#fef2f2' : '#fffbeb'

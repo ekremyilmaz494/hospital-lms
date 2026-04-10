@@ -70,7 +70,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   })
   if (!question) return errorResponse('Soru bulunamadı', 404)
 
-  await prisma.question.delete({ where: { id: questionId } })
+  const deleted = await prisma.question.deleteMany({ where: { id: questionId, trainingId: id } })
+  if (deleted.count === 0) return errorResponse('Soru bulunamadi veya yetkiniz yok', 404)
 
   return jsonResponse({ success: true })
 }

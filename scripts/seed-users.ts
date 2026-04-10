@@ -7,10 +7,12 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false }
 })
 
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'demo123456' // secret-scanner-disable-line
+
 const USERS = [
-  { email: 'super@demo.com', password: 'demo123456', role: 'super_admin', name: 'Süper Admin' },
-  { email: 'admin@demo.com', password: 'demo123456', role: 'admin', name: 'Dr. Ahmet Yılmaz' },
-  { email: 'staff@demo.com', password: 'demo123456', role: 'staff', name: 'Elif Kaya' },
+  { email: 'super@demo.com', password: DEMO_PASSWORD, role: 'super_admin', name: 'Süper Admin' },
+  { email: 'admin@demo.com', password: DEMO_PASSWORD, role: 'admin', name: 'Dr. Ahmet Yılmaz' },
+  { email: 'staff@demo.com', password: DEMO_PASSWORD, role: 'staff', name: 'Elif Kaya' },
 ]
 
 async function seedUsers() {

@@ -1,15 +1,9 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, errorResponse } from '@/lib/api-helpers'
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
-
-const s3 = new S3Client({
-  region: process.env.AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-})
+import { s3 } from '@/lib/s3'
+import { GetObjectCommand } from '@aws-sdk/client-s3'
+import { logger } from '@/lib/logger'
 
 /**
  * GET /api/stream/[videoId]
@@ -78,7 +72,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       status: range ? 206 : 200,
       headers,
     })
-  } catch {
-    return errorResponse('İçerik stream hatası', 500)
+  } catch (err) {
+    const awsErr = err as { name?: string; $metadata?: { httpStatusCode?: number } }
+    const code = awsErr.name ?? 'UnknownError'
+    const httpStatus = awsErr.$metadata?.httpStatusCode
+
+    logger.error('stream', `S3 stream hatasi: ${code}`, { videoId, key, httpStatus, error: (err as Error).message })
+
+    if (code === 'NoSuchKey' || httpStatus === 404) {
+      return errorResponse('Dosya bulunamadi. Silinmis veya tasinmis olabilir.', 404)
+    }
+    if (code === 'AccessDenied' || httpStatus === 403) {
+      return errorResponse('Dosyaya erisim izni yok. Lutfen yoneticinize basin.', 403)
+    }
+    return errorResponse('Icerik yuklenirken bir hata olustu. Lutfen tekrar deneyin.', 500)
   }
 }

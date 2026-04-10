@@ -3698,3 +3698,102 @@ Admin ayarlar sayfasına **"Marka"** sekmesi eklendi:
 - ✅ Vercel production deploy başlatıldı
 
 *Son güncelleme: 10 Nisan 2026 — Oturum 35*
+
+---
+
+## OTURUM 36 — Kapsamlı Güvenlik & Altyapı Auditi (10 Nisan 2026)
+
+Bu oturum 6 büyük audit raporunun uygulamasını içerir: Supabase Auth, AWS S3, CI/CD, Sınav Güvenliği, Multi-Tenant İzolasyon ve Email Sistemi.
+
+### A) Supabase Auth Düzeltmeleri (7 dosya)
+
+| Değişiklik | Dosya |
+|-----------|-------|
+| Login: Orphan user tespiti + inactive check + mustChangePassword flag | `auth/login/route.ts` |
+| Hospital creation: email try/catch → logger + emailSent + tempPassword response | `super-admin/hospitals/route.ts` |
+| Register: fire-and-forget `.catch()` → await try/catch + emailSent flag | `auth/register/route.ts` |
+| Bulk import: results array + tempPassword per row | `admin/bulk-import/route.ts` |
+| Auth health endpoint (orphan/ghost/unconfirmed tespit) | `super-admin/auth-health/route.ts` (**yeni**) |
+| Seed scripts: hardcoded şifre → `process.env.DEMO_PASSWORD` | `scripts/seed-users.ts` |
+
+### B) AWS S3/CloudFront Düzeltmeleri (11 dosya)
+
+| Değişiklik | Dosya |
+|-----------|-------|
+| S3Client singleton — 5 dosyada yerel `new S3Client()` kaldırıldı | stream, health, system-health, backups, scorm |
+| Storage quota: `checkStorageQuota()` helper + 3 upload endpoint'ine kontrol | `s3.ts`, upload/video, upload/presign, trainings/videos |
+| CloudFront TTL 4h→2h, upload presign 1h→30dk | `s3.ts` |
+| Stream error: AWS error code ayrımı (NoSuchKey→404, AccessDenied→403) + logger | `stream/route.ts` |
+| Delete orphan: exception throw yerine `logger.warn` + devam | `s3.ts` |
+| Buffer upload kaldırıldı → presigned URL flow | `upload/video/route.ts` |
+| Schema: `fileSizeBytes BigInt?` alanı eklendi | `schema.prisma` |
+
+### C) CI/CD — E2E Test Job (2 dosya)
+
+| Değişiklik | Dosya |
+|-----------|-------|
+| `e2e` job eklendi: needs ci, sadece push'ta, chromium only, Playwright report artifact | `.github/workflows/ci.yml` |
+| `wait-on` devDependency + `test:e2e:ci` script | `package.json` |
+
+### D) Sınav Güvenliği Düzeltmeleri (7 dosya)
+
+| # | Sorun | Çözüm | Dosya |
+|---|-------|-------|-------|
+| B1 | Race condition — çift attempt | `SELECT FOR UPDATE` row-level lock | `start/route.ts` |
+| B2 | Retry'da pre-exam atlanıyor | `requirePreExamOnRetry` alan + koşullu logic | `schema.prisma` + `start/route.ts` |
+| B3 | Timer null = haksız timeout | `null → false` (expire etme) | `redis.ts` |
+| B4 | Concurrent submit → çift sertifika | `findFirst` kontrol + idempotent create | `submit/route.ts` |
+| B5 | Dual monitor kopya | examOnly'de fullscreen zorunlu | `post-exam/page.tsx` |
+| B6 | Tab switch sadece examOnly | Tüm sınavlarda aktif | `post-exam` + `pre-exam` |
+| B7 | Copy engeli sadece examOnly | Tüm sınavlarda onContextMenu/onCopy/onCut | `post-exam` + `pre-exam` |
+| B8 | 1 saniye video = completed | `>= duration * 0.80` (%80 minimum) | `videos/progress/route.ts` |
+
+### E) Multi-Tenant İzolasyon Düzeltmeleri (15 dosya)
+
+**TOCTOU Race Condition Fix (9 dosya):**
+Tüm admin update/delete endpoint'lerinde `findFirst` → `update/delete({ where: { id } })` pattern'i güvenli hale getirildi:
+- `updateMany/deleteMany({ where: { id, organizationId } })` veya
+- `$transaction(findFirst + update)` pattern'i
+
+Etkilenen dosyalar: staff/[id], departments/[id], competency/forms/[id], smg/periods/[id], trainings/videos, trainings/questions, question-bank/[id], training-categories/[id]
+
+**Schema Değişiklikleri:**
+- `Certificate` modeline `organizationId` eklendi + index
+- `ExamAttempt` modeline `organizationId` eklendi + index
+- `Organization` modeline `examAttempts` ve `certificates` relation eklendi
+
+**Data Migration:** `20260410000000_add_org_id_to_certs_attempts/migration.sql`
+- Mevcut kayıtlara training → organization_id üzerinden backfill
+
+**RLS:** certificates ve exam_attempts politikaları subquery yerine direkt `organization_id` filtresi
+
+### F) Email Sistemi Düzeltmeleri (7 dosya)
+
+| # | Değişiklik | Dosya |
+|---|-----------|-------|
+| C1a | `certificateIssuedEmail()` entegre (sınav geçince) | `submit/route.ts` |
+| C1b | `passwordChangedEmail()` entegre (şifre değişince) | `change-password/route.ts` |
+| C1c | `loginAlertEmail()` TODO ile işaretlendi | `email.ts` |
+| C1d | `forgotPasswordEmail()` silindi (Supabase kendi gönderiyor) | `email.ts` |
+| C2 | `.catch(() => {})` → `.catch(err => logger.warn(...))` | `login/route.ts` |
+| C3 | Subscription cron → 20'li batch + `Promise.allSettled` | `subscription-reminders/route.ts` |
+| C4 | `replyTo` header eklendi | `email.ts` + `.env.example` |
+| C5 | Lokal `escapeHtml` kaldırıldı → import | `notifications/send/route.ts` |
+| C6 | SMTP `pool: true` + `maxConnections: 5` + timeout'lar | `email.ts` |
+
+### G) Diğer Düzeltmeler
+
+- Landing page "Daha Fazla" butonları: `<div>` → `<Link href="/register">` (tıklanabilir)
+- Demo Özel Hastanesi dışındaki test organizasyonları DB'den silindi
+- `admin@demo.hastanelms.com` şifresi sıfırlandı (`Demo123!`)
+
+### Toplam Değiştirilen Dosya Sayısı
+~45 dosya değiştirildi, 3 yeni dosya oluşturuldu, 1 migration eklendi.
+
+### Doğrulama
+- ✅ TypeScript — temiz (tüm adımlarda)
+- ✅ Build — başarılı (tüm adımlarda)
+- ✅ Prisma generate — başarılı
+- ✅ 19/19 audit maddesi doğrulandı (paralel keşif ile)
+
+*Son güncelleme: 10 Nisan 2026 — Oturum 36*

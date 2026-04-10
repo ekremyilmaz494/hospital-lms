@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getRedis } from '@/lib/redis'
 import { logger } from '@/lib/logger'
-import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3'
+import { s3 } from '@/lib/s3'
+import { HeadBucketCommand } from '@aws-sdk/client-s3'
 
 const APP_VERSION = process.env.npm_package_version ?? '0.1.0'
 
@@ -66,13 +67,6 @@ export async function GET(request: Request) {
     const bucket = process.env.AWS_S3_BUCKET
     const region = process.env.AWS_REGION
     if (bucket && region && process.env.AWS_ACCESS_KEY_ID) {
-      const s3 = new S3Client({
-        region,
-        credentials: {
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-        },
-      })
       await s3.send(new HeadBucketCommand({ Bucket: bucket }))
       services.s3 = true
     }

@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, checkWritePermission } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, escapeHtml } from '@/lib/email'
 import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
 
@@ -22,9 +22,6 @@ function notificationEmailHtml(title: string, message: string, type: string, app
     success: '#059669',
   }
   const color = typeColors[type] ?? '#2563eb'
-
-  const escapeHtml = (s: string) =>
-    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">

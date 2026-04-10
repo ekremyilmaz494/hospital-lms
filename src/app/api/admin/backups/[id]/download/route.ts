@@ -1,4 +1,5 @@
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
+import { s3 } from '@/lib/s3'
+import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
 import { decryptBackup } from '@/app/api/admin/backups/route'
@@ -34,13 +35,6 @@ export async function GET( // perf-check-disable-line — dosya indirme, Cache-C
   // S3'te kayıtlı yedek — S3'ten indir + decrypt
   if (backup.fileUrl !== 'local') {
     try {
-      const s3 = new S3Client({
-        region: process.env.AWS_REGION!,
-        credentials: {
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-        },
-      })
       const command = new GetObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET!,
         Key: backup.fileUrl,

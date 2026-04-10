@@ -94,8 +94,9 @@ export async function DELETE(
   })
   if (!existing) return errorResponse('Soru bulunamadı', 404)
 
-  // Cascade delete (QuestionBankOption ON DELETE CASCADE)
-  await prisma.questionBank.delete({ where: { id } })
+  // Cascade delete (QuestionBankOption ON DELETE CASCADE) — multi-tenant güvenli
+  const deleted = await prisma.questionBank.deleteMany({ where: { id, organizationId: dbUser!.organizationId! } })
+  if (deleted.count === 0) return errorResponse('Soru bulunamadi veya yetkiniz yok', 404)
 
   await createAuditLog({
     userId: dbUser!.id,

@@ -69,7 +69,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let attempt: Awaited<ReturnType<typeof prisma.examAttempt.findFirst>> | null = null
   try {
   attempt = await prisma.$transaction(async (tx) => {
-    // Double-check inside transaction (prevent race condition between check above and create)
+    // SELECT FOR UPDATE ile row-level lock — concurrent race condition önlenir
+    await tx.$queryRaw`SELECT id FROM training_assignments WHERE id = ${assignmentId}::uuid FOR UPDATE`
+
+    // Double-check inside transaction (lock ile güvenli)
     const existingInTx = await tx.examAttempt.findFirst({
       where: {
         assignmentId,
@@ -98,6 +101,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           assignmentId,
           userId: dbUser!.id,
           trainingId: assignment.trainingId,
+          organizationId: dbUser!.organizationId,
           attemptNumber: newAttemptNumber,
           status: 'post_exam',
           postExamStartedAt: new Date(),
@@ -113,18 +117,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return created
     }
 
-    // 2. ve sonraki denemelerde ön sınav atlanır → doğrudan watching_videos
+    // Retry'da pre-exam gerekli mi? (varsayılan: evet)
     const isRetry = newAttemptNumber > 1
-    const initialStatus = isRetry ? 'watching_videos' : 'pre_exam'
+    const skipPreExam = isRetry && assignment.training.requirePreExamOnRetry === false
+    const initialStatus = skipPreExam ? 'watching_videos' : 'pre_exam'
 
     const created = await tx.examAttempt.create({
       data: {
         assignmentId,
         userId: dbUser!.id,
         trainingId: assignment.trainingId,
+        organizationId: dbUser!.organizationId,
         attemptNumber: newAttemptNumber,
         status: initialStatus,
-        ...(isRetry
+        ...(skipPreExam
           ? { preExamCompletedAt: new Date(), preExamScore: 0 }
           : { preExamStartedAt: new Date() }
         ),

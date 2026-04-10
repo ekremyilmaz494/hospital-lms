@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { getRateLimitCount, incrementRateLimit, deleteRateLimit, getRedis } from '@/lib/redis'
 import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
 
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
                   to: adminEmail,
                   subject: `[Güvenlik Uyarısı] ${normalizedEmail} için ${ALERT_THRESHOLD} başarısız giriş denemesi`,
                   html: `<p>IP: <strong>${ip}</strong><br>E-posta: <strong>${normalizedEmail}</strong><br>Zaman: ${new Date().toLocaleString('tr-TR')}</p><p>Bu kişi hesabına erişmeye çalışıyor olabilir. Lütfen kontrol edin.</p>`,
-                }).catch(() => {})
+                }).catch(err => logger.warn('LoginAlert', 'Guvenlik uyari emaili gonderilemedi', (err as Error).message))
               }
             }
           } catch { /* Redis failure tracking is best-effort */ }
@@ -87,6 +88,27 @@ export async function POST(request: NextRequest) {
       }
 
       return errorResponse('E-posta veya şifre hatalı.', 401)
+    }
+
+    // ── Orphan user detection + active check ──
+    const dbUser = await prisma.user.findUnique({
+      where: { id: data.user.id },
+      select: { id: true, mustChangePassword: true, isActive: true, role: true }
+    })
+
+    if (!dbUser) {
+      // Orphan user — exists in Supabase Auth but not in DB
+      return jsonResponse(
+        { error: 'Hesabınız sistemde kayıtlı değil. Yöneticinizle iletişime geçin.' },
+        403
+      )
+    }
+
+    if (!dbUser.isActive) {
+      return jsonResponse(
+        { error: 'Hesabınız devre dışı bırakılmış. Yöneticinizle iletişime geçin.' },
+        403
+      )
     }
 
     const role = data.user?.user_metadata?.role as string | undefined
@@ -121,6 +143,7 @@ export async function POST(request: NextRequest) {
         email: data.user?.email,
         role: role ?? 'staff',
       },
+      mustChangePassword: dbUser.mustChangePassword,
     })
   } catch (err) {
     logger.error('auth:login', 'Giriş işlemi sırasında beklenmeyen hata', err)

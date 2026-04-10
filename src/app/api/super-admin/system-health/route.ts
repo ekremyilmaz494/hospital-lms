@@ -2,7 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, assertRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { getRedis } from '@/lib/redis'
-import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3'
+import { s3 } from '@/lib/s3'
+import { HeadBucketCommand } from '@aws-sdk/client-s3'
 import nodemailer from 'nodemailer'
 
 interface ServiceStatus {
@@ -72,13 +73,6 @@ async function checkS3(): Promise<ServiceStatus> {
     if (!bucket) {
       throw new Error('AWS_S3_BUCKET yapilandirilmamis')
     }
-    const s3 = new S3Client({
-      region: process.env.AWS_REGION!,
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-      },
-    })
     await s3.send(new HeadBucketCommand({ Bucket: bucket }))
   })
 }

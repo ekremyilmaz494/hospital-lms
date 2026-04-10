@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type React from "react";
+import Link from "next/link";
 import {
   BookOpen,
   BarChart3,
@@ -223,12 +224,13 @@ export function FeaturesSection() {
                 <p className="text-sm leading-relaxed" style={{ color: "#4a7060" }}>
                   {desc}
                 </p>
-                <div
-                  className="mt-5 flex items-center gap-1 text-xs font-bold"
+                <Link
+                  href="/register"
+                  className="mt-5 flex items-center gap-1 text-xs font-bold group"
                   style={{ color: "#0d9668" }}
                 >
-                  Daha Fazla <ArrowRight className="w-3 h-3" />
-                </div>
+                  Daha Fazla <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
+                </Link>
               </div>
             ))}
           </div>

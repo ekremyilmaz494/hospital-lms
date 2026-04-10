@@ -61,8 +61,8 @@ CREATE POLICY "super_admin_assignments_all" ON training_assignments FOR ALL USIN
 CREATE POLICY "admin_assignments_all" ON training_assignments FOR ALL USING (training_id IN (SELECT id FROM trainings WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)));
 CREATE POLICY "staff_assignments_select" ON training_assignments FOR SELECT USING (user_id = auth.uid());
 
--- EXAM ATTEMPTS
-CREATE POLICY "admin_attempts_select" ON exam_attempts FOR SELECT USING (training_id IN (SELECT id FROM trainings WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)));
+-- EXAM ATTEMPTS (organization_id eklendi — direkt filtre, subquery gereksiz)
+CREATE POLICY "admin_attempts_select" ON exam_attempts FOR SELECT USING (organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid));
 CREATE POLICY "staff_attempts_all" ON exam_attempts FOR ALL USING (user_id = auth.uid());
 
 -- EXAM ANSWERS
@@ -95,7 +95,7 @@ CREATE POLICY "staff_departments_select" ON departments FOR SELECT USING (organi
 -- CERTIFICATES
 ALTER TABLE certificates ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "super_admin_certificates_all" ON certificates FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_certificates_all" ON certificates FOR ALL USING (training_id IN (SELECT id FROM trainings WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)));
+CREATE POLICY "admin_certificates_all" ON certificates FOR ALL USING (organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid));
 CREATE POLICY "staff_certificates_select" ON certificates FOR SELECT USING (user_id = auth.uid());
 
 -- KVKK REQUESTS
