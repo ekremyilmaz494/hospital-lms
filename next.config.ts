@@ -54,9 +54,6 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  // macOS provenance/file-provider attribute'leri Turbopack SST yazımını engelliyor.
-  // .next dizinini /tmp altına taşıyarak bu sorunu önlüyoruz.
-  distDir: process.env.NODE_ENV === 'development' ? '/tmp/hospital-lms-next' : '.next',
   compress: true,
   poweredByHeader: false,
   images: {
