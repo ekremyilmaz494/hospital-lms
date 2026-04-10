@@ -6,7 +6,7 @@
     "predev": "node scripts/predev.js",
     "dev": "next dev --turbopack",
     "dev:clean": "rm -rf .next && pnpm predev && next dev --turbopack",
-    "build": "prisma generate && next build --webpack",
+    "build": "prisma generate && next build --webpack && node scripts/fix-nft-manifests.js",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
