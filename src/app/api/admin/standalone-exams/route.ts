@@ -48,12 +48,11 @@ export async function GET(request: Request) {
     const [exams, total] = await Promise.all([
       prisma.training.findMany({
         where,
-        include: {
-          assignments: { select: { status: true } },
-          examAttempts: {
-            where: { status: 'completed' },
-            select: { postExamScore: true, isPassed: true },
-          },
+        select: {
+          id: true, title: true, description: true, category: true,
+          passingScore: true, maxAttempts: true, examDurationMinutes: true,
+          startDate: true, endDate: true, isActive: true, publishStatus: true,
+          isCompulsory: true, createdAt: true,
           _count: { select: { assignments: true, questions: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -63,39 +62,52 @@ export async function GET(request: Request) {
       prisma.training.count({ where }),
     ])
 
-    const mapped = exams.map((e) => {
-      const completedAttempts = e.examAttempts
-      const passedCount = completedAttempts.filter((a) => a.isPassed).length
-      const scores = completedAttempts
-        .map((a) => a.postExamScore)
-        .filter((s) => s !== null)
-        .map((s) => Number(s))
-      const avgScore =
-        scores.length > 0
-          ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-          : 0
+    // Toplu istatistikler — tüm examAttempt row'larını çekmek yerine groupBy
+    const examIds = exams.map(e => e.id)
+    const [passedCounts, avgScores, attemptCounts] = examIds.length > 0
+      ? await Promise.all([
+          prisma.examAttempt.groupBy({
+            by: ['trainingId'],
+            where: { trainingId: { in: examIds }, isPassed: true, status: 'completed' },
+            _count: true,
+          }),
+          prisma.examAttempt.groupBy({
+            by: ['trainingId'],
+            where: { trainingId: { in: examIds }, status: 'completed', postExamScore: { not: null } },
+            _avg: { postExamScore: true },
+          }),
+          prisma.examAttempt.groupBy({
+            by: ['trainingId'],
+            where: { trainingId: { in: examIds }, status: 'completed' },
+            _count: true,
+          }),
+        ])
+      : [[], [], []]
 
-      return {
-        id: e.id,
-        title: e.title,
-        description: e.description,
-        category: e.category ?? '',
-        passingScore: e.passingScore,
-        maxAttempts: e.maxAttempts,
-        examDurationMinutes: e.examDurationMinutes,
-        startDate: e.startDate?.toISOString() ?? '',
-        endDate: e.endDate?.toISOString() ?? '',
-        isActive: e.isActive,
-        publishStatus: e.publishStatus,
-        isCompulsory: e.isCompulsory,
-        assignedCount: e._count.assignments,
-        questionCount: e._count.questions,
-        attemptCount: completedAttempts.length,
-        passedCount,
-        avgScore,
-        createdAt: e.createdAt.toISOString(),
-      }
-    })
+    const passedMap = new Map(passedCounts.map(p => [p.trainingId, p._count]))
+    const avgMap = new Map(avgScores.map(a => [a.trainingId, Math.round(Number(a._avg.postExamScore ?? 0))]))
+    const attemptMap = new Map(attemptCounts.map(a => [a.trainingId, a._count]))
+
+    const mapped = exams.map((e) => ({
+      id: e.id,
+      title: e.title,
+      description: e.description,
+      category: e.category ?? '',
+      passingScore: e.passingScore,
+      maxAttempts: e.maxAttempts,
+      examDurationMinutes: e.examDurationMinutes,
+      startDate: e.startDate?.toISOString() ?? '',
+      endDate: e.endDate?.toISOString() ?? '',
+      isActive: e.isActive,
+      publishStatus: e.publishStatus,
+      isCompulsory: e.isCompulsory,
+      assignedCount: e._count.assignments,
+      questionCount: e._count.questions,
+      attemptCount: attemptMap.get(e.id) ?? 0,
+      passedCount: passedMap.get(e.id) ?? 0,
+      avgScore: avgMap.get(e.id) ?? 0,
+      createdAt: e.createdAt.toISOString(),
+    }))
 
     const responseData = {
       exams: mapped,

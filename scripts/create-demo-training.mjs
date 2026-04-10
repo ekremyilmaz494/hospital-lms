@@ -1,7 +1,7 @@
 /**
  * Demo eğitim oluşturma scripti
- * - denemevideo.mp4'ü S3'e yükler
- * - SQL ile training + video + soru + atama oluşturur
+ * - denemevideo2.mp4'ü S3'e yükler
+ * - SQL ile training + video + 10 soru + atama oluşturur
  */
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import pg from "pg";
@@ -23,7 +23,7 @@ async function main() {
   const pool = new pg.Pool({ connectionString: DATABASE_URL });
 
   // 1) Video S3'e yükle
-  console.log("1) Video S3'e yükleniyor...");
+  console.log("1) Video S3'e yükleniyor (29 MB)...");
   const s3 = new S3Client({
     region: REGION,
     credentials: {
@@ -34,19 +34,19 @@ async function main() {
 
   const trainingId = randomUUID();
   const videoId = randomUUID();
-  const videoKey = `videos/${ORG_ID}/${trainingId}/${videoId}.mp4`;
-  const videoBuffer = readFileSync("../denemevideo.mp4");
+  const vKey = `videos/${ORG_ID}/${trainingId}/${videoId}.mp4`;
+  const videoBuffer = readFileSync("../denemevideo2.mp4");
 
   await s3.send(
     new PutObjectCommand({
       Bucket: BUCKET,
-      Key: videoKey,
+      Key: vKey,
       Body: videoBuffer,
       ContentType: "video/mp4",
     })
   );
 
-  const videoUrl = `https://${CF_DOMAIN}/${videoKey}`;
+  const videoUrl = `https://${CF_DOMAIN}/${vKey}`;
   console.log(`   Video yüklendi: ${videoUrl}`);
 
   // 2) Training oluştur
@@ -59,8 +59,8 @@ async function main() {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16)`,
     [
       trainingId, ORG_ID,
-      "Demo Eğitim - Temel Hastane Oryantasyonu",
-      "Tüm demo personel için zorunlu temel oryantasyon eğitimi. Hastane prosedürleri, güvenlik kuralları ve temel protokolleri kapsar.",
+      "Hastane Genel Eğitim - Temel Protokoller",
+      "Tüm personel için zorunlu temel hastane eğitimi. Enfeksiyon kontrolü, hasta hakları, iş güvenliği, acil durum prosedürleri ve atık yönetimi konularını kapsar.",
       "Oryantasyon", 70, 3, 30, now, endDate, true, "published", true, 15, ADMIN_ID, now,
     ]
   );
@@ -71,35 +71,101 @@ async function main() {
   await pool.query(
     `INSERT INTO training_videos (id, training_id, title, video_url, video_key, content_type, duration_seconds, sort_order, created_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-    [videoId, trainingId, "Bölüm 1: Temel Hastane Oryantasyonu", videoUrl, videoKey, "video", 0, 0, now]
+    [videoId, trainingId, "Hastane Temel Protokoller Eğitim Videosu", videoUrl, vKey, "video", 0, 0, now]
   );
   console.log(`   Video: ${videoId}`);
 
-  // 4) Sorular
-  console.log("4) Sınav soruları oluşturuluyor...");
+  // 4) 10 Soru (4'er şık)
+  console.log("4) 10 sınav sorusu oluşturuluyor...");
   const questions = [
-    {
-      text: "Hastane acil durum prosedürlerinde ilk yapılması gereken nedir?",
-      options: [
-        { text: "Acil durum planını takip etmek ve yetkililere haber vermek", correct: true },
-        { text: "Hastaneyi terk etmek", correct: false },
-        { text: "Sosyal medyadan paylaşım yapmak", correct: false },
-      ],
-    },
-    {
-      text: "Hasta bilgilerinin gizliliği hangi mevzuatla korunur?",
-      options: [
-        { text: "KVKK (Kişisel Verilerin Korunması Kanunu)", correct: true },
-        { text: "Ticaret Kanunu", correct: false },
-        { text: "İmar Kanunu", correct: false },
-      ],
-    },
     {
       text: "El hijyeni ne zaman uygulanmalıdır?",
       options: [
         { text: "Sadece yemekten önce", correct: false },
         { text: "Her hasta temasından önce ve sonra", correct: true },
         { text: "Sadece mesai bitiminde", correct: false },
+        { text: "Günde bir kez yeterlidir", correct: false },
+      ],
+    },
+    {
+      text: "Kesici-delici alet yaralanmasında ilk yapılması gereken nedir?",
+      options: [
+        { text: "Yarayı bol su ve sabunla yıkamak", correct: true },
+        { text: "Yarayı sıkıca sarmak ve beklemek", correct: false },
+        { text: "Hiçbir şey yapmadan çalışmaya devam etmek", correct: false },
+        { text: "Yaraya tentürdiyot sürmek", correct: false },
+      ],
+    },
+    {
+      text: "Hastane enfeksiyonlarının en sık bulaş yolu nedir?",
+      options: [
+        { text: "Hava yoluyla", correct: false },
+        { text: "Yiyeceklerle", correct: false },
+        { text: "Temas yoluyla (eller)", correct: true },
+        { text: "Su yoluyla", correct: false },
+      ],
+    },
+    {
+      text: "Yangın anında hangi davranış YANLIŞTIR?",
+      options: [
+        { text: "Yangın merdivenlerini kullanmak", correct: false },
+        { text: "Asansörü kullanmak", correct: true },
+        { text: "Yangın ihbar butonuna basmak", correct: false },
+        { text: "Duman altında eğilerek ilerlemek", correct: false },
+      ],
+    },
+    {
+      text: "Bilgilendirilmiş onam ne anlama gelir?",
+      options: [
+        { text: "Hastanın tedavi hakkında bilgilendirilip onay vermesi", correct: true },
+        { text: "Doktorun tedaviye kendisi karar vermesi", correct: false },
+        { text: "Hasta yakınının imza atması", correct: false },
+        { text: "Sigortanın tedaviyi onaylaması", correct: false },
+      ],
+    },
+    {
+      text: "KVKK kapsamında hasta verileri kimlerle paylaşılabilir?",
+      options: [
+        { text: "Hastanın tüm ailesiyle", correct: false },
+        { text: "Sosyal medyada anonim olarak", correct: false },
+        { text: "Sadece tedavi ekibi ve yasal zorunluluk halinde ilgili kurumlarla", correct: true },
+        { text: "Hastane çalışanlarının tamamıyla", correct: false },
+      ],
+    },
+    {
+      text: "Mavi kod ne anlama gelir?",
+      options: [
+        { text: "Yangın alarmı", correct: false },
+        { text: "Kardiyak arrest / solunum durması", correct: true },
+        { text: "Bomba ihbarı", correct: false },
+        { text: "Bebek kaçırma", correct: false },
+      ],
+    },
+    {
+      text: "Sterilizasyon ve dezenfeksiyon arasındaki temel fark nedir?",
+      options: [
+        { text: "İkisi aynı anlama gelir", correct: false },
+        { text: "Sterilizasyon tüm mikroorganizmaları yok eder, dezenfeksiyon patojen mikroorganizmaları azaltır", correct: true },
+        { text: "Dezenfeksiyon daha etkilidir", correct: false },
+        { text: "Sterilizasyon sadece ellere uygulanır", correct: false },
+      ],
+    },
+    {
+      text: "İş güvenliğinde KKD ne anlama gelir?",
+      options: [
+        { text: "Kalite Kontrol Departmanı", correct: false },
+        { text: "Kişisel Koruyucu Donanım", correct: true },
+        { text: "Kurumsal Kaynak Denetimi", correct: false },
+        { text: "Klinik Koordinasyon Düzeni", correct: false },
+      ],
+    },
+    {
+      text: "Atık yönetiminde kırmızı torba ne için kullanılır?",
+      options: [
+        { text: "Evsel atıklar", correct: false },
+        { text: "Geri dönüşüm atıkları", correct: false },
+        { text: "Tıbbi atıklar (enfeksiyöz atıklar)", correct: true },
+        { text: "Ambalaj atıkları", correct: false },
       ],
     },
   ];
@@ -119,7 +185,7 @@ async function main() {
       );
     }
   }
-  console.log(`   3 soru + 9 seçenek oluşturuldu`);
+  console.log(`   10 soru + 40 seçenek oluşturuldu`);
 
   // 5) Tüm demo personele ata
   console.log("5) Demo personele atanıyor...");
@@ -131,14 +197,13 @@ async function main() {
   const staffIds = staffResult.rows.map((r) => r.id);
   console.log(`   ${staffIds.length} personel bulundu`);
 
-  // Batch insert assignments
   let assignCount = 0;
   const batchSize = 50;
   for (let i = 0; i < staffIds.length; i += batchSize) {
     const batch = staffIds.slice(i, i + batchSize);
     const values = batch
       .map(
-        (uid, idx) =>
+        (_, idx) =>
           `($${idx * 6 + 1}, $${idx * 6 + 2}, $${idx * 6 + 3}, $${idx * 6 + 4}, $${idx * 6 + 5}, $${idx * 6 + 6})`
       )
       .join(", ");
@@ -167,7 +232,7 @@ async function main() {
     const params = batch.flatMap((uid) => [
       randomUUID(), uid, ORG_ID,
       "Yeni Eğitim Atandı",
-      '"Demo Eğitim - Temel Hastane Oryantasyonu" eğitimi size atandı.',
+      '"Hastane Genel Eğitim - Temel Protokoller" eğitimi size atandı.',
       "training_assigned",
     ]);
 
@@ -179,9 +244,10 @@ async function main() {
   }
   console.log(`   ${staffIds.length} bildirim gönderildi`);
 
-  console.log("\n✓ Tamamlandı!");
+  console.log("\n✅ Tamamlandı!");
   console.log(`  Eğitim ID: ${trainingId}`);
   console.log(`  Video: ${videoUrl}`);
+  console.log(`  Sorular: 10 soru × 4 şık`);
   console.log(`  Atanan: ${assignCount} personel`);
 
   await pool.end();

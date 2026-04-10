@@ -14,40 +14,64 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  const training = await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
-    include: {
-      videos: { orderBy: { sortOrder: 'asc' } },
-      questions: { include: { options: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } },
-      assignments: {
-        include: {
-          user: { select: { id: true, firstName: true, lastName: true, email: true, departmentRel: { select: { name: true } } } },
-          examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1 },
-        },
-        orderBy: { assignedAt: 'desc' },
-        take: 20,
+  const orgId = dbUser!.organizationId!
+
+  // Paralel: training + assignment istatistikleri + son 20 atama + imza/skor
+  const [training, assignmentStats, recentAssignments, signedCount, avgScoreResult] = await Promise.all([
+    prisma.training.findFirst({
+      where: { id, organizationId: orgId },
+      include: {
+        videos: { orderBy: { sortOrder: 'asc' } },
+        questions: { include: { options: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } },
+        _count: { select: { assignments: true, questions: true, videos: true } },
       },
-      _count: { select: { assignments: true, questions: true, videos: true } },
-    },
-  })
+    }),
+    prisma.trainingAssignment.groupBy({
+      by: ['status'],
+      where: { trainingId: id },
+      _count: true,
+    }),
+    prisma.trainingAssignment.findMany({
+      where: { trainingId: id },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true, departmentRel: { select: { name: true } } } },
+        examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1 },
+      },
+      orderBy: { assignedAt: 'desc' },
+      take: 20,
+    }),
+    prisma.examAttempt.count({
+      where: { assignment: { trainingId: id }, signedAt: { not: null } },
+    }),
+    prisma.examAttempt.aggregate({
+      where: { assignment: { trainingId: id }, postExamScore: { not: null } },
+      _avg: { postExamScore: true },
+    }),
+  ])
 
   if (!training) return errorResponse('Training not found', 404)
 
-  // Batch S3 URL generation (parallel instead of sequential waterfall)
+  // S3 URL generation (parallel)
   const streamUrls = await Promise.all(
     training.videos.map(v => (v.videoKey ? getStreamUrl(v.videoKey) : Promise.resolve(null)))
   )
 
-  // Transform for frontend
-  const assignedStaff = training.assignments.map(a => {
-    const latestAttempt = a.examAttempts[0] // desc order, take 1
+  // Assignment stats from groupBy
+  const statusMap = new Map(assignmentStats.map(s => [s.status, s._count]))
+  const passedCount = statusMap.get('passed') ?? 0
+  const failedCount = statusMap.get('failed') ?? 0
+  const completedCount = passedCount + failedCount
+  const avgScore = avgScoreResult._avg.postExamScore ? Math.round(Number(avgScoreResult._avg.postExamScore)) : 0
+
+  // Transform recent assignments for frontend
+  const assignedStaff = recentAssignments.map(a => {
+    const latestAttempt = a.examAttempts[0]
     const progress = (() => {
-      const attempt = latestAttempt
-      if (!attempt) return 0
+      if (!latestAttempt) return 0
       const steps = [
-        !!attempt.preExamCompletedAt,
-        !!attempt.videosCompletedAt,
-        !!attempt.postExamCompletedAt,
+        !!latestAttempt.preExamCompletedAt,
+        !!latestAttempt.videosCompletedAt,
+        !!latestAttempt.postExamCompletedAt,
       ]
       return Math.round((steps.filter(Boolean).length / 3) * 100)
     })()
@@ -66,16 +90,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       signatureMethod: latestAttempt?.signatureMethod ?? null,
     }
   })
-
-  const completedCount = training.assignments.filter(a => a.status === 'passed' || a.status === 'failed').length
-  const passedCount = training.assignments.filter(a => a.status === 'passed').length
-  const failedCount = training.assignments.filter(a => a.status === 'failed').length
-  const scores = training.assignments
-    .map(a => a.examAttempts[0]?.postExamScore)
-    .filter(s => s !== null && s !== undefined)
-    .map(Number)
-  const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
-  const signedCount = training.assignments.filter(a => a.examAttempts[0]?.signedAt).length
 
   return jsonResponse({
     id: training.id,
@@ -117,7 +131,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         order: o.sortOrder,
       })),
     })),
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

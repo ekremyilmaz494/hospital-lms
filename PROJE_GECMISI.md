@@ -3598,4 +3598,103 @@ Admin ayarlar sayfasına **"Marka"** sekmesi eklendi:
 - ✅ Vercel deploy başarılı
 - ✅ Git push temiz (101 dosya, 7056 satır)
 
-*Son güncelleme: 10 Nisan 2026 — Oturum 33*
+---
+
+## Oturum 34 — 10 Nisan 2026 (Devam)
+
+### 1. GitHub Pull & Vercel Build Hatası Çözümü
+- **İşlem:** `main` branch'ten güncel kod çekildi (5 yeni dosya: seed-demo-200.ts, validations.ts, proxy.ts→middleware.ts rename)
+- **Vercel Hata:** `ENOENT: no such file or directory ... app/(marketing)/page_client-reference-manifest.js`
+- **Kök Neden 1:** `(marketing)/layout.tsx` başında `"use client"` directive vardı — Next.js App Router'da layout **server component** olmalı
+- **Kök Neden 2:** `src/app/page.tsx` ve `src/app/(marketing)/page.tsx` **aynı `/` URL'e** map ediyordu — route çakışması
+- **Çözüm:**
+  - `layout.tsx` → server component yapıldı, client kısmı `marketing-layout-client.tsx`'e taşındı
+  - `(marketing)/page.tsx` ve `home-client.tsx` silindi (root `page.tsx` zaten landing page)
+  - `next.config.ts`'den gereksiz `distDir: '/tmp/...'` override kaldırıldı
+  - Metadata root `page.tsx`'e taşındı
+- **Sonuç:** `dev` branch'ine push edildi
+
+### 2. Demo Eğitim Oluşturma
+- **Script:** `scripts/create-demo-training.mjs` — S3 upload + SQL ile eğitim oluşturma
+- **Video:** `denemevideo.mp4` (5MB) → S3'e yüklendi, CloudFront üzerinden serve ediliyor
+- **Eğitim:** "Demo Eğitim - Temel Hastane Oryantasyonu" — 3 soru, 210 demo personele atandı
+- **Bildirimler:** 210 personele "Yeni Eğitim Atandı" bildirimi gönderildi
+- **İkinci eğitim:** Kullanıcı `denemevideo2.mp4` (29MB) ile "Hastane Genel Eğitim - Temel Protokoller" oluşturdu — 10 soru, 4'er şık
+
+### 3. Video Oynatma Sorunu Çözümü
+- **Sorun:** Admin panelinde eğitim videosunu izleyemiyordu — siyah ekran
+- **Kök Neden:** `getStreamUrl()` (`src/lib/s3.ts`) CloudFront signing key'leri boşken S3 presigned URL'e fallback yapıyordu — farklı domain, CORS/CSP bloklanması
+- **Çözüm:** CloudFront domain varsa ama signing key yoksa **doğrudan public CloudFront URL** dönmesi sağlandı (distribution zaten public)
+- **Dosya:** `src/lib/s3.ts:61-79` — 3 aşamalı fallback: signed URL → public CF URL → S3 presigned
+
+### 4. Devakent Hastanesi Rebranding
+- **Kapsam:** Tüm "Hastane LMS" / "Hospital LMS" / "HastaneLMS" referansları "Devakent Hastanesi" olarak değiştirildi
+- **53 dosya** güncellendi:
+  - Landing/marketing sayfaları (hero, features, testimonials, pricing, terms, privacy, demo, contact, kvkk, data-retention)
+  - Auth sayfaları (login, forgot-password, reset-password, mobile-layout)
+  - Admin & super-admin sayfaları (sidebar, layout, settings, certificates, branding-tab)
+  - API route'ları (email templates, PDF generators, reports, certificates, notifications, invoices, swagger)
+  - Config dosyaları (layout.tsx metadata, manifest.json, worker/index.ts)
+- **Logo:** "H" harfi → "D", "Hastane**LMS**" → "Deva**kent**"
+- **Dokunulmayan:** Email domain'leri (`hastanelms.com`, `hastane-lms.com`) — teknik domain, ayrı değiştirilmeli
+
+### Doğrulama
+- ✅ 0 adet "Hastane LMS" / "HastaneLMS" / "Hospital LMS" referansı kaldı
+- ✅ CloudFront video URL'leri public erişime açık (HTTP 200)
+- ✅ S3 video upload başarılı
+- ✅ Demo eğitimler canlı DB'de oluşturuldu ve 210 personele atandı
+
+---
+
+## Oturum 35 — 10 Nisan 2026 (Akşam)
+
+### 1. Eğitim İçerik Yükleme Step 2 Yeniden Tasarım
+- **Kapsam:** Admin eğitim oluşturma wizard Step 2 tamamen yeniden tasarlandı
+- **Değişiklik:** Eski "Yeni Yükle" dropdown kaldırıldı → Dokümanlar / Medya tab yapısı eklendi
+- **Her tabda:** "Bilgisayardan Yükle" + "Kütüphaneden Seç" butonları
+- **ContentLibraryModal:** `defaultFilter` prop eklendi — tabdan açılınca ilgili filtre ile başlıyor
+- **Upload kodu:** `uploadFileToS3()` ortak fonksiyonuna çıkarıldı (~130 satır tekrar kaldırıldı)
+- **Dosyalar:** `page.tsx`, `content-library-modal.tsx`
+
+### 2. API Performans Optimizasyonu (5 Endpoint)
+- **trainings/[id]** (5.6s→~1s): Nested N+1 include → paralel groupBy + Cache-Control eklendi
+- **competency-matrix** (4.3s→~0ms cache): Redis `withCache` 300s TTL eklendi
+- **trainings GET** (2.3s→~0.5s): assignments include kaldırıldı → toplu groupBy ile completedCount
+- **standalone-exams** (2.2s→~0.5s): examAttempts include → toplu groupBy
+- **staff GET** (2.1s→~1s): 2 dalgalı Promise.all → tek dalgalı
+- **org-branding** (2.1s→~0ms cache): 2 sıralı sorgu → tek join + Redis 10dk cache
+
+### 3. Soru/Şık Karıştırma — Tüm Eğitimlere Genişletildi
+- **Önceki:** Sadece `examOnly` sınavlarda soru/şık karıştırma vardı
+- **Şimdi:** Tüm eğitimlerde (pre + post exam) hem sorular hem şıklar Fisher-Yates ile karıştırılıyor
+- **Dosya:** `src/app/api/exam/[id]/questions/route.ts`
+
+### 4. Demo Eğitim Oluşturma
+- `denemevideo2.mp4` (29MB) S3'e yüklendi
+- "Hastane Genel Eğitim - Temel Protokoller" eğitimi oluşturuldu
+- 10 soru × 4 şık (el hijyeni, enfeksiyon, yangın, KVKK, mavi kod, sterilizasyon, KKD, atık yönetimi)
+- 210 personele otomatik atandı + bildirim gönderildi
+
+### 5. Login Rate Limit Düzeltmesi (KRİTİK)
+- **Sorun:** Rate limit başarılı girişleri de sayıyordu → 20 giriş-çıkış sonrası hesap kilitleniyordu
+- **Çözüm:**
+  - `getRateLimitCount()`: Sayacı artırmadan kontrol eder
+  - `incrementRateLimit()`: Sadece başarısız girişlerde çağrılır
+  - `deleteRateLimit()`: Başarılı girişte fail counter sıfırlanır
+  - Limitler artırıldı: IP 50→100, E-posta 20→30 (5dk pencere)
+- **Dosyalar:** `src/lib/redis.ts`, `src/app/api/auth/login/route.ts`
+
+### 6. Sistem Tanıtım Dokümanı
+- Masaüstüne `Hastane LMS - Sistem Tanitimi.txt` oluşturuldu
+- Tüm modüller, özellikler, teknik altyapı ve canlı giriş bilgileri
+
+### Doğrulama
+- ✅ TypeScript temiz
+- ✅ Eğitim oluşturma Step 2 tab yapısı çalışıyor
+- ✅ 5 API endpoint optimize edildi
+- ✅ Soru/şık karıştırma tüm sınavlarda aktif
+- ✅ Demo eğitim 210 personele atandı
+- ✅ Login rate limit sadece başarısız girişlerde sayılıyor
+- ✅ Vercel production deploy başlatıldı
+
+*Son güncelleme: 10 Nisan 2026 — Oturum 35*

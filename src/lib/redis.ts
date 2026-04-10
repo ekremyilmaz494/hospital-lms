@@ -242,3 +242,66 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
   entry.count++
   return entry.count <= effectiveMax
 }
+
+/** Get current rate limit count without incrementing */
+export async function getRateLimitCount(key: string): Promise<number> {
+  if (!SAFE_KEY_PATTERN.test(key)) return 0
+
+  const redis = getRedis()
+  if (redis) {
+    try {
+      const val = await redis.get(`ratelimit:${key}`)
+      return typeof val === 'number' ? val : (parseInt(String(val ?? '0'), 10) || 0)
+    } catch {
+      resetRedis()
+    }
+  }
+
+  const k = `ratelimit:${key}`
+  const entry = memoryRateLimits.get(k)
+  if (!entry || entry.expiresAt < Date.now()) return 0
+  return entry.count
+}
+
+/** Increment rate limit counter (for failed attempts only) */
+export async function incrementRateLimit(key: string, windowSeconds: number): Promise<void> {
+  if (!SAFE_KEY_PATTERN.test(key)) return
+
+  const redis = getRedis()
+  if (redis) {
+    try {
+      const k = `ratelimit:${key}`
+      const pipeline = redis.pipeline()
+      pipeline.set(k, 0, { nx: true, ex: windowSeconds })
+      pipeline.incr(k)
+      await pipeline.exec()
+      return
+    } catch {
+      resetRedis()
+    }
+  }
+
+  const k = `ratelimit:${key}`
+  const now = Date.now()
+  const entry = memoryRateLimits.get(k)
+  if (!entry || entry.expiresAt < now) {
+    memoryRateLimits.set(k, { count: 1, expiresAt: now + windowSeconds * 1000 })
+  } else {
+    entry.count++
+  }
+}
+
+/** Delete rate limit key (reset on successful login) */
+export async function deleteRateLimit(key: string): Promise<void> {
+  if (!SAFE_KEY_PATTERN.test(key)) return
+
+  const redis = getRedis()
+  if (redis) {
+    try {
+      await redis.del(`ratelimit:${key}`)
+    } catch {
+      resetRedis()
+    }
+  }
+  memoryRateLimits.delete(`ratelimit:${key}`)
+}

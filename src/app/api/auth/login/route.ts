@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
-import { checkRateLimit, getRedis } from '@/lib/redis'
+import { getRateLimitCount, incrementRateLimit, deleteRateLimit, getRedis } from '@/lib/redis'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
@@ -35,19 +35,17 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.trim().toLowerCase()
     const ip = getTrustedIp(request)
 
-    // ── Rate limiting + Supabase client oluşturma PARALEL ──
-    // createClient() cookie parse'ı rate limit kontrolüyle eşzamanlı çalışır.
-    // signInWithPassword() rate limit geçerse hemen başlar — ~200ms tasarruf.
-    const [ipAllowed, emailAllowed, supabase] = await Promise.all([
-      checkRateLimit(`login-ip:${ip}`, 50, 300),
-      checkRateLimit(`login:${normalizedEmail}`, 20, 300),
+    // ── Rate limiting (sadece başarısız girişler sayılır) + Supabase client PARALEL ──
+    const [ipCount, emailCount, supabase] = await Promise.all([
+      getRateLimitCount(`login-ip:${ip}`),
+      getRateLimitCount(`login:${normalizedEmail}`),
       createClient(),
     ])
-    if (!ipAllowed) {
+    if (ipCount >= 100) {
       logger.warn('auth:login', 'IP rate limit aşıldı', { ip })
       return errorResponse('Çok fazla giriş denemesi. 5 dakika bekleyin.', 429)
     }
-    if (!emailAllowed) {
+    if (emailCount >= 30) {
       logger.warn('auth:login', 'E-posta rate limit aşıldı', { email: normalizedEmail })
       return errorResponse('Çok fazla giriş denemesi. 5 dakika bekleyin.', 429)
     }
@@ -60,11 +58,16 @@ export async function POST(request: NextRequest) {
     if (authError) {
       logger.info('auth:login', 'Başarısız giriş denemesi', { email: normalizedEmail, ip })
 
+      // Sadece başarısız girişlerde rate limit sayacını artır
+      void Promise.all([
+        incrementRateLimit(`login-ip:${ip}`, 300),
+        incrementRateLimit(`login:${normalizedEmail}`, 300),
+      ]).catch(() => {})
+
       // Track consecutive failures — fire-and-forget (response'u bekletme)
       const redis = getRedis()
       if (redis) {
         const failKey = `login-fail:${normalizedEmail}`
-        // Background: Redis ops + alert email — response'u bloklamaz
         void (async () => {
           try {
             await redis.set(failKey, 0, { nx: true, ex: 900 })
@@ -103,6 +106,12 @@ export async function POST(request: NextRequest) {
         factorId: activeFactor.id,
       })
     }
+
+    // Başarılı giriş — fail counter sıfırla
+    void Promise.all([
+      deleteRateLimit(`login:${normalizedEmail}`),
+      deleteRateLimit(`login-fail:${normalizedEmail}`),
+    ]).catch(() => {})
 
     logger.info('auth:login', 'Basarili giris', { userId: data.user?.id, role })
 

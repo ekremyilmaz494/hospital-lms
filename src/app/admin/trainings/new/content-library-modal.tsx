@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +56,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSelect: (items: SelectedContent[]) => void;
+  defaultFilter?: 'all' | 'video' | 'audio' | 'pdf';
 }
 
 function formatDuration(seconds: number): string {
@@ -79,7 +80,7 @@ const CONTENT_LABEL: Record<string, string> = {
   pdf: 'Doküman',
 };
 
-export function ContentLibraryModal({ open, onClose, onSelect }: Props) {
+export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = 'all' }: Props) {
   const { data, isLoading } = useFetch<{ trainings: LibraryTraining[] }>(
     open ? '/api/admin/content-library/my-videos' : null,
   );
@@ -87,7 +88,11 @@ export function ContentLibraryModal({ open, onClose, onSelect }: Props) {
 
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState<'all' | 'video' | 'audio' | 'pdf'>('all');
+  const [filter, setFilter] = useState<'all' | 'video' | 'audio' | 'pdf'>(defaultFilter);
+
+  useEffect(() => {
+    if (open) setFilter(defaultFilter);
+  }, [open, defaultFilter]);
 
   // Flatten all videos from all trainings
   const allVideos = useMemo(() => {

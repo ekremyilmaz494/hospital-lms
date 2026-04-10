@@ -40,9 +40,9 @@ export async function GET(request: Request) {
     const [trainings, total] = await Promise.all([
       prisma.training.findMany({
         where,
-        include: {
-          videos: { select: { id: true, title: true, durationSeconds: true, sortOrder: true } },
-          assignments: { select: { status: true } },
+        select: {
+          id: true, title: true, category: true, passingScore: true,
+          publishStatus: true, startDate: true, endDate: true,
           _count: { select: { assignments: true, questions: true, videos: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -52,9 +52,20 @@ export async function GET(request: Request) {
       prisma.training.count({ where }),
     ])
 
+    // Toplu completedCount sorgusu — tüm assignment row'larını çekmek yerine tek groupBy
+    const trainingIds = trainings.map(t => t.id)
+    const completedCounts = trainingIds.length > 0
+      ? await prisma.trainingAssignment.groupBy({
+          by: ['trainingId'],
+          where: { trainingId: { in: trainingIds }, status: 'passed' },
+          _count: true,
+        })
+      : []
+    const completedMap = new Map(completedCounts.map(c => [c.trainingId, c._count]))
+
     const mapped = trainings.map(t => {
       const assignedCount = t._count.assignments
-      const completedCount = t.assignments.filter(a => a.status === 'passed').length
+      const completedCount = completedMap.get(t.id) ?? 0
       const completionRate = assignedCount > 0 ? Math.round((completedCount / assignedCount) * 100) : 0
       return {
         id: t.id,

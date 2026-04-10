@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
-import { checkRateLimit } from '@/lib/redis'
+import { checkRateLimit, withCache } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
 /**
@@ -35,7 +35,10 @@ export async function GET(request: Request) {
     ]
   }
 
+  const cacheKey = `cache:${orgId}:competency:${page}:${limit}:${search}:${departmentId || ''}`
+
   try {
+    const result = await withCache(cacheKey, 300, async () => {
     const [staff, totalStaffCount, trainings] = await Promise.all([
       prisma.user.findMany({
         where: staffWhere,
@@ -126,7 +129,7 @@ export async function GET(request: Request) {
       }
     })
 
-    return jsonResponse({
+    return {
       trainings: trainings.map(t => ({ id: t.id, title: t.title, category: t.category, isCompulsory: t.isCompulsory })),
       staff: matrix,
       summary: {
@@ -137,7 +140,10 @@ export async function GET(request: Request) {
       page,
       limit,
       totalPages: Math.ceil(totalStaffCount / limit),
-    }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+    }
+    })
+
+    return jsonResponse(result, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('CompetencyMatrix', 'Matris verileri alınamadı', err)
     return errorResponse('Yetkinlik matrisi alınamadı', 503)

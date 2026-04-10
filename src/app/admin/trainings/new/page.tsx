@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, Info, Video, FileQuestion, Users, Check, Plus, Trash2,
@@ -54,11 +54,11 @@ export default function NewTrainingPage() {
     id: number; title: string; url: string; file?: File;
     contentType: 'video' | 'pdf' | 'audio'; pageCount?: number; durationSeconds?: number;
     documentKey?: string; documentFile?: File; documentUploading?: boolean;
-  }[]>([
-    { id: 1, title: '', url: '', contentType: 'video' },
-  ]);
-  const [contentTypeMenu, setContentTypeMenu] = useState(false);
+  }[]>([]);
+  const [contentTab, setContentTab] = useState<'documents' | 'media'>('media');
   const [libraryModalOpen, setLibraryModalOpen] = useState(false);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
+  const mediaFileInputRef = useRef<HTMLInputElement>(null);
   const [questions, setQuestions] = useState([
     { id: 1, text: '', points: 10, options: ['', '', '', ''], correct: -1 },
   ]);
@@ -91,9 +91,98 @@ export default function NewTrainingPage() {
     );
   };
 
-  const addContent = (type: 'video' | 'audio') => {
+  const addContent = (type: 'video' | 'audio' | 'pdf') => {
     setVideos(prev => [...prev, { id: Date.now(), title: '', url: '', contentType: type }]);
-    setContentTypeMenu(false);
+  };
+
+  /** Shared upload handler — uploads file to S3 via presigned URL with progress tracking */
+  const uploadFileToS3 = async (itemId: number, file: File) => {
+    const isPdf = file.type === 'application/pdf';
+    const isAudio = file.type.startsWith('audio/');
+    const maxSize = isPdf ? 100 * 1024 * 1024 : isAudio ? 200 * 1024 * 1024 : 500 * 1024 * 1024;
+    const maxLabel = isPdf ? '100MB' : isAudio ? '200MB' : '500MB';
+    if (file.size > maxSize) {
+      toast(`Dosya boyutu ${maxLabel} sınırını aşıyor`, 'error');
+      return;
+    }
+    const detectedType: 'video' | 'pdf' | 'audio' = isPdf ? 'pdf' : isAudio ? 'audio' : 'video';
+    setVideos(prev => prev.map(v => v.id === itemId ? { ...v, file, url: '', contentType: detectedType } : v));
+    setUploadProgress(prev => ({ ...prev, [itemId]: 0 }));
+
+    // PDF page count
+    if (isPdf) {
+      try {
+        const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
+        GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs`;
+        const arrayBuf = await file.arrayBuffer();
+        const pdf = await getDocument({ data: new Uint8Array(arrayBuf) }).promise;
+        setVideos(prev => prev.map(v => v.id === itemId ? { ...v, pageCount: pdf.numPages } : v));
+      } catch { /* continue */ }
+    }
+
+    // Audio duration
+    if (isAudio) {
+      try {
+        const objectUrl = URL.createObjectURL(file);
+        const audioEl = new Audio(objectUrl);
+        audioEl.onloadedmetadata = () => {
+          setVideos(prev => prev.map(v => v.id === itemId ? { ...v, durationSeconds: Math.round(audioEl.duration) } : v));
+          URL.revokeObjectURL(objectUrl);
+        };
+        audioEl.onerror = () => URL.revokeObjectURL(objectUrl);
+      } catch { /* continue */ }
+    }
+
+    // Presigned URL → S3 upload with XHR progress
+    try {
+      setUploadProgress(prev => ({ ...prev, [itemId]: 5 }));
+      const presignRes = await fetch('/api/upload/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+      });
+      if (!presignRes.ok) {
+        const err = await presignRes.json();
+        toast(err.error || 'Yükleme URL alınamadı', 'error');
+        setVideos(prev => prev.map(v => v.id === itemId ? { ...v, url: '', file: undefined } : v));
+        setUploadProgress(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+        return;
+      }
+      const { uploadUrl, key } = await presignRes.json();
+      const xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = (ev) => {
+        if (ev.lengthComputable) {
+          const pct = Math.round((ev.loaded / ev.total) * 95);
+          setUploadProgress(prev => ({ ...prev, [itemId]: Math.max(5, pct) }));
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setUploadProgress(prev => ({ ...prev, [itemId]: 100 }));
+          setTimeout(() => {
+            setVideos(prev => prev.map(v => v.id === itemId ? { ...v, url: key, file } : v));
+            setUploadProgress(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+          }, 500);
+          toast(isPdf ? 'Doküman yüklendi' : isAudio ? 'Ses dosyası yüklendi' : 'Video yüklendi', 'success');
+        } else {
+          toast('Dosya yüklenemedi', 'error');
+          setVideos(prev => prev.map(v => v.id === itemId ? { ...v, url: '', file: undefined } : v));
+          setUploadProgress(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+        }
+      };
+      xhr.onerror = () => {
+        toast('Dosya yüklenemedi — bağlantı hatası', 'error');
+        setVideos(prev => prev.map(v => v.id === itemId ? { ...v, url: '', file: undefined } : v));
+        setUploadProgress(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+      };
+      xhr.open('PUT', uploadUrl);
+      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.send(file);
+    } catch {
+      toast('Dosya yüklenemedi', 'error');
+      setVideos(prev => prev.map(v => v.id === itemId ? { ...v, url: '', file: undefined } : v));
+      setUploadProgress(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+    }
   };
   const addFromLibrary = (items: SelectedContent[]) => {
     setVideos(prev => {
@@ -109,9 +198,7 @@ export default function NewTrainingPage() {
         pageCount: item.pageCount,
         documentKey: item.documentKey,
       }));
-      return filled.length === 0 && newItems.length === 0
-        ? [{ id: Date.now(), title: '', url: '', contentType: 'video' as const }]
-        : [...filled, ...newItems];
+      return [...filled, ...newItems];
     });
   };
   const removeVideo = (id: number) => setVideos(prev => prev.filter(v => v.id !== id));
@@ -464,70 +551,116 @@ export default function NewTrainingPage() {
           {/* Step 2: Content (Video + PDF + Audio) */}
           {currentStep === 2 && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
-                    <Layers className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Eğitim İçerikleri</h3>
-                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      {videos.filter(v => v.contentType === 'video').length} video, {videos.filter(v => v.contentType === 'audio').length} ses, {videos.filter(v => v.contentType === 'pdf').length} doküman eklendi
-                    </p>
-                  </div>
+              {/* Header */}
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
+                  <Layers className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
                 </div>
-                <div className="flex items-center gap-2">
-                  {/* Yeni Yükle — dropdown: Video / Ses */}
-                  <div className="relative">
-                    <Button
-                      onClick={() => setContentTypeMenu(prev => !prev)}
-                      variant="outline"
-                      className="gap-2 font-semibold rounded-xl"
-                      style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
-                    >
-                      <Plus className="h-4 w-4" /> Yeni Yükle <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                    </Button>
-                    {contentTypeMenu && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setContentTypeMenu(false)} />
-                        <div
-                          className="absolute right-0 top-full mt-1 z-50 rounded-xl border shadow-lg overflow-hidden"
-                          style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', minWidth: 180 }}
-                        >
-                          <button
-                            onClick={() => addContent('video')}
-                            className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-left hover:bg-[var(--color-surface-hover)]"
-                            style={{ color: 'var(--color-text-primary)' }}
-                          >
-                            <Video className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
-                            Video
-                          </button>
-                          <button
-                            onClick={() => addContent('audio')}
-                            className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-left hover:bg-[var(--color-surface-hover)]"
-                            style={{ color: 'var(--color-text-primary)', borderTop: '1px solid var(--color-border)' }}
-                          >
-                            <Music className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
-                            Ses Dosyası
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Kütüphaneden Seç — doğrudan modal */}
-                  <Button
-                    onClick={() => setLibraryModalOpen(true)}
-                    className="gap-2 font-semibold text-white rounded-xl"
-                    style={{ background: 'var(--color-primary)' }}
-                  >
-                    <Library className="h-4 w-4" /> Kütüphaneden Seç
-                  </Button>
+                <div>
+                  <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Eğitim İçerikleri</h3>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    {videos.filter(v => v.contentType === 'video').length} video, {videos.filter(v => v.contentType === 'audio').length} ses, {videos.filter(v => v.contentType === 'pdf').length} doküman eklendi
+                  </p>
                 </div>
               </div>
 
+              {/* Tabs: Dokümanlar / Medya */}
+              <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--color-surface)' }}>
+                <button
+                  onClick={() => setContentTab('documents')}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all"
+                  style={{
+                    background: contentTab === 'documents' ? 'var(--color-bg)' : 'transparent',
+                    color: contentTab === 'documents' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                    boxShadow: contentTab === 'documents' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  }}
+                >
+                  <FileText className="h-4 w-4" />
+                  Dokümanlar
+                  {videos.filter(v => v.contentType === 'pdf').length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'var(--color-primary)', color: 'white' }}>
+                      {videos.filter(v => v.contentType === 'pdf').length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setContentTab('media')}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all"
+                  style={{
+                    background: contentTab === 'media' ? 'var(--color-bg)' : 'transparent',
+                    color: contentTab === 'media' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                    boxShadow: contentTab === 'media' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  }}
+                >
+                  <Video className="h-4 w-4" />
+                  Medya
+                  {videos.filter(v => v.contentType === 'video' || v.contentType === 'audio').length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'var(--color-primary)', color: 'white' }}>
+                      {videos.filter(v => v.contentType === 'video' || v.contentType === 'audio').length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Tab action buttons */}
+              <div className="flex items-center gap-2">
+                {/* Hidden file inputs */}
+                <input
+                  ref={docFileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const newId = Date.now();
+                      setVideos(prev => [...prev, { id: newId, title: file.name.replace(/\.[^.]+$/, ''), url: '', contentType: 'pdf' as const }]);
+                      setTimeout(() => uploadFileToS3(newId, file), 0);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+                <input
+                  ref={mediaFileInputRef}
+                  type="file"
+                  accept="video/mp4,video/webm,.mp3,.wav,.m4a,.ogg,.aac,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/ogg,audio/aac"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const isAudio = file.type.startsWith('audio/');
+                      const newId = Date.now();
+                      setVideos(prev => [...prev, { id: newId, title: file.name.replace(/\.[^.]+$/, ''), url: '', contentType: isAudio ? 'audio' as const : 'video' as const }]);
+                      setTimeout(() => uploadFileToS3(newId, file), 0);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+
+                <Button
+                  onClick={() => contentTab === 'documents' ? docFileInputRef.current?.click() : mediaFileInputRef.current?.click()}
+                  variant="outline"
+                  className="gap-2 font-semibold rounded-xl"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                >
+                  <Upload className="h-4 w-4" />
+                  Bilgisayardan Yükle
+                </Button>
+                <Button
+                  onClick={() => setLibraryModalOpen(true)}
+                  className="gap-2 font-semibold text-white rounded-xl"
+                  style={{ background: 'var(--color-primary)' }}
+                >
+                  <Library className="h-4 w-4" />
+                  Kütüphaneden Seç
+                </Button>
+              </div>
+
+              {/* Content list — filtered by active tab */}
               <div className="space-y-4">
-                {videos.map((video, idx) => (
+                {videos
+                  .filter(v => contentTab === 'documents' ? v.contentType === 'pdf' : (v.contentType === 'video' || v.contentType === 'audio'))
+                  .map((video, idx) => (
                   <div
                     key={video.id}
                     className="rounded-xl border group"
@@ -559,7 +692,7 @@ export default function NewTrainingPage() {
                             {Math.floor(video.durationSeconds / 60)}:{String(video.durationSeconds % 60).padStart(2, '0')} dk
                           </span>
                         ) : null}
-                        {videos.length > 1 && (
+                        {videos.length > 0 && (
                           <button
                             onClick={() => removeVideo(video.id)}
                             className="rounded-lg p-2 opacity-0 group-hover:opacity-100"
@@ -609,88 +742,12 @@ export default function NewTrainingPage() {
                     >
                       <input
                         type="file"
-                        accept="video/mp4,video/webm,application/pdf"
+                        accept={video.contentType === 'pdf' ? 'application/pdf' : 'video/mp4,video/webm,application/pdf'}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const isPdf = file.type === 'application/pdf';
-                            const maxSize = isPdf ? 100 * 1024 * 1024 : 500 * 1024 * 1024;
-                            const maxLabel = isPdf ? '100MB' : '500MB';
-                            if (file.size > maxSize) {
-                              toast(`Dosya boyutu ${maxLabel} sınırını aşıyor`, 'error');
-                              return;
-                            }
-                            const detectedType: 'video' | 'pdf' = isPdf ? 'pdf' : 'video';
-                            setVideos(prev => prev.map(v => v.id === video.id ? { ...v, file, url: '', contentType: detectedType } : v));
-                            setUploadProgress(prev => ({ ...prev, [video.id]: 0 }));
-
-                            // PDF sayfa sayısını client-side çıkar
-                            if (isPdf) {
-                              try {
-                                const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
-                                GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs`;
-                                const arrayBuf = await file.arrayBuffer();
-                                const pdf = await getDocument({ data: new Uint8Array(arrayBuf) }).promise;
-                                setVideos(prev => prev.map(v => v.id === video.id ? { ...v, pageCount: pdf.numPages } : v));
-                              } catch {
-                                // Sayfa sayısı alınamazsa devam et
-                              }
-                            }
-
-                            // Presigned URL ile client-side S3 upload (Vercel body limit bypass)
-                            try {
-                              // 1. Presigned URL al
-                              setUploadProgress(prev => ({ ...prev, [video.id]: 5 }));
-                              const presignRes = await fetch('/api/upload/presign', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ fileName: file.name, contentType: file.type }),
-                              });
-                              if (!presignRes.ok) {
-                                const err = await presignRes.json();
-                                toast(err.error || 'Yükleme URL alınamadı', 'error');
-                                setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
-                                setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                                return;
-                              }
-                              const { uploadUrl, key } = await presignRes.json();
-
-                              // 2. Dosyayı doğrudan S3'e yükle (XHR ile progress tracking)
-                              const xhr = new XMLHttpRequest();
-                              xhr.upload.onprogress = (ev) => {
-                                if (ev.lengthComputable) {
-                                  const pct = Math.round((ev.loaded / ev.total) * 95);
-                                  setUploadProgress(prev => ({ ...prev, [video.id]: Math.max(5, pct) }));
-                                }
-                              };
-                              xhr.onload = () => {
-                                if (xhr.status >= 200 && xhr.status < 300) {
-                                  setUploadProgress(prev => ({ ...prev, [video.id]: 100 }));
-                                  setTimeout(() => {
-                                    setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: key, file } : v));
-                                    setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                                  }, 500);
-                                  toast(isPdf ? 'Doküman yüklendi' : 'Video yüklendi', 'success');
-                                } else {
-                                  toast('Dosya yüklenemedi', 'error');
-                                  setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
-                                  setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                                }
-                              };
-                              xhr.onerror = () => {
-                                toast('Dosya yüklenemedi — bağlantı hatası', 'error');
-                                setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
-                                setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                              };
-                              xhr.open('PUT', uploadUrl);
-                              xhr.setRequestHeader('Content-Type', file.type);
-                              xhr.send(file);
-                            } catch {
-                              toast('Dosya yüklenemedi', 'error');
-                              setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
-                              setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                            }
+                            uploadFileToS3(video.id, file);
                           }
                         }}
                       />
@@ -749,7 +806,7 @@ export default function NewTrainingPage() {
                               Dosyayı sürükleyin veya tıklayıp seçin
                             </p>
                             <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                              Video (MP4, WebM — Maks. 500MB) veya PDF (Maks. 100MB)
+                              {video.contentType === 'pdf' ? 'PDF — Maks. 100MB' : 'Video (MP4, WebM — Maks. 500MB) veya PDF (Maks. 100MB)'}
                             </p>
                           </>
                         )}
@@ -797,77 +854,7 @@ export default function NewTrainingPage() {
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              if (file.size > 200 * 1024 * 1024) {
-                                toast('Ses dosyası boyutu 200MB sınırını aşıyor', 'error');
-                                return;
-                              }
-                              setVideos(prev => prev.map(v => v.id === video.id ? { ...v, file, url: '' } : v));
-                              setUploadProgress(prev => ({ ...prev, [video.id]: 0 }));
-
-                              // HTML5 Audio ile süre tespiti
-                              try {
-                                const objectUrl = URL.createObjectURL(file);
-                                const audioEl = new Audio(objectUrl);
-                                audioEl.onloadedmetadata = () => {
-                                  setVideos(prev => prev.map(v => v.id === video.id
-                                    ? { ...v, durationSeconds: Math.round(audioEl.duration) } : v));
-                                  URL.revokeObjectURL(objectUrl);
-                                };
-                                audioEl.onerror = () => URL.revokeObjectURL(objectUrl);
-                              } catch {
-                                // Süre alınamazsa devam et
-                              }
-
-                              // Presigned URL ile client-side S3 upload
-                              try {
-                                setUploadProgress(prev => ({ ...prev, [video.id]: 5 }));
-                                const presignRes = await fetch('/api/upload/presign', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ fileName: file.name, contentType: file.type }),
-                                });
-                                if (!presignRes.ok) {
-                                  const err = await presignRes.json();
-                                  toast(err.error || 'Yükleme URL alınamadı', 'error');
-                                  setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
-                                  setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                                  return;
-                                }
-                                const { uploadUrl, key } = await presignRes.json();
-                                const xhr = new XMLHttpRequest();
-                                xhr.upload.onprogress = (ev) => {
-                                  if (ev.lengthComputable) {
-                                    const pct = Math.round((ev.loaded / ev.total) * 95);
-                                    setUploadProgress(prev => ({ ...prev, [video.id]: Math.max(5, pct) }));
-                                  }
-                                };
-                                xhr.onload = () => {
-                                  if (xhr.status >= 200 && xhr.status < 300) {
-                                    setUploadProgress(prev => ({ ...prev, [video.id]: 100 }));
-                                    setTimeout(() => {
-                                      setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: key, file } : v));
-                                      setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                                    }, 500);
-                                    toast('Ses dosyası yüklendi', 'success');
-                                  } else {
-                                    toast('Ses dosyası yüklenemedi', 'error');
-                                    setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
-                                    setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                                  }
-                                };
-                                xhr.onerror = () => {
-                                  toast('Ses dosyası yüklenemedi — bağlantı hatası', 'error');
-                                  setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
-                                  setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                                };
-                                xhr.open('PUT', uploadUrl);
-                                xhr.setRequestHeader('Content-Type', file.type);
-                                xhr.send(file);
-                              } catch {
-                                toast('Ses dosyası yüklenemedi', 'error');
-                                setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
-                                setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                              }
+                              uploadFileToS3(video.id, file);
                             }
                           }}
                         />
@@ -1043,6 +1030,27 @@ export default function NewTrainingPage() {
                     )}
                   </div>
                 ))}
+                {/* Empty state for current tab */}
+                {videos.filter(v => contentTab === 'documents' ? v.contentType === 'pdf' : (v.contentType === 'video' || v.contentType === 'audio')).length === 0 && (
+                  <div
+                    className="flex flex-col items-center justify-center py-12 rounded-xl border-2 border-dashed"
+                    style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
+                  >
+                    {contentTab === 'documents' ? (
+                      <FileText className="h-10 w-10 mb-3" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
+                    ) : (
+                      <Video className="h-10 w-10 mb-3" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
+                    )}
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                      {contentTab === 'documents' ? 'Henüz doküman eklenmedi' : 'Henüz medya eklenmedi'}
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)', opacity: 0.7 }}>
+                      {contentTab === 'documents'
+                        ? 'PDF dosyası yükleyin veya kütüphaneden seçin'
+                        : 'Video veya ses dosyası yükleyin veya kütüphaneden seçin'}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Content Library Modal */}
@@ -1050,6 +1058,7 @@ export default function NewTrainingPage() {
                 open={libraryModalOpen}
                 onClose={() => setLibraryModalOpen(false)}
                 onSelect={addFromLibrary}
+                defaultFilter={contentTab === 'documents' ? 'pdf' : 'all'}
               />
             </div>
           )}

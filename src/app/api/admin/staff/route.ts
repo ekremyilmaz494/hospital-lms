@@ -40,7 +40,8 @@ export async function GET(request: Request) {
     if (department) where.department = department
     if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 
-    const [staff, total, rawDepartments, activeStaff] = await Promise.all([
+    // Tek dalgalı Promise.all — tüm sorgular paralel
+    const [staff, total, rawDepartments, activeStaff, completedCounts, avgScores] = await Promise.all([
       prisma.user.findMany({
         where,
         include: {
@@ -57,22 +58,17 @@ export async function GET(request: Request) {
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
       prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
-    ])
-
-    // Staff ID'leri ile toplu olarak completed count ve avg score hesapla (N+1 yerine 2 sorgu)
-    const staffIds = staff.map(s => s.id)
-    const [completedCounts, avgScores] = staffIds.length > 0 ? await Promise.all([
       prisma.trainingAssignment.groupBy({
         by: ['userId'],
-        where: { userId: { in: staffIds }, status: 'passed' },
+        where: { user: { organizationId: orgId, role: 'staff' }, status: 'passed' },
         _count: true,
       }),
       prisma.examAttempt.groupBy({
         by: ['userId'],
-        where: { userId: { in: staffIds }, isPassed: true },
+        where: { user: { organizationId: orgId, role: 'staff' }, isPassed: true },
         _avg: { postExamScore: true },
       }),
-    ]) : [[], []]
+    ])
 
     const completedMap = new Map(completedCounts.map(c => [c.userId, c._count]))
     const avgScoreMap = new Map(avgScores.map(a => [a.userId, Math.round(Number(a._avg.postExamScore ?? 0))]))

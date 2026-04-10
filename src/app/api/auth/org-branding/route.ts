@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { getCached, setCached } from '@/lib/redis'
 
 /**
  * GET /api/auth/org-branding
@@ -16,34 +17,41 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const userId = session.user.id
+    const cacheKey = `org-branding:${userId}`
+
+    // Redis cache — branding nadiren değişir (10 dk TTL)
+    const cached = await getCached<object>(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached, {
+        headers: { 'Cache-Control': 'private, max-age=300' },
+      })
+    }
+
+    // Tek sorgu: user → organization join ile
     const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { organizationId: true },
-    })
-
-    if (!dbUser?.organizationId) {
-      return NextResponse.json({ error: 'Organizasyon bulunamadi' }, { status: 404 })
-    }
-
-    const org = await prisma.organization.findUnique({
-      where: { id: dbUser.organizationId },
+      where: { id: userId },
       select: {
-        name: true,
-        code: true,
-        logoUrl: true,
-        brandColor: true,
-        secondaryColor: true,
+        organization: {
+          select: {
+            name: true,
+            code: true,
+            logoUrl: true,
+            brandColor: true,
+            secondaryColor: true,
+          },
+        },
       },
     })
 
-    if (!org) {
+    if (!dbUser?.organization) {
       return NextResponse.json({ error: 'Organizasyon bulunamadi' }, { status: 404 })
     }
 
-    return NextResponse.json(org, {
-      headers: {
-        'Cache-Control': 'private, max-age=300',
-      },
+    await setCached(cacheKey, dbUser.organization, 600)
+
+    return NextResponse.json(dbUser.organization, {
+      headers: { 'Cache-Control': 'private, max-age=300' },
     })
   } catch {
     return NextResponse.json({ error: 'Sunucu hatasi' }, { status: 500 })

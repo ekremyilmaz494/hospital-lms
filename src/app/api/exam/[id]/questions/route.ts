@@ -69,12 +69,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     orderBy: { sortOrder: 'asc' },
   })
 
-  // Soru karıştırma (examOnly + randomizeQuestions)
-  if (training.examOnly && training.randomizeQuestions) {
-    questions = shuffle(questions)
-    if (training.randomQuestionCount && training.randomQuestionCount > 0 && training.randomQuestionCount < questions.length) {
-      questions = questions.slice(0, training.randomQuestionCount)
-    }
+  // Tüm eğitimlerde soru sırası karıştır (pre + post exam)
+  questions = shuffle(questions)
+
+  // examOnly sınavlarda rastgele soru sayısı limiti
+  if (training.examOnly && training.randomQuestionCount && training.randomQuestionCount > 0 && training.randomQuestionCount < questions.length) {
+    questions = questions.slice(0, training.randomQuestionCount)
   }
 
   return jsonResponse({
@@ -83,8 +83,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     totalTime: training.examDurationMinutes * 60,
     questions: questions.map((q, idx) => {
       const savedOptionId = savedMap.get(q.id)
-      // Şık karıştırma (examOnly sınavlarda her zaman)
-      const rawOptions = training.examOnly ? shuffle(q.options) : q.options
+      // Tüm eğitimlerde şık sırası karıştır
+      const rawOptions = shuffle(q.options)
       const options = rawOptions.map((o, oIdx) => ({
         id: String.fromCharCode(97 + oIdx), // a, b, c, d
         optionId: o.id,
@@ -100,5 +100,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         savedAnswer,
       }
     }),
-  })
+  }, 200, { 'Cache-Control': 'no-store' })
 }
