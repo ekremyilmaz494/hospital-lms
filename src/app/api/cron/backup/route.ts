@@ -152,7 +152,7 @@ export async function GET(request: Request) {
           <p><strong>Başarısız:</strong> ${failures.length}</p>
           <ul>${failures.map(f => `<li>${f}</li>`).join('')}</ul>
           <p>Lütfen S3 erişimi ve veritabanı bağlantısını kontrol edin.</p>`,
-      }).catch(() => { /* Email hatası cron'u durdurmasın */ })
+      }).catch(err => logger.warn('BackupCron', 'Backup uyari emaili gonderilemedi', (err as Error).message))
     }
   }
 
