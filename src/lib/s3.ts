@@ -63,18 +63,26 @@ export async function getStreamUrl(key: string) {
   const keyPairId = process.env.AWS_CLOUDFRONT_KEY_PAIR_ID
   const privateKey = process.env.AWS_CLOUDFRONT_PRIVATE_KEY
 
-  // CloudFront configured → signed URL
-  if (domain && keyPairId && privateKey && !domain.includes('your-')) {
-    const url = `${domain.startsWith('http') ? domain : `https://${domain}`}/${key}`
+  const cfUrl = domain && !domain.includes('your-')
+    ? `${domain.startsWith('http') ? domain : `https://${domain}`}/${key}`
+    : null
+
+  // CloudFront configured with signing keys → signed URL
+  if (cfUrl && keyPairId && privateKey) {
     return getCloudfrontSignedUrl({
-      url,
+      url: cfUrl,
       keyPairId,
       privateKey: privateKey.replace(/\\n/g, '\n'),
       dateLessThan: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
     })
   }
 
-  // Fallback → S3 presigned download URL
+  // CloudFront configured but no signing keys → direct URL (public distribution)
+  if (cfUrl) {
+    return cfUrl
+  }
+
+  // No CloudFront at all → S3 presigned download URL
   return getDownloadUrl(key)
 }
 
