@@ -203,7 +203,7 @@ export default function StaffDetailPage() {
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: 'var(--color-info-bg)' }}>
                     <GraduationCap className="h-6 w-6" style={{ color: 'var(--color-info)' }} />
                   </div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Henüz eğitim atanmamış</p>
+                  <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Bu personele henüz eğitim atanmadı.</p>
                   <Button variant="outline" size="sm" className="gap-2 rounded-lg" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }} onClick={() => setAssignModalOpen(true)}>
                     <Plus className="h-3.5 w-3.5" /> Eğitim Ata
                   </Button>

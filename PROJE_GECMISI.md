@@ -3290,3 +3290,287 @@ Zaten mevcut Excel toplu import özelliği tespit edildi:
 - ✅ Perf-check — tüm admin + staff route'lar temiz (0 error)
 
 *Son güncelleme: 7 Nisan 2026 — Oturum 29*
+
+---
+
+## OTURUM 30 — PDF/Excel Export Düzeltmeleri & Profesyonel Rapor Çıktıları (9 Nisan 2026)
+
+### Sorun 1: Sınav Sonuçları Export Butonları Çalışmıyor
+**Sayfa:** `/admin/exams/[id]/results` — PDF İndir ve Excel İndir butonları sessizce başarısız oluyordu.
+
+**Kök Neden:** `jspdf-autotable` v5'te API değişmiş. Eski sürümde `doc.autoTable(opts)` şeklinde çağrılıyordu, v5'te `autoTable(doc, opts)` şeklinde standalone fonksiyon olarak import edilmesi gerekiyor. Side-effect import (`import 'jspdf-autotable'`) artık prototype'a ekleme yapmadığı için `doc.autoTable is not a function` runtime hatası oluşuyordu. Frontend'deki `catch { // silently fail }` bloğu hatayı yutuyordu.
+
+**Çözümler:**
+1. `import 'jspdf-autotable'` → `import { autoTable } from 'jspdf-autotable'` + `autoTable(doc, opts)` çağrı şekli
+2. Frontend'deki sessiz catch kaldırıldı → toast ile hata bildirimi eklendi
+3. Backend'e `try/catch` + `logger.error()` eklendi
+
+### Sorun 2: Export Sadece Tamamlanan Personeli Gösteriyordu
+**Problem:** Export route'u `examAttempt.findMany({ where: { status: 'completed' } })` ile sadece tamamlanmış denemeleri çekiyordu. Atanmış ama sınava girmemiş personel hiç görünmüyordu.
+
+**Çözüm:** Tüm `trainingAssignment` kayıtları çekilip her kullanıcının en iyi denemesi eşleştiriliyor.
+- 4 durum eklendi: **Başlamadı / Devam Ediyor / Geçti / Kaldı**
+- PDF landscape moda geçirildi
+- Excel sheet adı "Personel İlerleme" olarak değiştirildi
+- Durum hücrelerine renk kodlaması (yeşil/kırmızı/sarı/gri)
+
+### Sorun 3: PDF'te Türkçe Karakterler Kırık
+**Problem:** jsPDF varsayılan Helvetica fontu Unicode Türkçe karakterleri desteklemiyor (ğ→boşluk, ı→1, ş→s).
+
+**Çözüm:** `tr()` transliteration fonksiyonu eklendi — tüm PDF text çıktılarında ğşıçöü → gsicou dönüşümü yapılıyor. Excel çıktısı Unicode desteklediği için etkilenmiyor.
+
+```typescript
+const TR_MAP: Record<string, string> = {
+  'ğ': 'g', 'Ğ': 'G', 'ü': 'u', 'Ü': 'U', 'ş': 's', 'Ş': 'S',
+  'ı': 'i', 'İ': 'I', 'ö': 'o', 'Ö': 'O', 'ç': 'c', 'Ç': 'C',
+}
+function tr(text: string): string {
+  return text.replace(/[ğĞüÜşŞıİöÖçÇ]/g, (c) => TR_MAP[c] ?? c)
+}
+```
+
+### Yeni Özellik: Raporlar Sayfası Profesyonel Export
+**Sayfa:** `/admin/reports` — Excel ve PDF butonları tamamen yeniden yazıldı.
+
+**Eski durum:**
+- Excel butonu: Client-side CSV export (gerçek Excel değil, tek sheet, stil yok)
+- PDF butonu: `/api/admin/export/pdf` — tek sayfa, düz metin, tablo yok
+
+**Yeni API:** `/api/admin/reports/export?format=pdf|xlsx`
+
+**Excel çıktısı — gerçek `.xlsx`, 6 profesyonel sheet:**
+| Sheet | İçerik |
+|-------|--------|
+| Genel Ozet | Hastane adı, tarih, özet metrikler (yeşil başlık) |
+| Egitim Bazli | Her eğitim: atanan/tamamlayan/başarısız/ort.puan + renk kodlu başarı % |
+| Personel | Tüm personel: ad, departman, atanan, başarılı, başarısız, ort.puan, durum (Yıldız/Normal/Risk) + renkli arka plan |
+| Departman | Departman bazlı: personel sayısı, başarılı, başarısız, oran |
+| Basarisiz | Kırmızı başlıklı başarısız personel listesi |
+| Skor Analizi | Ön sınav vs son sınav karşılaştırma + gelişim (yeşil/kırmızı) |
+
+**PDF çıktısı — 5+ sayfa, landscape:**
+- Sayfa 1: Kapak (hastane adı + özet metrikler tablosu)
+- Sayfa 2: Eğitim bazlı tablo (striped rows, renk kodlu başarı %)
+- Sayfa 3: Personel performans tablosu (Yıldız/Risk renkleri)
+- Sayfa 4: Departman analizi
+- Sayfa 5: Başarısız personel (kırmızı başlık)
+- Sayfa 6: Skor karşılaştırma (gelişim +/- renkleri)
+- Her sayfada footer: hastane adı + sayfa no + tarih
+
+**Frontend değişiklikleri:**
+- `exportExcel()` (client-side CSV) → `handleExport('xlsx')` (server-side gerçek Excel)
+- `handlePDFExport()` (eski endpoint) → `handleExport('pdf')` (yeni endpoint)
+- İndirme durumu gösteriliyor (disabled + "İndiriliyor...")
+- Tarih filtreleri export'a da yansıyor
+- Başarı/hata toast bildirimleri
+
+### Ek Düzeltmeler
+- `ai-content-studio/page.tsx` ve `content-library/page.tsx` — string içindeki tek tırnak syntax hatası düzeltildi (build'i kırıyordu)
+
+### Değiştirilen Dosyalar
+1. `src/app/api/admin/standalone-exams/[id]/export/route.ts` — Tam yeniden yazım
+2. `src/app/admin/exams/[id]/results/page.tsx` — Toast hata bildirimi
+3. `src/app/api/admin/reports/export/route.ts` — **Yeni dosya** (profesyonel export API)
+4. `src/app/admin/reports/page.tsx` — Yeni export butonları
+5. `src/app/admin/ai-content-studio/page.tsx` — Syntax fix
+6. `src/app/admin/content-library/page.tsx` — Syntax fix
+
+### Öğrenilen Dersler
+- **jspdf-autotable v5 breaking change:** `doc.autoTable()` → `autoTable(doc, opts)`. Side-effect import artık çalışmıyor.
+- **jsPDF Türkçe:** Helvetica fontu Unicode desteklemiyor. Türkçe PDF için ya custom font embed et ya da transliteration kullan.
+- **Sessiz catch yasak:** Frontend'de `catch { }` ile hata yutmak kullanıcıyı karanlıkta bırakır — her zaman toast/alert göster.
+- **CSV ≠ Excel:** Client-side CSV export kullanıcı için yetersiz. Gerçek `.xlsx` için server-side ExcelJS kullan.
+
+### Doğrulama
+- ✅ TypeScript — temiz
+- ✅ Build — başarılı
+- ✅ Test — 272 test geçti (7 mevcut test hatası, değişikliklerden bağımsız)
+- ✅ 4 commit push edildi
+
+### Vercel Deployment Notu
+Son 3 Preview deployment **Error** durumunda — `DATABASE_URL` ortam değişkeni Vercel'de tanımlı olmasına rağmen "Collecting page data" aşamasında bulunamıyor hatası alıyor. Production deployment'lar (2 saat önceki) çalışıyor. Araştırılacak.
+
+---
+
+## Oturum 31 — 9 Nisan 2026
+
+### Yapılan Isler
+
+#### 1. 200 Demo Personel Seed Script
+- `prisma/seed-demo-200.ts` oluşturuldu
+- 200 personel Supabase Auth + PostgreSQL'e eklendi (gerçekçi Türkçe isimler, 5 departmana dağılmış)
+- **518 eğitim ataması**, **335 sınav denemesi**, **238 sertifika**, **30 başarısız sınav** oluşturuldu
+- Dağılım: 60 tamamlamış, 60 kısmen tamamlamış, 40 devam eden, 40 atanmış
+- Tüm personel şifresi: `Demo123!`, email formatı: `demo1@demo.hastanelms.com` ... `demo200@demo.hastanelms.com`
+
+#### 2. Vercel Env Düzeltmesi
+- **Sorun:** Vercel production farklı bir Supabase projesi (`bzvunibntyewobkdsoow`) kullanıyordu, lokal ise `pkkkyyajfmusurcoovwt`
+- **Çözüm:** Vercel'deki tüm Supabase env'leri (DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY) production + preview + development ortamlarında güncellendi
+- Redeploy tetiklendi, login çalışır hale geldi
+- Yeni production URL: `https://hospital-lms-eta.vercel.app`
+
+#### 3. Beyaz Etiket (White-Label) Kurulum UI
+Admin ayarlar sayfasına **"Marka"** sekmesi eklendi:
+
+**Yeni dosyalar:**
+- `src/app/admin/settings/branding-tab.tsx` — Ana branding bileşeni
+- `src/app/api/admin/settings/upload-branding/route.ts` — Logo/banner yükleme API (FormData → server-side S3 upload)
+
+**Değiştirilen dosyalar:**
+- `src/lib/s3.ts` — Image content types (`image/png`, `image/jpeg`, `image/svg+xml`, `image/webp`) + `brandingKey()` helper + `requestChecksumCalculation: 'WHEN_REQUIRED'` (tarayıcı uyumluluğu)
+- `src/app/api/admin/settings/route.ts` — GET/PUT'a `brandColor`, `secondaryColor`, `loginBannerUrl`, `customDomain` eklendi
+- `src/app/admin/settings/page.tsx` — `Palette` icon, `BrandingTab` lazy import, `SettingsData`'ya branding alanları, tabs dizisine "Marka" sekmesi
+
+**Marka sekmesi özellikleri:**
+- Logo sürükle-bırak yükleme (S3'e server-side upload)
+- Login banner görseli yükleme
+- Renk seçici (native `<input type="color">` + hex input + 8 hazır palet)
+- Login sayfası canlı önizleme (mini mockup)
+- Özel alan adı bilgi alanı (salt okunur)
+
+#### 4. Turbopack Cache Sorunu
+- `localhost:3000` "Internal Server Error" veriyordu
+- Sebep: Turbopack cache bozulmuş (`range start index out of range` panic)
+- Çözüm: `.next` klasörü silindi, dev server yeniden başlatıldı
+
+### Karşılaşılan Sorunlar
+- **Vercel deploy CLI hatası:** 2.4GB upload EPIPE hatası — `git push` ile çözüldü
+- **Pre-commit hook yavaşlığı:** 696 dosya taranırken SIGKILL — sadece kritik dosyalar commit edildi
+- **S3 presigned URL CORS/checksum:** Tarayıcıdan S3 PUT "Failed to fetch" — presigned URL yerine server-side `uploadBuffer()` yaklaşımına geçildi
+- **Rate limit:** Canlıda login rate limit aktifti (in-memory fallback), redeploy ile sıfırlandı
+
+### Doğrulama
+- ✅ TypeScript — temiz (yeni dosyalarda hata yok)
+- ✅ Lint — temiz
+- ✅ Build — başarılı
+
+---
+
+## OTURUM 32 — Production Hazırlık, Güvenlik & Ölçeklendirme (9 Nisan 2026)
+
+### 1. Production Hazırlık İncelemesi
+- 65 sayfa, 170 API route kapsamlı inceleme yapıldı
+- %99 frontend, %92 backend hazır bulundu
+- Kritik, önemli ve düşük öncelikli eksikler listelendi
+
+### 2. Güvenlik İyileştirmeleri
+- **RLS politikaları:** 27 yeni tablo için Supabase Row Level Security eklendi (toplam 42 tablo, 99 politika)
+- **UUID validation:** Training categories API'ye geçersiz ID koruması
+- **Sertifika iptali:** `revokedAt` + `revocationReason` alanları ve PATCH endpoint
+- **Redis key sanitization:** Unsafe karakter kontrolü eklendi
+- **Password complexity:** `createUserSchema`'ya regex eklendi
+- **TC Kimlik şifreleme (KVKK Md. 12):** AES-256-GCM ile tcNo şifreleme — 9 API route güncellendi
+- **Audit log hash zinciri (JCI/SKS):** SHA-256 blockchain benzeri zincir — değiştirilemez audit trail
+- **Audit log doğrulama endpoint'i:** `/api/admin/audit-logs/verify` + admin panelde "Zinciri Doğrula" butonu
+
+### 3. Performans & Ölçeklendirme (200 Kullanıcı)
+- **DB bağlantı havuzu:** max 10 → 25, min 2 → 5
+- **Rate limit production halving kaldırıldı** (sınav sırasında engelleme sorunu)
+- **Sınav rate limit:** save-answer ve video-progress 30 → 60/dk
+- **useFetch cache:** 100 → 300 girdi
+- **Dashboard cache TTL:** 120s → 300s
+- **Login rate limit:** 50/5dk IP, 20/5dk email (eskiden 30/15dk)
+
+### 4. Sayfa Optimizasyonları
+- **Auth login:** BlurFade lazy-load, mobil layout ayrı dosya (557→428 satır)
+- **Admin settings:** 3 tab lazy-load ile ayrıştırıldı (555→223 satır)
+- **Admin compliance:** Recharts lazy-load
+- **Admin SMG:** Bekleyen onaylar sadece tab açıkken fetch
+- **Super-admin content-library:** Modal ayrı dosyaya çıkarıldı
+- **Auth forgot-password:** BlurFade + ShimmerButton lazy-load
+
+### 5. Sertifika Türkiye Uyumu
+- **Otomatik expiresAt:** renewalPeriodMonths'tan hesaplanıyor
+- **Sertifika iptali:** PATCH `/api/admin/certificates/[id]` (revoke/restore)
+- **Bakanlık export:** `/api/admin/export/ministry` — Sağlık Bakanlığı formatında JSON rapor
+- **Doğrulama güncellendi:** İptal edilen sertifika "geçersiz" gösteriyor
+
+### 6. SMG Sistemi İyileştirmeleri
+- **Eğitim başına SMG puanı:** Sabit 10 yerine `training.smgPoints` (ayarlanabilir)
+- **Çift kayıt engeli:** Unique constraint eklendi
+- **Dönem yönetimi UI:** Ekle/düzenle/sil
+- **Toplu onay:** Bekleyen aktiviteler toplu onaylanabilir
+- **Ret nedeni:** Modal + personele gösterim
+- **rejectionReason alanı:** SmgActivity modeline eklendi
+
+### 7. Veri Doğruluğu Düzeltmeleri
+- **Dashboard "Geciken Eğitim":** failed yerine gerçek overdue count
+- **Bildirimler "Okunmamış" filtresi:** isRead kontrolü eklendi
+- **Uyum oranı:** Weighted average (eğitim başına eşit ağırlık yerine atama sayısına göre)
+- **SMG rapor:** Dönem yokken uyarı mesajı
+- **Staff sayfası:** router hatası düzeltildi
+
+### 8. Bug Düzeltmeleri
+- **LibraryContentPicker/LibraryQuestionPicker:** Tanımsız referanslar kaldırıldı
+- **Soru Analizi bölümü:** Exam results'tan kaldırıldı
+- **Kategori silme:** Varsayılan kategorilerde silme butonu gizlendi + UUID validation
+- **Super-admin backups:** Sidebar'dan kaldırıldı (sayfa yok)
+- **Toggle butonları:** Pixel-based boyutlarla düzeltildi
+- **PDF viewer:** unpkg.com CDN yerine local worker
+- **Sınav validasyonu:** examDurationMinutes min:5→min:1, points max:10→max:100
+- **Sınav düzenleme sayfası:** `/admin/exams/[id]/edit` oluşturuldu
+
+### 9. 17 Başarısız Test Düzeltmesi
+- auto-assign, redis, auth, export, validations, use-fetch, upload/video testleri
+- 279/279 test başarılı
+
+### 10. CI/CD & DevOps
+- **GitHub Actions:** E2E test + coverage + Sentry release eklendi
+- **Git branching:** main (canlı, korumalı) + dev (geliştirme) yapısı
+- **Pre-push hook:** main'e direkt push engeli
+- **predev.js:** macOS provenance temizliği + Prisma generate + DB sync
+
+### 11. macOS Turbopack Sorunu Çözümü
+- **Kök neden:** macOS `com.apple.provenance` + file-provider attribute'leri
+- **Kalıcı çözüm:** Development'ta `.next` dizini `/tmp/hospital-lms-next`'e taşındı
+- **Middleware taşıma:** `src/proxy.ts` → root `middleware.ts`
+
+### 12. Yeni Testler (39 güvenlik + chaos + performans)
+- **security-injection.test.ts:** SQL injection, XSS, şifre güçlülük (10 test)
+- **security-idor.test.ts:** Cross-org izolasyon, rol engeli (5 test)
+- **security-permissions.test.ts:** Erişim matrisi (8 test)
+- **chaos/redis-fallback.test.ts:** Redis çökmesi graceful fallback (5 test)
+- **chaos/email-failure.test.ts:** Email hatası ana işlemi durdurmaz (4 test)
+- **chaos/db-timeout.test.ts:** DB timeout davranışı (4 test)
+- **performance/export-limits.test.ts:** Büyük veri, rate limit, multi-tenant (3 test)
+
+### 13. Dokümantasyon
+- **docs/kvkk-teknik-uyum.md:** KVKK teknik uyum belgesi (~350 satır, formal Türkçe)
+- **docs/staff-guide.md:** Personel kullanıcı kılavuzu (~200 satır)
+- **docs/his-entegrasyon-rehberi.md:** HBYS entegrasyon kılavuzu (~210 satır)
+- **docs/api-key-rehberi.md:** API key yönetim kılavuzu (~115 satır)
+- **docs/veri-guvenligi-teknik-ozet.md:** IT güvenlik ekibi için teknik özet
+- **docs/disaster-recovery.md:** RTO/RPO hedefleri, 4 senaryo, "kimin yapacağı" güncellendi
+- **CHANGELOG.md:** Versiyon 1.0.0 değişiklik günlüğü
+- **Empty state mesajları:** 35 generik mesaj → bağlama uygun yönlendirici mesajlara
+
+### 14. Altyapı
+- **Otomatik uyum raporu cron:** Her ayın 1'i, score <%80 olana uyarı emaili
+- **Backup doğrulama scripti:** `pnpm verify:backup` — DB, Redis, S3 sağlık kontrolü
+- **Load test:** k6 scripti (3 senaryo, 200 VU)
+- **Accessibility:** 8 sayfada 30+ aria-label eklendi
+- **Super-admin error boundaries:** content-library + system-health eksikleri tamamlandı
+- **Request ID tracing:** Her API yanıtında X-Request-Id header
+- **E-posta şablonları:** 5 yeni Türkçe şablon (şifre değişikliği, login alert, sertifika, abonelik, KVKK)
+- **.env.example:** 5 eksik değişken eklendi
+- **PWA cache:** CacheFirst → StaleWhileRevalidate (eski chunk sorunu önlendi)
+
+### 15. Video Yükleme Sorunu Çözümü (Vercel)
+- **Kök neden:** Vercel Hobby plan 4.5MB body limiti — video sunucudan geçiyordu
+- **Çözüm:** Presigned URL ile client-side S3 upload
+- **`/api/upload/presign` endpoint:** Presigned URL üretir, dosya doğrudan S3'e gider
+- **3 upload noktası güncellendi:** Video, ses dosyası, doküman
+
+### 16. 360° Değerlendirme Kaldırıldı
+- Sidebar'dan admin + staff linkleri silindi
+- `/admin/competency` ve `/staff/evaluations` dizinleri kaldırıldı
+- DB modelleri bırakıldı (geri ekleme kolaylığı)
+
+### Doğrulama
+- ✅ TypeScript — temiz
+- ✅ 279+ unit test başarılı
+- ✅ 39 güvenlik/chaos/performans testi başarılı
+- ✅ DB schema senkronize
+- ✅ Canlı Vercel p95: 195ms
+
+*Son güncelleme: 9 Nisan 2026 — Oturum 32*

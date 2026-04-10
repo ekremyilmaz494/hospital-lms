@@ -4,6 +4,7 @@ import { getAuthUser, getAuthUserWithWriteGuard, requireRole, jsonResponse, erro
 import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { maskeTcNo } from '@/lib/utils'
+import { encrypt, safeDecryptTcNo } from '@/lib/crypto'
 import { z } from 'zod/v4'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -41,7 +42,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       lastName: staff.lastName,
       email: staff.email,
       phone: staff.phone ?? '',
-      tcNo: maskeTcNo(staff.tcNo),
+      tcNo: maskeTcNo(safeDecryptTcNo(staff.tcNo)),
       department: departmentName,
       departmentId: staff.departmentId,
       title: staff.title ?? '',
@@ -89,7 +90,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     firstName: staff.firstName,
     lastName: staff.lastName,
     email: staff.email,
-    tcNo: maskeTcNo(staff.tcNo),
+    tcNo: maskeTcNo(safeDecryptTcNo(staff.tcNo)),
     department: departmentName,
     departmentId: staff.departmentId,
     title: staff.title ?? '',
@@ -150,7 +151,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
   if (!existing) return errorResponse('Personel bulunamadı', 404)
 
-  const dataToUpdate = { ...parsed.data }
+  const dataToUpdate: Record<string, unknown> = { ...parsed.data }
+  if (dataToUpdate.tcNo) {
+    dataToUpdate.tcNo = encrypt(dataToUpdate.tcNo as string)
+  }
   if (dataToUpdate.departmentId) {
     // B4.2/G4.2 — Departmanın bu organizasyona ait olduğunu doğrula
     const dept = await prisma.department.findFirst({

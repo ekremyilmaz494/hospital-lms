@@ -352,7 +352,7 @@ export default function ExamsPage() {
       size: 50,
       cell: ({ row }) => (
         <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md hover:bg-accent hover:text-accent-foreground">
+          <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md hover:bg-accent hover:text-accent-foreground" aria-label="Sınav işlemleri">
             <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -431,6 +431,8 @@ export default function ExamsPage() {
               <button
                 key={f.key}
                 onClick={() => setStatusFilter(f.key)}
+                aria-label={`Filtrele: ${f.label}`}
+                aria-pressed={statusFilter === f.key}
                 className="rounded-full px-3 py-1 text-[11px] font-semibold"
                 style={{
                   background: isActive ? 'var(--color-primary-light)' : 'transparent',
@@ -475,6 +477,7 @@ export default function ExamsPage() {
               setStatusFilter('all');
               setCategoryFilter(null);
             }}
+            aria-label="Filtreleri temizle"
             className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
             style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
           >

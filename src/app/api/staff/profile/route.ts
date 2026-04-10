@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
+import { safeDecryptTcNo } from '@/lib/crypto'
 
 export async function GET() {
   const { dbUser, error } = await getAuthUser()
@@ -28,7 +29,7 @@ export async function GET() {
     hospital: profile.organization?.name ?? '',
     department: profile.departmentRel?.name ?? '',
     title: profile.title ?? '',
-    tcKimlik: profile.tcNo ?? '',
+    tcKimlik: safeDecryptTcNo(profile.tcNo) ?? '',
     avatarUrl: profile.avatarUrl ?? '',
     stats: {
       assignments: profile._count.assignments,

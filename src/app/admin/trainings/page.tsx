@@ -212,7 +212,7 @@ export default function TrainingsPage() {
       size: 50,
       cell: ({ row }) => (
         <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md hover:bg-accent hover:text-accent-foreground">
+          <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md hover:bg-accent hover:text-accent-foreground" aria-label="Eğitim işlemleri">
               <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -294,6 +294,8 @@ export default function TrainingsPage() {
               <button
                 key={key}
                 onClick={() => setStatusFilter(isActive ? null : key)}
+                aria-label={`Filtrele: ${cfg.label}`}
+                aria-pressed={isActive}
                 className="rounded-full px-3 py-1 text-[11px] font-semibold"
                 style={{
                   background: isActive ? cfg.bg : 'transparent',
@@ -312,6 +314,7 @@ export default function TrainingsPage() {
         {activeFilters > 0 && (
           <button
             onClick={() => { setStatusFilter(null); setCategoryFilter(null); }}
+            aria-label="Filtreleri temizle"
             className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
             style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
           >
@@ -328,7 +331,7 @@ export default function TrainingsPage() {
         {filteredTrainings.length > 0 ? (
           <DataTable columns={columns} data={filteredTrainings} searchKey="title" searchPlaceholder="Eğitim adı veya kategori ara..." />
         ) : (
-          <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+          <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz eğitim oluşturulmadı. İlk eğitimi ekleyerek başlayın.</div>
         )}
       </div>
     </div>

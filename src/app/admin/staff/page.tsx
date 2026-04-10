@@ -72,7 +72,7 @@ function StaffActions({ staff }: { staff: Staff }) {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg transition-colors duration-150 hover:bg-(--color-surface-hover)">
+        <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg transition-colors duration-150 hover:bg-(--color-surface-hover)" aria-label="Personel işlemleri">
           <MoreHorizontal className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -179,7 +179,7 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
             <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Yeni Personel Ekle</h3>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Personel bilgilerini girin</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-(--color-surface-hover)">
+          <button onClick={onClose} aria-label="Kapat" className="rounded-lg p-2 hover:bg-(--color-surface-hover)">
             <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
           </button>
         </div>
@@ -326,7 +326,7 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
             <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Personel Ekle</h3>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{deptName} departmanına personel ata</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-(--color-surface-hover)">
+          <button onClick={onClose} aria-label="Kapat" className="rounded-lg p-2 hover:bg-(--color-surface-hover)">
             <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
           </button>
         </div>
@@ -337,6 +337,7 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
             className="w-full h-10 rounded-xl border pl-9 pr-4 text-sm outline-none"
             style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
             placeholder="İsim veya e-posta ile ara..."
+            aria-label="Personel ara"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
@@ -584,6 +585,7 @@ export default function StaffPage() {
                         <DropdownMenuTrigger
                           className="flex h-7 w-7 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-(--color-surface-hover)"
                           onClick={(e) => e.stopPropagation()}
+                          aria-label="Departman işlemleri"
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
                         </DropdownMenuTrigger>

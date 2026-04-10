@@ -142,6 +142,7 @@ export default function StaffNotificationsPage() {
           <button
             onClick={handleMarkAllRead}
             disabled={markingAll || unreadCount === 0}
+            aria-label="Tümünü okundu işaretle"
             className="flex items-center gap-2 rounded-xl px-4 py-2.5 min-h-[44px] text-[13px] font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background: unreadCount > 0 ? 'var(--color-primary-light)' : 'var(--color-bg)',
@@ -169,6 +170,8 @@ export default function StaffNotificationsPage() {
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
+                aria-label={`Filtrele: ${f.label}`}
+                aria-pressed={filter === f.key}
                 className="rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors duration-150"
                 style={{
                   background: filter === f.key ? 'var(--color-primary)' : 'transparent',
@@ -200,7 +203,7 @@ export default function StaffNotificationsPage() {
                 <BellOff className="h-7 w-7" style={{ color: 'var(--color-text-muted)' }} />
               </div>
               <p className="text-[14px] font-semibold mb-1">
-                {filter === 'unread' ? 'Okunmamış bildirim yok' : 'Henüz bildirim yok'}
+                {filter === 'unread' ? 'Okunmamış bildirim yok' : 'Bildirimleriniz burada görünecek.'}
               </p>
               <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
                 {filter === 'unread'
@@ -271,6 +274,7 @@ export default function StaffNotificationsPage() {
                       className="flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-50"
                       style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
                       title="Okundu olarak işaretle"
+                      aria-label="Okundu işaretle"
                     >
                       <Check className="h-4 w-4" />
                     </button>

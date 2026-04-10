@@ -473,6 +473,51 @@ export async function sendSelfRegistrationEmail(params: {
   })
 }
 
+/** Aylık uyum raporu e-posta şablonu — organizasyon admin'lerine gönderilir */
+export function complianceReportEmail(orgName: string, score: number, criticalCount: number, detailUrl: string): string {
+  const scoreColor = score >= 80 ? '#16a34a' : score >= 60 ? '#f59e0b' : '#dc2626'
+  const scoreBg = score >= 80 ? '#dcfce7' : score >= 60 ? '#fffbeb' : '#fef2f2'
+  const headerGradient = score >= 80
+    ? 'linear-gradient(135deg, #0d9668, #0f4a35)'
+    : score >= 60
+      ? 'linear-gradient(135deg, #f59e0b, #92400e)'
+      : 'linear-gradient(135deg, #dc2626, #7f1d1d)'
+  const statusLabel = score >= 80 ? 'Basarili' : score >= 60 ? 'Dikkat Gerekli' : 'Kritik Seviye'
+
+  return `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: ${headerGradient}; padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Aylik Uyum Raporu</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #1e293b; margin-top: 0;">Aylik Uyum Raporu — ${escapeHtml(orgName)}</h2>
+        <div style="text-align: center; margin: 24px 0;">
+          <div style="display: inline-block; background: ${scoreBg}; border-radius: 50%; width: 100px; height: 100px; line-height: 100px; font-size: 28px; font-weight: bold; color: ${scoreColor};">
+            %${score}
+          </div>
+          <p style="margin: 8px 0 0; font-weight: bold; color: ${scoreColor};">${statusLabel}</p>
+        </div>
+        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #475569;"><strong>Organizasyon:</strong> ${escapeHtml(orgName)}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Uyum Orani:</strong> %${score}</p>
+          <p style="margin: 4px 0; color: #475569;"><strong>Kritik Egitim Sayisi:</strong> ${criticalCount}</p>
+        </div>
+        ${score < 80 ? `
+        <div style="background: ${scoreBg}; border-left: 4px solid ${scoreColor}; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
+          <p style="margin: 0; color: ${scoreColor}; font-size: 13px;"><strong>Uyari:</strong> Zorunlu egitim uyum oraniniz %80 hedefinin altinda. Lutfen personel egitim tamamlama durumlarini inceleyiniz.</p>
+        </div>
+        ` : ''}
+        <a href="${escapeHtml(detailUrl)}"
+           style="display: inline-block; background: ${scoreColor}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Detayli Raporu Goruntule
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Bu e-posta her ayin 1'inde otomatik olarak gonderilmektedir.</p>
+      </div>
+    </div>
+  `
+}
+
 // Gecikmiş eğitim hatırlatması (manuel veya otomatik)
 export function overdueTrainingReminderEmail(staffName: string, trainingTitle: string, dueDate: string, daysOverdue: number) {
   return `

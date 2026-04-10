@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { createHash } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { checkSubscriptionStatus } from '@/lib/subscription-guard'
@@ -18,12 +19,25 @@ export function getAppUrl(): string {
   return url || 'http://localhost:3000'
 }
 
+/** Generate a random UUID v4 for request tracing */
+export function generateRequestId(): string {
+  return crypto.randomUUID()
+}
+
 export function jsonResponse(data: unknown, status = 200, headers?: Record<string, string>) {
-  return NextResponse.json(data, { status, headers })
+  const requestId = generateRequestId()
+  return NextResponse.json(data, {
+    status,
+    headers: { 'X-Request-Id': requestId, ...headers },
+  })
 }
 
 export function errorResponse(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status })
+  const requestId = generateRequestId()
+  return NextResponse.json({ error: message }, {
+    status,
+    headers: { 'X-Request-Id': requestId },
+  })
 }
 
 export function safePagination(params: URLSearchParams, maxLimit = 100) {
@@ -261,7 +275,30 @@ function sanitizeAuditData(data: unknown): unknown {
   return sanitized;
 }
 
-/** Audit log helper */
+/**
+ * Compute SHA-256 hash for audit log chain integrity.
+ * Includes enough fields to make tampering evident.
+ */
+export function computeAuditHash(fields: {
+  prevHash: string | null
+  action: string
+  entityType: string
+  entityId: string | null
+  userId: string | null
+  createdAt: string
+}): string {
+  const payload = [
+    fields.prevHash ?? '',
+    fields.action,
+    fields.entityType,
+    fields.entityId ?? '',
+    fields.userId ?? '',
+    fields.createdAt,
+  ].join('|')
+  return createHash('sha256').update(payload).digest('hex')
+}
+
+/** Audit log helper — creates a hash-chained record for JCI/SKS compliance */
 export async function createAuditLog(params: {
   userId?: string | null
   organizationId?: string | null
@@ -276,6 +313,27 @@ export async function createAuditLog(params: {
   const userAgent = params.request?.headers.get('user-agent') ?? null
 
   try {
+    // Fetch the last audit log for this organization to get its hash (chain link)
+    const lastLog = params.organizationId
+      ? await prisma.auditLog.findFirst({
+          where: { organizationId: params.organizationId },
+          orderBy: { createdAt: 'desc' },
+          select: { hash: true },
+        })
+      : null
+
+    const prevHash = lastLog?.hash ?? null
+    const now = new Date()
+
+    const hash = computeAuditHash({
+      prevHash,
+      action: params.action,
+      entityType: params.entityType,
+      entityId: params.entityId ?? null,
+      userId: params.userId ?? null,
+      createdAt: now.toISOString(),
+    })
+
     await prisma.auditLog.create({
       data: {
         userId: params.userId ?? null,
@@ -287,6 +345,9 @@ export async function createAuditLog(params: {
         newData: params.newData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.newData))) as object : undefined,
         ipAddress,
         userAgent,
+        hash,
+        prevHash,
+        createdAt: now,
       },
     })
   } catch (err) {

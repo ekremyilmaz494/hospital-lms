@@ -28,4 +28,18 @@ export const logger = {
   info: (tag: string, message: string, extra?: unknown, options?: LogOptions) => log('info', tag, message, extra, options),
   warn: (tag: string, message: string, extra?: unknown, options?: LogOptions) => log('warn', tag, message, extra, options),
   error: (tag: string, message: string, extra?: unknown, options?: LogOptions) => log('error', tag, message, extra, options),
+
+  /**
+   * Create a scoped logger instance that automatically includes the request ID
+   * in every log call. Useful in API route handlers.
+   *
+   * @example
+   * const log = logger.withRequestId(requestId)
+   * log.info('MyRoute', 'Processing request')
+   */
+  withRequestId: (requestId: string) => ({
+    info: (tag: string, message: string, extra?: unknown) => log('info', tag, message, extra, { requestId }),
+    warn: (tag: string, message: string, extra?: unknown) => log('warn', tag, message, extra, { requestId }),
+    error: (tag: string, message: string, extra?: unknown) => log('error', tag, message, extra, { requestId }),
+  }),
 }

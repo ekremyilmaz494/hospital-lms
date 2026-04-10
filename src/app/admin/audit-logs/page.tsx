@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, Download, History, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Search, Download, History, ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
+import { useToast } from '@/components/shared/toast';
 
 interface AuditLogUser {
   firstName: string;
@@ -125,6 +126,34 @@ export default function AdminAuditLogsPage() {
   const [search, setSearch] = useState('');
   const [entityTypeFilter, setEntityTypeFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [verifying, setVerifying] = useState(false);
+  const { toast } = useToast();
+
+  const handleVerifyChain = useCallback(async () => {
+    setVerifying(true);
+    try {
+      const res = await fetch('/api/admin/audit-logs/verify');
+      if (res.status === 429) {
+        toast('Bu islem 5 dakikada bir yapilabilir. Lutfen bekleyin.', 'warning');
+        return;
+      }
+      if (!res.ok) {
+        toast('Dogrulama sirasinda bir hata olustu', 'error');
+        return;
+      }
+      const data = await res.json();
+      if (data.verified) {
+        toast(`Audit log zinciri dogrulandi — ${data.totalRecords} kayit kontrol edildi`, 'success');
+      } else {
+        const brokenDate = new Date(data.brokenAt.createdAt).toLocaleString('tr-TR');
+        toast(`Zincir bozuldu! Ilk uyumsuz kayit: ${brokenDate}`, 'error');
+      }
+    } catch {
+      toast('Dogrulama sirasinda bir hata olustu', 'error');
+    } finally {
+      setVerifying(false);
+    }
+  }, [toast]);
 
   const params = new URLSearchParams();
   params.set('page', String(page));
@@ -193,9 +222,14 @@ export default function AdminAuditLogsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <PageHeader title="İşlem Geçmişi" subtitle="Tüm sistem işlemlerini görüntüle" />
-        <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={handleExportCSV}>
-          <Download className="h-4 w-4" /> Dışa Aktar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={handleVerifyChain} disabled={verifying}>
+            <ShieldCheck className="h-4 w-4" /> {verifying ? 'Dogrulanıyor...' : 'Zinciri Doğrula'}
+          </Button>
+          <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={handleExportCSV}>
+            <Download className="h-4 w-4" /> Dışa Aktar
+          </Button>
+        </div>
       </div>
 
       <BlurFade delay={0.05}>
@@ -326,7 +360,7 @@ export default function AdminAuditLogsPage() {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: 'var(--color-bg)' }}>
                 <History className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
               </div>
-              <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Henüz işlem kaydı yok</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Sistem kullanıldıkça işlem kayıtları burada görünecek.</p>
               <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Sistem işlemleri burada görüntülenecek</p>
             </div>
           )}

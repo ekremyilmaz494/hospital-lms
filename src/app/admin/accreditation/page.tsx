@@ -629,7 +629,7 @@ export default function AccreditationPage() {
                 border: '1px solid var(--color-border, #e2e8f0)',
               }}>
                 <FileText size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
-                <div>Henüz kayıtlı rapor yok.</div>
+                <div>Akreditasyon raporu oluşturmak için 'Rapor Oluştur' butonunu kullanın.</div>
                 <div style={{ fontSize: 12, marginTop: 4 }}>Simülasyon sekmesinden rapor oluşturabilirsiniz.</div>
               </div>
             ) : (

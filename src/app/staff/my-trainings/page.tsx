@@ -123,6 +123,8 @@ export default function MyTrainingsPage() {
         <div className="flex gap-1 rounded-xl p-1 mb-6" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
           <button
             onClick={() => setActiveTab('trainings')}
+            aria-label="Eğitimlerim sekmesi"
+            aria-pressed={activeTab === 'trainings'}
             className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold flex-1 justify-center"
             style={{
               background: activeTab === 'trainings' ? 'var(--color-surface)' : 'transparent',
@@ -139,6 +141,8 @@ export default function MyTrainingsPage() {
           </button>
           <button
             onClick={() => setActiveTab('exams')}
+            aria-label="Sınavlarım sekmesi"
+            aria-pressed={activeTab === 'exams'}
             className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold flex-1 justify-center"
             style={{
               background: activeTab === 'exams' ? 'var(--color-surface)' : 'transparent',
@@ -184,6 +188,7 @@ export default function MyTrainingsPage() {
         <BlurFade delay={0.04}>
           <button
             onClick={() => completedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            aria-label="Tamamlanan eğitimlere git"
             className="w-full flex items-center justify-between rounded-2xl border px-5 py-3.5 mb-6 transition-all duration-200 hover:-translate-y-0.5"
             style={{
               background: 'var(--color-success-bg)',
@@ -442,7 +447,7 @@ export default function MyTrainingsPage() {
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl mb-4" style={{ background: 'var(--color-bg)' }}>
               <BookOpen className="h-7 w-7" style={{ color: 'var(--color-text-muted)' }} />
             </div>
-            <p className="text-[14px] font-semibold mb-1">Henüz eğitiminiz yok</p>
+            <p className="text-[14px] font-semibold mb-1">Size henüz eğitim atanmadı. Yöneticiniz eğitim atadığında burada görünecek.</p>
             <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
               Size eğitim atandığında burada görünecek
             </p>

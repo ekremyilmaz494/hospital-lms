@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
 import { jsPDF } from 'jspdf'
 
 export async function GET(request: Request) {
@@ -8,6 +9,9 @@ export async function GET(request: Request) {
 
   const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
+
+  const allowed = await checkRateLimit(`pdf-export:${dbUser!.id}`, 5, 60)
+  if (!allowed) return errorResponse('Çok fazla dışa aktarma isteği. Lütfen 1 dakika bekleyin.', 429)
 
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type')

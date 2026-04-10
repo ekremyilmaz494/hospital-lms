@@ -353,7 +353,7 @@ export default function TrainingDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+                  <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Bu eğitime henüz personel atanmadı.</div>
                 )}
               </motion.div>
             )}
@@ -449,7 +449,7 @@ export default function TrainingDetailPage() {
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: 'var(--color-bg)' }}>
                       <Video className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
                     </div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Henüz video eklenmemiş</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Eğitime video veya PDF eklemek için 'İçerik Ekle' butonunu kullanın.</p>
                   </div>
                 )}
               </motion.div>
@@ -506,7 +506,7 @@ export default function TrainingDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+                  <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Bu eğitime henüz soru eklenmemiş.</div>
                 )}
               </motion.div>
             )}

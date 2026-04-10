@@ -288,6 +288,8 @@ export default function NotificationsPage() {
                 <button
                   key={f.id}
                   onClick={() => setFilter(f.id)}
+                  aria-label={`Filtrele: ${f.label}`}
+                  aria-pressed={filter === f.id}
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] transition-all duration-200"
                   style={{
                     background: isActive ? 'var(--color-primary)' : 'transparent',
@@ -386,6 +388,7 @@ export default function NotificationsPage() {
                           className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150 disabled:opacity-50"
                           style={{ color: 'var(--color-error)' }}
                           title="Sil"
+                          aria-label="Bildirimi sil"
                           disabled={dismissing === n.id}
                           onClick={() => handleDelete(n.id)}
                         >
@@ -410,9 +413,9 @@ export default function NotificationsPage() {
               >
                 <BellOff className="h-7 w-7" style={{ color: 'var(--color-text-muted)' }} />
               </div>
-              <p className="text-[14px] font-semibold mb-1">Bildirim bulunamadı</p>
+              <p className="text-[14px] font-semibold mb-1">Henüz bildirim yok</p>
               <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
-                {filter !== 'all' ? 'Bu filtreye uygun bildirim yok' : 'Henüz bildiriminiz bulunmuyor'}
+                {filter !== 'all' ? 'Bu filtreye uygun bildirim yok' : 'Henüz bildirim yok. Personele bildirim göndermek için yukarıdaki butonu kullanın.'}
               </p>
             </div>
           )}
@@ -437,7 +440,7 @@ export default function NotificationsPage() {
                   <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Personellere hedefli bildirim gönderin</p>
                 </div>
               </div>
-              <button onClick={() => setShowSendModal(false)} className="rounded-lg p-2" style={{ color: 'var(--color-text-muted)' }}>
+              <button onClick={() => setShowSendModal(false)} aria-label="Kapat" className="rounded-lg p-2" style={{ color: 'var(--color-text-muted)' }}>
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -637,6 +640,9 @@ export default function NotificationsPage() {
               <label className="flex items-center gap-3 cursor-pointer group">
                 <div
                   onClick={() => setAlsoSendEmail(!alsoSendEmail)}
+                  role="checkbox"
+                  aria-checked={alsoSendEmail}
+                  aria-label="E-posta ile de gönder"
                   className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors duration-150"
                   style={{
                     background: alsoSendEmail ? 'var(--color-primary)' : 'var(--color-bg)',

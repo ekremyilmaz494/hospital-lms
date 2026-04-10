@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { encrypt } from '@/lib/crypto'
 import ExcelJS from 'exceljs'
 
 /** Satır ayrıştırma sonucu */
@@ -202,7 +203,7 @@ export async function POST(request: Request) {
           lastName: row.lastName,
           role: 'staff',
           organizationId: orgId,
-          tcNo: row.tcNo,
+          tcNo: row.tcNo ? encrypt(row.tcNo) : undefined,
           phone: row.phone,
           departmentId: row.deptId,
           title: row.title,

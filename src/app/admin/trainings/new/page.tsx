@@ -638,64 +638,59 @@ export default function NewTrainingPage() {
                               }
                             }
 
-                            const formData = new FormData();
-                            formData.append('file', file);
-                            const xhr = new XMLHttpRequest();
-                            let s3Phase = false;
-                            xhr.upload.onprogress = (ev) => {
-                              if (ev.lengthComputable && !s3Phase) {
-                                const pct = Math.round((ev.loaded / ev.total) * 80);
-                                setUploadProgress(prev => ({ ...prev, [video.id]: pct }));
+                            // Presigned URL ile client-side S3 upload (Vercel body limit bypass)
+                            try {
+                              // 1. Presigned URL al
+                              setUploadProgress(prev => ({ ...prev, [video.id]: 5 }));
+                              const presignRes = await fetch('/api/upload/presign', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+                              });
+                              if (!presignRes.ok) {
+                                const err = await presignRes.json();
+                                toast(err.error || 'Yükleme URL alınamadı', 'error');
+                                setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
+                                setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
+                                return;
                               }
-                            };
-                            xhr.upload.onload = () => {
-                              s3Phase = true;
-                              setUploadProgress(prev => ({ ...prev, [video.id]: 82 }));
-                              const tick = setInterval(() => {
-                                setUploadProgress(prev => {
-                                  const cur = prev[video.id] ?? 82;
-                                  if (cur >= 95) { clearInterval(tick); return prev; }
-                                  return { ...prev, [video.id]: cur + 1 };
-                                });
-                              }, 400);
-                              (xhr as unknown as Record<string, unknown>)._s3Tick = tick;
-                            };
-                            xhr.onload = () => {
-                              const tick = (xhr as unknown as Record<string, unknown>)._s3Tick as ReturnType<typeof setInterval> | undefined;
-                              if (tick) clearInterval(tick);
-                              if (xhr.status >= 200 && xhr.status < 300) {
-                                setUploadProgress(prev => ({ ...prev, [video.id]: 100 }));
-                                try {
-                                  const { key } = JSON.parse(xhr.responseText);
+                              const { uploadUrl, key } = await presignRes.json();
+
+                              // 2. Dosyayı doğrudan S3'e yükle (XHR ile progress tracking)
+                              const xhr = new XMLHttpRequest();
+                              xhr.upload.onprogress = (ev) => {
+                                if (ev.lengthComputable) {
+                                  const pct = Math.round((ev.loaded / ev.total) * 95);
+                                  setUploadProgress(prev => ({ ...prev, [video.id]: Math.max(5, pct) }));
+                                }
+                              };
+                              xhr.onload = () => {
+                                if (xhr.status >= 200 && xhr.status < 300) {
+                                  setUploadProgress(prev => ({ ...prev, [video.id]: 100 }));
                                   setTimeout(() => {
                                     setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: key, file } : v));
                                     setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
                                   }, 500);
                                   toast(isPdf ? 'Doküman yüklendi' : 'Video yüklendi', 'success');
-                                } catch {
-                                  toast('Yanıt işlenemedi', 'error');
+                                } else {
+                                  toast('Dosya yüklenemedi', 'error');
+                                  setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
                                   setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
                                 }
-                              } else {
-                                try {
-                                  const err = JSON.parse(xhr.responseText);
-                                  toast(err.error || 'Dosya yüklenemedi', 'error');
-                                } catch {
-                                  toast('Dosya yüklenemedi', 'error');
-                                }
+                              };
+                              xhr.onerror = () => {
+                                toast('Dosya yüklenemedi — bağlantı hatası', 'error');
                                 setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
                                 setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                              }
-                            };
-                            xhr.onerror = () => {
-                              const tick = (xhr as unknown as Record<string, unknown>)._s3Tick as ReturnType<typeof setInterval> | undefined;
-                              if (tick) clearInterval(tick);
-                              toast('Dosya yüklenemedi — bağlantı hatası', 'error');
+                              };
+                              xhr.open('PUT', uploadUrl);
+                              xhr.setRequestHeader('Content-Type', file.type);
+                              xhr.send(file);
+                            } catch {
+                              toast('Dosya yüklenemedi', 'error');
                               setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
                               setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                            };
-                            xhr.open('POST', '/api/upload/content');
-                            xhr.send(formData);
+                            }
                           }
                         }}
                       />
@@ -823,64 +818,56 @@ export default function NewTrainingPage() {
                                 // Süre alınamazsa devam et
                               }
 
-                              const formData = new FormData();
-                              formData.append('file', file);
-                              const xhr = new XMLHttpRequest();
-                              let s3Phase = false;
-                              xhr.upload.onprogress = (ev) => {
-                                if (ev.lengthComputable && !s3Phase) {
-                                  const pct = Math.round((ev.loaded / ev.total) * 80);
-                                  setUploadProgress(prev => ({ ...prev, [video.id]: pct }));
+                              // Presigned URL ile client-side S3 upload
+                              try {
+                                setUploadProgress(prev => ({ ...prev, [video.id]: 5 }));
+                                const presignRes = await fetch('/api/upload/presign', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+                                });
+                                if (!presignRes.ok) {
+                                  const err = await presignRes.json();
+                                  toast(err.error || 'Yükleme URL alınamadı', 'error');
+                                  setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
+                                  setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
+                                  return;
                                 }
-                              };
-                              xhr.upload.onload = () => {
-                                s3Phase = true;
-                                setUploadProgress(prev => ({ ...prev, [video.id]: 82 }));
-                                const tick = setInterval(() => {
-                                  setUploadProgress(prev => {
-                                    const cur = prev[video.id] ?? 82;
-                                    if (cur >= 95) { clearInterval(tick); return prev; }
-                                    return { ...prev, [video.id]: cur + 1 };
-                                  });
-                                }, 400);
-                                (xhr as unknown as Record<string, unknown>)._s3Tick = tick;
-                              };
-                              xhr.onload = () => {
-                                const tick = (xhr as unknown as Record<string, unknown>)._s3Tick as ReturnType<typeof setInterval> | undefined;
-                                if (tick) clearInterval(tick);
-                                if (xhr.status >= 200 && xhr.status < 300) {
-                                  setUploadProgress(prev => ({ ...prev, [video.id]: 100 }));
-                                  try {
-                                    const { key } = JSON.parse(xhr.responseText);
+                                const { uploadUrl, key } = await presignRes.json();
+                                const xhr = new XMLHttpRequest();
+                                xhr.upload.onprogress = (ev) => {
+                                  if (ev.lengthComputable) {
+                                    const pct = Math.round((ev.loaded / ev.total) * 95);
+                                    setUploadProgress(prev => ({ ...prev, [video.id]: Math.max(5, pct) }));
+                                  }
+                                };
+                                xhr.onload = () => {
+                                  if (xhr.status >= 200 && xhr.status < 300) {
+                                    setUploadProgress(prev => ({ ...prev, [video.id]: 100 }));
                                     setTimeout(() => {
                                       setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: key, file } : v));
                                       setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
                                     }, 500);
                                     toast('Ses dosyası yüklendi', 'success');
-                                  } catch {
-                                    toast('Yanıt işlenemedi', 'error');
+                                  } else {
+                                    toast('Ses dosyası yüklenemedi', 'error');
+                                    setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
                                     setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
                                   }
-                                } else {
-                                  try {
-                                    const err = JSON.parse(xhr.responseText);
-                                    toast(err.error || 'Ses dosyası yüklenemedi', 'error');
-                                  } catch {
-                                    toast('Ses dosyası yüklenemedi', 'error');
-                                  }
+                                };
+                                xhr.onerror = () => {
+                                  toast('Ses dosyası yüklenemedi — bağlantı hatası', 'error');
                                   setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
                                   setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                                }
-                              };
-                              xhr.onerror = () => {
-                                const tick = (xhr as unknown as Record<string, unknown>)._s3Tick as ReturnType<typeof setInterval> | undefined;
-                                if (tick) clearInterval(tick);
-                                toast('Ses dosyası yüklenemedi — bağlantı hatası', 'error');
+                                };
+                                xhr.open('PUT', uploadUrl);
+                                xhr.setRequestHeader('Content-Type', file.type);
+                                xhr.send(file);
+                              } catch {
+                                toast('Ses dosyası yüklenemedi', 'error');
                                 setVideos(prev => prev.map(v => v.id === video.id ? { ...v, url: '', file: undefined } : v));
                                 setUploadProgress(prev => { const n = { ...prev }; delete n[video.id]; return n; });
-                              };
-                              xhr.open('POST', '/api/upload/content');
-                              xhr.send(formData);
+                              }
                             }
                           }}
                         />
@@ -985,17 +972,30 @@ export default function NewTrainingPage() {
                               }
                               setVideos(prev => prev.map(v => v.id === video.id ? { ...v, documentFile: file, documentKey: '', documentUploading: true } : v));
 
-                              const formData = new FormData();
-                              formData.append('file', file);
+                              // Presigned URL ile client-side S3 upload
                               try {
-                                const res = await fetch('/api/upload/content', { method: 'POST', body: formData });
-                                if (res.ok) {
-                                  const { key } = await res.json();
+                                const presignRes = await fetch('/api/upload/presign', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+                                });
+                                if (!presignRes.ok) {
+                                  const err = await presignRes.json();
+                                  toast(err.error || 'Yükleme URL alınamadı', 'error');
+                                  setVideos(prev => prev.map(v => v.id === video.id ? { ...v, documentFile: undefined, documentKey: undefined, documentUploading: false } : v));
+                                  return;
+                                }
+                                const { uploadUrl, key } = await presignRes.json();
+                                const uploadRes = await fetch(uploadUrl, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': file.type },
+                                  body: file,
+                                });
+                                if (uploadRes.ok) {
                                   setVideos(prev => prev.map(v => v.id === video.id ? { ...v, documentKey: key, documentUploading: false } : v));
                                   toast('Doküman yüklendi', 'success');
                                 } else {
-                                  const err = await res.json().catch(() => ({}));
-                                  toast(err.error || 'Doküman yüklenemedi', 'error');
+                                  toast('Doküman yüklenemedi', 'error');
                                   setVideos(prev => prev.map(v => v.id === video.id ? { ...v, documentFile: undefined, documentKey: undefined, documentUploading: false } : v));
                                 }
                               } catch {

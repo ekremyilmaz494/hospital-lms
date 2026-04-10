@@ -381,7 +381,7 @@ export default function StaffCertificatesPage() {
                       <code className="flex-1 text-[11px] font-mono font-semibold truncate" style={{ color: 'var(--color-primary)' }}>
                         {cert.certificateCode}
                       </code>
-                      <button onClick={() => copyCode(cert.certificateCode)} className="shrink-0 p-2 sm:p-1 rounded-lg sm:rounded hover:bg-[var(--color-surface-hover)]">
+                      <button onClick={() => copyCode(cert.certificateCode)} aria-label="Sertifika kodunu kopyala" className="shrink-0 p-2 sm:p-1 rounded-lg sm:rounded hover:bg-[var(--color-surface-hover)]">
                         <Copy className="h-4 w-4 sm:h-3.5 sm:w-3.5" style={{ color: 'var(--color-text-muted)' }} />
                       </button>
                     </div>
@@ -419,7 +419,7 @@ export default function StaffCertificatesPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl mb-4" style={{ background: 'var(--color-bg)' }}>
             <Award className="h-7 w-7" style={{ color: 'var(--color-text-muted)' }} />
           </div>
-          <p className="text-[14px] font-semibold mb-1">Henüz sertifikanız yok</p>
+          <p className="text-[14px] font-semibold mb-1">Eğitimleri başarıyla tamamladığınızda sertifikalarınız burada görünecek.</p>
           <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
             Eğitimleri tamamladığınızda sertifikalarınız burada görünecek
           </p>
@@ -443,6 +443,7 @@ export default function StaffCertificatesPage() {
               </div>
               <button
                 onClick={() => setSelected(null)}
+                aria-label="Kapat"
                 className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--color-bg)]"
               >
                 <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
@@ -466,6 +467,7 @@ export default function StaffCertificatesPage() {
               </Button>
               <button
                 disabled={pdfLoading}
+                aria-label="Sertifikayı PDF olarak indir"
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl h-11 text-[13px] font-semibold text-white disabled:opacity-60"
                 style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
                 onClick={() => selected && handleDownloadPDF(selected)}

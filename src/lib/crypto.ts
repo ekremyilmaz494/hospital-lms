@@ -38,6 +38,16 @@ export function encrypt(plaintext: string): string {
  * AES-256-GCM ile şifrelenmiş string'i çöz.
  * Auth tag doğrulaması otomatik — değiştirilmiş veri hata fırlatır.
  */
+/**
+ * TC No güvenli çözme — eski şifrelenmemiş değerlerle uyumlu.
+ * Eğer değer ':' içermiyorsa şifrelenmemiş legacy değer olarak kabul eder.
+ */
+export function safeDecryptTcNo(value: string | null): string | null {
+  if (!value) return null
+  if (!value.includes(':')) return value // şifrelenmemiş legacy değer
+  try { return decrypt(value) } catch { return value }
+}
+
 export function decrypt(token: string): string {
   const key = getKey()
   const parts = token.split(':')

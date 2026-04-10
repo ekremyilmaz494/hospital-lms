@@ -270,7 +270,7 @@ export default function StaffDashboard() {
               </div>
               <div className="space-y-3">
                 {upcomingTrainings.length === 0 && (
-                  <p className="text-sm text-center py-4" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>
+                  <p className="text-sm text-center py-4" style={{ color: 'var(--color-text-muted)' }}>Yaklaşan eğitiminiz bulunmuyor.</p>
                 )}
                 {upcomingTrainings.map((t) => {
                   const st = statusMap[t.status] || statusMap.assigned;
@@ -337,7 +337,7 @@ export default function StaffDashboard() {
                 </div>
                 <div className="space-y-2.5">
                   {notifications.length === 0 && (
-                    <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>
+                    <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>Yeni bildirimleriniz burada görünecek.</p>
                   )}
                   {notifications.map((n, i) => (
                     <div key={i} className="flex items-start gap-2.5 rounded-xl px-3 py-2.5 transition-colors duration-150" style={{ background: !n.isRead ? 'var(--color-primary-light)' : 'transparent' }}>
@@ -362,7 +362,7 @@ export default function StaffDashboard() {
               <h3 className="mb-4 text-sm font-bold">Son Aktivitelerim</h3>
               <div className="space-y-3.5">
                 {recentActivity.length === 0 && (
-                  <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</p>
+                  <p className="text-xs text-center py-2" style={{ color: 'var(--color-text-muted)' }}>Eğitim ve sınav aktiviteleriniz burada görünecek.</p>
                 )}
                 {recentActivity.map((a, i) => (
                   <div key={i} className="flex gap-3">

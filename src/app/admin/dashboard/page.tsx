@@ -517,7 +517,7 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitim atamaları yapıldıkça veriler burada görünecek.</div>
                 )}
               </div>
             </MagicCard>
@@ -639,7 +639,7 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Personel sınavları tamamladıkça performans verileri görünecek.</div>
                 )}
               </div>
             </MagicCard>
@@ -682,7 +682,7 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Sertifika süreleri yaklaştıkça hatırlatmalar burada görünecek.</div>
                 )}
               </div>
             </MagicCard>

@@ -81,7 +81,7 @@ export default function EffectivenessPage() {
                     <Bar dataKey="avgPostScore" name="Ort. Puan" fill="var(--color-info)" radius={[4, 4, 0, 0]} barSize={24} />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <div className="flex h-full items-center justify-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz trend verisi yok</div>}
+              ) : <div className="flex h-full items-center justify-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Sınavlar tamamlandıkça başarı trendi burada görünecek.</div>}
             </div>
           </ChartCard>
         </BlurFade>
@@ -104,7 +104,7 @@ export default function EffectivenessPage() {
                   </div>
                 ))}
               </div>
-            ) : <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>}
+            ) : <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Kategori bazlı veriler eğitimler oluşturuldukça görünecek.</div>}
           </div>
         </BlurFade>
       </div>
@@ -145,7 +145,7 @@ export default function EffectivenessPage() {
               ))}
             </tbody>
           </table>
-          {trainings.length === 0 && <div className="text-center py-12 text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz sınav verisi yok</div>}
+          {trainings.length === 0 && <div className="text-center py-12 text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitimlere sınav ekleyip personel atadıkça etkinlik analizi burada görünecek.</div>}
         </div>
       </BlurFade>
     </div>

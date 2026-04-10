@@ -4,6 +4,7 @@ import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, creat
 import { createUserSchema } from '@/lib/validations'
 import { createServiceClient } from '@/lib/supabase/server'
 import { maskeTcNo } from '@/lib/utils'
+import { encrypt, safeDecryptTcNo } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
@@ -102,7 +103,7 @@ export async function GET(request: Request) {
       name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
       email: s.email,
       // KVKK: TC No maskeleme — sadece son 4 hane göster
-      tcNo: maskeTcNo(s.tcNo),
+      tcNo: maskeTcNo(safeDecryptTcNo(s.tcNo)),
       department: departments.find(d => d.id === s.departmentId)?.name || '',
       departmentId: s.departmentId,
       title: s.title || '',
@@ -205,7 +206,7 @@ export async function POST(request: Request) {
         lastName: parsed.data.lastName,
         role: 'staff',
         organizationId: dbUser!.organizationId!,
-        tcNo: parsed.data.tcNo,
+        tcNo: parsed.data.tcNo ? encrypt(parsed.data.tcNo) : undefined,
         phone: parsed.data.phone,
         departmentId: parsed.data.departmentId,
         title: parsed.data.title,

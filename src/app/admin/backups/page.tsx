@@ -117,7 +117,7 @@ export default function BackupsPage() {
               </tbody>
             </table>
           ) : (
-            <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz veri yok</div>
+            <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz yedekleme yapılmadı. İlk yedeği almak için 'Yedek Al' butonunu kullanın.</div>
           )}
         </div>
       </BlurFade>

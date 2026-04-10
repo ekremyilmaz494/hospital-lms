@@ -316,7 +316,7 @@ export default function AdminSmgPage() {
                 <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Yükleniyor...</div>
               ) : report.length === 0 ? (
                 <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  {reportData?.period ? 'Bu döneme ait personel kaydı bulunamadı.' : 'Aktif dönem bulunamadı. Lütfen önce bir SMG dönemi oluşturun.'}
+                  {reportData?.period ? 'Bu dönemde henüz SMG aktivitesi kaydedilmemiş.' : 'Aktif dönem bulunamadı. Lütfen önce bir SMG dönemi oluşturun.'}
                 </div>
               ) : (
                 <table className="w-full text-sm">

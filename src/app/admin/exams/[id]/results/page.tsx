@@ -364,7 +364,7 @@ export default function ExamResultsPage() {
           <h3 className="text-sm font-bold mb-4">Departman Analizi</h3>
           {sortedDepts.length === 0 ? (
             <p className="text-sm text-center py-6" style={{ color: 'var(--color-text-muted)' }}>
-              Henüz veri yok
+              Personel sınavı tamamladıkça sonuçlar burada görünecek.
             </p>
           ) : (
             <div className="space-y-3">

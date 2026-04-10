@@ -1,13 +1,18 @@
 # Felaket Kurtarma Plani (Disaster Recovery)
 
-> Son guncelleme: 2026-04-05
+> Son guncelleme: 2026-04-09
 
-## Hedefler
+## RTO / RPO Hedefleri
 
-| Metrik | Deger | Aciklama |
-|--------|-------|----------|
-| **RPO** (Recovery Point Objective) | **24 saat** | Maksimum kabul edilebilir veri kaybi suresi. Gunluk otomatik yedekleme ile saglanir. |
-| **RTO** (Recovery Time Objective) | **4 saat** | Sistem kesintisinden tam calisir hale donme suresi. |
+| Metrik | Hedef | Mevcut | Aciklama |
+|--------|-------|--------|----------|
+| **RPO** (Recovery Point Objective — maks. veri kaybi suresi) | **< 1 saat** | ~1 saat | Supabase Pro'da point-in-time recovery (PITR) ile dakika bazinda geri alma mumkun. Free planda gunluk yedek = 24 saat RPO. |
+| **RTO** (Recovery Time Objective — sistemi ayaga kaldirma suresi) | **< 4 saat** | ~3.5 saat | En kotu senaryo (DB tamamen coktu): yedekten geri yukleme ~3.5 saat. En iyi senaryo (Vercel deploy hatasi): rollback ~15 dakika. |
+
+### RPO Iyilestirme Yol Haritasi
+- **Supabase Free** → RPO: 24 saat (gunluk cron yedegi)
+- **Supabase Pro** → RPO: < 1 saat (PITR + WAL arsivleme)
+- **S3 Cross-Region Replication** → RPO: < 5 dakika (video/dosya icin)
 
 ---
 
@@ -67,56 +72,69 @@
 
 ## Senaryo Bazli Aksiyon Planlari
 
-### Senaryo 1: Veritabani Bozulmasi (DB Corrupted)
+### Senaryo 1: Supabase Tamamen Coktu (DB erisim yok)
 
-| Adim | Aksiyon | Sure |
-|------|---------|------|
-| 1 | Supabase Dashboard'dan DB durumunu kontrol et | 15 dk |
-| 2 | Supabase'in otomatik point-in-time recovery ozelligini kullan (varsa) | 30 dk |
-| 3 | Basarisizsza: En son dogrulanmis S3 yedegini indir | 15 dk |
-| 4 | Yeni bir Supabase projesi olustur veya mevcut DB'yi resetle | 30 dk |
-| 5 | Prisma migration'lari calistir: `pnpm db:migrate` | 15 dk |
-| 6 | RLS politikalarini uygula: `node scripts/apply-rls.js` | 10 dk |
-| 7 | Yedek verisini geri yukle | 60 dk |
-| 8 | Vercel env degiskenlerini guncelle (yeni DB URL gerekiyorsa) | 15 dk |
-| 9 | Dogrulama testleri | 30 dk |
-| **Toplam** | | **~3.5 saat** |
+| Adim | Aksiyon | Sorumlu | Sure |
+|------|---------|---------|------|
+| 1 | Supabase status sayfasini kontrol et: https://status.supabase.com | Gelistirici | 5 dk |
+| 2 | Supabase genel arizasiysa: Kullanicilari bilgilendir, bekle | Proje Yoneticisi | - |
+| 3 | Supabase Pro'da PITR (Point-in-Time Recovery) kullan | Gelistirici | 30 dk |
+| 4 | PITR yoksa: En son dogrulanmis S3 yedegini indir | Gelistirici | 15 dk |
+| 5 | Yeni Supabase projesi olustur | Gelistirici | 15 dk |
+| 6 | Prisma migration calistir: `pnpm db:migrate` | Gelistirici | 15 dk |
+| 7 | RLS politikalarini uygula: `node scripts/apply-rls.js` | Gelistirici | 10 dk |
+| 8 | Yedek verisini geri yukle: Restore API (`/api/super-admin/restore`) | Gelistirici | 60 dk |
+| 9 | Vercel env degiskenlerini guncelle (yeni DB URL) | Gelistirici | 15 dk |
+| 10 | Vercel'i yeniden deploy et | Gelistirici | 10 dk |
+| 11 | Dogrulama: Dashboard, personel listesi, egitimler kontrol | Proje Yoneticisi | 30 dk |
+| **Toplam** | | | **~3.5 saat** |
+
+**Otomatik fallback:** Yok — DB olmadan sistem calismaz. Kullanicilara "Bakim calismasi" mesaji gosterilir.
 
 ### Senaryo 2: Vercel Coktu / Deploy Hatasi
 
-| Adim | Aksiyon | Sure |
-|------|---------|------|
-| 1 | Vercel status sayfasini kontrol et: https://www.vercel-status.com | 5 dk |
-| 2 | Vercel genel arizasiysa: Bekle ve kullanicilari bilgilendir | - |
-| 3 | Deploy hatasiysa: Son calisan deployment'a rollback yap | 10 dk |
-| 4 | `vercel rollback` veya Vercel Dashboard > Deployments > Promote | 5 dk |
-| 5 | Alternatif: Farkli bir hesap/bolgeye yeni deploy | 60 dk |
-| **Toplam** | | **~15 dk - 1.5 saat** |
+| Adim | Aksiyon | Sorumlu | Sure |
+|------|---------|---------|------|
+| 1 | Vercel status kontrol et: https://www.vercel-status.com | Gelistirici | 5 dk |
+| 2 | Vercel genel arizasiysa: Kullanicilari bilgilendir, bekle | Proje Yoneticisi | - |
+| 3 | Deploy hatasiysa: Vercel Dashboard > Deployments > onceki deploy'u "Promote" et | Gelistirici | 5 dk |
+| 4 | Alternatif CLI: `vercel rollback` | Gelistirici | 5 dk |
+| 5 | Her iki yol basarisizsza: Farkli bolgeye yeni deploy | Gelistirici | 60 dk |
+| **Toplam** | | | **~15 dk - 1.5 saat** |
 
-### Senaryo 3: S3 Erisim Kaybi
+**Otomatik fallback:** PWA Service Worker son cache'lenen sayfalari gosterir (offline mode). API istekleri basarisiz olur ama kullanici bos sayfa yerine cache'li veri gorur.
 
-| Adim | Aksiyon | Sure |
-|------|---------|------|
-| 1 | AWS Health Dashboard kontrol et | 5 dk |
-| 2 | S3 bucket erisim politikalarini kontrol et | 10 dk |
-| 3 | IAM kullanici/role izinlerini dogrula | 10 dk |
-| 4 | Gecici: CloudFront cache'den video servisi devam edebilir | - |
-| 5 | S3 tamamen kaybolduysa: Yedek bucket'tan cross-region replikasyon | 60 dk |
-| 6 | Video dosyalari icin: Organizasyonlardan orijinal dosyalari talep et | - |
-| 7 | Backup JSON dosyalari icin: DB'den mevcut verileri tekrar export et | 30 dk |
-| **Toplam** | | **~2-4 saat** |
+### Senaryo 3: S3 Bucket Erisim Yok (videolar/dosyalar yuklenmiyor)
+
+| Adim | Aksiyon | Sorumlu | Sure |
+|------|---------|---------|------|
+| 1 | AWS Health Dashboard kontrol et | Gelistirici | 5 dk |
+| 2 | IAM kullanici izinlerini dogrula (Access Key gecerli mi?) | Gelistirici | 10 dk |
+| 3 | S3 bucket policy kontrol et | Gelistirici | 10 dk |
+| 4 | **Gecici cozum**: CloudFront cache'den video servisi devam eder (~4 saat) | Otomatik | - |
+| 5 | S3 tamamen kaybolduysa: Yedek bucket olustur, cross-region copy baslat | Gelistirici | 60 dk |
+| 6 | Vercel env'de `AWS_S3_BUCKET` degiskenini yeni bucket ile guncelle | Gelistirici | 10 dk |
+| 7 | Video dosyalari kayipsa: Organizasyonlardan orijinal dosyalari talep et | Proje Yoneticisi | - |
+| **Toplam** | | | **~2-4 saat** |
+
+**Otomatik fallback:** CloudFront signed URL'ler 4 saat gecerli — bu sure boyunca videolar cache'den izlenmeye devam eder. Yeni video yukleme basarisiz olur.
 
 ### Senaryo 4: Redis Coktu (Upstash)
 
-| Adim | Aksiyon | Sure |
-|------|---------|------|
-| 1 | Upstash Dashboard'dan durumu kontrol et | 5 dk |
-| 2 | **Etki**: Sinav zamanlayicilari ve rate limiting calismaz | - |
-| 3 | Gecici cozum: Redis bagimliliklarini devre disi birak | 15 dk |
-| 4 | `src/lib/redis.ts`'de fallback: in-memory cache veya no-op | 15 dk |
-| 5 | Upstash duzeldikten sonra: Aktif sinav oturumlarini kontrol et | 10 dk |
-| 6 | Alternatif: Yeni Upstash instance olustur ve env degiskenlerini guncelle | 20 dk |
-| **Toplam** | | **~30 dk - 1 saat** |
+| Adim | Aksiyon | Sorumlu | Sure |
+|------|---------|---------|------|
+| 1 | Upstash Dashboard'dan durumu kontrol et | Gelistirici | 5 dk |
+| 2 | **Etki**: Sinav zamanlayicilari ve rate limiting gecici olarak devre disi | - | - |
+| 3 | **OTOMATIK FALLBACK AKTIF** — `src/lib/redis.ts` in-memory fallback devreye girer: | Otomatik | 0 dk |
+| | - Sinav zamanlayicilari: `memoryTimers` Map ile calismaya devam eder | | |
+| | - Rate limiting: `memoryRateLimits` Map ile calismaya devam eder | | |
+| | - Cache: L1 in-memory cache aktif kalir, L2 Redis cache devre disi | | |
+| 4 | Upstash duzeldikten sonra: Sistem otomatik Redis'e reconnect eder | Otomatik | 0 dk |
+| 5 | Aktif sinav oturumlarini kontrol et (suresi dolmus mu?) | Gelistirici | 10 dk |
+| 6 | Upstash tamamen kaybolduysa: Yeni instance olustur, env guncelle | Gelistirici | 20 dk |
+| **Toplam** | | | **~0 dk (otomatik) - 30 dk** |
+
+**Otomatik fallback:** ✅ TAM CALISIYOR. Redis cokse bile sistem calismaya devam eder. Kod dogrulamasi: `src/lib/redis.ts` satir 20-22 (`memoryTimers`, `memoryRateLimits`) ve satir 229-246 (in-memory fallback). Tek risk: Vercel'de birden fazla serverless instance varsa in-memory state paylasılmaz — her instance kendi rate limit sayacini tutar.
 
 ---
 

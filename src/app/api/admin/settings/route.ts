@@ -12,6 +12,9 @@ const settingsSchema = z.object({
   defaultPassingScore: z.coerce.number().int().min(0).max(100).optional(),
   defaultMaxAttempts: z.coerce.number().int().min(1).max(10).optional(),
   defaultExamDuration: z.coerce.number().int().min(5).max(180).optional(),
+  brandColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Geçerli bir hex renk kodu girin').optional(),
+  secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Geçerli bir hex renk kodu girin').optional(),
+  loginBannerUrl: z.string().url().optional().or(z.literal('')),
 })
 
 // GET /api/admin/settings — Hastane ayarlarını getir
@@ -27,7 +30,7 @@ export async function GET() {
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { name: true, logoUrl: true, email: true, phone: true, address: true, sessionTimeout: true, defaultPassingScore: true, defaultMaxAttempts: true, defaultExamDuration: true },
+    select: { name: true, logoUrl: true, email: true, phone: true, address: true, sessionTimeout: true, defaultPassingScore: true, defaultMaxAttempts: true, defaultExamDuration: true, brandColor: true, secondaryColor: true, loginBannerUrl: true, customDomain: true },
   })
 
   return jsonResponse({
@@ -40,6 +43,10 @@ export async function GET() {
     phone: org?.phone ?? '',
     address: org?.address ?? '',
     sessionTimeout: org?.sessionTimeout ?? 30,
+    brandColor: org?.brandColor ?? '#0F172A',
+    secondaryColor: org?.secondaryColor ?? '#3B82F6',
+    loginBannerUrl: org?.loginBannerUrl ?? '',
+    customDomain: org?.customDomain ?? '',
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }
 
@@ -60,7 +67,7 @@ export async function PUT(request: Request) {
   const parsed = settingsSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const { hospitalName, logoUrl, email, phone, address, sessionTimeout, defaultPassingScore, defaultMaxAttempts, defaultExamDuration } = parsed.data
+  const { hospitalName, logoUrl, email, phone, address, sessionTimeout, defaultPassingScore, defaultMaxAttempts, defaultExamDuration, brandColor, secondaryColor, loginBannerUrl } = parsed.data
 
   const oldOrg = await prisma.organization.findUnique({ where: { id: orgId } })
 
@@ -76,6 +83,9 @@ export async function PUT(request: Request) {
       ...(defaultPassingScore !== undefined && { defaultPassingScore }),
       ...(defaultMaxAttempts !== undefined && { defaultMaxAttempts }),
       ...(defaultExamDuration !== undefined && { defaultExamDuration }),
+      ...(brandColor !== undefined && { brandColor }),
+      ...(secondaryColor !== undefined && { secondaryColor }),
+      ...(loginBannerUrl !== undefined && { loginBannerUrl: loginBannerUrl || null }),
     },
   })
 
@@ -99,5 +109,9 @@ export async function PUT(request: Request) {
     defaultPassingScore: updated.defaultPassingScore ?? 70,
     defaultMaxAttempts: updated.defaultMaxAttempts ?? 3,
     defaultExamDuration: updated.defaultExamDuration ?? 30,
+    brandColor: updated.brandColor,
+    secondaryColor: updated.secondaryColor,
+    loginBannerUrl: updated.loginBannerUrl ?? '',
+    customDomain: updated.customDomain ?? '',
   })
 }

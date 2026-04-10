@@ -212,7 +212,7 @@ export default function StaffSmgPage() {
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Aktivitelerim</h3>
               </div>
               {allActivities.length === 0 ? (
-                <div className="p-6 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz aktivite eklenmedi.</div>
+                <div className="p-6 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>SMG aktivitesi eklemek için 'Aktivite Ekle' butonunu kullanın.</div>
               ) : (
                 <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
                   {allActivities.map(a => {

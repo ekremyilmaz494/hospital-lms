@@ -137,6 +137,7 @@ export default function CertificatesPage() {
             </div>
           </div>
           <button
+            aria-label="Sertifikaları dışa aktar"
             className="flex items-center gap-2 rounded-xl h-10 px-5 text-[13px] font-semibold text-white transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
             style={{
               background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
@@ -213,6 +214,8 @@ export default function CertificatesPage() {
               <button
                 key={f.key}
                 onClick={() => setStatusFilter(f.key)}
+                aria-label={`Filtrele: ${f.label}`}
+                aria-pressed={statusFilter === f.key}
                 className="rounded-md px-3 py-1.5 text-[12px] font-medium transition-all duration-150"
                 style={{
                   background: statusFilter === f.key ? 'var(--color-primary)' : 'transparent',
@@ -306,6 +309,7 @@ export default function CertificatesPage() {
                             onClick={(e) => { e.stopPropagation(); copyCode(cert.certificateCode); }}
                             className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded"
                             title="Kopyala"
+                            aria-label="Sertifika kodunu kopyala"
                           >
                             <Copy className="h-3 w-3" style={{ color: 'var(--color-text-muted)' }} />
                           </button>
@@ -341,6 +345,7 @@ export default function CertificatesPage() {
                             onClick={(e) => { e.stopPropagation(); setSelectedCert(cert); }}
                             className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150 hover:bg-(--color-bg)"
                             title="Detay"
+                            aria-label="Sertifika detayını görüntüle"
                           >
                             <Eye className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
                           </button>
@@ -447,7 +452,7 @@ export default function CertificatesPage() {
                   <span className="text-[11px] font-medium" style={{ color: 'var(--color-text-muted)' }}>Sertifika Kodu</span>
                   <div className="flex items-center gap-2">
                     <code className="text-[13px] font-mono font-bold" style={{ color: 'var(--color-primary)' }}>{selectedCert.certificateCode}</code>
-                    <button onClick={() => copyCode(selectedCert.certificateCode)} className="p-1 rounded hover:bg-(--color-surface-hover)">
+                    <button onClick={() => copyCode(selectedCert.certificateCode)} aria-label="Sertifika kodunu kopyala" className="p-1 rounded hover:bg-(--color-surface-hover)">
                       <Copy className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
                     </button>
                   </div>
@@ -478,6 +483,7 @@ export default function CertificatesPage() {
                 </Button>
                 <button
                   disabled={pdfLoading}
+                  aria-label="Sertifikayı PDF olarak indir"
                   className="flex-1 flex items-center justify-center gap-2 rounded-xl h-11 text-[13px] font-semibold text-white disabled:opacity-60"
                   style={{
                     background: 'linear-gradient(135deg, var(--color-primary), #065f46)',

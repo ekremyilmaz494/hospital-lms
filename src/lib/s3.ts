@@ -8,6 +8,8 @@ const s3 = new S3Client({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+  responseChecksumValidation: 'WHEN_REQUIRED',
 })
 
 const BUCKET = process.env.AWS_S3_BUCKET!
@@ -23,6 +25,10 @@ const ALLOWED_CONTENT_TYPES = [
   'audio/mp4',
   'audio/ogg',
   'audio/aac',
+  'image/png',
+  'image/jpeg',
+  'image/svg+xml',
+  'image/webp',
 ]
 
 /** Generate presigned URL for uploading video to S3 */
@@ -134,6 +140,8 @@ export function backupKey(orgId: string) {
   return `backups/${orgId}/${Date.now()}.json`
 }
 
+const ALLOWED_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp']
+
 const ALLOWED_VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'ogg']
 const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'pptx']
 const ALLOWED_AUDIO_EXTENSIONS = ['mp3', 'wav', 'm4a', 'ogg', 'aac']
@@ -156,6 +164,16 @@ export function documentKey(orgId: string, trainingId: string, filename: string)
   }
   const id = crypto.randomUUID()
   return `documents/${orgId}/${trainingId}/${id}.${ext}`
+}
+
+/** Generate branding image storage key (logo, login banner) */
+export function brandingKey(orgId: string, type: 'logo' | 'login-banner', filename: string) {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
+    throw new Error(`İzin verilmeyen dosya uzantısı: .${ext}`)
+  }
+  const id = crypto.randomUUID()
+  return `branding/${orgId}/${type}/${id}.${ext}`
 }
 
 /** Generate audio storage key */

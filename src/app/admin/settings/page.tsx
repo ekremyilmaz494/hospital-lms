@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Settings, Save, Building2,
-  GraduationCap, Bell,
+  GraduationCap, Bell, Palette,
   ChevronRight, CheckCircle2,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
@@ -16,6 +16,7 @@ const tabLoading = () => <div className="h-64 animate-pulse rounded-lg m-8" styl
 const HospitalTab = dynamic(() => import('./hospital-tab'), { ssr: false, loading: tabLoading });
 const TrainingTab = dynamic(() => import('./training-tab'), { ssr: false, loading: tabLoading });
 const NotificationTab = dynamic(() => import('./notification-tab'), { ssr: false, loading: tabLoading });
+const BrandingTab = dynamic(() => import('./branding-tab'), { ssr: false, loading: tabLoading });
 
 interface SettingsData {
   defaultPassingScore: number;
@@ -31,6 +32,10 @@ interface SettingsData {
   notifyOnComplete: boolean;
   notifyOnFail: boolean;
   sessionTimeout: number;
+  brandColor: string;
+  secondaryColor: string;
+  loginBannerUrl: string;
+  customDomain: string;
 }
 
 const defaultSettings: SettingsData = {
@@ -47,11 +52,16 @@ const defaultSettings: SettingsData = {
   notifyOnComplete: true,
   notifyOnFail: true,
   sessionTimeout: 30,
+  brandColor: '#0F172A',
+  secondaryColor: '#3B82F6',
+  loginBannerUrl: '',
+  customDomain: '',
 };
 
 const tabs = [
   { id: 'hospital', label: 'Kurum', icon: Building2 },
   { id: 'training', label: 'Eğitim', icon: GraduationCap },
+  { id: 'branding', label: 'Marka', icon: Palette },
   { id: 'notifications', label: 'Bildirimler', icon: Bell },
 ] as const;
 
@@ -214,6 +224,7 @@ export default function AdminSettingsPage() {
           >
             {activeTab === 'hospital' && <HospitalTab {...tabProps} />}
             {activeTab === 'training' && <TrainingTab {...tabProps} />}
+            {activeTab === 'branding' && <BrandingTab {...tabProps} />}
             {activeTab === 'notifications' && <NotificationTab {...tabProps} />}
           </div>
         </BlurFade>

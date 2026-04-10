@@ -3,6 +3,7 @@ import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, creat
 import { createUserSchema } from '@/lib/validations'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { encrypt } from '@/lib/crypto'
 
 export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
         lastName: parsed.data.lastName,
         role: parsed.data.role,
         organizationId: parsed.data.organizationId,
-        tcNo: parsed.data.tcNo,
+        tcNo: parsed.data.tcNo ? encrypt(parsed.data.tcNo) : undefined,
         phone: parsed.data.phone,
         title: parsed.data.title,
       },

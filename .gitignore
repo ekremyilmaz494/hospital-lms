@@ -62,3 +62,6 @@ ai-content-service/_auth_b64.txt
 
 # Claude Code hook logs
 .claude/command-log.txt
+tmp/
+/tmp/
+hospital-lms-next/

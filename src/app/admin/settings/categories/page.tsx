@@ -175,7 +175,7 @@ export default function CategoriesPage() {
           </div>
         ) : sorted.length === 0 ? (
           <div className="py-16 text-center">
-            <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz kategori yok</p>
+            <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitim kategorisi oluşturmak için 'Yeni Kategori' butonunu kullanın.</p>
           </div>
         ) : (
           <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>

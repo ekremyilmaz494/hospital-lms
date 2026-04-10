@@ -842,7 +842,7 @@ export default function HisIntegrationsPage() {
               textAlign: 'center', padding: '32px 0',
               color: 'var(--color-text-muted)', fontSize: 14,
             }}>
-              Henüz senkronizasyon kaydı yok
+              HIS entegrasyonu yapılandırıldıktan sonra senkronizasyon kayıtları burada görünecek.
             </div>
           ) : (
             <>
