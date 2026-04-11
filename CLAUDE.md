@@ -219,11 +219,6 @@ Bu projede asagidaki GitHub repolarindaki skill ve rehberlerden faydalanilmaktad
 - Test coverage %80 altina dusurulmemelidir
 - `pnpm test` her PR oncesi gecmeli
 
-## Demo Giris Bilgileri
-- Super Admin: `super@demo.com` / `demo123456`
-- Hastane Admin: `admin@demo.com` / `demo123456`
-- Personel: `staff@demo.com` / `demo123456`
-
 ## Claude'dan Beklentiler
 1. TypeScript tip guvenligini her zaman koru
 2. Multi-tenant izolasyonunu asla atlama
