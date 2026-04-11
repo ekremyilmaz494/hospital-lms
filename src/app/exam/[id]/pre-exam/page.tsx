@@ -172,45 +172,18 @@ export default function PreExamPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [toast]);
 
-  // Force submit on 3rd tab switch violation
-  useEffect(() => {
-    if (tabSwitchCount >= 3 && handleFinishRef.current) {
-      handleFinishRef.current();
-    }
-  }, [tabSwitchCount]);
-
-  if (isLoading) {
-    return <PageLoading />;
-  }
-
-  if (error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
-  }
-
-  if (!examData || (examData.questions ?? []).length === 0) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>;
-  }
-
-  const questions = examData.questions ?? [];
-  const currentTimeLeft = timeLeft ?? 0;
-  const minutes = Math.floor(currentTimeLeft / 60);
-  const seconds = currentTimeLeft % 60;
-  const progress = ((currentQ + 1) / questions.length) * 100;
-  const q = questions[currentQ];
-  const answeredCount = Object.keys(answers).length;
-
+  // handleFinish — tüm hook'lar early return'lerden ÖNCE tanımlanmalı (React rules of hooks)
   const handleFinish = useCallback(async () => {
-    if (submitting) return;
+    if (submitting || !examData) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      // BUG #1 FIX: answers key'leri q.id ile saklanıyor, idx değil
-      const qs = examData?.questions ?? [];
+      const qs = examData.questions ?? [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedAnswers = qs.map((q: any) => {
         const questionId = q.questionId ?? q.id ?? '';
         const options = q.options ?? [];
-        const selectedAnswer = answers[q.id];  // q.id ile oku
+        const selectedAnswer = answers[q.id];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const selectedOption = options.find((o: any) => o.id === selectedAnswer);
         return selectedOption ? { questionId: String(questionId), selectedOptionId: selectedOption.optionId ?? selectedOption.id } : null;
@@ -222,7 +195,6 @@ export default function PreExamPage() {
         body: JSON.stringify({ answers: formattedAnswers, phase: 'pre' }),
       });
 
-      // BUG #2 FIX: response.ok kontrolü
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setSubmitError(data.error ?? 'Gönderim başarısız. Tekrar deneyin.');
@@ -243,6 +215,34 @@ export default function PreExamPage() {
   useEffect(() => {
     if (timeLeft === 0 && handleFinishRef.current) handleFinishRef.current();
   }, [timeLeft]);
+
+  // Force submit on 3rd tab switch violation
+  useEffect(() => {
+    if (tabSwitchCount >= 3 && handleFinishRef.current) {
+      handleFinishRef.current();
+    }
+  }, [tabSwitchCount]);
+
+  // ── Early returns (tüm hook'lar yukarıda tanımlandı) ──
+  if (isLoading) {
+    return <PageLoading />;
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  }
+
+  if (!examData || (examData.questions ?? []).length === 0) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>;
+  }
+
+  const questions = examData.questions ?? [];
+  const currentTimeLeft = timeLeft ?? 0;
+  const minutes = Math.floor(currentTimeLeft / 60);
+  const seconds = currentTimeLeft % 60;
+  const progress = ((currentQ + 1) / questions.length) * 100;
+  const q = questions[currentQ];
+  const answeredCount = Object.keys(answers).length;
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }} onContextMenu={(e) => e.preventDefault()} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()}>
