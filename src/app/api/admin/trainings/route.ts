@@ -136,23 +136,42 @@ export async function POST(request: Request) {
         },
       })
 
-      // 2. Videoları Oluştur
+      // 2. Videoları Oluştur (doğrudan URL veya medya kütüphanesinden)
       if (videos && videos.length > 0) {
         for (const [idx, v] of videos.entries()) {
-          if (!v.url) continue;
-          const ct = v.contentType || 'video'
-          const defaultTitle = v.url.split('/').pop()?.replace(/\.[^.]+$/, '') || (ct === 'pdf' ? `Doküman ${idx + 1}` : `Video ${idx + 1}`)
-          const videoTitle = v.title || defaultTitle
+          let url = v.url
+          let ct = v.contentType || 'video'
+          let duration = v.durationSeconds || (ct === 'video' ? 300 : 0)
+          let docKey = v.documentKey ?? null
+          let pgCount = v.pageCount ?? null
+          let videoTitle = v.title
+
+          // Medya kütüphanesinden seçim — libraryItemId varsa bilgileri oradan çek
+          if ((v as Record<string, unknown>).libraryItemId) {
+            const libItem = await tx.contentLibrary.findFirst({
+              where: { id: (v as Record<string, unknown>).libraryItemId as string, organizationId: dbUser!.organizationId! },
+            })
+            if (libItem?.s3Key) {
+              url = libItem.s3Key
+              ct = (libItem.contentType as typeof ct) || 'video'
+              duration = (libItem.duration || 0) * 60
+              videoTitle = videoTitle || libItem.title
+            }
+          }
+
+          if (!url) continue
+          const defaultTitle = url.split('/').pop()?.replace(/\.[^.]+$/, '') || (ct === 'pdf' ? `Doküman ${idx + 1}` : `Video ${idx + 1}`)
+
           await tx.trainingVideo.create({
             data: {
               trainingId: t.id,
-              title: videoTitle,
-              videoUrl: v.url,
-              videoKey: v.url,
-              durationSeconds: v.durationSeconds || (ct === 'video' ? 300 : 0),
+              title: videoTitle || defaultTitle,
+              videoUrl: url,
+              videoKey: url,
+              durationSeconds: duration,
               contentType: ct,
-              pageCount: v.pageCount ?? null,
-              documentKey: v.documentKey ?? null,
+              pageCount: pgCount,
+              documentKey: docKey,
               sortOrder: idx,
             }
           })
