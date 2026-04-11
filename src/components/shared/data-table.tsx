@@ -36,6 +36,16 @@ interface DataTableProps<TData, TValue> {
   mobileCardRenderer?: MobileCardRenderer<TData>;
   /** Called when a row is clicked (excluding actions column). Receives the row data. */
   onRowClick?: (row: TData) => void;
+  /** Server-side pagination: total record count from API */
+  totalCount?: number;
+  /** Server-side pagination: total page count from API */
+  pageCount?: number;
+  /** Server-side pagination: current page (1-based) */
+  currentPage?: number;
+  /** Server-side pagination: called when page changes (1-based) */
+  onPageChange?: (page: number) => void;
+  /** Server-side search: called when search text changes */
+  onSearchChange?: (query: string) => void;
 }
 
 /** @deprecated Use useMobile() from @/hooks/use-mobile instead */
@@ -48,10 +58,17 @@ export const DataTable = memo(function DataTable<TData, TValue>({
   searchPlaceholder = 'Ara...',
   mobileCardRenderer,
   onRowClick,
+  totalCount,
+  pageCount: serverPageCount,
+  currentPage,
+  onPageChange,
+  onSearchChange,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const isMobile = useMobileView();
+
+  const isServerPagination = onPageChange !== undefined && currentPage !== undefined;
 
   const stableData = useMemo(() => data, [data]);
   const stableColumns = useMemo(() => columns, [columns]);
@@ -62,12 +79,22 @@ export const DataTable = memo(function DataTable<TData, TValue>({
     columns: stableColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    // Server-side arama aktifken client-side filtre yapma — API zaten filtrelenmiş veri döndürüyor
+    ...(isServerPagination && onSearchChange ? {} : { getFilteredRowModel: getFilteredRowModel() }),
+    // Server-side pagination: tablo client-side bölmesin, API zaten sayfalamış
+    ...(isServerPagination ? {} : { getPaginationRowModel: getPaginationRowModel() }),
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
-    state: { sorting, globalFilter },
-    initialState: { pagination: { pageSize: 10 } },
+    state: {
+      sorting,
+      globalFilter,
+      ...(isServerPagination ? { pagination: { pageIndex: 0, pageSize: 99999 } } : {}),
+    },
+    ...(isServerPagination ? {
+      manualPagination: true,
+      pageCount: serverPageCount ?? -1,
+    } : {}),
+    initialState: isServerPagination ? undefined : { pagination: { pageSize: 10 } },
   });
 
   return (
@@ -83,7 +110,11 @@ export const DataTable = memo(function DataTable<TData, TValue>({
             <Input
               placeholder={searchPlaceholder}
               value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setGlobalFilter(value);
+                if (onSearchChange) onSearchChange(value);
+              }}
               className="h-10 pl-10 text-sm"
               style={{
                 background: 'var(--color-surface)',
@@ -277,99 +308,125 @@ export const DataTable = memo(function DataTable<TData, TValue>({
       )}
 
       {/* Pagination */}
-      <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <p className="text-xs text-center md:text-left" style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
-          <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-            {table.getFilteredRowModel().rows.length}
-          </span>{' '}
-          kayıttan{' '}
-          <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-            {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}-
-            {Math.min(
-              (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-              table.getFilteredRowModel().rows.length
-            )}
-          </span>{' '}
-          arası
-        </p>
-        {table.getPageCount() > 1 && (
-          <div className="flex items-center justify-center gap-1.5" role="navigation" aria-label="Sayfa gezintisi">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
-              aria-label="İlk sayfa"
-              className="h-8 w-8 p-0 rounded-lg"
-              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
-            >
-              <ChevronsLeft className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-              aria-label="Önceki sayfa"
-              className="h-8 w-8 p-0 rounded-lg"
-              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
+      {(() => {
+        // Server-side pagination uses API total/page counts; client-side uses table model
+        const srvPage = currentPage ?? 1;
+        const totalRows = isServerPagination
+          ? (totalCount ?? data.length)
+          : table.getFilteredRowModel().rows.length;
+        const totalPages = isServerPagination
+          ? (serverPageCount ?? 1)
+          : table.getPageCount();
+        const pageSize = isServerPagination
+          ? (totalRows > 0 && totalPages > 0 ? Math.ceil(totalRows / totalPages) : data.length)
+          : table.getState().pagination.pageSize;
+        const activePageIdx = isServerPagination ? srvPage - 1 : table.getState().pagination.pageIndex;
+        const canPrev = isServerPagination ? srvPage > 1 : table.getCanPreviousPage();
+        const canNext = isServerPagination ? srvPage < totalPages : table.getCanNextPage();
 
-            {/* Page numbers — show fewer on mobile to prevent overflow */}
-            {Array.from({ length: Math.min(table.getPageCount(), isMobile ? 3 : 5) }, (_, i) => {
-              const pageIdx = table.getState().pagination.pageIndex;
-              const maxVisible = isMobile ? 3 : 5;
-              const halfVisible = Math.floor(maxVisible / 2);
-              let pageNum = i;
-              if (pageIdx > halfVisible) pageNum = pageIdx - halfVisible + i;
-              if (pageNum >= table.getPageCount()) return null;
-              const isActive = pageNum === pageIdx;
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => table.setPageIndex(pageNum)}
-                  aria-label={`Sayfa ${pageNum + 1}`}
-                  aria-current={isActive ? 'page' : undefined}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold cursor-pointer transition-[background,color,transform] duration-150 active:scale-90 active:duration-75"
-                  style={{
-                    background: isActive ? 'var(--color-primary)' : 'var(--color-surface)',
-                    color: isActive ? 'white' : 'var(--color-text-secondary)',
-                    border: isActive ? 'none' : '1px solid var(--color-border)',
-                    boxShadow: isActive ? '0 2px 8px rgba(var(--color-primary-rgb), 0.3)' : 'none',
-                  }}
+        const goToPage = (p: number) => {
+          if (isServerPagination) onPageChange!(p);
+          else table.setPageIndex(p - 1);
+        };
+
+        const rangeStart = isServerPagination
+          ? (srvPage - 1) * pageSize + 1
+          : activePageIdx * pageSize + 1;
+        const rangeEnd = isServerPagination
+          ? Math.min(srvPage * pageSize, totalRows)
+          : Math.min((activePageIdx + 1) * pageSize, totalRows);
+
+        return (
+          <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-xs text-center md:text-left" style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+              <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                {totalRows}
+              </span>{' '}
+              kayıttan{' '}
+              <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                {rangeStart}-{rangeEnd}
+              </span>{' '}
+              arası
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-1.5" role="navigation" aria-label="Sayfa gezintisi">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(1)}
+                  disabled={!canPrev}
+                  aria-label="İlk sayfa"
+                  className="h-8 w-8 p-0 rounded-lg"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
                 >
-                  {pageNum + 1}
-                </button>
-              );
-            })}
+                  <ChevronsLeft className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(isServerPagination ? srvPage - 1 : activePageIdx)}
+                  disabled={!canPrev}
+                  aria-label="Önceki sayfa"
+                  className="h-8 w-8 p-0 rounded-lg"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-              aria-label="Sonraki sayfa"
-              className="h-8 w-8 p-0 rounded-lg"
-              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              disabled={!table.getCanNextPage()}
-              aria-label="Son sayfa"
-              className="h-8 w-8 p-0 rounded-lg"
-              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
-            >
-              <ChevronsRight className="h-3.5 w-3.5" />
-            </Button>
+                {/* Page numbers — show fewer on mobile to prevent overflow */}
+                {Array.from({ length: Math.min(totalPages, isMobile ? 3 : 5) }, (_, i) => {
+                  const maxVisible = isMobile ? 3 : 5;
+                  const halfVisible = Math.floor(maxVisible / 2);
+                  let pageNum = i;
+                  if (activePageIdx > halfVisible) pageNum = activePageIdx - halfVisible + i;
+                  if (pageNum >= totalPages) return null;
+                  const isActive = pageNum === activePageIdx;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => goToPage(pageNum + 1)}
+                      aria-label={`Sayfa ${pageNum + 1}`}
+                      aria-current={isActive ? 'page' : undefined}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold cursor-pointer transition-[background,color,transform] duration-150 active:scale-90 active:duration-75"
+                      style={{
+                        background: isActive ? 'var(--color-primary)' : 'var(--color-surface)',
+                        color: isActive ? 'white' : 'var(--color-text-secondary)',
+                        border: isActive ? 'none' : '1px solid var(--color-border)',
+                        boxShadow: isActive ? '0 2px 8px rgba(var(--color-primary-rgb), 0.3)' : 'none',
+                      }}
+                    >
+                      {pageNum + 1}
+                    </button>
+                  );
+                })}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(isServerPagination ? srvPage + 1 : activePageIdx + 2)}
+                  disabled={!canNext}
+                  aria-label="Sonraki sayfa"
+                  className="h-8 w-8 p-0 rounded-lg"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(totalPages)}
+                  disabled={!canNext}
+                  aria-label="Son sayfa"
+                  className="h-8 w-8 p-0 rounded-lg"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                >
+                  <ChevronsRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
     </div>
   );
 }) as <TData, TValue>(props: DataTableProps<TData, TValue>) => React.JSX.Element;

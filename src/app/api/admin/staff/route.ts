@@ -35,9 +35,11 @@ export async function GET(request: Request) {
         { firstName: { contains: search, mode: 'insensitive' } },
         { lastName: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
+        { title: { contains: search, mode: 'insensitive' } },
+        ...(search.length === 11 && /^\d+$/.test(search) ? [{ tcNo: search }] : []),
       ]
     }
-    if (department) where.department = department
+    if (department) where.departmentId = department
     if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 
     // Tek dalgalı Promise.all — tüm sorgular paralel
@@ -54,7 +56,7 @@ export async function GET(request: Request) {
       prisma.user.count({ where }),
       prisma.department.findMany({
         where: { organizationId: orgId },
-        include: { _count: { select: { users: true } } },
+        include: { _count: { select: { users: { where: { role: 'staff', isActive: true } } } } },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
       prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),

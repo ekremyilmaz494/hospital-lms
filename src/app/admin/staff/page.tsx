@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
 import {
@@ -414,9 +414,20 @@ export default function StaffPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
-  const { data, isLoading, refetch } = useFetch<StaffPageData>(`/api/admin/staff?page=${currentPage}&limit=20`);
+  const [searchQuery, setSearchQuery] = useState('');
   const [activeView, setActiveView] = useState<'all' | 'departments'>('departments');
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
+  const { data, isLoading, refetch } = useFetch<StaffPageData>(`/api/admin/staff?page=${currentPage}&limit=10${selectedDept ? `&department=${selectedDept}` : ''}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`);
+
+  // ADIM 4: Debounce arama — 300ms bekle, her tuşta API çağrısı yapma
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const handleSearch = useCallback((query: string) => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      setSearchQuery(query);
+      setCurrentPage(1);
+    }, 300);
+  }, []);
   const [showAddDept, setShowAddDept] = useState(false);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [showAssignStaff, setShowAssignStaff] = useState(false);
@@ -436,9 +447,7 @@ export default function StaffPage() {
   const allDepartments = data?.departments ?? [];
   const statsData = data?.stats ?? { totalStaff: 0, activeStaff: 0, departmentCount: 0, avgScore: 0 };
 
-  const filteredStaff = selectedDept
-    ? allStaff.filter(s => s.departmentId === selectedDept)
-    : allStaff;
+  const filteredStaff = allStaff;
 
   const selectedDeptData = selectedDept ? allDepartments.find(d => d.id === selectedDept) : null;
 
@@ -546,7 +555,7 @@ export default function StaffPage() {
           ].map((v) => (
             <button
               key={v.key}
-              onClick={() => { setActiveView(v.key); setSelectedDept(null); }}
+              onClick={() => { setActiveView(v.key); setSelectedDept(null); setCurrentPage(1); setSearchQuery(''); }}
               className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150"
               style={{
                 background: activeView === v.key ? 'var(--color-primary)' : 'transparent',
@@ -568,14 +577,14 @@ export default function StaffPage() {
               {allDepartments.map((dept, i) => (
                 <BlurFade key={dept.id} delay={0.05 + i * 0.03}>
                   <div
-                    onClick={() => setSelectedDept(dept.id)}
+                    onClick={() => { setSelectedDept(dept.id); setCurrentPage(1); setSearchQuery(''); }}
                     className="group w-full text-left rounded-2xl border p-5 cursor-pointer transition-transform duration-200 hover:-translate-y-1"
                     style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
                     onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 8px 25px ${dept.color}20`; e.currentTarget.style.borderColor = `${dept.color}40`; }}
                     onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}
                     role="button"
                     tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDept(dept.id); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDept(dept.id); setCurrentPage(1); setSearchQuery(''); } }}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: `${dept.color}15` }}>
@@ -748,7 +757,7 @@ export default function StaffPage() {
             >
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => setSelectedDept(null)}
+                  onClick={() => { setSelectedDept(null); setCurrentPage(1); setSearchQuery(''); }}
                   className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-150"
                   style={{ background: 'var(--color-surface-hover)' }}
                 >
@@ -759,7 +768,7 @@ export default function StaffPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold">{selectedDeptData.name}</h3>
-                  <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>{filteredStaff.length} personel</p>
+                  <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>{data?.total ?? filteredStaff.length} personel</p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -793,7 +802,7 @@ export default function StaffPage() {
             </div>
 
             <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-              <DataTable columns={columns} data={filteredStaff} searchKey="name" searchPlaceholder="Bu departmanda ara..." onRowClick={(staff) => router.push(`/admin/staff/${(staff as { id: string }).id}`)} />
+              <DataTable columns={columns} data={filteredStaff} searchKey="name" searchPlaceholder="Bu departmanda ara..." onRowClick={(staff) => router.push(`/admin/staff/${(staff as { id: string }).id}`)} totalCount={data?.total} pageCount={data?.totalPages} currentPage={currentPage} onPageChange={setCurrentPage} onSearchChange={handleSearch} />
             </div>
           </div>
         </BlurFade>
@@ -803,36 +812,7 @@ export default function StaffPage() {
       {activeView === 'all' && (
         <BlurFade delay={0.05}>
           <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <DataTable columns={columns} data={allStaff} searchKey="name" searchPlaceholder="Personel ara (isim, TC, e-posta)..." onRowClick={(staff) => router.push(`/admin/staff/${(staff as { id: string }).id}`)} />
-            <div className="flex items-center justify-between pt-4 mt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                Toplam {data?.total ?? allStaff.length} personel{(data?.totalPages ?? 1) > 1 ? ` — Sayfa ${currentPage}/${data?.totalPages}` : ''}
-              </p>
-              {(data?.totalPages ?? 1) > 1 && (
-                <div className="flex gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage <= 1}
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    className="rounded-lg text-xs"
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    Önceki
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage >= (data?.totalPages ?? 1)}
-                    onClick={() => setCurrentPage(p => p + 1)}
-                    className="rounded-lg text-xs"
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    Sonraki
-                  </Button>
-                </div>
-              )}
-            </div>
+            <DataTable columns={columns} data={allStaff} searchKey="name" searchPlaceholder="Personel ara (isim, TC, e-posta)..." onRowClick={(staff) => router.push(`/admin/staff/${(staff as { id: string }).id}`)} totalCount={data?.total} pageCount={data?.totalPages} currentPage={currentPage} onPageChange={setCurrentPage} onSearchChange={handleSearch} />
           </div>
         </BlurFade>
       )}
