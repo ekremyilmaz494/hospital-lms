@@ -45,7 +45,7 @@ export async function GET(
   // --- Header ---
   doc.setFontSize(18)
   doc.setTextColor(13, 150, 104)
-  doc.text('Hastane LMS - Akreditasyon Raporu', pageWidth / 2, 18, { align: 'center' })
+  doc.text('Devakent Hastanesi - Akreditasyon Raporu', pageWidth / 2, 18, { align: 'center' })
 
   doc.setFontSize(11)
   doc.setTextColor(80)
@@ -180,7 +180,7 @@ export async function GET(
     doc.setFontSize(7)
     doc.setTextColor(150)
     doc.text(`Sayfa ${i} / ${totalPages}`, pageWidth / 2, 290, { align: 'center' })
-    doc.text('Hastane LMS — Gizli', 20, 290)
+    doc.text('Devakent Hastanesi — Gizli', 20, 290)
   }
 
   const pdfBuffer = doc.output('arraybuffer')

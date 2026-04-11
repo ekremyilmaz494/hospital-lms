@@ -24,26 +24,31 @@ export async function GET() {
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  const categories = await prisma.trainingCategory.findMany({
+  let categories = await prisma.trainingCategory.findMany({
     where: { organizationId: dbUser!.organizationId! },
     orderBy: { order: 'asc' },
     select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
   })
 
-  // DB'de kayıt yoksa hardcode varsayılanları döndür (fallback)
+  // DB'de kayıt yoksa varsayılanları DB'ye seed'le (tek seferlik)
   if (categories.length === 0) {
-    return jsonResponse(
-      TRAINING_CATEGORIES.map((cat, i) => ({
-        id: cat.value,
+    await prisma.trainingCategory.createMany({
+      data: TRAINING_CATEGORIES.map((cat, i) => ({
+        organizationId: dbUser!.organizationId!,
         value: cat.value,
         label: cat.label,
         icon: cat.icon,
         order: i,
-        isDefault: true,
+        isDefault: false,
       })),
-      200,
-      { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' }
-    )
+      skipDuplicates: true,
+    })
+
+    categories = await prisma.trainingCategory.findMany({
+      where: { organizationId: dbUser!.organizationId! },
+      orderBy: { order: 'asc' },
+      select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
+    })
   }
 
   return jsonResponse(categories, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })

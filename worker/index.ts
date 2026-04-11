@@ -18,7 +18,7 @@ self.addEventListener('push', (event: PushEvent) => {
     payload = { body: event.data.text() };
   }
 
-  const title = payload.title ?? 'Hastane LMS';
+  const title = payload.title ?? 'Devakent Hastanesi';
   const options: NotificationOptions = {
     body:    payload.body ?? '',
     icon:    '/icons/icon-192.png',

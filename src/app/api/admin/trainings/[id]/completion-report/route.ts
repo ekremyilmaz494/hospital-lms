@@ -100,7 +100,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = doc.internal.pageSize.getWidth()
   const H = doc.internal.pageSize.getHeight()
-  const orgName = training.organization?.name ?? 'Hastane LMS'
+  const orgName = training.organization?.name ?? 'Devakent Hastanesi'
 
   // ── HEADER ──────────────────────────────────────────────
   doc.setFillColor(...PRIMARY)

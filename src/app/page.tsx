@@ -3,11 +3,11 @@ import dynamic from "next/dynamic";
 import { HeroSection } from "./(landing)/hero-section";
 
 export const metadata: Metadata = {
-  title: "Hastane LMS - Hastane Personel Egitim ve Sinav Yonetim Sistemi",
+  title: "Devakent Hastanesi - Personel Egitim ve Sinav Yonetim Sistemi",
   description:
     "Hastane personeli icin video tabanli egitim, sinav, sertifika ve akreditasyon yonetim platformu. 500+ hastane tarafindan tercih ediliyor.",
   openGraph: {
-    title: "Hastane LMS - Personel Egitim ve Sinav Yonetim Sistemi",
+    title: "Devakent Hastanesi - Personel Egitim ve Sinav Yonetim Sistemi",
     description:
       "Hastane personelinizi egitimler, sinavlar ve sertifikalarla yonetin. KVKK uyumlu, 7/24 erisim.",
     type: "website",

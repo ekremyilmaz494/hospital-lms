@@ -346,7 +346,7 @@ export async function GET(
 
     // ── Excel Export ──
     const wb = new ExcelJS.Workbook()
-    wb.creator = 'Hospital LMS'
+    wb.creator = 'Devakent Hastanesi'
     wb.created = new Date()
 
     // Sheet 1: Özet

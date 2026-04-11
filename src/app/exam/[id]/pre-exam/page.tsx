@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Clock, ChevronLeft, ChevronRight, AlertTriangle, LogOut } from 'lucide-react';
+import { Clock, ChevronLeft, ChevronRight, AlertTriangle, LogOut, Shield, Timer, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
@@ -39,6 +39,7 @@ export default function PreExamPage() {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
 
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
@@ -46,6 +47,7 @@ export default function PreExamPage() {
 
   // 1. Once attempt baslat, sonra sorulari cek, timer'i Redis'ten al
   useEffect(() => {
+    if (!confirmed) return;
     let cancelled = false;
 
     async function initExam() {
@@ -96,7 +98,12 @@ export default function PreExamPage() {
             try {
               const timerRes = await fetch(`/api/exam/${attempt.id}/timer`, { method: 'POST' });
               const timerData = await timerRes.json();
-              setTimeLeft(timerData.remainingSeconds ?? data.totalTime);
+              const remaining = timerData.remainingSeconds ?? data.totalTime;
+              if (remaining <= 0) {
+                if (!cancelled) setError('Sınav süresi dolmuş. Lütfen sınavı tekrar başlatın.');
+                return;
+              }
+              setTimeLeft(remaining);
             } catch {
               setTimeLeft(data.totalTime);
             }
@@ -122,7 +129,7 @@ export default function PreExamPage() {
 
     initExam();
     return () => { cancelled = true; };
-  }, [id, router]);
+  }, [id, router, confirmed]);
 
   // Timer countdown
   useEffect(() => {
@@ -224,6 +231,74 @@ export default function PreExamPage() {
   }, [tabSwitchCount]);
 
   // ── Early returns (tüm hook'lar yukarıda tanımlandı) ──
+
+  // Sınav başlamadan önce uyarı ekranı
+  if (!confirmed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--color-bg)' }}>
+        <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
+          {/* Header */}
+          <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg, #0d9668, #0f4a35)' }}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                <Shield className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-white">Ön Sınav Başlamak Üzere</h1>
+                <p className="text-sm text-white/70">Lütfen aşağıdaki kuralları dikkatlice okuyun</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Rules */}
+          <div className="px-6 py-5 space-y-4">
+            <div className="flex items-start gap-3 p-3 rounded-xl" style={{ background: 'var(--color-warning-bg)' }}>
+              <Timer className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Süre başladığında durdurulamaz</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Sınavı başlattığınız anda süre işlemeye başlar ve duraklatılamaz. Sayfayı kapatsanız bile süre devam eder.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-xl" style={{ background: 'var(--color-bg)' }}>
+              <Ban className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--color-error)' }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Sekme değiştirme yasağı</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Sınav sırasında başka sekmeye geçmeniz tespit edilir. 3 ihlalde sınav otomatik olarak gönderilir.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-xl" style={{ background: 'var(--color-bg)' }}>
+              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Süre dolduğunda otomatik gönderim</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Süre bittiğinde cevaplarınız otomatik olarak gönderilir. Süre dolduktan sonra gönderim kabul edilmez.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="px-6 py-4 flex items-center justify-between gap-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <Button
+              variant="outline"
+              onClick={() => router.back()}
+              className="text-sm"
+            >
+              Geri Dön
+            </Button>
+            <Button
+              onClick={() => setConfirmed(true)}
+              className="text-sm font-semibold text-white px-6"
+              style={{ background: 'linear-gradient(135deg, #0d9668, #059669)' }}
+            >
+              Anladım, Sınavı Başlat
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return <PageLoading />;
   }

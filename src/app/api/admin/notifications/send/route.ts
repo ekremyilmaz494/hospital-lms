@@ -26,7 +26,7 @@ function notificationEmailHtml(title: string, message: string, type: string, app
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #065f46); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.7); margin: 8px 0 0; font-size: 14px;">Yeni Bildirim</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -38,7 +38,7 @@ function notificationEmailHtml(title: string, message: string, type: string, app
            style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px;">
           Bildirimleri Görüntüle
         </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Bu e-posta Hastane LMS sistemi tarafından otomatik olarak gönderilmiştir.</p>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Bu e-posta Devakent Hastanesi sistemi tarafından otomatik olarak gönderilmiştir.</p>
       </div>
     </div>
   `
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
         batch.map(u =>
           sendEmail({
             to: u.email,
-            subject: `[Hastane LMS] ${title}`,
+            subject: `[Devakent Hastanesi] ${title}`,
             html,
           })
         )

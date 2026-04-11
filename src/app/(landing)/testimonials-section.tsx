@@ -157,7 +157,7 @@ export function TestimonialsSection() {
             style={{ borderColor: "rgba(255,255,255,0.08)" }}
           >
             <p className="text-xs" style={{ color: "#6dba92" }}>
-              © 2026 Hastane LMS Platformu. Tüm hakları saklıdır.
+              © 2026 Devakent Hastanesi Platformu. Tüm hakları saklıdır.
             </p>
             <Link
               href="/kvkk"

@@ -75,7 +75,7 @@ function GoldSeal() {
 /** Premium HTML certificate preview — professional design */
 function CertificatePreview({ cert }: { cert: Certificate }) {
   const fullName = cert.user ? `${cert.user.firstName ?? ''} ${cert.user.lastName ?? ''}`.trim() : '';
-  const orgName = cert.user?.organization?.name ?? 'Hastane LMS';
+  const orgName = cert.user?.organization?.name ?? 'Devakent Hastanesi';
 
   return (
     <div

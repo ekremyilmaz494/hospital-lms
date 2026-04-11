@@ -88,7 +88,20 @@ export async function GET(request: Request) {
     }
   } catch { /* SMTP check failed */ }
 
-  const critical = services.database && services.auth
+  // ── Config ref kontrolü ──
+  const expectedRef = 'pkkkyyajfmusurcoovwt'
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+  const supabaseRef = supabaseUrl.match(/\/\/([^.]+)\.supabase/)?.[1] ?? 'unknown'
+  const refMatch = supabaseRef === expectedRef
+  const dbUrl = process.env.DATABASE_URL ?? ''
+  const dbRegion = dbUrl.match(/([a-z]{2}-[a-z]+-\d)/)?.[1] ?? 'unknown'
+
+  // Yanlış projeye bağlıysa auth'u override et
+  if (!refMatch) {
+    services.auth = false
+  }
+
+  const critical = services.database && services.auth && refMatch
   const status = critical
     ? Object.values(services).every(Boolean) ? 'healthy' : 'degraded'
     : 'down'
@@ -97,6 +110,13 @@ export async function GET(request: Request) {
     {
       status,
       services,
+      config: {
+        supabaseRef,
+        expectedRef,
+        refMatch,
+        region: dbRegion,
+        appUrl: process.env.NEXT_PUBLIC_APP_URL ?? '',
+      },
       timestamp: new Date().toISOString(),
       version: APP_VERSION,
     },

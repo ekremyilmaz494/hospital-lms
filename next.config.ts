@@ -4,6 +4,21 @@ import { withSentryConfig } from '@sentry/nextjs';
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+// ── Build-time guard: Yanlış Supabase URL ile production build'i engelle ──
+if (process.env.NODE_ENV === 'production') {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+  const expectedRef = 'pkkkyyajfmusurcoovwt';
+  if (!supabaseUrl.includes(expectedRef)) {
+    throw new Error(
+      `\n\n🚨 NEXT_PUBLIC_SUPABASE_URL yanlış Supabase projesine işaret ediyor!\n` +
+      `   Beklenen ref: ${expectedRef} (Frankfurt eu-central-1)\n` +
+      `   Mevcut URL:   ${supabaseUrl || '(boş)'}\n` +
+      `   → Vercel Environment Variables'ı kontrol edin.\n` +
+      `   → Doğru URL: https://${expectedRef}.supabase.co\n\n`
+    );
+  }
+}
+
 const withPWA = withPWAInit({
   dest: "public",
   // Service worker'ı sadece production'da aktif et

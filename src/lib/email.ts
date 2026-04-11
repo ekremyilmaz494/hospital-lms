@@ -60,7 +60,7 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
   }
 
   await transporter.sendMail({
-    from: process.env.SMTP_FROM ?? 'Hastane LMS <noreply@hastanelms.com>',
+    from: process.env.SMTP_FROM ?? 'Devakent Hastanesi <noreply@hastanelms.com>',
     replyTo: process.env.SMTP_REPLY_TO ?? process.env.SMTP_FROM ?? 'destek@hastanelms.com',
     to: recipientList.join(', '),
     subject,
@@ -74,7 +74,7 @@ export function trainingAssignedEmail(staffName: string, trainingTitle: string, 
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <h2 style="color: #1e293b; margin-top: 0;">Yeni Eğitim Atandı</h2>
@@ -94,7 +94,7 @@ export function examResultEmail(staffName: string, trainingTitle: string, score:
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <h2 style="color: #1e293b; margin-top: 0;">Sınav Sonucu</h2>
@@ -113,18 +113,36 @@ export function examResultEmail(staffName: string, trainingTitle: string, score:
   `
 }
 
-// forgotPasswordEmail silindi — Supabase Auth kendi sifre sifirlama emailini gonderiyor (resetPasswordForEmail)
+export function forgotPasswordEmail(name: string, resetLink: string) {
+  return `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #1e293b; margin-top: 0;">Şifre Sıfırlama</h2>
+        <p style="color: #64748b;">Merhaba ${escapeHtml(name)},</p>
+        <p style="color: #64748b;">Hesabınız için bir şifre sıfırlama isteği aldık. Aşağıdaki butona tıklayarak yeni şifrenizi belirleyebilirsiniz:</p>
+        <a href="${escapeHtml(resetLink)}"
+           style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
+          Şifremi Sıfırla
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu link 1 saat içerisinde geçerliliğini yitirecektir. Eğer siz bu isteği yapmadıysanız bu e-postayı göz ardı edebilirsiniz.</p>
+      </div>
+    </div>
+  `
+}
 
 export function welcomeEmail(name: string, email: string, resetLink: string) {
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <h2 style="color: #1e293b; margin-top: 0;">Hoş Geldiniz!</h2>
         <p style="color: #64748b;">Merhaba ${escapeHtml(name)},</p>
-        <p style="color: #64748b;">Hastane LMS hesabınız oluşturulmuştur.</p>
+        <p style="color: #64748b;">Devakent Hastanesi hesabınız oluşturulmuştur.</p>
         <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
           <p style="margin: 4px 0; color: #475569;"><strong>E-posta:</strong> ${escapeHtml(email)}</p>
         </div>
@@ -154,7 +172,7 @@ export async function sendHospitalWelcomeEmail(params: {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Hastane Hesabınız Oluşturuldu</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -179,7 +197,7 @@ export async function sendHospitalWelcomeEmail(params: {
 
   await sendEmail({
     to,
-    subject: 'Hastane LMS Hesabınız Oluşturuldu',
+    subject: 'Devakent Hastanesi Hesabınız Oluşturuldu',
     html,
   })
 }
@@ -192,7 +210,7 @@ export function upcomingTrainingReminderEmail(staffName: string, trainingTitle: 
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, ${urgencyColor}, ${daysLeft <= 1 ? '#7f1d1d' : '#92400e'}); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Eğitim Deadline Hatırlatması</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -223,7 +241,7 @@ export function certificateExpiryReminderEmail(staffName: string, trainingTitle:
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, ${urgencyColor}, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Sertifika Yenileme Hatırlatması</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -281,7 +299,7 @@ export async function sendInvoiceEmail(params: {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Fatura Bildirimi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -299,7 +317,7 @@ export async function sendInvoiceEmail(params: {
   `
 
   await transporter.sendMail({
-    from: process.env.SMTP_FROM ?? 'Hastane LMS <noreply@hastanelms.com>',
+    from: process.env.SMTP_FROM ?? 'Devakent Hastanesi <noreply@hastanelms.com>',
     to: recipientList.join(', '),
     subject: `Fatura - ${invoiceNumber}`,
     html,
@@ -320,7 +338,7 @@ export async function sendTrialExpiringEmail(to: string, hospitalName: string, d
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #f59e0b, #92400e); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Deneme Suresi Uyarisi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -338,7 +356,7 @@ export async function sendTrialExpiringEmail(to: string, hospitalName: string, d
       </div>
     </div>
   `
-  await sendEmail({ to, subject: `Hastane LMS — Deneme surenizin bitmesine ${daysLeft} gun`, html })
+  await sendEmail({ to, subject: `Devakent Hastanesi — Deneme surenizin bitmesine ${daysLeft} gun`, html })
 }
 
 /** Deneme suresi doldu */
@@ -346,7 +364,7 @@ export async function sendTrialExpiredEmail(to: string, hospitalName: string) {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Deneme Suresi Sona Erdi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -364,7 +382,7 @@ export async function sendTrialExpiredEmail(to: string, hospitalName: string) {
       </div>
     </div>
   `
-  await sendEmail({ to, subject: 'Hastane LMS — Deneme sureniz sona erdi', html })
+  await sendEmail({ to, subject: 'Devakent Hastanesi — Deneme sureniz sona erdi', html })
 }
 
 /** Abonelik suresi dolmak uzere (7, 3, 1 gun kala) */
@@ -372,7 +390,7 @@ export async function sendSubscriptionExpiringEmail(to: string, hospitalName: st
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #f59e0b, #92400e); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Yenileme Hatirlatmasi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -389,7 +407,7 @@ export async function sendSubscriptionExpiringEmail(to: string, hospitalName: st
       </div>
     </div>
   `
-  await sendEmail({ to, subject: `Hastane LMS — Aboneliginizin bitmesine ${daysLeft} gun`, html })
+  await sendEmail({ to, subject: `Devakent Hastanesi — Aboneliginizin bitmesine ${daysLeft} gun`, html })
 }
 
 /** Abonelik suresi doldu */
@@ -397,7 +415,7 @@ export async function sendSubscriptionExpiredEmail(to: string, hospitalName: str
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Sona Erdi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -415,7 +433,7 @@ export async function sendSubscriptionExpiredEmail(to: string, hospitalName: str
       </div>
     </div>
   `
-  await sendEmail({ to, subject: 'Hastane LMS — Aboneliginiz sona erdi', html })
+  await sendEmail({ to, subject: 'Devakent Hastanesi — Aboneliginiz sona erdi', html })
 }
 
 /**
@@ -433,7 +451,7 @@ export async function sendSelfRegistrationEmail(params: {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Hoş Geldiniz!</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -457,7 +475,7 @@ export async function sendSelfRegistrationEmail(params: {
 
   await sendEmail({
     to,
-    subject: 'Hastane LMS — Kaydınız Başarılı',
+    subject: 'Devakent Hastanesi — Kaydınız Başarılı',
     html,
   })
 }
@@ -476,7 +494,7 @@ export function complianceReportEmail(orgName: string, score: number, criticalCo
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: ${headerGradient}; padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Aylik Uyum Raporu</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -512,7 +530,7 @@ export function overdueTrainingReminderEmail(staffName: string, trainingTitle: s
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Gecikmiş Eğitim Uyarısı</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -538,7 +556,7 @@ export async function passwordChangedEmail(email: string) {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Güvenlik Bildirimi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -551,7 +569,7 @@ export async function passwordChangedEmail(email: string) {
       </div>
     </div>
   `
-  await sendEmail({ to: email, subject: 'Hastane LMS — Şifre Değiştirildi', html })
+  await sendEmail({ to: email, subject: 'Devakent Hastanesi — Şifre Değiştirildi', html })
 }
 
 /** Yeni giriş algılandığında güvenlik uyarısı
@@ -561,7 +579,7 @@ export async function loginAlertEmail(email: string, ipAddress: string, userAgen
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Güvenlik Bildirimi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -583,7 +601,7 @@ export async function loginAlertEmail(email: string, ipAddress: string, userAgen
       </div>
     </div>
   `
-  await sendEmail({ to: email, subject: 'Hastane LMS — Yeni Giriş Algılandı', html })
+  await sendEmail({ to: email, subject: 'Devakent Hastanesi — Yeni Giriş Algılandı', html })
 }
 
 /** Eğitim sertifikası hazır bildirimi */
@@ -591,7 +609,7 @@ export async function certificateIssuedEmail(email: string, staffName: string, t
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Sertifika Bildirimi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -610,7 +628,7 @@ export async function certificateIssuedEmail(email: string, staffName: string, t
       </div>
     </div>
   `
-  await sendEmail({ to: email, subject: 'Hastane LMS — Sertifikanız Hazır', html })
+  await sendEmail({ to: email, subject: 'Devakent Hastanesi — Sertifikanız Hazır', html })
 }
 
 /** Abonelik süresi dolmak üzere uyarısı (plan detayları ile)
@@ -623,7 +641,7 @@ export async function subscriptionExpiryEmail(email: string, hospitalName: strin
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, ${urgencyColor}, ${daysRemaining <= 3 ? '#7f1d1d' : '#92400e'}); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Uyarısı</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -645,7 +663,7 @@ export async function subscriptionExpiryEmail(email: string, hospitalName: strin
       </div>
     </div>
   `
-  await sendEmail({ to: email, subject: `Hastane LMS — Abonelik Süresi Dolmak Üzere (${daysRemaining} gün)`, html })
+  await sendEmail({ to: email, subject: `Devakent Hastanesi — Abonelik Süresi Dolmak Üzere (${daysRemaining} gün)`, html })
 }
 
 /** KVKK veri talebi yanıt bildirimi */
@@ -659,7 +677,7 @@ export async function kvkkResponseEmail(email: string, requestType: 'access' | '
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Hastane LMS</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">KVKK Bilgilendirme</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -674,5 +692,5 @@ export async function kvkkResponseEmail(email: string, requestType: 'access' | '
       </div>
     </div>
   `
-  await sendEmail({ to: email, subject: 'Hastane LMS — KVKK Talep Yanıtı', html })
+  await sendEmail({ to: email, subject: 'Devakent Hastanesi — KVKK Talep Yanıtı', html })
 }

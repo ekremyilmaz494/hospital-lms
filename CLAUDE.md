@@ -439,3 +439,18 @@ Tüm kontroller geçince kullanıcıya şu formatta özet ver:
 - **Kural 3**: Data yazma (create/update/delete) sonrasında ilgili cache key'i `invalidateCache(key)` ile temizle
 - **Kural 4**: Auth profil endpoint'lerine (`/api/auth/me` gibi) `Cache-Control: private, max-age=30` ekle
 - **Tarih**: 2026-03-31
+
+## Deploy Checklist (Her Vercel Deploy Oncesi ZORUNLU)
+
+1. `pnpm validate:env` — env degiskenleri dogrula (otomatik: `pnpm predeploy`)
+2. Supabase project ref kontrol: `NEXT_PUBLIC_SUPABASE_URL` → `pkkkyyajfmusurcoovwt` (Frankfurt)
+3. `DATABASE_URL` → `eu-central-1` icermeli
+4. Vercel → Settings → Deployment Protection → KAPALI (public erisim icin)
+5. Deploy sonrasi:
+   ```bash
+   curl -H "x-health-secret: $HEALTH_CHECK_SECRET" https://[URL]/api/health
+   ```
+   → `"refMatch": true` + `"status": "healthy"` gormeli
+6. Kalici referans: Dogru Supabase project ref = `pkkkyyajfmusurcoovwt`
+7. Referans dosya: `.env.production.reference` (format/beklenen degerler)
+8. Vercel env kontrol: `node scripts/check-vercel-env.js` (Vercel CLI gerekli)

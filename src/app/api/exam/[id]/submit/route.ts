@@ -253,7 +253,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         organizationId: attempt.training.organizationId,
         activityType: 'COURSE_COMPLETION',
         title: attempt.training.title,
-        provider: 'Hastane LMS',
+        provider: 'Devakent Hastanesi',
         completionDate: new Date(),
         smgPoints: attempt.training.smgPoints,
         approvalStatus: 'APPROVED',

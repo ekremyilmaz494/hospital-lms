@@ -152,7 +152,7 @@ export async function GET(request: Request) {
   try {
     const { org, staffCount, trainings, staff, departments, avgScoreResult } = await fetchReportData(orgId, dateFrom, dateTo)
 
-    const orgName = org?.name ?? 'Hastane LMS'
+    const orgName = org?.name ?? 'Devakent Hastanesi'
     const dateStr = new Date().toISOString().slice(0, 10)
     const dateLabel = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })
 

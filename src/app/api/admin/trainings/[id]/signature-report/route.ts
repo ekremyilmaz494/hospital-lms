@@ -94,7 +94,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   doc.text('H', 20, 26, { align: 'center' })
 
   // ── HEADER TEXT ────────────────────────────────────────────────────
-  const orgName = training.organization?.name ?? 'Hastane LMS'
+  const orgName = training.organization?.name ?? 'Devakent Hastanesi'
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)

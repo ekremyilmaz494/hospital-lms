@@ -1,5 +1,5 @@
 /**
- * OpenAPI 3.0.3 Specification for Hospital LMS API
+ * OpenAPI 3.0.3 Specification for Devakent Hastanesi API
  *
  * Hastane Personel Egitim ve Sinav Yonetim Sistemi API dokumantasyonu.
  * Tum aciklamalar Turkce olarak yazilmistir.
@@ -8,7 +8,7 @@
 export const openApiSpec = {
   openapi: '3.0.3',
   info: {
-    title: 'Hospital LMS API',
+    title: 'Devakent Hastanesi API',
     version: '1.0.0',
     description:
       'Hastane Personel Egitim ve Sinav Yonetim Sistemi (LMS) REST API dokumantasyonu.\n\n' +
@@ -22,7 +22,7 @@ export const openApiSpec = {
       '## Multi-Tenant\n' +
       'Tum veriler `organizationId` ile izole edilmistir. Her kullanici sadece kendi organizasyonunun verilerine erisebilir.',
     contact: {
-      name: 'Hospital LMS Destek',
+      name: 'Devakent Hastanesi Destek',
     },
   },
   servers: [{ url: '/api', description: 'API Base URL' }],

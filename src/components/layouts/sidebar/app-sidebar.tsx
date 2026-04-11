@@ -82,7 +82,7 @@ export const AppSidebar = memo(function AppSidebar({
   navGroups,
   collapsed = false,
   onToggleCollapse,
-  orgName = 'Hastane LMS',
+  orgName = 'Devakent Hastanesi',
   orgCode,
   orgLogoUrl,
   userName = 'Kullanıcı',

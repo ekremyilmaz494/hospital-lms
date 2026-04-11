@@ -3,7 +3,7 @@ import { ArrowLeft, Shield, Database, Share2, Clock, UserCheck, Mail } from 'luc
 import { BlurFade } from '@/components/ui/blur-fade'
 
 export const metadata = {
-  title: 'KVKK Aydınlatma Metni — Hastane LMS',
+  title: 'KVKK Aydınlatma Metni — Devakent Hastanesi',
   description: 'Kişisel Verilerin Korunması Kanunu kapsamında aydınlatma metni',
 }
 
@@ -12,7 +12,7 @@ const sections = [
     icon: Shield,
     title: '1. Veri Sorumlusu',
     content:
-      'Hastane LMS Platformu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan amaçlar doğrultusunda ve kanuna uygun olarak işlemekteyiz.',
+      'Devakent Hastanesi Platformu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan amaçlar doğrultusunda ve kanuna uygun olarak işlemekteyiz.',
   },
   {
     icon: Database,
@@ -101,9 +101,9 @@ export default function KVKKPage() {
               className="flex h-8 w-8 items-center justify-center rounded-xl text-sm font-bold text-white"
               style={{ background: 'linear-gradient(135deg, #0d9668, #1a3a28)' }}
             >
-              H
+              D
             </div>
-            <span className="text-sm font-semibold" style={{ color: '#1a3a28' }}>Hastane LMS</span>
+            <span className="text-sm font-semibold" style={{ color: '#1a3a28' }}>Devakent Hastanesi</span>
           </div>
         </div>
       </header>
@@ -191,7 +191,7 @@ export default function KVKKPage() {
         <BlurFade delay={0.6}>
           <div className="mt-12 text-center">
             <p className="text-xs" style={{ color: '#4a7060' }}>
-              Son güncelleme: Mart 2026 &middot; &copy; 2026 Hastane LMS Platformu
+              Son güncelleme: Mart 2026 &middot; &copy; 2026 Devakent Hastanesi Platformu
             </p>
           </div>
         </BlurFade>

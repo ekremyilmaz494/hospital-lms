@@ -101,12 +101,12 @@ export async function POST(request: NextRequest) {
       try {
         await sendEmail({
           to: adminEmail,
-          subject: `[Hastane LMS] Yeni Demo Talebi - ${sanitized.hospitalName}`,
+          subject: `[Devakent Hastanesi] Yeni Demo Talebi - ${sanitized.hospitalName}`,
           html: `
             <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
               <div style="background: linear-gradient(135deg, #0d9668, #065f46); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
                 <h1 style="color: white; font-size: 20px; margin: 0;">Yeni Demo Talebi</h1>
-                <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin: 8px 0 0;">Hastane LMS platformundan yeni bir demo talebi alindi.</p>
+                <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin: 8px 0 0;">Devakent Hastanesi platformundan yeni bir demo talebi alindi.</p>
               </div>
               <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                 <tr style="border-bottom: 1px solid #e2e8f0;">

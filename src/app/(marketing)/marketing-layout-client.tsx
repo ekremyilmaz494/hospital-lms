@@ -57,10 +57,10 @@ function MarketingHeader() {
               className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-sm"
               style={{ background: "linear-gradient(135deg, #0d9668, #065f46)" }}
             >
-              H
+              D
             </div>
             <span className="font-bold text-[15px] tracking-tight" style={{ color: "#0f172a" }}>
-              Hastane<span style={{ color: "#0d9668" }}>LMS</span>
+              Deva<span style={{ color: "#0d9668" }}>kent</span>
             </span>
           </Link>
 
@@ -248,10 +248,10 @@ function MarketingFooter() {
               className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-black text-xs"
               style={{ background: "linear-gradient(135deg, #0d9668, #065f46)" }}
             >
-              H
+              D
             </div>
             <p className="text-xs" style={{ color: "#94a3b8" }}>
-              &copy; 2026 Hastane LMS. Tum haklari saklidir.
+              &copy; 2026 Devakent Hastanesi. Tum haklari saklidir.
             </p>
           </div>
           <div className="flex items-center gap-4">

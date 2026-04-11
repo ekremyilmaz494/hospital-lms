@@ -21,6 +21,8 @@
     "db:studio": "prisma studio",
     "db:seed": "node scripts/seed-demo.js",
     "prepare": "husky",
+    "validate:env": "node scripts/validate-env.js",
+    "predeploy": "node scripts/validate-env.js",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "test:load": "k6 run scripts/load-test.js",

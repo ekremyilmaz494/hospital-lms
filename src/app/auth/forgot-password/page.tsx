@@ -67,7 +67,7 @@ export default function ForgotPasswordPage() {
             >
               H
             </div>
-            <span className="text-xl font-bold font-heading">Hastane LMS</span>
+            <span className="text-xl font-bold font-heading">Devakent Hastanesi</span>
           </div>
         </BlurFade>
 
@@ -199,7 +199,7 @@ export default function ForgotPasswordPage() {
             <BlurFade delay={0.4}>
               <div className="mt-10 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
                 <p className="text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  &copy; 2026 Hastane LMS. Tüm hakları saklıdır.
+                  &copy; 2026 Devakent Hastanesi. Tüm hakları saklıdır.
                 </p>
               </div>
             </BlurFade>

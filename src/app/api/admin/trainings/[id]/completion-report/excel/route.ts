@@ -70,7 +70,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
   const wb = new ExcelJS.Workbook()
-  wb.creator = training.organization?.name ?? 'Hastane LMS'
+  wb.creator = training.organization?.name ?? 'Devakent Hastanesi'
   wb.created = new Date()
 
   const ws = wb.addWorksheet('Tamamlama Raporu')

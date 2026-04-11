@@ -72,7 +72,7 @@ export default function MobileLayout({
               <div className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold" style={{ background: 'linear-gradient(135deg, #0d9668, #065f46)', color: 'white' }}>H</div>
             )}
             <div>
-              <span className="text-[15px] font-bold text-white block leading-tight">{branding?.name || 'Hastane LMS'}</span>
+              <span className="text-[15px] font-bold text-white block leading-tight">{branding?.name || 'Devakent Hastanesi'}</span>
               <span className="text-[10px] font-medium tracking-widest uppercase" style={{ color: '#34d399' }}>Eğitim Platformu</span>
             </div>
           </div>
@@ -197,7 +197,7 @@ export default function MobileLayout({
               <Shield className="h-3.5 w-3.5" style={{ color: '#0d9668' }} />
               <span className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>KVKK Uyumlu &middot; 256-bit SSL &middot; Güvenli Bağlantı</span>
             </div>
-            <p className="text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.15)' }}>&copy; 2026 Hastane LMS</p>
+            <p className="text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.15)' }}>&copy; 2026 Devakent Hastanesi</p>
           </div>
         </div>
       </div>

@@ -34,7 +34,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hospital LMS - Hastane Personel Eğitim Sistemi",
+  title: "Devakent Hastanesi - Personel Eğitim Sistemi",
   description: "Hastane personeli için eğitim ve sınav yönetim platformu",
 };
 

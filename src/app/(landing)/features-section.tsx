@@ -155,7 +155,7 @@ export function FeaturesSection() {
               Platform Özellikleri
             </p>
             <h2 className="text-3xl font-black" style={{ color: "#1a3a28" }}>
-              Neden Hastane LMS?
+              Neden Devakent Hastanesi?
             </h2>
           </div>
           <p

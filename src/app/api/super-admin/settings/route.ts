@@ -18,7 +18,7 @@ export async function GET() {
   const userCount = await prisma.user.count()
 
   return jsonResponse({
-    platformName: process.env.NEXT_PUBLIC_PLATFORM_NAME || 'Hastane LMS',
+    platformName: process.env.NEXT_PUBLIC_PLATFORM_NAME || 'Devakent Hastanesi',
     platformUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     defaultStorageLimit: 10,
     maintenanceMode: false,
@@ -26,7 +26,7 @@ export async function GET() {
     smtpPort: Number(process.env.SMTP_PORT || '587'),
     smtpUser: process.env.SMTP_USER ? '••••••••' : '',
     smtpPassword: process.env.SMTP_PASS ? '••••••••' : '',
-    senderName: process.env.SMTP_FROM_NAME || 'Hastane LMS',
+    senderName: process.env.SMTP_FROM_NAME || 'Devakent Hastanesi',
     stats: {
       totalOrganizations: orgCount,
       totalUsers: userCount,

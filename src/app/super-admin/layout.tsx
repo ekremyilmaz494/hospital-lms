@@ -46,7 +46,7 @@ export default function SuperAdminLayout({
           navGroups={superAdminNav}
           collapsed={sidebarCollapsed}
           onToggleCollapse={toggleSidebar}
-          orgName="Hastane LMS"
+          orgName="Devakent Hastanesi"
           userName={fullName}
           userRole="Platform Yöneticisi"
           userInitials={initials}

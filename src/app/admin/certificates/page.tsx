@@ -403,7 +403,7 @@ export default function CertificatesPage() {
                 <h2 className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
                   Tamamlama Sertifikası
                 </h2>
-                <p className="text-[13px] text-white/70 mt-1">Hastane LMS Eğitim Programı</p>
+                <p className="text-[13px] text-white/70 mt-1">Devakent Hastanesi Eğitim Programı</p>
               </div>
             </div>
 
@@ -564,7 +564,7 @@ export default function CertificatesPage() {
 
             {/* Title */}
             <h1 style={{ fontSize: '38px', fontWeight: 800, color: '#0f172a', letterSpacing: '2px', margin: '16px 0 4px', textAlign: 'center' }}>TAMAMLAMA SERTİFİKASI</h1>
-            <p style={{ fontSize: '14px', color: '#94a3b8', margin: 0, letterSpacing: '1px' }}>Hastane LMS Eğitim Programı</p>
+            <p style={{ fontSize: '14px', color: '#94a3b8', margin: 0, letterSpacing: '1px' }}>Devakent Hastanesi Eğitim Programı</p>
 
             {/* Divider */}
             <div style={{ width: '300px', height: '1px', background: 'linear-gradient(90deg, transparent, #cbd5e1, transparent)', margin: '20px 0' }} />

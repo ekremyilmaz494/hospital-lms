@@ -348,7 +348,7 @@ export async function GET(
     }
 
     // Organization name
-    const orgName = certificate.user.organization?.name ?? 'Hastane LMS'
+    const orgName = certificate.user.organization?.name ?? 'Devakent Hastanesi'
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
     doc.setTextColor(MUTED.r, MUTED.g, MUTED.b)

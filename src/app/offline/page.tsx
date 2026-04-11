@@ -70,7 +70,7 @@ export default function OfflinePage() {
           H
         </div>
         <span className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-          Hastane LMS
+          Devakent Hastanesi
         </span>
       </div>
     </div>

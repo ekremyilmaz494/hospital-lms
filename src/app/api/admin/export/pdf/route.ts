@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   // Header
   doc.setFontSize(20)
   doc.setTextColor(13, 150, 104) // primary color
-  doc.text('Hastane LMS', pageWidth / 2, 20, { align: 'center' })
+  doc.text('Devakent Hastanesi', pageWidth / 2, 20, { align: 'center' })
   doc.setFontSize(12)
   doc.setTextColor(100)
   doc.text(org?.name ?? '', pageWidth / 2, 28, { align: 'center' })

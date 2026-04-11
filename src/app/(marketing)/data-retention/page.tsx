@@ -1,19 +1,19 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Kisisel Veri Saklama ve Imha Politikasi — Hastane LMS',
+  title: 'Kisisel Veri Saklama ve Imha Politikasi — Devakent Hastanesi',
   description: '6698 sayili KVKK kapsaminda kisisel veri saklama sureleri ve imha yontemleri.',
 }
 
 const sections = [
   {
     title: '1. Amac ve Kapsam',
-    content: `Bu politika, 6698 sayili Kisisel Verilerin Korunmasi Kanunu ("KVKK") ve Kisisel Verilerin Silinmesi, Yok Edilmesi veya Anonim Hale Getirilmesi Hakkinda Yonetmelik uyarinca hazirlanmistir. Hastane LMS platformunda islenen tum kisisel verilerin saklanma sureleri, imha kosullari ve yontemlerini kapsar.`,
+    content: `Bu politika, 6698 sayili Kisisel Verilerin Korunmasi Kanunu ("KVKK") ve Kisisel Verilerin Silinmesi, Yok Edilmesi veya Anonim Hale Getirilmesi Hakkinda Yonetmelik uyarinca hazirlanmistir. Devakent Hastanesi platformunda islenen tum kisisel verilerin saklanma sureleri, imha kosullari ve yontemlerini kapsar.`,
   },
   {
     title: '2. Tanimlar',
     content: `**Kisisel Veri:** Kimliginizi belirli veya belirlenebilir kilan her turlu bilgi.
-**Veri Sorumlusu:** Hastane LMS Yazilim Teknolojileri, Ankara, Turkiye.
+**Veri Sorumlusu:** Devakent Hastanesi Yazilim Teknolojileri, Ankara, Turkiye.
 **Imha:** Kisisel verilerin silinmesi, yok edilmesi veya anonim hale getirilmesi.
 **Periyodik Imha:** Kanun'da yer alan kisisel veri isleme sartlarinin tamamen ortadan kalkmasi durumunda, tekrarlayan surelerle resen gerceklestirilen silme, yok etme veya anonimlestime islemidir.`,
   },
@@ -59,7 +59,7 @@ Imha islemleri kayit altina alinir ve 3 yil saklanir.`,
 **Basvuru Yollari:**
 - Platform icerisinden: Staff Paneli → Kisisel Verilerim (KVKK) → Yeni Talep
 - E-posta: kvkk@hastane-lms.com
-- Posta: Hastane LMS Yazilim Teknolojileri, Ankara, Turkiye
+- Posta: Devakent Hastanesi Yazilim Teknolojileri, Ankara, Turkiye
 
 **Yasal Sure:** Talebiniz en gec **30 gun** icinde sonuclandirilir. Islem ucret gerektiriyorsa (Kurul tarifesi), bilgilendirilirsiniz.
 

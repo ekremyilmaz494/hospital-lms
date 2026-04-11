@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { ExamAuthGuard } from './exam-auth-guard';
 
 export const metadata: Metadata = {
-  title: 'Sinav | Hastane LMS',
+  title: 'Sinav | Devakent Hastanesi',
   description: 'Hastane personeli egitim sinav modulu',
 };
 

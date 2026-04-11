@@ -99,7 +99,7 @@ export default function HelpPage() {
                   Yardım & Destek
                 </h1>
                 <p className="mt-2 text-base text-white/60 max-w-lg leading-relaxed">
-                  Hastane LMS platformunu verimli kullanmanız için ihtiyacınız olan tüm bilgiler
+                  Devakent Hastanesi platformunu verimli kullanmanız için ihtiyacınız olan tüm bilgiler
                 </p>
               </div>
             </div>

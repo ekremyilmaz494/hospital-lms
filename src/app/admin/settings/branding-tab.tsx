@@ -321,7 +321,7 @@ function LoginPreview({ settings }: { settings: SettingsData }) {
                 </div>
               )}
               <span className="text-[10px] font-semibold text-white/90">
-                {hospitalName || 'Hastane LMS'}
+                {hospitalName || 'Devakent Hastanesi'}
               </span>
             </div>
             <p className="text-[8px] uppercase tracking-wider font-semibold" style={{ color: secondaryColor }}>

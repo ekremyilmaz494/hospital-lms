@@ -74,7 +74,7 @@ function generateInvoicePdfBuffer(invoice: {
   doc.setFontSize(9)
   doc.setTextColor(30, 41, 59)
   y += 7
-  doc.text('Hastane LMS', leftMargin, y)
+  doc.text('Devakent Hastanesi', leftMargin, y)
   y += 5
   doc.text('Saglik Egitim Teknolojileri A.S.', leftMargin, y)
   y += 5

@@ -102,7 +102,7 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Platform Adı</Label>
-                <Input name="platformName" defaultValue={settings?.platformName ?? 'Hastane LMS'} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                <Input name="platformName" defaultValue={settings?.platformName ?? 'Devakent Hastanesi'} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
               </div>
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Platform URL</Label>
