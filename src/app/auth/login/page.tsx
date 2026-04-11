@@ -95,39 +95,47 @@ function LoginForm() {
         return;
       }
 
+      // İlk girişte şifre değiştirme zorunluluğu
+      if (data.mustChangePassword) {
+        router.push('/auth/change-password?reason=first-login');
+        return;
+      }
+
       const role = data.user?.role as string;
-      const target = redirectTo && redirectTo !== '/' ? redirectTo : ROLE_ROUTES[role] || '/staff/dashboard';
+      // redirectTo varsa role ile uyumlu mu kontrol et — admin kullanıcıyı /staff'a yönlendirme
+      const rolePrefix = role === 'super_admin' ? '/super-admin' : role === 'admin' ? '/admin' : '/staff';
+      const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
+      const target = isRedirectCompatible ? redirectTo : ROLE_ROUTES[role] || '/staff/dashboard';
 
-      // Store'u session'dan önceden doldur — layout mount olduğunda user mevcut olur,
-      // AuthProvider loading skeleton göstermez.
+      // Store'u session'dan doldur — layout mount olduğunda user mevcut olmalı.
+      // AWAIT ile bekliyoruz, yoksa layout guard store boş bulup login'e geri atar.
       const supabase = createClient();
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          const u = session.user;
-          useAuthStore.getState().setUser({
-            id: u.id,
-            email: u.email ?? '',
-            firstName: u.user_metadata?.first_name ?? '',
-            lastName: u.user_metadata?.last_name ?? '',
-            role: u.user_metadata?.role ?? 'staff',
-            organizationId: u.user_metadata?.organization_id ?? null,
-            tcNo: u.user_metadata?.tc_no ?? null,
-            phone: u.user_metadata?.phone ?? null,
-            departmentId: u.user_metadata?.department_id ?? null,
-            department: u.user_metadata?.department ?? null,
-            title: u.user_metadata?.title ?? null,
-            avatarUrl: u.user_metadata?.avatar_url ?? null,
-            isActive: u.user_metadata?.is_active !== false,
-            kvkkConsent: u.user_metadata?.kvkk_consent ?? false,
-            kvkkConsentDate: u.user_metadata?.kvkk_consent_date ?? null,
-            createdAt: u.created_at,
-            updatedAt: u.updated_at ?? u.created_at,
-          });
-        }
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const u = session.user;
+        useAuthStore.getState().setUser({
+          id: u.id,
+          email: u.email ?? '',
+          firstName: u.user_metadata?.first_name ?? '',
+          lastName: u.user_metadata?.last_name ?? '',
+          role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
+          organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
+          tcNo: u.user_metadata?.tc_no ?? null,
+          phone: u.user_metadata?.phone ?? null,
+          departmentId: u.user_metadata?.department_id ?? null,
+          department: u.user_metadata?.department ?? null,
+          title: u.user_metadata?.title ?? null,
+          avatarUrl: u.user_metadata?.avatar_url ?? null,
+          isActive: u.user_metadata?.is_active !== false,
+          kvkkConsent: u.user_metadata?.kvkk_consent ?? false,
+          kvkkConsentDate: u.user_metadata?.kvkk_consent_date ?? null,
+          createdAt: u.created_at,
+          updatedAt: u.updated_at ?? u.created_at,
+        });
+      }
 
-      // Navigasyonu getSession'ı beklemeden hemen başlat
-      router.push(target);
+      // Full reload — middleware fresh JWT ile çalışır, SPA race condition olmaz
+      window.location.href = target;
     } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
       setLoading(false);
@@ -183,7 +191,7 @@ function LoginForm() {
                 </div>
               )}
               <span className="text-xl font-bold text-white/90 font-heading tracking-tight">
-                {branding?.name || 'Hastane LMS'}
+                {branding?.name || 'Devakent Hastanesi'}
               </span>
             </div>
           </BlurFade>
@@ -227,7 +235,7 @@ function LoginForm() {
 
           {/* Footer */}
           <BlurFade delay={0.2} duration={0.3}>
-            <p className="text-xs text-white/30">&copy; 2026 {branding?.name || 'Hastane LMS Platformu'}</p>
+            <p className="text-xs text-white/30">&copy; 2026 {branding?.name || 'Devakent Hastanesi Platformu'}</p>
           </BlurFade>
         </div>
       </div>
@@ -242,7 +250,7 @@ function LoginForm() {
             ) : (
               <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white font-heading" style={{ background: 'var(--color-primary)' }}>H</div>
             )}
-            <span className="text-xl font-bold font-heading">{branding?.name || 'Hastane LMS'}</span>
+            <span className="text-xl font-bold font-heading">{branding?.name || 'Devakent Hastanesi'}</span>
           </div>
 
           <BlurFade delay={0.05} duration={0.3}>
@@ -379,7 +387,7 @@ function LoginForm() {
           <BlurFade delay={0.12} duration={0.3}>
             <div className="mt-10 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
               <p className="text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                &copy; 2026 Hastane LMS. Tüm hakları saklıdır.
+                &copy; 2026 Devakent Hastanesi. Tüm hakları saklıdır.
               </p>
             </div>
           </BlurFade>

@@ -1,9 +1,8 @@
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
-import { encrypt } from '@/lib/crypto'
 import ExcelJS from 'exceljs'
 
 /** Satır ayrıştırma sonucu */
@@ -173,7 +172,6 @@ export async function POST(request: Request) {
   }
 
   // ── Gerçek import ───────────────────────────────────────────────────────
-  const supabase = await createServiceClient()
   let created = 0
   let failed = 0
   const importErrors: string[] = rowResults
@@ -184,43 +182,29 @@ export async function POST(request: Request) {
 
   for (const row of validRows) {
     try {
-      const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      await createAuthUser({
         email: row.email,
         password: row.password,
-        email_confirm: true,
-        user_metadata: { first_name: row.firstName, last_name: row.lastName, role: 'staff', organization_id: orgId },
-      })
-
-      if (authError) {
-        failed++
-        const errMsg = authError.message?.includes('already registered') ? 'Bu e-posta zaten kayıtlı' : authError.message
-        importErrors.push(`${row.email}: ${errMsg}`)
-        results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'failed', error: errMsg })
-        continue
-      }
-
-      await prisma.user.create({
-        data: {
-          id: authUser.user.id,
-          email: row.email,
-          firstName: row.firstName,
-          lastName: row.lastName,
-          role: 'staff',
-          organizationId: orgId,
-          tcNo: row.tcNo ? encrypt(row.tcNo) : undefined,
-          phone: row.phone,
-          departmentId: row.deptId,
-          title: row.title,
-        },
+        firstName: row.firstName,
+        lastName: row.lastName,
+        role: 'staff',
+        organizationId: orgId,
+        tcNo: row.tcNo,
+        phone: row.phone,
+        departmentId: row.deptId,
+        title: row.title,
       })
 
       created++
       results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'created', tempPassword: row.password })
     } catch (err) {
       failed++
-      importErrors.push(`${row.email}: Veritabanı hatası`)
-      results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'failed', error: 'Veritabanı hatası' })
-      logger.error('Bulk Import', `DB insert failed for ${row.email}`, err)
+      const errMsg = err instanceof AuthUserError || err instanceof DbUserError
+        ? err.safeMessage
+        : 'Beklenmeyen hata'
+      importErrors.push(`${row.email}: ${errMsg}`)
+      results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'failed', error: errMsg })
+      logger.error('Bulk Import', `Failed for ${row.email}`, err instanceof Error ? err.message : err)
     }
   }
 

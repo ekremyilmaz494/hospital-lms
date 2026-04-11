@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAppUrl } from '@/lib/api-helpers'
+import { createAuthUser, AuthUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
 import {
   verifySsoState,
@@ -201,39 +202,28 @@ async function provisionAndLogin({
   }
 
   if (!dbUser) {
-    // Auto-provision: create Supabase auth user + DB user
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      user_metadata: {
-        role: org.ssoDefaultRole,
-        organization_id: org.id,
-        first_name: firstName,
-        last_name: lastName,
-        sso_provider: 'sso',
-      },
-    })
-
-    if (authError) {
-      logger.error('sso:callback', 'Kullanici olusturulamadi', authError.message)
-      return NextResponse.redirect(new URL('/auth/login?error=sso_provision_failed', request.url))
-    }
-
-    // upsert: eş zamanlı iki SSO isteği yarışsa bile duplicate key hatası almaz
-    dbUser = await prisma.user.upsert({
-      where: { email },
-      create: {
-        id: authUser.user.id,
+    // Auto-provision: create Supabase auth user + DB user via factory
+    try {
+      const result = await createAuthUser({
         email,
         firstName,
         lastName,
-        role: org.ssoDefaultRole,
+        role: org.ssoDefaultRole as 'admin' | 'staff',
         organizationId: org.id,
-      },
-      update: {},
-    })
+        emailConfirm: true,
+        extraUserMetadata: { sso_provider: 'sso' },
+      })
 
-    logger.info('sso:callback', 'Yeni SSO kullanicisi olusturuldu', { email, orgId: org.id })
+      dbUser = await prisma.user.findUniqueOrThrow({ where: { id: result.dbUser.id } })
+      logger.info('sso:callback', 'Yeni SSO kullanicisi olusturuldu', { email, orgId: org.id })
+    } catch (err) {
+      if (err instanceof AuthUserError) {
+        logger.error('sso:callback', 'Kullanici olusturulamadi', err.message)
+      } else {
+        logger.error('sso:callback', 'SSO provision hatasi', err instanceof Error ? err.message : err)
+      }
+      return NextResponse.redirect(new URL('/auth/login?error=sso_provision_failed', request.url))
+    }
   }
 
   // Kullanicinin organizasyonu dogrula — baska org'a SSO ile sizmay onle

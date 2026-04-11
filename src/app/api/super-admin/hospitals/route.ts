@@ -2,10 +2,10 @@ import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, getAppUrl } from '@/lib/api-helpers'
 import { createHospitalWithAdminSchema } from '@/lib/validations'
-import { createServiceClient } from '@/lib/supabase/server'
 import { sendHospitalWelcomeEmail } from '@/lib/email'
 import { TRAINING_CATEGORIES } from '@/lib/training-categories'
 import { slugify } from '@/lib/organization'
+import { createAuthUser, updateAuthUserOrgId, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
@@ -91,31 +91,8 @@ export async function POST(request: Request) {
   // Geçici şifre oluştur (form'dan gönderilmezse otomatik üret)
   const tempPassword = adminPassword || crypto.randomBytes(12).toString('base64url')
 
-  // Supabase Auth'da admin kullanıcı oluştur (service role)
-  const supabase = await createServiceClient()
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-    email: adminEmail,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: {
-      first_name: adminFirstName,
-      last_name: adminLastName,
-      role: 'admin',
-    },
-  })
-
-  if (authError || !authData.user) {
-    return errorResponse(
-      authError?.message === 'A user with this email address has already been registered'
-        ? 'Bu e-posta adresi Supabase Auth sisteminde zaten kayıtlı'
-        : 'Kullanıcı oluşturulamadı. Lütfen tekrar deneyin.',
-      400,
-    )
-  }
-
-  // Transaction: Organizasyon + Abonelik + User + Kategoriler
+  // 1) Transaction: Organizasyon + Abonelik + Kategoriler (user HARIC)
   const hospital = await prisma.$transaction(async (tx) => {
-    // a) Organization oluştur (setupCompleted: false)
     const org = await tx.organization.create({
       data: {
         ...orgData,
@@ -125,7 +102,6 @@ export async function POST(request: Request) {
       },
     })
 
-    // b) Abonelik oluştur
     if (planId) {
       const trialEndsAt = trialDays > 0
         ? new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000)
@@ -142,21 +118,6 @@ export async function POST(request: Request) {
       })
     }
 
-    // c) DB'de User kaydı oluştur (admin, mustChangePassword: true)
-    await tx.user.create({
-      data: {
-        id: authData.user.id,
-        organizationId: org.id,
-        email: adminEmail,
-        firstName: adminFirstName,
-        lastName: adminLastName,
-        role: 'admin',
-        mustChangePassword: !adminPassword, // Manuel şifre girilmişse zorunlu değil
-        isActive: true,
-      },
-    })
-
-    // d) Varsayılan eğitim kategorilerini seed et
     await tx.trainingCategory.createMany({
       data: TRAINING_CATEGORIES.map((cat, i) => ({
         organizationId: org.id,
@@ -170,6 +131,33 @@ export async function POST(request: Request) {
 
     return org
   })
+
+  // 2) Auth + DB user oluştur (factory ile rollback dahil)
+  let authResult
+  try {
+    authResult = await createAuthUser({
+      email: adminEmail,
+      password: tempPassword,
+      firstName: adminFirstName,
+      lastName: adminLastName,
+      role: 'admin',
+      organizationId: hospital.id,
+      mustChangePassword: !adminPassword,
+    })
+  } catch (err) {
+    // Auth veya DB basarisiz → org'u sil
+    await prisma.organization.delete({ where: { id: hospital.id } }).catch(() => {})
+    if (err instanceof AuthUserError) {
+      const safeMsg = err.message.includes('already registered')
+        ? 'Bu e-posta adresi Supabase Auth sisteminde zaten kayıtlı'
+        : 'Kullanıcı oluşturulamadı. Lütfen tekrar deneyin.'
+      return errorResponse(safeMsg, 400)
+    }
+    if (err instanceof DbUserError) {
+      return errorResponse(err.safeMessage)
+    }
+    throw err
+  }
 
   // Audit log
   await createAuditLog({

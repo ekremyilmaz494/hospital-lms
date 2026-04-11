@@ -8,6 +8,7 @@ import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/crypto'
+import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
 import type { SyncResult } from '@/types/database'
 import type { HisIntegration } from '@/generated/prisma/client'
@@ -280,25 +281,30 @@ export async function syncStaffFromHis(integration: HisIntegration): Promise<Syn
             result.updated++
           }
         } else {
-          // Yeni kullanıcı — Supabase auth + DB oluştur
+          // Yeni kullanıcı — factory ile Supabase auth + DB oluştur
           const tempEmail = staffRecord.email ?? `his-${staffRecord.externalId}@${integration.organizationId}.his`
           const tempPassword = crypto.randomBytes(16).toString('hex')
+          const departmentId = deptMap.get(staffRecord.department.toLowerCase())
 
-          const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-            email: tempEmail,
-            password: tempPassword,
-            email_confirm: true,
-            user_metadata: {
-              first_name: staffRecord.name,
-              last_name: staffRecord.surname,
+          try {
+            await createAuthUser({
+              email: tempEmail,
+              password: tempPassword,
+              firstName: staffRecord.name,
+              lastName: staffRecord.surname,
               role: 'staff',
-              organization_id: integration.organizationId,
-            },
-          })
-
-          if (authError) {
-            // Email çakışması — mevcut auth user'ı bul
-            if (authError.message?.includes('already registered')) {
+              organizationId: integration.organizationId,
+              hisExternalId: staffRecord.externalId,
+              tcNo: staffRecord.tcNo,
+              phone: staffRecord.phone,
+              departmentId: departmentId,
+              title: staffRecord.title || undefined,
+              isActive: staffRecord.isActive,
+            })
+            result.created++
+          } catch (err) {
+            if (err instanceof AuthUserError && err.message.includes('already registered')) {
+              // Email çakışması — mevcut auth user'ı bul
               const existingByEmail = await prisma.user.findFirst({
                 where: { email: tempEmail, organizationId: integration.organizationId },
               })
@@ -316,40 +322,11 @@ export async function syncStaffFromHis(integration: HisIntegration): Promise<Syn
               }
               continue
             }
-            throw new Error(`Supabase auth hatası: ${authError.message}`)
-          }
-
-          const departmentId = deptMap.get(staffRecord.department.toLowerCase())
-
-          try {
-            await prisma.user.create({
-              data: {
-                id: authUser.user.id,
-                email: tempEmail,
-                firstName: staffRecord.name,
-                lastName: staffRecord.surname,
-                role: 'staff',
-                organizationId: integration.organizationId,
-                hisExternalId: staffRecord.externalId,
-                tcNo: staffRecord.tcNo,
-                phone: staffRecord.phone,
-                departmentId: departmentId ?? null,
-                title: staffRecord.title || null,
-                isActive: staffRecord.isActive,
-              },
-            })
-            result.created++
-          } catch (dbErr) {
-            // Rollback: DB insert başarısız olursa auth user'ı sil
-            try {
-              await supabase.auth.admin.deleteUser(authUser.user.id)
-            } catch (rollbackErr) {
-              logger.error('HIS Sync', 'Auth user rollback başarısız', {
-                userId: authUser.user.id,
-                rollbackErr,
-              })
+            if (err instanceof AuthUserError) {
+              throw new Error(`Supabase auth hatası: ${err.message}`)
             }
-            throw dbErr
+            // DbUserError — factory zaten rollback yapmış, throw et
+            throw err
           }
         }
 

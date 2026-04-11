@@ -35,22 +35,23 @@ async function run() {
   }
   console.log('RLS enabled on all tables');
 
-  // Create helper functions
+  // Create helper functions — read from app_metadata (NOT user_metadata!)
+  // app_metadata can only be set via service_role, users cannot edit it.
   await client.query(`
     CREATE OR REPLACE FUNCTION public.get_user_role()
     RETURNS TEXT AS $$
-      SELECT raw_user_meta_data->>'role' FROM auth.users WHERE id = auth.uid();
-    $$ LANGUAGE sql SECURITY DEFINER STABLE
+      SELECT raw_app_meta_data->>'role' FROM auth.users WHERE id = auth.uid();
+    $$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = ''
   `);
-  console.log('Created get_user_role()');
+  console.log('Created get_user_role() [app_metadata]');
 
   await client.query(`
     CREATE OR REPLACE FUNCTION public.get_user_org_id()
     RETURNS UUID AS $$
-      SELECT (raw_user_meta_data->>'organization_id')::uuid FROM auth.users WHERE id = auth.uid();
-    $$ LANGUAGE sql SECURITY DEFINER STABLE
+      SELECT (raw_app_meta_data->>'organization_id')::uuid FROM auth.users WHERE id = auth.uid();
+    $$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = ''
   `);
-  console.log('Created get_user_org_id()');
+  console.log('Created get_user_org_id() [app_metadata]');
 
   // Policies
   const policies = [

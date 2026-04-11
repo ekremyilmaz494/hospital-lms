@@ -64,8 +64,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: user.email ?? '',
           firstName: user.user_metadata?.first_name ?? '',
           lastName: user.user_metadata?.last_name ?? '',
-          role: user.user_metadata?.role ?? 'staff',
-          organizationId: user.user_metadata?.organization_id ?? null,
+          role: user.app_metadata?.role ?? user.user_metadata?.role ?? 'staff',
+          organizationId: user.app_metadata?.organization_id ?? user.user_metadata?.organization_id ?? null,
           tcNo: user.user_metadata?.tc_no ?? null,
           phone: user.user_metadata?.phone ?? null,
           departmentId: user.user_metadata?.department_id ?? null,
@@ -113,8 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: u.email ?? '',
               firstName: u.user_metadata?.first_name ?? '',
               lastName: u.user_metadata?.last_name ?? '',
-              role: u.user_metadata?.role ?? 'staff',
-              organizationId: u.user_metadata?.organization_id ?? null,
+              role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
+              organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
               tcNo: u.user_metadata?.tc_no ?? null,
               phone: u.user_metadata?.phone ?? null,
               departmentId: u.user_metadata?.department_id ?? null,
@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             // Mevcut user var — sadece değişen alanları güncelle
             setUserIfChanged({
-              role: u.user_metadata?.role ?? currentUser.role,
+              role: u.app_metadata?.role ?? u.user_metadata?.role ?? currentUser.role,
               isActive: u.user_metadata?.is_active !== false,
               avatarUrl: u.user_metadata?.avatar_url ?? currentUser.avatarUrl,
             });

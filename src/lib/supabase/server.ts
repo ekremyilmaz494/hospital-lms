@@ -2,17 +2,18 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 /**
- * Why getUser() instead of getSession()?
+ * getSession() vs getUser():
  *
- * getSession() returns the session object from the LOCAL cookie without
- * making a network call to Supabase. This means a tampered or expired JWT
- * stored in the cookie would still be considered valid — making it unsafe
- * for authorization decisions.
+ * getSession() — local JWT parse, no HTTP call. Fast (~0ms) but cannot detect
+ * revoked tokens. Used by getAuthUser() for most API routes.
  *
- * getUser() makes a server-side request to Supabase Auth and cryptographically
- * validates the JWT. Always use getUser() in API routes and Server Components
- * where security matters. getSession() is acceptable only for non-sensitive
- * client-side reads (e.g. pre-populating a form with the user's email).
+ * getUser() — HTTP call to Supabase Auth, cryptographically validates JWT.
+ * Slower (~100-150ms) but catches revoked/expired tokens.
+ * Used by getAuthUserStrict() for security-critical operations
+ * (password changes, user CRUD, admin operations).
+ *
+ * NOTE: Middleware skips /api/* routes — API auth relies solely on
+ * getAuthUser()/getAuthUserStrict() in api-helpers.ts.
  */
 export async function createClient() {
   const cookieStore = await cookies()

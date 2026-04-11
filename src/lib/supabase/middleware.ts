@@ -123,7 +123,7 @@ export async function updateSession(request: NextRequest) {
     try {
       const sessionResult = await withTimeout(supabase.auth.getSession(), 2500)
       if (sessionResult?.data?.session?.user && (pathname === '/auth/login' || pathname === '/')) {
-        const role = sanitizeRole(sessionResult.data.session.user.user_metadata?.role)
+        const role = sanitizeRole(sessionResult.data.session.user.app_metadata?.role ?? sessionResult.data.session.user.user_metadata?.role)
         return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
       }
     } catch {
@@ -151,8 +151,8 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    // Role-based access control — enum doğrulaması ile manipülasyonu engelle
-    const role = sanitizeRole(user.user_metadata?.role)
+    // Role-based access control — app_metadata tercih edilir (kullanıcı değiştiremez)
+    const role = sanitizeRole(user.app_metadata?.role ?? user.user_metadata?.role)
 
     // /super-admin/* → sadece super_admin
     if (pathname.startsWith('/super-admin') && role !== 'super_admin') {

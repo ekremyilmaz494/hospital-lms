@@ -101,7 +101,13 @@ export default function PostExamPage() {
     fetch(`/api/exam/${attemptId}/timer`, { method: 'POST' })
       .then(res => res.json())
       .then(data => {
-        if (!cancelled) setTimeLeft(data.remainingSeconds ?? examData?.totalTime ?? 1800);
+        if (cancelled) return;
+        const remaining = data.remainingSeconds ?? examData?.totalTime ?? 1800;
+        if (remaining <= 0) {
+          router.push(`/exam/${id}?error=time_expired`);
+          return;
+        }
+        setTimeLeft(remaining);
       })
       .catch(() => { if (!cancelled) setTimeLeft(examData?.totalTime ?? 1800); });
     return () => { cancelled = true; };

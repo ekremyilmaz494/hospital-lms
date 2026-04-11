@@ -28,8 +28,10 @@ export function useActiveUsersCount(): ActiveUsersState {
 
   useEffect(() => {
     const supabase = createClient()
-    // Unique kanal adı: Strict Mode'da iki kez mount edildiğinde "already joined" hatasını önler
-    const channel = supabase.channel(`active-users-${Date.now()}`)
+    // use-presence-tracker.ts ile AYNI kanal adını kullan —
+    // farklı kanal adı olursa presence state paylaşılmaz, sayaç hep 0 görünür.
+    // Strict Mode double-mount durumunda cleanup doğru çalıştığı için sorun olmaz.
+    const channel = supabase.channel('active-users')
 
     channel
       .on('presence', { event: 'sync' }, () => {

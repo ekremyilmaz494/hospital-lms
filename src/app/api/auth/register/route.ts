@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
-import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { checkRateLimit } from '@/lib/redis'
 import { selfRegisterSchema } from '@/lib/validations'
 import { sendSelfRegistrationEmail } from '@/lib/email'
@@ -73,41 +73,35 @@ export async function POST(request: Request) {
       },
     })
 
-    // Supabase Auth kullanıcı oluştur — email doğrulama gerektirir
-    const supabase = await createServiceClient()
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: false, // Kullanıcı e-postasını doğrulamalı
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName,
-        role: 'admin',
-        organization_id: org.id,
-      },
-    })
-
-    if (authError) {
-      await prisma.organization.delete({ where: { id: org.id } }).catch(() => {})
-      logger.error('Register', 'Supabase auth hatasi', authError.message)
-      return errorResponse('Kullanıcı oluşturulamadı. Lütfen farklı bir e-posta deneyin.')
-    }
-
-    // Prisma User kaydı
-    await prisma.user.create({
-      data: {
-        id: authUser.user.id,
+    // Auth + DB kullanıcı oluştur (factory rollback dahil)
+    let authResult
+    try {
+      authResult = await createAuthUser({
         email,
+        password,
         firstName,
         lastName,
         role: 'admin',
         organizationId: org.id,
-      },
-    })
+        emailConfirm: false, // Kullanıcı e-postasını doğrulamalı
+      })
+    } catch (err) {
+      // Auth veya DB hatası → org'u da sil
+      await prisma.organization.delete({ where: { id: org.id } }).catch(() => {})
+      if (err instanceof AuthUserError) {
+        logger.error('Register', 'Auth hatası', err.message)
+        return errorResponse('Kullanıcı oluşturulamadı. Lütfen farklı bir e-posta deneyin.')
+      }
+      if (err instanceof DbUserError) {
+        logger.error('Register', 'DB user insert başarısız — rollback yapıldı', err.message)
+        return errorResponse(err.safeMessage)
+      }
+      throw err
+    }
 
     // Audit log
     await createAuditLog({
-      userId: authUser.user.id,
+      userId: authResult.authUser.id,
       organizationId: org.id,
       action: 'self_register',
       entityType: 'organization',

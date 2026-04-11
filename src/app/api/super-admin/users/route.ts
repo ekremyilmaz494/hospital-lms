@@ -1,9 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { createUserSchema } from '@/lib/validations'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
-import { encrypt } from '@/lib/crypto'
 
 export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -18,58 +17,39 @@ export async function POST(request: Request) {
   const parsed = createUserSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  // Create auth user via service role
-  const supabase = await createServiceClient()
-  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    email_confirm: true,
-    user_metadata: {
-      first_name: parsed.data.firstName,
-      last_name: parsed.data.lastName,
-      role: parsed.data.role,
-      organization_id: parsed.data.organizationId,
-    },
-  })
-
-  if (authError) {
-    logger.error('SuperAdmin Users', 'Supabase auth kullanıcı oluşturulamadı', authError.message)
-    const safeMsg = authError.message?.includes('already registered')
-      ? 'Bu e-posta adresi zaten kayıtlı'
-      : 'Kullanıcı oluşturulamadı'
-    return errorResponse(safeMsg)
-  }
-
-  // Create DB user record — rollback auth user if DB fails
-  let user
+  let result
   try {
-    user = await prisma.user.create({
-      data: {
-        id: authUser.user.id,
-        email: parsed.data.email,
-        firstName: parsed.data.firstName,
-        lastName: parsed.data.lastName,
-        role: parsed.data.role,
-        organizationId: parsed.data.organizationId,
-        tcNo: parsed.data.tcNo ? encrypt(parsed.data.tcNo) : undefined,
-        phone: parsed.data.phone,
-        title: parsed.data.title,
-      },
+    result = await createAuthUser({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      firstName: parsed.data.firstName,
+      lastName: parsed.data.lastName,
+      role: parsed.data.role as 'admin' | 'staff',
+      organizationId: parsed.data.organizationId!,
+      tcNo: parsed.data.tcNo,
+      phone: parsed.data.phone,
+      title: parsed.data.title,
     })
-  } catch (dbError) {
-    await supabase.auth.admin.deleteUser(authUser.user.id)
-    logger.error('SuperAdmin Users', 'DB user create başarısız — auth user rollback yapıldı', { userId: authUser.user.id, error: dbError })
-    return errorResponse('Kullanıcı oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.')
+  } catch (err) {
+    if (err instanceof AuthUserError) {
+      logger.error('SuperAdmin Users', 'Auth kullanıcı oluşturulamadı', err.message)
+      return errorResponse(err.safeMessage)
+    }
+    if (err instanceof DbUserError) {
+      logger.error('SuperAdmin Users', 'DB user create başarısız — auth user rollback yapıldı', err.message)
+      return errorResponse(err.safeMessage)
+    }
+    throw err
   }
 
   await createAuditLog({
     userId: dbUser!.id,
     action: 'create',
     entityType: 'user',
-    entityId: user.id,
-    newData: { ...user, password: undefined },
+    entityId: result.dbUser.id,
+    newData: { ...result.dbUser, password: undefined },
     request,
   })
 
-  return jsonResponse(user, 201)
+  return jsonResponse(result.dbUser, 201)
 }

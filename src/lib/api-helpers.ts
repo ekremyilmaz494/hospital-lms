@@ -49,9 +49,12 @@ export function safePagination(params: URLSearchParams, maxLimit = 100) {
 
 /** Get authenticated user + DB profile. Returns null responses on failure.
  *
- * Uses getSession() (local JWT parse) instead of getUser() (HTTP round-trip)
- * because middleware already validates the token with getUser() on every request.
- * This eliminates a redundant Supabase Auth HTTP call per API route (~50-150ms).
+ * Uses getSession() (local JWT parse) for performance (~50-150ms savings).
+ * NOTE: Middleware skips /api/* routes entirely, so getSession() is the
+ * only auth check for API calls. This means revoked/expired JWT cookies
+ * won't be detected until Supabase's own JWT expiry kicks in.
+ * For write operations where stronger validation is needed, use
+ * getAuthUserStrict() instead.
  *
  * DB user + org status are cached in-memory for 30s to avoid repeated DB hits
  * on rapid page navigations (sidebar triggers setup + in-progress-exams + page API).
@@ -114,6 +117,48 @@ export async function getAuthUser() {
     if (firstKey) authCache.delete(firstKey)
   }
   authCache.set(user.id, { dbUser, orgOk, expiresAt: Date.now() + 30_000 })
+
+  if (!orgOk) {
+    return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
+  }
+
+  return { user, dbUser, error: null, organizationId: dbUser.organizationId }
+}
+
+/**
+ * Strict auth check — uses getUser() (Supabase HTTP call) for cryptographic
+ * JWT validation. Use this for security-critical write operations:
+ * password changes, user CRUD, admin operations, role changes.
+ *
+ * ~100-150ms slower than getAuthUser() but catches revoked/expired tokens.
+ */
+export async function getAuthUserStrict() {
+  const cookieStore = await cookies()
+  const hasAuthCookie = cookieStore.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+  if (!hasAuthCookie) {
+    return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
+  }
+
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
+  }
+
+  const dbUser = await prisma.user.findUnique({ where: { id: user.id } })
+  if (!dbUser || !dbUser.isActive) {
+    return { user: null, dbUser: null, error: errorResponse('User not found or inactive', 403) }
+  }
+
+  let orgOk = true
+  if (dbUser.role !== 'super_admin' && dbUser.organizationId) {
+    const org = await prisma.organization.findUnique({
+      where: { id: dbUser.organizationId },
+      select: { isActive: true, isSuspended: true },
+    })
+    if (!org || !org.isActive || org.isSuspended) orgOk = false
+  }
 
   if (!orgOk) {
     return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }

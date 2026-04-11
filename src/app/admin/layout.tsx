@@ -68,7 +68,7 @@ export default function AdminLayout({
   };
 
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'admin')) {
+    if (!isLoading && (!user || !['admin', 'super_admin'].includes(user.role))) {
       router.replace('/auth/login');
     }
   }, [user, isLoading, router]);
@@ -76,7 +76,7 @@ export default function AdminLayout({
   if (isLoading || !setupChecked) {
     return <LayoutSkeleton variant="admin" />;
   }
-  if (!user || user.role !== 'admin') {
+  if (!user || !['admin', 'super_admin'].includes(user.role)) {
     return null;
   }
 

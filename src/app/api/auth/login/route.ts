@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (authError) {
-      logger.info('auth:login', 'Başarısız giriş denemesi', { email: normalizedEmail, ip })
+      logger.info('auth:login', 'Başarısız giriş denemesi', { email: normalizedEmail, ip, reason: authError.message, code: authError.status })
 
       // Sadece başarısız girişlerde rate limit sayacını artır
       void Promise.all([
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const role = data.user?.user_metadata?.role as string | undefined
+    const role = (data.user?.app_metadata?.role ?? data.user?.user_metadata?.role) as string | undefined
 
     // MFA check — session'daki factors bilgisinden kontrol et (HTTP call YOK).
     // signInWithPassword() response'unda user.factors her zaman döner.

@@ -47,8 +47,8 @@ export function useRealtimeExams() {
 
     const supabase = createClient()
 
-    // postgres_changes on exam_attempts — no org-level filter at DB level here;
-    // the API layer already scopes to the org, but for Realtime we re-fetch on change.
+    // postgres_changes on exam_attempts — org-level filter ile sadece kendi org'unun
+    // değişikliklerini dinle. Filtre olmadan tüm org'ların event'leri tetiklenir.
     const channel = supabase
       .channel(`exam-attempts:${user.organizationId}`)
       .on(
@@ -57,6 +57,7 @@ export function useRealtimeExams() {
           event: '*', // INSERT + UPDATE + DELETE
           schema: 'public',
           table: 'exam_attempts',
+          filter: `organization_id=eq.${user.organizationId}`,
         },
         () => {
           // Re-fetch on any change to keep the list accurate with full join data

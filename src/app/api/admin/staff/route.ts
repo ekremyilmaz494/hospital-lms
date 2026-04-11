@@ -2,9 +2,9 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, checkWritePermission } from '@/lib/api-helpers'
 import { createUserSchema } from '@/lib/validations'
-import { createServiceClient } from '@/lib/supabase/server'
 import { maskeTcNo } from '@/lib/utils'
-import { encrypt, safeDecryptTcNo } from '@/lib/crypto'
+import { safeDecryptTcNo } from '@/lib/crypto'
+import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
 import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
@@ -161,28 +161,6 @@ export async function POST(request: Request) {
     return errorResponse(msg)
   }
 
-  const supabase = await createServiceClient()
-  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    email_confirm: true,
-    user_metadata: {
-      first_name: parsed.data.firstName,
-      last_name: parsed.data.lastName,
-      role: 'staff',
-      organization_id: dbUser!.organizationId!,
-    },
-  })
-
-  if (authError) {
-    logger.error('Admin Staff', 'Supabase auth kullanıcı oluşturulamadı', authError.message)
-    let safeMsg = 'Kullanıcı oluşturulamadı'
-    if (authError.message?.includes('already registered')) safeMsg = 'Bu e-posta adresi zaten kayıtlı'
-    else if (authError.message?.includes('invalid format') || authError.message?.includes('validate email')) safeMsg = 'Geçersiz e-posta adresi. Türkçe karakter (ş, ç, ğ, ü, ö, ı) kullanmayın.'
-    else if (authError.message?.includes('password')) safeMsg = 'Şifre gereksinimleri karşılanmıyor'
-    return errorResponse(safeMsg)
-  }
-
   // B4.2/G4.2 — Cross-tenant departman kontrolü: departmentId bu organizasyona ait olmalı
   let resolvedDeptName: string | undefined = parsed.data.department
   if (parsed.data.departmentId) {
@@ -194,45 +172,33 @@ export async function POST(request: Request) {
     resolvedDeptName = dept.name
   }
 
-  let user
+  let result
   try {
-    user = await prisma.user.create({
-      data: {
-        id: authUser.user.id,
-        email: parsed.data.email,
-        firstName: parsed.data.firstName,
-        lastName: parsed.data.lastName,
-        role: 'staff',
-        organizationId: dbUser!.organizationId!,
-        tcNo: parsed.data.tcNo ? encrypt(parsed.data.tcNo) : undefined,
-        phone: parsed.data.phone,
-        departmentId: parsed.data.departmentId,
-        title: parsed.data.title,
-      },
+    result = await createAuthUser({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      firstName: parsed.data.firstName,
+      lastName: parsed.data.lastName,
+      role: 'staff',
+      organizationId: dbUser!.organizationId!,
+      tcNo: parsed.data.tcNo,
+      phone: parsed.data.phone,
+      departmentId: parsed.data.departmentId,
+      title: parsed.data.title,
     })
-  } catch (dbError) {
-    // Rollback: delete Supabase auth user if DB insert fails
-    try {
-      await supabase.auth.admin.deleteUser(authUser.user.id)
-    } catch (rollbackError) {
-      logger.error('Admin Staff', 'Rollback başarısız — orphan auth user', { userId: authUser.user.id, rollbackError })
-      // Retry once
-      try {
-        await supabase.auth.admin.deleteUser(authUser.user.id)
-      } catch {
-        logger.error('Admin Staff', 'Rollback yeniden deneme başarısız — manuel temizlik gerekli', { userId: authUser.user.id })
-      }
+  } catch (err) {
+    if (err instanceof AuthUserError) {
+      logger.error('Admin Staff', 'Auth kullanıcı oluşturulamadı', err.message)
+      return errorResponse(err.safeMessage)
     }
-    logger.error('Admin Staff', 'DB insert başarısız', dbError)
-    const prismaErr = dbError as { code?: string; meta?: { target?: string[]; modelName?: string } }
-    if (prismaErr.code === 'P2002') {
-      const targets = prismaErr.meta?.target ?? []
-      if (targets.some(t => t.includes('tc_no'))) return errorResponse('Bu TC Kimlik No ile kayıtlı bir personel zaten mevcut')
-      if (targets.some(t => t.includes('email'))) return errorResponse('Bu e-posta adresi ile kayıtlı bir personel zaten mevcut')
-      return errorResponse('Bu bilgilerle kayıtlı bir personel zaten mevcut')
+    if (err instanceof DbUserError) {
+      logger.error('Admin Staff', 'DB insert başarısız — rollback yapıldı', err.message)
+      return errorResponse(err.safeMessage)
     }
-    return errorResponse('Personel veritabanına kaydedilemedi. Lütfen tekrar deneyin.')
+    throw err
   }
+
+  const user = result.dbUser
 
   await createAuditLog({
     userId: dbUser!.id,
