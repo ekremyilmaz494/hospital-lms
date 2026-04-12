@@ -1,3 +1,19 @@
-"use client";
+import type { Metadata } from "next";
+import { MarketingHomeClient } from "./home-client";
 
-export { MarketingHomeClient as default } from "./home-client";
+export const metadata: Metadata = {
+  title: "Hastane LMS - Hastane Personel Egitim ve Sinav Yonetim Sistemi",
+  description:
+    "Hastane personeli icin video tabanli egitim, sinav, sertifika ve akreditasyon yonetim platformu. 500+ hastane tarafindan tercih ediliyor.",
+  openGraph: {
+    title: "Hastane LMS - Personel Egitim ve Sinav Yonetim Sistemi",
+    description:
+      "Hastane personelinizi egitimler, sinavlar ve sertifikalarla yonetin. KVKK uyumlu, 7/24 erisim.",
+    type: "website",
+    locale: "tr_TR",
+  },
+};
+
+export default function MarketingHomePage() {
+  return <MarketingHomeClient />;
+}
