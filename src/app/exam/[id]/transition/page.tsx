@@ -22,10 +22,12 @@ function TransitionContent() {
   const score = searchParams.get('score');
   const passed = searchParams.get('passed');
   const passingScore = searchParams.get('passingScore');
+  const attemptIdParam = searchParams.get('attemptId');
   const [timeLeft, setTimeLeft] = useState(COUNTDOWN_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const navigatedRef = useRef(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
+  const [feedbackRequired, setFeedbackRequired] = useState(false);
 
   // Determine type
   const isPreToVideos = from === 'pre' || from === 'pre-exam';
@@ -94,6 +96,20 @@ function TransitionContent() {
       }
     } catch { /* ignore */ }
   }, [isPostResult, id]);
+
+  // EY.FR.40 — aktif form var mı ve bu attempt için response gönderilmemiş mi?
+  useEffect(() => {
+    if (!isPostResult || !attemptIdParam) return;
+    let cancelled = false;
+    fetch(`/api/feedback/status?attemptId=${attemptIdParam}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (cancelled || !d) return;
+        setFeedbackRequired(!!d.feedbackRequired);
+      })
+      .catch(() => { /* sessizce geç, feedbackRequired=false kalır */ });
+    return () => { cancelled = true; };
+  }, [isPostResult, attemptIdParam]);
 
   // ═══ POST-EXAM RESULT SCREEN ═══
   if (isPostResult) {
@@ -184,13 +200,19 @@ function TransitionContent() {
               )}
 
               <button
-                onClick={() => router.push('/staff/my-trainings')}
+                onClick={() => {
+                  if (feedbackRequired && attemptIdParam) {
+                    router.push(`/exam/${id}/feedback?attemptId=${attemptIdParam}`);
+                  } else {
+                    router.push('/staff/my-trainings');
+                  }
+                }}
                 className="w-full flex items-center justify-center gap-2 rounded-xl h-12 text-[14px] font-semibold text-white"
                 style={{
                   background: isPassed ? 'linear-gradient(135deg, var(--color-primary), #065f46)' : 'linear-gradient(135deg, #475569, #334155)',
                 }}
               >
-                Eğitimlerime Dön
+                {feedbackRequired ? 'Geri Bildirim Ver' : 'Eğitimlerime Dön'}
               </button>
             </div>
           </div>

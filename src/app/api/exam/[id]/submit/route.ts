@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   // B7.3/G7.3 — Explicit organizationId cross-check: training.organizationId === dbUser.organizationId
-  let attempt = await prisma.examAttempt.findFirst({
+  let attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
     where: { id: attemptId, userId: dbUser!.id, training: { organizationId: dbUser!.organizationId! } },
     include: { training: true, assignment: true },
   })
@@ -273,5 +273,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try { await invalidateDashboardCache(attempt.training.organizationId) } catch {}
 
-  return jsonResponse({ phase: 'post', score, isPassed, passingScore: attempt.training.passingScore, results: questionResults })
+  // EY.FR.40 geri bildirim gerekli mi? (Organizasyonun aktif formu var mı)
+  // Fire-and-forget: hata olursa feedbackRequired=false, akış bozulmaz.
+  let feedbackRequired = false
+  try {
+    const activeForm = await prisma.trainingFeedbackForm.findFirst({ // perf-check-disable-line
+      where: { organizationId: attempt.training.organizationId, isActive: true },
+      select: { id: true },
+    })
+    feedbackRequired = !!activeForm
+  } catch (err) {
+    logger.warn('ExamSubmit', 'feedbackRequired check failed', { err: (err as Error).message })
+  }
+
+  return jsonResponse({
+    phase: 'post',
+    score,
+    isPassed,
+    passingScore: attempt.training.passingScore,
+    results: questionResults,
+    feedbackRequired,
+  })
 }

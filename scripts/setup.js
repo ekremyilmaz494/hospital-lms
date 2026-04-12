@@ -134,14 +134,6 @@ async function setup() {
   // ── Final ──
   console.log('\n\x1b[32m\x1b[1m  Setup tamamlandi!\x1b[0m\n');
   console.log('  Baslatmak icin:  \x1b[1mpnpm dev\x1b[0m\n');
-  console.log('  Giris bilgileri:');
-  console.log('  +--------------+-------------------+--------------+');
-  console.log('  | Rol          | E-posta           | Sifre        |');
-  console.log('  +--------------+-------------------+--------------+');
-  console.log('  | Super Admin  | super@demo.com    | demo123456   |');
-  console.log('  | Hastane Admin| admin@demo.com    | demo123456   |');
-  console.log('  | Personel     | staff@demo.com    | demo123456   |');
-  console.log('  +--------------+-------------------+--------------+\n');
 }
 
 setup().catch(err => {

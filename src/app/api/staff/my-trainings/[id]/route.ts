@@ -83,7 +83,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     })
   }
 
-  if (!assignment) return errorResponse('Assignment not found', 404)
+  if (!assignment) return errorResponse('Eğitim ataması bulunamadı', 404)
 
   const t = assignment.training
   const latestAttempt = assignment.examAttempts[0] // highest attemptNumber (desc sort)

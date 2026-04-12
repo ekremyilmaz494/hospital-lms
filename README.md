@@ -40,7 +40,6 @@ Ardından aşağıdaki değişkenleri kendi Supabase projenizden alıp doldurun:
 - `SUPABASE_SERVICE_ROLE_KEY` (Sadece admin/sunucu işlemleri için)
 - `DATABASE_URL` (Transaction pooler adresi `pgbouncer=true` ile önerilir)
 - `DIRECT_URL` (Session pooler adresi)
-- `DEMO_PASSWORD` (İsteğe bağlı, varsayılan: demo123456)
 
 ### 4. Prisma Setup
 ```bash
@@ -66,10 +65,6 @@ Eğitim sisteminin özelliklerini test etmek ve hızlı bir ortam kurmak için s
 ```bash
 node scripts/seed-demo.js
 ```
-**Demo Giriş Bilgileri:**
-- Super Admin: `super@demo.com` / `demo123456`
-- Hastane Admin: `admin@demo.com` / `demo123456`
-- Personel: `staff@demo.com` / `demo123456`
 
 ## Projeyi Çalıştırma
 ```bash

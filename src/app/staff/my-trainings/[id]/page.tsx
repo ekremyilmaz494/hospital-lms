@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft, Video, FileQuestion, CheckCircle, Clock, Play, Target,
@@ -47,17 +47,49 @@ export default function TrainingDetailPage() {
 
   const apiUrl = id ? `/api/staff/my-trainings/${id}` : null;
 
-  // Clear stale cache on mount — exam state changes between attempts,
-  // showing cached data causes wrong step to flash briefly
-  useEffect(() => {
-    if (apiUrl) clearFetchCache(apiUrl);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Clear stale cache synchronously during render — exam state changes between attempts.
+  // Doing this in useEffect would be too late: useFetch's own useEffect fires first (hooks
+  // run in registration order), causing it to read the stale cached value before we clear it.
+  const cacheCleared = useRef(false);
+  if (!cacheCleared.current && apiUrl) {
+    cacheCleared.current = true;
+    clearFetchCache(apiUrl);
+  }
 
-  const { data: training, isLoading, error } = useFetch<TrainingDetail>(apiUrl);
+  const { data: training, isLoading, error, refetch } = useFetch<TrainingDetail>(apiUrl);
+
+  // Auto-retry once when assignment lookup fails on first load (timing edge case)
+  const retried = useRef(false);
+  useEffect(() => {
+    if (error === 'Eğitim ataması bulunamadı' && !retried.current) {
+      retried.current = true;
+      const t = setTimeout(() => refetch(), 500);
+      return () => clearTimeout(t);
+    }
+  }, [error, refetch]);
 
   if (isLoading) return <PageLoading />;
-  if (error) return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</div></div>;
+  if (error) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-4">
+      <div className="text-sm" style={{ color: 'var(--color-error)' }}>
+        {error === 'Eğitim ataması bulunamadı' || error.includes('not found') || error.includes('404')
+          ? 'Bu eğitime erişim yetkiniz yok veya eğitim bulunamadı.'
+          : error}
+      </div>
+      <div className="flex items-center gap-4">
+        <Link href="/staff/my-trainings" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
+          ← Eğitimlerime Dön
+        </Link>
+        <button
+          onClick={refetch}
+          className="text-sm font-semibold"
+          style={{ color: 'var(--color-primary)' }}
+        >
+          ↻ Tekrar Dene
+        </button>
+      </div>
+    </div>
+  );
   if (!training) return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitim bulunamadı</div></div>;
 
   const videos = training.videos ?? [];

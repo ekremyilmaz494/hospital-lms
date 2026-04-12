@@ -23,8 +23,9 @@ const examDuration = new Trend('exam_duration');
 
 // ── Ayarlar ──
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
-const DEMO_EMAIL = __ENV.DEMO_EMAIL || 'admin@demo.com';
-const DEMO_PASS = __ENV.DEMO_PASS || 'demo123456';
+const DEMO_EMAIL = __ENV.DEMO_EMAIL;
+const DEMO_PASS = __ENV.DEMO_PASS;
+if (!DEMO_EMAIL || !DEMO_PASS) { throw new Error('DEMO_EMAIL ve DEMO_PASS env değişkenleri gerekli'); }
 
 // ── Senaryolar ──
 export const options = {

@@ -1179,7 +1179,7 @@ Yedekleme sistemi iskelet halindeydi — tüm eksikler kapatıldı:
 
 ### 8.6 Login Sorunu Çözümü (Kritik)
 
-- **Problem:** `admin@demo.com` / `demo123456` ile giriş yapılamıyordu
+- **Problem:** Demo hesabıyla giriş yapılamıyordu
 - **Kök Neden:** Middleware'in `publicRoutes` listesinde `/api/auth/` yoktu. Login API'sine gelen POST isteği middleware tarafından yakalanıp login sayfasına redirect ediliyordu.
 - **Çözüm:** `/api/auth/` yolu public routes'a eklendi
 - **Doğrulama:** `curl` ile API test → 200 OK + access_token
@@ -1625,15 +1625,7 @@ Supabase MCP aracılığıyla proje bilgileri alındı:
 Migration'lar önceden uygulanmış — 20 tablo mevcut:
 `_prisma_migrations`, `audit_logs`, `certificates`, `db_backups`, `departments`, `exam_answers`, `exam_attempts`, `kvkk_requests`, `notifications`, `organization_subscriptions`, `organizations`, `question_options`, `questions`, `scorm_attempts`, `subscription_plans`, `training_assignments`, `training_videos`, `trainings`, `users`, `video_progress`
 
-Demo kullanıcılar zaten oluşturulmuş:
-| Rol | E-posta |
-|-----|---------|
-| Super Admin | `super@demo.com` |
-| Admin | `admin@demo.com` |
-| Staff | `staff@demo.com` |
-| Staff | `ekrem@gmail.com` |
-| Staff | `ekrem1452aa@gmail.com` |
-| Staff | `ayse@gmail.com` |
+Demo kullanıcılar oluşturulmuştu.
 
 ### 12.5 Dev Server
 
@@ -2958,7 +2950,7 @@ Supabase projesini Seul'den (ap-northeast-2) Frankfurt'a (eu-central-1) taşıma
 - `.env` güncellendi: DATABASE_URL, DIRECT_URL, SUPABASE_URL, ANON_KEY, SERVICE_ROLE_KEY
 - `prisma db push` ile schema senkronize edildi (direct connection port 5432 kullanıldı — pooler timeout veriyor)
 - `prisma/seed.ts` ile demo veriler oluşturuldu (5 departman, 10 personel, 5 eğitim)
-- `super@demo.com` kullanıcısı users tablosuna eklendi, `setup_completed = true` güncellendi
+- Super admin kullanıcısı users tablosuna eklendi, `setup_completed = true` güncellendi
 
 ### Login Sayfası Geçiş İyileştirmesi
 - `src/app/auth/login/loading.tsx` — PageLoading spinner → layout skeleton (sol koyu + sağ açık bg)
@@ -3401,7 +3393,7 @@ Son 3 Preview deployment **Error** durumunda — `DATABASE_URL` ortam değişken
 - 200 personel Supabase Auth + PostgreSQL'e eklendi (gerçekçi Türkçe isimler, 5 departmana dağılmış)
 - **518 eğitim ataması**, **335 sınav denemesi**, **238 sertifika**, **30 başarısız sınav** oluşturuldu
 - Dağılım: 60 tamamlamış, 60 kısmen tamamlamış, 40 devam eden, 40 atanmış
-- Tüm personel şifresi: `Demo123!`, email formatı: `demo1@demo.hastanelms.com` ... `demo200@demo.hastanelms.com`
+- Email formatı: `demo1@demo.hastanelms.com` ... `demo200@demo.hastanelms.com`
 
 #### 2. Vercel Env Düzeltmesi
 - **Sorun:** Vercel production farklı bir Supabase projesi (`bzvunibntyewobkdsoow`) kullanıyordu, lokal ise `pkkkyyajfmusurcoovwt`
@@ -3785,7 +3777,7 @@ Etkilenen dosyalar: staff/[id], departments/[id], competency/forms/[id], smg/per
 
 - Landing page "Daha Fazla" butonları: `<div>` → `<Link href="/register">` (tıklanabilir)
 - Demo Özel Hastanesi dışındaki test organizasyonları DB'den silindi
-- `admin@demo.hastanelms.com` şifresi sıfırlandı (`Demo123!`)
+- Admin şifresi sıfırlandı
 
 ### Toplam Değiştirilen Dosya Sayısı
 ~45 dosya değiştirildi, 3 yeni dosya oluşturuldu, 1 migration eklendi.
@@ -3797,3 +3789,74 @@ Etkilenen dosyalar: staff/[id], departments/[id], competency/forms/[id], smg/per
 - ✅ 19/19 audit maddesi doğrulandı (paralel keşif ile)
 
 *Son güncelleme: 10 Nisan 2026 — Oturum 36*
+
+---
+
+## OTURUM 37 — 12 Nisan 2026
+
+### A) Gizli Giriş Bilgilerinin Temizlenmesi (12 dosya)
+
+Demo şifreleri (`demo123456`, `Demo123!`) ve hardcoded email adresleri (`super@demo.com`, `admin@demo.com`, `staff@demo.com`) projeden tüm dosyalardan kaldırıldı. Artık tüm kimlik bilgileri yalnızca ortam değişkenlerinden (`SEED_*`, `E2E_*`) okunuyor.
+
+| Dosya | Değişiklik |
+|-------|------------|
+| `CLAUDE.md` | Demo giriş bölümü silindi |
+| `README.md` | Demo Giriş Bilgileri bölümü ve DEMO_PASSWORD açıklaması silindi |
+| `scripts/seed-demo.js` | Hardcoded email/şifreler → `SEED_SUPER_EMAIL`, `SEED_ADMIN_EMAIL`, `SEED_STAFF_EMAIL` env var; credential tablosu log'dan kaldırıldı |
+| `scripts/setup.js` | Giriş bilgileri tablosu console.log'dan silindi |
+| `scripts/load-test.js` | `\|\| 'admin@demo.com'` ve `\|\| 'demo123456'` fallback'leri kaldırıldı, eksikse process.exit |
+| `scripts/seed-users.ts` | USERS dizisi ve DEMO_PASSWORD sabit kaldırıldı, stub mesajla değiştirildi |
+| `prisma/seed.ts` | `DEMO_PASSWORD = 'Demo123!'` → `process.env.SEED_PASSWORD` (eksikse process.exit) |
+| `prisma/seed-demo-200.ts` | Aynı değişiklik |
+| `e2e/helpers/auth.ts` | CREDENTIALS objesi `E2E_*` env var kullanımına geçirildi |
+| `e2e/auth.spec.ts` | `admin@demo.com` → `test@example.com` |
+| `src/app/api/docs/swagger.ts` | Örnek email `kullanici@hastane.com` oldu, şifre örneği kaldırıldı |
+| `PROJE_GECMISI.md` | Şifre/email referansları genel ifadelerle değiştirildi |
+
+**Aktif Supabase kullanıcıları** (Supabase MCP ile doğrulandı):
+- `super@devakent.com` — super_admin
+- `admin@devakent.com` — admin
+- `personel1@devakent.com` … `personel100@devakent.com` — staff (100 adet)
+
+---
+
+### B) Admin Geri Bildirim Sayfaları — Light Tema Dönüşümü (4 dosya)
+
+Önceki oturumda `/admin/feedback-forms/*` altındaki 4 sayfa karanlık atmosferik temayla (koyu arka plan gradient, radial orb'lar, beyaz yazılar) tasarlanmıştı. Kullanıcı geri bildirimi: *"diğer sayfalarla uyumlu değil rengi falan"*. Tüm sayfalar projenin açık tasarım sistemine (`var(--color-surface)`, `var(--color-border)`, `var(--color-text-muted)`) uygun hale getirildi.
+
+| Dosya | Değişiklik |
+|-------|------------|
+| `src/app/admin/feedback-forms/analytics/page.tsx` | Light tema — SVG ring gauge, accordion kategoriler, stat kartlar |
+| `src/app/admin/feedback-forms/responses/page.tsx` | Light tema — PageHeader bileşeni, CSS var tabanlı tablo ve filtreler |
+| `src/app/admin/feedback-forms/responses/[id]/page.tsx` | Light tema — CSS var tabanlı info grid ve kategori kartları |
+| `src/app/admin/feedback-forms/page.tsx` | Light tema — PageHeader, standart Button bileşeni, CSS var toggle |
+
+**Ortak değişiklikler:**
+- `linear-gradient(135deg,#0a1628...)` koyu arka plan → kaldırıldı
+- `-m-8` full-bleed hack → kaldırıldı (light tema layout'a normal oturur)
+- `rgba(255,255,255,0.04)` → `var(--color-surface)`
+- `rgba(255,255,255,0.08)` → `var(--color-border)`
+- `rgba(255,255,255,0.4)` → `var(--color-text-muted)`
+- Hardcoded `#10b981`/`#ef4444` → `var(--color-success)` / `var(--color-error)`
+
+---
+
+### C) Race Condition Düzeltmesi — my-trainings/[id] (1 dosya)
+
+**Sorun:** `src/app/staff/my-trainings/[id]/page.tsx` ilk açılışta "Eğitim ataması bulunamadı" hatası veriyordu; sayfadan çıkıp tekrar girilince çalışıyordu.
+
+**Kök neden:** `clearFetchCache(apiUrl)` bir `useEffect` içinde tanımlıydı. React hook'ların `useEffect`'leri kayıt sırasına göre çalışır — `useFetch`'in iç `useEffect`'i önce çalışıp stale cache'i okuyordu, ardından temizleme geliyordu.
+
+| # | Değişiklik |
+|---|------------|
+| 1 | `import { useEffect }` → `import { useEffect, useRef }` |
+| 2 | Mount `useEffect` ile cache temizleme **kaldırıldı** |
+| 3 | `useRef(false)` + render sırasında senkron `clearFetchCache` eklendi |
+| 4 | `useFetch`'ten `refetch` destructure edildi |
+| 5 | Hata `=== 'Eğitim ataması bulunamadı'` ise 500ms sonra otomatik retry `useEffect` eklendi |
+| 6 | Hata ekranına "↻ Tekrar Dene" butonu eklendi |
+
+### Doğrulama
+- ✅ TypeScript — temiz (feedback dosyaları dahil sıfır yeni hata)
+
+*Son güncelleme: 12 Nisan 2026 — Oturum 37*

@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft, GraduationCap, Users, TrendingUp, Clock, Edit, Play, BarChart3,
   FileText, RotateCcw, Download, Eye, Video, CheckCircle2, XCircle, Timer,
-  ChevronRight, Award, PenLine, FileDown
+  ChevronRight, Award, PenLine, FileDown, MessageSquare
 } from 'lucide-react';
 import { PageLoading } from '@/components/shared/page-loading';
 import { Button } from '@/components/ui/button';
@@ -160,6 +160,9 @@ export default function TrainingDetailPage() {
             }}
           >
             <Download className="h-4 w-4" /> {downloadingCompletion === 'excel' ? 'Hazırlanıyor...' : 'Excel Rapor'}
+          </Button>
+          <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => router.push(`/admin/feedback-forms/responses?trainingId=${id}`)}>
+            <MessageSquare className="h-4 w-4" /> Geri Bildirimler
           </Button>
           <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => router.push(`/admin/trainings/${id}/edit`)}>
             <Edit className="h-4 w-4" /> Düzenle
