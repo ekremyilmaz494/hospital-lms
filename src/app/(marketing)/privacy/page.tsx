@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Gizlilik Politikasi | Devakent Hastanesi",
+  title: "Gizlilik Politikasi | Hastane LMS",
   description:
-    "Devakent Hastanesi gizlilik politikasi - KVKK uyumlu kisisel verilerin korunmasi.",
+    "Hastane LMS gizlilik politikasi - KVKK uyumlu kisisel verilerin korunmasi.",
 };
 
 const LAST_UPDATED = "5 Nisan 2026";
@@ -36,7 +36,7 @@ export default function PrivacyPage() {
           </p>
           <ul className="mt-3 space-y-1">
             <li>
-              <strong>Unvan:</strong> Devakent Hastanesi Yazilim Teknolojileri
+              <strong>Unvan:</strong> Hastane LMS Yazilim Teknolojileri
             </li>
             <li>
               <strong>Adres:</strong> Ankara, Turkiye
@@ -275,12 +275,12 @@ export default function PrivacyPage() {
             9. VERBIS Kayit Bilgileri
           </h2>
           <p>
-            6698 sayili Kanun&apos;un 16. maddesi uyarinca, Devakent Hastanesi Veri Sorumlusu olarak
+            6698 sayili Kanun&apos;un 16. maddesi uyarinca, Hastane LMS Veri Sorumlusu olarak
             Veri Sorumlulari Sicil Bilgi Sistemi&apos;ne (VERBIS) kayitlidir.
           </p>
           <ul className="mt-3 space-y-1">
             <li>
-              <strong>Veri Sorumlusu:</strong> Devakent Hastanesi Yazilim Teknolojileri
+              <strong>Veri Sorumlusu:</strong> Hastane LMS Yazilim Teknolojileri
             </li>
             <li>
               <strong>VERBIS Kayit Numarasi:</strong> [Kayit tamamlaninca eklenecektir]
