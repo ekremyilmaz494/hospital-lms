@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
-import { withSentryConfig } from '@sentry/nextjs';
+// TEMP DEBUG: Sentry wrapper disabled — testing if it's causing Next.js 16
+// client reference manifest generation failure on (marketing)/page prerender.
+// import { withSentryConfig } from '@sentry/nextjs';
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -138,9 +140,6 @@ const nextConfig: NextConfig = {
   ],
 };
 
-export default withSentryConfig(withPWA(nextConfig), {
-  silent: true,
-  sourcemaps: {
-    deleteSourcemapsAfterUpload: true,
-  },
-});
+// TEMP DEBUG: Sentry wrapper removed to isolate RSC manifest build failure.
+// Restore with: withSentryConfig(withPWA(nextConfig), { silent: true, sourcemaps: { deleteSourcemapsAfterUpload: true } })
+export default withPWA(nextConfig);
