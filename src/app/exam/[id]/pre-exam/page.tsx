@@ -150,26 +150,6 @@ export default function PreExamPage() {
     return () => window.removeEventListener('beforeunload', saveOnExit);
   }, [id, examData, currentQ, answers]);
 
-  if (isLoading) {
-    return <PageLoading />;
-  }
-
-  if (error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
-  }
-
-  if (!examData || (examData.questions ?? []).length === 0) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>;
-  }
-
-  const questions = examData.questions ?? [];
-  const currentTimeLeft = timeLeft ?? 0;
-  const minutes = Math.floor(currentTimeLeft / 60);
-  const seconds = currentTimeLeft % 60;
-  const progress = ((currentQ + 1) / questions.length) * 100;
-  const q = questions[currentQ];
-  const answeredCount = Object.keys(answers).length;
-
   const handleFinish = useCallback(async () => {
     if (submitting) return;
     setSubmitting(true);
@@ -214,6 +194,27 @@ export default function PreExamPage() {
   useEffect(() => {
     if (timeLeft === 0 && handleFinishRef.current) handleFinishRef.current();
   }, [timeLeft]);
+
+  // ── Early returns (tüm hook'lar yukarıda tanımlandı) ──
+  if (isLoading) {
+    return <PageLoading />;
+  }
+
+  if (error) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+  }
+
+  if (!examData || (examData.questions ?? []).length === 0) {
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>;
+  }
+
+  const questions = examData.questions ?? [];
+  const currentTimeLeft = timeLeft ?? 0;
+  const minutes = Math.floor(currentTimeLeft / 60);
+  const seconds = currentTimeLeft % 60;
+  const progress = ((currentQ + 1) / questions.length) * 100;
+  const q = questions[currentQ];
+  const answeredCount = Object.keys(answers).length;
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
