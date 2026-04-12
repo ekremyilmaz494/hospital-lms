@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { MarketingHomeClient } from "./home-client";
 
+// Next.js 16 webpack prerender'ı bu route için client reference manifest
+// oluşturamıyor. force-dynamic runtime render ile sorunu atlatır.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Hastane LMS - Hastane Personel Egitim ve Sinav Yonetim Sistemi",
   description:
