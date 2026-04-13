@@ -11,7 +11,9 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
-    directUrl: process.env["DIRECT_URL"],
+    // Prisma CLI (migrate / db push) için — schema engine pgbouncer üzerinden çalışmaz,
+    // bu yüzden session pooler URL'i kullanılır. Runtime Prisma Client ise DATABASE_URL'i
+    // `src/lib/prisma.ts` içinde env'den doğrudan okur (bu config'ten bağımsız).
+    url: process.env["DIRECT_URL"],
   },
 });
