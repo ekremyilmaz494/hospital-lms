@@ -49,6 +49,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   })
 
   if (existing) {
+    // K2: Post-exam answer lock — 30 sn grace süresi, sonra cevap kilitli.
+    // "Fikir değiştirme" penceresi açık; DevTools ile geriye dönüp eski soruları
+    // sonradan değiştirme girişimleri reddedilir.
+    if (body.examPhase === 'post') {
+      const ageMs = Date.now() - new Date(existing.answeredAt).getTime()
+      const GRACE_MS = 30_000
+      if (ageMs > GRACE_MS) {
+        return errorResponse('Bu sorunun cevabı kilitlendi, değiştirilemez', 423)
+      }
+    }
     await prisma.examAnswer.update({
       where: { id: existing.id },
       data: { selectedOptionId: body.selectedOptionId, answeredAt: new Date() },

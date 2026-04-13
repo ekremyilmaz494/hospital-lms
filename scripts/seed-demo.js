@@ -6,7 +6,7 @@ const { Client } = require('pg');
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DB_URL = process.env.DATABASE_URL;
-const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'demo123456';
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD;
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !DB_URL) {
   console.error("Missing required environment variables.");
@@ -175,10 +175,7 @@ async function run() {
 
   await db.end();
   console.log('\n=== DEMO SETUP COMPLETE ===');
-  console.log('Login credentials:');
-  console.log('  Super Admin: super@demo.com / demo123456');
-  console.log('  Admin:       admin@demo.com / demo123456');
-  console.log('  Staff:       staff@demo.com / demo123456');
+  console.log('Kullanici bilgileri env dosyasindan okunur (DEMO_PASSWORD).');
 }
 
 run().catch(e => console.error('FATAL:', e.message));

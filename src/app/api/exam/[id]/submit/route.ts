@@ -89,11 +89,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const questionMap = new Map(questions.map(q => [q.id, q]))
 
+  // K2: Post-exam'da body.answers'a güvenme — DevTools ile manipüle edilebilir.
+  // Onun yerine save-answer üzerinden persist edilmiş examAnswer kayıtlarını
+  // otorite kabul et. save-answer, 30 sn'lik grace sonrası kilitleme uygular,
+  // yani geriye dönüp soru değiştirme girişimi server'da reddedilmiş olur.
+  const sourceAnswers = phase === 'post'
+    ? (await prisma.examAnswer.findMany({
+        where: { attemptId: attempt.id, examPhase: 'post' },
+        select: { questionId: true, selectedOptionId: true },
+      }))
+    : parsed.data.answers
+
   // Calculate score — cevaplanmamış sorular yanlış sayılır (submit engellenmez)
   let totalPoints = 0
   let earnedPoints = 0
 
-  const validAnswers = parsed.data.answers
+  const validAnswers = sourceAnswers
     .filter(a => questionMap.has(a.questionId))
     .map(a => {
       const question = questionMap.get(a.questionId)!
@@ -111,7 +122,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
 
   // Cevaplanmamış soruları da toplam puana ekle (yanlış sayılır)
-  const answeredIds = new Set(parsed.data.answers.map(a => a.questionId))
+  const answeredIds = new Set(sourceAnswers.map(a => a.questionId))
   for (const q of questions) {
     if (!answeredIds.has(q.id)) {
       totalPoints += q.points
@@ -125,7 +136,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ? questions
         .sort((a, b) => a.sortOrder - b.sortOrder)
         .map(q => {
-          const answer = parsed.data.answers.find(a => a.questionId === q.id)
+          const answer = sourceAnswers.find(a => a.questionId === q.id)
           const correctOption = q.options.find(o => o.isCorrect)
           const selectedOption = answer ? q.options.find(o => o.id === answer.selectedOptionId) : null
           return {

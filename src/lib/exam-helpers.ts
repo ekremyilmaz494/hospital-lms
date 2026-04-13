@@ -9,10 +9,13 @@ export async function getAttemptWithPhaseCheck(
   id: string,
   userId: string,
   requiredPhase: string | string[],
+  userOrgId: string,
 ) {
-  // Try as assignmentId first, then trainingId
+  // Tenant isolation: training.organizationId mutlaka çağıranın org'u olmalı (cross-org leak önlemi)
+  const orgGuard = { training: { organizationId: userOrgId } }
+
   let attempt = await prisma.examAttempt.findFirst({
-    where: { assignmentId: id, userId, status: { not: 'completed' } },
+    where: { assignmentId: id, userId, status: { not: 'completed' }, ...orgGuard },
     include: {
       training: { select: { id: true, passingScore: true, examDurationMinutes: true } },
       videoProgress: true,
@@ -22,7 +25,7 @@ export async function getAttemptWithPhaseCheck(
 
   if (!attempt) {
     attempt = await prisma.examAttempt.findFirst({
-      where: { trainingId: id, userId, status: { not: 'completed' } },
+      where: { trainingId: id, userId, status: { not: 'completed' }, ...orgGuard },
       include: {
         training: { select: { id: true, passingScore: true, examDurationMinutes: true } },
         videoProgress: true,
@@ -62,18 +65,18 @@ export async function getAttemptWithPhaseCheck(
  * Get attempt status for frontend phase guard (read-only, no phase restriction)
  * Searches by assignmentId first, then by trainingId as fallback
  */
-export async function getAttemptStatus(id: string, userId: string) {
-  // Try as assignmentId first
+export async function getAttemptStatus(id: string, userId: string, userOrgId: string) {
+  const orgGuard = { training: { organizationId: userOrgId } }
+
   let attempt = await prisma.examAttempt.findFirst({
-    where: { assignmentId: id, userId },
+    where: { assignmentId: id, userId, ...orgGuard },
     orderBy: { attemptNumber: 'desc' },
     select: { id: true, status: true, preExamCompletedAt: true, videosCompletedAt: true, postExamCompletedAt: true },
   })
 
-  // Fallback: try as trainingId
   if (!attempt) {
     attempt = await prisma.examAttempt.findFirst({
-      where: { trainingId: id, userId },
+      where: { trainingId: id, userId, ...orgGuard },
       orderBy: { attemptNumber: 'desc' },
       select: { id: true, status: true, preExamCompletedAt: true, videosCompletedAt: true, postExamCompletedAt: true },
     })

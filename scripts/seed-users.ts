@@ -7,7 +7,7 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false }
 })
 
-const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'demo123456' // secret-scanner-disable-line
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD!
 
 const USERS = [
   { email: 'super@demo.com', password: DEMO_PASSWORD, role: 'super_admin', name: 'Süper Admin' },

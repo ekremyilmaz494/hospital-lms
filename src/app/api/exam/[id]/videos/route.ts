@@ -11,7 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
   // Phase guard: check attempt status for video access
-  const attemptInfo = await getAttemptStatus(id, dbUser!.id)
+  const attemptInfo = await getAttemptStatus(id, dbUser!.id, dbUser!.organizationId!)
   const attemptStatus = attemptInfo?.status ?? null
   // Videos accessible during watching_videos, post_exam (read-only), and completed phases
   // Only block during pre_exam (hasn't finished pre-exam yet)

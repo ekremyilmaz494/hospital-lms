@@ -1179,7 +1179,7 @@ Yedekleme sistemi iskelet halindeydi — tüm eksikler kapatıldı:
 
 ### 8.6 Login Sorunu Çözümü (Kritik)
 
-- **Problem:** `admin@demo.com` / `demo123456` ile giriş yapılamıyordu
+- **Problem:** Admin hesabı ile giriş yapılamıyordu
 - **Kök Neden:** Middleware'in `publicRoutes` listesinde `/api/auth/` yoktu. Login API'sine gelen POST isteği middleware tarafından yakalanıp login sayfasına redirect ediliyordu.
 - **Çözüm:** `/api/auth/` yolu public routes'a eklendi
 - **Doğrulama:** `curl` ile API test → 200 OK + access_token
@@ -3401,7 +3401,7 @@ Son 3 Preview deployment **Error** durumunda — `DATABASE_URL` ortam değişken
 - 200 personel Supabase Auth + PostgreSQL'e eklendi (gerçekçi Türkçe isimler, 5 departmana dağılmış)
 - **518 eğitim ataması**, **335 sınav denemesi**, **238 sertifika**, **30 başarısız sınav** oluşturuldu
 - Dağılım: 60 tamamlamış, 60 kısmen tamamlamış, 40 devam eden, 40 atanmış
-- Tüm personel şifresi: `Demo123!`, email formatı: `demo1@demo.hastanelms.com` ... `demo200@demo.hastanelms.com`
+- Tüm personel email formatı: `demo1@demo.hastanelms.com` ... `demo200@demo.hastanelms.com`
 
 #### 2. Vercel Env Düzeltmesi
 - **Sorun:** Vercel production farklı bir Supabase projesi (`bzvunibntyewobkdsoow`) kullanıyordu, lokal ise `pkkkyyajfmusurcoovwt`
@@ -3785,7 +3785,7 @@ Etkilenen dosyalar: staff/[id], departments/[id], competency/forms/[id], smg/per
 
 - Landing page "Daha Fazla" butonları: `<div>` → `<Link href="/register">` (tıklanabilir)
 - Demo Özel Hastanesi dışındaki test organizasyonları DB'den silindi
-- `admin@demo.hastanelms.com` şifresi sıfırlandı (`Demo123!`)
+- `admin@demo.hastanelms.com` şifresi sıfırlandı
 
 ### Toplam Değiştirilen Dosya Sayısı
 ~45 dosya değiştirildi, 3 yeni dosya oluşturuldu, 1 migration eklendi.

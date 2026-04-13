@@ -26,7 +26,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return errorResponse('phase parametresi zorunludur (pre veya post)', 400)
   }
   const requiredStatus = phase === 'pre' ? 'pre_exam' : 'post_exam'
-  const { attempt, error: phaseError } = await getAttemptWithPhaseCheck(id, dbUser!.id, [requiredStatus])
+  const { attempt, error: phaseError } = await getAttemptWithPhaseCheck(id, dbUser!.id, [requiredStatus], dbUser!.organizationId!)
   if (phaseError) return phaseError
 
   // id can be trainingId or assignmentId — find the training

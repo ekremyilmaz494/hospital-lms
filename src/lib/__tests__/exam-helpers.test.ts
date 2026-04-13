@@ -32,11 +32,13 @@ beforeEach(() => {
   mockFindFirst.mockReset()
 })
 
+const ORG = 'org-uuid-1'
+
 describe('getAttemptWithPhaseCheck', () => {
   it('assignmentId ile aktif denemeyi döndürür', async () => {
     mockFindFirst.mockResolvedValueOnce(mockAttempt)
 
-    const result = await getAttemptWithPhaseCheck('assignment-uuid-1', 'user-uuid-1', 'pre_exam')
+    const result = await getAttemptWithPhaseCheck('assignment-uuid-1', 'user-uuid-1', 'pre_exam', ORG)
 
     expect(result.error).toBeNull()
     expect(result.attempt?.id).toBe('attempt-uuid-1')
@@ -48,7 +50,7 @@ describe('getAttemptWithPhaseCheck', () => {
     // İkinci çağrı (trainingId) → bulundu
     mockFindFirst.mockResolvedValueOnce(mockAttempt)
 
-    const result = await getAttemptWithPhaseCheck('training-uuid-1', 'user-uuid-1', 'pre_exam')
+    const result = await getAttemptWithPhaseCheck('training-uuid-1', 'user-uuid-1', 'pre_exam', ORG)
 
     expect(result.error).toBeNull()
     expect(result.attempt?.id).toBe('attempt-uuid-1')
@@ -58,7 +60,7 @@ describe('getAttemptWithPhaseCheck', () => {
   it('hiç deneme bulunamazsa 404 hata döndürür', async () => {
     mockFindFirst.mockResolvedValue(null)
 
-    const result = await getAttemptWithPhaseCheck('uuid-yok', 'user-uuid-1', 'pre_exam')
+    const result = await getAttemptWithPhaseCheck('uuid-yok', 'user-uuid-1', 'pre_exam', ORG)
 
     expect(result.attempt).toBeNull()
     expect(result.error).not.toBeNull()
@@ -70,7 +72,7 @@ describe('getAttemptWithPhaseCheck', () => {
     const watchingAttempt = { ...mockAttempt, status: 'watching_videos' }
     mockFindFirst.mockResolvedValueOnce(watchingAttempt)
 
-    const result = await getAttemptWithPhaseCheck('assignment-uuid-1', 'user-uuid-1', 'pre_exam')
+    const result = await getAttemptWithPhaseCheck('assignment-uuid-1', 'user-uuid-1', 'pre_exam', ORG)
 
     expect(result.attempt).toBeNull()
     expect(result.error).not.toBeNull()
@@ -84,7 +86,7 @@ describe('getAttemptWithPhaseCheck', () => {
     const postAttempt = { ...mockAttempt, status: 'post_exam' }
     mockFindFirst.mockResolvedValueOnce(postAttempt)
 
-    const result = await getAttemptWithPhaseCheck('assignment-uuid-1', 'user-uuid-1', ['pre_exam', 'post_exam'])
+    const result = await getAttemptWithPhaseCheck('assignment-uuid-1', 'user-uuid-1', ['pre_exam', 'post_exam'], ORG)
 
     expect(result.error).toBeNull()
     expect(result.attempt?.status).toBe('post_exam')
@@ -102,7 +104,7 @@ describe('getAttemptStatus', () => {
     }
     mockFindFirst.mockResolvedValueOnce(statusData)
 
-    const result = await getAttemptStatus('assignment-uuid-1', 'user-uuid-1')
+    const result = await getAttemptStatus('assignment-uuid-1', 'user-uuid-1', ORG)
 
     expect(result?.status).toBe('watching_videos')
     expect(result?.preExamCompletedAt).toBeTruthy()
@@ -113,7 +115,7 @@ describe('getAttemptStatus', () => {
     mockFindFirst.mockResolvedValueOnce(null)
     mockFindFirst.mockResolvedValueOnce({ id: 'attempt-uuid-2', status: 'post_exam', preExamCompletedAt: null, videosCompletedAt: null, postExamCompletedAt: null })
 
-    const result = await getAttemptStatus('training-uuid-1', 'user-uuid-1')
+    const result = await getAttemptStatus('training-uuid-1', 'user-uuid-1', ORG)
 
     expect(result?.id).toBe('attempt-uuid-2')
     expect(mockFindFirst).toHaveBeenCalledTimes(2)
@@ -122,7 +124,7 @@ describe('getAttemptStatus', () => {
   it('hiç deneme bulunamazsa null döndürür', async () => {
     mockFindFirst.mockResolvedValue(null)
 
-    const result = await getAttemptStatus('uuid-yok', 'user-uuid-1')
+    const result = await getAttemptStatus('uuid-yok', 'user-uuid-1', ORG)
 
     expect(result).toBeNull()
   })

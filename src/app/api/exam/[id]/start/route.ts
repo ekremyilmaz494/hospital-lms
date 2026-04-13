@@ -48,9 +48,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   })
 
   if (existing) {
+    let resumed = existing
+    // Retry attempt'i pre_exam'da takılı kalmışsa watching_videos'a yükselt
+    if (existing.attemptNumber > 1 && existing.status === 'pre_exam') {
+      resumed = await prisma.examAttempt.update({
+        where: { id: existing.id },
+        data: {
+          status: 'watching_videos',
+          preExamCompletedAt: existing.preExamCompletedAt ?? new Date(),
+          preExamScore: existing.preExamScore ?? 0,
+        },
+        include: { videoProgress: true },
+      })
+    }
     const examOnly = assignment.training.examOnly === true
     return jsonResponse({
-      ...existing,
+      ...resumed,
       examOnly,
       redirectTo: examOnly ? 'post-exam' : undefined,
     })
@@ -82,7 +95,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       include: { videoProgress: true },
     })
 
-    if (existingInTx) return existingInTx
+    if (existingInTx) {
+      if (existingInTx.attemptNumber > 1 && existingInTx.status === 'pre_exam') {
+        return await tx.examAttempt.update({
+          where: { id: existingInTx.id },
+          data: {
+            status: 'watching_videos',
+            preExamCompletedAt: existingInTx.preExamCompletedAt ?? new Date(),
+            preExamScore: existingInTx.preExamScore ?? 0,
+          },
+          include: { videoProgress: true },
+        })
+      }
+      return existingInTx
+    }
 
     // Create new attempt
     const newAttemptNumber = assignment.currentAttempt + 1
@@ -119,7 +145,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     // Retry'da pre-exam gerekli mi? (varsayılan: evet)
     const isRetry = newAttemptNumber > 1
-    const skipPreExam = isRetry && assignment.training.requirePreExamOnRetry === false
+    const skipPreExam = isRetry
     const initialStatus = skipPreExam ? 'watching_videos' : 'pre_exam'
 
     const created = await tx.examAttempt.create({

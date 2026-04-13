@@ -11,7 +11,7 @@ test.describe('Kimlik Dogrulama Akislari', () => {
 
   test('yanlis sifre → hata mesaji gosterilir', async ({ page }) => {
     await page.goto('/auth/login')
-    await page.fill('[type="email"]', 'admin@demo.com')
+    await page.fill('[type="email"]', process.env.E2E_ADMIN_EMAIL!)
     await page.fill('[type="password"]', 'yanlis_sifre_123')
 
     // KVKK checkbox

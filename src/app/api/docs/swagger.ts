@@ -1155,8 +1155,8 @@ export const openApiSpec = {
         type: 'object',
         required: ['email', 'password'],
         properties: {
-          email: { type: 'string', format: 'email', description: 'E-posta adresi', example: 'admin@demo.com' },
-          password: { type: 'string', format: 'password', description: 'Sifre (min 8 karakter)', example: 'demo123456' },
+          email: { type: 'string', format: 'email', description: 'E-posta adresi', example: 'kullanici@firma.com' },
+          password: { type: 'string', format: 'password', description: 'Sifre (min 8 karakter)' },
         },
       },
 

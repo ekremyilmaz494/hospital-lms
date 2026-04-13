@@ -1,7 +1,36 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
-import { deleteObject } from '@/lib/s3'
+import { deleteObject, getStreamUrl } from '@/lib/s3'
 import { logger } from '@/lib/logger'
+
+/**
+ * GET /api/admin/media-library/[id] — Oynatma/önizleme için signed URL üret
+ */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { dbUser, error } = await getAuthUser()
+  if (error) return error
+
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
+  if (roleError) return roleError
+
+  const { id } = await params
+  const orgId = dbUser!.organizationId!
+
+  const item = await prisma.contentLibrary.findFirst({
+    where: { id, organizationId: orgId },
+    select: { id: true, title: true, contentType: true, fileType: true, s3Key: true },
+  })
+  if (!item) return errorResponse('İçerik bulunamadı', 404)
+  if (!item.s3Key) return errorResponse('Dosya yok', 404)
+
+  const url = await getStreamUrl(item.s3Key)
+
+  return jsonResponse(
+    { id: item.id, title: item.title, contentType: item.contentType, fileType: item.fileType, url },
+    200,
+    { 'Cache-Control': 'private, max-age=60' },
+  )
+}
 
 /**
  * PATCH /api/admin/media-library/[id] — Medya bilgilerini güncelle (title, category)

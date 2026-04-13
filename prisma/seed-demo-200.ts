@@ -34,7 +34,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
-const DEMO_PASSWORD = 'Demo123!' // secret-scanner-disable-line
+const DEMO_PASSWORD = process.env.SEED_PASSWORD!
 const ORG_CODE = 'demo-hastane'
 
 // ── TURKISH NAME DATA ──────────────────────────────────────

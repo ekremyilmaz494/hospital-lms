@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
-import { getUploadUrl, videoKey, documentKey, audioKey } from '@/lib/s3'
+import { getUploadUrl, videoKey, documentKey, audioKey, getStreamUrl } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -58,12 +58,28 @@ export async function GET(request: Request) {
     prisma.contentLibrary.count({ where }),
   ])
 
+  // Thumbnail signed URL'lerini paralel üret (S3 key → geçici indirilebilir URL)
+  const itemsWithThumb = await Promise.all(
+    items.map(async (item) => {
+      let thumbUrl: string | null = null
+      if (item.thumbnailUrl) {
+        try {
+          thumbUrl = await getStreamUrl(item.thumbnailUrl)
+        } catch {
+          thumbUrl = null
+        }
+      }
+      return {
+        ...item,
+        thumbnailUrl: thumbUrl,
+        usageCount: item.trainings.length,
+        trainings: undefined,
+      }
+    }),
+  )
+
   return jsonResponse({
-    items: items.map(item => ({
-      ...item,
-      usageCount: item.trainings.length,
-      trainings: undefined,
-    })),
+    items: itemsWithThumb,
     total,
     page,
     limit,
@@ -145,6 +161,14 @@ export async function POST(request: Request) {
       // Presigned URL al
       const uploadUrl = await getUploadUrl(key, file.contentType)
 
+      // Video ise thumbnail için ayrı presigned URL üret
+      let thumbnailKey: string | null = null
+      let thumbnailUploadUrl: string | null = null
+      if (detectedType === 'video') {
+        thumbnailKey = key.replace(/\.[^./]+$/, '') + '.thumb.jpg'
+        thumbnailUploadUrl = await getUploadUrl(thumbnailKey, 'image/jpeg')
+      }
+
       // content_library'ye kayıt ekle
       const title = file.title || file.fileName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
       const item = await prisma.contentLibrary.create({
@@ -155,6 +179,7 @@ export async function POST(request: Request) {
           contentType: detectedType,
           fileType: detectedFileType,
           s3Key: key,
+          thumbnailUrl: thumbnailKey, // S3 key; GET sırasında signed URL'e çevrilecek
           duration: file.durationSeconds ? Math.ceil(file.durationSeconds / 60) : 0,
           difficulty: 'BASIC',
           targetRoles: ['all'],
@@ -174,6 +199,7 @@ export async function POST(request: Request) {
       results.push({
         ...item,
         uploadUrl,
+        thumbnailUploadUrl,
         fileName: file.fileName,
       })
     }
