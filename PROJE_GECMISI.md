@@ -3951,3 +3951,141 @@ Admin sidebar'ında "Geri Bildirim" menüsü görünmüyordu. Sebep: lokal `dev`
 - ✅ Commit'ler: `6a213b0` (merge), `cc5cdee` (prisma fix), `92afca4` (remember me)
 
 *Son güncelleme: 13 Nisan 2026 — Oturum 38*
+
+---
+
+## Oturum 39 — 13 Nisan 2026 (Akşam) — Production Geçişi + Git Cleanup
+
+**Hedef:** Dev branch'indeki kritik özellikleri (EY.FR.40, Medya Kütüphanesi, RLS app_metadata, remember me) production'a almak ve git yapısını tek branch düzenine indirgemek.
+
+**Temel problem:** `main` ve `dev` branch'leri **orphan** (ortak ata yok) → `git merge` 156 dosyalık conflict yaratırdı. Güvenli yol: Vercel Production Branch ayarını değiştirmek + git rename ile tek branch düzenine geçmek.
+
+### A) Vercel Production Branch Switch (main → dev)
+
+**Öğleden sonra:** `hospital-lms` Vercel projesinde Production Branch `main` → `dev` olarak değiştirildi. Dev branch'in tüm özellikleri artık `hospital-lms-eta.vercel.app` adresinde canlı.
+
+#### Sürprizler ve Çözümleri
+
+**1. İki Vercel projesi fark edildi:**
+- `hospital-lms` — asıl proje (kullanıcının günlük kullandığı)
+- `hospital-lms-uajo` — yan/yedek proje (aynı GitHub repo'suna bağlı, kullanılmıyor)
+- Karar: Sadece `hospital-lms`'e dokunuldu, uajo olduğu gibi bırakıldı.
+
+**2. Env variable scope karmaşası:**
+`hospital-lms`'te 5 Supabase/DB değişkeni 3 ayrı scope'ta tanımlıydı (Production + Development + Preview→dev branch). Dev branch'i Production Branch yapmaya çalışınca Vercel hata verdi: *"Cannot set Git branch 'dev' as Production Branch, because it's used for Preview Environment Variables..."*
+
+**Çözüm:**
+- Preview→dev scope'lu 5 değişken silindi (değerler zaten Production'la aynıydı — `pkkkyyajfmusurcoovwt` Supabase projesi)
+- `hospital-lms-uajo`'da olup `hospital-lms`'te eksik olan 10 env variable "Import .env" ile toplu eklendi:
+  - `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_VAPID_KEY`, `VAPID_PRIVATE_KEY`
+  - SMTP grubu: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+  - `HEALTH_CHECK_SECRET`, `CRON_SECRET`
+- `AI_CONTENT_SERVICE_URL` ve `AI_CONTENT_INTERNAL_KEY` **atlandı** — AI servisi (`ai-content-service/`) sadece Mac'te lokal çalışıyor, deploy edilmedi. AI özellikleri production'da silent fail (sonra Render/Railway'e deploy edilecek).
+- SMTP_PASS boşluklu hâldeydi (`birx xknl nptr qkqj`) → boşluksuz eklendi (parser güvenliği)
+
+**3. Build Cache nedeniyle ilk redeploy eski env'lerle geldi:**
+- İlk otomatik deploy eski build cache kullandı, NEXT_PUBLIC_* env'ler güncellenmedi
+- Manuel Redeploy: Environment=Production + Build Cache=Off → temiz build
+
+### B) Git Cleanup (dev → main, eski main → archive)
+
+**Akşam:** Orphan branch karmaşasını tek branch düzenine indirgeme.
+
+#### Uygulanan adımlar
+
+**1. `.husky/pre-push` hook güncellendi:**
+Eski hook "main'e push yasak" diyordu (main = korumalı production). Yeni modelde main = production + direkt push normal. Hook içeriği silindi, sadece açıklama yorumu kaldı. Commit `d7b8ebf` — dev'e push edildi.
+
+**2. Eski remote main arşivlendi (non-destructive):**
+```bash
+git push origin refs/remotes/origin/main:refs/heads/archive/old-main-2026-04-13
+```
+Eski main'in 81 commit'lik history'si `archive/old-main-2026-04-13` olarak remote'ta duruyor.
+
+**3. Dev içeriği force push ile main'e taşındı:**
+```bash
+git push origin dev:main --force
+```
+Remote main artık dev'in içeriği (HEAD=`d7b8ebf`). Branch protection yoktu, komut tek seferde geçti.
+
+**4. Vercel Production Branch: dev → main:**
+- İlk build fail oldu (force push anında Production Branch hâlâ `dev`'di → main'e push Preview olarak queue'ya alındı) → Preview scope'unda env vars yoktu → boş URL → build fail
+- Manuel Redeploy: Environment=Production + Build Cache=Off → geçti
+- `hospital-lms-eta.vercel.app` artık main'den deploy oluyor
+
+**5. Remote dev silindi:**
+```bash
+git push origin --delete dev
+```
+
+**6. Lokal temizlik:**
+```bash
+git checkout main
+git reset --hard origin/main   # yeni içerik (dev'in aynısı)
+git branch -D dev              # lokal dev silindi
+git fetch origin --prune
+```
+
+### C) Çözülen Ek Sorun
+
+**Vercel Deployment Protection** — Başka cihazdan açılınca "Login to Vercel" sayfası çıktı:
+- Hobby plan default'u: "Deployment Protection: All Deployments" → production bile korumalı
+- Settings → Deployment Protection → "Only Preview Deployments" yapıldı → production herkese açık
+
+### Final Durum
+
+```
+main (local + remote)           ← production, d7b8ebf canlı
+archive/old-main-2026-04-13     ← eski 81 commit yedek (remote)
+dev                             ← SİLİNDİ (lokal + remote)
+backup/dev-2026-04-13 (local)   ← yedek
+backup/main-2026-04-13 (local)  ← yedek
+```
+
+**Yeni workflow:**
+```bash
+git checkout main
+# kod + test
+git add . && git commit -m "..."
+git push origin main    # → Vercel otomatik production deploy
+```
+
+### Test Edildi ve Çalışıyor
+- ✅ Login (Supabase auth)
+- ✅ Admin → Medya Kütüphanesi (S3 + Supabase)
+- ✅ Admin → Feedback Forms (EY.FR.40 seed datası geldi)
+- ✅ Sınav sonrası feedback formu
+- ✅ Production URL başka cihazdan açılıyor (Deployment Protection kapatıldı)
+
+### Bilinen Takip İşleri (v2'ye bırakıldı)
+
+**1. AI Content Service Deploy:**
+- `ai-content-service/` şu an sadece Mac'te localhost:8100'de çalışıyor
+- Render/Railway'e deploy edilecek, sonra `hospital-lms` Vercel env'ine `AI_CONTENT_SERVICE_URL` + `AI_CONTENT_INTERNAL_KEY` eklenecek
+- Şu an AI özellikleri production'da silent fail
+
+**2. Secret Rotation (müşteri gelmeden önce):**
+Bu oturumda 4 secret sohbette açıkça paylaşıldı, rotate edilmeli:
+
+| Değişken | Risk | Öncelik |
+|---|---|---|
+| `SMTP_PASS` | Yüksek (Gmail app password, e-mail hijack riski) | 1 |
+| `HEALTH_CHECK_SECRET` | Orta (tahmin edilebilir string, zaten zayıf) | 2 |
+| `CRON_SECRET` | Orta (random ama log'da yazılı) | 3 |
+| `AI_CONTENT_INTERNAL_KEY` | Düşük (AI service deploy edilmedi, etkisiz) | 4 |
+
+Komut: `openssl rand -hex 32` + Gmail → Security → App passwords → yeni oluştur.
+
+**3. Opsiyonel temizlik (acil değil):**
+- `hospital-lms-uajo` Vercel projesi — sil/pause kararı
+- Eski Claude-oluşturma branch'leri (`claude/add-demo-credentials-y7u6M`, `claude/add-project-entry-form-U4dzl`)
+
+### Doğrulama
+- ✅ Git durumu temiz (tek branch: main)
+- ✅ Remote main = local main (d7b8ebf)
+- ✅ origin/HEAD → main (doğru)
+- ✅ Vercel production deploy başarılı (Environment=Production)
+- ✅ Public URL herkese açık
+- ✅ Commit'ler: `d7b8ebf` (hook fix) — bu oturumdaki tek yeni commit
+
+*Son güncelleme: 13 Nisan 2026 — Oturum 39*
