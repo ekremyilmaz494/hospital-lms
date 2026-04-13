@@ -62,6 +62,7 @@ export function NumberTicker({
       )}
       ref={ref}
       style={style}
+      suppressHydrationWarning
     >
       {formatted}
     </span>

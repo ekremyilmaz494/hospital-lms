@@ -3,9 +3,9 @@ import { type Page, expect } from '@playwright/test'
 export type UserRole = 'admin' | 'staff' | 'super_admin'
 
 const CREDENTIALS: Record<UserRole, { email: string; password: string }> = {
-  admin: { email: process.env.E2E_ADMIN_EMAIL!, password: process.env.E2E_ADMIN_PASS! },
-  staff: { email: process.env.E2E_STAFF_EMAIL!, password: process.env.E2E_STAFF_PASS! },
-  super_admin: { email: process.env.E2E_SUPER_EMAIL!, password: process.env.E2E_SUPER_PASS! },
+  admin: { email: process.env.E2E_ADMIN_EMAIL ?? '', password: process.env.E2E_ADMIN_PASSWORD ?? '' },
+  staff: { email: process.env.E2E_STAFF_EMAIL ?? '', password: process.env.E2E_STAFF_PASSWORD ?? '' },
+  super_admin: { email: process.env.E2E_SUPER_EMAIL ?? '', password: process.env.E2E_SUPER_PASSWORD ?? '' },
 }
 
 const DASHBOARD_ROUTES: Record<UserRole, string> = {

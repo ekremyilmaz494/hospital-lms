@@ -518,3 +518,38 @@ export const setupWizardSchema = z.object({
   // Step 4: Complete
   complete: z.boolean().optional(),
 })
+
+// ── EY.FR.40 EĞİTİM GERİ BİLDİRİM ──
+
+export const feedbackQuestionTypeSchema = z.enum(['likert_5', 'yes_partial_no', 'text'])
+
+/** Staff tarafından gönderilen geri bildirim yanıtı */
+export const trainingFeedbackSubmitSchema = z.object({
+  attemptId: z.uuid(),
+  includeName: z.boolean().default(false),
+  answers: z.array(z.object({
+    itemId: z.uuid(),
+    score: z.number().int().min(1).max(5).optional(),
+    textAnswer: z.string().max(2000).optional(),
+  })).min(1).max(200),
+})
+
+/** Admin form editörü: tüm formu replace eder */
+export const trainingFeedbackFormUpsertSchema = z.object({
+  title: z.string().min(1).max(255),
+  description: z.string().max(2000).optional().nullable(),
+  documentCode: z.string().max(50).optional().nullable(),
+  isActive: z.boolean().default(true),
+  categories: z.array(z.object({
+    id: z.uuid().optional(),
+    name: z.string().min(1).max(255),
+    order: z.number().int().min(0).max(999),
+    items: z.array(z.object({
+      id: z.uuid().optional(),
+      text: z.string().min(1).max(500),
+      questionType: feedbackQuestionTypeSchema,
+      isRequired: z.boolean().default(true),
+      order: z.number().int().min(0).max(999),
+    })).min(0).max(100),
+  })).min(1).max(20),
+})

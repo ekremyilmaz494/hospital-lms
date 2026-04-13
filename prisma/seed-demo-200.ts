@@ -34,7 +34,8 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
-const DEMO_PASSWORD = process.env.SEED_PASSWORD!
+const DEMO_PASSWORD = process.env.SEED_PASSWORD
+if (!DEMO_PASSWORD) { console.error('SEED_PASSWORD env değişkeni eksik'); process.exit(1) }
 const ORG_CODE = 'demo-hastane'
 
 // ── TURKISH NAME DATA ──────────────────────────────────────

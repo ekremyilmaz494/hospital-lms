@@ -7,6 +7,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DB_URL = process.env.DATABASE_URL;
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD;
+if (!DEMO_PASSWORD) { console.error('DEMO_PASSWORD env değişkeni eksik'); process.exit(1); }
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !DB_URL) {
   console.error("Missing required environment variables.");
@@ -53,10 +54,17 @@ async function run() {
   console.log('Subscription linked');
 
   // 4. Create auth users
+  const SUPER_EMAIL = process.env.SEED_SUPER_EMAIL;
+  const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL;
+  const STAFF_EMAIL = process.env.SEED_STAFF_EMAIL;
+  if (!SUPER_EMAIL || !ADMIN_EMAIL || !STAFF_EMAIL) {
+    console.error('SEED_SUPER_EMAIL, SEED_ADMIN_EMAIL, SEED_STAFF_EMAIL env değişkenleri gerekli');
+    process.exit(1);
+  }
   const users = [
-    { email: 'super@demo.com', password: DEMO_PASSWORD, firstName: 'Super', lastName: 'Admin', role: 'super_admin', orgId: null },
-    { email: 'admin@demo.com', password: DEMO_PASSWORD, firstName: 'Hastane', lastName: 'Admin', role: 'admin', orgId: orgId },
-    { email: 'staff@demo.com', password: DEMO_PASSWORD, firstName: 'Personel', lastName: 'Test', role: 'staff', orgId: orgId },
+    { email: SUPER_EMAIL, password: DEMO_PASSWORD, firstName: 'Super', lastName: 'Admin', role: 'super_admin', orgId: null },
+    { email: ADMIN_EMAIL, password: DEMO_PASSWORD, firstName: 'Hastane', lastName: 'Admin', role: 'admin', orgId: orgId },
+    { email: STAFF_EMAIL, password: DEMO_PASSWORD, firstName: 'Personel', lastName: 'Test', role: 'staff', orgId: orgId },
   ];
 
   for (const u of users) {
@@ -107,8 +115,8 @@ async function run() {
   }
 
   // 5. Create a sample training
-  const adminUser = await db.query(`SELECT id FROM users WHERE email = 'admin@demo.com'`);
-  const staffUser = await db.query(`SELECT id FROM users WHERE email = 'staff@demo.com'`);
+  const adminUser = await db.query(`SELECT id FROM users WHERE email = $1`, [ADMIN_EMAIL]);
+  const staffUser = await db.query(`SELECT id FROM users WHERE email = $1`, [STAFF_EMAIL]);
 
   if (adminUser.rows[0] && staffUser.rows[0]) {
     const trainingResult = await db.query(`
@@ -175,7 +183,7 @@ async function run() {
 
   await db.end();
   console.log('\n=== DEMO SETUP COMPLETE ===');
-  console.log('Kullanici bilgileri env dosyasindan okunur (DEMO_PASSWORD).');
+  console.log('Demo setup tamamlandi.');
 }
 
 run().catch(e => console.error('FATAL:', e.message));

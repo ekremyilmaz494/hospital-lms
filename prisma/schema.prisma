@@ -103,6 +103,9 @@ model Organization {
   orgContentLibrary      ContentLibrary[]      @relation("OrgContentLibrary")
   examAttempts           ExamAttempt[]
   certificates           Certificate[]
+  // EY.FR.40 Eğitim Geri Bildirim
+  feedbackForm           TrainingFeedbackForm?
+  feedbackResponses      TrainingFeedbackResponse[]
 
   @@map("organizations")
 }
@@ -258,6 +261,8 @@ model User {
   aiGenerations           AiGeneration[]               @relation("UserAiGenerations")
   aiEvaluations           AiGeneration[]               @relation("AiEvaluator")
   aiGoogleConnections     AiGoogleConnection[]
+  // EY.FR.40 Eğitim Geri Bildirim
+  feedbackResponses       TrainingFeedbackResponse[]
 
   @@unique([organizationId, tcNo])
   @@index([organizationId], map: "idx_users_org")
@@ -323,6 +328,8 @@ model Training {
   certificates    Certificate[]
   scormAttempts   ScormAttempt[]
   departmentRules DepartmentTrainingRule[]
+  // EY.FR.40 Eğitim Geri Bildirim
+  feedbackResponses TrainingFeedbackResponse[]
 
   @@index([organizationId], map: "idx_trainings_org")
   @@index([startDate, endDate], map: "idx_trainings_dates")
@@ -447,6 +454,8 @@ model ExamAttempt {
   examAnswers   ExamAnswer[]
   videoProgress VideoProgress[]
   certificates  Certificate[]
+  // EY.FR.40 Eğitim Geri Bildirim (attempt başına 1 yanıt)
+  feedbackResponse TrainingFeedbackResponse?
 
   @@unique([assignmentId, attemptNumber])
   @@index([assignmentId], map: "idx_attempts_assignment")
@@ -1103,4 +1112,94 @@ model AiGoogleConnection {
 
   @@index([status])
   @@map("ai_google_connections")
+}
+
+// ──────────────────────────────────────────────────────────────
+// EY.FR.40 EĞİTİM DEĞERLENDİRME (GERİ BİLDİRİM) FORMU
+// Her organizasyon için tek form; kategoriler + item'lar dinamik.
+// Eğitim/sınav akışı sonunda (geçsin/kalsın) personele gösterilir.
+// ──────────────────────────────────────────────────────────────
+
+model TrainingFeedbackForm {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @unique @map("organization_id") @db.Uuid
+  title          String   @default("Eğitim Değerlendirme Anket Formu") @db.VarChar(255)
+  description    String?  @db.Text
+  documentCode   String?  @default("EY.FR.40") @map("document_code") @db.VarChar(50)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  categories   TrainingFeedbackCategory[]
+  responses    TrainingFeedbackResponse[]
+
+  @@map("training_feedback_forms")
+}
+
+model TrainingFeedbackCategory {
+  id     String @id @default(uuid()) @db.Uuid
+  formId String @map("form_id") @db.Uuid
+  name   String @db.VarChar(255)
+  order  Int    @default(0)
+
+  form  TrainingFeedbackForm   @relation(fields: [formId], references: [id], onDelete: Cascade)
+  items TrainingFeedbackItem[]
+
+  @@index([formId], map: "idx_tfb_categories_form")
+  @@map("training_feedback_categories")
+}
+
+model TrainingFeedbackItem {
+  id           String  @id @default(uuid()) @db.Uuid
+  categoryId   String  @map("category_id") @db.Uuid
+  text         String  @db.VarChar(500)
+  // likert_5 (1-5) | yes_partial_no (1=Evet, 2=Kısmen, 3=Hayır) | text (serbest metin)
+  questionType String  @default("likert_5") @map("question_type") @db.VarChar(20)
+  isRequired   Boolean @default(true) @map("is_required")
+  order        Int     @default(0)
+
+  category TrainingFeedbackCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  answers  TrainingFeedbackAnswer[]
+
+  @@index([categoryId], map: "idx_tfb_items_category")
+  @@map("training_feedback_items")
+}
+
+model TrainingFeedbackResponse {
+  id             String   @id @default(uuid()) @db.Uuid
+  formId         String   @map("form_id") @db.Uuid
+  attemptId      String   @unique @map("attempt_id") @db.Uuid
+  trainingId     String   @map("training_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  includeName    Boolean  @default(false) @map("include_name")
+  isPassed       Boolean  @map("is_passed")
+  submittedAt    DateTime @default(now()) @map("submitted_at") @db.Timestamptz
+
+  form         TrainingFeedbackForm     @relation(fields: [formId], references: [id], onDelete: Restrict)
+  attempt      ExamAttempt              @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  training     Training                 @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  answers      TrainingFeedbackAnswer[]
+
+  @@index([organizationId, trainingId], map: "idx_tfb_responses_org_training")
+  @@index([organizationId, submittedAt], map: "idx_tfb_responses_org_submitted")
+  @@map("training_feedback_responses")
+}
+
+model TrainingFeedbackAnswer {
+  id         String  @id @default(uuid()) @db.Uuid
+  responseId String  @map("response_id") @db.Uuid
+  itemId     String  @map("item_id") @db.Uuid
+  score      Int?
+  textAnswer String? @map("text_answer") @db.Text
+
+  response TrainingFeedbackResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  item     TrainingFeedbackItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([responseId, itemId])
+  @@index([responseId], map: "idx_tfb_answers_response")
+  @@map("training_feedback_answers")
 }

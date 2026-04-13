@@ -212,11 +212,11 @@ export function HeroSection() {
               className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-lg"
               style={{ background: "linear-gradient(135deg, #0d9668, #1a3a28)" }}
             >
-              D
+              H
             </div>
             <div className="leading-none">
               <p className="font-bold text-base" style={{ color: "#1a3a28" }}>
-                Devakent Hastanesi
+                Hastane LMS
               </p>
               <p
                 className="text-[10px] font-bold tracking-widest uppercase"

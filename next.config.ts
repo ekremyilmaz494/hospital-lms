@@ -71,6 +71,9 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+  // macOS: Desktop iCloud-synced; build output iCloud sync tetiklemesin.
+  // Vercel (CI): .next'te kalır (Vercel build environment). Local: /tmp'e yaz.
+  distDir: process.env.VERCEL ? '.next' : '/tmp/hospital-lms-next',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.supabase.co' },

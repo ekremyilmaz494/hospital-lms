@@ -25,6 +25,7 @@ import {
   Tags,
   Sparkles,
   Activity,
+  MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -108,6 +109,16 @@ export const adminNav: NavGroup[] = [
       { title: 'Uyum Raporu', href: '/admin/compliance', icon: ShieldCheck },
       { title: 'Yetkinlik Matrisi', href: '/admin/competency-matrix', icon: Grid3x3 },
       { title: 'Etkinlik Analizi', href: '/admin/effectiveness', icon: TrendingUp },
+      {
+        title: 'Geri Bildirim',
+        href: '/admin/feedback-forms',
+        icon: MessageSquare,
+        children: [
+          { title: 'Form Editörü', href: '/admin/feedback-forms' },
+          { title: 'Yanıtlar', href: '/admin/feedback-forms/responses' },
+          { title: 'Analitik', href: '/admin/feedback-forms/analytics' },
+        ],
+      },
       { title: 'SMG Takibi', href: '/admin/smg', icon: Star },
       { title: 'Raporlar', href: '/admin/reports', icon: BarChart3 },
       { title: 'Bildirimler', href: '/admin/notifications', icon: Bell },

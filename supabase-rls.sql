@@ -308,3 +308,107 @@ CREATE POLICY "staff_ai_google_connections_own" ON ai_google_connections
     user_id = auth.uid()
     AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
   );
+
+-- ═══════════════════════════════════════════════════════════════
+-- EY.FR.40 EĞİTİM GERİ BİLDİRİM FORMU
+-- ═══════════════════════════════════════════════════════════════
+
+ALTER TABLE training_feedback_forms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE training_feedback_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE training_feedback_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE training_feedback_responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE training_feedback_answers ENABLE ROW LEVEL SECURITY;
+
+-- TRAINING FEEDBACK FORMS: admin duzenler, staff sadece okur (dolduracak)
+CREATE POLICY "super_admin_tfb_forms_all" ON training_feedback_forms
+  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_tfb_forms_all" ON training_feedback_forms
+  FOR ALL USING (
+    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+CREATE POLICY "staff_tfb_forms_select" ON training_feedback_forms
+  FOR SELECT USING (
+    organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+    AND is_active = true
+  );
+
+-- TRAINING FEEDBACK CATEGORIES: form uzerinden org filtreli
+CREATE POLICY "admin_tfb_categories_all" ON training_feedback_categories
+  FOR ALL USING (
+    form_id IN (
+      SELECT id FROM training_feedback_forms
+      WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+    )
+  );
+CREATE POLICY "staff_tfb_categories_select" ON training_feedback_categories
+  FOR SELECT USING (
+    form_id IN (
+      SELECT id FROM training_feedback_forms
+      WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+        AND is_active = true
+    )
+  );
+
+-- TRAINING FEEDBACK ITEMS: kategori uzerinden org filtreli
+CREATE POLICY "admin_tfb_items_all" ON training_feedback_items
+  FOR ALL USING (
+    category_id IN (
+      SELECT c.id FROM training_feedback_categories c
+      JOIN training_feedback_forms f ON c.form_id = f.id
+      WHERE f.organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+    )
+  );
+CREATE POLICY "staff_tfb_items_select" ON training_feedback_items
+  FOR SELECT USING (
+    category_id IN (
+      SELECT c.id FROM training_feedback_categories c
+      JOIN training_feedback_forms f ON c.form_id = f.id
+      WHERE f.organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+        AND f.is_active = true
+    )
+  );
+
+-- TRAINING FEEDBACK RESPONSES: denormalize organization_id ile direkt filtre
+CREATE POLICY "super_admin_tfb_responses_all" ON training_feedback_responses
+  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_tfb_responses_select" ON training_feedback_responses
+  FOR SELECT USING (
+    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+-- Staff: kendi attempt'ine ait response'u gorebilir ve ekleyebilir; guncelleme/silme yok
+CREATE POLICY "staff_tfb_responses_select_own" ON training_feedback_responses
+  FOR SELECT USING (
+    attempt_id IN (SELECT id FROM exam_attempts WHERE user_id = auth.uid())
+  );
+CREATE POLICY "staff_tfb_responses_insert_own" ON training_feedback_responses
+  FOR INSERT WITH CHECK (
+    attempt_id IN (SELECT id FROM exam_attempts WHERE user_id = auth.uid())
+    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+  );
+
+-- TRAINING FEEDBACK ANSWERS: response uzerinden filtreli
+CREATE POLICY "admin_tfb_answers_select" ON training_feedback_answers
+  FOR SELECT USING (
+    response_id IN (
+      SELECT id FROM training_feedback_responses
+      WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+    )
+  );
+CREATE POLICY "staff_tfb_answers_select_own" ON training_feedback_answers
+  FOR SELECT USING (
+    response_id IN (
+      SELECT r.id FROM training_feedback_responses r
+      JOIN exam_attempts a ON r.attempt_id = a.id
+      WHERE a.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "staff_tfb_answers_insert_own" ON training_feedback_answers
+  FOR INSERT WITH CHECK (
+    response_id IN (
+      SELECT r.id FROM training_feedback_responses r
+      JOIN exam_attempts a ON r.attempt_id = a.id
+      WHERE a.user_id = auth.uid()
+    )
+  );

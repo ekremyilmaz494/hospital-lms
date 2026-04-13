@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type React from "react";
-import Link from "next/link";
 import {
   BookOpen,
   BarChart3,
@@ -155,7 +154,7 @@ export function FeaturesSection() {
               Platform Özellikleri
             </p>
             <h2 className="text-2xl sm:text-3xl font-black" style={{ color: "#1a3a28" }}>
-              Neden Devakent Hastanesi?
+              Neden Hastane LMS?
             </h2>
           </div>
           <p
@@ -224,13 +223,12 @@ export function FeaturesSection() {
                 <p className="text-sm leading-relaxed" style={{ color: "#4a7060" }}>
                   {desc}
                 </p>
-                <Link
-                  href="/register"
-                  className="mt-5 flex items-center gap-1 text-xs font-bold group"
+                <div
+                  className="mt-5 flex items-center gap-1 text-xs font-bold"
                   style={{ color: "#0d9668" }}
                 >
-                  Daha Fazla <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
-                </Link>
+                  Daha Fazla <ArrowRight className="w-3 h-3" />
+                </div>
               </div>
             ))}
           </div>
