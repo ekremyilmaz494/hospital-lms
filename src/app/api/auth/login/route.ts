@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { getRateLimitCount, incrementRateLimit, deleteRateLimit, getRedis } from '@/lib/redis'
-import { createClient } from '@/lib/supabase/server'
+import { createLoginClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
@@ -26,8 +26,8 @@ const ALERT_THRESHOLD = 5
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { email?: string; password?: string }
-    const { email, password } = body
+    const body = await request.json() as { email?: string; password?: string; rememberMe?: boolean }
+    const { email, password, rememberMe = false } = body
 
     if (!email || !password) {
       return errorResponse('E-posta ve şifre gereklidir.', 400)
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const [ipCount, emailCount, supabase] = await Promise.all([
       getRateLimitCount(`login-ip:${ip}`),
       getRateLimitCount(`login:${normalizedEmail}`),
-      createClient(),
+      createLoginClient(rememberMe),
     ])
     if (ipCount >= 100) {
       logger.warn('auth:login', 'IP rate limit aşıldı', { ip })

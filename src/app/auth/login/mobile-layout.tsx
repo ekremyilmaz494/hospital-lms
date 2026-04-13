@@ -172,7 +172,7 @@ export default function MobileLayout({
                   onCheckedChange={(checked) => setRememberMe(checked === true)}
                   className="border-white/20 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
                 />
-                <label htmlFor="rememberMe-mobile" className="text-[12px] font-medium cursor-pointer select-none" style={{ color: 'rgba(255,255,255,0.4)' }}>Beni 30 gün hatırla</label>
+                <label htmlFor="rememberMe-mobile" className="text-[12px] font-medium cursor-pointer select-none" style={{ color: 'rgba(255,255,255,0.4)' }}>Bu cihazda oturumumu açık tut (7 gün)</label>
               </div>
             </div>
 

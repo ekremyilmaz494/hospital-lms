@@ -68,13 +68,6 @@ function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, rememberMe }),
       });
-      // If not rememberMe, mark session as tab-only (auth-provider clears on new tab)
-      if (!rememberMe) {
-        sessionStorage.setItem('lms_session_only', '1');
-      } else {
-        sessionStorage.removeItem('lms_session_only');
-      }
-
       const data = await res.json();
 
       if (res.status === 429) {
@@ -364,7 +357,7 @@ function LoginForm() {
                   onCheckedChange={(checked) => setRememberMe(checked === true)}
                 />
                 <label htmlFor="rememberMe" className="text-xs font-medium cursor-pointer select-none" style={{ color: 'var(--color-text-secondary)' }}>
-                  Beni 30 gün hatırla
+                  Bu cihazda oturumumu açık tut (7 gün)
                 </label>
               </div>
 
