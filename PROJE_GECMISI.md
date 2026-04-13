@@ -3860,3 +3860,94 @@ Demo şifreleri (`demo123456`, `Demo123!`) ve hardcoded email adresleri (`super@
 - ✅ TypeScript — temiz (feedback dosyaları dahil sıfır yeni hata)
 
 *Son güncelleme: 12 Nisan 2026 — Oturum 37*
+
+---
+
+## OTURUM 38 — 13 Nisan 2026
+
+### A) "Geri Bildirim" Menüsü — origin/dev Merge (10 commit)
+
+Admin sidebar'ında "Geri Bildirim" menüsü görünmüyordu. Sebep: lokal `dev` branch'i `origin/dev`'in 10 commit gerisindeydi. Eksik commit `a049b20` (EY.FR.40 — Geri Bildirim Sistemi) içeriyordu.
+
+**Merge öncesi durum:** Lokal WIP commit (`eb8d2aa`) — media library stats + video thumbnail + exam API iyileştirmeleri.
+
+**Merge:** `git pull origin dev` → 13 dosyada conflict. Tüm conflict'ler tek tek (B seçeneği — titiz) incelendi ve çözüldü:
+
+| Dosya | Karar |
+|-------|-------|
+| `CLAUDE.md` | Origin (Türkçe karakterli, daha kapsamlı) |
+| `PROJE_GECMISI.md` | Origin (demo email/şifre referansları kaldırıldı) |
+| `README.md` | HEAD (DEMO_PASSWORD env var seed script'lerde hâlâ gerekli) |
+| `e2e/auth.spec.ts` | Origin (`test@example.com` — yanlış şifre testi için yeterli) |
+| `e2e/helpers/auth.ts` | Origin (`?? ''` defansif, `E2E_*_PASSWORD` naming) |
+| `prisma/seed.ts` | Origin (env guard + process.exit — `!` non-null yerine) |
+| `prisma/seed-demo-200.ts` | Origin (aynı) |
+| `scripts/load-test.js` | Origin (DEMO_EMAIL/DEMO_PASS env guard eklendi) |
+| `scripts/seed-demo.js` | Origin (DEMO_PASSWORD guard + temiz log) |
+| `scripts/seed-users.ts` | Origin (hardcoded demo emailler kaldırıldı — güvenlik) |
+| `scripts/setup.js` | Origin (ölü giriş bilgileri log'u silindi) |
+| `src/app/api/docs/swagger.ts` | Origin (`firma.com` → `hastane.com` — marka uyumu) |
+
+**Merge sonrası feedback sistemi içeriği (`a049b20`):**
+- `src/app/admin/feedback-forms/` — 4 admin sayfası (list, analytics, responses, detail)
+- `src/app/api/admin/feedback/` — 4 admin API route
+- `src/app/api/feedback/` — 3 public API route (form, submit, status)
+- `src/app/exam/[id]/feedback/page.tsx` — sınav sonrası feedback ekranı
+- `src/lib/feedback-helpers.ts` + test dosyası
+- `src/components/layouts/sidebar/sidebar-config.ts` — "Geri Bildirim" nav entry (3 alt menü)
+- `prisma/schema.prisma` — feedback modelleri (+99 satır)
+- `supabase-rls.sql` — feedback tabloları RLS politikaları (+104 satır)
+- `e2e/training-feedback.spec.ts` — E2E testleri
+
+---
+
+### B) Prisma DIRECT_URL — Kalıcı Altyapı Düzeltmesi
+
+**Sorun:** `pnpm db:migrate` ve `pnpm db:push` komutları "Schema engine error" vererek çalışmıyordu.
+
+**Kök neden 1:** `.env.local`'deki `DIRECT_URL` `db.pkkkyyajfmusurcoovwt.supabase.co:5432` adresini gösteriyordu. Bu host 2024 sonrası Supabase'de IPv6-only — Windows/TTNet (IPv4) ortamından bağlanılamıyor.
+
+**Kök neden 2:** `prisma.config.ts`'de `directUrl` alanı tanımlıydı ama Prisma 7 config type'ında (`Datasource`) bu alan yok — sessizce yok sayılıyordu. Dolayısıyla Prisma CLI her zaman `DATABASE_URL` (pgbouncer, port 6543) üzerinden çalışmaya çalışıyordu. Schema engine pgbouncer üzerinden çalışmaz (prepared statement yoktur).
+
+**Çözüm:**
+- `.env.local` `DIRECT_URL` → Session Pooler URL'i (`aws-1-eu-central-1.pooler.supabase.com:5432`) — IPv4 uyumlu
+- `prisma.config.ts` `datasource.url` → `DIRECT_URL` env var'a işaret ettirildi
+- Runtime Prisma Client etkilenmedi — `src/lib/prisma.ts` `DATABASE_URL`'i env'den doğrudan okuyor
+- Vercel production `DIRECT_URL` zaten doğru formattaydı — değişiklik gerekmedi
+- Migration drift düzeltmesi: `20260410000000_add_org_id_to_certs_attempts` — kolon zaten vardı ama `_prisma_migrations`'da kayıtlı değildi → `prisma migrate resolve --applied` ile düzeltildi
+- `.env.example`, `.env.production.reference` belgelendi; `.gitignore`'a `!.env.production.reference` istisnası eklendi
+
+**Kalıcı kural:** Direct host (`db.xxx.supabase.co:5432`) bir daha kullanılmaz. `DIRECT_URL` her ortamda Session Pooler URL'i olmalı (port 5432, user: `postgres.{ref}`, host: `aws-1-eu-central-1.pooler.supabase.com`).
+
+---
+
+### C) "Beni Hatırla" — Gerçek Implementasyon (30 gün → 7 gün)
+
+**Sorun:** "Beni 30 gün hatırla" checkbox'ı hiç çalışmıyordu.
+
+**Kök neden 1:** Login API route body'den sadece `{ email, password }` alıyordu — `rememberMe` yok sayılıyordu.
+
+**Kök neden 2:** Frontend `sessionStorage.setItem('lms_session_only', '1')` yazıyordu ama auth-provider bu flag'i hiç okumuyordu — ölü kod.
+
+**Güvenlik değerlendirmesi:** 30 gün hastane uygulaması için fazla uzun. Paylaşımlı cihaz riski + KVKK uyumu → **7 gün** kararlaştırıldı.
+
+**Çözüm:**
+- `createLoginClient(rememberMe: boolean)` eklendi (`src/lib/supabase/server.ts`) — cookie `setAll` handler'ında `maxAge` override eder:
+  - `rememberMe=true` → `maxAge: 604800` (7 gün, persistent cookie)
+  - `rememberMe=false` → `maxAge: undefined` (session cookie, tarayıcı kapanınca siler)
+- Login API route: body type'ına `rememberMe?: boolean` eklendi, `createLoginClient(rememberMe)` kullanıldı
+- Ölü `sessionStorage` kodu (`lms_session_only`) kaldırıldı
+- UI etiketi güncellendi: "Beni 30 gün hatırla" → "Bu cihazda oturumumu açık tut (7 gün)"
+- Mobil layout'ta da etiket güncellendi
+
+### Toplam Değiştirilen Dosya Sayısı
+~20 dosya (merge 13 conflict + prisma fix 4 + remember me 4)
+
+### Doğrulama
+- ✅ TypeScript — temiz (non-test dosyalar)
+- ✅ Lint — temiz (exit code 0)
+- ✅ DB schema — güncel (`prisma migrate status`: 13/13)
+- ✅ Vercel production env — DIRECT_URL doğru formatta
+- ✅ Commit'ler: `6a213b0` (merge), `cc5cdee` (prisma fix), `92afca4` (remember me)
+
+*Son güncelleme: 13 Nisan 2026 — Oturum 38*
