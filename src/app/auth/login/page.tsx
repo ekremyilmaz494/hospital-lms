@@ -135,11 +135,21 @@ function LoginForm() {
     }
   };
 
+  // Font kombinasyonu: A=space-grotesk+dm-sans | B=outfit | C=bricolage+dm-sans | D=syne+dm-sans
+  const loginFont = '--font-syne';
+
   return (
     <div className="flex min-h-screen">
+      <style>{`
+        .login-card,.login-card *{font-family:var(${loginFont}),sans-serif!important}
+        .login-left,.login-left h1,.login-left p{font-family:var(${loginFont}),sans-serif!important}
+        .login-gradient-text{background:linear-gradient(135deg,#34d399 0%,#6ee7b7 50%,#a7f3d0 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .login-heading-gradient{background:linear-gradient(135deg,#ffffff 0%,#e2e8f0 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .login-card-heading-gradient{background:linear-gradient(135deg,#064e3b 0%,#0d9668 60%,#34d399 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      `}</style>
       {/* ── Left Panel: Branding ── */}
       <div
-        className="relative hidden lg:flex lg:w-[55%] flex-col justify-between overflow-hidden"
+        className="login-left relative hidden lg:flex lg:w-[55%] flex-col justify-between overflow-hidden"
         style={{
           background: branding?.loginBannerUrl
             ? undefined
@@ -197,9 +207,9 @@ function LoginForm() {
               </p>
             </BlurFade>
             <BlurFade delay={0.1} duration={0.3}>
-              <h1 className="text-[2.75rem] xl:text-5xl font-bold text-white leading-[1.1] tracking-tight mb-6">
-                Eğitimi Yönet,<br />
-                <span style={{ color: '#34d399' }}>Başarıyı Ölç.</span>
+              <h1 className="text-[2.75rem] xl:text-5xl font-bold leading-[1.1] tracking-tight mb-6">
+                <span className="login-heading-gradient">Eğitimi Yönet,</span><br />
+                <span className="login-gradient-text">Başarıyı Ölç.</span>
               </h1>
             </BlurFade>
             <BlurFade delay={0.12} duration={0.3}>
@@ -234,8 +244,29 @@ function LoginForm() {
       </div>
 
       {/* ── Right Panel: Login Form ── */}
-      <div className="flex flex-1 items-center justify-center p-6 sm:p-8" style={{ background: 'var(--color-bg)' }}>
-        <div className="w-full max-w-105">
+      <div
+        className="relative flex flex-1 items-center justify-center p-6 sm:p-8 overflow-hidden"
+        style={{
+          backgroundColor: 'var(--color-bg)',
+          backgroundImage: branding?.loginBannerUrl
+            ? undefined
+            : `url('/login/gradient.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      >
+
+        <div
+          className="login-card relative z-10 w-full max-w-105 rounded-3xl p-8 sm:p-10"
+          style={{
+            background: 'rgba(255, 255, 255, 0.78)',
+            backdropFilter: 'blur(24px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+            border: '1px solid rgba(255, 255, 255, 0.5)',
+            boxShadow: '0 20px 60px -15px rgba(6, 78, 59, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
+          }}
+        >
           {/* Mobile logo */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             {branding?.logoUrl ? (
@@ -250,7 +281,9 @@ function LoginForm() {
             <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-3" style={{ color: 'var(--color-primary)' }}>
               Giriş Yap
             </p>
-            <h2 className="text-3xl font-bold tracking-tight mb-2">Hoş Geldiniz</h2>
+            <h2 className="text-3xl font-bold tracking-tight mb-2">
+              <span className="login-card-heading-gradient">Hoş Geldiniz</span>
+            </h2>
             <p className="text-sm mb-8" style={{ color: 'var(--color-text-muted)' }}>
               Devam etmek için hesabınıza giriş yapın
             </p>
@@ -291,7 +324,7 @@ function LoginForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
                   className="h-12 rounded-xl text-[15px]"
-                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                  style={{ background: 'rgba(255, 255, 255, 0.6)', borderColor: 'rgba(6, 78, 59, 0.12)' }}
                   required
                 />
               </div>
@@ -309,7 +342,7 @@ function LoginForm() {
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
                     className="h-12 rounded-xl pr-11 text-[15px]"
-                    style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                    style={{ background: 'rgba(255, 255, 255, 0.6)', borderColor: 'rgba(6, 78, 59, 0.12)' }}
                     required
                   />
                   <button

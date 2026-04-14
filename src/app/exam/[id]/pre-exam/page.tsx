@@ -208,7 +208,7 @@ export default function PreExamPage() {
         return;
       }
 
-      router.push(`/exam/${id}/transition?from=pre&score=${data.score ?? 0}`);
+      router.replace(`/exam/${id}/transition?from=pre&score=${data.score ?? 0}`);
     } catch {
       setSubmitError('Bir hata oluştu. Tekrar deneyin.');
     } finally {

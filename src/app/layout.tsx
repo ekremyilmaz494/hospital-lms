@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Inter, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Inter, JetBrains_Mono, Space_Grotesk, Outfit, Bricolage_Grotesque, Syne, DM_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ToastProvider } from "@/components/shared/toast";
@@ -33,6 +33,13 @@ const jetbrainsMono = JetBrains_Mono({
   adjustFontFallback: false,
 });
 
+// Login sayfasi font denemeleri icin
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-space-grotesk", display: "swap", adjustFontFallback: false });
+const outfit = Outfit({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-outfit", display: "swap", adjustFontFallback: false });
+const bricolage = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-bricolage", display: "swap", adjustFontFallback: false });
+const syne = Syne({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-syne", display: "swap", adjustFontFallback: false });
+const dmSans = DM_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-dm-sans", display: "swap", adjustFontFallback: false });
+
 export const metadata: Metadata = {
   title: "Devakent Hastanesi - Personel Eğitim Sistemi",
   description: "Hastane personeli için eğitim ve sınav yönetim platformu",
@@ -48,7 +55,7 @@ export default function RootLayout({
       lang="tr"
       data-scroll-behavior="smooth"
       suppressHydrationWarning
-      className={`${plusJakarta.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${plusJakarta.variable} ${inter.variable} ${jetbrainsMono.variable} ${spaceGrotesk.variable} ${outfit.variable} ${bricolage.variable} ${syne.variable} ${dmSans.variable}`}
     >
       <head>
         <link rel="manifest" href="/manifest.json" />

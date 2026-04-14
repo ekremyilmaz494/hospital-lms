@@ -4089,3 +4089,60 @@ Komut: `openssl rand -hex 32` + Gmail → Security → App passwords → yeni ol
 - ✅ Commit'ler: `d7b8ebf` (hook fix) — bu oturumdaki tek yeni commit
 
 *Son güncelleme: 13 Nisan 2026 — Oturum 39*
+
+---
+
+## OTURUM 40 — 14 Nisan 2026
+
+### 1. Eğitim Akışında Tarayıcı Geri Tuşu Düzeltmesi
+
+**Sorun:** Personel ön sınav → video → son sınav akışında tarayıcı geri tuşuyla önceki aşamaya dönebiliyordu. `router.push()` tarayıcı geçmişine entry eklediği için geri tuşu çalışıyordu.
+
+**Risk seviyesi:** UX sorunu (veri bütünlüğü değil — sunucu zaten `attempt.status` ile otoriter, tekrar sınav çözülemez). Ama kısa süre eski sayfa cache'den görünüyordu (flash efekti), profesyonelce değildi.
+
+**Çözüm:** Akış içi tüm ileri yönlendirmeleri `router.push` → `router.replace` olarak değiştirdik. Geri tuşu artık akış içine değil, akış öncesine (my-trainings) götürüyor.
+
+**Değiştirilen dosyalar (10 satır):**
+- `src/app/exam/[id]/pre-exam/page.tsx` — submit sonrası transition
+- `src/app/exam/[id]/videos/page.tsx` — 6 ayrı transition noktası
+- `src/app/exam/[id]/post-exam/page.tsx` — submit, retry, timeout sonrası
+- `src/app/exam/[id]/transition/page.tsx` — otomatik yönlendirme
+
+**Dokunulmayan:** Phase guard redirect'ler (zaten `replace`), çıkış butonları (confirm'li, `push` kalsın).
+
+---
+
+### 2. Giriş Sayfası Görsel Yenileme
+
+**Değişiklikler:**
+
+**Arka plan görseli:**
+- Gemini (Nano Banana Pro) ile 6 farklı görsel üretildi
+- Gradient mesh seçildi, optimize edildi (7MB PNG → 225KB JPEG, sips ile)
+- `public/login/` altına: `lobby.jpg`, `gradient.jpg`, `corridor.jpg`, `dna.jpg`, `olive.jpg`, `isometric.jpg`
+- CSS `background-image` + `linear-gradient` overlay ile uygulandı
+
+**Glassmorphism kart:**
+- Sağ panel form alanı kart haline getirildi
+- `background: rgba(255,255,255,0.78)` + `backdrop-blur(24px) saturate(180%)`
+- `border: 1px solid rgba(255,255,255,0.5)` + yeşil-tonlu shadow
+- Input'lar yarı saydam (`rgba(255,255,255,0.6)`)
+- Branding sistemi korundu — hastane kendi `loginBannerUrl`'ünü yüklerse default görsel gizlenir
+
+**Font yenilemesi:**
+- Denenen fontlar: Outfit, Space Grotesk, Bricolage Grotesque, Syne
+- Seçilen: **Syne** — her iki panel (sol branding + sağ form kartı)
+- Uygulama: `<style>` tag ile scoped `!important` override (Tailwind class çakışmasını atlatmak için)
+- `layout.tsx`'e font variable'ları eklendi: `--font-space-grotesk`, `--font-outfit`, `--font-bricolage`, `--font-syne`, `--font-dm-sans`
+
+**Gradient başlıklar:**
+- Sol panel: "Eğitimi Yönet," → beyaz gradient, "Başarıyı Ölç." → mint yeşil gradient
+- Sağ panel: "Hoş Geldiniz" → koyu yeşil→mint gradient
+- Teknik: `background-clip: text` + `-webkit-text-fill-color: transparent`
+
+**Teknik notlar:**
+- Next.js `<Image fill>` + `overflow-hidden` stacking context sorunu yaşandı → CSS `background-image` ile çözüldü
+- Turbopack cache temizlendi (`.next` silindi) hydration mismatch sonrası
+- `suppressHydrationWarning` yerine scoped `<style>` tag tercih edildi
+
+*Son güncelleme: 14 Nisan 2026 — Oturum 40*

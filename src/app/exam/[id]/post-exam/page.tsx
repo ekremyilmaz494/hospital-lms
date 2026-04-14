@@ -104,7 +104,7 @@ export default function PostExamPage() {
         if (cancelled) return;
         const remaining = data.remainingSeconds ?? examData?.totalTime ?? 1800;
         if (remaining <= 0) {
-          router.push(`/exam/${id}?error=time_expired`);
+          router.replace(`/exam/${id}?error=time_expired`);
           return;
         }
         setTimeLeft(remaining);
@@ -234,7 +234,7 @@ export default function PostExamPage() {
           if (retryData.results) {
             try { sessionStorage.setItem(`exam-results-${id}`, JSON.stringify(retryData.results)); } catch { /* ignore */ }
           }
-          router.push(`/exam/${id}/transition?from=post-exam&score=${retryData.score ?? 0}&passed=${retryData.isPassed ?? false}&passingScore=${retryData.passingScore ?? 70}&attemptId=${attemptId}`);
+          router.replace(`/exam/${id}/transition?from=post-exam&score=${retryData.score ?? 0}&passed=${retryData.isPassed ?? false}&passingScore=${retryData.passingScore ?? 70}&attemptId=${attemptId}`);
           return;
         }
         toast(`Sınav gönderilemedi: ${data.error || retryData.error || 'Bilinmeyen hata'}. Cevaplarınız kaydedilmemiş olabilir.`, 'error');
@@ -244,7 +244,7 @@ export default function PostExamPage() {
       if (data.results) {
         try { sessionStorage.setItem(`exam-results-${id}`, JSON.stringify(data.results)); } catch { /* ignore */ }
       }
-      router.push(`/exam/${id}/transition?from=post-exam&score=${data.score ?? 0}&passed=${data.isPassed ?? false}&passingScore=${data.passingScore ?? 70}&attemptId=${attemptId}`);
+      router.replace(`/exam/${id}/transition?from=post-exam&score=${data.score ?? 0}&passed=${data.isPassed ?? false}&passingScore=${data.passingScore ?? 70}&attemptId=${attemptId}`);
     } catch (err) {
       toast('Sınav gönderilemedi — internet bağlantınızı kontrol edin. Sayfayı yenileyip tekrar deneyin.', 'error');
       router.push('/staff/my-trainings');

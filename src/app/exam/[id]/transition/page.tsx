@@ -59,7 +59,7 @@ function TransitionContent() {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
     if (timerRef.current) clearInterval(timerRef.current);
-    router.push(destination);
+    router.replace(destination);
   };
 
   useEffect(() => {

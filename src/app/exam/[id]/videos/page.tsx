@@ -184,7 +184,7 @@ export default function VideoPlayerPage() {
 
     // Last incomplete video → redirect to transition page (60s countdown)
     if (remainingIncomplete === 0 || (isLastVideo && vids.filter(v => !v.completed).length <= 1)) {
-      setTimeout(() => router.push(`/exam/${id}/transition?from=videos`), 800);
+      setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
     } else if (!isLastVideo) {
       setTimeout(() => goToNextVideo(), 1500);
     }
@@ -267,7 +267,7 @@ export default function VideoPlayerPage() {
             <Button variant="outline" onClick={() => router.back()} className="gap-2" style={{ borderColor: 'var(--color-border)' }}>
               <ArrowLeft className="h-4 w-4" /> Geri Dön
             </Button>
-            <Button onClick={() => router.push(`/exam/${id}/transition?from=videos`)} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-primary)' }}>
+            <Button onClick={() => router.replace(`/exam/${id}/transition?from=videos`)} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-primary)' }}>
               Son Sınava Geç <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
@@ -293,7 +293,7 @@ export default function VideoPlayerPage() {
             </p>
             <div className="flex flex-col gap-3">
               <Button
-                onClick={() => router.push(`/exam/${id}/transition?from=videos`)}
+                onClick={() => router.replace(`/exam/${id}/transition?from=videos`)}
                 className="w-full gap-2 py-3 font-semibold text-white rounded-xl"
                 style={{ background: 'var(--color-primary)' }}
               >
@@ -371,7 +371,7 @@ export default function VideoPlayerPage() {
                       if (!res.ok) throw new Error('Server error');
                       const data = await res.json();
                       if (data.allVideosCompleted) {
-                        setTimeout(() => router.push(`/exam/${id}/transition?from=videos`), 800);
+                        setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
                       }
                     }).catch(() => {
                       setLocalCompleted(prev => { const next = new Set(prev); next.delete(currentVideo.id); return next; });
@@ -409,7 +409,7 @@ export default function VideoPlayerPage() {
                       if (!res.ok) throw new Error('Server error');
                       const data = await res.json();
                       if (data.allVideosCompleted) {
-                        setTimeout(() => router.push(`/exam/${id}/transition?from=videos`), 800);
+                        setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
                       }
                     }).catch(() => {
                       setLocalCompleted(prev => { const next = new Set(prev); next.delete(currentVideo.id); return next; });
@@ -571,7 +571,7 @@ export default function VideoPlayerPage() {
             {/* Next Action */}
             <div className="mt-3 sm:mt-4 pt-3 sm:pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
               {allCompleted ? (
-                <Button onClick={() => router.push(`/exam/${id}/transition?from=videos`)} className="w-full gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)' }}>
+                <Button onClick={() => router.replace(`/exam/${id}/transition?from=videos`)} className="w-full gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)' }}>
                   Son Sınava Git <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : (
