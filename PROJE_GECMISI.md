@@ -4356,3 +4356,70 @@ Değiştirilen dosyalar:
 - **E2E job**: 🔄 KVKK fix push edildi, sonuç bekleniyor
 
 *Son güncelleme: 14 Nisan 2026 — Oturum 41*
+
+---
+
+## Oturum 42 — 14 Nisan 2026
+
+### Yapılanlar
+
+#### 1. Organizasyon Yönetimi
+- Sistemdeki 3 organizasyon sorgulandı: **Devakent Hastanesi**, **Demo Hastanesi**, **E2E Test Hastanesi**
+- Giriş bilgilerinin (super@devakent.com, admin@devakent.com, personel1@devakent.com) hangi organizasyona bağlı olduğu kontrol edildi → **Devakent Hastanesi**
+- `Demo Hastanesi` incelendi: setup tamamlanmamış, kullanıcı yok, `created_by: null` → test/demo amaçlı açılmış
+- **Demo Hastanesi silindi** (id: `5fdc2715-4279-41d8-8100-c842beb63087`)
+
+#### 2. Firebase Değerlendirmesi
+- Firebase'in projede ne işe yarayabileceği tartışıldı
+- Supabase zaten Auth, DB, Storage, Realtime kapsadığından Firebase büyük ölçüde gereksiz
+- **Push notification** için FCM yerine mevcut `web-push` kütüphanesi önerildi
+- Firebase Analytics yerine Supabase tabanlı `activity_logs` çözümü tercih edildi
+
+#### 3. `activity_logs` Tablosu Kurulumu
+- Supabase'de `activity_logs` tablosu oluşturuldu:
+  - Kolonlar: `id`, `user_id`, `organization_id`, `action`, `resource_type`, `resource_id`, `resource_title`, `metadata (JSONB)`, `ip_address`, `created_at`
+  - 4 performans indexi: org+tarih, user+tarih, action+tarih, resource
+- RLS politikaları eklendi: super_admin (tümü), admin (kendi org), staff (kendi kayıtları), insert (kendi kaydı)
+- `supabase-rls.sql` dosyası güncellendi
+
+#### 4. `activity-logger.ts` Utility
+- `src/lib/activity-logger.ts` oluşturuldu
+- `logActivity()` — fire-and-forget, hata sessizce loglanır
+- `getIpFromHeaders()` — `x-vercel-forwarded-for` öncelikli IP çıkarma
+- `organizationId` boşsa (super_admin) erken çıkış yapılır
+
+#### 5. Activity Logging — Tüm Route'lara Eklendi
+
+| Route | Event |
+|---|---|
+| `POST /api/auth/login` | `login` |
+| `POST /api/auth/logout` | `logout` |
+| `POST /api/auth/change-password` | `password_change` |
+| `POST /api/exam/[id]/start` | `exam_start` |
+| `POST /api/exam/[id]/submit` (post-exam) | `exam_pass` / `exam_fail` |
+| `GET /api/certificates/[id]/pdf` | `certificate_download` |
+| `GET /api/staff/my-trainings/[id]` | `course_view` |
+| `PATCH /api/staff/profile` | `profile_update` |
+
+- `logout` rotasında `signOut()` öncesi kullanıcı bilgisi alınarak log yazıldı
+- `login` rotasında Prisma select'e `organizationId: true` eklendi
+- TypeScript ve Lint: ✅ Temiz
+
+### Değiştirilen Dosyalar
+- `src/lib/activity-logger.ts` *(yeni)*
+- `supabase-rls.sql`
+- `src/app/api/auth/login/route.ts`
+- `src/app/api/auth/logout/route.ts`
+- `src/app/api/auth/change-password/route.ts`
+- `src/app/api/exam/[id]/start/route.ts`
+- `src/app/api/exam/[id]/submit/route.ts`
+- `src/app/api/certificates/[id]/pdf/route.ts`
+- `src/app/api/staff/my-trainings/[id]/route.ts`
+- `src/app/api/staff/profile/route.ts`
+
+### Durum
+- **activity_logs** tablosu: ✅ Supabase'de aktif
+- **Tüm kritik event'ler**: ✅ Loglanıyor
+- **Admin paneli görünümü**: 🔄 Henüz yapılmadı
+
+*Son güncelleme: 14 Nisan 2026 — Oturum 42*
