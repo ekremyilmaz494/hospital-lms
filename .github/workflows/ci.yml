@@ -90,9 +90,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           NEXT_PUBLIC_VAPID_KEY: placeholder
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Wait for server
-        run: npx wait-on http://localhost:3000 --timeout 30000
+        run: npx wait-on http://localhost:3000 --timeout 90000
 
       - name: Run E2E tests
         run: pnpm test:e2e:ci
@@ -101,6 +102,13 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           NEXT_PUBLIC_VAPID_KEY: placeholder
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          E2E_STAFF_EMAIL: ${{ secrets.E2E_STAFF_EMAIL }}
+          E2E_STAFF_PASSWORD: ${{ secrets.E2E_STAFF_PASSWORD }}
+          E2E_SUPER_EMAIL: ${{ secrets.E2E_SUPER_EMAIL }}
+          E2E_SUPER_PASSWORD: ${{ secrets.E2E_SUPER_PASSWORD }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
