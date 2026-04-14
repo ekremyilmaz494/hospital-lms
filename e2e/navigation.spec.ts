@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Navigation', () => {
   test('root page redirects', async ({ page }) => {
-    await page.goto('/')
-    // Should redirect to login or dashboard
-    await expect(page).not.toHaveURL('http://localhost:3000/')
+    // Korumalı bir sayfaya git — auth olmadan login'e yönlendirmeli
+    await page.goto('/admin/dashboard')
+    await expect(page).toHaveURL(/\/auth\/login/, { timeout: 10000 })
   })
 
   test('404 page works', async ({ page }) => {

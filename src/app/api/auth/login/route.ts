@@ -52,10 +52,13 @@ export async function POST(request: NextRequest) {
       return errorResponse('Çok fazla giriş denemesi. 5 dakika bekleyin.', 429)
     }
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    })
+    const authTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('auth_timeout')), 12000)
+    )
+    const { data, error: authError } = await Promise.race([
+      supabase.auth.signInWithPassword({ email: normalizedEmail, password }),
+      authTimeout,
+    ])
 
     if (authError) {
       logger.info('auth:login', 'Başarısız giriş denemesi', { email: normalizedEmail, ip, reason: authError.message, code: authError.status })

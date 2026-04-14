@@ -31,7 +31,10 @@ test.describe('Kimlik Dogrulama Akislari', () => {
   test('bos form gonderimi → validasyon hatalari', async ({ page }) => {
     await page.goto('/auth/login')
 
-    // KVKK onaylamadan gonder
+    // Email ve şifre doldur (HTML5 required validasyonunu geç)
+    // ama KVKK kutusunu işaretleme → onSubmit handler KVKK hatasını tetikler
+    await page.fill('[type="email"]', 'test@example.com')
+    await page.fill('[type="password"]', 'testpassword123')
     await page.click('button[type="submit"]')
 
     // KVKK hata mesaji gosterilmeli
