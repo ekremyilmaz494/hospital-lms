@@ -57,7 +57,9 @@ async function loginAndSave(
     await page.fill('[type="email"]', email)
     await page.fill('[type="password"]', password)
 
-    const kvkk = page.locator('#kvkk')
+    // Shadcn Checkbox: '#kvkk' is a hidden <input aria-hidden="true">.
+    // The actual clickable element is <button data-slot="checkbox">.
+    const kvkk = page.locator('button[data-slot="checkbox"]')
     if (await kvkk.isVisible({ timeout: 3000 }).catch(() => false)) {
       await kvkk.click()
     }

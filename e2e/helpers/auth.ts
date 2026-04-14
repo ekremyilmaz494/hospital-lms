@@ -67,8 +67,9 @@ export async function login(page: Page, role: UserRole = 'admin') {
   await page.fill('[type="email"]', email)
   await page.fill('[type="password"]', password)
 
-  // KVKK checkbox — required before submit
-  const kvkkCheckbox = page.locator('#kvkk')
+  // Shadcn Checkbox: '#kvkk' is a hidden <input aria-hidden="true">.
+  // The actual clickable element is <button data-slot="checkbox">.
+  const kvkkCheckbox = page.locator('button[data-slot="checkbox"]')
   if (await kvkkCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
     await kvkkCheckbox.click()
   }

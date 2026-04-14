@@ -14,8 +14,8 @@ test.describe('Kimlik Dogrulama Akislari', () => {
     await page.fill('[type="email"]', 'test@example.com')
     await page.fill('[type="password"]', 'yanlis_sifre_123')
 
-    // KVKK checkbox
-    await page.locator('#kvkk').click()
+    // Shadcn Checkbox — visible button, not hidden #kvkk input
+    await page.locator('button[data-slot="checkbox"]').click()
 
     await page.click('button[type="submit"]')
 
