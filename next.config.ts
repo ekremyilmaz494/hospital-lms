@@ -5,7 +5,8 @@ import { withSentryConfig } from '@sentry/nextjs';
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 // ── Build-time guard: Yanlış Supabase URL ile production build'i engelle ──
-if (process.env.NODE_ENV === 'production') {
+// CI (GitHub Actions) ortamında placeholder URL kullanıldığı için atla.
+if (process.env.NODE_ENV === 'production' && !process.env.CI) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
   const expectedRef = 'pkkkyyajfmusurcoovwt';
   if (!supabaseUrl.includes(expectedRef)) {
