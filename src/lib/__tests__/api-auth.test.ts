@@ -3,20 +3,36 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ── Mocks ──
 
 const mockSignInWithPassword = vi.fn()
-const mockListFactors = vi.fn()
+const mockGetSession = vi.fn()
 
 vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => ({
+  createLoginClient: vi.fn(async () => ({
     auth: {
       signInWithPassword: mockSignInWithPassword,
-      mfa: { listFactors: mockListFactors },
+    },
+  })),
+  createClient: vi.fn(async () => ({
+    auth: {
+      getSession: mockGetSession,
     },
   })),
 }))
 
+const mockCookiesGetAll = vi.fn(() => [] as { name: string; value: string }[])
+
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(async () => ({
+    getAll: mockCookiesGetAll,
+    get: vi.fn(),
+  })),
+}))
+
 vi.mock('@/lib/redis', () => ({
-  checkRateLimit: vi.fn(async () => true),
+  getRateLimitCount: vi.fn(async () => 0),
+  incrementRateLimit: vi.fn(async () => 1),
+  deleteRateLimit: vi.fn(async () => {}),
   getRedis: vi.fn(() => null),
+  checkRateLimit: vi.fn(async () => true),
 }))
 
 vi.mock('@/lib/logger', () => ({
@@ -34,16 +50,16 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-import { checkRateLimit } from '@/lib/redis'
+import { getRateLimitCount } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 
-// Top-level dynamic imports (after mocks are set up)
 const { POST } = await import('@/app/api/auth/login/route')
 const { requireRole, getAuthUser } = await import('@/lib/api-helpers')
-const { createClient: mockCreateClient } = await import('@/lib/supabase/server')
 
-const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>
-const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>
+type AnyMock = ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockGetRateLimitCount = getRateLimitCount as AnyMock
+const mockUserFindUnique = prisma.user.findUnique as AnyMock
+const mockOrgFindUnique = prisma.organization.findUnique as AnyMock
 
 function makeRequest(body: Record<string, unknown>, headers?: Record<string, string>) {
   return new Request('http://localhost:3000/api/auth/login', {
@@ -53,10 +69,18 @@ function makeRequest(body: Record<string, unknown>, headers?: Record<string, str
   }) as unknown as import('next/server').NextRequest
 }
 
+const activeDbUser = {
+  id: 'user-1',
+  isActive: true,
+  mustChangePassword: false,
+  role: 'admin',
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(checkRateLimit as ReturnType<typeof vi.fn>).mockResolvedValue(true)
-  mockListFactors.mockResolvedValue({ data: { totp: [] } })
+  mockGetRateLimitCount.mockResolvedValue(0)
+  mockUserFindUnique.mockResolvedValue(activeDbUser)
+  mockCookiesGetAll.mockReturnValue([])
 })
 
 // ── Tests ──
@@ -67,6 +91,7 @@ describe('POST /api/auth/login', () => {
       mockSignInWithPassword.mockResolvedValue({
         data: {
           user: { id: 'user-1', email: 'admin@test.com', user_metadata: { role: 'admin' } },
+          session: { user: { factors: [] } },
         },
         error: null,
       })
@@ -82,7 +107,8 @@ describe('POST /api/auth/login', () => {
     it('email adresini normalize eder (trim + lowercase)', async () => {
       mockSignInWithPassword.mockResolvedValue({
         data: {
-          user: { id: 'user-2', email: 'staff@test.com', user_metadata: { role: 'staff' } },
+          user: { id: 'user-1', email: 'staff@test.com', user_metadata: { role: 'staff' } },
+          session: { user: { factors: [] } },
         },
         error: null,
       })
@@ -98,12 +124,14 @@ describe('POST /api/auth/login', () => {
     it('MFA gerektiren kullanici icin mfaRequired dondurir', async () => {
       mockSignInWithPassword.mockResolvedValue({
         data: {
-          user: { id: 'user-mfa', email: 'mfa@test.com', user_metadata: { role: 'admin' } },
+          user: { id: 'user-1', email: 'mfa@test.com', user_metadata: { role: 'admin' } },
+          session: {
+            user: {
+              factors: [{ id: 'factor-1', factor_type: 'totp', status: 'verified' }],
+            },
+          },
         },
         error: null,
-      })
-      mockListFactors.mockResolvedValue({
-        data: { totp: [{ id: 'factor-1', status: 'verified' }] },
       })
 
       const res = await POST(makeRequest({ email: 'mfa@test.com', password: 'pass123' }))
@@ -112,7 +140,6 @@ describe('POST /api/auth/login', () => {
       expect(res.status).toBe(200)
       expect(body.mfaRequired).toBe(true)
       expect(body.factorId).toBe('factor-1')
-      // Kullanici bilgisi sizdirilmamali
       expect(body.user).toBeUndefined()
     })
   })
@@ -145,9 +172,9 @@ describe('POST /api/auth/login', () => {
 
   describe('Rate limiting', () => {
     it('IP rate limit asildiginda 429 doner', async () => {
-      ;(checkRateLimit as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce(false) // IP limit
-        .mockResolvedValueOnce(true)  // email limit
+      mockGetRateLimitCount
+        .mockResolvedValueOnce(100) // IP over limit
+        .mockResolvedValueOnce(0)
 
       const res = await POST(makeRequest({ email: 'test@test.com', password: 'pass' }))
       expect(res.status).toBe(429)
@@ -157,9 +184,9 @@ describe('POST /api/auth/login', () => {
     })
 
     it('email rate limit asildiginda 429 doner', async () => {
-      ;(checkRateLimit as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce(true)  // IP limit OK
-        .mockResolvedValueOnce(false) // email limit exceeded
+      mockGetRateLimitCount
+        .mockResolvedValueOnce(0)  // IP OK
+        .mockResolvedValueOnce(30) // email over limit
 
       const res = await POST(makeRequest({ email: 'test@test.com', password: 'pass' }))
       expect(res.status).toBe(429)
@@ -170,7 +197,8 @@ describe('POST /api/auth/login', () => {
     it('role metadata yoksa varsayilan staff rolu doner', async () => {
       mockSignInWithPassword.mockResolvedValue({
         data: {
-          user: { id: 'user-no-role', email: 'norole@test.com', user_metadata: {} },
+          user: { id: 'user-1', email: 'norole@test.com', user_metadata: {} },
+          session: { user: { factors: [] } },
         },
         error: null,
       })
@@ -203,10 +231,19 @@ describe('getAuthUser - rol bazli erisim', () => {
 })
 
 describe('getAuthUser - oturum kontrolleri', () => {
+  it('auth cookie yoksa 401 doner', async () => {
+    mockCookiesGetAll.mockReturnValue([])
+
+    const { error } = await getAuthUser()
+
+    expect(error).not.toBeNull()
+    const body = await error!.json()
+    expect(body.error).toBe('Unauthorized')
+  })
+
   it('oturum yoksa 401 doner', async () => {
-    ;(mockCreateClient as ReturnType<typeof vi.fn>).mockResolvedValue({
-      auth: { getSession: async () => ({ data: { session: null }, error: null }) },
-    })
+    mockCookiesGetAll.mockReturnValue([{ name: 'sb-xxx-auth-token', value: 'x' }])
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null })
 
     const { error } = await getAuthUser()
 
@@ -216,11 +253,10 @@ describe('getAuthUser - oturum kontrolleri', () => {
   })
 
   it('aktif olmayan kullanici 403 doner', async () => {
-    ;(mockCreateClient as ReturnType<typeof vi.fn>).mockResolvedValue({
-      auth: { getSession: async () => ({
-        data: { session: { user: { id: 'user-inactive' } } },
-        error: null,
-      }) },
+    mockCookiesGetAll.mockReturnValue([{ name: 'sb-xxx-auth-token', value: 'x' }])
+    mockGetSession.mockResolvedValue({
+      data: { session: { user: { id: 'user-inactive' } } },
+      error: null,
     })
     mockUserFindUnique.mockResolvedValue({ id: 'user-inactive', isActive: false, role: 'staff' })
 
@@ -232,11 +268,10 @@ describe('getAuthUser - oturum kontrolleri', () => {
   })
 
   it('askiya alinmis organizasyon 403 doner', async () => {
-    ;(mockCreateClient as ReturnType<typeof vi.fn>).mockResolvedValue({
-      auth: { getSession: async () => ({
-        data: { session: { user: { id: 'user-suspended-org' } } },
-        error: null,
-      }) },
+    mockCookiesGetAll.mockReturnValue([{ name: 'sb-xxx-auth-token', value: 'x' }])
+    mockGetSession.mockResolvedValue({
+      data: { session: { user: { id: 'user-suspended-org' } } },
+      error: null,
     })
     mockUserFindUnique.mockResolvedValue({
       id: 'user-suspended-org',

@@ -13,6 +13,13 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }))
 
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(async () => ({
+    getAll: () => [{ name: 'sb-xxx-auth-token', value: 'x' }],
+    get: vi.fn(),
+  })),
+}))
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: { findUnique: vi.fn() },

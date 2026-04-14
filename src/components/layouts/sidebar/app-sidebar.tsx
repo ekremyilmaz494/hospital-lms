@@ -34,9 +34,9 @@ function AiBadgeCount() {
 }
 
 /** pathname izolasyonu — sadece bu wrapper re-render olur, parent sidebar değil */
-function NavItemActive({ href, children: childHrefs, render }: {
+function NavItemActive({ href, childHrefs, render }: {
   href: string;
-  children?: { href: string }[];
+  childHrefs?: { href: string }[];
   render: (active: boolean) => React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -176,7 +176,7 @@ export const AppSidebar = memo(function AppSidebar({
               const Icon = item.icon;
               const hasChildren = item.children && item.children.length > 0;
               return (
-                <NavItemActive key={item.href} href={item.href} children={item.children} render={(active) => (
+                <NavItemActive key={item.href} href={item.href} childHrefs={item.children} render={(active) => (
                   <Tooltip>
                     <TooltipTrigger
                       render={<Link href={hasChildren ? item.children![0].href : item.href} />}
@@ -301,7 +301,7 @@ export const AppSidebar = memo(function AppSidebar({
                   const hasChildren = item.children && item.children.length > 0;
 
                   return (
-                    <NavItemActive key={item.href} href={item.href} children={item.children} render={(active) => (
+                    <NavItemActive key={item.href} href={item.href} childHrefs={item.children} render={(active) => (
                       <div>
                         {hasChildren ? (
                           <button

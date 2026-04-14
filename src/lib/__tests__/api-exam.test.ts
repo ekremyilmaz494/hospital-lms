@@ -64,13 +64,13 @@ vi.mock('@/lib/api-helpers', async (importOriginal) => {
 import { prisma } from '@/lib/prisma'
 import { isExamExpired } from '@/lib/redis'
 
-const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>
-const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>
-const mockAssignmentFindFirst = prisma.trainingAssignment.findFirst as ReturnType<typeof vi.fn>
-const mockAttemptFindFirst = prisma.examAttempt.findFirst as ReturnType<typeof vi.fn>
-const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>
-const mockQuestionFindMany = prisma.question.findMany as ReturnType<typeof vi.fn>
-const mockAttemptUpdateMany = prisma.examAttempt.updateMany as ReturnType<typeof vi.fn>
+const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockAssignmentFindFirst = prisma.trainingAssignment.findFirst as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockAttemptFindFirst = prisma.examAttempt.findFirst as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockQuestionFindMany = prisma.question.findMany as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockAttemptUpdateMany = prisma.examAttempt.updateMany as ReturnType<typeof vi.fn<(...args: any[]) => any>>
 
 const ORG_ID = 'org-test-uuid'
 const USER_ID = 'staff-user-1'
@@ -337,27 +337,26 @@ describe('Sinav suresi dolma kontrolu', () => {
   })
 
   it('isExamExpired helper ile Redis timer kontrolu', async () => {
-    ;(isExamExpired as ReturnType<typeof vi.fn>).mockResolvedValue(true)
+    ;(isExamExpired as ReturnType<typeof vi.fn<(...args: any[]) => any>>).mockResolvedValue(true)
     const expired = await isExamExpired('attempt-expired')
     expect(expired).toBe(true)
   })
 })
 
 describe('Phase transition validasyonu', () => {
+  const isPhaseValid = (
+    attemptStatus: 'pre_exam' | 'post_exam',
+    submittedPhase: 'pre' | 'post',
+  ) =>
+    (submittedPhase === 'pre' && attemptStatus === 'pre_exam') ||
+    (submittedPhase === 'post' && attemptStatus === 'post_exam')
+
   it('pre_exam asamasinda sadece pre submit kabul edilir', () => {
-    const attemptStatus = 'pre_exam'
-    const submittedPhase = 'post'
-    const isValid = (submittedPhase === 'pre' && attemptStatus === 'pre_exam') ||
-                    (submittedPhase === 'post' && attemptStatus === 'post_exam')
-    expect(isValid).toBe(false)
+    expect(isPhaseValid('pre_exam', 'post')).toBe(false)
   })
 
   it('post_exam asamasinda sadece post submit kabul edilir', () => {
-    const attemptStatus = 'post_exam'
-    const submittedPhase = 'post'
-    const isValid = (submittedPhase === 'pre' && attemptStatus === 'pre_exam') ||
-                    (submittedPhase === 'post' && attemptStatus === 'post_exam')
-    expect(isValid).toBe(true)
+    expect(isPhaseValid('post_exam', 'post')).toBe(true)
   })
 
   it('tamamlanmis denemeye tekrar gonderim yapilamaz', () => {

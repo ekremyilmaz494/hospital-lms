@@ -164,7 +164,7 @@ describe('POST /api/auth/register', () => {
         email: 'admin@ankara.com',
         password: 'SecurePass123!',
         email_confirm: false,
-        user_metadata: expect.objectContaining({
+        app_metadata: expect.objectContaining({
           role: 'admin',
           organization_id: 'new-org-1',
         }),

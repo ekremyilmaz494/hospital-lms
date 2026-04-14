@@ -38,6 +38,7 @@ vi.mock('@/lib/prisma', () => ({
     user: { findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
     training: { findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
     trainingAssignment: { groupBy: vi.fn().mockResolvedValue([]) },
+    examAttempt: { groupBy: vi.fn().mockResolvedValue([]), findMany: vi.fn().mockResolvedValue([]) },
     department: { findMany: vi.fn().mockResolvedValue([]) },
   },
 }))

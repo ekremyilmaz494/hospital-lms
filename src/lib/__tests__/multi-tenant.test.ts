@@ -56,14 +56,14 @@ vi.mock('@/lib/api-helpers', async (importOriginal) => {
 import { prisma } from '@/lib/prisma'
 import { requireRole, errorResponse } from '@/lib/api-helpers'
 
-const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>
-const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>
-const mockTrainingFindMany = prisma.training.findMany as ReturnType<typeof vi.fn>
-const mockTrainingFindUnique = prisma.training.findUnique as ReturnType<typeof vi.fn>
-const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>
-const mockAssignmentFindFirst = prisma.trainingAssignment.findFirst as ReturnType<typeof vi.fn>
-const mockAttemptFindFirst = prisma.examAttempt.findFirst as ReturnType<typeof vi.fn>
-const mockDeptFindFirst = prisma.department.findFirst as ReturnType<typeof vi.fn>
+const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockTrainingFindMany = prisma.training.findMany as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockTrainingFindUnique = prisma.training.findUnique as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockAssignmentFindFirst = prisma.trainingAssignment.findFirst as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockAttemptFindFirst = prisma.examAttempt.findFirst as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockDeptFindFirst = prisma.department.findFirst as ReturnType<typeof vi.fn<(...args: any[]) => any>>
 
 const ORG_A = 'org-a-hospital-uuid'
 const ORG_B = 'org-b-hospital-uuid'

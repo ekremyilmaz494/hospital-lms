@@ -102,8 +102,7 @@ describe('checkRateLimit', () => {
   })
 
   it('applies same limits in production mode (no halving)', async () => {
-    const originalEnv = process.env.NODE_ENV
-    process.env.NODE_ENV = 'production'
+    vi.stubEnv('NODE_ENV', 'production')
 
     try {
       const key = `test:prod:${Date.now()}`
@@ -113,7 +112,7 @@ describe('checkRateLimit', () => {
       const result = await checkRateLimit(key, 4, 60)
       expect(result).toBe(true) // 3rd request still within limit of 4
     } finally {
-      process.env.NODE_ENV = originalEnv
+      vi.unstubAllEnvs()
     }
   })
 })
@@ -163,9 +162,9 @@ describe('isExamExpired', () => {
     expect(expired).toBe(false)
   })
 
-  it('returns true when timer does not exist', async () => {
+  it('returns false when timer does not exist (recovery pattern — haksız zaman aşımı önlenir)', async () => {
     const expired = await isExamExpired('nonexistent-attempt')
-    expect(expired).toBe(true)
+    expect(expired).toBe(false)
   })
 
   it('returns true when timer has expired', async () => {

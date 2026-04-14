@@ -11,6 +11,7 @@ export interface ReportRow {
 export interface ReportData {
   headers?: string[];
   rows?: (string | number | boolean | null | undefined)[][];
+  filename?: string;
 }
 
 export function exportExcel(reportData?: ReportData) {
@@ -28,7 +29,8 @@ export function exportExcel(reportData?: ReportData) {
 
   const BOM = '\uFEFF';
   const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-  downloadBlob(blob, `rapor-${formatDate()}.csv`);
+  const name = reportData.filename ? `${reportData.filename}.csv` : `rapor-${formatDate()}.csv`;
+  downloadBlob(blob, name);
 }
 
 export function exportPDF(reportData?: ReportData, title?: string) {

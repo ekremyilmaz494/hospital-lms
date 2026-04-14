@@ -71,15 +71,15 @@ vi.mock('next/cache', () => ({
 
 import { prisma } from '@/lib/prisma'
 
-const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>
-const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>
-const mockUserCreate = prisma.user.create as ReturnType<typeof vi.fn>
-const mockUserCount = prisma.user.count as ReturnType<typeof vi.fn>
-const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>
-const mockDeptFindMany = prisma.department.findMany as ReturnType<typeof vi.fn>
-const mockDeptFindFirst = prisma.department.findFirst as ReturnType<typeof vi.fn>
-const mockAssignmentGroupBy = prisma.trainingAssignment.groupBy as ReturnType<typeof vi.fn>
-const mockExamGroupBy = prisma.examAttempt.groupBy as ReturnType<typeof vi.fn>
+const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockUserCreate = prisma.user.create as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockUserCount = prisma.user.count as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockDeptFindMany = prisma.department.findMany as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockDeptFindFirst = prisma.department.findFirst as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockAssignmentGroupBy = prisma.trainingAssignment.groupBy as ReturnType<typeof vi.fn<(...args: any[]) => any>>
+const mockExamGroupBy = prisma.examAttempt.groupBy as ReturnType<typeof vi.fn<(...args: any[]) => any>>
 
 const ORG_ID = 'org-test-uuid-1234'
 
@@ -259,7 +259,7 @@ describe('Personel CRUD islemleri', () => {
   describe('Rate limiting', () => {
     it('50 istekten sonra 429 donmeli', async () => {
       const { checkRateLimit } = await import('@/lib/redis')
-      ;(checkRateLimit as ReturnType<typeof vi.fn>).mockResolvedValue(false)
+      ;(checkRateLimit as ReturnType<typeof vi.fn<(...args: any[]) => any>>).mockResolvedValue(false)
 
       const allowed = await checkRateLimit('staff-create:ip:127.0.0.1', 50, 3600)
       expect(allowed).toBe(false)

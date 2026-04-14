@@ -106,9 +106,14 @@ describe('useFetch — fetch davranışı', () => {
   })
 
   it('401 yanıtında /auth/login adresine yönlendirir', async () => {
-    // window.location mock
     const locationMock = { href: '' }
+    const sessionStore: Record<string, string> = {}
     vi.stubGlobal('window', { location: locationMock })
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => sessionStore[k] ?? null,
+      setItem: (k: string, v: string) => { sessionStore[k] = v },
+      removeItem: (k: string) => { delete sessionStore[k] },
+    })
 
     mockFetch.mockResolvedValueOnce({
       ok: false,
@@ -119,18 +124,16 @@ describe('useFetch — fetch davranışı', () => {
     const { useFetch } = await import('@/hooks/use-fetch')
     useFetch('/api/protected')
 
-    // fetch çağrısını bekle
     await vi.waitFor(() => {
       expect(mockFetch).toHaveBeenCalled()
     })
 
-    // Yönlendirme gerçekleşene kadar bekle
     await vi.waitFor(() => {
       expect(locationMock.href).toBe('/auth/login?reason=session_expired')
     })
   })
 
-  it('403 yanıtında /auth/login adresine yönlendirir', async () => {
+  it('403 yanıtında yönlendirme YAPMAZ (authenticated ama yetkisiz)', async () => {
     const locationMock = { href: '' }
     vi.stubGlobal('window', { location: locationMock })
 
@@ -147,8 +150,8 @@ describe('useFetch — fetch davranışı', () => {
       expect(mockFetch).toHaveBeenCalled()
     })
 
-    await vi.waitFor(() => {
-      expect(locationMock.href).toBe('/auth/login?reason=session_expired')
-    })
+    // 403 authenticated ama yetkisiz — login'e yönlendirmez
+    await new Promise(r => setTimeout(r, 50))
+    expect(locationMock.href).toBe('')
   })
 })
