@@ -4423,3 +4423,145 @@ Değiştirilen dosyalar:
 - **Admin paneli görünümü**: 🔄 Henüz yapılmadı
 
 *Son güncelleme: 14 Nisan 2026 — Oturum 42*
+
+---
+
+## Oturum 43 — SMG Modülü SKS Uyumlu Genişletme
+
+**Tarih:** 14 Nisan 2026
+
+### Amaç
+Mevcut SMG (Sürekli Mesleki Gelişim) modülünü Türkiye Sağlık Bakanlığı SKS denetim gereksinimlerine uyumlu hale getirmek. Yeni özellikler: 7 standart SKS aktivite kategorisi, unvana göre puan hedefleri, sertifika belgesi görüntüleme, SKS denetim raporu.
+
+---
+
+### Adım 1 — Şema + Migration + RLS
+
+#### Prisma Schema (`prisma/schema.prisma`)
+- `SmgCategory` modeli eklendi: id, organizationId, name, code (unique/org), description, maxPointsPerActivity (nullable), isActive, sortOrder, createdAt, relations
+- `SmgTarget` modeli eklendi: id, organizationId, periodId, unvan (nullable), userId (nullable), requiredPoints, createdAt, relations
+- `SmgActivity.categoryId` opsiyonel kolon eklendi (FK → SmgCategory, `activityType` silinmedi)
+- `Organization`, `SmgPeriod`, `User` modellerine yeni relation'lar eklendi
+
+#### Migration (`prisma/migrations/20260414100000_add_smg_categories_targets/migration.sql`)
+- `CREATE TABLE smg_categories` + `CREATE TABLE smg_targets`
+- `ALTER TABLE smg_activities ADD COLUMN category_id`
+- FK constraint'ler + performans indexleri
+
+#### RLS (`supabase-rls.sql`)
+4 yeni policy eklendi:
+- `admin_smg_categories_all` — admin CRUD
+- `staff_smg_categories_select` — staff SELECT
+- `admin_smg_targets_all` — admin CRUD
+- `staff_smg_targets_select` — staff SELECT
+
+Tablolar ve seed, Supabase MCP `execute_sql` ile uygulandı (migration önceden mevcuttu).
+
+---
+
+### Adım 2 — Seed Script
+
+**`scripts/seed-smg-categories.ts`** oluşturuldu:
+- Her org için 7 standart SKS kategorisi upsert: TTB Kongre/Sempozyum, Kurum İçi Eğitim, Sertifika Programları, Uzaktan Eğitim, Kongre/Sempozyum Katılımı, Makale/Yayın, Diğer Mesleki Gelişim
+- `activityType` → `categoryId` mapping (4 enum değeri → kategori code'u)
+- Her `SmgPeriod` için varsayılan `SmgTarget` (unvan=null, userId=null)
+- `package.json` → `"seed:smg": "tsx scripts/seed-smg-categories.ts"` eklendi
+
+**Seed sonucu (MCP ile çalıştırıldı):** 14 kategori (2 org × 7), 1 aktivite maplandı, 0 dönem olduğundan target eklenmedi.
+
+---
+
+### Adım 3 — Helper + Validasyon
+
+#### `src/lib/smg-helpers.ts` (yeni)
+- `resolveRequiredPoints()` — tek kullanıcı için 3 paralel sorgu (kişisel > unvan > varsayılan > period fallback)
+- `resolveRequiredPointsBulk()` — N kullanıcı için tek SQL + Map lookup (N+1 önleme)
+
+#### `src/lib/validations.ts`
+- `createSmgActivitySchema` → `categoryId` opsiyonel + `refine` (activityType veya categoryId zorunlu)
+- Yeni şemalar: `createSmgCategorySchema`, `updateSmgCategorySchema`, `createSmgTargetSchema`, `updateSmgTargetSchema`, `inspectionReportQuerySchema`
+
+---
+
+### Adım 4 — Backend API (6 yeni + 3 güncelleme)
+
+| Dosya | Açıklama |
+|---|---|
+| `src/app/api/admin/smg/categories/route.ts` | GET (staff+admin, Cache-Control), POST (unique kod kontrolü) |
+| `src/app/api/admin/smg/categories/[id]/route.ts` | PATCH (kod unique kontrolü), DELETE (bağlı aktivite → 409) |
+| `src/app/api/admin/smg/targets/route.ts` | GET (periodId zorunlu), POST (dönem+kullanıcı paralel doğrulama) |
+| `src/app/api/admin/smg/targets/[id]/route.ts` | PUT (requiredPoints), DELETE |
+| `src/app/api/admin/smg/activities/[id]/certificate/route.ts` | S3 key → presigned URL, pdf/image type tespiti |
+| `src/app/api/admin/smg/activities/[id]/upload-url/route.ts` | PDF/JPEG/PNG kontrolü, S3 presigned PUT, certificateUrl güncelleme |
+| `src/app/api/admin/smg/inspection-report/route.ts` | SKS raporu: period/custom range, `resolveRequiredPointsBulk`, byUnvan/byDepartment gruplamalar |
+| `src/app/api/admin/smg/report/route.ts` | `resolveRequiredPointsBulk` entegrasyonu, `title`/`unvan` eklendi |
+| `src/app/api/staff/smg/my-points/route.ts` | `resolveRequiredPoints` entegrasyonu |
+| `src/app/api/staff/smg/activities/route.ts` | categoryId handling, maxPointsPerActivity validasyonu |
+
+**Düzeltilen hatalar:**
+- `activityType` enum tip hatası → `let activityType: string` explicit typing
+- `Promise.all` paralel sorgu düzenlemeleri (perf-check uyumu)
+
+---
+
+### Adım 5 — Admin UI Bileşenleri
+
+| Dosya | Açıklama |
+|---|---|
+| `src/app/admin/smg/components/certificate-viewer-modal.tsx` | PDF iframe / image / boş state, "Dışarıda Aç" butonu |
+| `src/app/admin/smg/components/categories-tab.tsx` | Kategori tablosu, ekle/düzenle modal, "Standart SKS Kategorilerini Ekle" butonu |
+| `src/app/admin/smg/components/targets-tab.tsx` | Dönem seçici, unvana göre inline-edit tablo, bireysel override bölümü |
+| `src/app/admin/smg/components/inspection-report-tab.tsx` | Özet kartlar, unvan/departman tabloları, expandable personel detay, Excel + Print export |
+| `src/app/admin/smg/page.tsx` | 5 tab (+ Kategoriler, Hedefler, SKS Denetim Raporu), "Sertifika" kolonu, `CertificateViewerModal` |
+
+**Düzeltilen hatalar:**
+- `ReportData` isim çakışması → `InspectionReportData` olarak yeniden adlandırıldı
+
+---
+
+### Adım 6 — Staff UI
+
+**`src/app/staff/smg/page.tsx`** güncellendi:
+- Aktivite ekleme modalindeki "Aktivite Tipi" dropdown → dinamik kategoriler (GET `/api/admin/smg/categories`)
+- API hata verirse 4 hardcoded değere fallback
+- `maxPointsPerActivity` varsa puan alanı altında hint
+- `categoryId` form state + submit entegrasyonu
+
+---
+
+### Adım 7 — Standalone Denetim Sayfası
+
+- `src/app/admin/smg/inspection/page.tsx` oluşturuldu (tam genişlik, yer imine eklenebilir)
+- `src/components/layouts/sidebar/sidebar-config.ts` → SMG Takibi entry'si "Genel Bakış" + "SKS Denetim Raporu" sub-item'larıyla genişletildi
+
+---
+
+### Doğrulama Sonuçları
+
+| Kontrol | Sonuç |
+|---|---|
+| `pnpm tsc --noEmit` | ✅ Temiz |
+| `pnpm lint` | ✅ exit 0 |
+| `pnpm build` | ✅ Başarılı, tüm SMG route'ları listede |
+| Supabase DB seed | ✅ 14 kategori, 1 aktivite maplandı |
+
+### Değiştirilen/Oluşturulan Dosyalar (Özet)
+- `prisma/schema.prisma`, `prisma/migrations/20260414100000_add_smg_categories_targets/migration.sql`
+- `supabase-rls.sql`, `scripts/seed-smg-categories.ts`, `package.json`
+- `src/lib/smg-helpers.ts` *(yeni)*, `src/lib/validations.ts`
+- `src/app/api/admin/smg/categories/route.ts` + `[id]/route.ts` *(yeni)*
+- `src/app/api/admin/smg/targets/route.ts` + `[id]/route.ts` *(yeni)*
+- `src/app/api/admin/smg/activities/[id]/certificate/route.ts` + `upload-url/route.ts` *(yeni)*
+- `src/app/api/admin/smg/inspection-report/route.ts` *(yeni)*
+- `src/app/api/admin/smg/report/route.ts`, `src/app/api/staff/smg/my-points/route.ts`, `src/app/api/staff/smg/activities/route.ts`
+- `src/app/admin/smg/components/{certificate-viewer-modal,categories-tab,targets-tab,inspection-report-tab}.tsx` *(yeni)*
+- `src/app/admin/smg/page.tsx`, `src/app/staff/smg/page.tsx`
+- `src/app/admin/smg/inspection/page.tsx` *(yeni)*
+- `src/components/layouts/sidebar/sidebar-config.ts`
+
+### Durum
+- **SMG SKS modülü**: ✅ Tam uygulandı
+- **Sertifika yükleme frontend UI**: 🔄 Upload-url endpoint hazır, dosya picker UI henüz yok
+- **Dönem varsayılan target**: 🔄 Dönem oluşturulunca Hedefler tab'ından eklenebilir
+
+*Son güncelleme: 14 Nisan 2026 — Oturum 43*
