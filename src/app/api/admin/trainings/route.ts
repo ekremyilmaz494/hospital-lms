@@ -142,8 +142,8 @@ export async function POST(request: Request) {
           let url = v.url
           let ct = v.contentType || 'video'
           let duration = v.durationSeconds || (ct === 'video' ? 300 : 0)
-          let docKey = v.documentKey ?? null
-          let pgCount = v.pageCount ?? null
+          const docKey = v.documentKey ?? null
+          const pgCount = v.pageCount ?? null
           let videoTitle = v.title
 
           // Medya kütüphanesinden seçim — libraryItemId varsa bilgileri oradan çek

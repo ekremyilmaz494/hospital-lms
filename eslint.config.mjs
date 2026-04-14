@@ -31,8 +31,7 @@ const eslintConfig = defineConfig([
     "test-results/**",
     "tmp/**",
     "aaaaaaa/**",
-    "public/sw*.js",
-    "public/workbox-*.js",
+    "public/**",
     "**/*.min.js",
   ]),
 ]);
