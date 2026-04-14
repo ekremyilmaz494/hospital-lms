@@ -133,7 +133,7 @@ async function createSupabaseUsersBatch(
   console.log('  Mevcut Supabase kullanıcıları kontrol ediliyor...')
   const allExisting = new Map<string, string>()
   let page = 1
-  // eslint-disable-next-line no-constant-condition
+   
   while (true) {
     const { data } = await supabase.auth.admin.listUsers({ page, perPage: 1000 })
     if (!data?.users?.length) break

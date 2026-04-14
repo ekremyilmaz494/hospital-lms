@@ -1,7 +1,19 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/api-helpers'
+import { logActivity } from '@/lib/activity-logger'
 
 export async function POST() {
+  // Kullanıcı bilgisini signOut'tan ÖNCE al — sonra session silinir
+  const { dbUser } = await getAuthUser()
+  if (dbUser?.id && dbUser.organizationId) {
+    void logActivity({
+      userId: dbUser.id,
+      organizationId: dbUser.organizationId,
+      action: 'logout',
+    })
+  }
+
   try {
     const supabase = await createClient()
     await supabase.auth.signOut()

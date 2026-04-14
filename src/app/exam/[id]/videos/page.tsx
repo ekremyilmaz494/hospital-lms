@@ -155,7 +155,7 @@ export default function VideoPlayerPage() {
 
   // When video ends, mark as completed
   const [showPostExamPrompt, setShowPostExamPrompt] = useState(false);
-  const handleVideoEnded = useCallback(() => { // eslint-disable-line
+  const handleVideoEnded = useCallback(() => {  
     setIsPlaying(false);
     if (!currentVideo) return;
 

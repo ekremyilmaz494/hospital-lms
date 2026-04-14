@@ -20,6 +20,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "node scripts/seed-demo.js",
+    "seed:smg": "tsx scripts/seed-smg-categories.ts",
     "prepare": "husky",
     "validate:env": "node scripts/validate-env.js",
     "predeploy": "node scripts/validate-env.js",

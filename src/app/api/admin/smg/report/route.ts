@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { resolveRequiredPointsBulk } from '@/lib/smg-helpers'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
         id: true,
         firstName: true,
         lastName: true,
+        title: true,
         departmentRel: { select: { name: true } },
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
@@ -69,18 +71,30 @@ export async function GET(request: Request) {
     pointsMap.set(a.userId, (pointsMap.get(a.userId) ?? 0) + a.smgPoints)
   }
 
-  const requiredPoints = period?.requiredPoints ?? 0
+  const periodFallback = period?.requiredPoints ?? 0
+
+  const requiredMap = period
+    ? await resolveRequiredPointsBulk({
+        prisma,
+        periodId: period.id,
+        organizationId: orgId,
+        periodFallback,
+        users: staff.map(s => ({ id: s.id, title: s.title })),
+      })
+    : new Map<string, number>()
 
   const report = staff.map(u => {
     const earned = pointsMap.get(u.id) ?? 0
+    const requiredPoints = requiredMap.get(u.id) ?? periodFallback
     return {
       userId: u.id,
       name: `${u.firstName} ${u.lastName}`,
+      unvan: u.title ?? null,
       department: u.departmentRel?.name ?? '-',
       earnedPoints: earned,
       requiredPoints,
       progress: requiredPoints > 0 ? Math.min(100, Math.round((earned / requiredPoints) * 100)) : 0,
-      isCompleted: earned >= requiredPoints,
+      isCompleted: earned >= requiredPoints && requiredPoints > 0,
     }
   })
 

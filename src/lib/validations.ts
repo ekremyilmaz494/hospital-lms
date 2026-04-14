@@ -289,12 +289,52 @@ export const createSmgPeriodSchema = z.object({
 })
 
 export const createSmgActivitySchema = z.object({
-  activityType: z.enum(['EXTERNAL_TRAINING', 'CONFERENCE', 'PUBLICATION']),
+  activityType: z.enum(['EXTERNAL_TRAINING', 'CONFERENCE', 'PUBLICATION', 'COURSE_COMPLETION']).optional(),
+  categoryId: z.string().uuid().optional(),
   title: z.string().min(2).max(255),
   provider: z.string().max(255).optional(),
   completionDate: z.string().date(),
   smgPoints: z.coerce.number().int().min(1).max(999),
   certificateUrl: z.string().url().optional().or(z.literal('')).transform(v => v || undefined),
+}).refine(
+  data => data.categoryId || data.activityType,
+  { message: 'Kategori veya aktivite tipi belirtilmelidir', path: ['categoryId'] }
+)
+
+// ── SMG KATEGORİ ŞEMALARI ──
+export const createSmgCategorySchema = z.object({
+  name: z.string().min(2, 'En az 2 karakter').max(255),
+  code: z.string().min(2).max(50).regex(/^[A-Z_]+$/, 'Sadece büyük harf ve alt çizgi'),
+  description: z.string().max(1000).optional(),
+  maxPointsPerActivity: z.coerce.number().int().min(1).max(9999).optional().nullable(),
+  isActive: z.boolean().optional().default(true),
+  sortOrder: z.coerce.number().int().min(0).max(999).optional().default(0),
+})
+
+export const updateSmgCategorySchema = createSmgCategorySchema.partial()
+
+// ── SMG HEDEF ŞEMALARI ──
+export const createSmgTargetSchema = z.object({
+  periodId: z.string().uuid(),
+  unvan: z.string().max(100).optional(),
+  userId: z.string().uuid().optional(),
+  requiredPoints: z.coerce.number().int().min(1).max(9999),
+}).refine(
+  data => !(data.unvan && data.userId),
+  { message: 'Unvan veya kullanıcı belirtilebilir, ikisi birden olamaz' }
+)
+
+export const updateSmgTargetSchema = z.object({
+  requiredPoints: z.coerce.number().int().min(1).max(9999),
+})
+
+// ── SKS DENETİM RAPORU ŞEMASI ──
+export const inspectionReportQuerySchema = z.object({
+  periodId: z.string().uuid().optional(),
+  startDate: z.string().date().optional(),
+  endDate: z.string().date().optional(),
+  departmentId: z.string().uuid().optional(),
+  format: z.enum(['json', 'csv']).optional().default('json'),
 })
 
 export const approveSmgActivitySchema = z.object({

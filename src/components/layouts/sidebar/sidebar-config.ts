@@ -119,7 +119,15 @@ export const adminNav: NavGroup[] = [
           { title: 'Analitik', href: '/admin/feedback-forms/analytics' },
         ],
       },
-      { title: 'SMG Takibi', href: '/admin/smg', icon: Star },
+      {
+        title: 'SMG Takibi',
+        href: '/admin/smg',
+        icon: Star,
+        children: [
+          { title: 'Genel Bakış', href: '/admin/smg' },
+          { title: 'SKS Denetim Raporu', href: '/admin/smg/inspection' },
+        ],
+      },
       { title: 'Raporlar', href: '/admin/reports', icon: BarChart3 },
       { title: 'Bildirimler', href: '/admin/notifications', icon: Bell },
       { title: 'İşlem Geçmişi', href: '/admin/audit-logs', icon: History },

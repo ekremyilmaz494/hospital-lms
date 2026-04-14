@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import { logActivity } from '@/lib/activity-logger'
 
 /** Start a new exam attempt or resume existing one */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -189,6 +190,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     entityId: attempt.id,
     newData: { trainingId: assignment.trainingId, attemptNumber: attempt.attemptNumber },
     request,
+  })
+
+  void logActivity({
+    userId: dbUser!.id,
+    organizationId: dbUser!.organizationId ?? '',
+    action: 'exam_start',
+    resourceType: 'exam_attempt',
+    resourceId: attempt.id,
+    resourceTitle: assignment.training.title,
+    metadata: { attemptNumber: attempt.attemptNumber, trainingId: assignment.trainingId },
   })
 
   const examOnly = assignment.training.examOnly === true

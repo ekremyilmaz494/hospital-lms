@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { safeDecryptTcNo } from '@/lib/crypto'
+import { logActivity } from '@/lib/activity-logger'
 
 export async function GET() {
   const { dbUser, error } = await getAuthUser()
@@ -165,6 +166,17 @@ export async function PATCH(request: Request) {
       entityType: 'user',
       entityId: dbUser!.id,
       request,
+    })
+  }
+
+  if (Object.keys(updateData).length > 0) {
+    void logActivity({
+      userId: dbUser!.id,
+      organizationId: dbUser!.organizationId ?? '',
+      action: 'profile_update',
+      resourceType: 'user',
+      resourceId: dbUser!.id,
+      metadata: { updatedFields: Object.keys(updateData) },
     })
   }
 

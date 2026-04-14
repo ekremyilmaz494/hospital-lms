@@ -5,6 +5,7 @@ import { createLoginClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
+import { logActivity } from '@/lib/activity-logger'
 
 /**
  * Trusted IP extraction for Vercel deployments.
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
     // ── Orphan user detection + active check ──
     const dbUser = await prisma.user.findUnique({
       where: { id: data.user.id },
-      select: { id: true, mustChangePassword: true, isActive: true, role: true }
+      select: { id: true, mustChangePassword: true, isActive: true, role: true, organizationId: true }
     })
 
     if (!dbUser) {
@@ -136,6 +137,13 @@ export async function POST(request: NextRequest) {
     ]).catch(() => {})
 
     logger.info('auth:login', 'Basarili giris', { userId: data.user?.id, role })
+
+    void logActivity({
+      userId: data.user.id,
+      organizationId: dbUser.organizationId ?? '',
+      action: 'login',
+      ipAddress: ip,
+    })
 
     return jsonResponse({
       user: {

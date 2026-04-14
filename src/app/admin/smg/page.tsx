@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Star, Users, CheckCircle, Clock, Download, Check, X, ChevronDown, Plus, Loader2 } from 'lucide-react';
+import { Star, Users, CheckCircle, Clock, Download, Check, X, ChevronDown, Plus, Loader2, FileText } from 'lucide-react';
 import { StatCard } from '@/components/shared/stat-card';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
@@ -11,6 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/shared/toast';
+import { CertificateViewerModal } from './components/certificate-viewer-modal';
+import { CategoriesTab } from './components/categories-tab';
+import { TargetsTab } from './components/targets-tab';
+import { InspectionReportTab } from './components/inspection-report-tab';
 
 interface SmgPeriod {
   id: string;
@@ -37,6 +41,7 @@ interface PendingActivity {
   activityType: string;
   smgPoints: number;
   completionDate: string;
+  certificateUrl: string | null;
   user: {
     id: string;
     firstName: string;
@@ -69,8 +74,9 @@ const activityTypeLabels: Record<string, string> = {
 
 export default function AdminSmgPage() {
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'staff' | 'pending'>('staff');
+  const [activeTab, setActiveTab] = useState<'staff' | 'pending' | 'categories' | 'targets' | 'inspection'>('staff');
   const [approving, setApproving] = useState<string | null>(null);
+  const [certificateActivityId, setCertificateActivityId] = useState<string | null>(null);
 
   // Period modal state
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
@@ -293,18 +299,24 @@ export default function AdminSmgPage() {
       <BlurFade delay={0.15}>
         <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
           {/* Tabs */}
-          <div className="flex border-b" style={{ borderColor: 'var(--color-border)' }}>
-            {(['staff', 'pending'] as const).map(tab => (
+          <div className="flex border-b overflow-x-auto" style={{ borderColor: 'var(--color-border)' }}>
+            {([
+              { key: 'staff', label: 'Personel İlerlemesi' },
+              { key: 'pending', label: `Bekleyen Onaylar${activities.length > 0 ? ` (${activities.length})` : ''}` },
+              { key: 'categories', label: 'Kategoriler' },
+              { key: 'targets', label: 'Hedefler' },
+              { key: 'inspection', label: 'SKS Denetim Raporu' },
+            ] as const).map(tab => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className="px-5 py-3.5 text-sm font-semibold transition-colors"
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className="px-5 py-3.5 text-sm font-semibold transition-colors whitespace-nowrap"
                 style={{
-                  color: activeTab === tab ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                  borderBottom: activeTab === tab ? '2px solid var(--color-primary)' : '2px solid transparent',
+                  color: activeTab === tab.key ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  borderBottom: activeTab === tab.key ? '2px solid var(--color-primary)' : '2px solid transparent',
                 }}
               >
-                {tab === 'staff' ? 'Personel İlerlemesi' : `Bekleyen Onaylar${activities.length > 0 ? ` (${activities.length})` : ''}`}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -367,6 +379,10 @@ export default function AdminSmgPage() {
             </div>
           )}
 
+          {activeTab === 'categories' && <CategoriesTab />}
+          {activeTab === 'targets' && <TargetsTab periods={periods} />}
+          {activeTab === 'inspection' && <InspectionReportTab periods={periods} />}
+
           {/* Bekleyen Onaylar */}
           {activeTab === 'pending' && (
             <div className="overflow-x-auto">
@@ -404,7 +420,7 @@ export default function AdminSmgPage() {
                           style={{ accentColor: 'var(--color-primary)' }}
                         />
                       </th>
-                      {['Aktivite', 'Personel', 'Departman', 'Tip', 'Puan', 'Tarih', 'İşlem'].map(h => (
+                      {['Aktivite', 'Personel', 'Departman', 'Tip', 'Puan', 'Tarih', 'Sertifika', 'İşlem'].map(h => (
                         <th key={h} className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
                       ))}
                     </tr>
@@ -432,6 +448,19 @@ export default function AdminSmgPage() {
                         <td className="px-4 py-3 font-semibold" style={{ color: 'var(--color-primary)' }}>{a.smgPoints}</td>
                         <td className="px-4 py-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
                           {new Date(a.completionDate).toLocaleDateString('tr-TR')}
+                        </td>
+                        <td className="px-4 py-3">
+                          {a.certificateUrl ? (
+                            <button
+                              onClick={() => setCertificateActivityId(a.id)}
+                              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors"
+                              style={{ background: 'var(--color-primary-bg)', color: 'var(--color-primary)' }}
+                            >
+                              <FileText className="h-3.5 w-3.5" /> Görüntüle
+                            </button>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
@@ -523,6 +552,13 @@ export default function AdminSmgPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Sertifika Görüntüleyici */}
+      <CertificateViewerModal
+        activityId={certificateActivityId}
+        open={certificateActivityId !== null}
+        onOpenChange={(open) => { if (!open) setCertificateActivityId(null); }}
+      />
 
       {/* Reddet Nedeni Modal */}
       <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>

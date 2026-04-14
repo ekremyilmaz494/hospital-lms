@@ -15,9 +15,40 @@ export async function POST(request: Request) {
   const parsed = createSmgActivitySchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
+  // categoryId varsa kategoriyi doğrula, activityType fallback'i kategori code'undan türet
+  let activityType: string = parsed.data.activityType ?? 'EXTERNAL_TRAINING'
+  let categoryId: string | null = null
+  if (parsed.data.categoryId) {
+    const category = await prisma.smgCategory.findFirst({
+      where: {
+        id: parsed.data.categoryId,
+        organizationId: dbUser!.organizationId!,
+        isActive: true,
+      },
+      select: { id: true, code: true, maxPointsPerActivity: true },
+    })
+    if (!category) return errorResponse('Kategori bulunamadı veya aktif değil', 404)
+
+    if (category.maxPointsPerActivity && parsed.data.smgPoints > category.maxPointsPerActivity) {
+      return errorResponse(
+        `Bu kategori için maksimum ${category.maxPointsPerActivity} puan girilebilir`,
+        400
+      )
+    }
+
+    categoryId = category.id
+    // Geriye uyum: activityType'ı category.code ile doldur (eski enum değeri yerine)
+    activityType = category.code
+  }
+
   const activity = await prisma.smgActivity.create({
     data: {
-      ...parsed.data,
+      title: parsed.data.title,
+      provider: parsed.data.provider,
+      smgPoints: parsed.data.smgPoints,
+      certificateUrl: parsed.data.certificateUrl,
+      activityType,
+      categoryId,
       completionDate: new Date(parsed.data.completionDate),
       userId: dbUser!.id,
       organizationId: dbUser!.organizationId!,

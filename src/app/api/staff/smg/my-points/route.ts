@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { resolveRequiredPoints } from '@/lib/smg-helpers'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -74,7 +75,16 @@ export async function GET(request: Request) {
 
   const approvedPoints = approvedActivities.reduce((sum, a) => sum + a.smgPoints, 0)
   const pendingPoints = pendingActivities.reduce((sum, a) => sum + a.smgPoints, 0)
-  const requiredPoints = period?.requiredPoints ?? 0
+  const requiredPoints = period
+    ? await resolveRequiredPoints({
+        prisma,
+        periodId: period.id,
+        organizationId: orgId,
+        userId,
+        userTitle: dbUser!.title ?? null,
+        periodFallback: period.requiredPoints,
+      })
+    : 0
   const remainingPoints = Math.max(0, requiredPoints - approvedPoints)
   const daysLeft = period
     ? Math.max(0, Math.ceil((period.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))

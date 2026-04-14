@@ -89,6 +89,8 @@ model Organization {
   kvkkRequests           KvkkRequest[]
   smgActivities          SmgActivity[]
   smgPeriods             SmgPeriod[]
+  smgCategories          SmgCategory[]
+  smgTargetsList         SmgTarget[]                 @relation("SmgTargetOrg")
   contentLibraryInstalls OrganizationContentLibrary[]
   hisIntegrations        HisIntegration[]
   competencyForms        CompetencyForm[]
@@ -251,6 +253,7 @@ model User {
   scormAttempts           ScormAttempt[]
   smgActivities           SmgActivity[]                @relation("UserSmgActivities")
   smgApprovals            SmgActivity[]                @relation("SmgApprovals")
+  smgTargetOverrides      SmgTarget[]                  @relation("SmgTargetOverrides")
   createdContentLibraries ContentLibrary[]             @relation("ContentLibraryCreator")
   contentLibraryInstalls  OrganizationContentLibrary[] @relation("ContentLibraryInstaller")
   subjectEvaluations      CompetencyEvaluation[]       @relation("EvaluationSubject")
@@ -682,6 +685,7 @@ model SmgActivity {
   completionDate DateTime  @map("completion_date") @db.Date
   smgPoints      Int       @map("smg_points")
   certificateUrl String?   @map("certificate_url") @db.VarChar(1000)
+  categoryId     String?   @map("category_id") @db.Uuid
   approvalStatus String    @default("PENDING") @map("approval_status") @db.VarChar(20)
   // PENDING | APPROVED | REJECTED
   approvedBy      String?   @map("approved_by") @db.Uuid
@@ -692,10 +696,12 @@ model SmgActivity {
   user         User         @relation("UserSmgActivities", fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   approver     User?        @relation("SmgApprovals", fields: [approvedBy], references: [id], onDelete: SetNull)
+  category     SmgCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@unique([userId, activityType, title, completionDate], map: "idx_smg_activities_unique")
   @@index([userId], map: "idx_smg_activities_user")
   @@index([organizationId], map: "idx_smg_activities_org")
+  @@index([categoryId], map: "idx_smg_activities_category")
   @@map("smg_activities")
 }
 
@@ -711,9 +717,51 @@ model SmgPeriod {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  targets      SmgTarget[]
 
   @@index([organizationId], map: "idx_smg_periods_org")
   @@map("smg_periods")
+}
+
+// ── SMG KATEGORİLERİ (SKS Uyumlu) ──
+model SmgCategory {
+  id                   String   @id @default(uuid()) @db.Uuid
+  organizationId       String   @map("organization_id") @db.Uuid
+  name                 String   @db.VarChar(255)
+  code                 String   @db.VarChar(50)
+  description          String?  @db.Text
+  maxPointsPerActivity Int?     @map("max_points_per_activity")
+  isActive             Boolean  @default(true) @map("is_active")
+  sortOrder            Int      @default(0) @map("sort_order")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  activities   SmgActivity[]
+
+  @@unique([organizationId, code], map: "idx_smg_categories_org_code")
+  @@index([organizationId], map: "idx_smg_categories_org")
+  @@map("smg_categories")
+}
+
+// ── SMG HEDEFLERİ (Unvana/Kişiye Göre) ──
+model SmgTarget {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  periodId       String   @map("period_id") @db.Uuid
+  unvan          String?  @db.VarChar(100)
+  userId         String?  @map("user_id") @db.Uuid
+  requiredPoints Int      @map("required_points")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization @relation("SmgTargetOrg", fields: [organizationId], references: [id], onDelete: Cascade)
+  period       SmgPeriod    @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  user         User?        @relation("SmgTargetOverrides", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([periodId, unvan, userId], map: "idx_smg_targets_unique")
+  @@index([periodId], map: "idx_smg_targets_period")
+  @@index([organizationId], map: "idx_smg_targets_org")
+  @@map("smg_targets")
 }
 
 // ── İÇERİK KÜTÜPHANESİ ──

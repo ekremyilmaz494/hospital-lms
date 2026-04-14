@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger'
 import { jsPDF } from 'jspdf'
 import { NextRequest } from 'next/server'
 import QRCode from 'qrcode'
+import { logActivity } from '@/lib/activity-logger'
 
 /** Format date in Turkish locale */
 function formatDateTR(date: Date): string {
@@ -497,12 +498,23 @@ export async function GET(
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
     const fileName = `sertifika-${certificate.certificateCode}.pdf`
 
+    void logActivity({
+      userId: dbUser!.id,
+      organizationId: certificate.user.organizationId ?? '',
+      action: 'certificate_download',
+      resourceType: 'certificate',
+      resourceId: certificate.id,
+      resourceTitle: certificate.training.title,
+      metadata: { certificateCode: certificate.certificateCode },
+    })
+
     return new Response(pdfBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${fileName}"`,
         'Content-Length': String(pdfBuffer.length),
+        'Cache-Control': 'private, max-age=3600, stale-while-revalidate=86400',
       },
     })
   } catch (err) {

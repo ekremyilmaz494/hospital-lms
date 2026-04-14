@@ -6,6 +6,7 @@ import { checkRateLimit, clearExamTimer } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { logger } from '@/lib/logger'
 import { sendEmail, certificateIssuedEmail } from '@/lib/email'
+import { logActivity } from '@/lib/activity-logger'
 
 
 /** Submit pre-exam or post-exam answers */
@@ -280,6 +281,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     entityType: 'exam_attempt',
     entityId: attempt.id,
     newData: { score, isPassed, trainingId: attempt.trainingId },
+  })
+
+  void logActivity({
+    userId: dbUser!.id,
+    organizationId: attempt.training.organizationId,
+    action: isPassed ? 'exam_pass' : 'exam_fail',
+    resourceType: 'exam_attempt',
+    resourceId: attempt.id,
+    resourceTitle: attempt.training.title,
+    metadata: { score, passingScore: attempt.training.passingScore, attemptNumber: attempt.attemptNumber },
   })
 
   try { await invalidateDashboardCache(attempt.training.organizationId) } catch {}

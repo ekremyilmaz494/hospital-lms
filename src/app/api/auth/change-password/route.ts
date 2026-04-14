@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod/v4'
 import { passwordChangedEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
+import { logActivity } from '@/lib/activity-logger'
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Mevcut şifre zorunludur'),
@@ -57,6 +58,12 @@ export async function POST(request: Request) {
   // Şifre değişikliği bildirimi (fire-and-forget)
   passwordChangedEmail(dbUser!.email)
     .catch(err => logger.warn('PwdEmail', 'Sifre degistirme emaili gonderilemedi', (err as Error).message))
+
+  void logActivity({
+    userId: dbUser!.id,
+    organizationId: dbUser!.organizationId ?? '',
+    action: 'password_change',
+  })
 
   return jsonResponse({ message: 'Şifreniz başarıyla güncellendi' })
 }

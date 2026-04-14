@@ -40,6 +40,14 @@ interface MyPointsData {
   rejectedActivities: SmgActivity[];
 }
 
+interface SmgCategoryOption {
+  id: string;
+  name: string;
+  code: string;
+  maxPointsPerActivity: number | null;
+}
+interface CategoriesResponse { categories: SmgCategoryOption[]; }
+
 const activityTypeLabels: Record<string, string> = {
   EXTERNAL_TRAINING: 'Harici Eğitim',
   CONFERENCE: 'Konferans',
@@ -59,6 +67,7 @@ export default function StaffSmgPage() {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     activityType: 'EXTERNAL_TRAINING',
+    categoryId: '',
     title: '',
     provider: '',
     completionDate: '',
@@ -69,6 +78,9 @@ export default function StaffSmgPage() {
 
   const pointsUrl = `/api/staff/smg/my-points${selectedPeriodId ? `?periodId=${selectedPeriodId}` : ''}`;
   const { data, isLoading, refetch } = useFetch<MyPointsData>(pointsUrl);
+  const { data: categoriesData } = useFetch<CategoriesResponse>('/api/admin/smg/categories');
+  const categories = categoriesData?.categories ?? [];
+  const selectedCategory = categories.find(c => c.id === form.categoryId);
 
   const handleSubmit = async () => {
     if (!form.title || !form.completionDate || !form.smgPoints) {
@@ -77,15 +89,22 @@ export default function StaffSmgPage() {
     }
     setSubmitting(true);
     try {
+      const payload: Record<string, unknown> = {
+        title: form.title,
+        completionDate: form.completionDate,
+        smgPoints: Number(form.smgPoints),
+        certificateUrl: form.certificateUrl || undefined,
+        provider: form.provider || undefined,
+      };
+      if (form.categoryId) {
+        payload.categoryId = form.categoryId;
+      } else {
+        payload.activityType = form.activityType;
+      }
       const res = await fetch('/api/staff/smg/activities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          smgPoints: Number(form.smgPoints),
-          certificateUrl: form.certificateUrl || undefined,
-          provider: form.provider || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -94,7 +113,7 @@ export default function StaffSmgPage() {
       }
       toast('Aktivite başarıyla eklendi. Onay bekleniyor.', 'success');
       setModalOpen(false);
-      setForm({ activityType: 'EXTERNAL_TRAINING', title: '', provider: '', completionDate: '', smgPoints: '', certificateUrl: '' });
+      setForm({ activityType: 'EXTERNAL_TRAINING', categoryId: '', title: '', provider: '', completionDate: '', smgPoints: '', certificateUrl: '' });
       refetch?.();
     } finally {
       setSubmitting(false);
@@ -254,17 +273,32 @@ export default function StaffSmgPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Aktivite Tipi</label>
-              <select
-                value={form.activityType}
-                onChange={e => setForm(f => ({ ...f, activityType: e.target.value }))}
-                className="w-full text-sm rounded-xl px-3 py-2 border outline-none"
-                style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}
-              >
-                <option value="EXTERNAL_TRAINING">Harici Eğitim</option>
-                <option value="CONFERENCE">Konferans</option>
-                <option value="PUBLICATION">Yayın</option>
-              </select>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Aktivite Kategorisi</label>
+              {categories.length > 0 ? (
+                <select
+                  value={form.categoryId}
+                  onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}
+                  className="w-full text-sm rounded-xl px-3 py-2 border outline-none"
+                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}
+                >
+                  <option value="">Seçiniz...</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={form.activityType}
+                  onChange={e => setForm(f => ({ ...f, activityType: e.target.value }))}
+                  className="w-full text-sm rounded-xl px-3 py-2 border outline-none"
+                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}
+                >
+                  <option value="EXTERNAL_TRAINING">Harici Eğitim</option>
+                  <option value="CONFERENCE">Konferans</option>
+                  <option value="PUBLICATION">Yayın</option>
+                  <option value="COURSE_COMPLETION">Kurs Tamamlama</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Başlık *</label>
@@ -299,12 +333,17 @@ export default function StaffSmgPage() {
                 <Input
                   type="number"
                   min={1}
-                  max={999}
+                  max={selectedCategory?.maxPointsPerActivity ?? 999}
                   value={form.smgPoints}
                   onChange={e => setForm(f => ({ ...f, smgPoints: e.target.value }))}
                   placeholder="1–999"
                   className="rounded-xl"
                 />
+                {selectedCategory?.maxPointsPerActivity && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Bu kategori için maksimum {selectedCategory.maxPointsPerActivity} puan girilebilir.
+                  </p>
+                )}
               </div>
             </div>
             <div>

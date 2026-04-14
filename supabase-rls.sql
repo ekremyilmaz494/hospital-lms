@@ -412,3 +412,21 @@ CREATE POLICY "staff_tfb_answers_insert_own" ON training_feedback_answers
       WHERE a.user_id = auth.uid()
     )
   );
+
+-- ── SMG CATEGORIES RLS (SKS Uyumu) ──
+ALTER TABLE smg_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE smg_targets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_smg_categories_all" ON smg_categories FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+CREATE POLICY "staff_smg_categories_select" ON smg_categories FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid) AND is_active = true);
+
+CREATE POLICY "admin_smg_targets_all" ON smg_targets FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+CREATE POLICY "staff_smg_targets_select" ON smg_targets FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+
+-- ── ACTIVITY LOGS RLS (Personel Hareket Takibi) ──
+ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "super_admin_activity_logs_all" ON activity_logs FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_activity_logs_select" ON activity_logs FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+CREATE POLICY "staff_activity_logs_select" ON activity_logs FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "authenticated_activity_logs_insert" ON activity_logs FOR INSERT WITH CHECK (user_id = auth.uid() AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));

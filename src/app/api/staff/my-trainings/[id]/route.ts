@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { logActivity } from '@/lib/activity-logger'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -84,6 +85,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   if (!assignment) return errorResponse('Eğitim ataması bulunamadı', 404)
+
+  void logActivity({
+    userId: dbUser!.id,
+    organizationId: dbUser!.organizationId ?? '',
+    action: 'course_view',
+    resourceType: 'course',
+    resourceId: assignment.training.id,
+    resourceTitle: assignment.training.title,
+  })
 
   const t = assignment.training
   const latestAttempt = assignment.examAttempts[0] // highest attemptNumber (desc sort)
