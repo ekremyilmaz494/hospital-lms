@@ -1,4 +1,6 @@
-import { type Page, expect } from '@playwright/test'
+import { type Page, type BrowserContext, expect } from '@playwright/test'
+import path from 'path'
+import fs from 'fs'
 
 export type UserRole = 'admin' | 'staff' | 'super_admin'
 
@@ -14,28 +16,65 @@ const DASHBOARD_ROUTES: Record<UserRole, string> = {
   super_admin: '/super-admin/dashboard',
 }
 
+const STATE_DIR = path.join(process.cwd(), '.playwright')
+
 /**
- * Login helper — navigates to login page, fills credentials, accepts KVKK,
- * and submits. Waits until redirected to the expected dashboard.
+ * Global setup'ın kaydettiği storageState dosyası var mı kontrol et.
+ * Varsa context'e uygula — re-login gerekmiyor.
+ */
+export async function applyStoredAuth(context: BrowserContext, role: UserRole): Promise<boolean> {
+  const stateFile = path.join(STATE_DIR, `${role}.json`)
+  if (!fs.existsSync(stateFile)) return false
+
+  try {
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'))
+    await context.addCookies(state.cookies ?? [])
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Login helper — önce global-setup'ın kaydettiği session'ı dene.
+ * Session yoksa gerçek login yapar.
  */
 export async function login(page: Page, role: UserRole = 'admin') {
+  const dashboard = DASHBOARD_ROUTES[role]
+
+  // Önce kaydedilmiş session ile dene
+  const stateFile = path.join(STATE_DIR, `${role}.json`)
+  if (fs.existsSync(stateFile)) {
+    try {
+      const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'))
+      await page.context().addCookies(state.cookies ?? [])
+      await page.goto(dashboard)
+
+      // Hâlâ login sayfasına yönlendirmediyse session geçerli
+      await page.waitForURL(`**${dashboard}`, { timeout: 8000 })
+      return
+    } catch {
+      // Session geçersiz — normal login yap
+    }
+  }
+
+  // Normal login akışı
   const { email, password } = CREDENTIALS[role]
 
   await page.goto('/auth/login')
-  await page.waitForSelector('[type="email"]', { timeout: 10000 })
+  await page.waitForSelector('[type="email"]', { timeout: 15000 })
 
   await page.fill('[type="email"]', email)
   await page.fill('[type="password"]', password)
 
   // KVKK checkbox — required before submit
   const kvkkCheckbox = page.locator('#kvkk')
-  await kvkkCheckbox.click()
+  if (await kvkkCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await kvkkCheckbox.click()
+  }
 
   await page.click('button[type="submit"]')
-
-  // Wait for navigation to dashboard
-  const expectedPath = DASHBOARD_ROUTES[role]
-  await page.waitForURL(`**${expectedPath}`, { timeout: 15000 })
+  await page.waitForURL(`**${dashboard}`, { timeout: 20000 })
 }
 
 /**

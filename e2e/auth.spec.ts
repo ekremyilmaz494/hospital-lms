@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, logout, CREDENTIALS } from './helpers/auth'
+import { login, logout } from './helpers/auth'
 
 test.describe('Kimlik Dogrulama Akislari', () => {
   test('basarili giris → dashboard yonlendirmesi', async ({ page }) => {

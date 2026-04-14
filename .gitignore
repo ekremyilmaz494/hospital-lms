@@ -54,6 +54,7 @@ next-env.d.ts
 /take-screenshots.mjs
 /playwright-report
 /test-results
+/.playwright
 
 # AI Content Service
 ai-content-service/browser_profiles/
