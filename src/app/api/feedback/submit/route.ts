@@ -57,6 +57,17 @@ export async function POST(request: Request) {
   if (attempt.status !== 'completed') return errorResponse('Önce sınavı tamamlamalısınız', 400)
   if (attempt.feedbackResponse) return errorResponse('Bu sınav için zaten geri bildirim gönderdiniz', 409)
 
+  // Kullanıcı+training bazlı idempotency: aynı eğitim için ikinci feedback engellenir.
+  // attempt.userId üzerinden bağlıyoruz — anonim (userId=null) kayıtlar da yakalanır.
+  const priorResponse = await prisma.trainingFeedbackResponse.findFirst({
+    where: {
+      trainingId: attempt.trainingId,
+      attempt: { userId: dbUser.id },
+    },
+    select: { id: true },
+  })
+  if (priorResponse) return errorResponse('Bu eğitim için zaten geri bildirim gönderdiniz', 409)
+
   // Aktif form + tüm item'ları çek — answer validation için
   const form = await prisma.trainingFeedbackForm.findFirst({
     where: { organizationId: dbUser.organizationId, isActive: true },

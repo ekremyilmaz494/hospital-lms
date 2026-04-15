@@ -72,6 +72,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       trainingId: id,
       userId,
       maxAttempts: parsed.data.maxAttempts,
+      originalMaxAttempts: parsed.data.maxAttempts,
       assignedById: dbUser!.id,
     })),
   })

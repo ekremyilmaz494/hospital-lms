@@ -58,11 +58,11 @@ export async function POST(request: Request) {
     const existingSet = new Set(existing.map(e => `${e.trainingId}:${e.userId}`))
 
     // Yeni atama kombinasyonlarını oluştur
-    const newAssignments: { trainingId: string; userId: string; maxAttempts: number; assignedById: string }[] = []
+    const newAssignments: { trainingId: string; userId: string; maxAttempts: number; originalMaxAttempts: number; assignedById: string }[] = []
     for (const trainingId of trainingIds) {
       for (const userId of userIds) {
         if (!existingSet.has(`${trainingId}:${userId}`)) {
-          newAssignments.push({ trainingId, userId, maxAttempts, assignedById: dbUser!.id })
+          newAssignments.push({ trainingId, userId, maxAttempts, originalMaxAttempts: maxAttempts, assignedById: dbUser!.id })
         }
       }
     }
