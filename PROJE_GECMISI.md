@@ -4565,3 +4565,185 @@ Tablolar ve seed, Supabase MCP `execute_sql` ile uygulandı (migration önceden 
 - **Dönem varsayılan target**: 🔄 Dönem oluşturulunca Hedefler tab'ından eklenebilir
 
 *Son güncelleme: 14 Nisan 2026 — Oturum 43*
+
+---
+
+## Oturum 44 — 15 Nisan 2026 — GitHub Pull + Migration Fix + E2E CI Düzeltmeleri
+
+### Özet
+Bu oturumda GitHub'dan son commit'ler çekildi, migration çakışması çözüldü ve E2E testlerinin CI'da sürekli başarısız olmasına neden olan birden fazla hata düzeltildi.
+
+---
+
+### Adım 1 — GitHub'dan Güncelleme Çekme
+
+```bash
+git stash push -m "tmp tsconfig paths" tsconfig.json
+git pull origin main
+git stash pop
+```
+
+**14 yeni commit geldi. Başlıca değişiklikler:**
+
+| Alan | İçerik |
+|---|---|
+| SMG modülü | Kategoriler, hedefler, denetim raporu (UI + API + DB migration) |
+| E2E altyapısı | `global-setup.ts`, CI workflow güncellemeleri, Playwright config |
+| Activity logger | `src/lib/activity-logger.ts` yeni dosya |
+| Marketing route | `(marketing)` → `marketing` klasörü rename (CI fix) |
+| Unit testler | `api-auth`, `api-exam`, `multi-tenant` genişledi |
+| CI | pnpm v10, build guard, lint config düzeltmeleri |
+
+---
+
+### Adım 2 — Migration Çakışması Çözümü
+
+**Sorun:** `smg_categories` tablosu zaten Supabase'de vardı ama Prisma migration geçmişinde kayıtlı değildi.
+
+```bash
+pnpm prisma migrate deploy
+# → Error P3018: relation "smg_categories" already exists
+
+pnpm prisma migrate resolve --applied 20260414100000_add_smg_categories_targets
+# → Migration marked as applied
+
+pnpm prisma migrate deploy
+# → No pending migrations to apply. (14/14 tamam)
+```
+
+**Açıklama:** `migrate resolve --applied` komutu Prisma'ya "bu migration zaten çalıştırıldı, sadece geçmiş kaydına ekle" der. Tablo elle veya farklı yolla oluşturulmuşsa kullanılır.
+
+---
+
+### Adım 3 — E2E CI Hatalarının Analizi
+
+**Semptom:** GitHub Actions'ta son 5+ run'ın tamamı E2E job'ında fail.
+
+**Kök neden araştırması:** `gh run view 24407899952 --log-failed` ile incelendi.
+
+**Tespit edilen hatalar:**
+
+#### Hata 1 — Global-setup login timeout
+```
+[global-setup] admin: login başarısız — page.waitForURL: Timeout 20000ms exceeded.
+waiting for navigation to "**/admin/dashboard" until "load"
+```
+Tüm roller (admin, staff, super_admin) için login başarısız → state dosyaları kaydedilemiyor → tüm login bağımlı testler cascade fail.
+
+**Olası sebepler:**
+- E2E kullanıcıları Supabase Auth'da var ama Prisma `users` tablosunda yok → login API 403 döndürüyor (orphan user), form login sayfasında kalıyor, `waitForURL` 20s sonra timeout
+- CI `Start server` adımında kritik secret'lar eksik
+- Supabase auth API gecikmesi 10s'yi aşıyor → fetch asılı kalıyor
+
+#### Hata 2 — `navigation.spec.ts › root page redirects` (5.4s fail)
+**Sebep:** `src/app/page.tsx` bir landing page bileşeni, redirect değil. Test `/` URL'inin değişmesini bekliyordu ama asla değişmedi.
+
+#### Hata 3 — `auth.spec.ts › bos form gonderimi` (5.6s fail)
+**Sebep:** Form `<input type="email" required>` + `<input type="password" required>` içeriyor. `noValidate` yok. Email/password boşken submit'e tıklanınca HTML5 validasyonu `onSubmit` handler'ının önüne geçiyor → `handleLogin` hiç çağrılmıyor → `setKvkkError(true)` tetiklenmiyor → KVKK hata metni asla görünmüyor.
+
+#### Hata 4 — `auth.spec.ts › yanlis sifre` (15.6s fail, 10s timeout'a uyuyor)
+**Sebep:** Login API'de Supabase auth call'ı (`signInWithPassword`) CI ortamında yavaşlayabilir veya ulaşılamaz olabilir. Fetch asılı kalıyor, client 10s test timeout'unu aşıyor, hata mesajı hiç gösterilemiyor.
+
+---
+
+### Adım 4 — Düzeltmeler
+
+#### Düzeltme 1: `e2e/navigation.spec.ts`
+
+```typescript
+// ÖNCE (yanlış):
+test('root page redirects', async ({ page }) => {
+  await page.goto('/')
+  await expect(page).not.toHaveURL('http://localhost:3000/')
+})
+
+// SONRA (doğru):
+test('root page redirects', async ({ page }) => {
+  // Korumalı bir sayfaya git — auth olmadan login'e yönlendirmeli
+  await page.goto('/admin/dashboard')
+  await expect(page).toHaveURL(/\/auth\/login/, { timeout: 10000 })
+})
+```
+
+#### Düzeltme 2: `e2e/auth.spec.ts` — "bos form" testi
+
+```typescript
+// ÖNCE (HTML5 required engel oluyor):
+await page.click('button[type="submit"]')
+
+// SONRA (email/password doldur → HTML5 pass → onSubmit çağrılır → KVKK check):
+await page.fill('[type="email"]', 'test@example.com')
+await page.fill('[type="password"]', 'testpassword123')
+await page.click('button[type="submit"]')
+```
+
+#### Düzeltme 3: `src/app/api/auth/login/route.ts` — Supabase timeout
+
+```typescript
+// Promise.race ile 12s hard timeout
+const authTimeout = new Promise<never>((_, reject) =>
+  setTimeout(() => reject(new Error('auth_timeout')), 12000)
+)
+const { data, error: authError } = await Promise.race([
+  supabase.auth.signInWithPassword({ email: normalizedEmail, password }),
+  authTimeout,
+])
+```
+
+**Neden önemli:** Supabase'in kendi fetch timeout'u yoksa request sonsuza askıda kalabilir. 12s sonra `catch` bloğu 500 döndürür, client "Bir hata oluştu" gösterir, test `hata oluştu` regex'iyle yakalayabilir.
+
+#### Düzeltme 4: `.github/workflows/ci.yml`
+
+**Start server adımına eksik secret'lar eklendi:**
+```yaml
+SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+REDIS_URL: ${{ secrets.REDIS_URL }}
+REDIS_TOKEN: ${{ secrets.REDIS_TOKEN }}
+```
+
+**Run E2E'den önce kullanıcı setup adımı eklendi:**
+```yaml
+- name: Setup E2E test users
+  run: pnpm tsx scripts/setup-e2e-users.ts
+  env:
+    DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+```
+
+`setup-e2e-users.ts` idempotent çalışır: kullanıcı varsa skip, yoksa Supabase Auth + Prisma DB'de oluşturur. Orphan user sorununu önler.
+
+---
+
+### Prisma Client Regenerate
+
+Migration + SMG modeli için:
+```bash
+pnpm prisma generate
+```
+
+`smgTarget`, `smgCategory` modelleri artık TypeScript'te type-safe erişilebilir.
+
+---
+
+### Doğrulama
+
+| Kontrol | Sonuç |
+|---|---|
+| `pnpm tsc --noEmit` (src/) | ✅ Temiz (tmp/ cache hataları hariç) |
+| Pre-commit hook | ✅ Geçti (secret scanner + perf check) |
+| `git push origin main` | ✅ Push başarılı |
+| GitHub Actions CI | 🔄 Çalışıyor (run #24418336123) |
+
+### Değiştirilen Dosyalar
+- `e2e/navigation.spec.ts` — root page redirect testi düzeltildi
+- `e2e/auth.spec.ts` — bos form KVKK testi düzeltildi
+- `src/app/api/auth/login/route.ts` — 12s Supabase auth timeout
+- `.github/workflows/ci.yml` — eksik secret'lar + setup-e2e-users adımı
+- `src/generated/prisma/` — client regenerate (smgTarget modeli)
+
+### Önemli Not
+`SUPABASE_SERVICE_ROLE_KEY` GitHub Secrets'ta tanımlı olmalı. Tanımlı değilse setup adımı çalışmaz. GitHub → Settings → Secrets → Actions'tan kontrol edilmeli.
+
+*Son güncelleme: 15 Nisan 2026 — Oturum 44*
