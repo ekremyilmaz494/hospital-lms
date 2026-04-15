@@ -64,6 +64,8 @@ function FeedbackContent() {
   const [submitting, setSubmitting] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [includeName, setIncludeName] = useState(false);
+  const [trainingTitle, setTrainingTitle] = useState<string | null>(null);
+  const [isMandatory, setIsMandatory] = useState(false);
   // answers: itemId → { score?, textAnswer? }
   const [answers, setAnswers] = useState<Record<string, { score?: number; textAnswer?: string }>>({});
 
@@ -89,6 +91,8 @@ function FeedbackContent() {
         if (status.hasSubmittedFeedback) {
           setAlreadySubmitted(true);
         }
+        if (status.trainingTitle) setTrainingTitle(status.trainingTitle as string);
+        if (status.feedbackMandatory) setIsMandatory(true);
 
         if (!formData.form) {
           toast('Aktif geri bildirim formu bulunamadı', 'error');
@@ -190,8 +194,34 @@ function FeedbackContent() {
   return (
     <div className="min-h-screen py-8 px-4" style={{ background: 'var(--color-bg)' }}>
       <div className="max-w-3xl mx-auto">
+        {/* Zorunlu uyarısı */}
+        {isMandatory && (
+          <div
+            className="mb-4 rounded-2xl p-4 flex items-start gap-3"
+            style={{
+              background: 'var(--color-error-bg)',
+              border: '1px solid color-mix(in srgb, var(--color-error) 30%, transparent)',
+            }}
+          >
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--color-error)' }} />
+            <div>
+              <p className="text-[13px] font-bold" style={{ color: 'var(--color-error)' }}>
+                Bu geri bildirim zorunludur
+              </p>
+              <p className="text-[12px] mt-1" style={{ color: 'var(--color-text)' }}>
+                Formu doldurmadan başka bir eğitime başlayamazsınız.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Başlık */}
         <div className="mb-6 rounded-2xl p-6" style={{ background: 'var(--color-surface)' }}>
+          {trainingTitle && (
+            <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--color-primary)' }}>
+              {trainingTitle}
+            </p>
+          )}
           <div className="flex items-start justify-between gap-4 mb-2">
             <h1 className="text-xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
               {form.title}
@@ -311,21 +341,23 @@ function FeedbackContent() {
           </div>
         )}
 
-        {/* Gönder + atla */}
+        {/* Gönder + (opsiyonel) atla */}
         <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => router.push('/staff/my-trainings')}
-            className="flex-1 rounded-xl h-12 text-[13px] font-medium"
-            style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}
-          >
-            Daha Sonra
-          </button>
+          {!isMandatory && (
+            <button
+              type="button"
+              onClick={() => router.push('/staff/my-trainings')}
+              className="flex-1 rounded-xl h-12 text-[13px] font-medium"
+              style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}
+            >
+              Daha Sonra
+            </button>
+          )}
           <button
             type="button"
             onClick={handleSubmit}
             disabled={submitting || missingRequired.length > 0}
-            className="flex-[2] rounded-xl h-12 text-[14px] font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+            className={`${isMandatory ? 'flex-1' : 'flex-[2]'} rounded-xl h-12 text-[14px] font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50`}
             style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

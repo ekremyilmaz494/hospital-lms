@@ -9,6 +9,7 @@ import { BorderBeam } from '@/components/ui/border-beam';
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
 import { PageLoading } from '@/components/shared/page-loading';
+import { MandatoryFeedbackBanner } from '@/components/shared/mandatory-feedback-banner';
 
 interface Training {
   id: string;
@@ -171,6 +172,7 @@ export default function StaffDashboard() {
 
   return (
     <div className="space-y-6">
+      <MandatoryFeedbackBanner />
       {/* Greeting Banner */}
       <BlurFade delay={0}>
         <div

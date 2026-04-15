@@ -3,8 +3,71 @@
  *
  * Analytics aggregation ve validation utility'leri. API route'lardan çağrılır.
  */
+import { prisma } from '@/lib/prisma'
 
 export type FeedbackQuestionType = 'likert_5' | 'yes_partial_no' | 'text'
+
+/**
+ * Kullanıcının bekleyen ZORUNLU geri bildirim'i varsa döner.
+ * "Zorunlu" = training.feedbackMandatory === true
+ * "Bekleyen" = trigger koşulunu sağlayan bir attempt'i var AMA kullanıcı henüz
+ *              bu training için feedback göndermemiş (anonim dahil).
+ *
+ * Kullanım:
+ *  - /api/exam/[id]/start → guard (başka eğitim başlatmayı engelle)
+ *  - /api/staff/pending-mandatory-feedback → banner için
+ *
+ * Tek sorgu + in-memory filter. Tipik personel en fazla 1-2 atama ile çalışır,
+ * liste küçük. Perf açısından endişelenilecek bir yerinde değil.
+ */
+export async function getPendingMandatoryFeedback(userId: string): Promise<{
+  trainingId: string
+  trainingTitle: string
+  attemptId: string
+} | null> {
+  // Zorunlu eğitimi olan ve trigger koşulunu sağlayan attempt'leri çek
+  const attempts = await prisma.examAttempt.findMany({
+    where: {
+      userId,
+      status: 'completed',
+      training: { feedbackMandatory: true },
+    },
+    select: {
+      id: true,
+      isPassed: true,
+      attemptNumber: true,
+      trainingId: true,
+      training: { select: { title: true } },
+      assignment: { select: { originalMaxAttempts: true } },
+    },
+    orderBy: { postExamCompletedAt: 'desc' },
+  })
+
+  if (attempts.length === 0) return null
+
+  // Kullanıcının feedback verdiği training ID'lerini tek sorguda çek
+  const submittedTrainingIds = new Set(
+    (await prisma.trainingFeedbackResponse.findMany({
+      where: { attempt: { userId } },
+      select: { trainingId: true },
+    })).map(r => r.trainingId),
+  )
+
+  for (const a of attempts) {
+    if (submittedTrainingIds.has(a.trainingId)) continue
+    const originalMax = a.assignment.originalMaxAttempts
+    if (a.attemptNumber > originalMax) continue
+    const isFinal = a.attemptNumber === originalMax
+    if (a.isPassed || isFinal) {
+      return {
+        trainingId: a.trainingId,
+        trainingTitle: a.training.title,
+        attemptId: a.id,
+      }
+    }
+  }
+  return null
+}
 
 /**
  * Soru tipine göre bir cevabın geçerli olup olmadığını kontrol eder.

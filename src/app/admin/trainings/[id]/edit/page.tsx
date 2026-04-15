@@ -18,6 +18,7 @@ interface TrainingEditData {
   description: string;
   passingScore: number;
   maxAttempts: number;
+  feedbackMandatory: boolean;
   examDurationMinutes: number;
   startDate: string;
   endDate: string;
@@ -44,6 +45,7 @@ export default function EditTrainingPage() {
         description: data.description || '',
         passingScore: data.passingScore || 70,
         maxAttempts: data.maxAttempts || 3,
+        feedbackMandatory: data.feedbackMandatory ?? false,
         examDurationMinutes: data.examDurationMinutes || 30,
         startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
         endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
@@ -172,6 +174,27 @@ export default function EditTrainingPage() {
               <Input type="date" value={formData.endDate} onChange={(e) => setFormData({ ...formData, endDate: e.target.value })} className="h-10 rounded-xl font-mono" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
             </div>
           </div>
+        </div>
+      </BlurFade>
+
+      {/* Feedback zorunluluğu */}
+      <BlurFade delay={0.12}>
+        <div className="rounded-2xl p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.feedbackMandatory}
+              onChange={(e) => setFormData({ ...formData, feedbackMandatory: e.target.checked })}
+              className="mt-1 w-4 h-4 rounded"
+              style={{ accentColor: 'var(--color-primary)' }}
+            />
+            <div>
+              <div className="text-[13px] font-semibold">Geri bildirim formu zorunlu</div>
+              <div className="text-[12px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                İşaretlenirse personel bu eğitimi bitirdikten sonra geri bildirim formunu doldurmadan başka bir eğitime başlayamaz.
+              </div>
+            </div>
+          </label>
         </div>
       </BlurFade>
 

@@ -98,6 +98,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     category: training.category,
     passingScore: training.passingScore,
     maxAttempts: training.maxAttempts,
+    feedbackMandatory: training.feedbackMandatory,
     examDurationMinutes: training.examDurationMinutes,
     startDate: training.startDate,
     endDate: training.endDate,

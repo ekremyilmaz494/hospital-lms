@@ -9,6 +9,7 @@ import {
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
+import { MandatoryFeedbackBanner } from '@/components/shared/mandatory-feedback-banner';
 
 interface Training {
   id: string;
@@ -95,6 +96,7 @@ export default function MyTrainingsPage() {
 
   return (
     <div>
+      <MandatoryFeedbackBanner />
       {/* Header */}
       <BlurFade delay={0}>
         <div className="flex items-center gap-4 mb-5 sm:mb-8">

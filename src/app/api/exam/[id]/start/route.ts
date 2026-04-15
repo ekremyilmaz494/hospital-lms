@@ -3,6 +3,7 @@ import { getAuthUser, jsonResponse, errorResponse, createAuditLog } from '@/lib/
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { logActivity } from '@/lib/activity-logger'
+import { getPendingMandatoryFeedback } from '@/lib/feedback-helpers'
 
 /** Start a new exam attempt or resume existing one */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -22,6 +23,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   })
 
   if (!assignment) return errorResponse('Assignment not found', 404)
+
+  // ── Zorunlu geri bildirim kilidi ──
+  // Kullanıcının başka bir eğitim için bekleyen zorunlu feedback'i varsa,
+  // aynı eğitime devam/retry hariç yeni başlatmayı engelle.
+  const pending = await getPendingMandatoryFeedback(dbUser!.id)
+  if (pending && pending.trainingId !== assignment.trainingId) {
+    return new Response(
+      JSON.stringify({
+        error: `"${pending.trainingTitle}" eğitimi için zorunlu geri bildirim bekleniyor. Başka eğitim başlatmadan önce doldurmalısınız.`,
+        pendingFeedback: pending,
+      }),
+      { status: 423, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
 
   // Egitim tarih araligi kontrolu
   const now = new Date()

@@ -28,6 +28,7 @@ function TransitionContent() {
   const navigatedRef = useRef(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
   const [feedbackRequired, setFeedbackRequired] = useState(false);
+  const [feedbackMandatory, setFeedbackMandatory] = useState(false);
 
   // Determine type
   const isPreToVideos = from === 'pre' || from === 'pre-exam';
@@ -106,6 +107,7 @@ function TransitionContent() {
       .then(d => {
         if (cancelled || !d) return;
         setFeedbackRequired(!!d.feedbackRequired);
+        setFeedbackMandatory(!!d.feedbackMandatory);
       })
       .catch(() => { /* sessizce geç, feedbackRequired=false kalır */ });
     return () => { cancelled = true; };
@@ -212,7 +214,9 @@ function TransitionContent() {
                   background: isPassed ? 'linear-gradient(135deg, var(--color-primary), #065f46)' : 'linear-gradient(135deg, #475569, #334155)',
                 }}
               >
-                {feedbackRequired ? 'Geri Bildirim Ver' : 'Eğitimlerime Dön'}
+                {feedbackRequired
+                  ? (feedbackMandatory ? 'Zorunlu Geri Bildirimi Doldur' : 'Geri Bildirim Ver')
+                  : 'Eğitimlerime Dön'}
               </button>
             </div>
           </div>

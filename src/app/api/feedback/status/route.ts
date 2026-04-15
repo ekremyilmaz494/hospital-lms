@@ -31,6 +31,7 @@ export async function GET(request: Request) {
           isPassed: true,
           attemptNumber: true,
           trainingId: true,
+          training: { select: { title: true, feedbackMandatory: true } },
           assignment: { select: { originalMaxAttempts: true } },
           feedbackResponse: { select: { id: true, submittedAt: true } },
         },
@@ -78,6 +79,9 @@ export async function GET(request: Request) {
       hasSubmittedFeedback: !!priorFeedback,
       submittedAt: priorFeedback?.submittedAt ?? attempt.feedbackResponse?.submittedAt ?? null,
       feedbackRequired,
+      feedbackMandatory: attempt.training.feedbackMandatory,
+      trainingId: attempt.trainingId,
+      trainingTitle: attempt.training.title,
       formId: activeForm?.id ?? null,
     }, 200, {
       'Cache-Control': 'private, max-age=10, stale-while-revalidate=30',
