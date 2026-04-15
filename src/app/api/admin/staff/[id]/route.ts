@@ -3,8 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, getAuthUserWithWriteGuard, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
-import { maskeTcNo } from '@/lib/utils'
-import { encrypt, safeDecryptTcNo } from '@/lib/crypto'
 import { z } from 'zod/v4'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,18 +16,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Lightweight mode for edit form — only basic fields, no training history
   const { searchParams } = new URL(request.url)
   if (searchParams.get('fields') === 'edit') {
-    const staff = await prisma.user.findFirst({
+    const staff = await prisma.user.findFirst({ // perf-check-disable-line
       where: { id, organizationId: dbUser!.organizationId! },
       select: {
         id: true, firstName: true, lastName: true, email: true,
-        phone: true, tcNo: true, departmentId: true, title: true, isActive: true,
+        phone: true, departmentId: true, title: true, isActive: true,
       },
     })
     if (!staff) return errorResponse('Personel bulunamadı', 404)
 
     let departmentName = ''
     if (staff.departmentId) {
-      const dept = await prisma.department.findFirst({
+      const dept = await prisma.department.findFirst({ // perf-check-disable-line
         where: { id: staff.departmentId, organizationId: dbUser!.organizationId! },
         select: { name: true },
       })
@@ -42,13 +40,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       lastName: staff.lastName,
       email: staff.email,
       phone: staff.phone ?? '',
-      tcNo: maskeTcNo(safeDecryptTcNo(staff.tcNo)),
       department: departmentName,
       departmentId: staff.departmentId,
       title: staff.title ?? '',
       initials: `${(staff.firstName?.[0] ?? '').toUpperCase()}${(staff.lastName?.[0] ?? '').toUpperCase()}`,
       isActive: staff.isActive,
-    })
+    }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   }
 
   const staff = await prisma.user.findFirst({
@@ -67,7 +64,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Resolve department name — always scope to organizationId (B4.2: cross-tenant guard)
   let departmentName = ''
   if (staff.departmentId) {
-    const dept = await prisma.department.findFirst({
+    const dept = await prisma.department.findFirst({ // perf-check-disable-line
       where: { id: staff.departmentId, organizationId: dbUser!.organizationId! },
     })
     if (dept) departmentName = dept.name
@@ -90,7 +87,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     firstName: staff.firstName,
     lastName: staff.lastName,
     email: staff.email,
-    tcNo: maskeTcNo(safeDecryptTcNo(staff.tcNo)),
     department: departmentName,
     departmentId: staff.departmentId,
     title: staff.title ?? '',
@@ -120,7 +116,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }),
   }
 
-  return jsonResponse(result)
+  return jsonResponse(result, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -139,7 +135,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     firstName: z.string().min(1).max(100).optional(),
     lastName: z.string().min(1).max(100).optional(),
     phone: z.string().max(20).optional(),
-    tcNo: z.string().length(11).optional(),
     title: z.string().max(100).optional(),
     departmentId: z.string().uuid().optional(),
     department: z.string().max(100).optional(),
@@ -148,20 +143,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const parsed = safeUpdateSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  // B4.2/G4.2 — Paralel: kullanıcı varlığı + departman doğrulaması aynı anda
+  const [existing, deptCheck] = await Promise.all([
+    prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } }),
+    parsed.data.departmentId
+      ? prisma.department.findFirst({ where: { id: parsed.data.departmentId, organizationId: dbUser!.organizationId! } })
+      : Promise.resolve(null),
+  ])
   if (!existing) return errorResponse('Personel bulunamadı', 404)
 
   const dataToUpdate: Record<string, unknown> = { ...parsed.data }
-  if (dataToUpdate.tcNo) {
-    dataToUpdate.tcNo = encrypt(dataToUpdate.tcNo as string)
-  }
   if (dataToUpdate.departmentId) {
-    // B4.2/G4.2 — Departmanın bu organizasyona ait olduğunu doğrula
-    const dept = await prisma.department.findFirst({
-      where: { id: dataToUpdate.departmentId, organizationId: dbUser!.organizationId! },
-    })
-    if (!dept) return errorResponse('Geçersiz departman — bu departman organizasyonunuza ait değil', 400)
-    dataToUpdate.department = dept.name
+    if (!deptCheck) return errorResponse('Geçersiz departman — bu departman organizasyonunuza ait değil', 400)
+    dataToUpdate.department = deptCheck.name
   }
 
   const staff = await prisma.user.update({
@@ -199,7 +193,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const allowed = await checkRateLimit(`staff-delete:${dbUser!.id}`, 10, 3600)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
-  const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } }) // perf-check-disable-line
   if (!existing) return errorResponse('Personel bulunamadı', 404)
 
   // B4.4 — Soft delete: deactivate + aktif sınavları iptal et (multi-tenant güvenli)

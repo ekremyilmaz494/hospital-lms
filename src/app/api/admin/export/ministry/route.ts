@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
-import { safeDecryptTcNo } from '@/lib/crypto'
 
 /**
  * GET /api/admin/export/ministry
@@ -43,7 +42,7 @@ export async function GET(request: Request) {
           firstName: true,
           lastName: true,
           email: true,
-          tcNo: true,
+          hisExternalId: true,
           title: true,
           departmentRel: { select: { name: true } },
         },
@@ -74,7 +73,7 @@ export async function GET(request: Request) {
     kurumAdi: org?.name ?? '',
     kurumKodu: org?.code ?? '',
     // Personel Bilgileri
-    tcKimlikNo: safeDecryptTcNo(cert.user.tcNo) ?? '',
+    personelKodu: cert.user.hisExternalId ?? '',
     personelAdi: `${cert.user.firstName} ${cert.user.lastName}`,
     personelEposta: cert.user.email,
     unvan: cert.user.title ?? '',

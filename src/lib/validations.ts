@@ -1,26 +1,5 @@
 import { z } from 'zod/v4'
 
-/**
- * Türkiye Cumhuriyeti Kimlik Numarası (TCKN) doğrulama algoritması.
- *
- * Kurallar:
- *  1. 11 rakamdan oluşur, tümü sayısal
- *  2. İlk rakam 0 olamaz
- *  3. 10. rakam = (7×(d0+d2+d4+d6+d8) − (d1+d3+d5+d7)) mod 10
- *  4. 11. rakam = (d0+d1+…+d9) mod 10
- */
-function isValidTCKN(tc: string): boolean {
-  if (!/^\d{11}$/.test(tc)) return false
-  if (tc[0] === '0') return false
-  const d = tc.split('').map(Number)
-  const oddSum  = d[0] + d[2] + d[4] + d[6] + d[8]
-  const evenSum = d[1] + d[3] + d[5] + d[7]
-  const d10 = ((7 * oddSum - evenSum) % 10 + 10) % 10  // +10 handles negative mod
-  if (d[9] !== d10) return false
-  const totalSum = d[0]+d[1]+d[2]+d[3]+d[4]+d[5]+d[6]+d[7]+d[8]+d[9]
-  return d[10] === totalSum % 10
-}
-
 // ── Self-Service Kayıt ──
 export const selfRegisterSchema = z.object({
   hospitalName: z.string().min(2, 'Hastane adı en az 2 karakter olmalıdır').max(255, 'Hastane adı en fazla 255 karakter olabilir'),
@@ -94,7 +73,6 @@ export const createUserSchema = z.object({
   ),
   role: z.enum(['admin', 'staff']),
   organizationId: z.string().uuid({ message: 'Geçersiz organizasyon kimliği' }).optional(),
-  tcNo: z.string().length(11).refine(isValidTCKN, { message: 'Geçersiz TC kimlik numarası' }).optional(),
   phone: z.string().max(20).optional(),
   department: z.string().max(100).optional(),
   departmentId: z.string().uuid({ message: 'Geçersiz departman kimliği' }).optional(),

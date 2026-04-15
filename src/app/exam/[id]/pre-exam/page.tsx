@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Clock, ChevronLeft, ChevronRight, AlertTriangle, LogOut, Shield, Timer, Ban } from 'lucide-react';
+import { Clock, ChevronRight, AlertTriangle, LogOut, Shield, Timer, Ban, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
@@ -35,6 +35,7 @@ export default function PreExamPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentQ, setCurrentQ] = useState(0);
+  const [maxReachedQ, setMaxReachedQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -203,6 +204,15 @@ export default function PreExamPage() {
     toast(`Sekme değiştirme tespit edildi (${tabSwitchCount}). Bu davranış kayıt altına alınıyor.`, 'warning');
   }, [tabSwitchCount, toast]);
 
+  /** Bir sonraki soruya geç — geri dönüş yasak (tek yönlü navigasyon) */
+  const goNext = useCallback(() => {
+    setCurrentQ(prev => {
+      const next = prev + 1;
+      setMaxReachedQ(m => Math.max(m, next));
+      return next;
+    });
+  }, []);
+
   // handleFinish — tüm hook'lar early return'lerden ÖNCE tanımlanmalı (React rules of hooks)
   const handleFinish = useCallback(async () => {
     if (submitting || !examData) return;
@@ -290,6 +300,14 @@ export default function PreExamPage() {
               <div>
                 <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Süre dolduğunda otomatik gönderim</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Süre bittiğinde cevaplarınız otomatik olarak gönderilir. Süre dolduktan sonra gönderim kabul edilmez.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-xl" style={{ background: 'var(--color-bg)' }}>
+              <Lock className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--color-error)' }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Önceki soruya dönülemez</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Bir soruyu geçtikten sonra o soruya geri dönemezsiniz. Cevabınızı vermeden sonraki soruya geçmeyin.</p>
               </div>
             </div>
           </div>
@@ -413,12 +431,9 @@ export default function PreExamPage() {
             </div>
 
             {/* Navigation */}
-            <div className="mt-6 flex items-center justify-between">
-              <Button variant="outline" onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0} className="gap-2" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                <ChevronLeft className="h-4 w-4" /> Önceki
-              </Button>
+            <div className="mt-6 flex items-center justify-end">
               {currentQ < questions.length - 1 ? (
-                <Button onClick={() => setCurrentQ(currentQ + 1)} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-primary)', transition: 'background var(--transition-fast)' }}>
+                <Button onClick={goNext} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-primary)', transition: 'background var(--transition-fast)' }}>
                   Sonraki <ChevronRight className="h-4 w-4" />
                 </Button>
               ) : (
@@ -442,13 +457,28 @@ export default function PreExamPage() {
             <h4 className="mb-3 text-sm font-bold">Soru Navigasyonu</h4>
             <div className="grid grid-cols-5 gap-2">
               {questions.map((_, i) => {
-                // B7.4/G7.4 — id ?? 0 fallback kaldırıldı: undefined id → answered=false (yanlış pozitif önlenir)
-                const qId = questions[i]?.id
+                const qId = questions[i]?.id;
                 const isAnswered = qId !== undefined ? answers[qId] !== undefined : false;
                 const isCurrent = i === currentQ;
+                const isLocked = i < currentQ;           // Geçilmiş soru — kilitli
+                const isFuture = i > maxReachedQ;        // Henüz ulaşılmamış soru
+                const isDisabled = isLocked || isFuture;
                 return (
-                  <button key={i} onClick={() => setCurrentQ(i)} className="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold" style={{ background: isCurrent ? 'var(--color-primary)' : isAnswered ? 'var(--color-success-bg)' : 'var(--color-surface-hover)', color: isCurrent ? 'white' : isAnswered ? 'var(--color-success)' : 'var(--color-text-muted)', border: `1.5px solid ${isCurrent ? 'var(--color-primary)' : isAnswered ? 'var(--color-success)' : 'var(--color-border)'}`, transition: 'background var(--transition-fast), border-color var(--transition-fast)' }}>
-                    {i + 1}
+                  <button
+                    key={i}
+                    onClick={() => !isDisabled && setCurrentQ(i)}
+                    disabled={isDisabled}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold"
+                    style={{
+                      background: isCurrent ? 'var(--color-primary)' : isLocked ? 'var(--color-surface-hover)' : isAnswered ? 'var(--color-success-bg)' : 'var(--color-surface-hover)',
+                      color: isCurrent ? 'white' : isLocked ? 'var(--color-text-muted)' : isAnswered ? 'var(--color-success)' : 'var(--color-text-muted)',
+                      border: `1.5px solid ${isCurrent ? 'var(--color-primary)' : isLocked ? 'var(--color-border)' : isAnswered ? 'var(--color-success)' : 'var(--color-border)'}`,
+                      opacity: isFuture ? 0.4 : 1,
+                      cursor: isDisabled ? 'not-allowed' : 'pointer',
+                      transition: 'background var(--transition-fast), border-color var(--transition-fast)',
+                    }}
+                  >
+                    {isLocked ? <Lock className="h-3 w-3" /> : i + 1}
                   </button>
                 );
               })}
@@ -456,7 +486,8 @@ export default function PreExamPage() {
             <div className="mt-4 space-y-2 text-xs">
               <div className="flex items-center gap-2"><div className="h-3 w-3 rounded" style={{ background: 'var(--color-success-bg)', border: '1.5px solid var(--color-success)' }} /><span style={{ color: 'var(--color-text-muted)' }}>Cevaplanmış ({answeredCount})</span></div>
               <div className="flex items-center gap-2"><div className="h-3 w-3 rounded" style={{ background: 'var(--color-primary)' }} /><span style={{ color: 'var(--color-text-muted)' }}>Aktif soru</span></div>
-              <div className="flex items-center gap-2"><div className="h-3 w-3 rounded" style={{ background: 'var(--color-surface-hover)', border: '1.5px solid var(--color-border)' }} /><span style={{ color: 'var(--color-text-muted)' }}>Cevaplanmamış ({questions.length - answeredCount})</span></div>
+              <div className="flex items-center gap-2"><div className="h-3 w-3 rounded" style={{ background: 'var(--color-surface-hover)', border: '1.5px solid var(--color-border)' }} /><Lock className="h-2.5 w-2.5" style={{ color: 'var(--color-text-muted)' }} /><span style={{ color: 'var(--color-text-muted)' }}>Kilitli (geçildi)</span></div>
+              <div className="flex items-center gap-2"><div className="h-3 w-3 rounded" style={{ background: 'var(--color-surface-hover)', border: '1.5px solid var(--color-border)', opacity: 0.4 }} /><span style={{ color: 'var(--color-text-muted)' }}>Cevaplanmamış ({questions.length - answeredCount})</span></div>
             </div>
           </div>
         </div>

@@ -2,8 +2,6 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, checkWritePermission } from '@/lib/api-helpers'
 import { createUserSchema } from '@/lib/validations'
-import { maskeTcNo } from '@/lib/utils'
-import { safeDecryptTcNo } from '@/lib/crypto'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
 import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
@@ -36,7 +34,6 @@ export async function GET(request: Request) {
         { lastName: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
         { title: { contains: search, mode: 'insensitive' } },
-        ...(search.length === 11 && /^\d+$/.test(search) ? [{ tcNo: search }] : []),
       ]
     }
     if (department) where.departmentId = department
@@ -100,8 +97,6 @@ export async function GET(request: Request) {
       id: s.id,
       name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
       email: s.email,
-      // KVKK: TC No maskeleme — sadece son 4 hane göster
-      tcNo: maskeTcNo(safeDecryptTcNo(s.tcNo)),
       department: departments.find(d => d.id === s.departmentId)?.name || '',
       departmentId: s.departmentId,
       title: s.title || '',
@@ -181,7 +176,6 @@ export async function POST(request: Request) {
       lastName: parsed.data.lastName,
       role: 'staff',
       organizationId: dbUser!.organizationId!,
-      tcNo: parsed.data.tcNo,
       phone: parsed.data.phone,
       departmentId: parsed.data.departmentId,
       title: parsed.data.title,

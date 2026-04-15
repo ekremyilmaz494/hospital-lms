@@ -65,8 +65,7 @@ export default function RootLayout({
       <body className="app-bg antialiased" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
-          enableSystem
+          forcedTheme="light"
           disableTransitionOnChange
         >
           <AuthProvider>

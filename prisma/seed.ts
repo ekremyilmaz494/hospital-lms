@@ -402,8 +402,7 @@ async function main() {
       title: 'Hastane Yöneticisi',
       organizationId: org.id,
       isActive: true,
-      kvkkConsent: true,
-      kvkkConsentDate: new Date(),
+      kvkkNoticeAcknowledgedAt: new Date(),
     },
   })
   console.log(`  Admin: ${adminEmail}`)
@@ -443,8 +442,7 @@ async function main() {
         organizationId: org.id,
         departmentId: deptIds[s.deptIndex],
         isActive: true,
-        kvkkConsent: true,
-        kvkkConsentDate: new Date(),
+        kvkkNoticeAcknowledgedAt: new Date(),
       },
     })
 

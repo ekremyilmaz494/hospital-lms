@@ -34,7 +34,6 @@ export async function POST(request: Request) {
         firstName: true,
         lastName: true,
         email: true,
-        tcNo: true,
         phone: true,
         role: true,
       },
@@ -70,7 +69,6 @@ export async function POST(request: Request) {
       firstName: targetUser.firstName,
       lastName: targetUser.lastName,
       email: targetUser.email,
-      tcNo: '[REDACTED]',
       phone: '[REDACTED]',
     }
 
@@ -83,7 +81,6 @@ export async function POST(request: Request) {
           firstName: 'Silinmiş',
           lastName: 'Kullanıcı',
           email: anonymizedEmail,
-          tcNo: null,
           phone: null,
           avatarUrl: null,
           isActive: false,
@@ -125,7 +122,6 @@ export async function POST(request: Request) {
         firstName: 'Silinmiş',
         lastName: 'Kullanıcı',
         email: anonymizedEmail,
-        tcNo: null,
         phone: null,
       },
       request,

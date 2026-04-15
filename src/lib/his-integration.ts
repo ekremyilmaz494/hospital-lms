@@ -19,7 +19,6 @@ export type { HisIntegration }
 
 export interface HisStaffRecord {
   externalId: string
-  tcNo?: string
   name: string
   surname: string
   email?: string
@@ -138,7 +137,6 @@ export function applyFieldMapping(
     surname,
     email: mapped.email ? String(mapped.email) : undefined,
     phone: mapped.phone ? String(mapped.phone) : undefined,
-    tcNo: mapped.tcNo ? String(mapped.tcNo) : undefined,
     department: String(mapped.department ?? mapped.birim ?? ''),
     title: String(mapped.title ?? mapped.unvan ?? ''),
     startDate: String(mapped.startDate ?? mapped.baslangicTarihi ?? ''),
@@ -295,7 +293,6 @@ export async function syncStaffFromHis(integration: HisIntegration): Promise<Syn
               role: 'staff',
               organizationId: integration.organizationId,
               hisExternalId: staffRecord.externalId,
-              tcNo: staffRecord.tcNo,
               phone: staffRecord.phone,
               departmentId: departmentId,
               title: staffRecord.title || undefined,

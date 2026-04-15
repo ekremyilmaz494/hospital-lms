@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Save, User, Building2, Phone, Mail, Shield, Briefcase } from 'lucide-react';
+import { ArrowLeft, Save, User, Building2, Phone, Mail, Briefcase } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,6 @@ interface StaffEditData {
   lastName: string;
   email: string;
   phone: string;
-  tcNo: string;
   department: string | null;
   departmentId: string | null;
   title: string;
@@ -153,21 +152,12 @@ export default function EditStaffPage() {
               <Input value={formData.email} disabled autoComplete="email" className="h-11 rounded-xl" style={{ background: 'var(--color-surface-hover)', borderColor: 'var(--color-border)' }} />
               <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>E-posta adresi değiştirilemez</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-                  <Phone className="h-3.5 w-3.5" /> Telefon
-                </Label>
-                <Input value={formData.phone} onChange={(e) => update('phone', e.target.value)} autoComplete="tel" className="h-11 rounded-xl" style={{ background: 'var(--color-bg)', borderColor: errors.phone ? 'var(--color-error)' : 'var(--color-border)' }} />
-                {errors.phone && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.phone}</p>}
-              </div>
-              <div>
-                <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-                  <Shield className="h-3.5 w-3.5" /> TC Kimlik No
-                </Label>
-                <Input value={formData.tcNo} disabled className="h-11 rounded-xl font-mono" style={{ background: 'var(--color-surface-hover)', borderColor: 'var(--color-border)' }} />
-                <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>TC Kimlik No değiştirilemez. Düzeltme için sistem yöneticisi ile iletişime geçin.</p>
-              </div>
+            <div>
+              <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                <Phone className="h-3.5 w-3.5" /> Telefon
+              </Label>
+              <Input value={formData.phone} onChange={(e) => update('phone', e.target.value)} autoComplete="tel" className="h-11 rounded-xl" style={{ background: 'var(--color-bg)', borderColor: errors.phone ? 'var(--color-error)' : 'var(--color-border)' }} />
+              {errors.phone && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.phone}</p>}
             </div>
           </div>
         </div>

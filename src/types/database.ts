@@ -37,7 +37,6 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
-  tcNo: string | null;
   phone: string | null;
   department: string | null;
   departmentId: string | null;
@@ -45,9 +44,8 @@ export interface User {
   role: UserRole;
   avatarUrl: string | null;
   isActive: boolean;
-  kvkkConsent: boolean;
-  kvkkConsentDate: string | null;
   hisExternalId?: string | null;
+  kvkkNoticeAcknowledgedAt: string | null;
   createdAt: string;
   updatedAt: string;
   departmentRel?: Department | null;

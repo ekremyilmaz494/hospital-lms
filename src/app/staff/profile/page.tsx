@@ -23,7 +23,6 @@ interface ProfileData {
   hospital: string;
   department: string;
   title: string;
-  tcKimlik: string;
   avatarUrl: string;
   stats: { assignments: number; exams: number; certificates: number };
   createdAt: string;
@@ -345,7 +344,6 @@ export default function ProfilePage() {
                     { icon: Mail, label: 'E-posta', value: profile?.email ?? '' },
                     { icon: Phone, label: 'Telefon', value: profile?.phone || '—' },
                     { icon: Building2, label: 'Hastane', value: profile?.hospital ?? '' },
-                    { icon: Shield, label: 'TC Kimlik', value: profile?.tcKimlik ? `***${profile.tcKimlik.slice(-4)}` : '—', mono: true },
                   ].map(item => (
                     <div
                       key={item.label}

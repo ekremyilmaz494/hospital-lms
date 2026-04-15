@@ -26,7 +26,6 @@ export async function POST(request: Request) {
       lastName: parsed.data.lastName,
       role: parsed.data.role as 'admin' | 'staff',
       organizationId: parsed.data.organizationId!,
-      tcNo: parsed.data.tcNo,
       phone: parsed.data.phone,
       title: parsed.data.title,
     })

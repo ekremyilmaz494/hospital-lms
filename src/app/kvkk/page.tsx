@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft, Shield, Database, Share2, Clock, UserCheck, Mail } from 'lucide-react'
+import { ArrowLeft, Shield, Database, Share2, Clock, UserCheck, Mail, Scale } from 'lucide-react'
 import { BlurFade } from '@/components/ui/blur-fade'
 
 export const metadata = {
@@ -21,39 +21,55 @@ const sections = [
       'Kişisel verileriniz; personel eğitim süreçlerinin yönetilmesi, sınav ve değerlendirme faaliyetlerinin gerçekleştirilmesi, eğitim performansının raporlanması, yasal yükümlülüklerin yerine getirilmesi, sertifika düzenlenmesi, bilgi güvenliği süreçlerinin yürütülmesi ve iletişim faaliyetlerinin yönetilmesi amaçlarıyla işlenmektedir.',
   },
   {
+    icon: Scale,
+    title: '3. İşlemenin Hukuki Sebepleri',
+    content: 'Kişisel verileriniz aşağıdaki hukuki sebeplere dayanılarak işlenmektedir (KVKK md. 5/2):',
+    items: [
+      'md. 5/2-c — Sözleşmenin kurulması veya ifasıyla doğrudan ilgili olması (iş akdi gereği eğitim kayıtlarının tutulması)',
+      'md. 5/2-ç — Veri sorumlusunun hukuki yükümlülüğünü yerine getirebilmesi (Sağlık Bakanlığı zorunlu eğitim gereksinimleri)',
+      'md. 5/2-f — Veri sorumlusunun meşru menfaatleri için zorunlu olması (platform güvenliği, sistem yönetimi)',
+    ],
+  },
+  {
     icon: UserCheck,
-    title: '3. İşlenen Kişisel Veriler',
+    title: '4. İşlenen Kişisel Veriler',
     items: [
       'Ad ve Soyad',
       'E-posta adresi',
-      'TC Kimlik Numarası',
-      'Departman bilgisi',
+      'Departman ve unvan bilgisi',
       'Sınav sonuçları ve başarı durumu',
       'Video izleme kayıtları ve ilerleme bilgileri',
-      'Oturum açma zaman damgaları',
+      'Oturum açma zaman damgaları ve IP adresi (audit log)',
     ],
   },
   {
     icon: Share2,
-    title: '4. Verilerin Aktarılması',
+    title: '5. Verilerin Aktarılması',
     content:
       'Kişisel verileriniz, hizmetin sunulabilmesi için aşağıdaki üçüncü taraf hizmet sağlayıcılarla paylaşılabilir:',
     items: [
       'Supabase (Avrupa Birliği) — Kimlik doğrulama ve veritabanı hizmetleri',
       'Amazon Web Services S3 (Avrupa Birliği) — Video depolama ve içerik dağıtımı',
+      'Vercel Inc. (Avrupa Birliği) — Uygulama hosting ve CDN hizmetleri',
     ],
     footer:
-      'Verileriniz yurt dışına aktarılırken KVKK\'nın 9. maddesi kapsamında gerekli önlemler alınmaktadır.',
+      'Verileriniz yurt dışına aktarılırken KVKK\'nın 9. maddesi kapsamında gerekli güvenceler sağlanmaktadır.',
   },
   {
     icon: Clock,
-    title: '5. Veri Saklama Süresi',
-    content:
-      'Kişisel verileriniz, aktif üyeliğiniz süresince ve üyeliğinizin sona ermesinden itibaren 2 (iki) yıl boyunca saklanmaktadır. Yasal zorunluluklar saklı kalmak kaydıyla, bu sürenin sonunda verileriniz silinir veya anonim hale getirilir.',
+    title: '6. Veri Saklama Süresi',
+    content: 'Kişisel verileriniz aşağıdaki süreler boyunca saklanır:',
+    items: [
+      'Kimlik ve iletişim bilgileri (ad, e-posta): İş akdi sona ermesinden itibaren 10 yıl (BK md. 146)',
+      'Video izleme kayıtları ve sertifikalar: 5 yıl',
+      'IP adresi ve audit loglar: 2 yıl',
+    ],
+    footer:
+      'Saklama süresinin dolması veya işleme amacının ortadan kalkması halinde veriler silinir ya da anonim hale getirilir.',
   },
   {
     icon: UserCheck,
-    title: '6. Veri Sahibinin Hakları',
+    title: '7. Veri Sahibinin Hakları',
     content: 'KVKK\'nın 11. maddesi uyarınca aşağıdaki haklara sahipsiniz:',
     items: [
       'Kişisel verilerinizin işlenip işlenmediğini öğrenme',
@@ -67,7 +83,7 @@ const sections = [
   },
   {
     icon: Mail,
-    title: '7. İletişim',
+    title: '8. İletişim',
     content:
       'KVKK kapsamındaki haklarınızı kullanmak için aşağıdaki kanallardan bizimle iletişime geçebilirsiniz. Başvurularınız en geç 30 (otuz) gün içinde sonuçlandırılacaktır.',
     footer: 'E-posta: kvkk@hastanelms.com',

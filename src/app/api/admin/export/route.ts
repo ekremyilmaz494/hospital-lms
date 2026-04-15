@@ -1,8 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
-import { maskeTcNo } from '@/lib/utils'
-import { safeDecryptTcNo } from '@/lib/crypto'
 import ExcelJS from 'exceljs'
 
 const XLSX_MAX_ROWS = 5000
@@ -40,7 +38,6 @@ export async function GET(request: Request) {
       { header: 'Ad', key: 'firstName', width: 15 },
       { header: 'Soyad', key: 'lastName', width: 15 },
       { header: 'E-posta', key: 'email', width: 30 },
-      { header: 'TC No', key: 'tcNo', width: 15 },
       { header: 'Telefon', key: 'phone', width: 15 },
       { header: 'Departman', key: 'department', width: 20 },
       { header: 'Unvan', key: 'title', width: 20 },
@@ -55,8 +52,6 @@ export async function GET(request: Request) {
         firstName: sanitizeCell(s.firstName ?? ''),
         lastName: sanitizeCell(s.lastName ?? ''),
         email: sanitizeCell(s.email),
-        // KVKK: TC No maskeleme — ilk 3 + **** + son 4
-        tcNo: maskeTcNo(safeDecryptTcNo(s.tcNo)),
         // KVKK: Telefon maskeleme — sadece son 3 hane göster
         phone: s.phone ? `***${s.phone.slice(-3)}` : '',
         department: sanitizeCell(s.departmentId ?? ''),

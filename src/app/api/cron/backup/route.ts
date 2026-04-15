@@ -2,7 +2,6 @@ import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { uploadBuffer, backupKey, verifyS3Object } from '@/lib/s3'
-import { maskeTcNo } from '@/lib/utils'
 import { sendEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 
@@ -12,7 +11,6 @@ import { logger } from '@/lib/logger'
 function sanitizeUsers(users: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
   return users.map(u => ({
     ...u,
-    tcNo: typeof u.tcNo === 'string' ? maskeTcNo(u.tcNo) || null : u.tcNo ?? null,
     phone: typeof u.phone === 'string' && u.phone.length > 3
       ? `${'*'.repeat(u.phone.length - 3)}${u.phone.slice(-3)}`
       : u.phone ?? null,

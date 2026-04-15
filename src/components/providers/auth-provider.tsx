@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { usePresenceTracker } from '@/hooks/use-presence-tracker';
+import { KvkkNoticeModal } from '@/components/shared/kvkk-notice-modal';
 
 const DB_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 dakika — deaktive kullanıcı penceresi
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setUserIfChanged, setLoading, setSessionTimeout } = useAuthStore();
+  const { setUser, setUserIfChanged, setLoading, setSessionTimeout, user } = useAuthStore();
   // G3.2 — Track this user's presence in the global active-users channel
   usePresenceTracker();
   const router = useRouter();
@@ -66,15 +67,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           lastName: user.user_metadata?.last_name ?? '',
           role: user.app_metadata?.role ?? user.user_metadata?.role ?? 'staff',
           organizationId: user.app_metadata?.organization_id ?? user.user_metadata?.organization_id ?? null,
-          tcNo: user.user_metadata?.tc_no ?? null,
           phone: user.user_metadata?.phone ?? null,
           departmentId: user.user_metadata?.department_id ?? null,
           department: user.user_metadata?.department ?? null,
           title: user.user_metadata?.title ?? null,
           avatarUrl: user.user_metadata?.avatar_url ?? null,
           isActive: user.user_metadata?.is_active !== false,
-          kvkkConsent: user.user_metadata?.kvkk_consent ?? false,
-          kvkkConsentDate: user.user_metadata?.kvkk_consent_date ?? null,
+          kvkkNoticeAcknowledgedAt: user.user_metadata?.kvkk_notice_acknowledged_at ?? null,
           createdAt: user.created_at,
           updatedAt: user.updated_at ?? user.created_at,
         });
@@ -115,15 +114,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               lastName: u.user_metadata?.last_name ?? '',
               role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
               organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
-              tcNo: u.user_metadata?.tc_no ?? null,
               phone: u.user_metadata?.phone ?? null,
               departmentId: u.user_metadata?.department_id ?? null,
               department: u.user_metadata?.department ?? null,
               title: u.user_metadata?.title ?? null,
               avatarUrl: u.user_metadata?.avatar_url ?? null,
               isActive: u.user_metadata?.is_active !== false,
-              kvkkConsent: u.user_metadata?.kvkk_consent ?? false,
-              kvkkConsentDate: u.user_metadata?.kvkk_consent_date ?? null,
+              kvkkNoticeAcknowledgedAt: u.user_metadata?.kvkk_notice_acknowledged_at ?? null,
               createdAt: u.created_at,
               updatedAt: u.updated_at ?? u.created_at,
             });
@@ -146,5 +143,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [setUser, setLoading, router, refreshFromDB]);
 
-  return <>{children}</>;
+  // Oturum açmış ve KVKK bildirimini henüz onaylamamış kullanıcıya modal göster
+  const showKvkkModal = !!user && user.kvkkNoticeAcknowledgedAt === null;
+
+  return (
+    <>
+      {children}
+      {showKvkkModal && <KvkkNoticeModal />}
+    </>
+  );
 }

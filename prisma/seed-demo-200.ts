@@ -93,11 +93,6 @@ function daysAgo(days: number): Date {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 }
 
-function generateTcNo(index: number): string {
-  // Generate unique 11-digit TC-like number (not real)
-  const base = (10000000000 + index * 137 + 12345678).toString().slice(0, 11)
-  return base
-}
 
 async function createSupabaseUser(
   email: string,
@@ -190,7 +185,6 @@ interface PersonnelData {
   email: string
   title: string
   deptIndex: number
-  tcNo: string
 }
 
 function generatePersonnel(count: number): PersonnelData[] {
@@ -214,9 +208,7 @@ function generatePersonnel(count: number): PersonnelData[] {
     const deptIndex = i % 5 // Distribute evenly across 5 departments
     const title = pick(TITLES_BY_DEPT[deptIndex])
     const email = `demo${i + 1}@demo.hastanelms.com`
-    const tcNo = generateTcNo(i + 100) // Offset to avoid collision with existing
-
-    personnel.push({ firstName, lastName, email, title, deptIndex, tcNo })
+    personnel.push({ firstName, lastName, email, title, deptIndex })
   }
 
   return personnel
@@ -316,12 +308,10 @@ async function main() {
         lastName: p.lastName,
         role: 'staff',
         title: p.title,
-        tcNo: p.tcNo,
         organizationId: org.id,
         departmentId: departments[p.deptIndex].id,
         isActive: true,
-        kvkkConsent: true,
-        kvkkConsentDate: daysAgo(randomInt(30, 90)),
+        kvkkNoticeAcknowledgedAt: daysAgo(randomInt(30, 90)),
       },
     })
 

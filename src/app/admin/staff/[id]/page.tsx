@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, Shield, RotateCcw, Plus } from 'lucide-react';
+import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus } from 'lucide-react';
 import { AssignTrainingModal } from '../assign-training-modal';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -19,7 +19,6 @@ interface StaffDetail {
   id: string;
   name: string;
   email: string;
-  tcNo: string;
   department: string;
   title: string;
   phone: string;
@@ -59,7 +58,6 @@ export default function StaffDetailPage() {
   const profileInfo = [
     { icon: Mail, label: 'E-posta', value: staff.email },
     { icon: Phone, label: 'Telefon', value: staff.phone, mono: true },
-    { icon: Shield, label: 'TC Kimlik', value: staff.tcNo, mono: true },
     { icon: Building2, label: 'Departman', value: staff.department },
     { icon: Briefcase, label: 'Unvan', value: staff.title },
   ];

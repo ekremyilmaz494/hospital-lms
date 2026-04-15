@@ -38,8 +38,6 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [kvkkAccepted, setKvkkAccepted] = useState(false);
-  const [kvkkError, setKvkkError] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
   const rawRedirect = searchParams.get('redirectTo');
@@ -55,11 +53,6 @@ function LoginForm() {
     e.preventDefault();
     setError('');
 
-    if (!kvkkAccepted) {
-      setKvkkError(true);
-      return;
-    }
-    setKvkkError(false);
     setLoading(true);
 
     try {
@@ -113,15 +106,13 @@ function LoginForm() {
           lastName: u.user_metadata?.last_name ?? '',
           role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
           organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
-          tcNo: u.user_metadata?.tc_no ?? null,
           phone: u.user_metadata?.phone ?? null,
           departmentId: u.user_metadata?.department_id ?? null,
           department: u.user_metadata?.department ?? null,
           title: u.user_metadata?.title ?? null,
           avatarUrl: u.user_metadata?.avatar_url ?? null,
           isActive: u.user_metadata?.is_active !== false,
-          kvkkConsent: u.user_metadata?.kvkk_consent ?? false,
-          kvkkConsentDate: u.user_metadata?.kvkk_consent_date ?? null,
+          kvkkNoticeAcknowledgedAt: u.user_metadata?.kvkk_notice_acknowledged_at ?? null,
           createdAt: u.created_at,
           updatedAt: u.updated_at ?? u.created_at,
         });
@@ -357,31 +348,13 @@ function LoginForm() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-start gap-2.5">
-                  <Checkbox
-                    id="kvkk"
-                    checked={kvkkAccepted}
-                    onCheckedChange={(checked) => {
-                      setKvkkAccepted(checked === true);
-                      if (checked) setKvkkError(false);
-                    }}
-                    className="mt-0.5"
-                    style={kvkkError ? { borderColor: 'var(--color-error)' } : undefined}
-                  />
-                  <label htmlFor="kvkk" className="text-xs leading-relaxed cursor-pointer" style={{ color: kvkkError ? 'var(--color-error)' : 'var(--color-text-secondary)' }}>
-                    <Link href="/kvkk" target="_blank" className="font-semibold underline transition-colors duration-150" style={{ color: 'var(--color-primary)' }}>
-                      KVKK Aydınlatma Metni
-                    </Link>
-                    &apos;ni okudum ve kabul ediyorum.
-                  </label>
-                </div>
-                {kvkkError && (
-                  <p className="text-xs font-medium pl-6" style={{ color: 'var(--color-error)' }}>
-                    Devam etmek için KVKK metnini onaylamanız zorunludur.
-                  </p>
-                )}
-              </div>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                Giriş yaparak{' '}
+                <Link href="/kvkk" target="_blank" className="font-semibold underline transition-colors duration-150" style={{ color: 'var(--color-primary)' }}>
+                  KVKK Aydınlatma Metni
+                </Link>
+                &apos;ni okumuş ve bilgilendirilmiş kabul edersiniz.
+              </p>
 
               <div className="flex items-center gap-2.5">
                 <Checkbox

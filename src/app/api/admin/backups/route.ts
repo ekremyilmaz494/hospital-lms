@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { uploadBuffer, backupKey } from '@/lib/s3'
 import { logger } from '@/lib/logger'
-import { maskeTcNo } from '@/lib/utils'
 
 /**
  * KVKK uyumlu PII maskeleme — backup verisindeki hassas alanları maskeler.
@@ -12,7 +11,6 @@ import { maskeTcNo } from '@/lib/utils'
 function sanitizeUsersForBackup(users: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
   return users.map(u => ({
     ...u,
-    tcNo: typeof u.tcNo === 'string' ? maskeTcNo(u.tcNo) || null : u.tcNo ?? null,
     phone: typeof u.phone === 'string' && u.phone.length > 3
       ? `${'*'.repeat(u.phone.length - 3)}${u.phone.slice(-3)}`
       : u.phone ?? null,

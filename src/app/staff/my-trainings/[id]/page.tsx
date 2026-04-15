@@ -408,27 +408,72 @@ export default function TrainingDetailPage() {
       )}
 
       {/* Completed state — passed */}
-      {allDone && training.status === 'passed' && (
+      {training.status === 'passed' && (
         <BlurFade delay={0.15}>
-          <div className="flex flex-col items-center gap-3 py-8">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full" style={{ background: 'var(--color-success-bg)' }}>
-              <CheckCircle className="h-8 w-8" style={{ color: 'var(--color-success)' }} />
+          {/* Success banner */}
+          <div
+            className="mt-2 mb-5 flex items-center gap-4 rounded-2xl px-5 py-4"
+            style={{ background: 'var(--color-success-bg)', border: '1px solid rgba(5,150,105,0.2)' }}
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--color-success)' }}>
+              <CheckCircle className="h-6 w-6 text-white" />
             </div>
-            <p className="text-[15px] font-bold" style={{ color: 'var(--color-success)' }}>Eğitim Tamamlandı!</p>
-            <div className="flex flex-col sm:flex-row items-center gap-3 mt-2">
-              {videos.length > 0 && (
-                <Link
-                  href={`/exam/${examId}/videos?mode=review`}
-                  className="flex items-center gap-2 rounded-xl px-4 py-2 text-[12px] font-semibold"
-                  style={{ border: '1px solid var(--color-primary)', color: 'var(--color-primary)', background: 'var(--color-surface)' }}
-                >
-                  <Play className="h-3.5 w-3.5" /> Videoları Tekrar İzle
-                </Link>
+            <div className="min-w-0">
+              <p className="text-[14px] font-black" style={{ color: 'var(--color-success)' }}>Eğitim Başarıyla Tamamlandı</p>
+              {training.lastAttemptScore !== undefined && (
+                <p className="text-[12px] font-semibold mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                  Son sınav puanı: <span className="font-black" style={{ color: 'var(--color-success)' }}>%{training.lastAttemptScore}</span>
+                </p>
               )}
-              <Link href="/staff/certificates" className="text-[12px] font-semibold" style={{ color: 'var(--color-primary)' }}>
-                Sertifikalarıma Git →
-              </Link>
             </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-col gap-3">
+            {videos.length > 0 && (
+              <Link href={`/exam/${examId}/videos?mode=review`} className="block w-full">
+                <div
+                  className="flex items-center gap-4 rounded-2xl px-5 py-4 sm:py-5 transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
+                    boxShadow: '0 6px 20px rgba(13, 150, 104, 0.25)',
+                  }}
+                >
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                    <Play className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] font-black text-white leading-tight">Eğitim İçeriğini Tekrar İzle</p>
+                    <p className="text-[12px] mt-0.5" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                      {videos.length} video · İstediğin zaman tekrar izleyebilirsin
+                    </p>
+                  </div>
+                  <BookOpen className="h-5 w-5 shrink-0 text-white/60" />
+                </div>
+              </Link>
+            )}
+
+            <Link href="/staff/certificates" className="block w-full">
+              <div
+                className="flex items-center gap-4 rounded-2xl px-5 py-4 transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                style={{
+                  background: 'var(--color-surface)',
+                  border: '1.5px solid var(--color-border)',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(13,150,104,0.08)' }}>
+                  <Award className="h-6 w-6" style={{ color: 'var(--color-primary)' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-black leading-tight" style={{ color: 'var(--color-text)' }}>Sertifikalarıma Git</p>
+                  <p className="text-[12px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    Başarı sertifikana ulaş
+                  </p>
+                </div>
+                <ArrowLeft className="h-5 w-5 shrink-0 rotate-180" style={{ color: 'var(--color-text-muted)' }} />
+              </div>
+            </Link>
           </div>
         </BlurFade>
       )}

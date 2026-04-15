@@ -222,16 +222,14 @@ model User {
   email              String    @unique @db.VarChar(255)
   firstName          String    @map("first_name") @db.VarChar(100)
   lastName           String    @map("last_name") @db.VarChar(100)
-  tcNo               String?   @map("tc_no") @db.VarChar(200)
   phone              String?   @db.VarChar(20)
   departmentId       String?   @map("department_id") @db.Uuid
   title              String?   @db.VarChar(100)
   role               String    @db.VarChar(20)
   avatarUrl          String?   @map("avatar_url") @db.Text
   isActive           Boolean   @default(true) @map("is_active")
-  kvkkConsent        Boolean   @default(false) @map("kvkk_consent")
-  kvkkConsentDate    DateTime? @map("kvkk_consent_date") @db.Timestamptz
   hisExternalId      String?   @map("his_external_id") @db.VarChar(100)
+  kvkkNoticeAcknowledgedAt DateTime? @map("kvkk_notice_acknowledged_at") @db.Timestamptz
   mustChangePassword Boolean   @default(false) @map("must_change_password")
   termsAccepted      Boolean   @default(false) @map("terms_accepted")
   termsAcceptedAt    DateTime? @map("terms_accepted_at") @db.Timestamptz
@@ -267,7 +265,6 @@ model User {
   // EY.FR.40 Eğitim Geri Bildirim
   feedbackResponses       TrainingFeedbackResponse[]
 
-  @@unique([organizationId, tcNo])
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
   @@index([departmentId], map: "idx_users_department")

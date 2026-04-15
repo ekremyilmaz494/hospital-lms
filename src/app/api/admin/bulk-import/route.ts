@@ -12,7 +12,6 @@ interface ParsedRow {
   lastName: string
   email: string
   password: string
-  tcNo?: string
   phone?: string
   title?: string
   deptId?: string
@@ -67,7 +66,6 @@ async function parseImportFile(
       lastName: r['soyad'] || r['soyad*'] || '',
       email: (r['e-posta'] || r['email'] || r['e-posta*'] || '').toLowerCase(),
       password: r['şifre'] || r['sifre'] || r['şifre*'] || r['parola'] || ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1'),
-      tcNo: r['tc'] || r['tc kimlik'] || r['tc no'] || undefined,
       phone: r['telefon'] || undefined,
       title: r['unvan'] || r['ünvan'] || undefined,
       deptId: dept?.id,
@@ -189,7 +187,6 @@ export async function POST(request: Request) {
         lastName: row.lastName,
         role: 'staff',
         organizationId: orgId,
-        tcNo: row.tcNo,
         phone: row.phone,
         departmentId: row.deptId,
         title: row.title,

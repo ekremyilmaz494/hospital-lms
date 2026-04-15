@@ -5,12 +5,10 @@
  * Avantajlari:
  *  - app_metadata (role, organization_id) otomatik set edilir
  *  - DB insert basarisiz olursa auth user otomatik rollback edilir
- *  - tcNo otomatik sifrelenir
  *  - TypeScript organizationId'yi zorunlu kilar (super_admin haric)
  */
 import { prisma } from '@/lib/prisma'
 import { createServiceClient } from '@/lib/supabase/server'
-import { encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 
 // ── Hata siniflari ──────────────────────────────────────────────
@@ -50,9 +48,7 @@ export class DbUserError extends Error {
 
     if (prismaErr.code === 'P2002') {
       const targets = prismaErr.meta?.target ?? []
-      if (targets.some(t => t.includes('tc_no'))) {
-        this.safeMessage = 'Bu TC Kimlik No ile kayıtlı bir personel zaten mevcut'
-      } else if (targets.some(t => t.includes('email'))) {
+      if (targets.some(t => t.includes('email'))) {
         this.safeMessage = 'Bu e-posta adresi ile kayıtlı bir personel zaten mevcut'
       } else {
         this.safeMessage = 'Bu bilgilerle kayıtlı bir personel zaten mevcut'
@@ -77,7 +73,6 @@ interface BaseParams {
 interface OrgUserParams extends BaseParams {
   role: 'admin' | 'staff'
   organizationId: string
-  tcNo?: string
   phone?: string
   title?: string
   departmentId?: string | null
@@ -157,7 +152,6 @@ export async function createAuthUser(params: CreateAuthUserParams): Promise<Crea
         role: params.role,
         organizationId,
         ...(isOrgUser(params) && {
-          tcNo: params.tcNo ? encrypt(params.tcNo) : undefined,
           phone: params.phone,
           title: params.title,
           departmentId: params.departmentId ?? undefined,
