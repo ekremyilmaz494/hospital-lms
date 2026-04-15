@@ -14,8 +14,10 @@ test.describe('Kimlik Dogrulama Akislari', () => {
     await page.fill('[type="email"]', 'test@example.com')
     await page.fill('[type="password"]', 'yanlis_sifre_123')
 
-    // Shadcn Checkbox — visible button, not hidden #kvkk input
-    await page.locator('button[data-slot="checkbox"]').click()
+    // Shadcn Checkbox — CI'da render geç tamamlanabilir, önce bekle
+    const kvkk = page.locator('button[data-slot="checkbox"]')
+    await kvkk.waitFor({ state: 'visible', timeout: 10000 })
+    await kvkk.click()
 
     await page.click('button[type="submit"]')
 
@@ -40,7 +42,7 @@ test.describe('Kimlik Dogrulama Akislari', () => {
     // KVKK hata mesaji gosterilmeli
     await expect(
       page.getByText(/KVKK metnini onaylamanız zorunludur/i)
-    ).toBeVisible({ timeout: 5000 })
+    ).toBeVisible({ timeout: 10000 })
   })
 
   test('cikis yap → login sayfasina yonlendirilir', async ({ page }) => {

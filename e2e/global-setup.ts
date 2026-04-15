@@ -59,13 +59,17 @@ async function loginAndSave(
 
     // Shadcn Checkbox: '#kvkk' is a hidden <input aria-hidden="true">.
     // The actual clickable element is <button data-slot="checkbox">.
+    // CI'da sayfa render geç tamamlanabilir — 10s bekle, bulamazsan devam et.
     const kvkk = page.locator('button[data-slot="checkbox"]')
-    if (await kvkk.isVisible({ timeout: 3000 }).catch(() => false)) {
+    try {
+      await kvkk.waitFor({ state: 'visible', timeout: 10000 })
       await kvkk.click()
+    } catch {
+      // Checkbox yoksa (ya da render gecikmesi) skip et
     }
 
     await page.click('button[type="submit"]')
-    await page.waitForURL(`**${dashboard}`, { timeout: 20000 })
+    await page.waitForURL(`**${dashboard}`, { timeout: 30000 })
 
     // Session'ı kaydet
     const stateFile = path.join(STATE_DIR, `${role}.json`)

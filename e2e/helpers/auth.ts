@@ -69,9 +69,13 @@ export async function login(page: Page, role: UserRole = 'admin') {
 
   // Shadcn Checkbox: '#kvkk' is a hidden <input aria-hidden="true">.
   // The actual clickable element is <button data-slot="checkbox">.
+  // CI'da sayfa render geç tamamlanabilir — 10s bekle, bulamazsan devam et.
   const kvkkCheckbox = page.locator('button[data-slot="checkbox"]')
-  if (await kvkkCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+  try {
+    await kvkkCheckbox.waitFor({ state: 'visible', timeout: 10000 })
     await kvkkCheckbox.click()
+  } catch {
+    // Checkbox yoksa skip et
   }
 
   await page.click('button[type="submit"]')
