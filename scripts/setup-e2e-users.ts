@@ -108,4 +108,7 @@ async function main() {
   await prisma.$disconnect()
 }
 
-main().catch((err) => { console.error('Hata:', err); process.exit(1) })
+// PgPool bağlantısı $disconnect sonrası event loop'u bloklar — process.exit ile zorla kapat
+main()
+  .then(() => process.exit(0))
+  .catch((err) => { console.error('Hata:', err); process.exit(1) })
