@@ -79,8 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           updatedAt: user.updated_at ?? user.created_at,
         });
         // JWT hydration sonrası sunucu doğrulaması yap (deaktive kullanıcı tespiti)
-        // 3 saniye geciktir — kritik render path'i bloklamadan kontrol et
-        setTimeout(refreshFromDB, 3000);
+        // 500ms geciktir — kritik render path'i bloklamadan kontrol et
+        setTimeout(refreshFromDB, 500);
       } else {
         setUser(null);
       }

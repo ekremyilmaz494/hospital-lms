@@ -9,7 +9,8 @@ const MFA_RATE_LIMIT_MAX = 5
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: { session }, error: authError } = await supabase.auth.getSession()
+  const user = session?.user
   if (authError || !user) return errorResponse('Oturum bulunamadı', 401)
 
   // Rate limiting: kullanıcı başına 5 dk / 5 deneme

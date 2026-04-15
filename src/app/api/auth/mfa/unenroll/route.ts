@@ -4,7 +4,8 @@ import { logger } from '@/lib/logger'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: { session }, error: authError } = await supabase.auth.getSession()
+  const user = session?.user
   if (authError || !user) return errorResponse('Oturum bulunamadı', 401)
 
   const body = await request.json().catch(() => null)
