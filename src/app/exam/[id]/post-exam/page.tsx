@@ -231,7 +231,7 @@ export default function PostExamPage() {
         });
         const retryData = await retry.json().catch(() => ({}));
         if (retry.ok) {
-          if (retryData.results) {
+          if (retryData.results && retryData.isPassed) {
             try { sessionStorage.setItem(`exam-results-${id}`, JSON.stringify(retryData.results)); } catch { /* ignore */ }
           }
           router.replace(`/exam/${id}/transition?from=post-exam&score=${retryData.score ?? 0}&passed=${retryData.isPassed ?? false}&passingScore=${retryData.passingScore ?? 70}&attemptId=${attemptId}`);
@@ -241,7 +241,7 @@ export default function PostExamPage() {
         router.push('/staff/my-trainings');
         return;
       }
-      if (data.results) {
+      if (data.results && data.isPassed) {
         try { sessionStorage.setItem(`exam-results-${id}`, JSON.stringify(data.results)); } catch { /* ignore */ }
       }
       router.replace(`/exam/${id}/transition?from=post-exam&score=${data.score ?? 0}&passed=${data.isPassed ?? false}&passingScore=${data.passingScore ?? 70}&attemptId=${attemptId}`);

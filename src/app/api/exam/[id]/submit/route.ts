@@ -313,7 +313,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     score,
     isPassed,
     passingScore: attempt.training.passingScore,
-    results: questionResults,
+    // Güvenlik: kullanıcı geçemediyse doğru cevapları/işaretlemelerini dönme.
+    // Aksi halde başarısız personel sonuç ekranından doğru cevapları ezberleyip
+    // sonraki denemede kolayca geçebilir.
+    results: isPassed ? questionResults : undefined,
     feedbackRequired,
   })
 }
