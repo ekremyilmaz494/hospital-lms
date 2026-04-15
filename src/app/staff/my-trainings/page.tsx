@@ -149,20 +149,20 @@ export default function MyTrainingsPage() {
 
       {/* ═══════ PAGE HEADER ═══════ */}
       <BlurFade delay={0}>
-        <header className="mb-10 sm:mb-14">
+        <header className="mb-6 sm:mb-14">
           <span
-            className="text-[10px] font-extrabold tracking-[0.22em] uppercase mb-3 block"
+            className="text-[10px] font-extrabold tracking-[0.22em] uppercase mb-2 sm:mb-3 block"
             style={{ color: T.secondary }}
           >
             LMS · Eğitim Portalı
           </span>
           <h1
-            className="text-[38px] sm:text-[60px] font-black tracking-[-0.03em] leading-[0.95] mb-4"
+            className="text-[30px] sm:text-[60px] font-black tracking-[-0.03em] leading-[0.95] mb-3 sm:mb-4"
             style={{ color: T.primary }}
           >
             Eğitimlerim
           </h1>
-          <p className="text-[14px] sm:text-[15px] leading-relaxed max-w-2xl" style={{ color: T.onSurfaceVariant }}>
+          <p className="text-[13px] sm:text-[15px] leading-relaxed max-w-2xl" style={{ color: T.onSurfaceVariant }}>
             Atanan eğitimlerinizi takip edin, sertifikalarınızı görüntüleyin ve profesyonel gelişiminizi sürdürün.
           </p>
         </header>
@@ -170,7 +170,7 @@ export default function MyTrainingsPage() {
 
       {/* ═══════ STATS BENTO — hover flips to primary ═══════ */}
       <BlurFade delay={0.05}>
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-10 sm:mb-12">
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 sm:mb-12">
           <StatCell icon={Library} label="Toplam Eğitim"  value={totalCount.toString()}      hoverBg={T.primary}          hoverText={T.primaryFixed} />
           <StatCell icon={Clock}   label="Devam Eden"     value={activeCount.toString()}     hoverBg={T.tertiaryContainer} hoverText={T.primary}       />
           <StatCell icon={CheckCircle2} label="Tamamlanan" value={completedCount.toString()} hoverBg={T.secondary}        hoverText={T.secondaryFixed} isGreen />
@@ -181,7 +181,7 @@ export default function MyTrainingsPage() {
       {/* ═══════ TAB SWITCHER ═══════ */}
       <BlurFade delay={0.07}>
         <div
-          className="flex gap-1 p-1.5 rounded-full mb-8 sm:mb-10 w-fit"
+          className="flex gap-1 p-1.5 rounded-full mb-6 sm:mb-10 w-full sm:w-fit"
           style={{
             background: 'rgba(255,255,255,0.6)',
             backdropFilter: 'blur(32px)',
@@ -200,7 +200,7 @@ export default function MyTrainingsPage() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 aria-pressed={isActive}
-                className="flex items-center gap-2.5 rounded-full px-5 py-2.5 text-[13px] font-bold transition-all duration-300"
+                className="flex flex-1 sm:flex-initial items-center justify-center gap-2 sm:gap-2.5 rounded-full px-4 sm:px-5 py-2.5 text-[13px] font-bold transition-all duration-300"
                 style={{
                   background: isActive ? T.primary : 'transparent',
                   color:      isActive ? '#ffffff' : T.onSurfaceVariant,
@@ -229,7 +229,7 @@ export default function MyTrainingsPage() {
           <button
             onClick={scrollToCompleted}
             aria-label="Tamamlanan eğitimlere git"
-            className="w-full flex items-center justify-between rounded-full px-7 py-4 mb-12 transition-all duration-300 group hover:-translate-y-0.5"
+            className="w-full flex items-center justify-between rounded-full px-5 py-3 sm:px-7 sm:py-4 mb-8 sm:mb-12 transition-all duration-300 group hover:-translate-y-0.5"
             style={{
               background: 'rgba(255,255,255,0.6)',
               backdropFilter: 'blur(32px)',
@@ -362,26 +362,26 @@ function StatCell({
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="p-6 sm:p-7 rounded-2xl flex flex-col justify-between transition-all duration-500 cursor-default"
+      className="p-4 sm:p-7 rounded-2xl flex flex-col justify-between transition-all duration-500 cursor-default"
       style={{
         background: hover ? hoverBg : baseBg,
-        minHeight: 180,
+        minHeight: 'clamp(120px, 25vw, 180px)',
       }}
     >
       <Icon
-        className="h-9 w-9 mb-6 transition-colors duration-500"
+        className="h-6 w-6 sm:h-9 sm:w-9 mb-3 sm:mb-6 transition-colors duration-500"
         style={{ color: hover ? hoverText : baseIcon }}
         strokeWidth={1.5}
       />
       <div>
         <div
-          className="text-[32px] sm:text-[40px] font-black leading-none tracking-tight mb-1.5 transition-colors duration-500"
+          className="text-[24px] sm:text-[40px] font-black leading-none tracking-tight mb-1 sm:mb-1.5 transition-colors duration-500"
           style={{ color: hover ? '#ffffff' : T.primary }}
         >
           {value}
         </div>
         <div
-          className="text-[11px] font-bold uppercase tracking-[0.12em] transition-colors duration-500"
+          className="text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.12em] transition-colors duration-500"
           style={{ color: hover ? hoverText : T.onSurfaceVariant }}
         >
           {label}
@@ -396,7 +396,7 @@ function SectionHead({
 }: { title: string; count: number; badgeBg: string; accent: string; delay?: number }) {
   return (
     <BlurFade delay={delay}>
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-4 mb-4 sm:mb-6">
         <h2 className="text-[22px] sm:text-[26px] font-black tracking-tight" style={{ color: accent }}>
           {title}
         </h2>
@@ -427,7 +427,7 @@ function ActiveHeroCard({ training: t }: { training: Training }) {
       >
         {/* Left: gradient panel with icon */}
         <div
-          className="md:w-[34%] h-52 md:h-auto relative overflow-hidden shrink-0"
+          className="md:w-[34%] h-36 sm:h-52 md:h-auto relative overflow-hidden shrink-0"
           style={{
             background: `linear-gradient(135deg, ${T.primary} 0%, ${T.primaryContainer} 55%, ${T.primaryDeep} 110%)`,
           }}
@@ -454,7 +454,7 @@ function ActiveHeroCard({ training: t }: { training: Training }) {
                 backdropFilter: 'blur(12px)',
               }}
             >
-              <Icon className="h-14 w-14" style={{ color: T.primaryFixed }} strokeWidth={1.5} />
+              <Icon className="h-9 w-9 sm:h-14 sm:w-14" style={{ color: T.primaryFixed }} strokeWidth={1.5} />
             </div>
           </div>
 
@@ -487,7 +487,7 @@ function ActiveHeroCard({ training: t }: { training: Training }) {
         </div>
 
         {/* Right: content */}
-        <div className="p-7 md:p-10 flex-1 flex flex-col justify-between min-w-0">
+        <div className="p-5 sm:p-7 md:p-10 flex-1 flex flex-col justify-between min-w-0">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <span
@@ -518,7 +518,7 @@ function ActiveHeroCard({ training: t }: { training: Training }) {
 
             {/* Inline stats ruler */}
             <dl
-              className="grid grid-cols-3 gap-4 py-4 border-y mb-6"
+              className="grid grid-cols-3 gap-2 sm:gap-4 py-3 sm:py-4 border-y mb-4 sm:mb-6"
               style={{ borderColor: `${T.outlineVariant}60` }}
             >
               <MiniStat label="Deneme"   value={`${t.attempt ?? 0} / ${t.maxAttempts ?? 3}`} />
@@ -534,13 +534,13 @@ function ActiveHeroCard({ training: t }: { training: Training }) {
           </div>
 
           {/* CTA row */}
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 sm:justify-between">
             <span className="text-[11px]" style={{ color: T.onSurfaceVariant }}>
               {t.status === 'assigned' ? 'Eğitime başlamak için hazırsınız' : 'Kaldığınız yerden devam edin'}
             </span>
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full pl-6 pr-5 py-3 text-[13px] font-extrabold transition-all duration-300 group-hover:pr-6"
+              className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-[13px] font-extrabold transition-all duration-300 w-full sm:w-auto"
               style={{
                 background: T.primary,
                 color: '#ffffff',
@@ -589,7 +589,7 @@ function CompletedCard({ training: t }: { training: Training }) {
   return (
     <Link href={`/staff/my-trainings/${t.id}`} className="block group">
       <article
-        className="rounded-2xl p-7 transition-all duration-500 group-hover:-translate-y-2 relative"
+        className="rounded-2xl p-5 sm:p-7 transition-all duration-500 group-hover:-translate-y-2 relative"
         style={{
           background: T.surfaceLowest,
           boxShadow: isTopScore
@@ -678,7 +678,7 @@ function FailedCard({ training: t }: { training: Training }) {
   return (
     <Link href={`/staff/my-trainings/${t.id}`} className="block group">
       <article
-        className="rounded-2xl p-6 transition-all duration-300 group-hover:-translate-y-0.5"
+        className="rounded-2xl p-4 sm:p-6 transition-all duration-300 group-hover:-translate-y-0.5"
         style={{
           background: T.surfaceLowest,
           borderLeft: `4px solid ${T.error}`,
