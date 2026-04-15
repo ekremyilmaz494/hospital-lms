@@ -191,7 +191,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  const allowed = await checkRateLimit(`training-delete:${dbUser!.id}`, 5, 3600)
+  const allowed = await checkRateLimit(`training-delete:${dbUser!.id}`, 30, 3600)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
   const existing = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })

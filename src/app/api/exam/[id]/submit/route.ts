@@ -274,13 +274,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }).catch(err => logger.error('SMG', 'Otomatik SMG aktivitesi oluşturulamadı', { err, attemptId: attempt.id }))
   }
 
+  const tabSwitchCount = parsed.data.tabSwitchCount ?? 0
+  const suspicious = tabSwitchCount >= 3
+
   await createAuditLog({
     userId: dbUser!.id,
     organizationId: attempt.training.organizationId,
     action: isPassed ? 'exam.passed' : 'exam.failed',
     entityType: 'exam_attempt',
     entityId: attempt.id,
-    newData: { score, isPassed, trainingId: attempt.trainingId },
+    newData: { score, isPassed, trainingId: attempt.trainingId, tabSwitchCount, suspicious },
   })
 
   void logActivity({
@@ -290,7 +293,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     resourceType: 'exam_attempt',
     resourceId: attempt.id,
     resourceTitle: attempt.training.title,
-    metadata: { score, passingScore: attempt.training.passingScore, attemptNumber: attempt.attemptNumber },
+    metadata: { score, passingScore: attempt.training.passingScore, attemptNumber: attempt.attemptNumber, tabSwitchCount, suspicious },
   })
 
   try { await invalidateDashboardCache(attempt.training.organizationId) } catch {}
@@ -308,11 +311,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     logger.warn('ExamSubmit', 'feedbackRequired check failed', { err: (err as Error).message })
   }
 
+  const attemptsRemaining = isPassed ? 0 : Math.max(0, effectiveMaxAttempts - attempt.attemptNumber)
+
   return jsonResponse({
     phase: 'post',
     score,
     isPassed,
     passingScore: attempt.training.passingScore,
+    attemptsRemaining,
     // Güvenlik: kullanıcı geçemediyse doğru cevapları/işaretlemelerini dönme.
     // Aksi halde başarısız personel sonuç ekranından doğru cevapları ezberleyip
     // sonraki denemede kolayca geçebilir.

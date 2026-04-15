@@ -116,7 +116,7 @@ const trainingBaseSchema = z.object({
   passingScore: z.coerce.number().int().min(0).max(100).default(70),
   maxAttempts: z.coerce.number().int().min(1).max(10).default(3),
   feedbackMandatory: z.coerce.boolean().default(false),
-  examDurationMinutes: z.coerce.number().int().max(180).default(30).transform(v => v < 5 ? 30 : v),
+  examDurationMinutes: z.coerce.number().int().min(1).max(180).default(30),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   // G5.4 — Training state machine
@@ -163,7 +163,7 @@ export const createTrainingBodySchema = z.object({
   passingScore: z.coerce.number().int().min(0).max(100).default(70),
   maxAttempts: z.coerce.number().int().min(1).max(10).default(3),
   feedbackMandatory: z.coerce.boolean().default(false),
-  examDurationMinutes: z.coerce.number().int().max(180).default(30).transform(v => v < 5 ? 30 : v),
+  examDurationMinutes: z.coerce.number().int().min(1).max(180).default(30),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   // Compliance alanları
@@ -207,6 +207,7 @@ export const submitExamSchema = z.object({
     selectedOptionId: z.string().uuid(),
   }).strict()).max(200),  // max 200 cevap — DoS koruması
   phase: z.enum(['pre', 'post']).optional(),
+  tabSwitchCount: z.number().int().min(0).max(10000).optional(),
 }).strict()
 
 // ── Subscription Plan ──

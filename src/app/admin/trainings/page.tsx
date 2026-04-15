@@ -91,17 +91,32 @@ export default function TrainingsPage() {
   };
 
   const handleDelete = async (training: Training) => {
-    if (window.confirm(`"${training.title}" eğitimini silmek istediğinize emin misiniz?`)) {
-      setDeletingId(training.id);
-      try {
-        const res = await fetch(`/api/admin/trainings/${training.id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Silme başarısız');
-        refetch();
-      } catch {
-        toast('Eğitim silinirken hata oluştu', 'error');
-      } finally {
-        setDeletingId(null);
+    if (!window.confirm(`"${training.title}" eğitimini silmek istediğinize emin misiniz?`)) return;
+    setDeletingId(training.id);
+    try {
+      let res = await fetch(`/api/admin/trainings/${training.id}`, { method: 'DELETE' });
+
+      if (res.status === 409) {
+        const data = await res.json().catch(() => null) as { requiresConfirmation?: boolean; activeAttemptCount?: number } | null;
+        if (data?.requiresConfirmation) {
+          const proceed = window.confirm(
+            `${data.activeAttemptCount} personelin devam eden sınavı var. Yine de silmek (arşivlemek) istiyor musunuz? Devam eden sınavlar iptal edilecek.`
+          );
+          if (!proceed) { setDeletingId(null); return; }
+          res = await fetch(`/api/admin/trainings/${training.id}?force=true`, { method: 'DELETE' });
+        }
       }
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null) as { error?: string; message?: string } | null;
+        throw new Error(data?.error || data?.message || `Silme başarısız (HTTP ${res.status})`);
+      }
+      toast(`"${training.title}" silindi`, 'success');
+      refetch();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Eğitim silinirken hata oluştu', 'error');
+    } finally {
+      setDeletingId(null);
     }
   };
 

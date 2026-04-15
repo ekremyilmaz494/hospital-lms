@@ -25,6 +25,7 @@ export async function GET(request: Request) {
   const data = await withCache(cacheKey, 120, async () => {
     const where: Record<string, unknown> = {
       organizationId: orgId,
+      isActive: true,
     }
 
     if (search) {

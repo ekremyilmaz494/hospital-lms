@@ -148,27 +148,18 @@ export default function PostExamPage() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setTabSwitchCount((prev) => {
-          const next = prev + 1;
-          if (next >= 3) {
-            toast('3. ihlal: Sınavınız otomatik sonlandırıldı', 'error');
-          } else {
-            toast(`Uyarı: Sekme değiştirme tespit edildi (${next}/3)`, 'warning');
-          }
-          return next;
-        });
+        setTabSwitchCount((prev) => prev + 1);
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [toast]);
+  }, []);
 
-  // Force submit on 3rd tab switch violation
+  // Tab switch count değişince uyarı toast'ı göster (kayıt admin raporlarında görünür)
   useEffect(() => {
-    if (tabSwitchCount >= 3 && handleFinishRef.current) {
-      handleFinishRef.current();
-    }
-  }, [tabSwitchCount]);
+    if (tabSwitchCount === 0) return;
+    toast(`Sekme değiştirme tespit edildi (${tabSwitchCount}). Bu davranış kayıt altına alınıyor.`, 'warning');
+  }, [tabSwitchCount, toast]);
 
   // Anti-cheat: Fullscreen zorunluluğu (examOnly sınavlarda)
   useEffect(() => {
@@ -219,7 +210,7 @@ export default function PostExamPage() {
       const res = await fetch(`/api/exam/${id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: formattedAnswers, phase: 'post' }),
+        body: JSON.stringify({ answers: formattedAnswers, phase: 'post', tabSwitchCount }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -227,14 +218,14 @@ export default function PostExamPage() {
         const retry = await fetch(`/api/exam/${id}/submit`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers: formattedAnswers, phase: 'post' }),
+          body: JSON.stringify({ answers: formattedAnswers, phase: 'post', tabSwitchCount }),
         });
         const retryData = await retry.json().catch(() => ({}));
         if (retry.ok) {
           if (retryData.results && retryData.isPassed) {
             try { sessionStorage.setItem(`exam-results-${id}`, JSON.stringify(retryData.results)); } catch { /* ignore */ }
           }
-          router.replace(`/exam/${id}/transition?from=post-exam&score=${retryData.score ?? 0}&passed=${retryData.isPassed ?? false}&passingScore=${retryData.passingScore ?? 70}&attemptId=${attemptId}`);
+          router.replace(`/exam/${id}/transition?from=post-exam&score=${retryData.score ?? 0}&passed=${retryData.isPassed ?? false}&passingScore=${retryData.passingScore ?? 70}&attemptsRemaining=${retryData.attemptsRemaining ?? 0}&attemptId=${attemptId}`);
           return;
         }
         toast(`Sınav gönderilemedi: ${data.error || retryData.error || 'Bilinmeyen hata'}. Cevaplarınız kaydedilmemiş olabilir.`, 'error');
@@ -244,7 +235,7 @@ export default function PostExamPage() {
       if (data.results && data.isPassed) {
         try { sessionStorage.setItem(`exam-results-${id}`, JSON.stringify(data.results)); } catch { /* ignore */ }
       }
-      router.replace(`/exam/${id}/transition?from=post-exam&score=${data.score ?? 0}&passed=${data.isPassed ?? false}&passingScore=${data.passingScore ?? 70}&attemptId=${attemptId}`);
+      router.replace(`/exam/${id}/transition?from=post-exam&score=${data.score ?? 0}&passed=${data.isPassed ?? false}&passingScore=${data.passingScore ?? 70}&attemptsRemaining=${data.attemptsRemaining ?? 0}&attemptId=${attemptId}`);
     } catch (err) {
       toast('Sınav gönderilemedi — internet bağlantınızı kontrol edin. Sayfayı yenileyip tekrar deneyin.', 'error');
       router.push('/staff/my-trainings');
@@ -288,9 +279,9 @@ export default function PostExamPage() {
       {isExamOnly && tabSwitchCount > 0 && (
         <div
           className="sticky top-0 z-60 flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white"
-          style={{ background: tabSwitchCount >= 2 ? 'var(--color-error)' : 'var(--color-warning)' }}
+          style={{ background: 'var(--color-warning)' }}
         >
-          Sekme değiştirme tespit edildi ({tabSwitchCount}/3) — 3. ihlalde sınav sonlandırılır
+          Sekme değiştirme tespit edildi ({tabSwitchCount}) — davranışınız kayıt altına alınıyor
         </div>
       )}
       <div className="sticky top-0 z-50 border-b px-6 py-3" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>

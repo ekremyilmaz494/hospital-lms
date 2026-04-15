@@ -22,6 +22,7 @@ function TransitionContent() {
   const score = searchParams.get('score');
   const passed = searchParams.get('passed');
   const passingScore = searchParams.get('passingScore');
+  const attemptsRemaining = Number(searchParams.get('attemptsRemaining') ?? '0');
   const attemptIdParam = searchParams.get('attemptId');
   const [timeLeft, setTimeLeft] = useState(COUNTDOWN_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -190,13 +191,23 @@ function TransitionContent() {
                 </div>
               )}
 
-              {!isPassed && (
+              {!isPassed && attemptsRemaining > 0 && (
                 <div className="rounded-xl p-4" style={{ background: 'var(--color-warning-bg)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
                   <p className="text-[13px] font-semibold" style={{ color: 'var(--color-warning)' }}>
-                    Bir sonraki denemenizde tekrar deneyebilirsiniz.
+                    {attemptsRemaining} deneme hakkınız kaldı.
                   </p>
                   <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    2. denemeden itibaren ön sınav atlanır, doğrudan videoları izleyip son sınava girersiniz.
+                    Sonraki denemenizde ön sınav atlanır, doğrudan videoları izleyip son sınava girersiniz.
+                  </p>
+                </div>
+              )}
+              {!isPassed && attemptsRemaining === 0 && (
+                <div className="rounded-xl p-4" style={{ background: 'var(--color-error-bg)', border: '1px solid rgba(220, 38, 38, 0.2)' }}>
+                  <p className="text-[13px] font-semibold" style={{ color: 'var(--color-error)' }}>
+                    Tüm deneme haklarınız tükendi.
+                  </p>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Yeni bir deneme için lütfen yöneticinize başvurun.
                   </p>
                 </div>
               )}

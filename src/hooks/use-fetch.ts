@@ -229,15 +229,15 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
   }, [normalizedUrl, intervalMs]);
 
   const refetch = useCallback(() => {
-    if (normalizedUrl) cache.delete(normalizedUrl);
     forceRef.current = true;
     // Reset interval timer to avoid double-fetch
     if (intervalRef.current && intervalMs && intervalMs > 0) {
       clearInterval(intervalRef.current);
       intervalRef.current = setInterval(() => fetchData(true), intervalMs);
     }
-    fetchData();
-  }, [normalizedUrl, fetchData, intervalMs]);
+    // Background fetch: keep existing data visible until new data arrives → no loading flash
+    fetchData(true);
+  }, [fetchData, intervalMs]);
 
   return { data, isLoading, error, refetch };
 }

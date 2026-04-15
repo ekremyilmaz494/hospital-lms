@@ -50,15 +50,38 @@ export default function PreExamPage() {
     if (!confirmed) return;
     let cancelled = false;
 
+    type StartAttemptBody = { id?: string; status?: string; examOnly?: boolean; error?: string };
+    // Geçici Redis/DB jitter'larına karşı: sadece 5xx/network hatasında 1 kez otomatik retry
+    async function startAttempt(): Promise<{ res: Response; body: StartAttemptBody }> {
+      for (let i = 0; i < 2; i++) {
+        try {
+          const res = await fetch(`/api/exam/${id}/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ examType: 'pre' }),
+          });
+          const body = await res.json().catch(() => ({}));
+          // 5xx'de tekrar dene (ilk deneme), diğer durumlarda döndür
+          if (res.status >= 500 && i === 0) {
+            await new Promise((r) => setTimeout(r, 800));
+            continue;
+          }
+          return { res, body };
+        } catch (err) {
+          if (i === 0) {
+            await new Promise((r) => setTimeout(r, 800));
+            continue;
+          }
+          throw err;
+        }
+      }
+      throw new Error('unreachable');
+    }
+
     async function initExam() {
       try {
-        // Adim 1: Attempt baslat
-        const startRes = await fetch(`/api/exam/${id}/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ examType: 'pre' }),
-        });
-        const attempt = await startRes.json();
+        // Adim 1: Attempt baslat (retry'lı)
+        const { res: startRes, body: attempt } = await startAttempt();
 
         // Start API hata kontrolu — gercek hatayi goster
         if (!startRes.ok) {
@@ -120,8 +143,11 @@ export default function PreExamPage() {
             if (Object.keys(restored).length > 0) setAnswers(restored);
           }
         }
-      } catch {
-        if (!cancelled) setError('Sınav başlatılamadı');
+      } catch (err) {
+        if (!cancelled) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setError(`Sınav başlatılamadı (ağ/istemci hatası): ${msg}`);
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -164,20 +190,18 @@ export default function PreExamPage() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setTabSwitchCount((prev) => {
-          const next = prev + 1;
-          if (next >= 3) {
-            toast('3. ihlal: Sinaviniz otomatik sonlandirildi', 'error');
-          } else {
-            toast(`Uyari: Sekme degistirme tespit edildi (${next}/3)`, 'warning');
-          }
-          return next;
-        });
+        setTabSwitchCount((prev) => prev + 1);
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [toast]);
+  }, []);
+
+  // Tab switch count değişince uyarı toast'ı göster (kayıt admin raporlarında görünür)
+  useEffect(() => {
+    if (tabSwitchCount === 0) return;
+    toast(`Sekme değiştirme tespit edildi (${tabSwitchCount}). Bu davranış kayıt altına alınıyor.`, 'warning');
+  }, [tabSwitchCount, toast]);
 
   // handleFinish — tüm hook'lar early return'lerden ÖNCE tanımlanmalı (React rules of hooks)
   const handleFinish = useCallback(async () => {
@@ -199,7 +223,7 @@ export default function PreExamPage() {
       const res = await fetch(`/api/exam/${id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: formattedAnswers, phase: 'pre' }),
+        body: JSON.stringify({ answers: formattedAnswers, phase: 'pre', tabSwitchCount }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -214,7 +238,7 @@ export default function PreExamPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [id, answers, examData, router, submitting]);
+  }, [id, answers, examData, router, submitting, tabSwitchCount]);
 
   // Auto-submit when timer hits zero
   const handleFinishRef = useRef<() => void>(undefined);
@@ -222,13 +246,6 @@ export default function PreExamPage() {
   useEffect(() => {
     if (timeLeft === 0 && handleFinishRef.current) handleFinishRef.current();
   }, [timeLeft]);
-
-  // Force submit on 3rd tab switch violation
-  useEffect(() => {
-    if (tabSwitchCount >= 3 && handleFinishRef.current) {
-      handleFinishRef.current();
-    }
-  }, [tabSwitchCount]);
 
   // ── Early returns (tüm hook'lar yukarıda tanımlandı) ──
 
@@ -264,7 +281,7 @@ export default function PreExamPage() {
               <Ban className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--color-error)' }} />
               <div>
                 <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Sekme değiştirme yasağı</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Sınav sırasında başka sekmeye geçmeniz tespit edilir. 3 ihlalde sınav otomatik olarak gönderilir.</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Sınav sırasında başka sekmeye geçmeniz tespit edilir ve admin raporlarına işlenir.</p>
               </div>
             </div>
 
