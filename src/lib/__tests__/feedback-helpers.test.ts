@@ -1,4 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// feedback-helpers.ts prisma'yı module scope'ta import eder; unit testlerde
+// DATABASE_URL olmadığından mock'lanması gerekir.
+vi.mock('@/lib/prisma', () => ({ prisma: {} }))
+
 import {
   isValidAnswer,
   aggregateItemScores,
