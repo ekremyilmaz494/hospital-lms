@@ -5,7 +5,7 @@
  * 3. DB schema senkronizasyonu
  */
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { execFileSync } = require('child_process');
+const { execSync } = require('child_process');
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
@@ -31,7 +31,7 @@ if (os.platform() === 'darwin') {
 // ── 2. Prisma generate ──
 try {
   console.log('[predev] Prisma client generate ediliyor...');
-  execFileSync('npx', ['prisma', 'generate'], { stdio: 'inherit', cwd: root, timeout: 30000 });
+  execSync('pnpm exec prisma generate', { stdio: 'inherit', cwd: root, timeout: 30000 });
   console.log('[predev] ✓ Prisma client hazır');
 } catch (err) {
   console.warn('[predev] ⚠ Prisma generate başarısız:', err.message?.substring(0, 80));

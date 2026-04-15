@@ -7,7 +7,7 @@
 require('dotenv').config({ path: '.env.local' });
 require('dotenv').config({ path: '.env' });
 
-const { execFileSync } = require('child_process');
+const { execSync } = require('child_process');
 
 const directUrl = process.env.DIRECT_URL;
 if (!directUrl) {
@@ -17,9 +17,9 @@ if (!directUrl) {
 
 try {
   console.log('[sync-db] Schema → DB senkronizasyonu başlıyor...');
-  execFileSync('npx', ['prisma', 'db', 'push', '--accept-data-loss', '--url', directUrl], {
+  execSync('pnpm exec prisma migrate deploy', {
     stdio: 'inherit',
-    timeout: 30000,
+    timeout: 60000,
   });
   console.log('[sync-db] ✓ DB senkronize edildi.');
 } catch (err) {
