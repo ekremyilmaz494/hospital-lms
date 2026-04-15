@@ -415,9 +415,20 @@ export default function TrainingDetailPage() {
               <CheckCircle className="h-8 w-8" style={{ color: 'var(--color-success)' }} />
             </div>
             <p className="text-[15px] font-bold" style={{ color: 'var(--color-success)' }}>Eğitim Tamamlandı!</p>
-            <Link href="/staff/certificates" className="text-[12px] font-semibold" style={{ color: 'var(--color-primary)' }}>
-              Sertifikalarıma Git →
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center gap-3 mt-2">
+              {videos.length > 0 && (
+                <Link
+                  href={`/exam/${examId}/videos?mode=review`}
+                  className="flex items-center gap-2 rounded-xl px-4 py-2 text-[12px] font-semibold"
+                  style={{ border: '1px solid var(--color-primary)', color: 'var(--color-primary)', background: 'var(--color-surface)' }}
+                >
+                  <Play className="h-3.5 w-3.5" /> Videoları Tekrar İzle
+                </Link>
+              )}
+              <Link href="/staff/certificates" className="text-[12px] font-semibold" style={{ color: 'var(--color-primary)' }}>
+                Sertifikalarıma Git →
+              </Link>
+            </div>
           </div>
         </BlurFade>
       )}

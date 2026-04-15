@@ -4747,3 +4747,178 @@ pnpm prisma generate
 `SUPABASE_SERVICE_ROLE_KEY` GitHub Secrets'ta tanımlı olmalı. Tanımlı değilse setup adımı çalışmaz. GitHub → Settings → Secrets → Actions'tan kontrol edilmeli.
 
 *Son güncelleme: 15 Nisan 2026 — Oturum 44*
+
+---
+
+## OTURUM 45 — 15 Nisan 2026
+
+### Kapsam
+Eğitim silme hatası, sınav zamanlayıcısı sorunları, examDurationMinutes fix, maxAttempts=1 retry mesajı, personel "Eğitimlerim" sayfası premium yeniden tasarım ve mobil optimizasyonu.
+
+---
+
+### 1. Eğitim Silme Hatası
+
+**Sorun:** Admin panelinde eğitim silme işlemi hata veriyor, kullanıcıya bildirim gelmiyor.
+
+**Kök Neden:** `handleDelete` fonksiyonu 409 (`requiresConfirmation`) yanıtını ele almıyordu.
+
+**Çözüm (`src/app/admin/trainings/page.tsx`):**
+- 409 kontrolü eklendi: `requiresConfirmation` true ise ikinci onay penceresi açılıyor
+- `?force=true` ile tekrar DELETE isteği
+- Başarılı silmede success toast bildirimi
+- Hata mesajında gerçek API hatası gösteriliyor
+
+---
+
+### 2. Silinen Eğitim Tablodan Kaybolmuyor + Loading Flash
+
+**Sorun:** Silme sonrası `refetch`'te tablo kaybolup tekrar beliriyordu (loading flash).
+
+**Çözüm 1 — API filtresi (`src/app/api/admin/trainings/route.ts`):**
+```ts
+const where = { organizationId: orgId, isActive: true }
+```
+Soft-delete kayıtlar artık listelenmez.
+
+**Çözüm 2 — Background refetch (`src/hooks/use-fetch.ts`):**
+```ts
+const refetch = useCallback(() => {
+  forceRef.current = true;
+  fetchData(true); // background=true — loading state tetiklenmiyor
+}, [fetchData, intervalMs]);
+```
+
+---
+
+### 3. Rate Limit Silmeyi Engelliyor
+
+**Çözüm (`src/app/api/admin/trainings/[id]/route.ts`):**
+Rate limit 5/saat'ten 30/saate yükseltildi — gerçek kullanım senaryosu için yeterli.
+
+---
+
+### 4. Sınav Zamanlayıcısı — Tab Switch Force Submit Kaldırıldı
+
+**Sorun:** `tabSwitchCount >= 3` olunca sınav zorla submit ediliyordu, 4. dakikada bitiyordu.
+
+**Karar:** Sadece uyarı + audit log, force submit yok.
+
+**Değişiklikler:**
+- `pre-exam/page.tsx` ve `post-exam/page.tsx`: force-submit useEffect kaldırıldı
+- Toast: "Sekme değiştirme tespit edildi (N). Bu davranış kayıt altına alınıyor."
+- `tabSwitchCount` submit body'ye eklendi
+- `src/app/api/exam/[id]/submit/route.ts`: `suspicious` flag (>= 3) audit log ve logActivity'ye eklendi
+
+---
+
+### 5. examDurationMinutes Her Zaman 30 Kaydediyordu
+
+**Kök Neden (`src/lib/validations.ts`):**
+`.transform(v => v < 5 ? 30 : v)` — form boş gelince bile 30'a çeviriyordu.
+
+**Çözüm:**
+```ts
+// ESKİ
+examDurationMinutes: z.coerce.number().int().min(1).max(180).default(30).transform(v => v < 5 ? 30 : v)
+// YENİ
+examDurationMinutes: z.coerce.number().int().min(1).max(180).default(30)
+```
+
+**Not:** Mevcut bozuk eğitimler Edit aracılığıyla düzeltilmeli.
+
+---
+
+### 6. maxAttempts=1 Eğitimde Yanlış Retry Mesajı
+
+**Sorun:** 1 deneme hakkı olan eğitimde başarısız olunca "2. deneme" mesajı çıkıyordu.
+
+**Çözüm zinciri:**
+
+1. **Submit API** (`src/app/api/exam/[id]/submit/route.ts`):
+```ts
+const attemptsRemaining = isPassed ? 0 : Math.max(0, effectiveMaxAttempts - attempt.attemptNumber)
+return jsonResponse({ ..., attemptsRemaining })
+```
+
+2. **Post-exam** (`src/app/exam/[id]/post-exam/page.tsx`): `attemptsRemaining` URL parametresine eklendi
+
+3. **Transition sayfası** (`src/app/exam/[id]/transition/page.tsx`):
+- `attemptsRemaining > 0` ise sarı uyarı "N deneme hakkınız kaldı"
+- `attemptsRemaining === 0` ise kırmızı "Tüm deneme haklarınız tükendi"
+
+---
+
+### 7. Personel "Eğitimlerim" Sayfası Premium Yeniden Tasarım
+
+**Dosya:** `src/app/staff/my-trainings/page.tsx` — 732 satır tam yeniden yazım
+
+**Tasarım konsepti:** "Klinik Atölye" — Plus Jakarta Sans font, proje renk sistemi (#0d9668 primary, #f59e0b accent), bento grid istatistikler, hero split kartlar.
+
+**Bileşenler:**
+
+| Bileşen | Açıklama |
+|---|---|
+| `StatCell` | Hover'da renge dönen bento kart, sayılar büyük, flip animasyonu |
+| `ActiveHeroCard` | %34 gradient panel (lucide ikon) + %66 içerik (mini stat ruler + CTA) |
+| `CompletedCard` | Bento kart, skor rengi, progress bar, Award ikonu (>= 95 puan) |
+| `FailedCard` | Sol 4px kırmızı border, AlertOctagon ikonu, yöneticiye başvur CTA |
+| `SectionHead` | Büyük başlık + renkli sayı badge |
+
+**Award ikonu çakışma fix:**
+`absolute top-5 right-5` → `%100` skor metniyle çakışıyordu.
+Çözüm: Award ikonu skor yanına inline taşındı (flex row içerisinde).
+
+---
+
+### 8. Browser Cache Sorunu (Vercel vs Localhost)
+
+**Sorun:** Yeni tasarım local'de görünüyor ama Vercel URL'inde eski görünüyor.
+**Neden:** Değişiklikler `git push` yapılmamıştı.
+**Çözüm:** `git add` → `git commit` → `git push origin main`
+
+---
+
+### 9. Mobil Optimizasyon
+
+**Dosya:** `src/app/staff/my-trainings/page.tsx`
+
+| Alan | Önceki | Sonraki |
+|---|---|---|
+| Başlık font | `38px` sabit | `30px` (sm: 60px) |
+| Stat kart yüksekliği | `180px` sabit | `clamp(120px, 25vw, 180px)` |
+| Stat kart ikon | `h-9 w-9` | `h-6 w-6` (sm: h-9) |
+| Stat kart sayı font | `32px` | `24px` (sm: 40px) |
+| Tab switcher | `w-fit` | `w-full` (sm: w-fit), butonlar `flex-1` |
+| Hero card gradient panel | `h-52` | `h-36` (sm: h-52) |
+| Hero card ikon | `h-14 w-14` | `h-9 w-9` (sm: h-14) |
+| Hero card içerik padding | `p-7` | `p-5` (sm: p-7) |
+| CTA butonu | satır sonu | `w-full` mobilde |
+| Completed card padding | `p-7` | `p-5` (sm: p-7) |
+| Failed card padding | `p-6` | `p-4` (sm: p-6) |
+
+**Teknik not:** `clamp(120px, 25vw, 180px)` — viewport'un %25'i, breakpoint sınıfı yerine tek CSS değeriyle fluid boyut.
+
+---
+
+### Commit Özeti
+
+| Commit | Açıklama |
+|---|---|
+| `36e1dd9` | feat(staff): my-trainings yeni tasarım + sınav & silme iyileştirmeleri |
+| `1c63ab0` | fix(staff): my-trainings mobil optimizasyon |
+
+### Değiştirilen Dosyalar
+
+- `src/app/staff/my-trainings/page.tsx` — tam yeniden yazım + mobil
+- `src/app/admin/trainings/page.tsx` — 409 silme akışı, toast
+- `src/app/api/admin/trainings/route.ts` — isActive filtresi
+- `src/app/api/admin/trainings/[id]/route.ts` — rate limit 30
+- `src/hooks/use-fetch.ts` — background refetch
+- `src/app/exam/[id]/pre-exam/page.tsx` — force-submit kaldırıldı
+- `src/app/exam/[id]/post-exam/page.tsx` — attemptsRemaining URL param
+- `src/app/exam/[id]/transition/page.tsx` — koşullu retry mesajı
+- `src/lib/validations.ts` — examDurationMinutes transform kaldırıldı
+- `src/app/api/exam/[id]/submit/route.ts` — tabSwitchCount, attemptsRemaining
+
+*Son güncelleme: 15 Nisan 2026 — Oturum 45*

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Play, Pause, Volume2, VolumeX, CheckCircle, Lock, ArrowRight, AlertTriangle, SkipForward, FileText } from 'lucide-react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Play, Pause, Volume2, VolumeX, CheckCircle, Lock, ArrowRight, AlertTriangle, SkipForward, FileText, Maximize2, Minimize2, Shield } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const PdfViewer = dynamic(
@@ -45,14 +45,17 @@ function formatTime(seconds: number): string {
 export default function VideoPlayerPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const isReview = searchParams.get('mode') === 'review';
 
   // Ensure an active exam attempt exists BEFORE fetching videos (prevents race condition
   // where GET /videos resolves before POST /start, finding a completed attempt and redirecting away)
-  const [startReady, setStartReady] = useState(false);
+  // Review modda start çağrısı atlanır — passed eğitim salt-okunur açılır
+  const [startReady, setStartReady] = useState(isReview);
   const [startError, setStartError] = useState<string | null>(null);
   const startCalled = useRef(false);
   useEffect(() => {
-    if (!id || startCalled.current) return;
+    if (isReview || !id || startCalled.current) return;
     startCalled.current = true;
     fetch(`/api/exam/${id}/start`, { method: 'POST' })
       .then(async (res) => {
@@ -64,9 +67,10 @@ export default function VideoPlayerPage() {
         setStartReady(true);
       })
       .catch(() => setStartError('Sınav başlatılamadı. Lütfen tekrar deneyin.'));
-  }, [id]);
+  }, [id, isReview]);
 
-  const { data, isLoading, error, refetch } = useFetch<VideosResponse>(startReady ? `/api/exam/${id}/videos` : null);
+  const videosUrl = startReady ? `/api/exam/${id}/videos${isReview ? '?mode=review' : ''}` : null;
+  const { data, isLoading, error, refetch } = useFetch<VideosResponse>(videosUrl);
 
   const rawVideos = data?.videos ?? [];
   const trainingTitle = data?.trainingTitle ?? '';
@@ -79,10 +83,20 @@ export default function VideoPlayerPage() {
   }));
   const videosRef = useRef(videosData);
 
+  // Split content into media (video/audio) and pdf groups
+  const mediaItems = videosData.filter(v => v.contentType !== 'pdf');
+  const pdfItems = videosData.filter(v => v.contentType === 'pdf');
+  const isMixed = mediaItems.length > 0 && pdfItems.length > 0;
+
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
   const [currentVideoIdx, setCurrentVideoIdx] = useState(-1);
+  const [currentMediaIdx, setCurrentMediaIdx] = useState(-1);
+  const [currentPdfIdx, setCurrentPdfIdx] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [videoError, setVideoError] = useState(false);
@@ -106,8 +120,21 @@ export default function VideoPlayerPage() {
     const firstIncomplete = videosData.findIndex((v) => !v.completed);
     setCurrentVideoIdx(firstIncomplete >= 0 ? firstIncomplete : 0);
   }
+  if (mediaItems.length > 0 && currentMediaIdx === -1) {
+    const firstIncomplete = mediaItems.findIndex((v) => !v.completed);
+    setCurrentMediaIdx(firstIncomplete >= 0 ? firstIncomplete : 0);
+  }
+  if (pdfItems.length > 0 && currentPdfIdx === -1) {
+    const firstIncomplete = pdfItems.findIndex((v) => !v.completed);
+    setCurrentPdfIdx(firstIncomplete >= 0 ? firstIncomplete : 0);
+  }
 
-  const currentVideo = videosData[currentVideoIdx >= 0 ? currentVideoIdx : 0];
+  // In mixed mode, `currentVideo` refers to the active media (left column).
+  // In single mode, it refers to the single-list selection.
+  const singleCurrent = videosData[currentVideoIdx >= 0 ? currentVideoIdx : 0];
+  const activeMedia = mediaItems[currentMediaIdx >= 0 ? currentMediaIdx : 0];
+  const activePdf = pdfItems[currentPdfIdx >= 0 ? currentPdfIdx : 0];
+  const currentVideo = isMixed ? activeMedia : singleCurrent;
   const allCompleted = videosData.length > 0 && videosData.every((v) => v.completed);
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -126,14 +153,56 @@ export default function VideoPlayerPage() {
   const toggleMute = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    video.muted = !video.muted;
-    setIsMuted(video.muted);
+    if (video.muted || volume === 0) {
+      const restored = volume === 0 ? 0.7 : volume;
+      video.muted = false;
+      video.volume = restored;
+      setVolume(restored);
+      setIsMuted(false);
+    } else {
+      video.muted = true;
+      setIsMuted(true);
+    }
+  }, [volume]);
+
+  // Volume slider
+  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const val = parseFloat(e.target.value);
+    video.volume = val;
+    video.muted = val === 0;
+    setVolume(val);
+    setIsMuted(val === 0);
+  }, []);
+
+  // Fullscreen toggle
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await playerContainerRef.current?.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch { /* fullscreen not supported */ }
+  }, []);
+
+  // Sync fullscreen state with browser (Escape key also exits)
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
   // Prevent fast-forward: if user seeks ahead, snap back
+  // Review modda ileri sarma serbest — snap-back devre dışı
   const handleTimeUpdate = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
+    if (isReview) {
+      setCurrentTime(video.currentTime);
+      return;
+    }
     // Allow up to 2 seconds ahead of last allowed time (for normal buffering)
     if (video.currentTime > lastAllowedTime.current + 2) {
       video.currentTime = lastAllowedTime.current;
@@ -141,14 +210,23 @@ export default function VideoPlayerPage() {
       lastAllowedTime.current = Math.max(lastAllowedTime.current, video.currentTime);
     }
     setCurrentTime(video.currentTime);
-  }, []);
+  }, [isReview]);
 
-  // Auto-advance to next video
+  // Auto-advance to next video (within its group in mixed mode)
   const goToNextVideo = useCallback(() => {
-    if (currentVideoIdx < videosData.length - 1) {
+    if (isMixed) {
+      if (currentMediaIdx < mediaItems.length - 1) {
+        setCurrentMediaIdx(currentMediaIdx + 1);
+        lastAllowedTime.current = 0;
+        setCurrentTime(0);
+        setDuration(0);
+        setIsPlaying(false);
+        setVideoError(false);
+      }
+    } else if (currentVideoIdx < videosData.length - 1) {
       changeVideo(currentVideoIdx + 1);
     }
-  }, [currentVideoIdx, videosData.length, changeVideo]);
+  }, [isMixed, currentMediaIdx, mediaItems.length, currentVideoIdx, videosData.length, changeVideo]);
 
   // Heartbeat error counter — declared before handleVideoEnded to avoid access-before-declare
   const [heartbeatErrors, setHeartbeatErrors] = useState(0);
@@ -161,12 +239,25 @@ export default function VideoPlayerPage() {
 
     // Use ref for fresh data (avoids stale closure)
     const vids = videosRef.current;
-    const isLastVideo = currentVideoIdx >= vids.length - 1;
+    const activeIdx = isMixed
+      ? vids.findIndex(v => v.id === currentVideo.id)
+      : currentVideoIdx;
+    const isLastVideo = isMixed
+      ? currentMediaIdx >= mediaItems.length - 1
+      : activeIdx >= vids.length - 1;
     const remainingIncomplete = vids.filter(v => !v.completed && v.id !== currentVideo.id).length;
 
     // Optimistic update first for instant UI feedback
     setLocalCompleted(prev => new Set(prev).add(currentVideo.id));
     videosRef.current = vids.map(v => v.id === currentVideo.id ? { ...v, completed: true } : v);
+
+    // Review modda server POST atlanır — progress bozulmasın
+    if (isReview) {
+      if (!isLastVideo) {
+        setTimeout(() => goToNextVideo(), 1500);
+      }
+      return;
+    }
 
     // Mark video as completed on server — rollback on failure
     fetch(`/api/exam/${id}/videos`, {
@@ -188,11 +279,11 @@ export default function VideoPlayerPage() {
     } else if (!isLastVideo) {
       setTimeout(() => goToNextVideo(), 1500);
     }
-  }, [currentVideo, id, duration, currentVideoIdx, goToNextVideo, router]);
+  }, [currentVideo, id, duration, currentVideoIdx, goToNextVideo, router, isMixed, currentMediaIdx, mediaItems.length, isReview]);
 
-  // Heartbeat every 15 seconds
+  // Heartbeat every 15 seconds — review modda progress yazılmaz
   useEffect(() => {
-    if (!isPlaying || !currentVideo) return;
+    if (isReview || !isPlaying || !currentVideo) return;
     const heartbeat = setInterval(() => {
       fetch(`/api/exam/${id}/videos`, {
         method: 'POST',
@@ -203,7 +294,7 @@ export default function VideoPlayerPage() {
       });
     }, 15000);
     return () => clearInterval(heartbeat);
-  }, [isPlaying, currentVideo?.id, currentTime, id]);
+  }, [isPlaying, currentVideo?.id, currentTime, id, isReview]);
 
   // Sekme degistiginde videoyu durdur — personel baska sekmede oyalanmasin
   useEffect(() => {
@@ -223,8 +314,9 @@ export default function VideoPlayerPage() {
     queueMicrotask(() => setCurrentTime(pos > 0 ? pos : 0));
   }, [currentVideo?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sayfa kapanirken son pozisyonu kaydet (beforeunload)
+  // Sayfa kapanirken son pozisyonu kaydet (beforeunload) — review modda yazma yok
   useEffect(() => {
+    if (isReview) return;
     const saveOnExit = () => {
       if (currentVideo && currentTime > 0) {
         const payload = JSON.stringify({
@@ -238,19 +330,21 @@ export default function VideoPlayerPage() {
     };
     window.addEventListener('beforeunload', saveOnExit);
     return () => window.removeEventListener('beforeunload', saveOnExit);
-  }, [currentVideo?.id, currentTime, id]);
+  }, [currentVideo?.id, currentTime, id, isReview]);
 
   // Phase guard: redirect based on attempt status (must be before early returns but after all hooks)
+  // Review modda guard atlanır — salt-okunur erişim verilir
   useEffect(() => {
+    if (isReview) return;
     if (data?.attemptStatus === 'pre_exam') router.replace(`/exam/${id}/pre-exam`);
     else if (data?.attemptStatus === 'post_exam') router.replace(`/exam/${id}/post-exam`);
     else if (data?.attemptStatus === 'completed') router.replace('/staff/my-trainings');
-  }, [data?.attemptStatus, id, router]);
+  }, [data?.attemptStatus, id, router, isReview]);
 
   // Show loading while start is pending OR video data is loading
   if ((!startReady && !startError) || isLoading) return <PageLoading />;
   if (startError || error) return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{startError || error}</div></div>;
-  if (data?.attemptStatus === 'pre_exam' || data?.attemptStatus === 'completed') return <PageLoading />;
+  if (!isReview && (data?.attemptStatus === 'pre_exam' || data?.attemptStatus === 'completed')) return <PageLoading />;
 
   if (videosData.length === 0) {
     return (
@@ -323,15 +417,22 @@ export default function VideoPlayerPage() {
             <Button variant="ghost" size="icon" onClick={() => router.back()} style={{ color: 'var(--color-text-secondary)' }}><ArrowLeft className="h-5 w-5" /></Button>
             <div className="min-w-0">
               <h3 className="text-[13px] sm:text-sm font-bold truncate">{trainingTitle}</h3>
-              <p className="text-[11px] sm:text-xs" style={{ color: 'var(--color-text-muted)' }}>İçerik {currentVideoIdx + 1} / {videosData.length}</p>
+              <p className="text-[11px] sm:text-xs" style={{ color: 'var(--color-text-muted)' }}>{isMixed ? `${videosData.filter(v => v.completed).length} / ${videosData.length} tamamlandı` : `İçerik ${currentVideoIdx + 1} / ${videosData.length}`}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {currentVideo?.contentType !== 'pdf' && (
-              <div className="hidden sm:flex items-center gap-1 rounded-full px-3 py-1" style={{ background: 'var(--color-warning-bg)' }}>
-                <AlertTriangle className="h-3.5 w-3.5" style={{ color: 'var(--color-warning)' }} />
-                <span className="text-[11px] font-semibold" style={{ color: 'var(--color-warning)' }}>Hızlandırma Engelli</span>
+            {isReview ? (
+              <div className="flex items-center gap-1 rounded-full px-3 py-1" style={{ background: 'var(--color-primary-light)' }}>
+                <Shield className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
+                <span className="text-[11px] font-semibold" style={{ color: 'var(--color-primary)' }}>İnceleme Modu</span>
               </div>
+            ) : (
+              currentVideo?.contentType !== 'pdf' && (
+                <div className="hidden sm:flex items-center gap-1 rounded-full px-3 py-1" style={{ background: 'var(--color-warning-bg)' }}>
+                  <AlertTriangle className="h-3.5 w-3.5" style={{ color: 'var(--color-warning)' }} />
+                  <span className="text-[11px] font-semibold" style={{ color: 'var(--color-warning)' }}>Hızlandırma Engelli</span>
+                </div>
+              )
             )}
           </div>
         </div>
@@ -341,7 +442,48 @@ export default function VideoPlayerPage() {
       <div className="mx-auto max-w-6xl px-0 py-3 sm:p-6">
         <div className="grid grid-cols-1 gap-3 sm:gap-6 lg:grid-cols-4">
           {/* Content Player Area */}
-          <div className="lg:col-span-3">
+          <div className={`lg:col-span-3 ${isMixed ? 'grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4' : ''}`}>
+            {isMixed && activePdf && (
+              <div className="rounded-none sm:rounded-xl border-y sm:border overflow-hidden order-2 lg:order-2" style={{ borderColor: 'var(--color-border)', height: 'calc(100vh - 200px)', minHeight: '480px' }}>
+                <PdfViewer
+                  key={activePdf.id}
+                  url={activePdf.url}
+                  pageCount={activePdf.pageCount}
+                  onPageChange={(page) => {
+                    if (isReview) return;
+                    fetch(`/api/exam/${id}/videos`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ videoId: activePdf.id, currentPage: page }),
+                    }).catch(() => setHeartbeatErrors(prev => prev + 1));
+                  }}
+                  onComplete={() => {
+                    const vids = videosRef.current;
+                    setLocalCompleted(prev => new Set(prev).add(activePdf.id));
+                    videosRef.current = vids.map(v => v.id === activePdf.id ? { ...v, completed: true } : v);
+                    if (isReview) return;
+                    fetch(`/api/exam/${id}/videos`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ videoId: activePdf.id, currentPage: activePdf.pageCount ?? 1, completed: true }),
+                    }).then(async res => {
+                      if (!res.ok) throw new Error('Server error');
+                      const data = await res.json();
+                      if (data.allVideosCompleted) {
+                        setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
+                      } else if (currentPdfIdx < pdfItems.length - 1) {
+                        setTimeout(() => setCurrentPdfIdx(currentPdfIdx + 1), 1200);
+                      }
+                    }).catch(() => {
+                      setLocalCompleted(prev => { const next = new Set(prev); next.delete(activePdf.id); return next; });
+                      videosRef.current = vids;
+                      setHeartbeatErrors(prev => prev + 1);
+                    });
+                  }}
+                />
+              </div>
+            )}
+            <div className={isMixed ? 'order-1 lg:order-1 min-w-0' : ''}>
             {currentVideo.contentType === 'audio' ? (
               /* ── Audio Player ── */
               <div className="rounded-none sm:rounded-xl border-y sm:border overflow-hidden p-4 sm:p-6" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
@@ -352,6 +494,7 @@ export default function VideoPlayerPage() {
                   duration={currentVideo.duration}
                   lastPosition={currentVideo.lastPosition}
                   onProgress={(watchedTime, position) => {
+                    if (isReview) return;
                     fetch(`/api/exam/${id}/videos`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -363,6 +506,7 @@ export default function VideoPlayerPage() {
                     setLocalCompleted(prev => new Set(prev).add(currentVideo.id));
                     videosRef.current = vids.map(v => v.id === currentVideo.id ? { ...v, completed: true } : v);
 
+                    if (isReview) return;
                     fetch(`/api/exam/${id}/videos`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -388,6 +532,7 @@ export default function VideoPlayerPage() {
                   url={currentVideo.url}
                   pageCount={currentVideo.pageCount}
                   onPageChange={(page, total) => {
+                    if (isReview) return;
                     // Heartbeat: sayfa değişimlerini kaydet
                     fetch(`/api/exam/${id}/videos`, {
                       method: 'POST',
@@ -401,6 +546,7 @@ export default function VideoPlayerPage() {
                     setLocalCompleted(prev => new Set(prev).add(currentVideo.id));
                     videosRef.current = vids.map(v => v.id === currentVideo.id ? { ...v, completed: true } : v);
 
+                    if (isReview) return;
                     fetch(`/api/exam/${id}/videos`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -422,7 +568,8 @@ export default function VideoPlayerPage() {
             ) : (
               /* ── Video Player ── */
               <>
-                <div className="relative aspect-video rounded-none sm:rounded-xl overflow-hidden" style={{ background: '#0c0f14' }}
+                <div ref={playerContainerRef} className="rounded-none sm:rounded-xl overflow-hidden" style={{ background: '#0c0f14' }}>
+                <div className="relative aspect-video"
                   onContextMenu={(e) => e.preventDefault()}>
                   {videoError ? (
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -467,6 +614,7 @@ export default function VideoPlayerPage() {
                       onEnded={handleVideoEnded}
                       onError={() => setVideoError(true)}
                       onSeeking={() => {
+                        if (isReview) return;
                         const video = videoRef.current;
                         if (video && video.currentTime > lastAllowedTime.current + 2) {
                           video.currentTime = lastAllowedTime.current;
@@ -487,42 +635,66 @@ export default function VideoPlayerPage() {
                 </div>
 
                 {/* Custom Controls */}
-                <div className="mt-1.5 sm:mt-3 rounded-none sm:rounded-xl border-y sm:border px-3 py-3 sm:p-4" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-                  {/* Progress bar — mobilde daha kalın */}
-                  <div className="mb-3 h-2 sm:h-1.5 w-full rounded-full cursor-not-allowed" style={{ background: 'var(--color-border)' }}>
+                <div className="px-3 py-3 sm:p-4" style={{ background: isFullscreen ? '#0c0f14' : 'var(--color-surface)', borderTop: isFullscreen ? 'none' : '1px solid var(--color-border)' }}>
+                  {/* Progress bar */}
+                  <div className="mb-3 h-2 sm:h-1.5 w-full rounded-full cursor-not-allowed" style={{ background: isFullscreen ? 'rgba(255,255,255,0.15)' : 'var(--color-border)' }}>
                     <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'var(--color-primary)', transition: 'width 0.3s linear' }} />
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 sm:gap-3">
-                      <button onClick={togglePlay} className="flex h-12 w-12 sm:h-10 sm:w-10 items-center justify-center rounded-full" style={{ background: 'var(--color-primary)', boxShadow: '0 2px 8px rgba(13,150,104,0.3)' }}>
+                      {/* Play/Pause */}
+                      <button onClick={togglePlay} className="flex h-12 w-12 sm:h-10 sm:w-10 items-center justify-center rounded-full shrink-0" style={{ background: 'var(--color-primary)', boxShadow: '0 2px 8px rgba(13,150,104,0.3)' }}>
                         {isPlaying ? <Pause className="h-5 w-5 text-white" /> : <Play className="h-5 w-5 text-white ml-0.5" />}
                       </button>
-                      <button onClick={toggleMute} className="flex h-10 w-10 sm:h-auto sm:w-auto items-center justify-center rounded-full sm:rounded-md sm:p-2" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg)' }}>
-                        {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                      {/* Mute toggle */}
+                      <button onClick={toggleMute} className="flex h-10 w-10 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full" style={{ color: isFullscreen ? 'rgba(255,255,255,0.8)' : 'var(--color-text-secondary)', background: isFullscreen ? 'rgba(255,255,255,0.1)' : 'var(--color-bg)' }}>
+                        {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                       </button>
-                      <span className="text-xs sm:text-sm font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>
+                      {/* Volume slider */}
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={isMuted ? 0 : volume}
+                        onChange={handleVolumeChange}
+                        className="hidden sm:block w-20 accent-emerald-500 cursor-pointer"
+                        style={{ accentColor: 'var(--color-primary)' }}
+                      />
+                      {/* Time */}
+                      <span className="text-xs sm:text-sm font-medium" style={{ fontFamily: 'var(--font-mono)', color: isFullscreen ? 'rgba(255,255,255,0.7)' : 'var(--color-text-primary)' }}>
                         {formatTime(currentTime)} / {formatTime(duration || currentVideo.duration)}
                       </span>
                     </div>
-                    {/* Sonraki butonu — sağ tarafa */}
-                    {currentVideo.completed && currentVideoIdx < videosData.length - 1 && (
-                      <button onClick={goToNextVideo} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-                        <SkipForward className="h-4 w-4" /> <span className="hidden sm:inline">Sonraki</span>
+                    <div className="flex items-center gap-2">
+                      {/* Sonraki butonu */}
+                      {currentVideo.completed && (isMixed ? currentMediaIdx < mediaItems.length - 1 : currentVideoIdx < videosData.length - 1) && (
+                        <button onClick={goToNextVideo} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+                          <SkipForward className="h-4 w-4" /> <span className="hidden sm:inline">Sonraki</span>
+                        </button>
+                      )}
+                      {/* Fullscreen butonu */}
+                      <button onClick={toggleFullscreen} className="flex h-10 w-10 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full" style={{ color: isFullscreen ? 'rgba(255,255,255,0.8)' : 'var(--color-text-secondary)', background: isFullscreen ? 'rgba(255,255,255,0.1)' : 'var(--color-bg)' }}>
+                        {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                       </button>
-                    )}
+                    </div>
                   </div>
-                  {/* Kısıtlama bilgileri — sadece desktop */}
-                  <div className="hidden sm:flex items-center gap-2 text-xs mt-2">
-                    <Lock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-                    <span style={{ color: 'var(--color-text-muted)' }}>1.0x (sabit)</span>
-                    <span style={{ color: 'var(--color-text-muted)' }}>•</span>
-                    <span style={{ color: 'var(--color-text-muted)' }}>İleri sarma kapalı</span>
-                    <span style={{ color: 'var(--color-text-muted)' }}>•</span>
-                    <span style={{ color: 'var(--color-text-muted)' }}>İndirme kapalı</span>
-                  </div>
+                  {/* Kısıtlama bilgileri — sadece desktop, fullscreen değilken */}
+                  {!isFullscreen && (
+                    <div className="hidden sm:flex items-center gap-2 text-xs mt-2">
+                      <Lock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
+                      <span style={{ color: 'var(--color-text-muted)' }}>1.0x (sabit)</span>
+                      <span style={{ color: 'var(--color-text-muted)' }}>•</span>
+                      <span style={{ color: 'var(--color-text-muted)' }}>İleri sarma kapalı</span>
+                      <span style={{ color: 'var(--color-text-muted)' }}>•</span>
+                      <span style={{ color: 'var(--color-text-muted)' }}>İndirme kapalı</span>
+                    </div>
+                  )}
+                </div>
                 </div>
               </>
             )}
+            </div>
           </div>
 
           {/* Video List Sidebar */}
@@ -533,44 +705,86 @@ export default function VideoPlayerPage() {
                 {videosData.filter(v => v.completed).length}/{videosData.length}
               </span>
             </div>
-            <div className="space-y-1.5 sm:space-y-2">
-              {videosData.map((v, i) => {
-                const isCurrent = i === currentVideoIdx;
-                const isLocked = !v.completed && i > (videosData.findIndex(x => !x.completed));
+            {(() => {
+              const renderItem = (v: VideoItem, opts: { isCurrent: boolean; isLocked: boolean; onSelect: () => void }) => (
+                <button
+                  key={v.id}
+                  onClick={() => { if (!opts.isLocked) opts.onSelect(); }}
+                  disabled={opts.isLocked}
+                  className="flex w-full items-center gap-2.5 sm:gap-3 rounded-lg p-2 sm:p-2.5 text-left"
+                  style={{
+                    background: opts.isCurrent ? 'var(--color-primary-light)' : 'transparent',
+                    borderLeft: opts.isCurrent ? '3px solid var(--color-primary)' : '3px solid transparent',
+                    opacity: opts.isLocked ? 0.5 : 1,
+                    transition: 'background var(--transition-fast)',
+                  }}
+                >
+                  <div className="flex h-9 w-9 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full" style={{ background: v.completed ? 'var(--color-success)' : opts.isCurrent ? 'var(--color-primary)' : 'var(--color-border)' }}>
+                    {v.completed ? <CheckCircle className="h-4 w-4 text-white" /> : opts.isLocked ? <Lock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} /> : v.contentType === 'pdf' ? <FileText className="h-3.5 w-3.5" style={{ color: opts.isCurrent ? 'white' : 'var(--color-text-muted)' }} /> : v.contentType === 'audio' ? <Volume2 className="h-3.5 w-3.5" style={{ color: opts.isCurrent ? 'white' : 'var(--color-text-muted)' }} /> : <Play className="h-3.5 w-3.5" style={{ color: opts.isCurrent ? 'white' : 'var(--color-text-muted)' }} />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-[13px] sm:text-xs font-medium" style={{ color: opts.isCurrent ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>{v.title}</p>
+                    <p className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>
+                      {v.contentType === 'pdf' ? `${v.pageCount ?? '?'} sayfa` : (opts.isCurrent && duration > 0 ? formatTime(duration) : formatTime(v.duration))}
+                    </p>
+                  </div>
+                </button>
+              );
+
+              if (isMixed) {
+                const firstIncompleteMedia = mediaItems.findIndex(x => !x.completed);
+                const firstIncompletePdf = pdfItems.findIndex(x => !x.completed);
                 return (
-                  <button
-                    key={v.id}
-                    onClick={() => {
-                      if (!isLocked) {
-                        changeVideo(i);
-                      }
-                    }}
-                    disabled={isLocked}
-                    className="flex w-full items-center gap-2.5 sm:gap-3 rounded-lg p-2 sm:p-2.5 text-left"
-                    style={{
-                      background: isCurrent ? 'var(--color-primary-light)' : 'transparent',
-                      borderLeft: isCurrent ? '3px solid var(--color-primary)' : '3px solid transparent',
-                      opacity: isLocked ? 0.5 : 1,
-                      transition: 'background var(--transition-fast)',
-                    }}
-                  >
-                    <div className="flex h-9 w-9 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full" style={{ background: v.completed ? 'var(--color-success)' : isCurrent ? 'var(--color-primary)' : 'var(--color-border)' }}>
-                      {v.completed ? <CheckCircle className="h-4 w-4 text-white" /> : isLocked ? <Lock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} /> : v.contentType === 'pdf' ? <FileText className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} /> : v.contentType === 'audio' ? <Volume2 className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} /> : <Play className="h-3.5 w-3.5" style={{ color: isCurrent ? 'white' : 'var(--color-text-muted)' }} />}
+                  <div className="space-y-3">
+                    <div>
+                      <h5 className="text-[10px] font-bold uppercase tracking-wider mb-1.5 px-1" style={{ color: 'var(--color-text-muted)' }}>Videolar ve Ses</h5>
+                      <div className="space-y-1.5 sm:space-y-2">
+                        {mediaItems.map((v, i) => renderItem(v, {
+                          isCurrent: i === currentMediaIdx,
+                          isLocked: !v.completed && firstIncompleteMedia >= 0 && i > firstIncompleteMedia,
+                          onSelect: () => {
+                            setCurrentMediaIdx(i);
+                            lastAllowedTime.current = 0;
+                            setCurrentTime(0);
+                            setDuration(0);
+                            setIsPlaying(false);
+                            setVideoError(false);
+                          },
+                        }))}
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="truncate text-[13px] sm:text-xs font-medium" style={{ color: isCurrent ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>{v.title}</p>
-                      <p className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>
-                        {v.contentType === 'pdf' ? `${v.pageCount ?? '?'} sayfa` : (isCurrent && duration > 0 ? formatTime(duration) : formatTime(v.duration))}
-                      </p>
+                    <div>
+                      <h5 className="text-[10px] font-bold uppercase tracking-wider mb-1.5 px-1" style={{ color: 'var(--color-text-muted)' }}>Dokümanlar</h5>
+                      <div className="space-y-1.5 sm:space-y-2">
+                        {pdfItems.map((v, i) => renderItem(v, {
+                          isCurrent: i === currentPdfIdx,
+                          isLocked: !v.completed && firstIncompletePdf >= 0 && i > firstIncompletePdf,
+                          onSelect: () => setCurrentPdfIdx(i),
+                        }))}
+                      </div>
                     </div>
-                  </button>
+                  </div>
                 );
-              })}
-            </div>
+              }
+
+              return (
+                <div className="space-y-1.5 sm:space-y-2">
+                  {videosData.map((v, i) => {
+                    const isCurrent = i === currentVideoIdx;
+                    const isLocked = !v.completed && i > (videosData.findIndex(x => !x.completed));
+                    return renderItem(v, { isCurrent, isLocked, onSelect: () => changeVideo(i) });
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Next Action */}
             <div className="mt-3 sm:mt-4 pt-3 sm:pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-              {allCompleted ? (
+              {isReview ? (
+                <Button onClick={() => router.push('/staff/my-trainings')} className="w-full gap-2 font-semibold text-white" style={{ background: 'var(--color-primary)' }}>
+                  Eğitimi Kapat <ArrowRight className="h-4 w-4" />
+                </Button>
+              ) : allCompleted ? (
                 <Button onClick={() => router.replace(`/exam/${id}/transition?from=videos`)} className="w-full gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)' }}>
                   Son Sınava Git <ArrowRight className="h-4 w-4" />
                 </Button>

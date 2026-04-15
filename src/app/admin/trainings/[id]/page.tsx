@@ -370,11 +370,11 @@ export default function TrainingDetailPage() {
                       const videoKey = v.id ?? `video-${vi}`;
                       const isActive = activeVideoId === videoKey;
                       return (
-                        <div key={videoKey} className="rounded-2xl overflow-hidden" style={{ background: isActive ? '#0a0a0a' : 'var(--color-bg)', border: isActive ? '1px solid rgba(13,150,104,0.3)' : '1px solid transparent', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: isActive ? '0 8px 32px rgba(0,0,0,0.12), 0 0 0 1px rgba(13,150,104,0.08)' : 'none' }}>
+                        <div key={videoKey} className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-bg)', border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--color-border)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: isActive ? '0 2px 12px rgba(13,150,104,0.12)' : 'none' }}>
                           {/* Video Row */}
                           <div
                             className="flex items-center gap-4 px-5 py-4 cursor-pointer group relative"
-                            style={{ background: isActive ? 'linear-gradient(135deg, rgba(13,150,104,0.08) 0%, rgba(13,150,104,0.02) 100%)' : 'transparent' }}
+                            style={{ background: 'transparent' }}
                             onClick={() => setActiveVideoId(isActive ? null : videoKey)}
                           >
                             {/* Order Number */}
@@ -383,9 +383,9 @@ export default function TrainingDetailPage() {
                             </div>
 
                             {/* Play Icon */}
-                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: isActive ? 'rgba(255,255,255,0.1)' : 'var(--color-surface)', transition: 'all 0.3s' }}>
+                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: isActive ? 'var(--color-primary)' : 'var(--color-surface)', transition: 'all 0.3s' }}>
                               {isActive ? (
-                                <Video className="h-5 w-5 text-white/90" />
+                                <Video className="h-5 w-5" style={{ color: 'white' }} />
                               ) : (
                                 <Play className="h-4 w-4" style={{ color: 'var(--color-primary)', marginLeft: 2 }} />
                               )}
@@ -393,10 +393,10 @@ export default function TrainingDetailPage() {
 
                             {/* Title & Meta */}
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold truncate" style={{ color: isActive ? 'white' : 'var(--color-text-primary)', transition: 'color 0.3s' }}>{v.title}</p>
+                              <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{v.title}</p>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <Clock className="h-3 w-3" style={{ color: isActive ? 'rgba(255,255,255,0.4)' : 'var(--color-text-muted)' }} />
-                                <span className="text-[11px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: isActive ? 'rgba(255,255,255,0.5)' : 'var(--color-text-muted)' }}>{v.duration}</span>
+                                <Clock className="h-3 w-3" style={{ color: 'var(--color-text-muted)' }} />
+                                <span className="text-[11px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>{v.duration}</span>
                               </div>
                             </div>
 
@@ -427,18 +427,16 @@ export default function TrainingDetailPage() {
                                 transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
                                 className="overflow-hidden"
                               >
-                                <div className="relative">
-                                  {/* Cinematic top fade */}
-                                  <div className="absolute top-0 left-0 right-0 h-6 z-10" style={{ background: 'linear-gradient(to bottom, #0a0a0a, transparent)' }} />
-                                  <video
-                                    key={videoKey}
-                                    src={v.videoUrl}
-                                    controls
-                                    className="w-full"
-                                    style={{ aspectRatio: '16/9', background: '#000', display: 'block' }}
-                                  />
-                                  {/* Cinematic bottom fade */}
-                                  <div className="absolute bottom-0 left-0 right-0 h-8 z-10 pointer-events-none" style={{ background: 'linear-gradient(to top, #0a0a0a, transparent)' }} />
+                                <div className="px-6 pb-6 pt-2">
+                                  <div className="mx-auto rounded-xl overflow-hidden" style={{ maxWidth: '640px', background: '#000', boxShadow: '0 4px 24px rgba(0,0,0,0.4)' }}>
+                                    <video
+                                      key={videoKey}
+                                      src={v.videoUrl}
+                                      controls
+                                      className="w-full"
+                                      style={{ aspectRatio: '16/9', display: 'block' }}
+                                    />
+                                  </div>
                                 </div>
                               </motion.div>
                             )}

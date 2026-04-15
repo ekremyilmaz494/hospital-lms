@@ -11,34 +11,33 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Search, Video, Music, FileText, Check, Library, Clock, Loader2 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 
-interface LibraryVideo {
+interface ContentLibraryItem {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  contentType: string | null;
+  s3Key: string | null;
+  duration: number | null;
+  thumbnailUrl: string | null;
+  isOwned: boolean;
+}
+
+interface NormalizedVideo {
   id: string;
   title: string;
   durationSeconds: number;
-  sortOrder: number;
-  videoUrl: string;
   videoKey: string;
+  videoUrl: string;
   contentType: string;
   pageCount: number | null;
   documentKey: string | null;
   description: string | null;
-  createdAt: string;
-}
-
-interface LibraryTraining {
-  id: string;
-  title: string;
   category: string;
-  publishStatus: string;
-  videoCount: number;
-  totalDurationSeconds: number;
-  createdAt: string;
-  videos: LibraryVideo[];
 }
 
 /** Wizard'a eklenecek video yapısına dönüşüm için */
@@ -81,10 +80,10 @@ const CONTENT_LABEL: Record<string, string> = {
 };
 
 export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = 'all' }: Props) {
-  const { data, isLoading } = useFetch<{ trainings: LibraryTraining[] }>(
-    open ? '/api/admin/content-library/my-videos' : null,
+  const { data, isLoading } = useFetch<{ items: ContentLibraryItem[] }>(
+    open ? '/api/admin/content-library' : null,
   );
-  const trainings = data?.trainings ?? [];
+  const items = data?.items ?? [];
 
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -94,12 +93,26 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
     if (open) setFilter(defaultFilter);
   }, [open, defaultFilter]);
 
-  // Flatten all videos from all trainings
-  const allVideos = useMemo(() => {
-    return trainings.flatMap(t =>
-      t.videos.map(v => ({ ...v, trainingTitle: t.title, trainingCategory: t.category })),
-    );
-  }, [trainings]);
+  // content_library satırlarını wizard'ın beklediği shape'e çevir
+  const allVideos = useMemo<NormalizedVideo[]>(() => {
+    return items
+      .filter(it => it.s3Key && (it.contentType === 'video' || it.contentType === 'audio' || it.contentType === 'pdf'))
+      .map(it => {
+        const isDoc = it.contentType === 'pdf';
+        return {
+          id: it.id,
+          title: it.title,
+          durationSeconds: (it.duration ?? 0) * 60,
+          videoKey: isDoc ? '' : (it.s3Key ?? ''),
+          videoUrl: '',
+          contentType: it.contentType ?? 'video',
+          pageCount: null,
+          documentKey: isDoc ? it.s3Key : null,
+          description: it.description,
+          category: it.category,
+        };
+      });
+  }, [items]);
 
   const filtered = useMemo(() => {
     return allVideos.filter(v => {
@@ -108,7 +121,8 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
         const q = search.toLowerCase();
         return (
           v.title.toLowerCase().includes(q) ||
-          v.trainingTitle.toLowerCase().includes(q)
+          (v.description?.toLowerCase().includes(q) ?? false) ||
+          v.category.toLowerCase().includes(q)
         );
       }
       return true;
@@ -132,7 +146,7 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
       items.push({
         id: Date.now() + Math.random(),
         title: v.title,
-        url: v.videoKey || v.videoUrl,
+        url: v.videoKey || v.documentKey || v.videoUrl,
         contentType: (v.contentType as 'video' | 'pdf' | 'audio') || 'video',
         durationSeconds: v.durationSeconds,
         pageCount: v.pageCount ?? undefined,
@@ -167,7 +181,7 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
             Kütüphaneden İçerik Seç
           </DialogTitle>
           <DialogDescription>
-            Mevcut eğitimlerinizdeki video, ses ve dokümanlardan seçin
+            İçerik kütüphanenizdeki video, ses ve dokümanlardan seçin
           </DialogDescription>
         </DialogHeader>
 
@@ -201,7 +215,7 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
         </div>
 
         {/* Content List */}
-        <ScrollArea className="flex-1 min-h-0 -mx-6 px-6" style={{ maxHeight: 'calc(85vh - 280px)' }}>
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'var(--color-primary)' }} />
@@ -246,7 +260,7 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
                         {v.title}
                       </p>
                       <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
-                        {v.trainingTitle}
+                        {v.category}
                       </p>
                     </div>
 
@@ -267,7 +281,7 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
               })}
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         {/* Footer */}
         <DialogFooter className="flex items-center justify-between sm:justify-between">

@@ -85,6 +85,18 @@ const nextConfig: NextConfig = {
     proxyClientMaxBodySize: '512mb',
     optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion', 'date-fns', '@tanstack/react-table', '@tiptap/react'],
   },
+  redirects: async () => [
+    {
+      source: '/admin/media-library',
+      destination: '/admin/content-library',
+      permanent: true,
+    },
+    {
+      source: '/admin/media-library/:path*',
+      destination: '/admin/content-library',
+      permanent: true,
+    },
+  ],
   headers: async () => [
     {
       source: '/(.*)',

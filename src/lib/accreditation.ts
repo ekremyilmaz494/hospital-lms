@@ -176,20 +176,21 @@ export async function generateAccreditationReport(params: {
 export async function getCurrentCompliance(params: {
   organizationId: string
   standardBody: StandardBody
+  requestedBy: string  // Admin user UUID — geçici rapor için generated_by alanı
 }): Promise<Omit<AccreditationReportData, 'reportId' | 'generatedBy'>> {
   const periodEnd = new Date()
   const periodStart = new Date(periodEnd)
   periodStart.setFullYear(periodStart.getFullYear() - 1)
 
-  const fakeGeneratedBy = 'system'
   const result = await generateAccreditationReport({
-    ...params,
+    organizationId: params.organizationId,
+    standardBody: params.standardBody,
     periodStart,
     periodEnd,
-    generatedBy: fakeGeneratedBy,
+    generatedBy: params.requestedBy,
   })
 
-  // Kaydedilen raporu sil (bu sadece önizleme)
+  // Kaydedilen raporu sil (bu sadece önizleme — kullanıcı simülasyon görmek istiyor)
   await prisma.accreditationReport.delete({ where: { id: result.reportId } })
 
   return result

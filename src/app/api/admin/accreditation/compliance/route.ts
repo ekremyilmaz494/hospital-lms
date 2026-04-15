@@ -26,6 +26,7 @@ export async function GET(request: Request) {
     const compliance = await getCurrentCompliance({
       organizationId: orgId,
       standardBody: standardBodyParam as StandardBody,
+      requestedBy: dbUser!.id,
     })
 
     return jsonResponse({ compliance }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })

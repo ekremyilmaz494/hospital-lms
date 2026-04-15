@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   Building2,
-  Film,
   CreditCard,
   BarChart3,
   Settings,
@@ -94,7 +93,6 @@ export const adminNav: NavGroup[] = [
           { title: 'Soru Bankası', href: '/admin/exams/question-bank' },
         ],
       },
-      { title: 'Medya Kütüphanesi', href: '/admin/media-library', icon: Film },
       { title: 'İçerik Kütüphanesi', href: '/admin/content-library', icon: Library },
       { title: 'AI İçerik Stüdyosu', href: '/admin/ai-content-studio', icon: Sparkles, badge: 'Beta' },
       {
@@ -137,6 +135,7 @@ export const adminNav: NavGroup[] = [
   {
     label: 'SİSTEM',
     items: [
+      { title: 'Aboneliğim', href: '/admin/subscription', icon: CreditCard },
       {
         title: 'Ayarlar',
         href: '/admin/settings',

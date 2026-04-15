@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { StatusBadge } from "@/components/shared/status-badge";
 
 /* ------------------------------------------------------------------ */
 /*  Navigation config                                                   */
@@ -254,7 +255,8 @@ function MarketingFooter() {
               &copy; 2026 Hastane LMS. Tum haklari saklidir.
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap justify-center sm:justify-end">
+            <StatusBadge />
             {["KVKK", "Gizlilik", "Sartlar"].map((label) => (
               <Link
                 key={label}

@@ -10,23 +10,29 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
+  // Review mode: salt-okunur içerik görüntüleme — passed bir eğitimi tekrar izleme
+  const url = new URL(request.url)
+  const isReview = url.searchParams.get('mode') === 'review'
+
   // Phase guard: check attempt status for video access
   const attemptInfo = await getAttemptStatus(id, dbUser!.id, dbUser!.organizationId!)
   const attemptStatus = attemptInfo?.status ?? null
   // Videos accessible during watching_videos, post_exam (read-only), and completed phases
   // Only block during pre_exam (hasn't finished pre-exam yet)
-  if (attemptStatus === 'pre_exam') {
+  if (!isReview && attemptStatus === 'pre_exam') {
     return errorResponse('Önce ön sınavı tamamlamalısınız', 403)
   }
 
   // id can be a trainingId — find the training and user's assignment
   const assignment = await prisma.trainingAssignment.findFirst({
     where: { trainingId: id, userId: dbUser!.id },
+    select: { id: true, trainingId: true, status: true },
   })
 
   // Also try as assignmentId
   const assignment2 = assignment ?? await prisma.trainingAssignment.findFirst({
     where: { id, userId: dbUser!.id },
+    select: { id: true, trainingId: true, status: true },
   })
 
   const trainingId = assignment2?.trainingId ?? id
@@ -37,6 +43,67 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   })
 
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
+
+  // Review mode passed kontrolü — tenant-safe (training yukarıda organizationId ile filtrelendi)
+  if (isReview) {
+    const [passedAttempt, passedAssignment] = await Promise.all([
+      prisma.examAttempt.findFirst({
+        where: {
+          userId: dbUser!.id,
+          trainingId: training.id,
+          organizationId: dbUser!.organizationId!,
+          status: 'completed',
+          isPassed: true,
+        },
+        select: { id: true },
+      }),
+      // trainingAssignment has no direct organizationId — training.id was already tenant-filtered above
+      prisma.trainingAssignment.findFirst({
+        where: {
+          userId: dbUser!.id,
+          trainingId: training.id,
+          status: 'passed',
+        },
+        select: { id: true },
+      }),
+    ])
+
+    if (!passedAttempt && !passedAssignment) {
+      return errorResponse('Bu eğitimi tekrar izlemek için önce başarıyla tamamlamış olmanız gerekir', 403)
+    }
+
+    const videos = await prisma.trainingVideo.findMany({
+      where: { trainingId: training.id },
+      orderBy: { sortOrder: 'asc' },
+    })
+
+    const videoList = await Promise.all(videos.map(async (v) => {
+      const hasS3Key = v.videoKey && !v.videoKey.startsWith('/uploads')
+      const videoUrl = hasS3Key ? `/api/stream/${v.id}` : v.videoUrl
+      const documentUrl = v.documentKey ? await getStreamUrl(v.documentKey) : undefined
+      return {
+        id: v.id,
+        title: v.title,
+        url: videoUrl,
+        duration: v.durationSeconds,
+        contentType: v.contentType || 'video',
+        pageCount: v.pageCount,
+        completed: true,
+        lastPosition: 0,
+        documentUrl,
+      }
+    }))
+
+    return jsonResponse(
+      {
+        trainingTitle: training.title,
+        attemptStatus: 'review',
+        videos: videoList,
+      },
+      200,
+      { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' }
+    )
+  }
 
   // Get videos for this training
   const videos = await prisma.trainingVideo.findMany({
@@ -98,7 +165,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
-  const body = await parseBody<{ videoId: string; watchedTime?: number; position?: number; completed?: boolean; currentPage?: number }>(request)
+  // Review mode: salt-okunur, progress yazma
+  const url = new URL(request.url)
+  const queryMode = url.searchParams.get('mode')
+  const headerMode = request.headers.get('x-review-mode')
+
+  const body = await parseBody<{ videoId: string; watchedTime?: number; position?: number; completed?: boolean; currentPage?: number; mode?: string }>(request)
+
+  if (queryMode === 'review' || headerMode === 'review' || body?.mode === 'review') {
+    return new Response(null, { status: 204 })
+  }
+
   if (!body?.videoId) return errorResponse('videoId required')
 
   // Find attempt — try assignmentId first, then trainingId

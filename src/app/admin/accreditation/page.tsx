@@ -265,21 +265,76 @@ export default function AccreditationPage() {
   return (
     <div style={{ padding: '32px 32px 64px', maxWidth: 1100, margin: '0 auto' }}>
       <BlurFade delay={0.05}>
-        {/* ── Başlık ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 28 }}>
+        {/* ── Premium Hero Header ── */}
+        <div style={{
+          position: 'relative',
+          borderRadius: 24,
+          padding: '32px 36px',
+          marginBottom: 32,
+          background: 'linear-gradient(135deg, #0f172a 0%, #064e3b 65%, #0d9668 100%)',
+          color: '#fff',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px -20px rgba(13,150,104,0.45), 0 8px 24px -12px rgba(15,23,42,0.3)',
+        }}>
+          {/* Dekoratif ışık halkası */}
           <div style={{
-            width: 46, height: 46, borderRadius: 14, background: 'rgba(13,150,104,0.1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <ClipboardCheck size={24} color="var(--color-primary)" />
-          </div>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
-              Akreditasyon Yönetimi
-            </h1>
-            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0, marginTop: 2 }}>
-              JCI, ISO, TJC ve OSHA standartlarına uyumluluk takibi
-            </p>
+            position: 'absolute', top: -80, right: -80, width: 280, height: 280,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(245,158,11,0.18) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }} />
+          <div style={{
+            position: 'absolute', bottom: -120, left: -100, width: 320, height: 320,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(13,150,104,0.25) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }} />
+
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 18, minWidth: 280 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 18,
+                background: 'rgba(255,255,255,0.12)',
+                backdropFilter: 'blur(8px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid rgba(255,255,255,0.18)',
+              }}>
+                <ClipboardCheck size={28} color="#fff" />
+              </div>
+              <div>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, letterSpacing: '0.14em',
+                  color: 'rgba(245,158,11,0.95)', textTransform: 'uppercase', marginBottom: 6,
+                }}>
+                  Akreditasyon &amp; Uyum
+                </div>
+                <h1 style={{ fontSize: 28, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.02em' }}>
+                  Denetim Hazırlık Merkezi
+                </h1>
+                <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.72)', margin: '6px 0 0', maxWidth: 460 }}>
+                  JCI, ISO 9001/15189, TJC ve OSHA standartlarında uyum takibi, simülasyon ve denetçiye hazır PDF raporlama.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick stats */}
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              {[
+                { label: 'Aktif Standart', value: STANDARD_BODIES.length, accent: '#34d399' },
+                { label: 'Toplam Rapor', value: reports.length, accent: '#fbbf24' },
+              ].map(s => (
+                <div key={s.label} style={{
+                  padding: '12px 18px', borderRadius: 14,
+                  background: 'rgba(255,255,255,0.08)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  minWidth: 120,
+                }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: s.accent, lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 4, fontWeight: 500 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -317,7 +372,7 @@ export default function AccreditationPage() {
               style={{
                 padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 border: 'none', background: 'transparent',
-                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-muted)',
+                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                 borderBottom: activeTab === tab.id ? '2px solid var(--color-primary)' : '2px solid transparent',
                 marginBottom: -2, transition: 'color 0.15s',
               }}
@@ -478,7 +533,7 @@ export default function AccreditationPage() {
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
-                        <tr style={{ background: 'var(--color-muted-bg, #f8fafc)' }}>
+                        <tr style={{ background: 'var(--color-surface-hover)' }}>
                           {['Kod', 'Standart', 'Gereken', 'Gerçekleşen', 'Eksik Personel', 'Durum'].map(h => (
                             <th key={h} style={{
                               padding: '10px 14px', textAlign: 'left', fontSize: 11,
@@ -504,7 +559,7 @@ export default function AccreditationPage() {
                             <td style={{ padding: '12px 14px', minWidth: 120 }}>
                               <RateBar actual={f.actualRate} required={f.requiredRate} />
                             </td>
-                            <td style={{ padding: '12px 14px', fontSize: 12, color: f.missingStaffCount > 0 ? '#dc2626' : 'var(--color-muted)' }}>
+                            <td style={{ padding: '12px 14px', fontSize: 12, color: f.missingStaffCount > 0 ? '#dc2626' : 'var(--color-text-muted)' }}>
                               {f.missingStaffCount > 0 ? `${f.missingStaffCount} kişi` : '—'}
                             </td>
                             <td style={{ padding: '12px 14px' }}>
@@ -624,77 +679,177 @@ export default function AccreditationPage() {
               </div>
             ) : reports.length === 0 ? (
               <div style={{
-                textAlign: 'center', padding: 56, color: 'var(--color-text-muted)', fontSize: 14,
-                background: 'var(--color-card, #fff)', borderRadius: 16,
-                border: '1px solid var(--color-border, #e2e8f0)',
+                textAlign: 'center', padding: '64px 32px',
+                background: 'var(--color-surface)',
+                borderRadius: 20,
+                border: '1px dashed rgba(13,150,104,0.35)',
               }}>
-                <FileText size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
-                <div>Akreditasyon raporu oluşturmak için 'Rapor Oluştur' butonunu kullanın.</div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>Simülasyon sekmesinden rapor oluşturabilirsiniz.</div>
+                <div style={{
+                  width: 72, height: 72, borderRadius: 20,
+                  background: 'rgba(13,150,104,0.12)',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: 18,
+                }}>
+                  <FileText size={32} color="#0d9668" />
+                </div>
+                <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 6px' }}>
+                  Henüz Akreditasyon Raporu Oluşturulmadı
+                </h3>
+                <p style={{ fontSize: 13.5, color: 'var(--color-text-secondary)', margin: '0 0 22px', maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
+                  Denetim Simülasyonu sekmesinden uyum analizini çalıştırın, sonucu resmi rapor olarak kaydedin.
+                </p>
+                <button
+                  onClick={() => setActiveTab('simulation')}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '11px 22px', borderRadius: 12, fontSize: 13.5, fontWeight: 700,
+                    background: 'var(--color-primary)', color: '#fff',
+                    border: 'none', cursor: 'pointer',
+                    boxShadow: '0 8px 24px rgba(13,150,104,0.3)',
+                  }}
+                >
+                  <RefreshCw size={15} />
+                  Simülasyon Başlat
+                </button>
               </div>
             ) : (
               <div style={{
-                background: 'var(--color-card, #fff)', borderRadius: 16,
-                border: '1px solid var(--color-border, #e2e8f0)', overflow: 'hidden',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                gap: 18,
               }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--color-muted-bg, #f8fafc)' }}>
-                      {['Rapor Adı', 'Standart', 'Dönem', 'Uyumluluk', 'Oluşturma Tarihi', ''].map(h => (
-                        <th key={h} style={{
-                          padding: '12px 16px', textAlign: 'left', fontSize: 11,
-                          fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.05em',
-                        }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reports.map((r, i) => {
-                      const rate = Number(r.overallComplianceRate);
-                      const color = rate >= 80 ? 'var(--color-success)' : rate >= 60 ? '#d97706' : '#dc2626';
-                      return (
-                        <tr key={r.id} style={{
-                          borderTop: i > 0 ? '1px solid var(--color-border, #e2e8f0)' : undefined,
-                        }}>
-                          <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                {reports.map((r, i) => {
+                  const rate = Number(r.overallComplianceRate);
+                  const color = rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444';
+                  const colorBg = rate >= 80 ? 'rgba(16,185,129,0.08)' : rate >= 60 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)';
+                  const status = rate >= 80 ? 'Uyumlu' : rate >= 60 ? 'Risk Altında' : 'Kritik';
+                  const periodMonths = Math.round(
+                    (new Date(r.periodEnd).getTime() - new Date(r.periodStart).getTime()) / (30 * 86400000)
+                  );
+                  const circumference = 2 * Math.PI * 36;
+                  const dashOffset = circumference - (rate / 100) * circumference;
+
+                  return (
+                    <BlurFade key={r.id} delay={0.04 * i}>
+                      <div style={{
+                        position: 'relative',
+                        background: 'var(--color-surface)',
+                        borderRadius: 18,
+                        border: '1px solid var(--color-border)',
+                        overflow: 'hidden',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        boxShadow: '0 1px 3px rgba(15,23,42,0.04)',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(15,23,42,0.12)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(15,23,42,0.04)';
+                      }}
+                      >
+                        {/* Üst color bar */}
+                        <div style={{ height: 4, background: color }} />
+
+                        <div style={{ padding: 22 }}>
+                          {/* Üst satır: standart badge + tarih */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 5,
+                              padding: '4px 10px', borderRadius: 8,
+                              background: 'rgba(13,150,104,0.08)',
+                              color: 'var(--color-primary)',
+                              fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+                            }}>
+                              <ClipboardCheck size={11} />
+                              {r.standardBody.replace('_', ' ')}
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                              {new Date(r.generatedAt).toLocaleDateString('tr-TR')}
+                            </span>
+                          </div>
+
+                          {/* Başlık */}
+                          <h3 style={{
+                            fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)',
+                            margin: '0 0 18px', lineHeight: 1.35,
+                            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden', minHeight: 40,
+                          }}>
                             {r.title}
-                          </td>
-                          <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--color-text-muted)' }}>
-                            {r.standardBody}
-                          </td>
-                          <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--color-text-muted)' }}>
-                            {new Date(r.periodStart).toLocaleDateString('tr-TR')} — {new Date(r.periodEnd).toLocaleDateString('tr-TR')}
-                          </td>
-                          <td style={{ padding: '13px 16px' }}>
-                            <span style={{ fontSize: 15, fontWeight: 800, color }}>{rate}%</span>
-                          </td>
-                          <td style={{ padding: '13px 16px', fontSize: 12, color: 'var(--color-text-muted)' }}>
-                            {new Date(r.generatedAt).toLocaleDateString('tr-TR')}
-                          </td>
-                          <td style={{ padding: '13px 16px' }}>
-                            <button
-                              onClick={() => downloadPdf(r)}
-                              disabled={downloadingId === r.id}
-                              title="PDF İndir"
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 6,
-                                padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                                background: 'rgba(13,150,104,0.08)', color: 'var(--color-primary)',
-                                border: '1px solid rgba(13,150,104,0.2)', cursor: 'pointer',
-                                opacity: downloadingId === r.id ? 0.6 : 1,
-                              }}
-                            >
-                              {downloadingId === r.id
-                                ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                                : <Download size={13} />}
-                              PDF
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </h3>
+
+                          {/* Donut + meta */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 18 }}>
+                            <svg width={88} height={88} style={{ flexShrink: 0 }}>
+                              <circle cx={44} cy={44} r={36} stroke="var(--color-border, #e2e8f0)" strokeWidth={8} fill="none" />
+                              <circle
+                                cx={44} cy={44} r={36}
+                                stroke={color} strokeWidth={8} fill="none"
+                                strokeLinecap="round"
+                                strokeDasharray={circumference}
+                                strokeDashoffset={dashOffset}
+                                transform="rotate(-90 44 44)"
+                                style={{ transition: 'stroke-dashoffset 0.6s ease-out' }}
+                              />
+                              <text x={44} y={44} textAnchor="middle" dominantBaseline="middle"
+                                fontSize={18} fontWeight={800} fill={color}>
+                                %{Math.round(rate)}
+                              </text>
+                            </svg>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                display: 'inline-block',
+                                padding: '3px 10px', borderRadius: 6,
+                                fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em',
+                                background: colorBg, color, marginBottom: 8,
+                              }}>
+                                {status}
+                              </div>
+                              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 2 }}>
+                                <strong style={{ color: 'var(--color-text-secondary)' }}>Dönem:</strong> {periodMonths} ay
+                              </div>
+                              <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
+                                {new Date(r.periodStart).toLocaleDateString('tr-TR')} — {new Date(r.periodEnd).toLocaleDateString('tr-TR')}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* PDF butonu */}
+                          <button
+                            onClick={() => downloadPdf(r)}
+                            disabled={downloadingId === r.id}
+                            style={{
+                              width: '100%',
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                              padding: '11px 16px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+                              background: downloadingId === r.id ? 'rgba(13,150,104,0.6)' : 'var(--color-primary)',
+                              color: '#fff',
+                              border: 'none', cursor: downloadingId === r.id ? 'wait' : 'pointer',
+                              boxShadow: '0 4px 12px rgba(13,150,104,0.25)',
+                              transition: 'transform 0.15s',
+                            }}
+                            onMouseEnter={e => { if (downloadingId !== r.id) e.currentTarget.style.transform = 'scale(1.02)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                          >
+                            {downloadingId === r.id ? (
+                              <>
+                                <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                                Hazırlanıyor...
+                              </>
+                            ) : (
+                              <>
+                                <Download size={15} />
+                                Profesyonel PDF İndir
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </BlurFade>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -55,7 +55,6 @@ export default function NewTrainingPage() {
     contentType: 'video' | 'pdf' | 'audio'; pageCount?: number; durationSeconds?: number;
     documentKey?: string; documentFile?: File; documentUploading?: boolean;
   }[]>([]);
-  const [contentTab, setContentTab] = useState<'documents' | 'media'>('media');
   const [libraryModalOpen, setLibraryModalOpen] = useState(false);
   const docFileInputRef = useRef<HTMLInputElement>(null);
   const mediaFileInputRef = useRef<HTMLInputElement>(null);
@@ -564,45 +563,7 @@ export default function NewTrainingPage() {
                 </div>
               </div>
 
-              {/* Tabs: Dokümanlar / Medya */}
-              <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--color-surface)' }}>
-                <button
-                  onClick={() => setContentTab('documents')}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all"
-                  style={{
-                    background: contentTab === 'documents' ? 'var(--color-bg)' : 'transparent',
-                    color: contentTab === 'documents' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                    boxShadow: contentTab === 'documents' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  }}
-                >
-                  <FileText className="h-4 w-4" />
-                  Dokümanlar
-                  {videos.filter(v => v.contentType === 'pdf').length > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'var(--color-primary)', color: 'white' }}>
-                      {videos.filter(v => v.contentType === 'pdf').length}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => setContentTab('media')}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all"
-                  style={{
-                    background: contentTab === 'media' ? 'var(--color-bg)' : 'transparent',
-                    color: contentTab === 'media' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                    boxShadow: contentTab === 'media' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  }}
-                >
-                  <Video className="h-4 w-4" />
-                  Medya
-                  {videos.filter(v => v.contentType === 'video' || v.contentType === 'audio').length > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'var(--color-primary)', color: 'white' }}>
-                      {videos.filter(v => v.contentType === 'video' || v.contentType === 'audio').length}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* Tab action buttons */}
+              {/* Action buttons */}
               <div className="flex items-center gap-2">
                 {/* Hidden file inputs */}
                 <input
@@ -638,13 +599,22 @@ export default function NewTrainingPage() {
                 />
 
                 <Button
-                  onClick={() => contentTab === 'documents' ? docFileInputRef.current?.click() : mediaFileInputRef.current?.click()}
+                  onClick={() => docFileInputRef.current?.click()}
+                  variant="outline"
+                  className="gap-2 font-semibold rounded-xl"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                >
+                  <FileText className="h-4 w-4" />
+                  Doküman Yükle
+                </Button>
+                <Button
+                  onClick={() => mediaFileInputRef.current?.click()}
                   variant="outline"
                   className="gap-2 font-semibold rounded-xl"
                   style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
                 >
                   <Upload className="h-4 w-4" />
-                  Bilgisayardan Yükle
+                  Video/Ses Yükle
                 </Button>
                 <Button
                   onClick={() => setLibraryModalOpen(true)}
@@ -658,9 +628,7 @@ export default function NewTrainingPage() {
 
               {/* Content list — filtered by active tab */}
               <div className="space-y-4">
-                {videos
-                  .filter(v => contentTab === 'documents' ? v.contentType === 'pdf' : (v.contentType === 'video' || v.contentType === 'audio'))
-                  .map((video, idx) => (
+                {videos.map((video, idx) => (
                   <div
                     key={video.id}
                     className="rounded-xl border group"
@@ -1030,24 +998,17 @@ export default function NewTrainingPage() {
                     )}
                   </div>
                 ))}
-                {/* Empty state for current tab */}
-                {videos.filter(v => contentTab === 'documents' ? v.contentType === 'pdf' : (v.contentType === 'video' || v.contentType === 'audio')).length === 0 && (
+                {videos.length === 0 && (
                   <div
                     className="flex flex-col items-center justify-center py-12 rounded-xl border-2 border-dashed"
                     style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
                   >
-                    {contentTab === 'documents' ? (
-                      <FileText className="h-10 w-10 mb-3" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
-                    ) : (
-                      <Video className="h-10 w-10 mb-3" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
-                    )}
+                    <Layers className="h-10 w-10 mb-3" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
                     <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>
-                      {contentTab === 'documents' ? 'Henüz doküman eklenmedi' : 'Henüz medya eklenmedi'}
+                      Henüz içerik eklenmedi
                     </p>
                     <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)', opacity: 0.7 }}>
-                      {contentTab === 'documents'
-                        ? 'PDF dosyası yükleyin veya kütüphaneden seçin'
-                        : 'Video veya ses dosyası yükleyin veya kütüphaneden seçin'}
+                      Doküman, video veya ses yükleyin ya da kütüphaneden seçin
                     </p>
                   </div>
                 )}
@@ -1058,7 +1019,7 @@ export default function NewTrainingPage() {
                 open={libraryModalOpen}
                 onClose={() => setLibraryModalOpen(false)}
                 onSelect={addFromLibrary}
-                defaultFilter={contentTab === 'documents' ? 'pdf' : 'all'}
+                defaultFilter="all"
               />
             </div>
           )}

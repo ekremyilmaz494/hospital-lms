@@ -6,7 +6,8 @@ import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2 } from 'lucide-re
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
-// PDF.js worker — public klasöründen yükle (CDN'ye bağımlılık yok)
+// PDF.js worker — public/ altındaki dosya react-pdf'in bundle ettiği sürümle eşleşmeli
+// (public/pdf.worker.min.mjs → node_modules/.pnpm/pdfjs-dist@X.Y.Z/.../build/pdf.worker.min.mjs)
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
 interface PdfViewerProps {
@@ -19,16 +20,38 @@ interface PdfViewerProps {
 export function PdfViewer({ url, pageCount: initialPageCount, onPageChange, onComplete }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number>(initialPageCount ?? 0)
   const [currentPage, setCurrentPage] = useState(1)
-  const [scale, setScale] = useState(1.2)
+  const [scale, setScale] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [containerWidth, setContainerWidth] = useState<number>(0)
   const completedRef = useRef(false)
   const maxPageReached = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Container genişliğini takip et — PDF sayfasını responsive fit et
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const update = () => setContainerWidth(el.clientWidth - 32)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   function onDocumentLoadSuccess({ numPages: total }: { numPages: number }) {
     setNumPages(total)
     setLoading(false)
+    setLoadError(null)
   }
+
+  const handleRetry = useCallback(() => {
+    setLoadError(null)
+    setLoading(true)
+    setReloadKey((k) => k + 1)
+  }, [])
 
   const goToPage = useCallback((page: number) => {
     if (page < 1 || page > numPages) return
@@ -48,7 +71,7 @@ export function PdfViewer({ url, pageCount: initialPageCount, onPageChange, onCo
 
   const zoomIn = useCallback(() => setScale(s => Math.min(s + 0.2, 2.5)), [])
   const zoomOut = useCallback(() => setScale(s => Math.max(s - 0.2, 0.6)), [])
-  const fitWidth = useCallback(() => setScale(1.2), [])
+  const fitWidth = useCallback(() => setScale(1), [])
 
   // Keyboard navigation
   useEffect(() => {
@@ -166,10 +189,11 @@ export function PdfViewer({ url, pageCount: initialPageCount, onPageChange, onCo
 
       {/* PDF Content */}
       <div
+        ref={scrollRef}
         className="flex-1 overflow-auto flex justify-center py-4"
         style={{ background: 'var(--color-bg)' }}
       >
-        {loading && (
+        {loading && !loadError && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-3">
               <div
@@ -182,21 +206,48 @@ export function PdfViewer({ url, pageCount: initialPageCount, onPageChange, onCo
             </div>
           </div>
         )}
-        <Document
-          file={url}
-          onLoadSuccess={onDocumentLoadSuccess}
-          onLoadError={() => setLoading(false)}
-          loading=""
-          className="flex flex-col items-center"
-        >
-          <Page
-            pageNumber={currentPage}
-            scale={scale}
-            className="shadow-lg rounded-lg overflow-hidden"
-            renderTextLayer
-            renderAnnotationLayer
-          />
-        </Document>
+        {loadError ? (
+          <div className="flex items-center justify-center w-full">
+            <div className="text-center space-y-3 max-w-sm p-6 rounded-2xl" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+              <p className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>
+                Belge yüklenemedi
+              </p>
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                {loadError}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                Yöneticinize başvurun veya sayfayı yenileyin.
+              </p>
+              <button
+                onClick={handleRetry}
+                className="mt-2 rounded-xl px-4 py-2 text-xs font-semibold text-white"
+                style={{ background: 'var(--color-primary)' }}
+              >
+                Tekrar Dene
+              </button>
+            </div>
+          </div>
+        ) : (
+          <Document
+            key={reloadKey}
+            file={url}
+            onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={(err: Error) => {
+              setLoadError(err?.message || 'PDF yüklenemedi')
+              setLoading(false)
+            }}
+            loading=""
+            className="flex flex-col items-center"
+          >
+            <Page
+              pageNumber={currentPage}
+              width={containerWidth > 0 ? containerWidth * scale : undefined}
+              className="shadow-lg rounded-lg overflow-hidden"
+              renderTextLayer
+              renderAnnotationLayer
+            />
+          </Document>
+        )}
       </div>
     </div>
   )

@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Library, Clock, Star, CheckCircle2, Plus, Layers, X, ArrowRight,
-  Video, ChevronDown, ChevronRight, Film, Play, Sparkles, Search,
-  BookOpen, GraduationCap, Folder, BarChart3, Eye,
+  Video, ChevronDown, Film, Play, Sparkles, Search,
+  BookOpen, GraduationCap, Folder, Eye, Upload, AlertCircle,
 } from 'lucide-react'
+import { generateVideoThumbnail } from '@/lib/video-thumbnail'
 import { useFetch } from '@/hooks/use-fetch'
 import { PageLoading } from '@/components/shared/page-loading'
 import { useToast } from '@/components/shared/toast'
@@ -32,6 +33,7 @@ interface ContentLibraryItem {
   targetRoles: string[]
   isActive: boolean
   isInstalled: boolean
+  isOwned?: boolean
 }
 
 interface PageData {
@@ -348,8 +350,8 @@ function ContentCard({ item, onInstall, installing }: ContentCardProps) {
                 <span>Ekleniyor...</span>
               ) : (
                 <>
-                  <Plus className="h-4 w-4" />
-                  Kuruma Ekle
+                  <GraduationCap className="h-4 w-4" />
+                  Eğitim olarak ata
                 </>
               )}
             </button>
@@ -813,12 +815,470 @@ function MyVideosTab() {
   )
 }
 
+// ── İçerik Yükleme Modalı ────────────────────────────────────────────────
+
+interface UploadContentModalProps {
+  onClose: () => void
+  onSuccess: () => void
+}
+
+interface FileUploadState {
+  fileName: string
+  loaded: number
+  total: number
+  status: 'pending' | 'uploading' | 'done' | 'error'
+  error?: string
+}
+
+function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
+  const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [title, setTitle] = useState('')
+  const [category, setCategory] = useState<string>('')
+  const [description, setDescription] = useState('')
+  const [difficulty, setDifficulty] = useState<string>('BASIC')
+  const [smgPoints, setSmgPoints] = useState<number | ''>('')
+  const [targetRoles, setTargetRoles] = useState<string[]>(['all'])
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState<Record<string, FileUploadState>>({})
+
+  const toggleRole = (role: string) => {
+    setTargetRoles(prev => {
+      if (role === 'all') return ['all']
+      const next = prev.filter(r => r !== 'all')
+      return next.includes(role) ? next.filter(r => r !== role) : [...next, role]
+    })
+  }
+
+  const handleFilesChange = (fileList: FileList | null) => {
+    if (!fileList) return
+    const files = Array.from(fileList).slice(0, 20)
+    setSelectedFiles(files)
+    if (!title && files[0]) {
+      setTitle(files[0].name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '))
+    }
+  }
+
+  const handleUpload = useCallback(async () => {
+    if (selectedFiles.length === 0) {
+      toast('Lütfen en az bir dosya seçin', 'error')
+      return
+    }
+    if (!title.trim()) {
+      toast('Başlık zorunlu', 'error')
+      return
+    }
+    if (!category) {
+      toast('Kategori zorunlu', 'error')
+      return
+    }
+
+    setUploading(true)
+
+    const payload = selectedFiles.map((f, idx) => ({
+      fileName: f.name,
+      contentType: f.type,
+      title: selectedFiles.length === 1 ? title : `${title}${selectedFiles.length > 1 ? ` (${idx + 1})` : ''}`,
+      category,
+      description: description || undefined,
+      difficulty,
+      targetRoles,
+      smgPoints: typeof smgPoints === 'number' ? smgPoints : undefined,
+    }))
+
+    try {
+      const res = await fetch('/api/admin/content-library', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: payload }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        toast(err.error || 'Yükleme başlatılamadı', 'error')
+        setUploading(false)
+        return
+      }
+
+      const { results } = await res.json() as {
+        results: Array<{
+          id?: string
+          uploadUrl?: string
+          thumbnailUploadUrl?: string | null
+          fileName: string
+          error?: string
+        }>
+      }
+
+      // Hatalı sonuçları topla
+      const failedPresign = results.filter(r => !r.uploadUrl)
+      for (const f of failedPresign) {
+        setProgress(prev => ({
+          ...prev,
+          [f.fileName]: { fileName: f.fileName, loaded: 0, total: 0, status: 'error', error: f.error ?? 'Hata' },
+        }))
+      }
+
+      const uploads = results
+        .filter((r): r is { id: string; uploadUrl: string; thumbnailUploadUrl?: string | null; fileName: string } =>
+          !!r.uploadUrl && !!r.id,
+        )
+        .map(result => {
+          const file = selectedFiles.find(f => f.name === result.fileName)
+          if (!file) return Promise.resolve({ ok: false, id: result.id, fileName: result.fileName })
+
+          setProgress(prev => ({
+            ...prev,
+            [result.fileName]: { fileName: result.fileName, loaded: 0, total: file.size, status: 'uploading' },
+          }))
+
+          if (file.type.startsWith('video/') && result.thumbnailUploadUrl) {
+            generateVideoThumbnail(file).then(blob => {
+              if (!blob || !result.thumbnailUploadUrl) return
+              fetch(result.thumbnailUploadUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'image/jpeg' },
+                body: blob,
+              }).catch(() => {})
+            }).catch(() => {})
+          }
+
+          return new Promise<{ ok: boolean; id: string; fileName: string }>(resolve => {
+            const xhr = new XMLHttpRequest()
+            xhr.upload.onprogress = e => {
+              if (e.lengthComputable) {
+                setProgress(prev => ({
+                  ...prev,
+                  [result.fileName]: {
+                    fileName: result.fileName,
+                    loaded: e.loaded,
+                    total: e.total,
+                    status: 'uploading',
+                  },
+                }))
+              }
+            }
+            xhr.onload = () => {
+              const ok = xhr.status >= 200 && xhr.status < 300
+              setProgress(prev => ({
+                ...prev,
+                [result.fileName]: {
+                  fileName: result.fileName,
+                  loaded: file.size,
+                  total: file.size,
+                  status: ok ? 'done' : 'error',
+                },
+              }))
+              resolve({ ok, id: result.id, fileName: result.fileName })
+            }
+            xhr.onerror = () => {
+              setProgress(prev => ({
+                ...prev,
+                [result.fileName]: {
+                  fileName: result.fileName,
+                  loaded: 0,
+                  total: file.size,
+                  status: 'error',
+                },
+              }))
+              resolve({ ok: false, id: result.id, fileName: result.fileName })
+            }
+            xhr.open('PUT', result.uploadUrl)
+            xhr.setRequestHeader('Content-Type', file.type)
+            xhr.send(file)
+          })
+        })
+
+      const uploadResults = await Promise.all(uploads)
+      const succeeded = uploadResults.filter(r => r.ok).length
+      const failed = uploadResults.length - succeeded
+
+      if (succeeded > 0 && failed === 0) {
+        toast(`${succeeded} içerik yüklendi`, 'success')
+        onSuccess()
+        onClose()
+      } else if (succeeded > 0 && failed > 0) {
+        toast(`${succeeded} yüklendi, ${failed} başarısız`, 'error')
+        onSuccess()
+      } else {
+        toast('Yükleme başarısız', 'error')
+      }
+    } catch {
+      toast('Yükleme sırasında bir hata oluştu', 'error')
+    } finally {
+      setUploading(false)
+    }
+  }, [selectedFiles, title, category, description, difficulty, targetRoles, smgPoints, toast, onSuccess, onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backdropFilter: 'blur(12px)', background: 'rgba(0,0,0,0.5)' }}
+    >
+      <div
+        className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl"
+        style={{
+          background: 'var(--color-surface)',
+          borderColor: 'color-mix(in srgb, var(--color-border) 60%, transparent)',
+          animation: 'modalIn 0.2s ease-out',
+        }}
+      >
+        <div className="flex items-center justify-between px-6 pt-6 pb-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl"
+              style={{ background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 70%, #000))' }}
+            >
+              <Upload className="h-4.5 w-4.5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>
+                İçerik Yükle
+              </h2>
+              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Video, PDF veya ses dosyası</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={uploading}
+            className="rounded-lg p-2 transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+          >
+            <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+          </button>
+        </div>
+
+        <div className="px-6 pb-6 space-y-4">
+          {/* Dosya seç */}
+          <div>
+            <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+              Dosya <span style={{ color: 'var(--color-error)' }}>*</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            >
+              <Upload className="h-4 w-4" />
+              {selectedFiles.length > 0
+                ? `${selectedFiles.length} dosya seçildi`
+                : 'Dosya seç (video, PDF, ses)'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="video/*,audio/*,.pdf,.pptx"
+              className="hidden"
+              onChange={e => {
+                handleFilesChange(e.target.files)
+                e.target.value = ''
+              }}
+            />
+            {selectedFiles.length > 0 && (
+              <ul className="mt-2 space-y-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                {selectedFiles.map(f => (
+                  <li key={f.name} className="truncate">• {f.name}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Başlık */}
+          <div>
+            <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+              Başlık <span style={{ color: 'var(--color-error)' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              disabled={uploading}
+              placeholder="Örn. Enfeksiyon Kontrolü Eğitimi"
+              className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
+              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            />
+          </div>
+
+          {/* Kategori */}
+          <div>
+            <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+              Kategori <span style={{ color: 'var(--color-error)' }}>*</span>
+            </label>
+            <select
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+              disabled={uploading}
+              className="w-full rounded-xl border px-4 py-2.5 text-sm font-medium outline-none transition-colors focus:border-[var(--color-primary)]"
+              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            >
+              <option value="">Kategori seçin...</option>
+              {Object.entries(CONTENT_LIBRARY_CATEGORIES).map(([key, cfg]) => (
+                <option key={key} value={key}>{cfg.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Açıklama (opsiyonel) */}
+          <div>
+            <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+              Açıklama <span style={{ color: 'var(--color-text-muted)' }}>(opsiyonel)</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              disabled={uploading}
+              rows={2}
+              className="w-full resize-none rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
+              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            />
+          </div>
+
+          {/* Opsiyonel alanlar */}
+          <details className="group">
+            <summary className="cursor-pointer text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+              Gelişmiş seçenekler (opsiyonel)
+            </summary>
+            <div className="mt-3 space-y-3">
+              <div>
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                  Zorluk
+                </label>
+                <select
+                  value={difficulty}
+                  onChange={e => setDifficulty(e.target.value)}
+                  disabled={uploading}
+                  className="w-full rounded-xl border px-4 py-2.5 text-sm font-medium outline-none transition-colors focus:border-[var(--color-primary)]"
+                  style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                >
+                  {Object.entries(CONTENT_LIBRARY_DIFFICULTY).map(([key, cfg]) => (
+                    <option key={key} value={key}>{cfg.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                  Hedef Roller
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {CONTENT_LIBRARY_TARGET_ROLES.map(r => {
+                    const active = targetRoles.includes(r.value)
+                    return (
+                      <button
+                        key={r.value}
+                        type="button"
+                        onClick={() => toggleRole(r.value)}
+                        disabled={uploading}
+                        className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
+                        style={{
+                          background: active ? 'var(--color-primary)' : 'var(--color-surface)',
+                          color: active ? '#fff' : 'var(--color-text-secondary)',
+                          border: `1.5px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        }}
+                      >
+                        {r.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                  SMG Puanı
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={smgPoints}
+                  onChange={e => setSmgPoints(e.target.value === '' ? '' : Number(e.target.value))}
+                  disabled={uploading}
+                  placeholder="0"
+                  className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
+                  style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                />
+              </div>
+            </div>
+          </details>
+
+          {/* Progress */}
+          {Object.keys(progress).length > 0 && (
+            <div className="space-y-2 rounded-xl p-3" style={{ background: 'var(--color-bg)' }}>
+              {Object.values(progress).map(p => {
+                const pct = p.total > 0 ? Math.min(100, Math.round((p.loaded / p.total) * 100)) : 0
+                return (
+                  <div key={p.fileName} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="flex items-center gap-1.5 truncate" style={{ color: 'var(--color-text-primary)' }}>
+                        {p.status === 'error' && <AlertCircle className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-error)' }} />}
+                        {p.status === 'done' && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-success)' }} />}
+                        <span className="truncate">{p.fileName}</span>
+                      </span>
+                      <span
+                        className="shrink-0 font-mono text-[10px] font-bold tabular-nums"
+                        style={{
+                          color:
+                            p.status === 'error' ? 'var(--color-error)'
+                              : p.status === 'done' ? 'var(--color-success)'
+                                : 'var(--color-primary)',
+                        }}
+                      >
+                        {p.status === 'error' ? 'HATA' : `${pct}%`}
+                      </span>
+                    </div>
+                    <div className="h-1 overflow-hidden rounded-full" style={{ background: 'var(--color-border)' }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${pct}%`,
+                          background:
+                            p.status === 'error' ? 'var(--color-error)'
+                              : p.status === 'done' ? 'var(--color-success)'
+                                : 'var(--color-primary)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={onClose}
+              disabled={uploading}
+              className="rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              İptal
+            </button>
+            <button
+              onClick={handleUpload}
+              disabled={uploading || selectedFiles.length === 0 || !title.trim() || !category}
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all duration-200 disabled:opacity-40 hover:shadow-lg disabled:hover:shadow-none"
+              style={{ background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, #000))' }}
+            >
+              <Upload className="h-4 w-4" />
+              {uploading ? 'Yükleniyor...' : 'Yükle'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Platform Kütüphanesi Sekmesi ──────────────────────────────────────────
 
 function PlatformLibraryTab() {
   const { toast } = useToast()
   const { data, isLoading, error, refetch } = useFetch<PageData>('/api/admin/content-library')
   const [showBulkModal, setShowBulkModal] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [installingId, setInstallingId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -861,6 +1321,13 @@ function PlatformLibraryTab() {
         <BulkInstallModal
           items={allItems}
           onClose={() => setShowBulkModal(false)}
+          onSuccess={refetch}
+        />
+      )}
+
+      {showUploadModal && (
+        <UploadContentModal
+          onClose={() => setShowUploadModal(false)}
           onSuccess={refetch}
         />
       )}
@@ -911,11 +1378,21 @@ function PlatformLibraryTab() {
             />
           </div>
 
+          {/* İçerik Yükle */}
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:shadow-lg"
+            style={{ background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, #000))' }}
+          >
+            <Plus className="h-4 w-4" />
+            İçerik Yükle
+          </button>
+
           {/* Toplu Ekle */}
           <button
             onClick={() => setShowBulkModal(true)}
-            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:shadow-lg"
-            style={{ background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, #000))' }}
+            className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition-colors hover:bg-[var(--color-surface-hover)]"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
           >
             <Layers className="h-4 w-4" />
             Toplu Ekle

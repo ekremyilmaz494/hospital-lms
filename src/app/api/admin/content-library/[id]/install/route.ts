@@ -17,14 +17,18 @@ export async function POST(
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId!
   const { id: contentLibraryId } = await params
 
-  const lib = await prisma.contentLibrary.findUnique({
-    where: { id: contentLibraryId, isActive: true },
+  const lib = await prisma.contentLibrary.findFirst({
+    where: {
+      id: contentLibraryId,
+      isActive: true,
+      OR: [{ organizationId: null }, { organizationId: orgId }],
+    },
   })
   if (!lib) return errorResponse('İçerik bulunamadı veya aktif değil', 404)
 
@@ -65,6 +69,22 @@ export async function POST(
         maxAttempts:      3,
       },
     })
+
+    // S3'te dosyası olan içerik ise tek videolu Training oluştur
+    if (lib.s3Key) {
+      await tx.trainingVideo.create({
+        data: {
+          trainingId:      t.id,
+          title:           lib.title,
+          description:     lib.description ?? undefined,
+          videoUrl:        lib.s3Key,
+          videoKey:        lib.s3Key,
+          contentType:     lib.contentType ?? 'video',
+          durationSeconds: (lib.duration ?? 0) * 60,
+          sortOrder:       0,
+        },
+      })
+    }
 
     await tx.organizationContentLibrary.create({
       data: {

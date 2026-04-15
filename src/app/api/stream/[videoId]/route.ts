@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!video) return errorResponse('İçerik bulunamadı', 404)
   if (video.training.organizationId !== dbUser!.organizationId) return errorResponse('Yetkisiz', 403)
 
-  const key = video.videoKey || video.videoUrl
+  const key = video.videoKey || video.documentKey || video.videoUrl
   if (!key || key.startsWith('/uploads')) {
     return errorResponse('Dosya S3\'te bulunamadı', 404)
   }

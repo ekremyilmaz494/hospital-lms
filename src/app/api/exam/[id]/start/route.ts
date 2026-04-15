@@ -7,6 +7,7 @@ import { getPendingMandatoryFeedback } from '@/lib/feedback-helpers'
 
 /** Start a new exam attempt or resume existing one */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const startedAt = Date.now()
   const { id: assignmentId } = await params
   const { dbUser, error } = await getAuthUser()
   if (error) return error
@@ -22,7 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     include: { training: true },
   })
 
-  if (!assignment) return errorResponse('Assignment not found', 404)
+  if (!assignment) return errorResponse('Eğitim atanması bulunamadı', 404)
 
   // ── Zorunlu geri bildirim kilidi ──
   // Kullanıcının başka bir eğitim için bekleyen zorunlu feedback'i varsa,
@@ -96,6 +97,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // B7.5 — Transaction hatalarını yakala; MAX_ATTEMPTS dışındaki hatalar 500 döndürmesin
   let attempt: Awaited<ReturnType<typeof prisma.examAttempt.findFirst>> | null = null
+  const txStartedAt = Date.now()
   try {
   attempt = await prisma.$transaction(async (tx) => {
     // SELECT FOR UPDATE ile row-level lock — concurrent race condition önlenir
@@ -186,13 +188,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
 
     return created
-  }).catch((err: Error) => {
+  }, { timeout: 10_000, maxWait: 5_000 }).catch((err: Error) => {
     if (err.message === 'MAX_ATTEMPTS_EXCEEDED') return null
     throw err // re-throw to outer try-catch
   })
   } catch (err) {
-    logger.error('Exam Start', 'Sınav başlatma hatası', err)
+    const txElapsed = Date.now() - txStartedAt
+    const totalElapsed = Date.now() - startedAt
+    const errName = err instanceof Error ? err.name : 'Unknown'
+    const errMsg = err instanceof Error ? err.message : String(err)
+    // Prisma known error codes (P2024=pool timeout, P2028=tx timeout, P2034=deadlock)
+    const prismaCode = (err as { code?: string } | null)?.code
+    logger.error('Exam Start', 'Sınav başlatma hatası', {
+      assignmentId,
+      userId: dbUser!.id,
+      organizationId: dbUser!.organizationId,
+      errName,
+      errMsg,
+      prismaCode,
+      txElapsedMs: txElapsed,
+      totalElapsedMs: totalElapsed,
+    })
     return errorResponse('Sınav başlatılamadı. Lütfen tekrar deneyin.', 500)
+  }
+
+  const totalElapsed = Date.now() - startedAt
+  if (totalElapsed > 2000) {
+    logger.warn('Exam Start', `Yavaş başlatma: ${totalElapsed}ms`, { assignmentId, userId: dbUser!.id })
   }
 
   if (!attempt) return errorResponse('Maksimum deneme sayısına ulaştınız', 403)
