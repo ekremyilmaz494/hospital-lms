@@ -16,9 +16,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS "users_orgId_hisExtId_key"
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "kvkk_notice_acknowledged_at" TIMESTAMPTZ;
 
 -- Mevcut consent=true olan kullanıcıların tarihi taşı (veri kaybı olmadan)
-UPDATE "users"
-SET "kvkk_notice_acknowledged_at" = kvkk_consent_date
-WHERE kvkk_consent = true AND kvkk_consent_date IS NOT NULL;
+-- Idempotent: kolonlar yoksa (fresh DB) UPDATE atlanır
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'kvkk_consent_date'
+  ) THEN
+    EXECUTE 'UPDATE "users"
+             SET "kvkk_notice_acknowledged_at" = kvkk_consent_date
+             WHERE kvkk_consent = true AND kvkk_consent_date IS NOT NULL';
+  END IF;
+END $$;
 
 ALTER TABLE "users" DROP COLUMN IF EXISTS "kvkk_consent";
 ALTER TABLE "users" DROP COLUMN IF EXISTS "kvkk_consent_date";
