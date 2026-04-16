@@ -49,6 +49,7 @@ export default function NewTrainingPage() {
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [excludedStaff, setExcludedStaff] = useState<string[]>([]);
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const [deptSearch, setDeptSearch] = useState('');
   const [uploadProgress, setUploadProgress] = useState<Record<number, number>>({});
   const [videos, setVideos] = useState<{
     id: number; title: string; url: string; file?: File;
@@ -204,6 +205,55 @@ export default function NewTrainingPage() {
 
   const addQuestion = () => setQuestions(prev => [...prev, { id: Date.now(), text: '', points: 10, options: ['', '', '', ''], correct: -1 }]);
   const removeQuestion = (id: number) => setQuestions(prev => prev.filter(q => q.id !== id));
+
+  const validateStep = (step: number): string | null => {
+    if (step === 1) {
+      if (!title.trim()) return 'Eğitim adı boş olamaz.';
+      if (!selectedCategory) return 'Kategori seçilmelidir.';
+      if (!startDate || !endDate) return 'Başlangıç ve bitiş tarihleri zorunludur.';
+      if (new Date(startDate) > new Date(endDate)) return 'Bitiş tarihi başlangıç tarihinden önce olamaz.';
+      const ps = Number(passingScore);
+      if (!Number.isFinite(ps) || ps < 0 || ps > 100) return 'Baraj puanı 0 ile 100 arasında olmalıdır.';
+      const ma = Number(maxAttempts);
+      if (!Number.isFinite(ma) || ma < 1 || ma > 10) return 'Deneme hakkı 1 ile 10 arasında olmalıdır.';
+      const ed = Number(examDurationMinutes);
+      if (!Number.isFinite(ed) || ed < 1 || ed > 600) return 'Sınav süresi 1 ile 600 dakika arasında olmalıdır.';
+      if (isCompulsory) {
+        if (!complianceDeadline) return 'Zorunlu eğitimler için uyum son tarihi girilmelidir.';
+        if (!regulatoryBody.trim()) return 'Zorunlu eğitimler için düzenleyici kurum girilmelidir.';
+      }
+    }
+    if (step === 2) {
+      if (Object.keys(uploadProgress).length > 0) {
+        return 'Dosya yüklemesi devam ediyor. Lütfen tamamlanmasını bekleyin.';
+      }
+      const pending = videos.find(v => !v.url);
+      if (pending) {
+        return 'Tamamlanmamış içerik var. Dosya yükleyin ya da satırı kaldırın.';
+      }
+      const missingTitle = videos.find(v => v.url && !v.title.trim() && !v.file?.name);
+      if (missingTitle) return 'Tüm içeriklere başlık girin.';
+    }
+    if (step === 3) {
+      for (const q of questions) {
+        if (!q.text.trim()) return 'Tüm soruların metni doldurulmalıdır.';
+        if (!Number.isFinite(q.points) || q.points < 1) return 'Soru puanı en az 1 olmalıdır.';
+        const emptyOption = q.options.findIndex(o => !o.trim());
+        if (emptyOption !== -1) return 'Tüm seçenekler doldurulmalıdır (boş seçenek bırakmayın).';
+        if (q.correct < 0 || q.correct > 3) return 'Her soru için doğru cevap seçilmelidir.';
+      }
+    }
+    return null;
+  };
+
+  const goToNextStep = () => {
+    const err = validateStep(currentStep);
+    if (err) {
+      toast(err, 'error');
+      return;
+    }
+    setCurrentStep(currentStep + 1);
+  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -1041,14 +1091,6 @@ export default function NewTrainingPage() {
                 </div>
                 <div className="flex gap-2">
                   <Button
-                    disabled
-                    variant="outline"
-                    className="gap-2 font-semibold rounded-xl"
-                    title="Soru kütüphanesi yakında eklenecek"
-                  >
-                    <BookOpen className="h-4 w-4" /> Kütüphaneden Ekle
-                  </Button>
-                  <Button
                     onClick={addQuestion}
                     className="gap-2 font-semibold text-white rounded-xl"
                     style={{ background: 'var(--color-accent)', transition: 'opacity var(--transition-fast)' }}
@@ -1176,6 +1218,8 @@ export default function NewTrainingPage() {
               <div className="flex gap-3">
                 <Input
                   placeholder="Departman veya personel ara..."
+                  value={deptSearch}
+                  onChange={(e) => setDeptSearch(e.target.value)}
                   className="max-w-sm h-11"
                   style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', borderRadius: 'var(--radius-lg)' }}
                 />
@@ -1190,7 +1234,12 @@ export default function NewTrainingPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {departments.map((dept) => {
+                {departments.filter(dept => {
+                  const q = deptSearch.trim().toLocaleLowerCase('tr-TR');
+                  if (!q) return true;
+                  if (dept.name.toLocaleLowerCase('tr-TR').includes(q)) return true;
+                  return dept.staff.some(s => s.name.toLocaleLowerCase('tr-TR').includes(q));
+                }).map((dept) => {
                   const isSelected = selectedDepts.includes(dept.id);
                   const activeStaff = dept.staff.filter(s => !excludedStaff.includes(s.id));
                   const isExpanded = expandedDept === dept.id;
@@ -1367,7 +1416,7 @@ export default function NewTrainingPage() {
 
         {currentStep < 4 ? (
           <Button
-            onClick={() => setCurrentStep(currentStep + 1)}
+            onClick={goToNextStep}
             className="gap-2 h-11 rounded-xl font-semibold text-white"
             style={{
               background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)',
@@ -1381,6 +1430,14 @@ export default function NewTrainingPage() {
           <Button
             disabled={publishing}
             onClick={async () => {
+              for (const step of [1, 2, 3]) {
+                const err = validateStep(step);
+                if (err) {
+                  toast(`Adım ${step}: ${err}`, 'error');
+                  setCurrentStep(step);
+                  return;
+                }
+              }
               setPublishing(true);
               try {
                 const res = await fetch('/api/admin/trainings', {

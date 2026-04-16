@@ -16,6 +16,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useFetch } from '@/hooks/use-fetch';
 import { AssignStaffModal } from './assign-staff-modal';
 import { useToast } from '@/components/shared/toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 interface TrainingDetail {
   title: string;
@@ -57,6 +65,8 @@ export default function TrainingDetailPage() {
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [downloadingCompletion, setDownloadingCompletion] = useState<'pdf' | 'excel' | null>(null);
+  const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   if (!id) {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitim bulunamadı</div></div>;
@@ -182,6 +192,48 @@ export default function TrainingDetailPage() {
           refetch(); // refresh data
         }}
       />
+
+      <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open && !resetting) setResetTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Yeni deneme hakkı ver</DialogTitle>
+            <DialogDescription>
+              {resetTarget?.name} için yeni bir deneme hakkı eklenecek. Bu işlem iptal edilemez. Devam etmek istediğinize emin misiniz?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={resetting} onClick={() => setResetTarget(null)}>Vazgeç</Button>
+            <Button
+              disabled={resetting}
+              style={{ background: 'var(--color-primary)', color: 'white' }}
+              onClick={async () => {
+                if (!resetTarget) return;
+                setResetting(true);
+                try {
+                  const res = await fetch(`/api/admin/trainings/${id}/assignments`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: resetTarget.userId }),
+                  });
+                  if (!res.ok) {
+                    const data = await res.json().catch(() => null) as { error?: string } | null;
+                    throw new Error(data?.error || 'İşlem başarısız oldu');
+                  }
+                  toast(`${resetTarget.name} için yeni hak verildi`, 'success');
+                  setResetTarget(null);
+                  refetch();
+                } catch (e) {
+                  toast(e instanceof Error ? e.message : 'İşlem başarısız oldu.', 'error');
+                } finally {
+                  setResetting(false);
+                }
+              }}
+            >
+              {resetting ? 'İşleniyor...' : 'Evet, hak ver'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Description */}
       <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
@@ -332,21 +384,12 @@ export default function TrainingDetailPage() {
                             <div className="flex justify-end">
                               {s.status === 'failed' && (
                                 <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold rounded-lg" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
-                                  onClick={async () => {
-                                    try {
-                                      const res = await fetch(`/api/admin/trainings/${id}/assignments`, {
-                                        method: 'PATCH',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ userId: s.userId }),
-                                      });
-                                      if (res.ok) refetch();
-                                    } catch { toast('İşlem başarısız oldu.', 'error'); }
-                                  }}
+                                  onClick={() => setResetTarget({ userId: s.userId, name: s.name })}
                                 >
                                   <RotateCcw className="h-3.5 w-3.5" /> Yeni Hak Ver
                                 </Button>
                               )}
-                              <button onClick={() => router.push(`/admin/staff/${s.userId}`)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium opacity-0 group-hover:opacity-100" style={{ color: 'var(--color-text-muted)', transition: 'opacity var(--transition-fast)' }}>
+                              <button onClick={() => router.push(`/admin/staff/${s.userId}`)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium" style={{ color: 'var(--color-text-muted)', transition: 'color var(--transition-fast)' }}>
                                 <Eye className="h-3.5 w-3.5" /> Detay<ChevronRight className="h-3 w-3" />
                               </button>
                             </div>

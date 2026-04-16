@@ -65,7 +65,31 @@ export default function EditTrainingPage() {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Eğitim bulunamadı</div></div>;
   }
 
+  const validate = (d: TrainingEditData): string | null => {
+    if (!d.title.trim()) return 'Eğitim adı boş olamaz.';
+    if (!d.category.trim()) return 'Kategori seçilmelidir.';
+    if (!Number.isFinite(d.passingScore) || d.passingScore < 0 || d.passingScore > 100) {
+      return 'Baraj puanı 0 ile 100 arasında olmalıdır.';
+    }
+    if (!Number.isFinite(d.maxAttempts) || d.maxAttempts < 1 || d.maxAttempts > 10) {
+      return 'Deneme hakkı 1 ile 10 arasında olmalıdır.';
+    }
+    if (!Number.isFinite(d.examDurationMinutes) || d.examDurationMinutes < 1 || d.examDurationMinutes > 600) {
+      return 'Sınav süresi 1 ile 600 dakika arasında olmalıdır.';
+    }
+    if (d.startDate && d.endDate && new Date(d.startDate) > new Date(d.endDate)) {
+      return 'Son tarih başlangıç tarihinden önce olamaz.';
+    }
+    return null;
+  };
+
   const handleSave = async () => {
+    if (!formData) return;
+    const err = validate(formData);
+    if (err) {
+      toast(err, 'error');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
