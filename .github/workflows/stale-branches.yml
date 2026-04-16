@@ -1,0 +1,110 @@
+name: Stale Branches Report
+
+on:
+  schedule:
+    # Her Pazartesi 03:00 UTC (TR saati 06:00)
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find stale branches
+        id: scan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          THRESHOLD_DAYS=60
+          CUTOFF=$(date -d "${THRESHOLD_DAYS} days ago" +%s)
+          PROTECTED_REGEX='^(main|master|develop|dev|production|release/.*)$'
+
+          git fetch --all --prune --quiet
+
+          REPORT_FILE=$(mktemp)
+          COUNT=0
+
+          for branch in $(git branch -r --format='%(refname:lstrip=3)' | grep -v '^HEAD$' | sort -u); do
+            if [[ "$branch" =~ $PROTECTED_REGEX ]]; then continue; fi
+
+            last_commit_ts=$(git log -1 --format=%ct "origin/$branch" 2>/dev/null || echo 0)
+            [ "$last_commit_ts" -eq 0 ] && continue
+
+            if [ "$last_commit_ts" -lt "$CUTOFF" ]; then
+              last_commit_date=$(date -d "@$last_commit_ts" +%Y-%m-%d)
+              last_author=$(git log -1 --format='%an' "origin/$branch" 2>/dev/null || echo 'unknown')
+              days_old=$(( ( $(date +%s) - last_commit_ts ) / 86400 ))
+              echo "- \`$branch\` — son commit: $last_commit_date ($days_old gün önce), yazar: $last_author" >> "$REPORT_FILE"
+              COUNT=$((COUNT + 1))
+            fi
+          done
+
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "report_file=$REPORT_FILE" >> "$GITHUB_OUTPUT"
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "✓ Stale branch bulunamadı."
+          else
+            echo "⚠ $COUNT stale branch bulundu:"
+            cat "$REPORT_FILE"
+          fi
+
+      - name: Create issue if stale branches found
+        if: steps.scan.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT_FILE: ${{ steps.scan.outputs.report_file }}
+          COUNT: ${{ steps.scan.outputs.count }}
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+          BODY_FILE=$(mktemp)
+
+          {
+            echo "## 60+ gündür aktivite görmemiş branch'ler"
+            echo ""
+            echo "Aşağıdaki branch'ler son 60 gündür güncellenmemiş. Manuel gözden geçirip gereksizleri silin:"
+            echo ""
+            cat "$REPORT_FILE"
+            echo ""
+            echo "### Silme komutu"
+            echo ""
+            echo '```bash'
+            echo "# Tek tek sil"
+            echo "git push origin --delete <branch-name>"
+            echo ""
+            echo "# Toplu silme (dikkat!)"
+            echo "git push origin --delete branch1 branch2 branch3"
+            echo '```'
+            echo ""
+            echo "### Korunan branch'ler (otomatik atlanır)"
+            echo "- \`main\`, \`master\`, \`develop\`, \`dev\`, \`production\`, \`release/*\`"
+            echo ""
+            echo "_Bu issue her Pazartesi otomatik güncellenir. Auto-delete yok — her silme manuel gözden geçirilir._"
+          } > "$BODY_FILE"
+
+          # Aynı başlıkta açık issue varsa update et, yoksa yeni aç
+          EXISTING=$(gh issue list --state open --search "Stale Branches Report in:title" --json number --jq '.[0].number' || echo "")
+
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" \
+              --title "🧹 Stale Branches Report ($TODAY) — $COUNT branch" \
+              --body-file "$BODY_FILE"
+            echo "✓ Issue #$EXISTING güncellendi."
+          else
+            gh issue create \
+              --title "🧹 Stale Branches Report ($TODAY) — $COUNT branch" \
+              --body-file "$BODY_FILE" \
+              --label "housekeeping"
+            echo "✓ Yeni issue açıldı."
+          fi
