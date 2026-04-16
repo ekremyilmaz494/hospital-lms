@@ -40,7 +40,7 @@ export function CertStatsBar({ stats, filterStats, filtersActive }: Props) {
               </span>
               <div
                 className="flex h-9 w-9 items-center justify-center rounded-xl"
-                style={{ background: `${s.color}12` }}
+                style={{ background: `color-mix(in srgb, ${s.color} 10%, transparent)` }}
               >
                 <s.icon className="h-4.5 w-4.5" style={{ color: s.color }} />
               </div>
