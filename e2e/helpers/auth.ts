@@ -42,6 +42,12 @@ export async function applyStoredAuth(context: BrowserContext, role: UserRole): 
 export async function login(page: Page, role: UserRole = 'admin') {
   const dashboard = DASHBOARD_ROUTES[role]
 
+  // Cookie consent banner (fixed bottom, z-[9999]) submit butonunu intercept ediyor — önceden kabul et
+  await page.addInitScript(() => {
+    localStorage.setItem('lms_cookie_consent', 'true')
+    localStorage.setItem('lms_cookie_prefs', JSON.stringify({ essential: true, functional: true, analytics: true }))
+  })
+
   // Önce kaydedilmiş session ile dene
   const stateFile = path.join(STATE_DIR, `${role}.json`)
   if (fs.existsSync(stateFile)) {
