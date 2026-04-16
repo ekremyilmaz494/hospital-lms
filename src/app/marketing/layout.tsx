@@ -56,12 +56,12 @@ function MarketingHeader() {
           <Link href="/" className="flex items-center gap-2.5">
             <div
               className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-sm"
-              style={{ background: "linear-gradient(135deg, #0d9668, #065f46)" }}
+              style={{ background: "linear-gradient(135deg, var(--brand-600), var(--brand-800))" }}
             >
               H
             </div>
             <span className="font-bold text-[15px] tracking-tight" style={{ color: "#0f172a" }}>
-              Hastane<span style={{ color: "#0d9668" }}>LMS</span>
+              Hastane<span style={{ color: "var(--brand-600)" }}>LMS</span>
             </span>
           </Link>
 
@@ -75,7 +75,7 @@ function MarketingHeader() {
                   href={href}
                   className="px-3.5 py-2 rounded-xl text-[13px] font-medium transition-colors hover:bg-black/[0.03]"
                   style={{
-                    color: isActive ? "#0d9668" : "#475569",
+                    color: isActive ? "var(--brand-600)" : "#475569",
                   }}
                 >
                   {label}
@@ -97,8 +97,8 @@ function MarketingHeader() {
               href="/demo"
               className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
               style={{
-                background: "linear-gradient(135deg, #0d9668, #059669)",
-                boxShadow: "0 2px 8px rgba(13,150,104,0.25)",
+                background: "linear-gradient(135deg, var(--brand-600), var(--brand-600))",
+                boxShadow: "0 2px 8px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)",
               }}
             >
               Ucretsiz Deneyin
@@ -157,7 +157,7 @@ function MarketingHeader() {
                   href="/demo"
                   onClick={() => setMobileOpen(false)}
                   className="block text-sm font-semibold py-2.5 text-center rounded-xl text-white"
-                  style={{ background: "linear-gradient(135deg, #0d9668, #059669)" }}
+                  style={{ background: "linear-gradient(135deg, var(--brand-600), var(--brand-600))" }}
                 >
                   Ucretsiz Deneyin
                 </Link>
@@ -227,7 +227,7 @@ function MarketingFooter() {
                   <li key={label}>
                     <Link
                       href={href}
-                      className="text-[13px] transition-colors hover:text-[#0d9668]"
+                      className="text-[13px] transition-colors hover:text-[var(--brand-600)]"
                       style={{ color: "#64748b" }}
                     >
                       {label}
@@ -247,7 +247,7 @@ function MarketingFooter() {
           <div className="flex items-center gap-2.5">
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-black text-xs"
-              style={{ background: "linear-gradient(135deg, #0d9668, #065f46)" }}
+              style={{ background: "linear-gradient(135deg, var(--brand-600), var(--brand-800))" }}
             >
               H
             </div>
@@ -261,7 +261,7 @@ function MarketingFooter() {
               <Link
                 key={label}
                 href={`/${label.toLowerCase()}`}
-                className="text-xs transition-colors hover:text-[#0d9668]"
+                className="text-xs transition-colors hover:text-[var(--brand-600)]"
                 style={{ color: "#94a3b8" }}
               >
                 {label}

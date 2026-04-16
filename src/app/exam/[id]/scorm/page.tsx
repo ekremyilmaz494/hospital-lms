@@ -363,7 +363,7 @@ export default function ScormPlayerPage() {
           <div
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
             style={{
-              background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
+              background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
             }}
           >
             <svg
@@ -399,7 +399,7 @@ export default function ScormPlayerPage() {
             className="rounded-full px-3 py-1 text-xs font-medium"
             style={{
               background: lessonStatus === 'passed' || lessonStatus === 'completed'
-                ? 'rgba(13, 150, 104, 0.1)'
+                ? 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)'
                 : 'rgba(148, 163, 184, 0.15)',
               color: lessonStatus === 'passed' || lessonStatus === 'completed'
                 ? 'var(--color-primary)'

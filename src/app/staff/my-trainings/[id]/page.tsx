@@ -153,7 +153,7 @@ export default function TrainingDetailPage() {
       <BlurFade delay={0}>
         <div
           className="relative overflow-hidden rounded-2xl"
-          style={{ background: 'linear-gradient(135deg, var(--color-primary), #064e3b)', boxShadow: '0 8px 32px rgba(13, 150, 104, 0.2)' }}
+          style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-900))', boxShadow: '0 8px 32px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' }}
         >
           {/* Decorative elements */}
           <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, white 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
@@ -334,7 +334,7 @@ export default function TrainingDetailPage() {
                     className="flex items-center gap-4 rounded-xl p-4 transition-all duration-200"
                     style={{
                       background: v.completed ? 'var(--color-success-bg)' : isNext ? 'var(--color-primary-light)' : 'transparent',
-                      border: `1px solid ${v.completed ? 'rgba(5,150,105,0.2)' : isNext ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                      border: `1px solid ${v.completed ? 'color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' : isNext ? 'var(--color-primary)' : 'var(--color-border)'}`,
                       opacity: isLocked ? 0.45 : 1,
                     }}
                   >
@@ -395,8 +395,8 @@ export default function TrainingDetailPage() {
             <div
               className="flex items-center justify-center gap-3 rounded-2xl py-4 text-[15px] font-semibold text-white transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99] w-full"
               style={{
-                background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                boxShadow: '0 6px 20px rgba(13, 150, 104, 0.3)',
+                background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                boxShadow: '0 6px 20px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)',
               }}
             >
               <CtaIcon className="h-5 w-5" />
@@ -413,7 +413,7 @@ export default function TrainingDetailPage() {
           {/* Success banner */}
           <div
             className="mt-2 mb-5 flex items-center gap-4 rounded-2xl px-5 py-4"
-            style={{ background: 'var(--color-success-bg)', border: '1px solid rgba(5,150,105,0.2)' }}
+            style={{ background: 'var(--color-success-bg)', border: '1px solid color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' }}
           >
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--color-success)' }}>
               <CheckCircle className="h-6 w-6 text-white" />
@@ -435,8 +435,8 @@ export default function TrainingDetailPage() {
                 <div
                   className="flex items-center gap-4 rounded-2xl px-5 py-4 sm:py-5 transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99]"
                   style={{
-                    background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                    boxShadow: '0 6px 20px rgba(13, 150, 104, 0.25)',
+                    background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                    boxShadow: '0 6px 20px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
                   }}
                 >
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
@@ -462,7 +462,7 @@ export default function TrainingDetailPage() {
                   boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(13,150,104,0.08)' }}>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)' }}>
                   <Award className="h-6 w-6" style={{ color: 'var(--color-primary)' }} />
                 </div>
                 <div className="flex-1 min-w-0">

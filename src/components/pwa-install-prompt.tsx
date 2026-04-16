@@ -68,8 +68,8 @@ export function PWAInstallPrompt() {
       <div
         className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white"
         style={{
-          background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-          boxShadow: '0 4px 12px rgba(13,150,104,0.3)',
+          background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+          boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)',
         }}
       >
         H

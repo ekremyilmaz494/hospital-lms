@@ -372,7 +372,7 @@ function AudioPreview({ url, title }: { url: string; title: string }) {
               className="flex h-12 w-12 items-center justify-center rounded-full text-white"
               style={{
                 background: 'var(--color-primary)',
-                boxShadow: '0 2px 8px rgba(13,150,104,0.3)',
+                boxShadow: '0 2px 8px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)',
                 opacity: isLoading && !isPlaying ? 0.6 : 1,
                 transition: 'opacity 200ms ease, transform 100ms ease',
               }}

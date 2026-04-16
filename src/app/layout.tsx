@@ -59,13 +59,20 @@ export default function RootLayout({
       className={`${plusJakarta.variable} ${inter.variable} ${jetbrainsMono.variable} ${spaceGrotesk.variable} ${outfit.variable} ${bricolage.variable} ${syne.variable} ${dmSans.variable}`}
     >
       <head>
+        {/* Pre-paint data-color set — FOUC önler, cascade ilk paint'te devreye girer */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('color-theme');if(t&&t!=='emerald')document.documentElement.setAttribute('data-color',t)}catch(_){}`,
+          }}
+        />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0d9668" />
       </head>
       <body className="app-bg antialiased" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
-          forcedTheme="light"
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
           <AuthProvider>

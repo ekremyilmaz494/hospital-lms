@@ -272,7 +272,7 @@ export function LibraryQuestionPicker({ open, onOpenChange, onSelect }: LibraryQ
                                     className="text-xs px-1.5 py-0.5 rounded"
                                     style={{
                                       background: oi === q.correctAnswer
-                                        ? 'var(--color-primary-light, rgba(13,150,104,0.1))'
+                                        ? 'var(--color-primary-light, color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent))'
                                         : 'var(--color-muted, rgba(0,0,0,0.04))',
                                       color: oi === q.correctAnswer
                                         ? 'var(--color-primary)'

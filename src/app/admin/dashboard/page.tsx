@@ -212,7 +212,7 @@ function LiveExamsWidget() {
 }
 
 const quickActions = [
-  { label: 'Yeni Eğitim', desc: 'Video tabanlı eğitim oluştur', icon: Plus, href: '/admin/trainings/new', color: 'var(--color-primary)', gradient: 'linear-gradient(135deg, rgba(13,150,104,0.08) 0%, rgba(13,150,104,0.02) 100%)', glowColor: 'rgba(13,150,104,0.06)' },
+  { label: 'Yeni Eğitim', desc: 'Video tabanlı eğitim oluştur', icon: Plus, href: '/admin/trainings/new', color: 'var(--color-primary)', gradient: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent) 0%, color-mix(in srgb, var(--brand-600) calc(0.02 * 100%), transparent) 100%)', glowColor: 'color-mix(in srgb, var(--brand-600) calc(0.06 * 100%), transparent)' },
   { label: 'Personel Ekle', desc: 'Yeni personel kaydı', icon: UserPlus, href: '/admin/staff', color: 'var(--color-info)', gradient: 'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.02) 100%)', glowColor: 'rgba(59,130,246,0.06)' },
   { label: 'Hatırlatma Gönder', desc: 'Toplu bildirim gönder', icon: Send, href: '/admin/notifications', color: 'var(--color-accent)', gradient: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%)', glowColor: 'rgba(245,158,11,0.06)' },
   { label: 'Rapor İndir', desc: 'Excel ve PDF raporları', icon: Download, href: '/admin/reports', color: 'var(--color-success)', gradient: 'linear-gradient(135deg, rgba(34,197,94,0.08) 0%, rgba(34,197,94,0.02) 100%)', glowColor: 'rgba(34,197,94,0.06)' },
@@ -653,7 +653,7 @@ export default function AdminDashboard() {
           ) : activity.isLoading ? (
             <ListSkeleton rows={4} />
           ) : (
-            <MagicCard gradientColor="rgba(13, 150, 104, 0.04)" gradientOpacity={0.4} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+            <MagicCard gradientColor="color-mix(in srgb, var(--brand-600) calc(0.04 * 100%), transparent)" gradientOpacity={0.4} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
               <div className="p-6">
                 <div className="mb-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">

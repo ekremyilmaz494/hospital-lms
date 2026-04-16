@@ -643,7 +643,7 @@ export default function VideoPlayerPage() {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 sm:gap-3">
                       {/* Play/Pause */}
-                      <button onClick={togglePlay} className="flex h-12 w-12 sm:h-10 sm:w-10 items-center justify-center rounded-full shrink-0" style={{ background: 'var(--color-primary)', boxShadow: '0 2px 8px rgba(13,150,104,0.3)' }}>
+                      <button onClick={togglePlay} className="flex h-12 w-12 sm:h-10 sm:w-10 items-center justify-center rounded-full shrink-0" style={{ background: 'var(--color-primary)', boxShadow: '0 2px 8px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)' }}>
                         {isPlaying ? <Pause className="h-5 w-5 text-white" /> : <Play className="h-5 w-5 text-white ml-0.5" />}
                       </button>
                       {/* Mute toggle */}
@@ -658,7 +658,7 @@ export default function VideoPlayerPage() {
                         step="0.05"
                         value={isMuted ? 0 : volume}
                         onChange={handleVolumeChange}
-                        className="hidden sm:block w-20 accent-emerald-500 cursor-pointer"
+                        className="hidden sm:block w-20 accent-brand-500 cursor-pointer"
                         style={{ accentColor: 'var(--color-primary)' }}
                       />
                       {/* Time */}

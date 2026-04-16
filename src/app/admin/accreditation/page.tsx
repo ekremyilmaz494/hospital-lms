@@ -271,10 +271,10 @@ export default function AccreditationPage() {
           borderRadius: 24,
           padding: '32px 36px',
           marginBottom: 32,
-          background: 'linear-gradient(135deg, #0f172a 0%, #064e3b 65%, #0d9668 100%)',
+          background: 'linear-gradient(135deg, #0f172a 0%, var(--brand-900) 65%, var(--brand-600) 100%)',
           color: '#fff',
           overflow: 'hidden',
-          boxShadow: '0 20px 60px -20px rgba(13,150,104,0.45), 0 8px 24px -12px rgba(15,23,42,0.3)',
+          boxShadow: '0 20px 60px -20px color-mix(in srgb, var(--brand-600) calc(0.45 * 100%), transparent), 0 8px 24px -12px rgba(15,23,42,0.3)',
         }}>
           {/* Dekoratif ışık halkası */}
           <div style={{
@@ -286,7 +286,7 @@ export default function AccreditationPage() {
           <div style={{
             position: 'absolute', bottom: -120, left: -100, width: 320, height: 320,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(13,150,104,0.25) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent) 0%, transparent 70%)',
             pointerEvents: 'none',
           }} />
 
@@ -320,7 +320,7 @@ export default function AccreditationPage() {
             {/* Quick stats */}
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
               {[
-                { label: 'Aktif Standart', value: STANDARD_BODIES.length, accent: '#34d399' },
+                { label: 'Aktif Standart', value: STANDARD_BODIES.length, accent: 'var(--brand-400)' },
                 { label: 'Toplam Rapor', value: reports.length, accent: '#fbbf24' },
               ].map(s => (
                 <div key={s.label} style={{
@@ -349,7 +349,7 @@ export default function AccreditationPage() {
                 padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                 cursor: 'pointer', border: '1.5px solid',
                 borderColor: selectedBody === b.value ? 'var(--color-primary)' : 'var(--color-border, #e2e8f0)',
-                background: selectedBody === b.value ? 'rgba(13,150,104,0.1)' : 'transparent',
+                background: selectedBody === b.value ? 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)' : 'transparent',
                 color: selectedBody === b.value ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                 transition: 'all 0.15s',
               }}
@@ -409,7 +409,7 @@ export default function AccreditationPage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                             <span style={{
                               fontSize: 11, fontWeight: 700, color: 'var(--color-primary)',
-                              background: 'rgba(13,150,104,0.1)', padding: '1px 7px', borderRadius: 6,
+                              background: 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)', padding: '1px 7px', borderRadius: 6,
                             }}>
                               {std.code}
                             </span>
@@ -682,15 +682,15 @@ export default function AccreditationPage() {
                 textAlign: 'center', padding: '64px 32px',
                 background: 'var(--color-surface)',
                 borderRadius: 20,
-                border: '1px dashed rgba(13,150,104,0.35)',
+                border: '1px dashed color-mix(in srgb, var(--brand-600) calc(0.35 * 100%), transparent)',
               }}>
                 <div style={{
                   width: 72, height: 72, borderRadius: 20,
-                  background: 'rgba(13,150,104,0.12)',
+                  background: 'color-mix(in srgb, var(--brand-600) calc(0.12 * 100%), transparent)',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   marginBottom: 18,
                 }}>
-                  <FileText size={32} color="#0d9668" />
+                  <FileText size={32} color="var(--brand-600)" />
                 </div>
                 <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 6px' }}>
                   Henüz Akreditasyon Raporu Oluşturulmadı
@@ -705,7 +705,7 @@ export default function AccreditationPage() {
                     padding: '11px 22px', borderRadius: 12, fontSize: 13.5, fontWeight: 700,
                     background: 'var(--color-primary)', color: '#fff',
                     border: 'none', cursor: 'pointer',
-                    boxShadow: '0 8px 24px rgba(13,150,104,0.3)',
+                    boxShadow: '0 8px 24px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)',
                   }}
                 >
                   <RefreshCw size={15} />
@@ -720,7 +720,7 @@ export default function AccreditationPage() {
               }}>
                 {reports.map((r, i) => {
                   const rate = Number(r.overallComplianceRate);
-                  const color = rate >= 80 ? '#10b981' : rate >= 60 ? '#f59e0b' : '#ef4444';
+                  const color = rate >= 80 ? 'var(--brand-500)' : rate >= 60 ? '#f59e0b' : '#ef4444';
                   const colorBg = rate >= 80 ? 'rgba(16,185,129,0.08)' : rate >= 60 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)';
                   const status = rate >= 80 ? 'Uyumlu' : rate >= 60 ? 'Risk Altında' : 'Kritik';
                   const periodMonths = Math.round(
@@ -758,7 +758,7 @@ export default function AccreditationPage() {
                             <span style={{
                               display: 'inline-flex', alignItems: 'center', gap: 5,
                               padding: '4px 10px', borderRadius: 8,
-                              background: 'rgba(13,150,104,0.08)',
+                              background: 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)',
                               color: 'var(--color-primary)',
                               fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
                             }}>
@@ -824,10 +824,10 @@ export default function AccreditationPage() {
                               width: '100%',
                               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                               padding: '11px 16px', borderRadius: 12, fontSize: 13, fontWeight: 700,
-                              background: downloadingId === r.id ? 'rgba(13,150,104,0.6)' : 'var(--color-primary)',
+                              background: downloadingId === r.id ? 'color-mix(in srgb, var(--brand-600) calc(0.6 * 100%), transparent)' : 'var(--color-primary)',
                               color: '#fff',
                               border: 'none', cursor: downloadingId === r.id ? 'wait' : 'pointer',
-                              boxShadow: '0 4px 12px rgba(13,150,104,0.25)',
+                              boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
                               transition: 'transform 0.15s',
                             }}
                             onMouseEnter={e => { if (downloadingId !== r.id) e.currentTarget.style.transform = 'scale(1.02)'; }}

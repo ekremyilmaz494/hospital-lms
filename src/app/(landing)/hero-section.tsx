@@ -18,11 +18,11 @@ function HeroVisual() {
       {/* Soft glow rings */}
       <div
         className="absolute w-[480px] h-[480px] rounded-full border opacity-[0.07]"
-        style={{ borderColor: "#0d9668" }}
+        style={{ borderColor: "var(--brand-600)" }}
       />
       <div
         className="absolute w-[380px] h-[380px] rounded-full border opacity-[0.12]"
-        style={{ borderColor: "#0d9668" }}
+        style={{ borderColor: "var(--brand-600)" }}
       />
 
       {/* Organic blob */}
@@ -37,7 +37,7 @@ function HeroVisual() {
         {/* Inner decorative glow */}
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full blur-3xl opacity-20"
-          style={{ backgroundColor: "#0d9668" }}
+          style={{ backgroundColor: "var(--brand-600)" }}
         />
         <div
           className="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-2xl opacity-10"
@@ -72,7 +72,7 @@ function HeroVisual() {
             >
               <div
                 className="h-1.5 rounded-full"
-                style={{ width: "68%", backgroundColor: "#0d9668" }}
+                style={{ width: "68%", backgroundColor: "var(--brand-600)" }}
               />
             </div>
             <div className="flex items-center justify-between">
@@ -151,7 +151,7 @@ function HeroVisual() {
       >
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-          style={{ backgroundColor: "#0d9668" }}
+          style={{ backgroundColor: "var(--brand-600)" }}
         >
           Dr
         </div>
@@ -166,16 +166,16 @@ function HeroVisual() {
       >
         <div
           className="w-5 h-5 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: "#ecfdf5" }}
+          style={{ backgroundColor: "var(--brand-50)" }}
         >
-          <Bell className="w-2.5 h-2.5" style={{ color: "#0d9668" }} />
+          <Bell className="w-2.5 h-2.5" style={{ color: "var(--brand-600)" }} />
         </div>
         <span className="text-xs font-semibold" style={{ color: "#1a3a28" }}>
           Yeni sertifika hazır
         </span>
         <span
           className="w-2 h-2 rounded-full"
-          style={{ backgroundColor: "#0d9668" }}
+          style={{ backgroundColor: "var(--brand-600)" }}
         />
       </div>
     </div>
@@ -197,7 +197,7 @@ export function HeroSection() {
           <Link href="/" className="flex items-center gap-2.5">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-lg"
-              style={{ background: "linear-gradient(135deg, #0d9668, #1a3a28)" }}
+              style={{ background: "linear-gradient(135deg, var(--brand-600), #1a3a28)" }}
             >
               D
             </div>
@@ -207,7 +207,7 @@ export function HeroSection() {
               </p>
               <p
                 className="text-[10px] font-bold tracking-widest uppercase"
-                style={{ color: "#0d9668" }}
+                style={{ color: "var(--brand-600)" }}
               >
                 Eğitim Platformu
               </p>
@@ -248,11 +248,11 @@ export function HeroSection() {
         <div>
           <span
             className="inline-flex items-center gap-2 text-xs font-bold tracking-[0.2em] uppercase px-4 py-1.5 rounded-full border mb-7"
-            style={{ color: "#0d9668", borderColor: "#0d9668" }}
+            style={{ color: "var(--brand-600)", borderColor: "var(--brand-600)" }}
           >
             <span
               className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: "#0d9668" }}
+              style={{ backgroundColor: "var(--brand-600)" }}
             />
             Personel Eğitim Platformu
           </span>
@@ -270,7 +270,7 @@ export function HeroSection() {
             Yönet,
             <br />
             Başarıyı{" "}
-            <span style={{ color: "#0d9668" }}>Ölç.</span>
+            <span style={{ color: "var(--brand-600)" }}>Ölç.</span>
           </h1>
 
           <p
@@ -313,10 +313,10 @@ export function HeroSection() {
             <div className="flex -space-x-2.5">
               {(
                 [
-                  { bg: "#0d9668", letter: "A" },
+                  { bg: "var(--brand-600)", letter: "A" },
                   { bg: "#1a3a28", letter: "M" },
                   { bg: "#b45309", letter: "F" },
-                  { bg: "#0d9668", letter: "K" },
+                  { bg: "var(--brand-600)", letter: "K" },
                 ] as const
               ).map(({ bg, letter }) => (
                 <div

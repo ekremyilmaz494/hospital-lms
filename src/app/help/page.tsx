@@ -39,7 +39,7 @@ const sections = [
     icon: Shield,
     title: 'Güvenlik & Gizlilik',
     accent: 'var(--color-success)',
-    accentBg: 'rgba(13, 150, 104, 0.08)',
+    accentBg: 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)',
     items: [
       { label: 'Otomatik oturum sonlandırma', detail: 'Belirli süre işlem yapılmadığında oturum kapanır' },
       { label: 'Denetim kayıtları', detail: 'Tüm işlemler güvenlik için kaydedilir' },
@@ -55,7 +55,7 @@ export default function HelpPage() {
       <div
         className="relative overflow-hidden"
         style={{
-          background: 'linear-gradient(135deg, #064e3b 0%, #0d9668 50%, #065f46 100%)',
+          background: 'linear-gradient(135deg, var(--brand-900) 0%, var(--brand-600) 50%, var(--brand-800) 100%)',
         }}
       >
         {/* Subtle pattern overlay */}
@@ -129,7 +129,7 @@ export default function HelpPage() {
             <div className="flex items-center gap-3 mb-8">
               <div
                 className="flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ background: 'rgba(13, 150, 104, 0.1)' }}
+                style={{ background: 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)' }}
               >
                 <Video className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
               </div>
@@ -161,8 +161,8 @@ export default function HelpPage() {
                       <div
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
                         style={{
-                          background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                          boxShadow: '0 2px 8px rgba(13, 150, 104, 0.3)',
+                          background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                          boxShadow: '0 2px 8px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)',
                         }}
                       >
                         {s.step}

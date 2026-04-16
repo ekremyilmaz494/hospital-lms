@@ -105,7 +105,7 @@ export default function AIContentStudioSettingsPage() {
           <div className="flex items-center gap-4">
             <div
               className="flex h-12 w-12 items-center justify-center rounded-2xl"
-              style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
+              style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' }}
             >
               <Settings className="h-6 w-6 text-white" />
             </div>

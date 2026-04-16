@@ -358,7 +358,7 @@ function FeedbackContent() {
             onClick={handleSubmit}
             disabled={submitting || missingRequired.length > 0}
             className={`${isMandatory ? 'flex-1' : 'flex-[2]'} rounded-xl h-12 text-[14px] font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50`}
-            style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
+            style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' }}
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {submitting ? 'Gönderiliyor...' : 'Geri Bildirimi Gönder'}

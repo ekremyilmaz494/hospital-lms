@@ -173,12 +173,12 @@ export function LibraryContentPicker({ open, onOpenChange, onSelect }: LibraryCo
                   className="w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all"
                   style={{
                     borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                    background: isSelected ? 'var(--color-primary-light, rgba(13,150,104,0.06))' : 'var(--color-surface)',
+                    background: isSelected ? 'var(--color-primary-light, color-mix(in srgb, var(--brand-600) calc(0.06 * 100%), transparent))' : 'var(--color-surface)',
                   }}
                 >
                   <div
                     className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ background: 'var(--color-primary-light, rgba(13,150,104,0.1))' }}
+                    style={{ background: 'var(--color-primary-light, color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent))' }}
                   >
                     <Icon className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
                   </div>

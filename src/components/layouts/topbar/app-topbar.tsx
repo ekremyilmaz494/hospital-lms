@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { Menu, Moon, Search, Sun, X } from 'lucide-react';
+import { Menu, Moon, Palette, Search, Sun, X } from 'lucide-react';
+import { useColorTheme, COLOR_THEMES } from '@/hooks/use-color-theme';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { NotificationBell } from '@/components/shared/notification-bell';
@@ -48,6 +49,7 @@ export function AppTopbar({
 }: AppTopbarProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { colorTheme, setColorTheme } = useColorTheme();
   const [searchOpen, setSearchOpen] = useState(false);
   const { user } = useAuthStore();
 
@@ -158,21 +160,71 @@ export function AppTopbar({
           )}
         </div>
 
-        {/* Theme Toggle */}
-        <Tooltip >
-          <TooltipTrigger
-            render={<Button variant="ghost" size="icon" className="h-9 w-9" />}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        {/* Theme Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="relative inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-[var(--color-surface-hover)]"
             style={{ color: 'var(--color-text-secondary)' }}
+            aria-label="Tema ayarları"
           >
             <Sun className="h-4.5 w-4.5 rotate-0 scale-100 dark:-rotate-90 dark:scale-0" style={{ transition: 'transform var(--transition-base)' }} />
             <Moon className="absolute h-4.5 w-4.5 rotate-90 scale-0 dark:rotate-0 dark:scale-100" style={{ transition: 'transform var(--transition-base)' }} />
-            <span className="sr-only">Tema değiştir</span>
-          </TooltipTrigger>
-          <TooltipContent>
-            {theme === 'dark' ? 'Aydınlık Tema' : 'Karanlık Tema'}
-          </TooltipContent>
-        </Tooltip>
+            {colorTheme !== 'emerald' && (
+              <span
+                className="absolute bottom-1 right-1 h-2 w-2 rounded-full ring-1 ring-white dark:ring-zinc-900"
+                style={{ background: COLOR_THEMES.find(t => t.id === colorTheme)?.light }}
+              />
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                Görünüm
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => setTheme('light')}
+                className="flex items-center gap-2.5 cursor-pointer"
+              >
+                <Sun className="h-4 w-4 shrink-0" />
+                <span>Aydınlık</span>
+                {theme === 'light' && <span className="ml-auto text-xs" style={{ color: 'var(--color-primary)' }}>✓</span>}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setTheme('dark')}
+                className="flex items-center gap-2.5 cursor-pointer"
+              >
+                <Moon className="h-4 w-4 shrink-0" />
+                <span>Karanlık</span>
+                {theme === 'dark' && <span className="ml-auto text-xs" style={{ color: 'var(--color-primary)' }}>✓</span>}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                Renk
+              </DropdownMenuLabel>
+            <div className="flex items-center gap-2 px-2 pb-2 pt-1">
+              {COLOR_THEMES.map((ct) => (
+                <button
+                  key={ct.id}
+                  onClick={() => setColorTheme(ct.id)}
+                  title={ct.label}
+                  aria-label={ct.label}
+                  className="relative h-6 w-6 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2"
+                  style={{
+                    background: theme === 'dark' ? ct.dark : ct.light,
+                    boxShadow: colorTheme === ct.id ? `0 0 0 2px var(--color-surface), 0 0 0 4px ${theme === 'dark' ? ct.dark : ct.light}` : undefined,
+                  }}
+                >
+                  {colorTheme === ct.id && (
+                    <span className="absolute inset-0 flex items-center justify-center text-white text-[10px] font-bold">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Notifications */}
         <NotificationBell unreadCount={unreadNotifications} />

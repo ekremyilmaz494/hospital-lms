@@ -24,7 +24,7 @@ export function TestimonialsSection() {
             <div className="flex items-center gap-3">
               <div className="flex -space-x-2.5">
                 {[
-                  { bg: "#0d9668", l: "A" },
+                  { bg: "var(--brand-600)", l: "A" },
                   { bg: "#1a3a28", l: "M" },
                   { bg: "#b45309", l: "F" },
                 ].map(({ bg, l }) => (
@@ -47,7 +47,7 @@ export function TestimonialsSection() {
             <div className="flex items-center gap-3 mb-5">
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                style={{ backgroundColor: "#0d9668" }}
+                style={{ backgroundColor: "var(--brand-600)" }}
               >
                 Dr
               </div>

@@ -52,8 +52,8 @@ export default function OfflinePage() {
         onClick={handleRetry}
         className="flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 active:scale-95"
         style={{
-          background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-          boxShadow: '0 4px 14px rgba(13,150,104,0.3)',
+          background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+          boxShadow: '0 4px 14px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)',
           transition: 'opacity 0.15s, transform 0.1s',
         }}
       >

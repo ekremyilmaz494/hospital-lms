@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import dynamic from 'next/dynamic';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { ShimmerButton } from '@/components/ui/shimmer-button';
+import { KvkkNoticeModal } from '@/components/shared/kvkk-notice-modal';
 
 const Particles = dynamic(() => import('@/components/ui/particles').then(m => ({ default: m.Particles })), { ssr: false });
 const Ripple = dynamic(() => import('@/components/ui/ripple').then(m => ({ default: m.Ripple })), { ssr: false });
@@ -39,6 +40,7 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
 
   const rawRedirect = searchParams.get('redirectTo');
   // Prevent open redirect — only allow relative paths starting with /
@@ -118,6 +120,14 @@ function LoginForm() {
         });
       }
 
+      // KVKK onaylanmamışsa önce login sayfasında modal göster, sonra yönlendir
+      const kvkkAcknowledged = session?.user?.user_metadata?.kvkk_notice_acknowledged_at ?? null;
+      if (!kvkkAcknowledged) {
+        setPendingRedirect(target);
+        setLoading(false);
+        return;
+      }
+
       // Full reload — middleware fresh JWT ile çalışır, SPA race condition olmaz
       window.location.href = target;
     } catch {
@@ -129,14 +139,20 @@ function LoginForm() {
   // Font kombinasyonu: A=space-grotesk+dm-sans | B=outfit | C=bricolage+dm-sans | D=syne+dm-sans
   const loginFont = '--font-syne';
 
+  if (pendingRedirect) {
+    return (
+      <KvkkNoticeModal onDismiss={() => { window.location.href = pendingRedirect; }} />
+    );
+  }
+
   return (
     <div className="flex min-h-screen">
       <style>{`
         .login-card,.login-card *{font-family:var(${loginFont}),sans-serif!important}
         .login-left,.login-left h1,.login-left p{font-family:var(${loginFont}),sans-serif!important}
-        .login-gradient-text{background:linear-gradient(135deg,#34d399 0%,#6ee7b7 50%,#a7f3d0 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .login-gradient-text{background:linear-gradient(135deg,var(--brand-400) 0%,var(--brand-300) 50%,var(--brand-200) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
         .login-heading-gradient{background:linear-gradient(135deg,#ffffff 0%,#e2e8f0 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-        .login-card-heading-gradient{background:linear-gradient(135deg,#064e3b 0%,#0d9668 60%,#34d399 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .login-card-heading-gradient{background:linear-gradient(135deg,var(--brand-900) 0%,var(--brand-600) 60%,var(--brand-400) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
       `}</style>
       {/* ── Left Panel: Branding ── */}
       <div
@@ -146,7 +162,7 @@ function LoginForm() {
             ? undefined
             : branding?.brandColor
               ? `linear-gradient(160deg, ${branding.brandColor} 0%, ${branding.brandColor}dd 35%, ${branding.brandColor}99 100%)`
-              : 'linear-gradient(160deg, #064e3b 0%, #0a3d2e 35%, #051c14 100%)',
+              : 'linear-gradient(160deg, var(--brand-900) 0%, #0a3d2e 35%, #051c14 100%)',
         }}
       >
         {/* Login banner (varsa tam ekran arka plan) */}
@@ -158,7 +174,7 @@ function LoginForm() {
         )}
 
         {/* Particles */}
-        <Particles className="absolute inset-0 z-0" quantity={80} staticity={20} color={branding?.secondaryColor || '#34d399'} size={0.3} />
+        <Particles className="absolute inset-0 z-0" quantity={80} staticity={20} color={branding?.secondaryColor || 'var(--brand-400)'} size={0.3} />
 
         {/* Ripple center accent */}
         <div className="absolute inset-0 z-0 flex items-center justify-center opacity-20">
@@ -166,7 +182,7 @@ function LoginForm() {
         </div>
 
         {/* Gradient overlays */}
-        <div className="absolute inset-0 z-0" style={{ background: 'radial-gradient(ellipse at 20% 50%, rgba(13, 150, 104, 0.15) 0%, transparent 60%)' }} />
+        <div className="absolute inset-0 z-0" style={{ background: 'radial-gradient(ellipse at 20% 50%, color-mix(in srgb, var(--brand-600) calc(0.15 * 100%), transparent) 0%, transparent 60%)' }} />
         <div className="absolute bottom-0 left-0 right-0 h-1/3 z-0" style={{ background: 'linear-gradient(to top, rgba(5, 28, 20, 0.8), transparent)' }} />
 
         {/* Content */}
@@ -179,7 +195,7 @@ function LoginForm() {
               ) : (
                 <div
                   className="flex h-11 w-11 items-center justify-center rounded-2xl text-lg font-bold font-heading"
-                  style={{ background: 'rgba(52, 211, 153, 0.15)', backdropFilter: 'blur(12px)', border: '1px solid rgba(52, 211, 153, 0.2)', color: '#34d399' }}
+                  style={{ background: 'color-mix(in srgb, var(--brand-400) calc(0.15 * 100%), transparent)', backdropFilter: 'blur(12px)', border: '1px solid color-mix(in srgb, var(--brand-400) calc(0.2 * 100%), transparent)', color: 'var(--brand-400)' }}
                 >
                   H
                 </div>
@@ -193,7 +209,7 @@ function LoginForm() {
           {/* Hero text */}
           <div className="max-w-lg">
             <BlurFade delay={0.08} duration={0.3}>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] mb-6" style={{ color: '#34d399' }}>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] mb-6" style={{ color: 'var(--brand-400)' }}>
                 Personel Eğitim Platformu
               </p>
             </BlurFade>
@@ -214,8 +230,8 @@ function LoginForm() {
               {features.map((f, i) => (
                 <BlurFade key={f.title} delay={0.15 + i * 0.05} duration={0.3}>
                   <div className="flex items-center gap-4 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(52, 211, 153, 0.1)' }}>
-                      <f.icon className="h-5 w-5" style={{ color: '#34d399' }} />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'color-mix(in srgb, var(--brand-400) calc(0.1 * 100%), transparent)' }}>
+                      <f.icon className="h-5 w-5" style={{ color: 'var(--brand-400)' }} />
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-white/90">{f.title}</p>
@@ -374,7 +390,7 @@ function LoginForm() {
                 shimmerColor="rgba(255,255,255,0.15)"
                 shimmerSize="0.08em"
                 borderRadius="12px"
-                background={branding?.brandColor ? `linear-gradient(135deg, ${branding.brandColor} 0%, ${branding.brandColor}cc 100%)` : 'linear-gradient(135deg, #0d9668 0%, #065f46 100%)'}
+                background={branding?.brandColor ? `linear-gradient(135deg, ${branding.brandColor} 0%, ${branding.brandColor}cc 100%)` : 'linear-gradient(135deg, var(--brand-600) 0%, var(--brand-800) 100%)'}
               >
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
                 {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}

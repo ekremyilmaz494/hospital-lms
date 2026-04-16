@@ -209,7 +209,7 @@ export default function EditTrainingPage() {
             disabled={saving || saved}
             className="gap-2 text-sm font-semibold"
             borderRadius="12px"
-            background={saved ? 'linear-gradient(135deg, #059669, #047857)' : 'linear-gradient(135deg, #0d9668, #065f46)'}
+            background={saved ? 'linear-gradient(135deg, var(--brand-600), #047857)' : 'linear-gradient(135deg, var(--brand-600), var(--brand-800))'}
             shimmerColor="rgba(255,255,255,0.15)"
           >
             {saving ? (

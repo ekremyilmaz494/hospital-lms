@@ -40,10 +40,10 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
         cursor: 'pointer',
         padding: 0,
         background: checked
-          ? 'linear-gradient(135deg, #0d9668, #0a7d56)'
+          ? 'linear-gradient(135deg, var(--brand-600), #0a7d56)'
           : '#d1d5db',
         boxShadow: checked
-          ? '0 2px 10px rgba(13, 150, 104, 0.35)'
+          ? '0 2px 10px color-mix(in srgb, var(--brand-600) calc(0.35 * 100%), transparent)'
           : 'inset 0 2px 4px rgba(0,0,0,0.08)',
         transition: 'background 0.25s ease, box-shadow 0.25s ease',
       }}

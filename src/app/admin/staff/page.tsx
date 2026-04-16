@@ -56,7 +56,7 @@ interface StaffPageData {
 }
 
 const DEPARTMENT_COLORS = [
-  '#0d9668', '#dc2626', '#2563eb', '#059669', '#f59e0b', '#d97706', '#6366f1', '#ec4899',
+  'var(--brand-600)', '#dc2626', '#2563eb', 'var(--brand-600)', '#f59e0b', '#d97706', '#6366f1', '#ec4899',
   '#14b8a6', '#8b5cf6', '#f97316', '#06b6d4',
 ];
 

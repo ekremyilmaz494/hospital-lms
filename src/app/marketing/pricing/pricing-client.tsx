@@ -111,7 +111,7 @@ const COMPARISON_FEATURES = [
 function renderCell(value: boolean | string) {
   if (typeof value === "boolean") {
     return value ? (
-      <Check className="w-5 h-5 mx-auto" style={{ color: "#0d9668" }} />
+      <Check className="w-5 h-5 mx-auto" style={{ color: "var(--brand-600)" }} />
     ) : (
       <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>--</span>
     );
@@ -125,7 +125,7 @@ export function PricingClient() {
       <div className="max-w-7xl mx-auto px-6">
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-14">
-          <p className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: "#0d9668" }}>
+          <p className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: "var(--brand-600)" }}>
             Fiyatlandirma
           </p>
           <h1 className="text-3xl lg:text-4xl font-black mb-4" style={{ color: "var(--color-text-primary)" }}>
@@ -151,8 +151,8 @@ export function PricingClient() {
                 className="rounded-2xl border p-8 flex flex-col relative"
                 style={{
                   backgroundColor: plan.highlighted ? "#0f172a" : "var(--color-surface)",
-                  borderColor: plan.highlighted ? "rgba(13,150,104,0.3)" : "var(--color-border)",
-                  boxShadow: plan.highlighted ? "0 20px 60px rgba(13,150,104,0.12)" : undefined,
+                  borderColor: plan.highlighted ? "color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)" : "var(--color-border)",
+                  boxShadow: plan.highlighted ? "0 20px 60px color-mix(in srgb, var(--brand-600) calc(0.12 * 100%), transparent)" : undefined,
                 }}
               >
                 {plan.highlighted && (
@@ -168,10 +168,10 @@ export function PricingClient() {
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center"
                     style={{
-                      backgroundColor: plan.highlighted ? "rgba(13,150,104,0.15)" : "rgba(13,150,104,0.08)",
+                      backgroundColor: plan.highlighted ? "color-mix(in srgb, var(--brand-600) calc(0.15 * 100%), transparent)" : "color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)",
                     }}
                   >
-                    <Icon className="w-5 h-5" style={{ color: "#0d9668" }} />
+                    <Icon className="w-5 h-5" style={{ color: "var(--brand-600)" }} />
                   </div>
                   <h3
                     className="font-bold text-lg"
@@ -211,7 +211,7 @@ export function PricingClient() {
                     <li key={feat} className="flex items-start gap-2.5">
                       <Check
                         className="w-4 h-4 mt-0.5 flex-shrink-0"
-                        style={{ color: "#0d9668" }}
+                        style={{ color: "var(--brand-600)" }}
                       />
                       <span
                         className="text-sm"
@@ -229,9 +229,9 @@ export function PricingClient() {
                   style={
                     plan.highlighted
                       ? {
-                          backgroundColor: "#0d9668",
+                          backgroundColor: "var(--brand-600)",
                           color: "white",
-                          boxShadow: "0 8px 24px rgba(13,150,104,0.3)",
+                          boxShadow: "0 8px 24px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)",
                         }
                       : {
                           backgroundColor: "transparent",
@@ -268,7 +268,7 @@ export function PricingClient() {
                     </th>
                     <th
                       className="px-6 py-4 text-sm font-semibold text-center"
-                      style={{ color: "#0d9668" }}
+                      style={{ color: "var(--brand-600)" }}
                     >
                       Profesyonel
                     </th>
@@ -310,8 +310,8 @@ export function PricingClient() {
             href="/demo"
             className="inline-flex items-center gap-2 px-8 py-4 rounded-xl text-sm font-bold text-white transition-transform hover:scale-105"
             style={{
-              backgroundColor: "#0d9668",
-              boxShadow: "0 8px 24px rgba(13,150,104,0.3)",
+              backgroundColor: "var(--brand-600)",
+              boxShadow: "0 8px 24px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)",
             }}
           >
             Ucretsiz Deneyin <ArrowRight className="w-4 h-4" />

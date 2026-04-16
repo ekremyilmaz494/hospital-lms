@@ -179,7 +179,7 @@ export default function StaffDashboard() {
           className="relative overflow-hidden rounded-2xl p-4 sm:p-6"
           style={{
             background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f4a35 60%, #071f18 100%)',
-            boxShadow: '0 8px 30px rgba(13, 150, 104, 0.2)',
+            boxShadow: '0 8px 30px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)',
           }}
         >
           <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, white 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
@@ -203,7 +203,7 @@ export default function StaffDashboard() {
               <div className="h-12 w-12 relative">
                 <svg viewBox="0 0 36 36" className="h-12 w-12 -rotate-90">
                   <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
-                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="#34d399" strokeWidth="3" strokeDasharray="97.4" strokeDashoffset={97.4 - (97.4 * overallProgress / 100)} strokeLinecap="round" />
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--brand-400)" strokeWidth="3" strokeDasharray="97.4" strokeDashoffset={97.4 - (97.4 * overallProgress / 100)} strokeLinecap="round" />
                 </svg>
               </div>
             </div>

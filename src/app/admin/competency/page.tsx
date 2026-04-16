@@ -36,7 +36,7 @@ interface StaffData { staff: StaffUser[] }
 const EVALUATOR_LABELS: Record<string, string> = {
   SELF: 'Öz Değerlendirme', MANAGER: 'Yönetici', PEER: 'Akran', SUBORDINATE: 'Ast',
 };
-const RADAR_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444'];
+const RADAR_COLORS = ['#6366f1', '#f59e0b', 'var(--brand-500)', '#ef4444'];
 
 // ── New Form Modal ─────────────────────────────────────────────
 function NewFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {

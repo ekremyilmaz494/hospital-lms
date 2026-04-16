@@ -158,7 +158,7 @@ export const AppSidebar = memo(function AppSidebar({
               className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white active:scale-90"
               style={{
                 background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f4a35 100%)',
-                boxShadow: '0 2px 8px rgba(13,150,104,0.3)',
+                boxShadow: '0 2px 8px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)',
                 transition: 'transform 100ms ease',
               }}
             >
@@ -262,7 +262,7 @@ export const AppSidebar = memo(function AppSidebar({
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white"
               style={{
                 background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f4a35 100%)',
-                boxShadow: '0 2px 8px rgba(13,150,104,0.3)',
+                boxShadow: '0 2px 8px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)',
               }}
             >
               H

@@ -23,7 +23,7 @@ export default function ApiDocsPage() {
       display: none;
     }
     .docs-header {
-      background: linear-gradient(135deg, #0d9668 0%, #047857 100%);
+      background: linear-gradient(135deg, var(--brand-600) 0%, #047857 100%);
       color: #fff;
       padding: 24px 32px;
       font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
@@ -58,7 +58,7 @@ export default function ApiDocsPage() {
       font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     }
     .swagger-ui .opblock.opblock-post .opblock-summary-method {
-      background: #0d9668;
+      background: var(--brand-600);
     }
     .swagger-ui .opblock.opblock-get .opblock-summary-method {
       background: #2563eb;
@@ -73,11 +73,11 @@ export default function ApiDocsPage() {
       background: #7c3aed;
     }
     .swagger-ui .btn.authorize {
-      color: #0d9668;
-      border-color: #0d9668;
+      color: var(--brand-600);
+      border-color: var(--brand-600);
     }
     .swagger-ui .btn.authorize svg {
-      fill: #0d9668;
+      fill: var(--brand-600);
     }
     .docs-loading {
       text-align: center;
@@ -90,7 +90,7 @@ export default function ApiDocsPage() {
       width: 32px;
       height: 32px;
       border: 3px solid #e2e8f0;
-      border-top-color: #0d9668;
+      border-top-color: var(--brand-600);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin-bottom: 16px;

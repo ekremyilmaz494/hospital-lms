@@ -265,7 +265,7 @@ export default function PreExamPage() {
       <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--color-bg)' }}>
         <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
           {/* Header */}
-          <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg, #0d9668, #0f4a35)' }}>
+          <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg, var(--brand-600), #0f4a35)' }}>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
                 <Shield className="h-5 w-5 text-white" />
@@ -324,7 +324,7 @@ export default function PreExamPage() {
             <Button
               onClick={() => setConfirmed(true)}
               className="text-sm font-semibold text-white px-6"
-              style={{ background: 'linear-gradient(135deg, #0d9668, #059669)' }}
+              style={{ background: 'linear-gradient(135deg, var(--brand-600), var(--brand-600))' }}
             >
               Anladım, Sınavı Başlat
             </Button>

@@ -232,7 +232,7 @@ export default function PrivacyPage() {
           </ul>
           <p className="mt-3">
             Haklarinizi kullanmak icin{" "}
-            <a href="mailto:kvkk@hastane-lms.com" className="underline" style={{ color: "#0d9668" }}>
+            <a href="mailto:kvkk@hastane-lms.com" className="underline" style={{ color: "var(--brand-600)" }}>
               kvkk@hastane-lms.com
             </a>{" "}
             adresine yazili basvuruda bulunabilir veya platform uzerindeki KVKK basvuru

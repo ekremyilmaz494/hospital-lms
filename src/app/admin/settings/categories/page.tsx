@@ -28,8 +28,8 @@ interface CategoryItem {
 
 /** Color palette for icon picker */
 const ICON_COLORS = [
-  '#ef4444', '#f59e0b', '#0d9668', '#3b82f6', '#8b5cf6',
-  '#ec4899', '#06b6d4', '#dc2626', '#64748b', '#10b981',
+  '#ef4444', '#f59e0b', 'var(--brand-600)', '#3b82f6', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#dc2626', '#64748b', 'var(--brand-500)',
 ];
 
 export default function CategoriesPage() {
@@ -39,7 +39,7 @@ export default function CategoriesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newIcon, setNewIcon] = useState('BookOpen');
-  const [newColor, setNewColor] = useState('#0d9668');
+  const [newColor, setNewColor] = useState('var(--brand-600)');
   const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<CategoryItem | null>(null);

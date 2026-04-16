@@ -32,7 +32,7 @@ interface Training {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Tema — proje paletine bağlı (sage #0d9668 + amber #f59e0b)
+   Tema — proje paletine bağlı (sage var(--brand-600) + amber #f59e0b)
    Mockup'ın layout yapısı korunur, renkler projenin CSS var'ları
    ───────────────────────────────────────────────────────────── */
 const T = {
@@ -44,10 +44,10 @@ const T = {
   surfaceHigh:         'var(--color-border)',
   // Primary — sage yeşili (mockup'ın forest green'i yerine)
   primary:             'var(--color-primary)',
-  primaryContainer:    '#065f46',
+  primaryContainer:    'var(--brand-800)',
   primaryDeep:         '#022c22',
   primaryFixed:        'var(--color-primary-light)',
-  primaryFixedDim:     'rgba(13, 150, 104, 0.28)',
+  primaryFixedDim:     'color-mix(in srgb, var(--brand-600) calc(0.28 * 100%), transparent)',
   onPrimaryContainer:  'rgba(255,255,255,0.88)',
   // Secondary — başarı yeşili (olive yerine)
   secondary:           'var(--color-success)',

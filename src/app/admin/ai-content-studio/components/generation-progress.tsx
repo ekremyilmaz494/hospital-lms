@@ -82,7 +82,7 @@ function OrbitalRing({ progress, isActive }: { progress: number; isActive: boole
           className="absolute rounded-full"
           style={{
             width: 120, height: 120,
-            background: 'radial-gradient(circle, rgba(13,150,104,0.15) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, color-mix(in srgb, var(--brand-600) calc(0.15 * 100%), transparent) 0%, transparent 70%)',
           }}
           animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
@@ -108,7 +108,7 @@ function OrbitalRing({ progress, isActive }: { progress: number; isActive: boole
         <motion.circle
           cx="70" cy="70" r="54"
           fill="none"
-          stroke="rgba(13,150,104,0.4)"
+          stroke="color-mix(in srgb, var(--brand-600) calc(0.4 * 100%), transparent)"
           strokeWidth="10"
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -118,9 +118,9 @@ function OrbitalRing({ progress, isActive }: { progress: number; isActive: boole
         />
         <defs>
           <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#0d9668" />
-            <stop offset="50%" stopColor="#10b981" />
-            <stop offset="100%" stopColor="#34d399" />
+            <stop offset="0%" stopColor="var(--brand-600)" />
+            <stop offset="50%" stopColor="var(--brand-500)" />
+            <stop offset="100%" stopColor="var(--brand-400)" />
           </linearGradient>
         </defs>
       </svg>
@@ -222,7 +222,7 @@ function StageTimeline({ currentStage }: { currentStage: number }) {
                     : isActive
                       ? 'var(--color-primary)'
                       : 'var(--color-surface-hover)',
-                  boxShadow: isActive ? '0 0 20px rgba(13,150,104,0.3)' : 'none',
+                  boxShadow: isActive ? '0 0 20px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)' : 'none',
                 }}
                 layout
               >
@@ -270,7 +270,7 @@ function StageTimeline({ currentStage }: { currentStage: number }) {
                 {isActive && (
                   <motion.div
                     className="absolute inset-y-0 w-8 rounded-full"
-                    style={{ background: 'linear-gradient(90deg, transparent, rgba(13,150,104,0.5), transparent)' }}
+                    style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand-600) calc(0.5 * 100%), transparent), transparent)' }}
                     animate={{ x: ['-100%', '400%'] }}
                     transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                   />
@@ -295,7 +295,7 @@ function ShimmerProgressBar({ progress }: { progress: number }) {
         <motion.div
           className="relative h-full rounded-full overflow-hidden"
           style={{
-            background: 'linear-gradient(90deg, #0d9668, #10b981, #34d399)',
+            background: 'linear-gradient(90deg, var(--brand-600), var(--brand-500), var(--brand-400))',
           }}
           initial={{ width: '0%' }}
           animate={{ width: `${progress}%` }}
@@ -338,7 +338,7 @@ function CompletionCelebration() {
           style={{
             width: 4 + (i % 4) * 2,
             height: 4 + (i % 4) * 2,
-            background: i % 3 === 0 ? '#0d9668' : i % 3 === 1 ? '#10b981' : '#f59e0b',
+            background: i % 3 === 0 ? 'var(--brand-600)' : i % 3 === 1 ? 'var(--brand-500)' : '#f59e0b',
           }}
           initial={{
             x: '50%', y: '50%',
@@ -375,8 +375,8 @@ function CompletionCelebration() {
         <div
           className="flex h-full w-full items-center justify-center rounded-full"
           style={{
-            background: 'linear-gradient(135deg, #0d9668, #10b981)',
-            boxShadow: '0 8px 32px rgba(13,150,104,0.3)',
+            background: 'linear-gradient(135deg, var(--brand-600), var(--brand-500))',
+            boxShadow: '0 8px 32px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)',
           }}
         >
           <motion.div
@@ -449,8 +449,8 @@ function FailureState({ message, onReset }: { message: string; onReset: () => vo
           onClick={onReset}
           className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:brightness-110"
           style={{
-            background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-            boxShadow: '0 4px 16px rgba(13,150,104,0.25)',
+            background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+            boxShadow: '0 4px 16px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
           }}
         >
           <RefreshCw className="h-4 w-4" />

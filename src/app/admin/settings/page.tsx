@@ -128,8 +128,8 @@ export default function AdminSettingsPage() {
             <div
               className="flex h-10 w-10 items-center justify-center rounded-2xl"
               style={{
-                background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)',
+                background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
               }}
             >
               <Settings className="h-5 w-5 text-white" />
@@ -162,7 +162,7 @@ export default function AdminSettingsPage() {
                       ? 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))'
                       : 'transparent',
                     color: isActive ? 'white' : 'var(--color-text-secondary)',
-                    boxShadow: isActive ? '0 4px 12px rgba(13, 150, 104, 0.2)' : 'none',
+                    boxShadow: isActive ? '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' : 'none',
                   }}
                 >
                   <tab.icon className="h-4 w-4" style={{ opacity: isActive ? 1 : 0.6 }} />
@@ -186,9 +186,9 @@ export default function AdminSettingsPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold text-white transition-all duration-300 disabled:opacity-70"
                 style={{
                   background: saved
-                    ? 'linear-gradient(135deg, #059669, #047857)'
-                    : 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                  boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)',
+                    ? 'linear-gradient(135deg, var(--brand-600), #047857)'
+                    : 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                  boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
                 }}
               >
                 {saving ? (

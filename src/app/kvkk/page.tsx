@@ -107,7 +107,7 @@ export default function KVKKPage() {
           <Link
             href="/"
             className="flex items-center gap-2 text-sm font-semibold transition-colors duration-150"
-            style={{ color: '#0d9668' }}
+            style={{ color: 'var(--brand-600)' }}
           >
             <ArrowLeft className="h-4 w-4" />
             Giriş Sayfasına Dön
@@ -115,7 +115,7 @@ export default function KVKKPage() {
           <div className="flex items-center gap-2.5">
             <div
               className="flex h-8 w-8 items-center justify-center rounded-xl text-sm font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, #0d9668, #1a3a28)' }}
+              style={{ background: 'linear-gradient(135deg, var(--brand-600), #1a3a28)' }}
             >
               D
             </div>
@@ -131,8 +131,8 @@ export default function KVKKPage() {
             <div
               className="mb-4 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold"
               style={{
-                background: 'rgba(13, 150, 104, 0.1)',
-                color: '#0d9668',
+                background: 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)',
+                color: 'var(--brand-600)',
               }}
             >
               <Shield className="h-3.5 w-3.5" />
@@ -160,10 +160,10 @@ export default function KVKKPage() {
                   <div
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
                     style={{
-                      background: 'rgba(13, 150, 104, 0.1)',
+                      background: 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)',
                     }}
                   >
-                    <section.icon className="h-4.5 w-4.5" style={{ color: '#0d9668' }} />
+                    <section.icon className="h-4.5 w-4.5" style={{ color: 'var(--brand-600)' }} />
                   </div>
                   <h2 className="text-lg font-bold tracking-tight" style={{ color: '#1a3a28' }}>{section.title}</h2>
                 </div>
@@ -183,7 +183,7 @@ export default function KVKKPage() {
                       <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#4a7060' }}>
                         <span
                           className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ background: '#0d9668' }}
+                          style={{ background: 'var(--brand-600)' }}
                         />
                         {item}
                       </li>

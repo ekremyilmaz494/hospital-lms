@@ -64,19 +64,19 @@ export function UpgradeModal({ open, onOpenChange, featureLabel }: UpgradeModalP
           </p>
           <ul className="mt-2 space-y-1.5">
             <li className="flex items-center gap-2">
-              <SparklesIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary, #0d9668)' }} />
+              <SparklesIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary, var(--brand-600))' }} />
               Yapay zeka destekli icerik olusturma
             </li>
             <li className="flex items-center gap-2">
-              <SparklesIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary, #0d9668)' }} />
+              <SparklesIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary, var(--brand-600))' }} />
               Gelismis raporlama ve analitik
             </li>
             <li className="flex items-center gap-2">
-              <SparklesIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary, #0d9668)' }} />
+              <SparklesIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary, var(--brand-600))' }} />
               HIS entegrasyonu ve SSO destegi
             </li>
             <li className="flex items-center gap-2">
-              <SparklesIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary, #0d9668)' }} />
+              <SparklesIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary, var(--brand-600))' }} />
               Ozel sertifika tasarimi
             </li>
           </ul>

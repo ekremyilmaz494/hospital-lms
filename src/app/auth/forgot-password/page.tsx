@@ -101,7 +101,7 @@ export default function ForgotPasswordPage() {
                   shimmerColor="rgba(255,255,255,0.15)"
                   shimmerSize="0.08em"
                   borderRadius="12px"
-                  background="linear-gradient(135deg, #0d9668 0%, #065f46 100%)"
+                  background="linear-gradient(135deg, var(--brand-600) 0%, var(--brand-800) 100%)"
                 >
                   <ArrowLeft className="h-5 w-5" />
                   Giriş Sayfasına Dön
@@ -174,7 +174,7 @@ export default function ForgotPasswordPage() {
                   shimmerColor="rgba(255,255,255,0.15)"
                   shimmerSize="0.08em"
                   borderRadius="12px"
-                  background="linear-gradient(135deg, #0d9668 0%, #065f46 100%)"
+                  background="linear-gradient(135deg, var(--brand-600) 0%, var(--brand-800) 100%)"
                 >
                   {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mail className="h-5 w-5" />}
                   {loading ? 'Gönderiliyor...' : 'Sıfırlama Bağlantısı Gönder'}

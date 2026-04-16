@@ -76,7 +76,7 @@ interface SyncLogRow extends Omit<SyncLog, 'errors'> {
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, { bg: string; color: string; label: string }> = {
-    SUCCESS: { bg: 'rgba(16,185,129,0.12)', color: '#10b981', label: 'Başarılı' },
+    SUCCESS: { bg: 'rgba(16,185,129,0.12)', color: 'var(--brand-500)', label: 'Başarılı' },
     FAILED:  { bg: 'rgba(239,68,68,0.12)',  color: '#ef4444', label: 'Başarısız' },
     RUNNING: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', label: 'Çalışıyor' },
   };
@@ -396,7 +396,7 @@ export default function HisIntegrationsPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {isConnected
-              ? <CheckCircle2 size={22} color="#10b981" />
+              ? <CheckCircle2 size={22} color="var(--brand-500)" />
               : <AlertTriangle size={22} color="#f59e0b" />
             }
             <div>
@@ -806,7 +806,7 @@ export default function HisIntegrationsPage() {
               {[
                 { label: 'Toplam', value: syncResult.totalRecords },
                 { label: 'İşlendi', value: syncResult.processedRecords },
-                { label: 'Oluşturuldu', value: syncResult.created, color: '#10b981' },
+                { label: 'Oluşturuldu', value: syncResult.created, color: 'var(--brand-500)' },
                 { label: 'Güncellendi', value: syncResult.updated, color: '#3b82f6' },
                 { label: 'Devre Dışı', value: syncResult.deactivated, color: '#f59e0b' },
                 { label: 'Hata', value: syncResult.errors.length, color: '#ef4444' },
@@ -901,7 +901,7 @@ export default function HisIntegrationsPage() {
                               {log.errorCount} (detay →)
                             </span>
                           ) : (
-                            <span style={{ color: '#10b981' }}>0</span>
+                            <span style={{ color: 'var(--brand-500)' }}>0</span>
                           )}
                         </td>
                       </tr>
@@ -962,11 +962,11 @@ export default function HisIntegrationsPage() {
             marginBottom: testModal.sampleData != null ? 16 : 0,
           }}>
             {testModal.success
-              ? <CheckCircle2 size={20} color="#10b981" />
+              ? <CheckCircle2 size={20} color="var(--brand-500)" />
               : <AlertTriangle size={20} color="#ef4444" />
             }
             <span style={{
-              color: testModal.success ? '#10b981' : '#ef4444',
+              color: testModal.success ? 'var(--brand-500)' : '#ef4444',
               fontWeight: 600, fontSize: 15,
             }}>
               {testModal.message}

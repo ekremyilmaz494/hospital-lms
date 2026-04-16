@@ -212,7 +212,7 @@ export default function AIContentStudioNewPage() {
           <div className="flex items-center gap-4">
             <div
               className="flex h-12 w-12 items-center justify-center rounded-2xl"
-              style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
+              style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' }}
             >
               <Sparkles className="h-6 w-6 text-white" />
             </div>
@@ -507,7 +507,7 @@ export default function AIContentStudioNewPage() {
                       disabled={generating || !isConnected}
                       className="flex items-center gap-2.5 rounded-xl px-8 py-3.5 text-[14px] font-bold text-white transition-transform duration-200 hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
                       style={{
-                        background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
+                        background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
                         boxShadow: 'var(--shadow-lg)',
                       }}
                     >
@@ -574,7 +574,7 @@ export default function AIContentStudioNewPage() {
                   disabled={!canNext}
                   className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white transition-opacity duration-200 disabled:opacity-40"
                   style={{
-                    background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
+                    background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
                     boxShadow: canNext ? 'var(--shadow-md)' : undefined,
                   }}
                 >

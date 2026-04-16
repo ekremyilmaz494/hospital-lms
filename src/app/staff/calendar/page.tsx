@@ -224,8 +224,8 @@ export default function CalendarPage() {
             <div
               className="flex h-12 w-12 items-center justify-center rounded-2xl"
               style={{
-                background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                boxShadow: '0 4px 14px rgba(13, 150, 104, 0.25)',
+                background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                boxShadow: '0 4px 14px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
               }}
             >
               <CalendarIcon className="h-6 w-6 text-white" />
@@ -246,7 +246,7 @@ export default function CalendarPage() {
               style={{
                 background: 'var(--color-primary-light)',
                 color: 'var(--color-primary)',
-                border: '1px solid rgba(13, 150, 104, 0.15)',
+                border: '1px solid color-mix(in srgb, var(--brand-600) calc(0.15 * 100%), transparent)',
               }}
             >
               <Target className="h-3.5 w-3.5" />
@@ -356,12 +356,12 @@ export default function CalendarPage() {
                       background: isSelected
                         ? 'var(--color-primary-light)'
                         : isToday
-                          ? 'rgba(13, 150, 104, 0.04)'
+                          ? 'color-mix(in srgb, var(--brand-600) calc(0.04 * 100%), transparent)'
                           : 'transparent',
                       border: isSelected
                         ? '2px solid var(--color-primary)'
                         : isToday
-                          ? '2px solid rgba(13, 150, 104, 0.3)'
+                          ? '2px solid color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)'
                           : '1px solid transparent',
                       cursor: cell.isCurrentMonth ? 'pointer' : 'default',
                     }}
@@ -373,8 +373,8 @@ export default function CalendarPage() {
                     }}
                     onMouseLeave={e => {
                       if (cell.isCurrentMonth && !isSelected) {
-                        e.currentTarget.style.background = isToday ? 'rgba(13, 150, 104, 0.04)' : 'transparent';
-                        e.currentTarget.style.border = isToday ? '2px solid rgba(13, 150, 104, 0.3)' : '1px solid transparent';
+                        e.currentTarget.style.background = isToday ? 'color-mix(in srgb, var(--brand-600) calc(0.04 * 100%), transparent)' : 'transparent';
+                        e.currentTarget.style.border = isToday ? '2px solid color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)' : '1px solid transparent';
                       }
                     }}
                   >

@@ -73,7 +73,7 @@ export default function MFASetupPage() {
             style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-lg)' }}
           >
             {/* Header */}
-            <div className="px-8 pt-8 pb-4 text-center" style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}>
+            <div className="px-8 pt-8 pb-4 text-center" style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' }}>
               <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
                 <Shield className="h-7 w-7 text-white" />
               </div>
@@ -94,7 +94,7 @@ export default function MFASetupPage() {
                     disabled={enrolling}
                     className="w-full h-11 gap-2 text-sm font-semibold"
                     borderRadius="12px"
-                    background="linear-gradient(135deg, #0d9668, #065f46)"
+                    background="linear-gradient(135deg, var(--brand-600), var(--brand-800))"
                   >
                     {enrolling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
                     {enrolling ? 'Hazırlanıyor...' : 'Kuruluma Başla'}
@@ -148,7 +148,7 @@ export default function MFASetupPage() {
                     disabled={loading || code.length !== 6}
                     className="w-full h-11 gap-2 text-sm font-semibold"
                     borderRadius="12px"
-                    background="linear-gradient(135deg, #0d9668, #065f46)"
+                    background="linear-gradient(135deg, var(--brand-600), var(--brand-800))"
                   >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                     {loading ? 'Doğrulanıyor...' : 'Aktive Et'}

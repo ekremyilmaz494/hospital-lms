@@ -80,7 +80,7 @@ const actionLabels: Record<string, string> = {
 };
 
 const avatarColors = [
-  '#0d9668', '#e67e22', '#3498db', '#9b59b6', '#e74c3c',
+  'var(--brand-600)', '#e67e22', '#3498db', '#9b59b6', '#e74c3c',
   '#1abc9c', '#f39c12', '#2980b9', '#8e44ad', '#c0392b',
 ];
 

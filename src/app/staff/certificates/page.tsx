@@ -99,7 +99,7 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
           style={{
             top: 0, left: 0,
             width: '40%', height: '45%',
-            background: '#0d9668',
+            background: 'var(--brand-600)',
             clipPath: 'polygon(0 0, 100% 0, 0 100%)',
           }}
         />
@@ -117,7 +117,7 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
           style={{
             top: 0, left: 0,
             width: '23%', height: '26%',
-            background: '#0d9668',
+            background: 'var(--brand-600)',
             clipPath: 'polygon(0 0, 100% 0, 0 100%)',
           }}
         />
@@ -139,7 +139,7 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
           style={{
             bottom: 0, right: 0,
             width: '30%', height: '35%',
-            background: '#0d9668',
+            background: 'var(--brand-600)',
             clipPath: 'polygon(100% 100%, 0 100%, 100% 0)',
           }}
         />
@@ -148,7 +148,7 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
           style={{
             bottom: 0, right: 0,
             width: '19%', height: '22%',
-            background: '#065f46',
+            background: 'var(--brand-800)',
             clipPath: 'polygon(100% 100%, 0 100%, 100% 0)',
           }}
         />
@@ -167,13 +167,13 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
           {/* Green diamond logo */}
           <div
             className="w-4 h-4 sm:w-5 sm:h-5 rotate-45 mb-1"
-            style={{ background: '#0d9668' }}
+            style={{ background: 'var(--brand-600)' }}
           />
           <span className="text-[8px] sm:text-[9px] font-sans font-bold tracking-[0.3em] uppercase" style={{ color: '#94a3b8' }}>
             {orgName}
           </span>
 
-          <h1 className="text-[18px] sm:text-[22px] font-bold tracking-[0.15em] uppercase mt-1" style={{ color: '#0d9668' }}>
+          <h1 className="text-[18px] sm:text-[22px] font-bold tracking-[0.15em] uppercase mt-1" style={{ color: 'var(--brand-600)' }}>
             SERTİFİKA
           </h1>
           <span className="text-[10px] sm:text-[11px] font-sans tracking-[0.2em] uppercase" style={{ color: '#1e1e1e' }}>
@@ -181,7 +181,7 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
           </span>
 
           {/* Separator */}
-          <div className="h-px w-20 mt-1" style={{ background: 'linear-gradient(90deg, transparent, #0d9668, transparent)' }} />
+          <div className="h-px w-20 mt-1" style={{ background: 'linear-gradient(90deg, transparent, var(--brand-600), transparent)' }} />
         </div>
 
         {/* Body */}
@@ -195,12 +195,12 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
             </p>
           )}
           {/* Name underline */}
-          <div className="h-px w-32 sm:w-40" style={{ background: '#0d9668' }} />
+          <div className="h-px w-32 sm:w-40" style={{ background: 'var(--brand-600)' }} />
 
           <p className="text-[8px] font-sans tracking-widest uppercase mt-1" style={{ color: '#94a3b8' }}>
             Eğitim
           </p>
-          <p className="text-[11px] sm:text-[13px] font-bold max-w-[200px] leading-snug" style={{ color: '#0d9668' }}>
+          <p className="text-[11px] sm:text-[13px] font-bold max-w-[200px] leading-snug" style={{ color: 'var(--brand-600)' }}>
             {cert.training.title}
           </p>
 
@@ -298,8 +298,8 @@ export default function StaffCertificatesPage() {
           <div
             className="flex h-12 w-12 items-center justify-center rounded-2xl"
             style={{
-              background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-              boxShadow: '0 4px 14px rgba(13, 150, 104, 0.25)',
+              background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+              boxShadow: '0 4px 14px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
             }}
           >
             <Award className="h-6 w-6 text-white" />
@@ -335,7 +335,7 @@ export default function StaffCertificatesPage() {
                     style={{
                       background: cert.isExpired
                         ? 'linear-gradient(90deg, var(--color-error), #f87171)'
-                        : 'linear-gradient(90deg, var(--color-primary), #34d399)',
+                        : 'linear-gradient(90deg, var(--color-primary), var(--brand-400))',
                     }}
                   />
 
@@ -469,7 +469,7 @@ export default function StaffCertificatesPage() {
                 disabled={pdfLoading}
                 aria-label="Sertifikayı PDF olarak indir"
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl h-11 text-[13px] font-semibold text-white disabled:opacity-60"
-                style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
+                style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' }}
                 onClick={() => selected && handleDownloadPDF(selected)}
               >
                 {pdfLoading ? (

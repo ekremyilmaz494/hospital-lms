@@ -56,8 +56,8 @@ export default function MobileLayout({
     >
       {/* Full-screen ambient background */}
       <div className="absolute inset-0">
-        <div className="absolute top-0 left-0 right-0 h-[55%]" style={{ background: 'linear-gradient(180deg, #064e3b 0%, #032b1f 100%)' }} />
-        <div className="absolute top-[20%] left-[50%] -translate-x-1/2 w-[500px] h-[500px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(13,150,104,0.15) 0%, transparent 65%)' }} />
+        <div className="absolute top-0 left-0 right-0 h-[55%]" style={{ background: 'linear-gradient(180deg, var(--brand-900) 0%, #032b1f 100%)' }} />
+        <div className="absolute top-[20%] left-[50%] -translate-x-1/2 w-[500px] h-[500px] rounded-full" style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--brand-600) calc(0.15 * 100%), transparent) 0%, transparent 65%)' }} />
       </div>
 
       {/* Content */}
@@ -69,11 +69,11 @@ export default function MobileLayout({
             {branding?.logoUrl ? (
               <Image src={branding.logoUrl} alt={branding.name} width={36} height={36} className="rounded-lg object-contain" style={{ background: 'rgba(255,255,255,0.1)' }} unoptimized />
             ) : (
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold" style={{ background: 'linear-gradient(135deg, #0d9668, #065f46)', color: 'white' }}>H</div>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold" style={{ background: 'linear-gradient(135deg, var(--brand-600), var(--brand-800))', color: 'white' }}>H</div>
             )}
             <div>
               <span className="text-[15px] font-bold text-white block leading-tight">{branding?.name || 'Devakent Hastanesi'}</span>
-              <span className="text-[10px] font-medium tracking-widest uppercase" style={{ color: '#34d399' }}>Eğitim Platformu</span>
+              <span className="text-[10px] font-medium tracking-widest uppercase" style={{ color: 'var(--brand-400)' }}>Eğitim Platformu</span>
             </div>
           </div>
         </div>
@@ -122,7 +122,7 @@ export default function MobileLayout({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-[12px] font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>Şifre</Label>
-                <Link href="/auth/forgot-password" className="text-[12px] font-medium" style={{ color: '#34d399' }}>Şifremi Unuttum</Link>
+                <Link href="/auth/forgot-password" className="text-[12px] font-medium" style={{ color: 'var(--brand-400)' }}>Şifremi Unuttum</Link>
               </div>
               <div className="relative">
                 <Input
@@ -156,11 +156,11 @@ export default function MobileLayout({
                     setKvkkAccepted(checked === true);
                     if (checked) setKvkkError(false);
                   }}
-                  className="mt-0.5 border-white/20 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                  className="mt-0.5 border-white/20 data-[state=checked]:bg-brand-500 data-[state=checked]:border-brand-500"
                   style={kvkkError ? { borderColor: '#f87171' } : undefined}
                 />
                 <label htmlFor="kvkk-mobile" className="text-[12px] leading-relaxed cursor-pointer" style={{ color: kvkkError ? '#fca5a5' : 'rgba(255,255,255,0.4)' }}>
-                  <Link href="/kvkk" target="_blank" className="font-semibold underline" style={{ color: '#34d399' }}>KVKK Aydınlatma Metni</Link>&apos;ni okudum ve kabul ediyorum.
+                  <Link href="/kvkk" target="_blank" className="font-semibold underline" style={{ color: 'var(--brand-400)' }}>KVKK Aydınlatma Metni</Link>&apos;ni okudum ve kabul ediyorum.
                 </label>
               </div>
               {kvkkError && <p className="text-[11px] font-medium pl-7" style={{ color: '#fca5a5' }}>KVKK metnini onaylamanız zorunludur.</p>}
@@ -170,7 +170,7 @@ export default function MobileLayout({
                   id="rememberMe-mobile"
                   checked={rememberMe}
                   onCheckedChange={(checked) => setRememberMe(checked === true)}
-                  className="border-white/20 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                  className="border-white/20 data-[state=checked]:bg-brand-500 data-[state=checked]:border-brand-500"
                 />
                 <label htmlFor="rememberMe-mobile" className="text-[12px] font-medium cursor-pointer select-none" style={{ color: 'rgba(255,255,255,0.4)' }}>Bu cihazda oturumumu açık tut (7 gün)</label>
               </div>
@@ -183,7 +183,7 @@ export default function MobileLayout({
               shimmerColor="rgba(255,255,255,0.15)"
               shimmerSize="0.08em"
               borderRadius="16px"
-              background={branding?.brandColor ? `linear-gradient(135deg, ${branding.brandColor} 0%, ${branding.brandColor}cc 100%)` : 'linear-gradient(135deg, #0d9668 0%, #065f46 100%)'}
+              background={branding?.brandColor ? `linear-gradient(135deg, ${branding.brandColor} 0%, ${branding.brandColor}cc 100%)` : 'linear-gradient(135deg, var(--brand-600) 0%, var(--brand-800) 100%)'}
             >
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
               {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
@@ -194,7 +194,7 @@ export default function MobileLayout({
           {/* Bottom trust + copyright */}
           <div className="mt-auto pt-8 pb-8">
             <div className="flex items-center justify-center gap-2 mb-4">
-              <Shield className="h-3.5 w-3.5" style={{ color: '#0d9668' }} />
+              <Shield className="h-3.5 w-3.5" style={{ color: 'var(--brand-600)' }} />
               <span className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>KVKK Uyumlu &middot; 256-bit SSL &middot; Güvenli Bağlantı</span>
             </div>
             <p className="text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.15)' }}>&copy; 2026 Devakent Hastanesi</p>

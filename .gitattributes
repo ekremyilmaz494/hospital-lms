@@ -1,0 +1,28 @@
+# Satır sonu normalleştirme — tüm text dosyaları repo'da LF ile saklanır.
+# Windows geliştiricilerinin editör'ü CRLF üretse bile, commit sırasında
+# Git otomatik olarak LF'e dönüştürür; checkout sırasında ise OS'a göre
+# CRLF/LF seçer. Böylece "300 dosya modified" gürültüsü bir daha yaşanmaz.
+
+* text=auto eol=lf
+
+# Windows-only scriptler CRLF kalmalı
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Binary dosyalar (diff/merge almasın)
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.svg   binary
+*.pdf   binary
+*.mp4   binary
+*.mp3   binary
+*.webm  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.zip   binary

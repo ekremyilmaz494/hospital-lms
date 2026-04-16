@@ -87,7 +87,7 @@ export default function DataRetentionPage() {
     <div className="min-h-screen py-24 px-4">
       <div className="max-w-3xl mx-auto">
         <div className="mb-12">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: '#0d9668' }}>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--brand-600)' }}>
             KVKK Uyum
           </p>
           <h1 className="text-3xl font-bold tracking-tight mb-3" style={{ color: '#0f172a' }}>
@@ -127,7 +127,7 @@ export default function DataRetentionPage() {
                         <tr key={i} style={{ borderTop: '1px solid #e2e8f0' }}>
                           <td className="px-4 py-3 font-medium text-xs" style={{ color: '#0f172a' }}>{item.category}</td>
                           <td className="px-4 py-3 text-xs" style={{ color: '#475569' }}>{item.data}</td>
-                          <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#0d9668' }}>{item.period}</td>
+                          <td className="px-4 py-3 text-xs font-semibold" style={{ color: 'var(--brand-600)' }}>{item.period}</td>
                           <td className="px-4 py-3 text-xs" style={{ color: '#64748b' }}>{item.basis}</td>
                         </tr>
                       ))}

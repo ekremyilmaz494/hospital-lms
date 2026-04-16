@@ -74,7 +74,7 @@ export default function StaffDetailPage() {
               <ArrowLeft className="h-5 w-5" />
             </button>
             <Avatar className="h-14 w-14 ring-4" style={{ '--tw-ring-color': 'var(--color-primary-light)' } as React.CSSProperties}>
-              <AvatarFallback className="text-lg font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}>{staff.initials}</AvatarFallback>
+              <AvatarFallback className="text-lg font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' }}>{staff.initials}</AvatarFallback>
             </Avatar>
             <div>
               <h2 className="text-2xl font-bold tracking-tight">{staff.name}</h2>
@@ -108,7 +108,7 @@ export default function StaffDetailPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Personal Info */}
         <BlurFade delay={0.25}>
-          <ShineBorder color={['#0d9668', '#f59e0b']} borderWidth={1.5} duration={10} className="rounded-2xl">
+          <ShineBorder color={['var(--brand-600)', '#f59e0b']} borderWidth={1.5} duration={10} className="rounded-2xl">
             <div className="p-5">
               <h3 className="mb-4 text-sm font-bold">Kişisel Bilgiler</h3>
               <div className="space-y-3">
@@ -130,7 +130,7 @@ export default function StaffDetailPage() {
 
         {/* Training History */}
         <BlurFade delay={0.3} className="lg:col-span-2">
-          <MagicCard gradientColor="rgba(13, 150, 104, 0.04)" gradientOpacity={0.3} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+          <MagicCard gradientColor="color-mix(in srgb, var(--brand-600) calc(0.04 * 100%), transparent)" gradientOpacity={0.3} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
             <div className="p-5">
               <h3 className="mb-4 text-sm font-bold">Eğitim Geçmişi</h3>
               {trainingHistory.length > 0 ? (

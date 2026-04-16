@@ -22,16 +22,16 @@ export function CtaSection() {
         {/* Glow accent */}
         <div
           className="absolute top-0 left-1/4 w-64 h-64 rounded-full blur-3xl opacity-10 pointer-events-none"
-          style={{ backgroundColor: "#0d9668" }}
+          style={{ backgroundColor: "var(--brand-600)" }}
         />
 
         {/* Left stats grid */}
         <div className="relative grid grid-cols-2 gap-3 p-6">
           {[
-            { label: "Toplam Eğitim", num: 120, prefix: "", suffix: "+", icon: BookOpen,    bar: 80, color: "#0d9668" },
+            { label: "Toplam Eğitim", num: 120, prefix: "", suffix: "+", icon: BookOpen,    bar: 80, color: "var(--brand-600)" },
             { label: "Tamamlanma",    num: 94,  prefix: "%", suffix: "", icon: CheckCircle, bar: 94, color: "#4ade80" },
             { label: "Sertifika",     num: 850, prefix: "", suffix: "+", icon: Award,       bar: 70, color: "#f59e0b" },
-            { label: "Kullanıcı",     num: 500, prefix: "", suffix: "+", icon: Users,       bar: 60, color: "#0d9668" },
+            { label: "Kullanıcı",     num: 500, prefix: "", suffix: "+", icon: Users,       bar: 60, color: "var(--brand-600)" },
           ].map(({ label, num, prefix, suffix, icon: Icon, bar, color }, i) => (
             <div
               key={label}
@@ -86,14 +86,14 @@ export function CtaSection() {
         <div className="relative p-10 flex flex-col justify-center">
           <p
             className="text-xs font-bold tracking-widest uppercase mb-4"
-            style={{ color: "#0d9668" }}
+            style={{ color: "var(--brand-600)" }}
           >
             İhtiyacınız Olan Her Şey
           </p>
           <h2 className="text-3xl font-black text-white leading-tight mb-6">
             Sağlıklı Personel,
             <br />
-            <span style={{ color: "#0d9668" }}>Güçlü Hastane.</span>
+            <span style={{ color: "var(--brand-600)" }}>Güçlü Hastane.</span>
           </h2>
           <p className="text-sm leading-relaxed mb-8" style={{ color: "#6dba92" }}>
             Video eğitimden sertifikaya, raporlamadan bildirimlere — tüm
@@ -108,7 +108,7 @@ export function CtaSection() {
               "Otomatik sertifika & QR doğrulama",
             ].map((item) => (
               <li key={item} className="flex items-center gap-2.5 text-sm" style={{ color: "#a0d4b8" }}>
-                <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#0d9668" }} />
+                <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: "var(--brand-600)" }} />
                 {item}
               </li>
             ))}

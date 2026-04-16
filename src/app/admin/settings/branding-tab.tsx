@@ -34,8 +34,8 @@ interface Props {
 }
 
 /* ─── Constants ─── */
-const PRIMARY_PRESETS = ['#0F172A', '#0d9668', '#1e40af', '#7c3aed', '#dc2626', '#0891b2', '#4f46e5', '#15803d'];
-const SECONDARY_PRESETS = ['#3B82F6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#f97316', '#ec4899'];
+const PRIMARY_PRESETS = ['#0F172A', 'var(--brand-600)', '#1e40af', '#7c3aed', '#dc2626', '#0891b2', '#4f46e5', '#15803d'];
+const SECONDARY_PRESETS = ['#3B82F6', '#f59e0b', 'var(--brand-500)', '#8b5cf6', '#ef4444', '#06b6d4', '#f97316', '#ec4899'];
 const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
 const inputClass = 'h-12 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--color-primary)]/20';
 const inputStyle = { background: 'var(--color-bg)', borderColor: 'var(--color-border)' };

@@ -25,8 +25,8 @@ interface Data { items: ResponseItem[]; total: number; page: number; limit: numb
 
 function ScorePill({ score }: { score: number | null }) {
   if (score === null) return <span className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>—</span>;
-  const col = score >= 4 ? 'var(--color-success)' : score >= 3 ? '#0d9668' : score >= 2 ? '#f59e0b' : 'var(--color-error)';
-  const bg = score >= 4 ? 'var(--color-success-bg)' : score >= 3 ? '#d1fae510' : score >= 2 ? '#fef3c710' : 'var(--color-error-bg)';
+  const col = score >= 4 ? 'var(--color-success)' : score >= 3 ? 'var(--brand-600)' : score >= 2 ? '#f59e0b' : 'var(--color-error)';
+  const bg = score >= 4 ? 'var(--color-success-bg)' : score >= 3 ? 'var(--brand-100)10' : score >= 2 ? '#fef3c710' : 'var(--color-error-bg)';
   return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-bold tabular-nums"
       style={{ background: bg, color: col, border: `1px solid ${col}30` }}>

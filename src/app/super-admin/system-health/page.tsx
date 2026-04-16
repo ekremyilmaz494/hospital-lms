@@ -290,7 +290,7 @@ export default function SystemHealthPage() {
               icon={Users}
               label="Aktif Kullanicilar (30 dk)"
               value={metrics.activeUsers}
-              color="var(--color-primary, #0d9668)"
+              color="var(--color-primary, var(--brand-600))"
             />
             <MetricCard
               icon={Building2}

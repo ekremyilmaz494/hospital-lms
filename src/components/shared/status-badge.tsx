@@ -27,7 +27,7 @@ interface StatusConfig {
 }
 
 const STATUS_MAP: Record<StatusLevel, StatusConfig> = {
-  operational:     { label: 'Tüm sistemler çalışıyor', color: '#10b981', bg: 'rgba(16,185,129,0.08)',  Icon: CheckCircle2 },
+  operational:     { label: 'Tüm sistemler çalışıyor', color: 'var(--brand-500)', bg: 'rgba(16,185,129,0.08)',  Icon: CheckCircle2 },
   degraded:        { label: 'Performans sorunu',        color: '#f59e0b', bg: 'rgba(245,158,11,0.08)',  Icon: AlertTriangle },
   partial_outage:  { label: 'Kısmi kesinti',            color: '#f97316', bg: 'rgba(249,115,22,0.08)',  Icon: AlertTriangle },
   major_outage:    { label: 'Sistem kesintisi',         color: '#ef4444', bg: 'rgba(239,68,68,0.08)',   Icon: XCircle },

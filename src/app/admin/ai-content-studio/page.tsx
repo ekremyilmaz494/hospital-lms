@@ -132,9 +132,9 @@ export default function AIContentStudioPage() {
   const savedCount = items.filter((i) => i.savedToLibrary).length
 
   const stats = [
-    { label: 'Toplam İçerik', value: total, color: '#0d9668', icon: Sparkles, gradient: 'linear-gradient(135deg, #0d9668, #065f46)' },
+    { label: 'Toplam İçerik', value: total, color: 'var(--brand-600)', icon: Sparkles, gradient: 'linear-gradient(135deg, var(--brand-600), var(--brand-800))' },
     { label: 'Aktif Üretim', value: activeCount, color: '#f59e0b', icon: Zap, gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', pulse: activeCount > 0 },
-    { label: 'Tamamlanan', value: completedCount, color: '#10b981', icon: CheckCircle2, gradient: 'linear-gradient(135deg, #10b981, #059669)' },
+    { label: 'Tamamlanan', value: completedCount, color: 'var(--brand-500)', icon: CheckCircle2, gradient: 'linear-gradient(135deg, var(--brand-500), var(--brand-600))' },
     { label: 'Kütüphanede', value: savedCount, color: '#3b82f6', icon: BookOpen, gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)' },
   ]
 
@@ -146,8 +146,8 @@ export default function AIContentStudioPage() {
         <div
           className="relative mb-8 overflow-hidden rounded-3xl p-7 lg:p-9"
           style={{
-            background: 'linear-gradient(135deg, #0d9668 0%, #065f46 50%, #064e3b 100%)',
-            boxShadow: '0 20px 60px rgba(13,150,104,0.2)',
+            background: 'linear-gradient(135deg, var(--brand-600) 0%, var(--brand-800) 50%, var(--brand-900) 100%)',
+            boxShadow: '0 20px 60px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)',
           }}
         >
           {/* Background pattern */}
@@ -207,7 +207,7 @@ export default function AIContentStudioPage() {
                 className="flex items-center gap-2.5 rounded-xl px-6 py-3 text-[13px] font-bold transition-all duration-200 hover:scale-[1.03]"
                 style={{
                   background: 'rgba(255,255,255,0.95)',
-                  color: '#065f46',
+                  color: 'var(--brand-800)',
                   boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
                 }}
               >
@@ -458,8 +458,8 @@ export default function AIContentStudioPage() {
                 href="/admin/ai-content-studio/new"
                 className="inline-flex items-center gap-2.5 rounded-xl px-6 py-3 text-[13px] font-bold text-white transition-transform hover:scale-[1.02]"
                 style={{
-                  background: 'linear-gradient(135deg, #0d9668, #065f46)',
-                  boxShadow: '0 8px 24px rgba(13,150,104,0.25)',
+                  background: 'linear-gradient(135deg, var(--brand-600), var(--brand-800))',
+                  boxShadow: '0 8px 24px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
                 }}
               >
                 <Sparkles className="h-4 w-4" />

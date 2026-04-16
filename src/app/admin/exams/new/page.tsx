@@ -837,7 +837,7 @@ export default function NewExamPage() {
             className="gap-2 rounded-xl font-semibold text-white"
             style={{
               background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)',
-              boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)',
+              boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
             }}
           >
             Sonraki Adım <ArrowRight className="h-4 w-4" />
@@ -859,7 +859,7 @@ export default function NewExamPage() {
               className="gap-2 rounded-xl font-semibold text-white"
               style={{
                 background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)',
-                boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)',
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
               }}
             >
               <Sparkles className="h-4 w-4" /> {publishing ? 'Kaydediliyor...' : 'Yayınla'}

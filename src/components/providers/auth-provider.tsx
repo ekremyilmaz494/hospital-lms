@@ -5,12 +5,11 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { usePresenceTracker } from '@/hooks/use-presence-tracker';
-import { KvkkNoticeModal } from '@/components/shared/kvkk-notice-modal';
 
 const DB_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 dakika — deaktive kullanıcı penceresi
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setUserIfChanged, setLoading, setSessionTimeout, user } = useAuthStore();
+  const { setUser, setUserIfChanged, setLoading, setSessionTimeout } = useAuthStore();
   // G3.2 — Track this user's presence in the global active-users channel
   usePresenceTracker();
   const router = useRouter();
@@ -143,13 +142,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [setUser, setLoading, router, refreshFromDB]);
 
-  // Oturum açmış ve KVKK bildirimini henüz onaylamamış kullanıcıya modal göster
-  const showKvkkModal = !!user && user.kvkkNoticeAcknowledgedAt === null;
-
-  return (
-    <>
-      {children}
-      {showKvkkModal && <KvkkNoticeModal />}
-    </>
-  );
+  return <>{children}</>;
 }

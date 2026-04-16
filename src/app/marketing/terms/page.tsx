@@ -90,7 +90,7 @@ export default function TermsPage() {
             Platform, kullanici verilerinin korunmasi icin endüstri standartlarinda
             guvenlik onlemleri uygular. Veriler sifrelenmis baglanti (TLS/SSL) uzerinden
             iletilir ve sunucularda sifrelenmis olarak saklanir. Detayli bilgi icin{" "}
-            <a href="/privacy" className="underline" style={{ color: "#0d9668" }}>
+            <a href="/privacy" className="underline" style={{ color: "var(--brand-600)" }}>
               Gizlilik Politikamizi
             </a>{" "}
             inceleyebilirsiniz.

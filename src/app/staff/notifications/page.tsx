@@ -147,7 +147,7 @@ export default function StaffNotificationsPage() {
             style={{
               background: unreadCount > 0 ? 'var(--color-primary-light)' : 'var(--color-bg)',
               color: unreadCount > 0 ? 'var(--color-primary)' : 'var(--color-text-muted)',
-              border: `1px solid ${unreadCount > 0 ? 'rgba(13, 150, 104, 0.2)' : 'var(--color-border)'}`,
+              border: `1px solid ${unreadCount > 0 ? 'color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' : 'var(--color-border)'}`,
             }}
           >
             <CheckCheck className="h-4 w-4" />

@@ -176,7 +176,7 @@ export default function SetupWizardPage() {
               {idx > 0 && (
                 <div
                   className={`h-0.5 w-8 sm:w-12 ${
-                    isCompleted ? 'bg-emerald-500' : 'bg-slate-200'
+                    isCompleted ? 'bg-brand-500' : 'bg-slate-200'
                   }`}
                 />
               )}
@@ -184,9 +184,9 @@ export default function SetupWizardPage() {
                 <div
                   className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors ${
                     isCompleted
-                      ? 'border-emerald-500 bg-emerald-500 text-white'
+                      ? 'border-brand-500 bg-brand-500 text-white'
                       : isActive
-                        ? 'border-emerald-500 bg-white text-emerald-600'
+                        ? 'border-brand-500 bg-white text-brand-600'
                         : 'border-slate-200 bg-white text-slate-400'
                   }`}
                 >
@@ -194,7 +194,7 @@ export default function SetupWizardPage() {
                 </div>
                 <span
                   className={`hidden text-xs font-medium sm:block ${
-                    isActive ? 'text-emerald-600' : isCompleted ? 'text-emerald-500' : 'text-slate-400'
+                    isActive ? 'text-brand-600' : isCompleted ? 'text-brand-500' : 'text-slate-400'
                   }`}
                 >
                   {step.label}
@@ -290,7 +290,7 @@ export default function SetupWizardPage() {
                     key={dept}
                     className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors ${
                       formData.departments.includes(dept)
-                        ? 'border-emerald-300 bg-emerald-50'
+                        ? 'border-brand-300 bg-brand-50'
                         : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
@@ -309,9 +309,9 @@ export default function SetupWizardPage() {
                 .map(dept => (
                   <div
                     key={dept}
-                    className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2"
+                    className="flex items-center gap-2 rounded-lg border border-brand-300 bg-brand-50 px-4 py-2"
                   >
-                    <Check className="h-4 w-4 text-emerald-600" />
+                    <Check className="h-4 w-4 text-brand-600" />
                     <span className="flex-1 text-sm font-medium text-slate-700">{dept}</span>
                     <button
                       type="button"
@@ -426,7 +426,7 @@ export default function SetupWizardPage() {
                     {formData.departments.map(dept => (
                       <span
                         key={dept}
-                        className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700"
+                        className="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-700"
                       >
                         {dept}
                       </span>
@@ -463,7 +463,7 @@ export default function SetupWizardPage() {
               İleri
             </Button>
           ) : (
-            <Button onClick={handleComplete} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleComplete} disabled={saving} className="bg-brand-600 hover:bg-brand-700">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sisteme Başla
             </Button>

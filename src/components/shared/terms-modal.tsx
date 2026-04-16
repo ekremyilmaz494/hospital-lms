@@ -77,7 +77,7 @@ export function TermsModal({ open, onAccepted }: TermsModalProps) {
                 href="/privacy"
                 target="_blank"
                 className="underline font-medium"
-                style={{ color: "#0d9668" }}
+                style={{ color: "var(--brand-600)" }}
               >
                 Gizlilik Politikamiz
               </Link>{" "}
@@ -86,7 +86,7 @@ export function TermsModal({ open, onAccepted }: TermsModalProps) {
                 href="/terms"
                 target="_blank"
                 className="underline font-medium"
-                style={{ color: "#0d9668" }}
+                style={{ color: "var(--brand-600)" }}
               >
                 Kullanim Sartlarimiza
               </Link>{" "}
@@ -118,7 +118,7 @@ export function TermsModal({ open, onAccepted }: TermsModalProps) {
             onClick={handleAccept}
             className="w-full sm:w-auto"
             style={{
-              backgroundColor: checked ? "#0d9668" : undefined,
+              backgroundColor: checked ? "var(--brand-600)" : undefined,
               color: checked ? "#fff" : undefined,
             }}
           >

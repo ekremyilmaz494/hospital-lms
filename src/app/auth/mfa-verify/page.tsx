@@ -96,7 +96,7 @@ function MFAVerifyForm() {
           <div className="text-center mb-8">
             <div
               className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
-              style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)', boxShadow: '0 4px 20px rgba(13,150,104,0.3)' }}
+              style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))', boxShadow: '0 4px 20px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)' }}
             >
               <Shield className="h-8 w-8 text-white" />
             </div>
@@ -141,7 +141,7 @@ function MFAVerifyForm() {
             className="w-full h-12 gap-2.5 text-[15px] font-semibold"
             shimmerColor="rgba(255,255,255,0.15)"
             borderRadius="12px"
-            background="linear-gradient(135deg, #0d9668 0%, #065f46 100%)"
+            background="linear-gradient(135deg, var(--brand-600) 0%, var(--brand-800) 100%)"
           >
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Shield className="h-5 w-5" />}
             {loading ? 'Doğrulanıyor...' : 'Doğrula'}

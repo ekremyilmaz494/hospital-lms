@@ -85,7 +85,7 @@ function UsageBar({ value, limit, label }: { value: number; limit: number | null
           className="h-full rounded-full transition-all duration-500"
           style={{
             width: limit ? `${percent}%` : '0%',
-            backgroundColor: isCritical ? 'var(--color-error)' : isWarning ? 'var(--color-warning)' : '#0d9668',
+            backgroundColor: isCritical ? 'var(--color-error)' : isWarning ? 'var(--color-warning)' : 'var(--brand-600)',
           }}
         />
       </div>
@@ -96,7 +96,7 @@ function UsageBar({ value, limit, label }: { value: number; limit: number | null
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; bg: string; color: string; Icon: typeof CheckCircle2 }> = {
-    active:     { label: 'Aktif',      bg: 'rgba(16,185,129,0.1)',  color: '#10b981', Icon: CheckCircle2 },
+    active:     { label: 'Aktif',      bg: 'rgba(16,185,129,0.1)',  color: 'var(--brand-500)', Icon: CheckCircle2 },
     trial:      { label: 'Deneme',     bg: 'rgba(245,158,11,0.1)',  color: '#f59e0b', Icon: Clock },
     past_due:   { label: 'Gecikmiş',   bg: 'rgba(239,68,68,0.1)',   color: '#ef4444', Icon: AlertTriangle },
     cancelled:  { label: 'İptal',      bg: 'rgba(100,116,139,0.1)', color: '#64748b', Icon: AlertTriangle },
@@ -147,8 +147,8 @@ export default function SubscriptionPage() {
       <div className="p-6 lg:p-8">
         <PageHeader title="Aboneliğim" subtitle="Mevcut plan ve kullanım bilgileriniz" />
         <div className="mt-8 max-w-md mx-auto text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(13,150,104,0.08)' }}>
-            <CreditCard className="w-8 h-8" style={{ color: '#0d9668' }} />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)' }}>
+            <CreditCard className="w-8 h-8" style={{ color: 'var(--brand-600)' }} />
           </div>
           <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>Aktif Abonelik Yok</h3>
           <p className="text-sm mb-6" style={{ color: 'var(--color-text-secondary)' }}>
@@ -157,7 +157,7 @@ export default function SubscriptionPage() {
           <Link
             href="/pricing"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white"
-            style={{ backgroundColor: '#0d9668' }}
+            style={{ backgroundColor: 'var(--brand-600)' }}
           >
             Planları İncele <ArrowUpRight className="w-4 h-4" />
           </Link>
@@ -209,7 +209,7 @@ export default function SubscriptionPage() {
             title="Mevcut Plan"
             value={plan!.name}
             icon={Zap}
-            accentColor="#0d9668"
+            accentColor="var(--brand-600)"
           />
           <StatCard
             title="Personel Kullanımı"
@@ -229,7 +229,7 @@ export default function SubscriptionPage() {
             title="Abonelik Durumu"
             value={subscription!.status === 'trial' ? `${daysLeftInfo?.days ?? 0} gün deneme` : 'Aktif'}
             icon={Calendar}
-            accentColor={daysLeftInfo?.urgent ? '#f59e0b' : '#10b981'}
+            accentColor={daysLeftInfo?.urgent ? '#f59e0b' : 'var(--brand-500)'}
           />
         </div>
       </BlurFade>
@@ -244,8 +244,8 @@ export default function SubscriptionPage() {
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(13,150,104,0.08)' }}>
-                  <CreditCard className="w-5 h-5" style={{ color: '#0d9668' }} />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)' }}>
+                  <CreditCard className="w-5 h-5" style={{ color: 'var(--brand-600)' }} />
                 </div>
                 <div>
                   <h3 className="font-bold" style={{ color: 'var(--color-text-primary)' }}>{plan!.name}</h3>
@@ -289,7 +289,7 @@ export default function SubscriptionPage() {
               <ul className="space-y-2">
                 {(plan!.features as string[]).slice(0, 8).map((feat, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#0d9668' }} />
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--brand-600)' }} />
                     {feat}
                   </li>
                 ))}
@@ -302,7 +302,7 @@ export default function SubscriptionPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ backgroundColor: 'rgba(13,150,104,0.08)', color: '#0d9668' }}
+                style={{ backgroundColor: 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)', color: 'var(--brand-600)' }}
               >
                 Plan Yükseltme Talebi <ArrowUpRight className="w-4 h-4" />
               </Link>
@@ -370,7 +370,7 @@ export default function SubscriptionPage() {
             style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
           >
             <div className="px-6 py-4 border-b flex items-center gap-3" style={{ borderColor: 'var(--color-border)' }}>
-              <FileText className="w-5 h-5" style={{ color: '#0d9668' }} />
+              <FileText className="w-5 h-5" style={{ color: 'var(--brand-600)' }} />
               <h3 className="font-bold" style={{ color: 'var(--color-text-primary)' }}>Fatura Geçmişi</h3>
             </div>
             <div className="overflow-x-auto">

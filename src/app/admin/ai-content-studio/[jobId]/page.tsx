@@ -132,7 +132,7 @@ export default function AIContentStudioDetailPage() {
                 <div
                   className="flex h-12 w-12 items-center justify-center rounded-2xl text-xl"
                   style={{
-                    background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
+                    background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
                   }}
                 >
                   <span>{formatConfig.icon}</span>
@@ -266,7 +266,7 @@ export default function AIContentStudioDetailPage() {
                 onClick={handleRegenerate}
                 className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white"
                 style={{
-                  background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
+                  background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
                   boxShadow: 'var(--shadow-md)',
                 }}
               >

@@ -167,7 +167,7 @@ export default function TrainingDetailPage() {
           <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => router.push(`/admin/trainings/${id}/edit`)}>
             <Edit className="h-4 w-4" /> Düzenle
           </Button>
-          <Button onClick={() => setAssignModalOpen(true)} className="gap-2 rounded-xl font-semibold text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)', boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)' }}>
+          <Button onClick={() => setAssignModalOpen(true)} className="gap-2 rounded-xl font-semibold text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)', boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)' }}>
             <Users className="h-4 w-4" /> Personel Ata
           </Button>
         </div>
@@ -370,7 +370,7 @@ export default function TrainingDetailPage() {
                       const videoKey = v.id ?? `video-${vi}`;
                       const isActive = activeVideoId === videoKey;
                       return (
-                        <div key={videoKey} className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-bg)', border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--color-border)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: isActive ? '0 2px 12px rgba(13,150,104,0.12)' : 'none' }}>
+                        <div key={videoKey} className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-bg)', border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--color-border)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: isActive ? '0 2px 12px color-mix(in srgb, var(--brand-600) calc(0.12 * 100%), transparent)' : 'none' }}>
                           {/* Video Row */}
                           <div
                             className="flex items-center gap-4 px-5 py-4 cursor-pointer group relative"
@@ -407,10 +407,10 @@ export default function TrainingDetailPage() {
                                   initial={{ opacity: 0, scale: 0.8 }}
                                   animate={{ opacity: 1, scale: 1 }}
                                   className="flex items-center gap-1.5 rounded-full px-2.5 py-1"
-                                  style={{ background: 'rgba(13,150,104,0.15)', border: '1px solid rgba(13,150,104,0.2)' }}
+                                  style={{ background: 'color-mix(in srgb, var(--brand-600) calc(0.15 * 100%), transparent)', border: '1px solid color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' }}
                                 >
-                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                  <span className="text-[10px] font-semibold tracking-wide uppercase text-emerald-400">Oynatılıyor</span>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse" />
+                                  <span className="text-[10px] font-semibold tracking-wide uppercase text-brand-400">Oynatılıyor</span>
                                 </motion.span>
                               )}
                               <ChevronRight className="h-4 w-4" style={{ color: isActive ? 'rgba(255,255,255,0.3)' : 'var(--color-text-muted)', transform: isActive ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.3s, color 0.3s, opacity 0.3s', opacity: isActive ? 1 : 0 }} />

@@ -1371,7 +1371,7 @@ export default function NewTrainingPage() {
             className="gap-2 h-11 rounded-xl font-semibold text-white"
             style={{
               background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)',
-              boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)',
+              boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
               transition: 'opacity var(--transition-fast)',
             }}
           >
@@ -1428,7 +1428,7 @@ export default function NewTrainingPage() {
             className="gap-2 h-11 rounded-xl font-semibold text-white"
             style={{
               background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)',
-              boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)',
+              boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
               transition: 'opacity var(--transition-fast)',
             }}
           >

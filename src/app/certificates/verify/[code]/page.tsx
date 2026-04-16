@@ -51,8 +51,8 @@ export default function CertificateVerifyPage() {
             <div
               className="flex h-12 w-12 items-center justify-center rounded-2xl mb-4"
               style={{
-                background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                boxShadow: '0 4px 14px rgba(13, 150, 104, 0.25)',
+                background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                boxShadow: '0 4px 14px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
               }}
             >
               <svg

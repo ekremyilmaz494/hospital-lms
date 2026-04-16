@@ -150,7 +150,7 @@ export function FeaturesSection() {
           <div>
             <p
               className="text-xs font-bold tracking-widest uppercase mb-2"
-              style={{ color: "#0d9668" }}
+              style={{ color: "var(--brand-600)" }}
             >
               Platform Özellikleri
             </p>
@@ -181,11 +181,11 @@ export function FeaturesSection() {
                   "active:scale-95",
                   activeCategory === cat
                     ? "text-white shadow-md"
-                    : "hover:bg-[#0d9668]/10 hover:text-[#1a3a28]",
+                    : "hover:bg-[var(--brand-600)]/10 hover:text-[#1a3a28]",
                 ].join(" ")}
                 style={
                   activeCategory === cat
-                    ? { backgroundColor: "#0d9668", color: "white" }
+                    ? { backgroundColor: "var(--brand-600)", color: "white" }
                     : { color: "#4a7060" }
                 }
               >
@@ -211,9 +211,9 @@ export function FeaturesSection() {
                 )}
                 <div
                   className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
-                  style={{ backgroundColor: "#ecfdf5" }}
+                  style={{ backgroundColor: "var(--brand-50)" }}
                 >
-                  <Icon className="w-5 h-5" style={{ color: "#0d9668" }} />
+                  <Icon className="w-5 h-5" style={{ color: "var(--brand-600)" }} />
                 </div>
                 <h3
                   className="font-bold text-base mb-2"
@@ -227,7 +227,7 @@ export function FeaturesSection() {
                 <Link
                   href="/register"
                   className="mt-5 flex items-center gap-1 text-xs font-bold group"
-                  style={{ color: "#0d9668" }}
+                  style={{ color: "var(--brand-600)" }}
                 >
                   Daha Fazla <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
                 </Link>

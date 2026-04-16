@@ -97,9 +97,9 @@ export function DemoClient() {
           >
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ backgroundColor: "rgba(13,150,104,0.1)" }}
+              style={{ backgroundColor: "color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)" }}
             >
-              <CheckCircle className="w-8 h-8" style={{ color: "#0d9668" }} />
+              <CheckCircle className="w-8 h-8" style={{ color: "var(--brand-600)" }} />
             </div>
             <h2 className="text-2xl font-black mb-3" style={{ color: "var(--color-text-primary)" }}>
               Talebiniz Alindi!
@@ -110,7 +110,7 @@ export function DemoClient() {
             <Link
               href="/"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white"
-              style={{ backgroundColor: "#0d9668" }}
+              style={{ backgroundColor: "var(--brand-600)" }}
             >
               Ana Sayfaya Don
             </Link>
@@ -135,7 +135,7 @@ export function DemoClient() {
                 variants={fadeUp}
                 custom={0}
                 className="text-xs font-bold tracking-widest uppercase mb-3"
-                style={{ color: "#0d9668" }}
+                style={{ color: "var(--brand-600)" }}
               >
                 Demo Talep Et
               </motion.p>
@@ -166,9 +166,9 @@ export function DemoClient() {
                   <div key={title} className="flex items-start gap-3">
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: "rgba(13,150,104,0.08)" }}
+                      style={{ backgroundColor: "color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)" }}
                     >
-                      <Icon className="w-5 h-5" style={{ color: "#0d9668" }} />
+                      <Icon className="w-5 h-5" style={{ color: "var(--brand-600)" }} />
                     </div>
                     <div>
                       <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>{title}</p>
@@ -205,7 +205,7 @@ export function DemoClient() {
                     value={form.firstName}
                     onChange={handleChange}
                     placeholder="Adiniz"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[var(--brand-600)]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -224,7 +224,7 @@ export function DemoClient() {
                     value={form.lastName}
                     onChange={handleChange}
                     placeholder="Soyadiniz"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[var(--brand-600)]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -246,7 +246,7 @@ export function DemoClient() {
                     value={form.email}
                     onChange={handleChange}
                     placeholder="ornek@hastane.com"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[var(--brand-600)]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -265,7 +265,7 @@ export function DemoClient() {
                     value={form.phone}
                     onChange={handleChange}
                     placeholder="+90 5XX XXX XX XX"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[var(--brand-600)]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -287,7 +287,7 @@ export function DemoClient() {
                     value={form.hospitalName}
                     onChange={handleChange}
                     placeholder="Hastane adiniz"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[var(--brand-600)]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -304,7 +304,7 @@ export function DemoClient() {
                     required
                     value={form.staffCount}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[var(--brand-600)]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -329,7 +329,7 @@ export function DemoClient() {
                   value={form.message}
                   onChange={handleChange}
                   placeholder="Ozel gereksinimleriniz veya sorulariniz varsa yazabilirsiniz..."
-                  className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668] resize-none"
+                  className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[var(--brand-600)] resize-none"
                   style={{
                     borderColor: "var(--color-border)",
                     backgroundColor: "var(--color-bg)",
@@ -352,8 +352,8 @@ export function DemoClient() {
                 disabled={loading}
                 className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white transition-transform hover:scale-[1.02] disabled:opacity-60 disabled:hover:scale-100 cursor-pointer"
                 style={{
-                  backgroundColor: "#0d9668",
-                  boxShadow: "0 8px 24px rgba(13,150,104,0.25)",
+                  backgroundColor: "var(--brand-600)",
+                  boxShadow: "0 8px 24px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)",
                 }}
               >
                 {loading ? (

@@ -128,7 +128,7 @@ function TransitionContent() {
         className="min-h-screen overflow-y-auto py-8 px-4"
         style={{
           background: isPassed
-            ? 'linear-gradient(135deg, #059669, #064e3b)'
+            ? 'linear-gradient(135deg, var(--brand-600), var(--brand-900))'
             : 'linear-gradient(135deg, #991b1b, #450a0a)',
         }}
       >
@@ -137,7 +137,7 @@ function TransitionContent() {
           <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-surface)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
             <div className="px-8 pt-8 pb-6 text-center" style={{
               background: isPassed
-                ? 'linear-gradient(135deg, #059669, #047857)'
+                ? 'linear-gradient(135deg, var(--brand-600), #047857)'
                 : 'linear-gradient(135deg, #dc2626, #991b1b)',
             }}>
               <div className="flex h-16 w-16 items-center justify-center rounded-full mx-auto mb-4" style={{ background: 'rgba(255,255,255,0.15)' }}>
@@ -168,7 +168,7 @@ function TransitionContent() {
               <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
                 <div className="h-full rounded-full" style={{
                   width: `${scoreNum}%`,
-                  background: isPassed ? 'linear-gradient(90deg, #059669, #34d399)' : 'linear-gradient(90deg, #dc2626, #f87171)',
+                  background: isPassed ? 'linear-gradient(90deg, var(--brand-600), var(--brand-400))' : 'linear-gradient(90deg, #dc2626, #f87171)',
                   transition: 'width 1s ease-out',
                 }} />
               </div>
@@ -222,7 +222,7 @@ function TransitionContent() {
                 }}
                 className="w-full flex items-center justify-center gap-2 rounded-xl h-12 text-[14px] font-semibold text-white"
                 style={{
-                  background: isPassed ? 'linear-gradient(135deg, var(--color-primary), #065f46)' : 'linear-gradient(135deg, #475569, #334155)',
+                  background: isPassed ? 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' : 'linear-gradient(135deg, #475569, #334155)',
                 }}
               >
                 {feedbackRequired
@@ -269,7 +269,7 @@ function TransitionContent() {
                           className="flex items-center gap-2 rounded-lg px-3 py-2"
                           style={{
                             background: result.isCorrect ? 'var(--color-success-bg)' : 'var(--color-error-bg)',
-                            border: `1px solid ${result.isCorrect ? 'rgba(5,150,105,0.2)' : 'rgba(220,38,38,0.2)'}`,
+                            border: `1px solid ${result.isCorrect ? 'color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' : 'rgba(220,38,38,0.2)'}`,
                           }}
                         >
                           <span className="text-[10px] font-bold uppercase tracking-wide shrink-0" style={{ color: result.isCorrect ? 'var(--color-success)' : 'var(--color-error)' }}>
@@ -286,7 +286,7 @@ function TransitionContent() {
                           className="flex items-center gap-2 rounded-lg px-3 py-2"
                           style={{
                             background: 'var(--color-success-bg)',
-                            border: '1px solid rgba(5,150,105,0.2)',
+                            border: '1px solid color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)',
                           }}
                         >
                           <span className="text-[10px] font-bold uppercase tracking-wide shrink-0" style={{ color: 'var(--color-success)' }}>
@@ -328,7 +328,7 @@ function TransitionContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{
-      background: 'linear-gradient(135deg, var(--color-primary), #064e3b)',
+      background: 'linear-gradient(135deg, var(--color-primary), var(--brand-900))',
     }}>
       <div className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-5" style={{ background: 'radial-gradient(circle, white 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
 
@@ -379,7 +379,7 @@ function TransitionContent() {
 
 export default function TransitionPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--color-primary), #064e3b)' }}><span className="text-white">Yükleniyor...</span></div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-900))' }}><span className="text-white">Yükleniyor...</span></div>}>
       <TransitionContent />
     </Suspense>
   );

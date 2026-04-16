@@ -240,8 +240,8 @@ export default function NotificationsPage() {
             <div
               className="flex h-12 w-12 items-center justify-center rounded-2xl"
               style={{
-                background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                boxShadow: '0 4px 14px rgba(13, 150, 104, 0.25)',
+                background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                boxShadow: '0 4px 14px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
               }}
             >
               <Bell className="h-6 w-6 text-white" />
@@ -260,8 +260,8 @@ export default function NotificationsPage() {
               onClick={() => setShowSendModal(true)}
               className="flex items-center gap-2 rounded-xl h-10 px-5 text-[13px] font-semibold text-white transition-[transform] duration-200 hover:scale-[1.02] active:scale-[0.98]"
               style={{
-                background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                boxShadow: '0 4px 12px rgba(13, 150, 104, 0.25)',
+                background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
               }}
             >
               <Send className="h-4 w-4" />
@@ -295,7 +295,7 @@ export default function NotificationsPage() {
                     background: isActive ? 'var(--color-primary)' : 'transparent',
                     color: isActive ? 'white' : 'var(--color-text-secondary)',
                     fontWeight: isActive ? 600 : 500,
-                    boxShadow: isActive ? '0 2px 8px rgba(13, 150, 104, 0.2)' : 'none',
+                    boxShadow: isActive ? '0 2px 8px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' : 'none',
                   }}
                 >
                   <f.icon
@@ -432,7 +432,7 @@ export default function NotificationsPage() {
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(13,150,104,0.1)' }}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)' }}>
                   <Send className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
                 </div>
                 <div>
@@ -558,7 +558,7 @@ export default function NotificationsPage() {
                           onClick={() => toggleStaff(s.id)}
                           className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors duration-100"
                           style={{
-                            background: isSelected ? 'rgba(13,150,104,0.08)' : 'transparent',
+                            background: isSelected ? 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)' : 'transparent',
                             borderBottom: '1px solid var(--color-border)',
                           }}
                         >
@@ -674,7 +674,7 @@ export default function NotificationsPage() {
                   onClick={handleSend}
                   disabled={sending || getRecipientCount() === 0 || !sendTitle.trim() || !sendMessage.trim()}
                   className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50 transition-[transform] duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
+                  style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' }}
                 >
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {sending ? 'Gönderiliyor...' : 'Gönder'}

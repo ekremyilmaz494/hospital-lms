@@ -95,7 +95,7 @@ export default function TrainingTab({ settings, setSettings }: Props) {
                   style={{
                     width: `${Math.min(settings.defaultPassingScore, 100)}%`,
                     background: settings.defaultPassingScore >= 80
-                      ? 'linear-gradient(90deg, var(--color-success), #34d399)'
+                      ? 'linear-gradient(90deg, var(--color-success), var(--brand-400))'
                       : settings.defaultPassingScore >= 50
                         ? 'linear-gradient(90deg, var(--color-accent), #fbbf24)'
                         : 'linear-gradient(90deg, var(--color-error), #f87171)',

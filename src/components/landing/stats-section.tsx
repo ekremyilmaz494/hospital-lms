@@ -41,7 +41,7 @@ export function StatsSection() {
           <div>
             <p
               className="text-xs font-bold tracking-widest uppercase mb-2"
-              style={{ color: "#0d9668" }}
+              style={{ color: "var(--brand-600)" }}
             >
               Öne Çıkanlar
             </p>
@@ -52,7 +52,7 @@ export function StatsSection() {
           <Link
             href="/auth/login"
             className="hidden md:flex items-center gap-1 text-sm font-semibold transition-opacity hover:opacity-60"
-            style={{ color: "#0d9668" }}
+            style={{ color: "var(--brand-600)" }}
           >
             Tümünü Gör <ArrowRight className="w-4 h-4" />
           </Link>
@@ -66,7 +66,7 @@ export function StatsSection() {
           >
             <div
               className="absolute -top-8 -right-8 w-44 h-44 rounded-full opacity-10 group-hover:opacity-20 transition-opacity"
-              style={{ backgroundColor: "#0d9668" }}
+              style={{ backgroundColor: "var(--brand-600)" }}
             />
             <div
               className="absolute bottom-0 left-0 w-32 h-32 rounded-full opacity-5"
@@ -75,7 +75,7 @@ export function StatsSection() {
             <div className="relative">
               <span
                 className="inline-block text-[11px] font-black tracking-widest uppercase px-3 py-1.5 rounded-full mb-5"
-                style={{ backgroundColor: "#0d9668", color: "white" }}
+                style={{ backgroundColor: "var(--brand-600)", color: "white" }}
               >
                 Zorunlu Eğitim
               </span>
@@ -124,7 +124,7 @@ export function StatsSection() {
           >
             <div
               className="absolute -bottom-12 -right-12 w-56 h-56 rounded-full opacity-20 group-hover:opacity-30 transition-opacity"
-              style={{ backgroundColor: "#0d9668" }}
+              style={{ backgroundColor: "var(--brand-600)" }}
             />
             {/* Rating badge */}
             <div
@@ -141,7 +141,7 @@ export function StatsSection() {
             <div className="relative p-5 sm:p-8">
               <span
                 className="inline-block text-[11px] font-black tracking-widest uppercase px-3 py-1.5 rounded-full border mb-5"
-                style={{ color: "#0d9668", borderColor: "#0d9668" }}
+                style={{ color: "var(--brand-600)", borderColor: "var(--brand-600)" }}
               >
                 Acil Tıp
               </span>

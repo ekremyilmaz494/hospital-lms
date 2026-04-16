@@ -222,7 +222,7 @@ export default function ResetPasswordPage() {
                   shimmerColor="rgba(255,255,255,0.15)"
                   shimmerSize="0.08em"
                   borderRadius="12px"
-                  background="linear-gradient(135deg, #0d9668 0%, #065f46 100%)"
+                  background="linear-gradient(135deg, var(--brand-600) 0%, var(--brand-800) 100%)"
                 >
                   {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Lock className="h-5 w-5" />}
                   {loading ? 'Güncelleniyor...' : 'Şifreyi Güncelle'}

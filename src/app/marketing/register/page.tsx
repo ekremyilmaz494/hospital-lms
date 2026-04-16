@@ -94,8 +94,8 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
 
   if (score <= 2) return { score, label: 'Zayif', color: '#dc2626' }
   if (score <= 3) return { score, label: 'Orta', color: '#f59e0b' }
-  if (score <= 4) return { score, label: 'Iyi', color: '#0d9668' }
-  return { score, label: 'Guclu', color: '#059669' }
+  if (score <= 4) return { score, label: 'Iyi', color: 'var(--brand-600)' }
+  return { score, label: 'Guclu', color: 'var(--brand-600)' }
 }
 
 /* ── Password requirement checks ── */
@@ -110,10 +110,10 @@ function PasswordRequirements({ password }: { password: string }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
       {checks.map(({ label, met }) => (
-        <div key={label} className="flex items-center gap-1.5 text-xs" style={{ color: met ? '#059669' : '#94a3b8' }}>
+        <div key={label} className="flex items-center gap-1.5 text-xs" style={{ color: met ? 'var(--brand-600)' : '#94a3b8' }}>
           <div
             className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
-            style={{ backgroundColor: met ? '#059669' : '#e2e8f0' }}
+            style={{ backgroundColor: met ? 'var(--brand-600)' : '#e2e8f0' }}
           >
             {met ? '\u2713' : ''}
           </div>
@@ -266,7 +266,7 @@ export default function RegisterPage() {
             <Link
               href="/auth/login"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-transform hover:scale-105"
-              style={{ backgroundColor: '#0d9668' }}
+              style={{ backgroundColor: 'var(--brand-600)' }}
             >
               Giris Sayfasina Git
               <ArrowRight className="w-4 h-4" />
@@ -298,7 +298,7 @@ export default function RegisterPage() {
             <div className="flex items-center gap-2 flex-1">
               <div
                 className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                style={{ backgroundColor: '#0d9668' }}
+                style={{ backgroundColor: 'var(--brand-600)' }}
               >
                 {step > 1 ? <CheckCircle2 className="w-4 h-4" /> : '1'}
               </div>
@@ -308,13 +308,13 @@ export default function RegisterPage() {
             </div>
             <div
               className="flex-1 h-0.5 rounded"
-              style={{ backgroundColor: step >= 2 ? '#0d9668' : '#e2e8f0' }}
+              style={{ backgroundColor: step >= 2 ? 'var(--brand-600)' : '#e2e8f0' }}
             />
             <div className="flex items-center gap-2 flex-1">
               <div
                 className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
                 style={{
-                  backgroundColor: step >= 2 ? '#0d9668' : '#e2e8f0',
+                  backgroundColor: step >= 2 ? 'var(--brand-600)' : '#e2e8f0',
                   color: step >= 2 ? 'white' : '#94a3b8',
                 }}
               >
@@ -353,7 +353,7 @@ export default function RegisterPage() {
                       className="w-10 h-10 rounded-xl flex items-center justify-center"
                       style={{ backgroundColor: '#f0fdf4' }}
                     >
-                      <Building2 className="w-5 h-5" style={{ color: '#0d9668' }} />
+                      <Building2 className="w-5 h-5" style={{ color: 'var(--brand-600)' }} />
                     </div>
                     <div>
                       <h2 className="font-bold" style={{ color: 'var(--color-text-primary)' }}>
@@ -428,7 +428,7 @@ export default function RegisterPage() {
                     type="button"
                     onClick={goToStep2}
                     className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-transform hover:scale-[1.02]"
-                    style={{ backgroundColor: '#0d9668' }}
+                    style={{ backgroundColor: 'var(--brand-600)' }}
                   >
                     Devam Et
                     <ArrowRight className="w-4 h-4" />
@@ -589,7 +589,7 @@ export default function RegisterPage() {
                       type="submit"
                       disabled={loading}
                       className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-transform hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: '#0d9668' }}
+                      style={{ backgroundColor: 'var(--brand-600)' }}
                     >
                       {loading ? (
                         <>
@@ -612,7 +612,7 @@ export default function RegisterPage() {
             <div className="mt-6 pt-6 text-center text-sm" style={{ borderTop: '1px solid var(--color-border)' }}>
               <p style={{ color: 'var(--color-text-secondary)' }}>
                 Zaten hesabiniz var mi?{' '}
-                <Link href="/auth/login" className="font-semibold" style={{ color: '#0d9668' }}>
+                <Link href="/auth/login" className="font-semibold" style={{ color: 'var(--brand-600)' }}>
                   Giris Yapin
                 </Link>
               </p>
@@ -631,7 +631,7 @@ export default function RegisterPage() {
                 className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-medium"
                 style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
               >
-                <Icon className="w-4 h-4 flex-shrink-0" style={{ color: '#0d9668' }} />
+                <Icon className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--brand-600)' }} />
                 {label}
               </div>
             ))}

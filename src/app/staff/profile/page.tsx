@@ -248,8 +248,8 @@ export default function ProfilePage() {
           <div
             className="flex h-12 w-12 items-center justify-center rounded-2xl"
             style={{
-              background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-              boxShadow: '0 4px 14px rgba(13, 150, 104, 0.25)',
+              background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+              boxShadow: '0 4px 14px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
             }}
           >
             <User className="h-6 w-6 text-white" />
@@ -277,7 +277,7 @@ export default function ProfilePage() {
               <div
                 className="relative h-24"
                 style={{
-                  background: 'linear-gradient(135deg, var(--color-primary) 0%, #065f46 60%, #0a3d2e 100%)',
+                  background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--brand-800) 60%, #0a3d2e 100%)',
                 }}
               >
                 <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 70% 30%, rgba(255,255,255,0.4) 0%, transparent 50%)' }} />
@@ -292,7 +292,7 @@ export default function ProfilePage() {
                   >
                     <AvatarFallback
                       className="text-2xl font-bold text-white"
-                      style={{ background: 'linear-gradient(135deg, var(--color-primary), #065f46)' }}
+                      style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' }}
                     >
                       {displayInitials}
                     </AvatarFallback>
@@ -423,8 +423,8 @@ export default function ProfilePage() {
                   disabled={savingProfile}
                   className="hidden sm:flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
                   style={{
-                    background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                    boxShadow: '0 4px 12px rgba(13, 150, 104, 0.2)',
+                    background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                    boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)',
                   }}
                 >
                   {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -491,8 +491,8 @@ export default function ProfilePage() {
                   disabled={savingProfile}
                   className="flex sm:hidden w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[14px] font-semibold text-white transition-all duration-200 active:scale-[0.98] disabled:opacity-60"
                   style={{
-                    background: 'linear-gradient(135deg, var(--color-primary), #065f46)',
-                    boxShadow: '0 4px 12px rgba(13, 150, 104, 0.2)',
+                    background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
+                    boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)',
                   }}
                 >
                   {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

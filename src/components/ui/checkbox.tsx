@@ -11,13 +11,13 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
       className={cn(
         // Base
         "peer relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-sm",
-        "border-2 border-[#0d9668] bg-white outline-none",
+        "border-2 border-[var(--brand-600)] bg-white outline-none",
         "transition-colors",
         "after:absolute after:-inset-x-3 after:-inset-y-2",
         // Focus ring
-        "focus-visible:ring-2 focus-visible:ring-[#0d9668]/40 focus-visible:ring-offset-1",
+        "focus-visible:ring-2 focus-visible:ring-[var(--brand-600)]/40 focus-visible:ring-offset-1",
         // Checked — solid green fill
-        "data-checked:bg-[#0d9668] data-checked:border-[#0d9668]",
+        "data-checked:bg-[var(--brand-600)] data-checked:border-[var(--brand-600)]",
         // Disabled
         "disabled:cursor-not-allowed disabled:opacity-40",
         className
