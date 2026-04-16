@@ -17,18 +17,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // B8.2/G8.2 — Parametre UUID formatında olmalı; hatalı değerler DB'ye ulaşmadan reddedilsin
   if (!UUID_REGEX.test(id)) return errorResponse('Geçersiz eğitim ID', 400)
 
+  // Arşivlenmiş veya soft-delete edilmiş eğitimler erişilemez (personel direct URL ile bile açamaz).
+  const trainingFilter = {
+    organizationId: dbUser!.organizationId!,
+    isActive: true,
+    publishStatus: { not: 'archived' },
+  }
+
   // Find assignment — try by ID, then by trainingId
   let assignment = await prisma.trainingAssignment.findFirst({
     where: {
       id,
       userId: dbUser!.id,
-      training: { organizationId: dbUser!.organizationId! },
+      training: trainingFilter,
     },
     include: {
       training: {
         include: {
           videos: {
-            select: { id: true, title: true, durationSeconds: true, sortOrder: true },
+            select: { id: true, title: true, durationSeconds: true, sortOrder: true, contentType: true },
             orderBy: { sortOrder: 'asc' },
           },
         },
@@ -55,7 +62,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       where: {
         trainingId: id,
         userId: dbUser!.id,
-        training: { organizationId: dbUser!.organizationId! },
+        training: trainingFilter,
       },
       include: {
         training: {
@@ -134,13 +141,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     currentAttempt = assignment.currentAttempt
     const isRetry = latestAttempt.attemptNumber > 1
     preExamCompleted = isRetry || latestAttempt.preExamCompletedAt !== null
-    // Video completion: check THIS attempt's video progress only
+    // Video completion: PDF içerikler opsiyonel — yalnızca video/ses tamamlanma şartı geçişi belirler
     const attemptVideoProgress = new Map(
       (latestAttempt.videoProgress ?? []).map(vp => [vp.videoId, vp])
     )
-    videosCompleted = t.videos.length === 0 ||
+    const requiredVideos = t.videos.filter(v => v.contentType !== 'pdf')
+    videosCompleted = requiredVideos.length === 0 ||
       (latestAttempt.videosCompletedAt !== null) ||
-      t.videos.every(v => attemptVideoProgress.get(v.id)?.isCompleted === true)
+      requiredVideos.every(v => attemptVideoProgress.get(v.id)?.isCompleted === true)
     postExamCompleted = latestAttempt.postExamCompletedAt !== null
   } else {
     // Passed or all attempts exhausted

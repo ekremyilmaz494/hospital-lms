@@ -233,6 +233,11 @@ export default function NewTrainingPage() {
       }
       const missingTitle = videos.find(v => v.url && !v.title.trim() && !v.file?.name);
       if (missingTitle) return 'Tüm içeriklere başlık girin.';
+      // PDF içerikler son sınava geçişi tetiklemez — en az 1 video/ses zorunlu
+      const hasPlayable = videos.some(v => v.contentType === 'video' || v.contentType === 'audio');
+      if (videos.length > 0 && !hasPlayable) {
+        return 'Eğitimde en az bir video veya ses içeriği bulunmalıdır. PDF tek başına yeterli değildir.';
+      }
     }
     if (step === 3) {
       for (const q of questions) {

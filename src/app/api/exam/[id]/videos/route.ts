@@ -231,17 +231,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
   })
 
-  // Check if ALL videos are completed → transition to post_exam
-  if (isCompleted) {
-    const allVideos = await prisma.trainingVideo.findMany({
-      where: { trainingId: attempt.trainingId },
+  // PDF içerikler opsiyoneldir — son sınava geçiş yalnızca video/ses tamamlanma şartına bağlı.
+  // Bu nedenle PDF tamamlanması transition'ı tetiklemez ve sayıma da girmez.
+  if (isCompleted && !isPdfContent) {
+    const requiredVideos = await prisma.trainingVideo.findMany({
+      where: { trainingId: attempt.trainingId, contentType: { not: 'pdf' } },
       select: { id: true },
     })
-    const completedCount = await prisma.videoProgress.count({
-      where: { attemptId: attempt.id, isCompleted: true },
+    const completedCount = requiredVideos.length === 0 ? 0 : await prisma.videoProgress.count({
+      where: {
+        attemptId: attempt.id,
+        isCompleted: true,
+        videoId: { in: requiredVideos.map(v => v.id) },
+      },
     })
 
-    if (completedCount >= allVideos.length) {
+    if (requiredVideos.length > 0 && completedCount >= requiredVideos.length) {
       await prisma.examAttempt.update({
         where: { id: attempt.id },
         data: { videosCompletedAt: new Date(), status: 'post_exam', postExamStartedAt: new Date() },

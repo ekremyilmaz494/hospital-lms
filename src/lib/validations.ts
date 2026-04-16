@@ -156,6 +156,14 @@ export const createTrainingBodySchema = z.object({
 }).refine(
   data => new Date(data.endDate) > new Date(data.startDate),
   { message: 'Bitis tarihi baslangic tarihinden sonra olmali', path: ['endDate'] }
+).refine(
+  // PDF içerikler son sınava geçişi tetiklemez — bu yüzden eğitimde en az 1 video/ses zorunludur.
+  // videos verilmemiş veya boşsa draft kabul edilir; içerik eklendiyse video/ses şartı aranır.
+  data => {
+    if (!data.videos || data.videos.length === 0) return true
+    return data.videos.some(v => v.contentType === 'video' || v.contentType === 'audio')
+  },
+  { message: 'Eğitimde en az bir video veya ses içeriği bulunmalıdır (PDF tek başına yeterli değildir).', path: ['videos'] }
 )
 
 // ── Question ──

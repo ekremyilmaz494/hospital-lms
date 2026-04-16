@@ -120,6 +120,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       videoUrl: streamUrls[i] ?? v.videoUrl,
       duration: `${Math.floor(v.durationSeconds / 60)}:${String(v.durationSeconds % 60).padStart(2, '0')}`,
       order: v.sortOrder,
+      contentType: v.contentType,
     })),
     questions: training.questions.map(q => ({
       id: q.id,

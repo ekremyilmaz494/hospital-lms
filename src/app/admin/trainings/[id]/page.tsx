@@ -44,7 +44,7 @@ interface TrainingDetail {
   signedCount: number;
   status: string;
   assignedStaff: { assignmentId: string; userId: string; name: string; department: string; attempt: number; progress: number; preScore: number | null; postScore: number | null; status: string; completedAt: string; signedAt: string | null; signatureMethod: string | null }[];
-  videos: { id: string; title: string; videoUrl: string; duration: string; order: number }[];
+  videos: { id: string; title: string; videoUrl: string; duration: string; order: number; contentType: string }[];
   questions: { id: string; text: string; points: number; options: { id: string; text: string; isCorrect: boolean; order: number }[] }[];
 }
 
@@ -87,6 +87,8 @@ export default function TrainingDetailPage() {
   const assignedStaff = training.assignedStaff ?? [];
   const trainingVideos = training.videos ?? [];
   const trainingQuestions = training.questions ?? [];
+  // PDF içerikler son sınava geçişi tetiklemez — atama ancak en az 1 video/ses varsa yapılabilir
+  const hasPlayableContent = trainingVideos.some(v => v.contentType === 'video' || v.contentType === 'audio');
 
   const tabs = [
     { id: 'staff', label: 'Personel Durumu', count: assignedStaff.length },
@@ -177,7 +179,20 @@ export default function TrainingDetailPage() {
           <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => router.push(`/admin/trainings/${id}/edit`)}>
             <Edit className="h-4 w-4" /> Düzenle
           </Button>
-          <Button onClick={() => setAssignModalOpen(true)} className="gap-2 rounded-xl font-semibold text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)', boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)' }}>
+          <Button
+            onClick={() => setAssignModalOpen(true)}
+            disabled={!hasPlayableContent}
+            title={hasPlayableContent ? undefined : 'Atama için en az bir video veya ses içeriği eklenmelidir.'}
+            className="gap-2 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: hasPlayableContent
+                ? 'linear-gradient(135deg, var(--color-primary), #0f4a35)'
+                : 'var(--color-text-muted)',
+              boxShadow: hasPlayableContent
+                ? '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)'
+                : 'none',
+            }}
+          >
             <Users className="h-4 w-4" /> Personel Ata
           </Button>
         </div>

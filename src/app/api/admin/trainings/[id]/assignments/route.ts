@@ -48,8 +48,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   if (!dbUser!.organizationId) return errorResponse('Organization not found', 403)
-  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  const training = await prisma.training.findFirst({
+    where: { id, organizationId: dbUser!.organizationId! },
+    select: {
+      id: true,
+      title: true,
+      videos: { select: { contentType: true } },
+    },
+  })
   if (!training) return errorResponse('Training not found', 404)
+
+  // PDF içerikler son sınava geçişi tetiklemez — atama öncesi son güvenlik kapısı
+  const hasPlayableContent = training.videos.some(v => v.contentType === 'video' || v.contentType === 'audio')
+  if (!hasPlayableContent) {
+    return errorResponse('Bu eğitim atanamaz: en az bir video veya ses içeriği eklenmelidir.', 400)
+  }
 
   // Create assignments for all users (skip existing)
   const existingAssignments = await prisma.trainingAssignment.findMany({
