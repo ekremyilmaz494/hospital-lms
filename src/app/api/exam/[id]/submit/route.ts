@@ -36,7 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // B7.3/G7.3 — Explicit organizationId cross-check: training.organizationId === dbUser.organizationId
   let attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
     where: { id: attemptId, userId: dbUser!.id, training: { organizationId: dbUser!.organizationId! } },
-    include: { training: true, assignment: true },
+    include: { training: { include: { organization: { select: { name: true } } } }, assignment: true },
   })
   if (!attempt) {
     attempt = await prisma.examAttempt.findFirst({
@@ -46,7 +46,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         status: { not: 'completed' },
         training: { organizationId: dbUser!.organizationId! },
       },
-      include: { training: true, assignment: true },
+      include: { training: { include: { organization: { select: { name: true } } } }, assignment: true },
       orderBy: { attemptNumber: 'desc' },
     })
   }
@@ -257,21 +257,50 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
-  // Eğitim tamamlandığında otomatik SMG aktivitesi (fire-and-forget)
+  // Eğitim tamamlandığında otomatik SMG aktivitesi — idempotent upsert
   if (isPassed && attempt.training.smgPoints > 0) {
-    prisma.smgActivity.create({
-      data: {
-        userId: dbUser!.id,
-        organizationId: attempt.training.organizationId,
-        activityType: 'COURSE_COMPLETION',
-        title: attempt.training.title,
-        provider: 'Devakent Hastanesi',
-        completionDate: new Date(),
-        smgPoints: attempt.training.smgPoints,
-        approvalStatus: 'APPROVED',
-        approvedAt: new Date(),
-      },
-    }).catch(err => logger.error('SMG', 'Otomatik SMG aktivitesi oluşturulamadı', { err, attemptId: attempt.id }))
+    try {
+      // Varsa organizasyonun "COURSE_COMPLETION" kategorisini bul, yoksa null.
+      // Conditional (sadece sınav geçilince), ardından upsert bu kategoriye bağımlı — paralelleştirilemez.
+      const defaultCategory = await prisma.smgCategory.findFirst({ // perf-check-disable-line
+        where: {
+          organizationId: attempt.training.organizationId,
+          code: 'COURSE_COMPLETION',
+          isActive: true,
+        },
+        select: { id: true },
+      })
+
+      const today = new Date()
+      // completionDate @db.Date; aynı gün duplicate'leri bastırmak için saat sıfırla
+      const completionDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
+
+      await prisma.smgActivity.upsert({
+        where: {
+          userId_activityType_title_completionDate: {
+            userId: dbUser!.id,
+            activityType: 'COURSE_COMPLETION',
+            title: attempt.training.title,
+            completionDate,
+          },
+        },
+        create: {
+          userId: dbUser!.id,
+          organizationId: attempt.training.organizationId,
+          activityType: 'COURSE_COMPLETION',
+          categoryId: defaultCategory?.id ?? null,
+          title: attempt.training.title,
+          provider: attempt.training.organization.name,
+          completionDate,
+          smgPoints: attempt.training.smgPoints,
+          approvalStatus: 'APPROVED',
+          approvedAt: new Date(),
+        },
+        update: {},
+      })
+    } catch (err) {
+      logger.error('SMG', 'Otomatik SMG aktivitesi oluşturulamadı', { err, attemptId: attempt.id })
+    }
   }
 
   const tabSwitchCount = parsed.data.tabSwitchCount ?? 0

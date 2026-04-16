@@ -757,7 +757,8 @@ model SmgTarget {
   period       SmgPeriod    @relation(fields: [periodId], references: [id], onDelete: Cascade)
   user         User?        @relation("SmgTargetOverrides", fields: [userId], references: [id], onDelete: SetNull)
 
-  @@unique([periodId, unvan, userId], map: "idx_smg_targets_unique")
+  // NOT: Unique kısıtı artık migration'da 3 ayrı partial unique index olarak tanımlı
+  // (PostgreSQL NULL semantiği ayrımı için). Bkz: 20260416120000_smg_targets_partial_unique.
   @@index([periodId], map: "idx_smg_targets_period")
   @@index([organizationId], map: "idx_smg_targets_org")
   @@map("smg_targets")

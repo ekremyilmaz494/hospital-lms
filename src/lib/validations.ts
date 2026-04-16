@@ -267,20 +267,22 @@ export const createSmgPeriodSchema = z.object({
   endDate: z.string().date(),
   requiredPoints: z.coerce.number().int().min(1).max(9999),
   isActive: z.boolean().optional().default(true),
-})
+}).refine(
+  data => new Date(data.endDate) > new Date(data.startDate),
+  { message: 'Bitiş tarihi başlangıç tarihinden sonra olmalıdır', path: ['endDate'] }
+)
 
+// SKS denetimi için her SMG aktivitesinin bir kategoriye bağlı olması zorunludur.
+// activityType kategori code'undan türetilir — route katmanında set edilir.
 export const createSmgActivitySchema = z.object({
+  categoryId: z.string().uuid('Kategori seçmek zorunludur'),
   activityType: z.enum(['EXTERNAL_TRAINING', 'CONFERENCE', 'PUBLICATION', 'COURSE_COMPLETION']).optional(),
-  categoryId: z.string().uuid().optional(),
   title: z.string().min(2).max(255),
   provider: z.string().max(255).optional(),
   completionDate: z.string().date(),
   smgPoints: z.coerce.number().int().min(1).max(999),
   certificateUrl: z.string().url().optional().or(z.literal('')).transform(v => v || undefined),
-}).refine(
-  data => data.categoryId || data.activityType,
-  { message: 'Kategori veya aktivite tipi belirtilmelidir', path: ['categoryId'] }
-)
+})
 
 // ── SMG KATEGORİ ŞEMALARI ──
 export const createSmgCategorySchema = z.object({
@@ -329,7 +331,12 @@ export const updateSmgPeriodSchema = z.object({
   endDate: z.string().date().optional(),
   requiredPoints: z.coerce.number().int().min(1).max(9999).optional(),
   isActive: z.boolean().optional(),
-})
+}).refine(
+  // Sadece iki tarih de verildiyse schema düzeyinde doğrula.
+  // Tek tarih verildiğinde karşılaştırma route katmanında DB'den çekilen değerle yapılır.
+  data => !data.startDate || !data.endDate || new Date(data.endDate) > new Date(data.startDate),
+  { message: 'Bitiş tarihi başlangıç tarihinden sonra olmalıdır', path: ['endDate'] }
+)
 
 // ── HIS Entegrasyon ──
 export const hisIntegrationSchema = z.object({

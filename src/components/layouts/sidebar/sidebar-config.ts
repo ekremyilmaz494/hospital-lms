@@ -41,6 +41,10 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+// Geliştirme aşamasındaki modüller — müşteriye (demo/prod) kapalı.
+// Tamamlanınca true yapılır veya NEXT_PUBLIC_ENABLE_BETA=true ile geçici açılır.
+const BETA_MODULES_ENABLED = process.env.NEXT_PUBLIC_ENABLE_BETA === 'true';
+
 export const superAdminNav: NavGroup[] = [
   {
     items: [
@@ -94,7 +98,9 @@ export const adminNav: NavGroup[] = [
         ],
       },
       { title: 'İçerik Kütüphanesi', href: '/admin/content-library', icon: Library },
-      { title: 'AI İçerik Stüdyosu', href: '/admin/ai-content-studio', icon: Sparkles, badge: 'Beta' },
+      ...(BETA_MODULES_ENABLED
+        ? [{ title: 'AI İçerik Stüdyosu', href: '/admin/ai-content-studio', icon: Sparkles, badge: 'Beta' } satisfies NavItem]
+        : []),
       {
         title: 'Personel',
         href: '/admin/staff',
@@ -142,7 +148,9 @@ export const adminNav: NavGroup[] = [
         icon: Settings,
         children: [
           { title: 'Genel Ayarlar', href: '/admin/settings' },
-          { title: 'Entegrasyonlar', href: '/admin/settings/integrations' },
+          ...(BETA_MODULES_ENABLED
+            ? [{ title: 'Entegrasyonlar', href: '/admin/settings/integrations' }]
+            : []),
         ],
       },
     ],

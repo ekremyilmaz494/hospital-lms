@@ -42,7 +42,14 @@ export async function GET(request: Request) {
       orderBy: { completionDate: 'desc' },
     }),
     prisma.smgActivity.findMany({
-      where: { userId, organizationId: orgId, approvalStatus: 'PENDING' },
+      where: {
+        userId,
+        organizationId: orgId,
+        approvalStatus: 'PENDING',
+        ...(period
+          ? { completionDate: { gte: period.startDate, lte: period.endDate } }
+          : {}),
+      },
       orderBy: { createdAt: 'desc' },
     }),
     prisma.smgActivity.findMany({

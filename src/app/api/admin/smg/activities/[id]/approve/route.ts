@@ -26,6 +26,14 @@ export async function PUT(
 
   if (!activity) return errorResponse('Aktivite bulunamadı', 404)
 
+  // Mevcut durum zaten istenen durum ise işlem anlamsız — kullanıcıya 409 dön.
+  if (activity.approvalStatus === parsed.data.status) {
+    return errorResponse(
+      `Aktivite zaten "${parsed.data.status === 'APPROVED' ? 'onaylanmış' : 'reddedilmiş'}" durumdadır.`,
+      409
+    )
+  }
+
   const updated = await prisma.smgActivity.update({
     where: { id },
     data: {

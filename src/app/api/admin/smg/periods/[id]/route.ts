@@ -26,6 +26,7 @@ export async function PATCH(
 
   if (!period) return errorResponse('Dönem bulunamadı', 404)
 
+  const orgId = dbUser!.organizationId!
   const updateData: Record<string, unknown> = {}
   if (parsed.data.name !== undefined) updateData.name = parsed.data.name
   if (parsed.data.startDate !== undefined) updateData.startDate = new Date(parsed.data.startDate)
@@ -33,9 +34,49 @@ export async function PATCH(
   if (parsed.data.requiredPoints !== undefined) updateData.requiredPoints = parsed.data.requiredPoints
   if (parsed.data.isActive !== undefined) updateData.isActive = parsed.data.isActive
 
-  const updated = await prisma.smgPeriod.update({
-    where: { id },
-    data: updateData,
+  // Tarih veya aktif durum değiştiriliyorsa ek kontroller:
+  const effectiveStart = parsed.data.startDate ? new Date(parsed.data.startDate) : period.startDate
+  const effectiveEnd = parsed.data.endDate ? new Date(parsed.data.endDate) : period.endDate
+
+  // startDate tek başına verildiyse mevcut endDate ile, veya tersi — tutarlılığı route'da kontrol et.
+  if (effectiveEnd <= effectiveStart) {
+    return errorResponse('Bitiş tarihi başlangıç tarihinden sonra olmalıdır', 400)
+  }
+
+  // Çakışma kontrolü: aynı organizasyonda başka bir dönemle (kendisi hariç) kesişme olmamalı.
+  // Ardından gelen transaction bu sonuca bağımlı — paralelleştirilemez.
+  if (parsed.data.startDate !== undefined || parsed.data.endDate !== undefined) {
+    const overlapping = await prisma.smgPeriod.findFirst({ // perf-check-disable-line
+      where: {
+        organizationId: orgId,
+        NOT: { id },
+        AND: [
+          { startDate: { lte: effectiveEnd } },
+          { endDate: { gte: effectiveStart } },
+        ],
+      },
+      select: { id: true, name: true },
+    })
+    if (overlapping) {
+      return errorResponse(
+        `"${overlapping.name}" dönemi ile tarihler çakışıyor. Lütfen çakışmayan bir aralık seçin.`,
+        409
+      )
+    }
+  }
+
+  // isActive=true yapılıyorsa diğer aktif dönemleri pasife al (atomik).
+  const updated = await prisma.$transaction(async (tx) => { // perf-check-disable-line
+    if (parsed.data.isActive === true) {
+      await tx.smgPeriod.updateMany({
+        where: { organizationId: orgId, isActive: true, NOT: { id } },
+        data: { isActive: false },
+      })
+    }
+    return tx.smgPeriod.update({
+      where: { id },
+      data: updateData,
+    })
   })
 
   await createAuditLog({
@@ -83,7 +124,9 @@ export async function DELETE(
 
   if (linkedActivities > 0) {
     return errorResponse(
-      `Bu döneme bağlı ${linkedActivities} aktivite bulunmaktadır. Önce aktiviteleri silin veya taşıyın.`,
+      `Bu döneme bağlı ${linkedActivities} SMG aktivitesi bulunmaktadır. ` +
+        `Dönemi silmek yerine arşivlemek için aktif bayrağını kapatabilirsiniz; ` +
+        `silmekte ısrarcıysanız önce bu aktiviteleri tek tek kaldırmanız gerekir.`,
       409
     )
   }

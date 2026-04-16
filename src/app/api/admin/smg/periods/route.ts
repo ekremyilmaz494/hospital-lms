@@ -30,13 +30,45 @@ export async function POST(request: Request) {
   const parsed = createSmgPeriodSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const period = await prisma.smgPeriod.create({
-    data: {
-      ...parsed.data,
-      startDate: new Date(parsed.data.startDate),
-      endDate: new Date(parsed.data.endDate),
-      organizationId: dbUser!.organizationId!,
+  const orgId = dbUser!.organizationId!
+  const newStart = new Date(parsed.data.startDate)
+  const newEnd = new Date(parsed.data.endDate)
+
+  // Tarih çakışma kontrolü — aynı organizasyonda başka bir dönemin tarih aralığı
+  // ile kesişen yeni dönem oluşturulamaz (aktivitelerin çift sayılmaması için).
+  const overlapping = await prisma.smgPeriod.findFirst({
+    where: {
+      organizationId: orgId,
+      AND: [
+        { startDate: { lte: newEnd } },
+        { endDate: { gte: newStart } },
+      ],
     },
+    select: { id: true, name: true },
+  })
+  if (overlapping) {
+    return errorResponse(
+      `"${overlapping.name}" dönemi ile tarihler çakışıyor. Lütfen çakışmayan bir aralık seçin.`,
+      409
+    )
+  }
+
+  // Atomik: isActive=true ise mevcut aktif dönemleri pasife al, sonra insert.
+  const period = await prisma.$transaction(async (tx) => {
+    if (parsed.data.isActive !== false) {
+      await tx.smgPeriod.updateMany({
+        where: { organizationId: orgId, isActive: true },
+        data: { isActive: false },
+      })
+    }
+    return tx.smgPeriod.create({
+      data: {
+        ...parsed.data,
+        startDate: newStart,
+        endDate: newEnd,
+        organizationId: orgId,
+      },
+    })
   })
 
   await createAuditLog({
