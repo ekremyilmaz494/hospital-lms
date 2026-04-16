@@ -16,9 +16,9 @@ export default function NotFound() {
         >
           404
         </h1>
-        <h2 className="text-xl font-bold mb-2">Sayfa Bulunamadi</h2>
+        <h2 className="text-xl font-bold mb-2">Sayfa Bulunamadı</h2>
         <p className="text-sm mb-8 max-w-sm mx-auto" style={{ color: 'var(--color-text-secondary)' }}>
-          Aradiginiz sayfa mevcut degil veya tasinmis olabilir.
+          Aradığınız sayfa mevcut değil veya taşınmış olabilir.
         </p>
         <div className="flex items-center justify-center gap-3">
           <Link href="/admin/dashboard">

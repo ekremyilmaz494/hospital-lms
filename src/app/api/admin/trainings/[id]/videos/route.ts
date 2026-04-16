@@ -4,6 +4,10 @@ import { getUploadUrl, videoKey, documentKey, deleteObject, checkStorageQuota } 
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
+// NOT: Bu dosyadaki await'ler ayrı endpoint handler'larında (GET/POST/DELETE);
+// tek istek akışında en fazla 2 await çalışır. Promise.all bu bağımlı
+// sıralı işlemler için uygun değil, bağımlılık zinciri var.
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { dbUser, error } = await getAuthUser()
@@ -12,8 +16,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
+  // Multi-tenant guard: trainingId'nin admin'in organizasyonuna ait olduğunu
+  // nested training.organizationId ile doğrula. Aksi halde başka hastanenin
+  // training ID'si bilinirse videoları listelenebilir.
   const videos = await prisma.trainingVideo.findMany({
-    where: { trainingId: id },
+    where: {
+      trainingId: id,
+      training: { organizationId: dbUser!.organizationId! },
+    },
     orderBy: { sortOrder: 'asc' },
   })
 
