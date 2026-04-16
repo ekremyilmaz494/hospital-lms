@@ -21,6 +21,9 @@ export async function GET() {
   if (cached) return jsonResponse(cached, 200, CACHE_HEADERS)
 
   try {
+    // Archived/inactive training'ler "yok hükmünde" — istatistik sayımlarında dışarı al
+    const trainingScope = { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } }
+
     const [
       staffCount,
       activeStaffCount,
@@ -31,15 +34,15 @@ export async function GET() {
     ] = await Promise.all([
       prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
       prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
-      prisma.training.count({ where: { organizationId: orgId } }),
-      prisma.training.count({ where: { organizationId: orgId, isActive: true } }),
+      prisma.training.count({ where: { organizationId: orgId, publishStatus: { not: 'archived' } } }),
+      prisma.training.count({ where: trainingScope }),
       prisma.trainingAssignment.groupBy({
         by: ['status'],
-        where: { training: { organizationId: orgId } },
+        where: { training: trainingScope },
         _count: true,
       }),
       prisma.training.findMany({
-        where: { organizationId: orgId, isCompulsory: true, isActive: true },
+        where: { ...trainingScope, isCompulsory: true },
         select: { id: true, title: true, complianceDeadline: true, regulatoryBody: true, assignments: { select: { status: true } } },
       }),
     ])

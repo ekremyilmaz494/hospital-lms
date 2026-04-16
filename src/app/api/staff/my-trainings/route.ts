@@ -16,9 +16,15 @@ export async function GET(request: Request) {
     const { page, limit, skip } = safePagination(searchParams)
     const status = searchParams.get('status') // assigned | in_progress | passed | failed
 
+    // Arşivlenmiş veya soft-delete edilmiş eğitimler personel listesinde gözükmemeli;
+    // aksi halde personel "asla bitiremeyeceği" eğitim görür (bkz. PDF-only edge case).
     const where: Record<string, unknown> = {
       userId: dbUser!.id,
-      training: { organizationId: dbUser!.organizationId! },
+      training: {
+        organizationId: dbUser!.organizationId!,
+        isActive: true,
+        publishStatus: { not: 'archived' },
+      },
     }
     if (status) where.status = status
 

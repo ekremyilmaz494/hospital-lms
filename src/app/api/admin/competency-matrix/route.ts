@@ -51,7 +51,7 @@ export async function GET(request: Request) {
           title: true,
           departmentRel: { select: { name: true, color: true } },
           assignments: {
-            where: { training: { organizationId: orgId, isActive: true } },
+            where: { training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } } },
             select: {
               trainingId: true,
               status: true,
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       }),
       prisma.user.count({ where: staffWhere }),
       prisma.training.findMany({
-        where: { organizationId: orgId, isActive: true },
+        where: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } },
         select: { id: true, title: true, category: true, isCompulsory: true, passingScore: true },
         orderBy: [{ isCompulsory: 'desc' }, { category: 'asc' }, { title: 'asc' }],
       }),

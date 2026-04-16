@@ -26,7 +26,8 @@ export async function GET() {
     // B6.3 — Büyük hastanelerde sonsuz yük önleme: atama başına ilk 500 personel
     const [compulsoryTrainings, allStaff] = await Promise.all([
       prisma.training.findMany({
-        where: { organizationId: orgId, isCompulsory: true },
+        // Archived/inactive zorunlu eğitimler current uyum oranını yanıltır — hariç tut
+        where: { organizationId: orgId, isCompulsory: true, isActive: true, publishStatus: { not: 'archived' } },
         include: {
           assignments: {
             take: 500, // Büyük hastanelerde performans koruması

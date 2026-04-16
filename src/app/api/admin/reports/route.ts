@@ -49,21 +49,24 @@ export async function GET(request: Request) {
   const userDeptFilter = validatedDeptId ? { departmentId: validatedDeptId } : {}
 
   try {
+    // Archived/inactive training'ler raporlardan dışarı — atama sayımları, ortalamalar ve listeler etkilenmemeli
+    const trainingScope = { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } }
+
     const [staffCount, trainingCount, assignmentStatusGroups, avgScoreResult, trainings, staff, departments] = await Promise.all([
       prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true, ...userDeptFilter } }),
-      prisma.training.count({ where: { organizationId: orgId, isActive: true } }),
+      prisma.training.count({ where: trainingScope }),
       prisma.trainingAssignment.groupBy({
         by: ['status'],
-        where: { training: { organizationId: orgId }, user: { ...userDeptFilter }, ...assignmentDateFilter },
+        where: { training: trainingScope, user: { ...userDeptFilter }, ...assignmentDateFilter },
         _count: true,
       }),
       prisma.examAttempt.aggregate({
-        where: { training: { organizationId: orgId }, postExamScore: { not: null }, user: { ...userDeptFilter }, ...(dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}) },
+        where: { training: trainingScope, postExamScore: { not: null }, user: { ...userDeptFilter }, ...(dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}) },
         _avg: { postExamScore: true },
       }),
       // Training-based report (max 500 — DoS koruması)
       prisma.training.findMany({
-        where: { organizationId: orgId },
+        where: trainingScope,
         include: {
           assignments: {
             where: { user: { ...userDeptFilter }, ...assignmentDateFilter },
@@ -79,7 +82,7 @@ export async function GET(request: Request) {
         where: { organizationId: orgId, role: 'staff', ...userDeptFilter },
         include: {
           assignments: {
-            where: { ...assignmentDateFilter },
+            where: { ...assignmentDateFilter, training: { isActive: true, publishStatus: { not: 'archived' } } },
             include: { training: { select: { title: true } }, examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true, status: true } } },
           },
           departmentRel: { select: { name: true } },
@@ -93,7 +96,7 @@ export async function GET(request: Request) {
           users: {
             where: { role: 'staff', isActive: true },
             include: {
-              assignments: { where: { ...assignmentDateFilter }, select: { status: true } },
+              assignments: { where: { ...assignmentDateFilter, training: { isActive: true, publishStatus: { not: 'archived' } } }, select: { status: true } },
             },
           },
         },

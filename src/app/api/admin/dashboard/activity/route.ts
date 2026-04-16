@@ -25,7 +25,7 @@ export async function GET() {
       prisma.trainingAssignment.findMany({
         where: {
           status: 'passed',
-          training: { organizationId: orgId },
+          training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } },
         },
         include: {
           user: { select: { id: true, firstName: true, lastName: true, departmentRel: { select: { name: true } } } },

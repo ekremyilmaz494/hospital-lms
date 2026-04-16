@@ -31,7 +31,7 @@ export async function GET(request: Request) {
       // Pre + post skoru olan attempts: öğrenme kazanımını ölçmek için
       prisma.examAttempt.findMany({
         where: {
-          training: { organizationId: orgId },
+          training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } },
           preExamScore: { not: null },
           postExamScore: { not: null },
         },
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
       // Tüm attempt'ler (pass rate için)
       prisma.examAttempt.findMany({
         where: {
-          training: { organizationId: orgId },
+          training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } },
           postExamScore: { not: null },
         },
         select: {

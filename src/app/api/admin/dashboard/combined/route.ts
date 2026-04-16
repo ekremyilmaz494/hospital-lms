@@ -10,20 +10,23 @@ async function fetchStats(orgId: string) {
   const cached = await getCached<object>(cacheKey)
   if (cached) return cached
 
+  // Archived/inactive training'ler dashboard sayımlarından dışarı
+  const trainingScope = { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } }
+
   const [staffCount, activeStaffCount, trainingCount, activeTrainingCount, statusCounts, compulsoryTrainings, overdueCount] = await Promise.all([
     prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
     prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
-    prisma.training.count({ where: { organizationId: orgId } }),
-    prisma.training.count({ where: { organizationId: orgId, isActive: true } }),
-    prisma.trainingAssignment.groupBy({ by: ['status'], where: { training: { organizationId: orgId } }, _count: true }),
+    prisma.training.count({ where: { organizationId: orgId, publishStatus: { not: 'archived' } } }),
+    prisma.training.count({ where: trainingScope }),
+    prisma.trainingAssignment.groupBy({ by: ['status'], where: { training: trainingScope }, _count: true }),
     prisma.training.findMany({
-      where: { organizationId: orgId, isCompulsory: true, isActive: true },
+      where: { ...trainingScope, isCompulsory: true },
       select: { id: true, title: true, complianceDeadline: true, regulatoryBody: true, assignments: { select: { status: true } } },
     }),
     // Geciken eğitim: süresi dolmuş ama tamamlanmamış atamalar
     prisma.trainingAssignment.count({
       where: {
-        training: { organizationId: orgId, endDate: { lt: new Date() } },
+        training: { ...trainingScope, endDate: { lt: new Date() } },
         status: { notIn: ['passed'] },
       },
     }),
@@ -87,13 +90,15 @@ async function fetchCharts(orgId: string) {
   const now = new Date()
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
 
+  const trainingScope = { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } }
+
   const [trendRaw, deptAssignments] = await Promise.all([
     prisma.trainingAssignment.findMany({
-      where: { training: { organizationId: orgId }, assignedAt: { gte: sixMonthsAgo } },
+      where: { training: trainingScope, assignedAt: { gte: sixMonthsAgo } },
       select: { status: true, assignedAt: true },
     }),
     prisma.trainingAssignment.findMany({
-      where: { training: { organizationId: orgId } },
+      where: { training: trainingScope },
       select: {
         status: true,
         user: { select: { departmentRel: { select: { name: true } } } },
@@ -149,7 +154,7 @@ async function fetchCompliance(orgId: string) {
 
   const now = new Date()
   const overdueAssignments = await prisma.trainingAssignment.findMany({
-    where: { status: { not: 'passed' }, training: { organizationId: orgId, endDate: { lt: now } } },
+    where: { status: { not: 'passed' }, training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' }, endDate: { lt: now } } },
     include: {
       user: { select: { firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
       training: { select: { title: true, endDate: true } },
@@ -181,7 +186,7 @@ async function fetchActivity(orgId: string) {
 
   const [topPerformerData, recentLogs] = await Promise.all([
     prisma.trainingAssignment.findMany({
-      where: { status: 'passed', training: { organizationId: orgId } },
+      where: { status: 'passed', training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } } },
       include: {
         user: { select: { id: true, firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
         examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, preExamScore: true } },

@@ -39,7 +39,7 @@ export async function GET() {
     const now = new Date()
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
 
-    // Tek sorguda trend data — aylık atama/tamamlama/başarısız sayıları
+    // Archived/inactive training'leri trend ve departman raporlarından dışarı al — yanıltıcı sayım önlenir
     const [trendRows, deptRows] = await Promise.all([
       prisma.$queryRaw<TrendRow[]>`
         SELECT
@@ -51,6 +51,8 @@ export async function GET() {
         FROM training_assignments ta
         JOIN trainings t ON t.id = ta.training_id
         WHERE t.organization_id = ${orgId}::uuid
+          AND t.is_active = true
+          AND t.publish_status <> 'archived'
           AND ta.assigned_at >= ${sixMonthsAgo}
         GROUP BY month_key, month_label
         ORDER BY month_key
@@ -74,6 +76,8 @@ export async function GET() {
           LIMIT 1
         ) ea ON true
         WHERE t.organization_id = ${orgId}::uuid
+          AND t.is_active = true
+          AND t.publish_status <> 'archived'
         GROUP BY d.name
       `,
     ])

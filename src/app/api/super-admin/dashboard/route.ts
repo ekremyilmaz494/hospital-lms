@@ -15,7 +15,7 @@ export async function GET() {
 
   try {
     const cached = await getCached<Record<string, unknown>>(CACHE_KEY)
-    if (cached) return jsonResponse(cached)
+    if (cached) return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 
     const [
       hospitalCount,
@@ -33,9 +33,10 @@ export async function GET() {
       prisma.organization.count({ where: { isActive: true, isSuspended: false } }),
       prisma.user.count(),
       prisma.user.count({ where: { role: 'staff' } }),
-      prisma.training.count(),
-      prisma.trainingAssignment.count(),
-      prisma.trainingAssignment.count({ where: { status: 'passed' } }),
+      // Platform sayımları: archived/inactive training'ler "aktif değil" — tutarlılık için hariç
+      prisma.training.count({ where: { isActive: true, publishStatus: { not: 'archived' } } }),
+      prisma.trainingAssignment.count({ where: { training: { isActive: true, publishStatus: { not: 'archived' } } } }),
+      prisma.trainingAssignment.count({ where: { status: 'passed', training: { isActive: true, publishStatus: { not: 'archived' } } } }),
       prisma.organizationSubscription.findMany({
         include: { plan: { select: { name: true } }, organization: { select: { name: true, code: true, isActive: true } } },
         orderBy: { createdAt: 'desc' },
@@ -44,7 +45,7 @@ export async function GET() {
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
-          _count: { select: { users: true, trainings: true } },
+          _count: { select: { users: true, trainings: { where: { isActive: true, publishStatus: { not: 'archived' } } } } },
           subscription: { include: { plan: { select: { name: true } } } },
         },
       }),
@@ -196,7 +197,7 @@ export async function GET() {
 
     await setCached(CACHE_KEY, responseData, CACHE_TTL)
 
-    return jsonResponse(responseData)
+    return jsonResponse(responseData, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
   } catch (err) {
     logger.error('SuperAdmin Dashboard', 'Dashboard verileri alınamadı', err)
     return errorResponse('Dashboard verileri alınamadı', 503)
