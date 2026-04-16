@@ -234,7 +234,7 @@
    ══════════════════════════════════════════════════════ */
 
 /* Okyanus (Ocean Blue — sky) */
-[data-color="ocean"] {
+html[data-color="ocean"] {
   --brand-50:  #f0f9ff;
   --brand-100: #e0f2fe;
   --brand-200: #bae6fd;
@@ -247,12 +247,12 @@
   --brand-900: #0c4a6e;
   --color-primary-rgb: 2, 132, 199;
 }
-.dark[data-color="ocean"] {
+html.dark[data-color="ocean"] {
   --color-primary-rgb: 56, 189, 248;
 }
 
 /* Mor (Violet) */
-[data-color="violet"] {
+html[data-color="violet"] {
   --brand-50:  #f5f3ff;
   --brand-100: #ede9fe;
   --brand-200: #ddd6fe;
@@ -265,12 +265,12 @@
   --brand-900: #4c1d95;
   --color-primary-rgb: 124, 58, 237;
 }
-.dark[data-color="violet"] {
+html.dark[data-color="violet"] {
   --color-primary-rgb: 167, 139, 250;
 }
 
 /* Gül (Rose) */
-[data-color="rose"] {
+html[data-color="rose"] {
   --brand-50:  #fff1f2;
   --brand-100: #ffe4e6;
   --brand-200: #fecdd3;
@@ -283,12 +283,12 @@
   --brand-900: #881337;
   --color-primary-rgb: 225, 29, 72;
 }
-.dark[data-color="rose"] {
+html.dark[data-color="rose"] {
   --color-primary-rgb: 251, 113, 133;
 }
 
 /* Kehribar (Amber) */
-[data-color="amber"] {
+html[data-color="amber"] {
   --brand-50:  #fffbeb;
   --brand-100: #fef3c7;
   --brand-200: #fde68a;
@@ -301,7 +301,7 @@
   --brand-900: #78350f;
   --color-primary-rgb: 180, 83, 9;
 }
-.dark[data-color="amber"] {
+html.dark[data-color="amber"] {
   --color-primary-rgb: 251, 191, 36;
 }
 
