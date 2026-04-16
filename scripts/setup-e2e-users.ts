@@ -12,6 +12,13 @@ import 'dotenv/config'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: '.env.local', override: true })
 
+// Production ortamında çalıştırılması fatal hata; yanlış DATABASE_URL ile
+// canlı veriye test kullanıcısı sızdırmayı engeller.
+if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
+  console.error('❌ E2E setup production ortamında çalıştırılamaz. NODE_ENV=development ile çalıştırın.')
+  process.exit(1)
+}
+
 const ORG_NAME = 'E2E Test Hastanesi'
 const ORG_CODE = 'E2E-TEST-001'
 

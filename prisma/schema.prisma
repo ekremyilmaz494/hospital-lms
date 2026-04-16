@@ -447,12 +447,12 @@ model ExamAttempt {
   signatureData       String?   @map("signature_data") @db.Text
   signatureIp         String?   @map("signature_ip") @db.VarChar(45)
   signatureMethod     String?   @map("signature_method") @db.VarChar(20)
-  organizationId      String?   @map("organization_id") @db.Uuid
+  organizationId      String    @map("organization_id") @db.Uuid
 
   assignment    TrainingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   user          User               @relation(fields: [userId], references: [id])
   training      Training           @relation(fields: [trainingId], references: [id])
-  organization  Organization?      @relation(fields: [organizationId], references: [id])
+  organization  Organization       @relation(fields: [organizationId], references: [id])
   examAnswers   ExamAnswer[]
   videoProgress VideoProgress[]
   certificates  Certificate[]

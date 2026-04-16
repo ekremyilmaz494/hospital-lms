@@ -4922,3 +4922,435 @@ return jsonResponse({ ..., attemptsRemaining })
 - `src/app/api/exam/[id]/submit/route.ts` — tabSwitchCount, attemptsRemaining
 
 *Son güncelleme: 15 Nisan 2026 — Oturum 45*
+
+---
+
+## Oturum 46 — 16 Nisan 2026: Admin Eğitimler Modülü Teslim Öncesi Denetim + 4 Fazlı Düzeltme
+
+**Bağlam:** Müşteri teslimi yakın (190.000 ₺/yıl kontrat, sunum hazır). `/admin/trainings/*` modülünün baştan aşağı denetlenmesi istendi: mantıksızlık, güvenlik açığı, diğer modüllerle ilişki, butonlar/bağlantılar. Çıktı: 4 faza bölünmüş düzeltme planı, her faz onaylandıkça uygulandı.
+
+**Plan dosyası:** `~/.claude/plans/misty-hopping-eich.md` — tam denetim raporu + modül haritası.
+
+---
+
+### 1. Denetim Yaklaşımı — 3 Paralel Explore Ajanı
+
+| Ajan | Odak |
+|---|---|
+| A | UI route'lar, butonlar, form validasyonu, sidebar entegrasyonu |
+| B | API/server katmanı, Prisma şema, multi-tenant güvenlik, cross-module coupling |
+| C | Staff tarafı, end-to-end journey, mobile/i18n, mevcut HATA raporları |
+
+**Kritik ders:** Ajanların 2 "kritik" iddiası dosya doğrulamasında **yanlış pozitif** çıktı. Her iddiayı plana almadan önce kodu okudum:
+
+| Ajan iddiası | Gerçek | Kanıt |
+|---|---|---|
+| `admin/trainings/page.tsx` kategori filtresi bozuk | Çalışıyor | `page.tsx:71` — filtre doğru |
+| `questions/[questionId]` cross-tenant IDOR | Düzeltilmiş | `route.ts:17-18, 62-63` org+training FK check |
+
+**Çıkarım:** Güvenlik raporları tarihlidir; sabit liste gibi alınamaz. Bu ders memory'ye yazıldı (doğrulama kuralı).
+
+---
+
+### 2. Faz 1 — Güvenlik + Görsel (3 madde)
+
+| # | Sorun | Dosya | Çözüm |
+|---|---|---|---|
+| 5.1 | Videos GET endpoint cross-tenant ihlali | `api/admin/trainings/[id]/videos/route.ts:16` | `where: { trainingId, training: { organizationId } }` nested filter |
+| 5.5 | 4 not-found.tsx'te Türkçe diacritic hataları | `admin/trainings/(not-found\|[id]/not-found\|[id]/edit/not-found\|new/not-found).tsx` | "Bulunamadi" → "Bulunamadı", "Aradiginiz" → "Aradığınız", vb. |
+| 5.7 | Certificate POST attempt-user-training tutarsızlığı | `api/admin/certificates/route.ts:155-162` | Attempt.userId === userId && Attempt.trainingId === trainingId check |
+
+**Not (5.7):** Plan orijinal olarak "cross-org validation eksik" demişti ama kod zaten güvenliydi (her iki entity aynı org filter'ından geçiyor). Gerçek sorun attempt integrity idi — doğru olanı düzelttim. `feedback_challenge_ideas` memory'si uyarınca kullanıcıya hata bildirdim.
+
+---
+
+### 3. Faz 2 — UX + Validation (3 madde)
+
+#### 5.2 — "Yeni Hak Ver" butonuna Dialog onayı
+**Dosya:** `admin/trainings/[id]/page.tsx`
+- State: `resetTarget: { userId, name } | null` + `resetting: boolean`
+- Button click → state set → Dialog açılır → onay + loading + hata mesajını API'den alıyor
+
+#### 5.3 — Wizard adım-bazlı validation
+**Dosya:** `admin/trainings/new/page.tsx`
+- `validateStep(step: number): string | null` fonksiyonu eklendi
+- Adım 1: başlık, kategori, tarih mantığı, baraj 0-100, deneme 1-10, süre 1-600, zorunlu alan koşulları
+- Adım 2: `uploadProgress` boş + tüm videoların url'i dolu + başlık kontrolü
+- Adım 3: her soru metni, tüm 4 seçenek dolu, puan ≥1, doğru cevap 0-3 arası
+- "Sonraki Adım" butonu `goToNextStep()` çağırıyor — hatalı adımda toast + engelle
+- "Eğitimi Yayınla" son adımda 3 adımı baştan valide ediyor, hatalıysa `setCurrentStep(step)` ile geri dönüyor
+
+#### 5.4 — Edit sayfası validation
+**Dosya:** `admin/trainings/[id]/edit/page.tsx`
+- `validate(d: TrainingEditData): string | null` — 6 alan
+- handleSave çağrısı önünde `if (!formData) return` null-guard
+
+---
+
+### 4. Faz 3 — Canlı DB Migration (5.6)
+
+**Amaç:** `ExamAttempt.organizationId` `String?` → `String` (NOT NULL). Schema'da nullable olmasına rağmen tüm kod dolu olduğunu varsayıyordu — silent isolation breakage riski.
+
+**Akış:**
+
+| Adım | Komut | Sonuç |
+|---|---|---|
+| 1. Teşhis | `SELECT COUNT(*)...` | 148 kayıt, 2 null, 146 dolu |
+| 2. İnceleme | Training+User FK join | Her iki null kayıt da `training_org === user_org` (demo data kalıntısı) |
+| 3. Backfill | `UPDATE ea SET org_id = t.org_id FROM trainings t WHERE ea.training_id = t.id AND ea.org_id IS NULL` | 2 kayıt güncellendi |
+| 4. Doğrulama | `SELECT COUNT WHERE org_id IS NULL` | 0 |
+| 5. Migration | `ALTER TABLE exam_attempts ALTER COLUMN organization_id SET NOT NULL` (Supabase MCP apply_migration) | Başarılı |
+| 6. Schema | `organizationId String?` → `String`, `organization Organization?` → `Organization` | `pnpm db:generate` OK |
+| 7. TS hataları | Compile-time'da 5 yer yakalandı | Düzeltildi |
+
+**Düzeltilen 5 TS hatası (schema NOT NULL sonrası):**
+
+| Dosya | Satır | Değişiklik |
+|---|---|---|
+| `api/exam/[id]/start/route.ts` | 148 | `dbUser!.organizationId` → `dbUser!.organizationId!` |
+| `api/exam/[id]/start/route.ts` | 174 | aynı |
+| `prisma/seed-demo-200.ts` | 421 | `organizationId: org.id` eklendi |
+| `prisma/seed-demo-200.ts` | 574 | aynı |
+| `prisma/seed.ts` | 615 | aynı |
+
+**Çıkarım:** Schema zorlaması runtime'a kaçabilecek null insert risklerini compile-time'da yakaladı.
+
+---
+
+### 5. Faz 4 — Orta Öncelik UX + Güvenlik (6 madde)
+
+| # | Sorun | Dosya | Çözüm |
+|---|---|---|---|
+| 6.1 | Liste silmede `window.confirm()` | `admin/trainings/page.tsx` | İki aşamalı Dialog: normal onay + 409 durumunda force onay |
+| 6.2 | Soru wizard'ında "Kütüphaneden Ekle" disabled butonu | `admin/trainings/new/page.tsx:1092-1099` | Tamamen kaldırıldı (feature hazır değil) |
+| 6.3 | Departman arama input uncontrolled | `admin/trainings/new/page.tsx` | `deptSearch` state + `toLocaleLowerCase('tr-TR')` Türkçe filter |
+| 6.4 | "Detay" butonu `opacity-0 group-hover:opacity-100` | `admin/trainings/[id]/page.tsx:~349` | Her zaman görünür yapıldı |
+| 6.9 | Ölü component'ler | `admin/trainings/components/*` | 2 dosya + boş klasör silindi |
+| 6.12 | Video upload contentType allow-list yoktu (XSS) | `api/admin/trainings/[id]/videos/route.ts:67-78` | Regex bazlı allow-list: video/mp4, pdf, audio/mpeg... — eşleşmezse 400 |
+
+**6.3 detay:** JS default `toLowerCase()` Türkçe "İ" → "i̇" üretir ve eşleşmez. `toLocaleLowerCase('tr-TR')` Türkçe locale ile doğru eşleştirme yapar.
+
+**6.12 detay:** S3 presigned URL imzalanırken `Content-Type` sabit kalıyor. Allow-list yokken admin `text/html` ile imza isteyip CloudFront üzerinden XSS yükleyebilirdi. Regex'ler: `video/(mp4|webm|quicktime|x-matroska|ogg)`, `application/pdf`, `audio/(mpeg|mp4|mp3|ogg|wav|webm|x-m4a|aac)`.
+
+---
+
+### 6. Erteleme / Karar Bekleyenler
+
+| # | Konu | Neden ertelendi |
+|---|---|---|
+| 6.5 | Bulk assignment rate-limit | Scope kararı gerekiyor |
+| 6.6 | AssignStaffModal `limit=1000` → pagination | 1000+ personelli hastane müşteri kapsamında mı? |
+| 6.7 | Atama e-posta bildirimi | Yeni feature, müşteriye sorulmalı |
+| 6.10 | Cron stale attempt → TrainingAssignment.status fix | Backend akış mantığı değişikliği |
+| 6.11 | SMG upsert race condition | Düşük etkili, deterministic değil |
+| 6.13 | PDF rapor Türkçe karakter transliterasyonu | jsPDF font embed değişikliği gerekir |
+
+---
+
+### 7. Kullanıcı Tarafında Keşfedilen Pre-existing Sorun
+
+Bu oturumdan **bağımsız** olarak, `pnpm tsc --noEmit` çıktısında 3 dosyada **merge conflict marker** (TS1185) var:
+- `src/app/auth/forgot-password/page.tsx` (satır 37, 46, 59)
+- `src/app/auth/reset-password/page.tsx` (satır 23, 45, 78, 105, 108, 118)
+- `src/app/marketing/layout.tsx` (satır 3, 281, 282)
+
+Teslim öncesi ayrıca çözülmesi gerekir (build'i bloklar).
+
+---
+
+### 8. Diğer Modüllerle İlişki Haritası (özet)
+
+Denetimde çıkarılan tam harita plan dosyasında. Ana bulgular:
+
+- ✅ **Trainings ↔ Certificates** — otomatik, submit sonrası fire-and-forget
+- ✅ **Trainings ↔ Exams** — modülün kalbi
+- ✅ **Trainings ↔ Feedback (EY.FR.40)** — pending feedback lock ile entegre
+- ✅ **Trainings ↔ SMG** — smgPoints > 0 ise SmgActivity upsert
+- ✅ **Trainings ↔ Content Library / AI Studio** — sourceLibraryId FK
+- ✅ **Trainings ↔ Departments** — DepartmentTrainingRule
+- ⚠️ **Trainings ↔ Notifications** — in-app var, **e-posta yok** (6.7)
+- ⚠️ **Trainings ↔ Super Admin Reports** — orgId=null filter bug (BACKEND_HATA_RAPORU.md)
+- ❌ **Trainings ↔ Competency Matrix** — otomatik bağ yok, manuel admin işi
+
+---
+
+### 9. Doğrulama
+
+Her faz sonrası:
+- `pnpm tsc --noEmit` — trainings/certificates/exam'de 0 yeni hata
+- `pnpm lint` — 0 error, 236 pre-existing warning (değişmedi)
+- DB'de `is_nullable=NO` kontrol edildi
+
+Manuel test **henüz yapılmadı** — kullanıcı dev server başlatıp aşağıdakileri test edebilir:
+- Wizard'da boş soru/seçenek ile "Sonraki Adım" → engel
+- Başarısız personel "Yeni Hak Ver" → Dialog
+- Silme akışı → iki aşamalı Dialog
+- `/admin/trainings/olmayan-id` → Türkçe 404
+
+---
+
+### Değiştirilen Dosyalar
+
+**Production kod (11 dosya):**
+- `src/app/api/admin/trainings/[id]/videos/route.ts` — 5.1 org scope + 6.12 contentType allow-list
+- `src/app/api/admin/certificates/route.ts` — 5.7 attempt consistency
+- `src/app/api/exam/[id]/start/route.ts` — 5.6 TS null assertion
+- `src/app/admin/trainings/not-found.tsx` — 5.5
+- `src/app/admin/trainings/[id]/not-found.tsx` — 5.5
+- `src/app/admin/trainings/[id]/edit/not-found.tsx` — 5.5
+- `src/app/admin/trainings/new/not-found.tsx` — 5.5
+- `src/app/admin/trainings/page.tsx` — 6.1 Dialog
+- `src/app/admin/trainings/[id]/page.tsx` — 5.2 Dialog + 6.4 opacity
+- `src/app/admin/trainings/new/page.tsx` — 5.3 validation + 6.2 button sil + 6.3 controlled input
+- `src/app/admin/trainings/[id]/edit/page.tsx` — 5.4 validation
+
+**Schema + seed (3 dosya):**
+- `prisma/schema.prisma` — ExamAttempt.organizationId NOT NULL
+- `prisma/seed.ts` — organizationId eklendi
+- `prisma/seed-demo-200.ts` — 2 yerde organizationId eklendi
+
+**Silinen (2 dosya + 1 klasör):**
+- `src/app/admin/trainings/components/library-content-picker.tsx`
+- `src/app/admin/trainings/components/library-question-picker.tsx`
+- `src/app/admin/trainings/components/` (boş klasör)
+
+**DB (canlı Supabase — pkkkyyajfmusurcoovwt):**
+- `exam_attempts.organization_id` backfill (2 kayıt)
+- Migration `exam_attempts_organization_id_not_null` uygulandı
+
+---
+
+---
+
+## Oturum 47 — 16 Nisan 2026: Migration Drift Tespiti + Tamiri + CI Koruması
+
+**Bağlam:** Kullanıcı "migration nedir?" sorusuyla başladı, sonra tüm migration'ların mantık/bütünlük denetimini istedi. Denetim kritik bir **schema drift** ortaya çıkardı: `schema.prisma` ile `prisma/migrations/` arasında 8 tablo ve 40+ kolon fark vardı. Prod çalışıyordu çünkü kolonlar `db push` ile elle eklenmişti — ama fresh Supabase ortamı, preview branch veya disaster recovery kurulamazdı. Müşteri teslimi öncesi (SaaS olarak sunum) halledildi.
+
+---
+
+### 1. Migration Audit — 18 Dosyalık Derin İnceleme
+
+Tüm migration'lar tek tek okundu ve `schema.prisma` + prod DB (Supabase MCP) ile karşılaştırıldı. Tespit edilen sorunlar:
+
+| # | Sorun | Etki |
+|---|---|---|
+| 1 | Schema drift: 8 tablo (`payments`, `invoices`, `content_library`, `ai_notebooks`, `ai_generations`, `question_bank`, `push_subscriptions`, `kvkk_requests` + alt tablolar) migrations'ta yok | Fresh deploy imkansız |
+| 2 | 40+ kolon drift: SCORM, SSO, AI içerik, KVKK alanları schema'da var, migration'da yok | Fresh deploy imkansız |
+| 3 | `20260415150000_kvkk_compliance` — `UPDATE kvkk_consent_date` kolonu init migration'ında yok | Fresh DB'de migration çöker |
+| 4 | `ExamAttempt.organizationId` schema'da `NOT NULL`, DB'de `nullable` | Silent tenant isolation riski |
+| 5 | `users.department` (eski VARCHAR) schema'dan kaldırıldı ama DB'de kaldı | Legacy kolon, data temizlenmemiş |
+| 6 | `users_tc_no_key` + `users_organization_id_tc_no_key` index kalıntısı (KVKK'da tc_no DROP edildi) | Stale unique index |
+
+---
+
+### 2. Kök Sebep — `db push` vs `db migrate` Karmaşası
+
+Geliştirme sürecinde hızlı prototipleme için `pnpm db:push` kullanılmış. Bu komut şemayı direkt DB'ye yazar, **migration dosyası üretmez**. Zamanla:
+
+- `schema.prisma` → 30+ model'e büyüdü
+- `prisma/migrations/` → 18 dosyada kaldı
+- Prod DB → `db push` sayesinde her iki kaynağın "ileri versiyonunu" taşıyordu
+
+**Ders:** `db push` sadece lokal deneme içindir. Şema kararlıysa `prisma migrate dev --name <x>` zorunlu. Aksi takdirde rollback yolu yok, yeni ortam kurulamaz, schema'nın "git history'si" yok olur.
+
+---
+
+### 3. Plan A — Drift Catch-Up (Squash reddedildi)
+
+**Plan dosyası:** `~/.claude/plans/mutable-puzzling-truffle.md`
+
+İki seçenek değerlendirildi:
+- **Plan B (Squash):** 18 migration'ı tek başlangıç migration'ına birleştir → prod `_prisma_migrations` tablosuna elle dokunmak gerek → 102 canlı kullanıcılı DB için riskli → **reddedildi**
+- **Plan A (Drift catch-up):** Eksik tablo/kolon/FK'leri `IF NOT EXISTS` ile sarılmış yeni bir migration'a ekle → mevcut prod'a dokunma → **onaylandı**
+
+---
+
+### 4. Faz 1 — KVKK Migration İdempotent Fix
+
+**Dosya:** `prisma/migrations/20260415150000_kvkk_compliance/migration.sql`
+
+Problemli UPDATE:
+```sql
+UPDATE "users" SET "kvkk_notice_acknowledged_at" = kvkk_consent_date ...
+```
+
+`DO $$` bloğuyla sarıldı — `kvkk_consent_date` kolonu yoksa (fresh DB'de) UPDATE skip edilir:
+
+```sql
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'kvkk_consent_date'
+  ) THEN
+    EXECUTE 'UPDATE "users" SET "kvkk_notice_acknowledged_at" = kvkk_consent_date
+             WHERE kvkk_consent = true AND kvkk_consent_date IS NOT NULL';
+  END IF;
+END $$;
+```
+
+---
+
+### 5. Faz 2 — Schema Drift Catch-Up Migration (2538 satır)
+
+**Dosya:** `prisma/migrations/20260416130000_schema_drift_catchup/migration.sql`
+
+**Üretim süreci:**
+1. İlk deneme: `prisma migrate diff --from-migrations ... --to-schema-datamodel ...` → **Prisma 7'de flag rename** (`--to-schema-datamodel` kaldırıldı, `--to-schema` oldu)
+2. İkinci deneme: shadow DB gerekti → Supabase branching denendi → **Free plan branching'i desteklemiyor** (Pro gerekir)
+3. Çözüm: `--from-empty --to-schema` ile tam şemayı üret + Python script ile her `CREATE TABLE` → `CREATE TABLE IF NOT EXISTS`, her `ALTER TABLE ADD COLUMN` → `IF NOT EXISTS`, FK'ler `DO $$ ... EXCEPTION WHEN duplicate_object` ile sarıldı
+4. Windows cp1254 encoding hatası (Python'da `→` unicode ok karakteri) → ASCII `->` ile değiştirildi
+5. `CREATE TABLE IF NOT EXISTS`'in mevcut tabloya kolon eklemediği fark edildi → script v2: her tablo için CREATE + eksik kolonlar için ADD COLUMN IF NOT EXISTS
+
+**Sonuç:** 15+ tablo + 40+ kolon + indeksler + FK'ler — her biri idempotent.
+
+---
+
+### 6. Faz 3 — ExamAttempt.organizationId NOT NULL
+
+**Dosya:** `prisma/migrations/20260416140000_exam_attempts_org_not_null/migration.sql`
+
+```sql
+-- Backfill (idempotent)
+UPDATE exam_attempts SET organization_id = (
+  SELECT organization_id FROM trainings WHERE id = exam_attempts.training_id
+) WHERE organization_id IS NULL;
+
+ALTER TABLE exam_attempts ALTER COLUMN organization_id SET NOT NULL;
+
+-- FK'yi RESTRICT'e çevir (org silinince attempt'ler orphan kalmasın)
+ALTER TABLE exam_attempts DROP CONSTRAINT IF EXISTS exam_attempts_organization_id_fkey;
+ALTER TABLE exam_attempts ADD CONSTRAINT exam_attempts_organization_id_fkey
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE RESTRICT ON UPDATE CASCADE;
+```
+
+---
+
+### 7. Faz 4 — Legacy Cleanup
+
+**Dosya:** `prisma/migrations/20260416150000_cleanup_legacy_columns/migration.sql`
+
+```sql
+ALTER TABLE "users" DROP COLUMN IF EXISTS "department";  -- departments tablosuna taşındı
+DROP INDEX IF EXISTS "users_tc_no_key";                   -- tc_no KVKK'da DROP edildi
+DROP INDEX IF EXISTS "users_organization_id_tc_no_key";   -- aynı, partial unique kalıntısı
+```
+
+---
+
+### 8. Prod Senkronizasyonu — Supabase MCP Doğrulama
+
+Supabase MCP ile 15 tablo ve kolon sayıları karşılaştırıldı — tümü schema.prisma ile eşleşti. Sonra `pnpm prisma migrate deploy` çalıştırıldı:
+
+- Drift catch-up migration: no-op (her şey zaten vardı, `IF NOT EXISTS` sayesinde)
+- NOT NULL constraint: temiz uygulandı
+- Legacy cleanup: `users.department` drop edildi, stale index'ler kaldırıldı
+- **Sonuç:** "Database schema is up to date!" — 21/21 migration applied
+
+Planın 6-7. adımları (SMG targets duplicate cleanup + exam_attempts millisecond tie cleanup) **atlandı** — SQL ile kontrol edildi, migration'lar zaten temiz uygulanmıştı, cleanup gereksizdi.
+
+---
+
+### 9. E2E Helper Fix — Cookie Consent Banner
+
+**Sorun:** `e2e/helpers/auth.ts:81` — `page.click('button[type="submit"]')` intercept ediliyor. 8 login testi aynı satırda fail veriyordu.
+
+**Kök sebep:** `src/components/shared/cookie-consent.tsx` — login sayfasında 1 saniye gecikmeyle açılan `fixed bottom-0 z-[9999]` banner, submit butonu üstünü kapatıyor. KVKK modal'ı DEĞİL — cookie consent banner.
+
+**Fix:** `page.addInitScript` ile goto'dan ÖNCE `localStorage.setItem('lms_cookie_consent', 'true')` → banner hiç render olmuyor, race ortadan kalkıyor. Dismiss yaklaşımından daha temiz (visible beklemek yerine önlem almak).
+
+---
+
+### 10. CI Drift Detector + CLAUDE.md Sertleştirmesi
+
+Bu sorunun bir daha yaşanmaması için **3 katmanlı savunma**:
+
+#### Katman 1 — CI Drift Detector (`.github/workflows/ci.yml`)
+
+`ci` job'una postgres:17 service container + drift step eklendi:
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    env: { POSTGRES_USER: ci, POSTGRES_PASSWORD: ci, POSTGRES_DB: ci_shadow }
+    ports: [5432:5432]
+    options: >- --health-cmd pg_isready --health-interval 10s ...
+
+# Step:
+- name: Migration drift check
+  env:
+    SHADOW_DB_URL: postgresql://ci:ci@localhost:5432/ci_shadow  # secret-scanner-disable-line
+  run: |
+    pnpm prisma migrate diff \
+      --from-migrations ./prisma/migrations \
+      --to-schema ./prisma/schema.prisma \
+      --shadow-database-url "$SHADOW_DB_URL" \
+      --exit-code
+```
+
+`--exit-code` bayrağı drift varsa exit 2 → PR bloklanır.
+
+**Secret scanner false positive:** `ci:ci@localhost` URL'ini yakaladı — env var'a taşıyıp `# secret-scanner-disable-line` ile bypass edildi (mevcut ci.yml'deki konvansiyon).
+
+#### Katman 2 — Pre-commit Hook (opsiyonel, sonraki sprint)
+
+`scripts/schema-migration-check.js` — `schema.prisma` değişmişse `prisma/migrations/` altında yeni klasör olup olmadığını kontrol et. Şimdilik atlandı, test edilmesi gerekiyor.
+
+#### Katman 3 — CLAUDE.md Sertleştirmesi
+
+3 nokta güncellendi:
+- Komut tablosu: `pnpm db:push` → "⚠️ YASAK — sadece tek seferlik yerel deneme. Migration dosyası üretmez, drift yaratır."
+- Veritabanı bölümü: `pnpm db:migrate dev --name <isim>` ZORUNLU kuralı + Nisan 2026 drift referansı + CI drift detector notu
+- Kural #10: "Her şema değişikliğinde `db:migrate dev` öner — `db:push` ASLA önerme"
+
+---
+
+### 11. Commit'ler + Deploy
+
+| SHA | Mesaj | Dosyalar |
+|---|---|---|
+| `016b283` | `fix(db): repair migration drift + idempotency for fresh deploys` | 4 migration (1 edit + 3 yeni) |
+| `fa7a55c` | `fix(e2e): dismiss cookie consent banner before login submit` | `e2e/helpers/auth.ts` |
+| `86f7cab` | `ci(db): add migration drift detector + harden CLAUDE.md against db push` | `.github/workflows/ci.yml` + `CLAUDE.md` |
+
+Vercel deploy başarılı, smoke test geçti (login + eğitim listesi + sınav başlatma).
+
+---
+
+### 12. Alınan Dersler (Öğretici Notlar)
+
+1. **`db push` ≠ `db migrate`** — biri prototip, diğeri production. Karıştırılırsa yeni ortam kurulamaz.
+2. **Prod çalışıyor olması drift olmadığı anlamına gelmez** — drift "yeni ortam kurma testi"nde ortaya çıkar.
+3. **Migration'lar idempotent olmalı** — fresh DB + mevcut prod aynı dosyayı çalıştırabilmeli. `IF EXISTS`, `IF NOT EXISTS`, `DO $$ ... EXCEPTION` zorunlu.
+4. **Shadow DB yerine mantık kopyası** — Supabase branching Pro gerektiriyor, onun yerine `--from-empty --to-schema` + Python transform ile aynı sonuç.
+5. **Swiss cheese güvenlik modeli** — tek katman yetmez: CI (PR blok) + pre-commit (local blok) + kural (ekip bilinci). Biri atlanırsa diğeri yakalar.
+6. **Secret scanner false positive'leri** — konvansiyon bypass (`# secret-scanner-disable-line`) + env var'a taşıma kombinasyonu en temiz çözüm.
+7. **`page.addInitScript` > dismiss** — race condition'ı önleyen en temiz Playwright pattern'i. Banner'ı görünmeden önlemek, görünüp kapatmaktan iyidir.
+
+---
+
+### Değiştirilen Dosyalar
+
+**Migration'lar (4 dosya):**
+- `prisma/migrations/20260415150000_kvkk_compliance/migration.sql` — edit (idempotent DO block)
+- `prisma/migrations/20260416130000_schema_drift_catchup/migration.sql` — YENİ (2538 satır)
+- `prisma/migrations/20260416140000_exam_attempts_org_not_null/migration.sql` — YENİ
+- `prisma/migrations/20260416150000_cleanup_legacy_columns/migration.sql` — YENİ
+
+**Test altyapı (1 dosya):**
+- `e2e/helpers/auth.ts` — addInitScript ile cookie consent bypass
+
+**CI + Dokümantasyon (2 dosya):**
+- `.github/workflows/ci.yml` — postgres service + drift check step
+- `CLAUDE.md` — 3 noktada `db push` yasağı + `db:migrate dev` zorunluluğu
+
+**DB (canlı Supabase — pkkkyyajfmusurcoovwt):**
+- 21/21 migration applied (3 yeni migration uygulandı)
+- `exam_attempts.organization_id` → NOT NULL
+- `users.department` DROP
+- Stale unique index'ler DROP
+
+---
+
+*Son güncelleme: 16 Nisan 2026 — Oturum 47*

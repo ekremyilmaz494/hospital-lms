@@ -12,6 +12,15 @@ import Link from 'next/link';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface Training {
   id: string;
@@ -55,6 +64,8 @@ export default function TrainingsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Training | null>(null);
+  const [forceTarget, setForceTarget] = useState<{ training: Training; activeAttemptCount: number } | null>(null);
 
   if (isLoading) {
     return <PageLoading />;
@@ -90,20 +101,18 @@ export default function TrainingsPage() {
     }
   };
 
-  const handleDelete = async (training: Training) => {
-    if (!window.confirm(`"${training.title}" eğitimini silmek istediğinize emin misiniz?`)) return;
+  const confirmDelete = async (training: Training, force = false) => {
     setDeletingId(training.id);
     try {
-      let res = await fetch(`/api/admin/trainings/${training.id}`, { method: 'DELETE' });
+      const url = force ? `/api/admin/trainings/${training.id}?force=true` : `/api/admin/trainings/${training.id}`;
+      const res = await fetch(url, { method: 'DELETE' });
 
-      if (res.status === 409) {
+      if (!force && res.status === 409) {
         const data = await res.json().catch(() => null) as { requiresConfirmation?: boolean; activeAttemptCount?: number } | null;
         if (data?.requiresConfirmation) {
-          const proceed = window.confirm(
-            `${data.activeAttemptCount} personelin devam eden sınavı var. Yine de silmek (arşivlemek) istiyor musunuz? Devam eden sınavlar iptal edilecek.`
-          );
-          if (!proceed) { setDeletingId(null); return; }
-          res = await fetch(`/api/admin/trainings/${training.id}?force=true`, { method: 'DELETE' });
+          setDeleteTarget(null);
+          setForceTarget({ training, activeAttemptCount: data.activeAttemptCount ?? 0 });
+          return;
         }
       }
 
@@ -112,6 +121,8 @@ export default function TrainingsPage() {
         throw new Error(data?.error || data?.message || `Silme başarısız (HTTP ${res.status})`);
       }
       toast(`"${training.title}" silindi`, 'success');
+      setDeleteTarget(null);
+      setForceTarget(null);
       refetch();
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Eğitim silinirken hata oluştu', 'error');
@@ -252,7 +263,7 @@ export default function TrainingsPage() {
                 <X className="h-4 w-4" style={{ color: 'var(--color-info)' }} /> Arşivle
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem className="gap-2 text-red-500" disabled={deletingId === row.original.id} onClick={() => handleDelete(row.original)}>
+            <DropdownMenuItem className="gap-2 text-red-500" disabled={deletingId === row.original.id} onClick={() => setDeleteTarget(row.original)}>
               <Trash2 className="h-4 w-4" /> {deletingId === row.original.id ? 'Siliniyor...' : 'Sil'}
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -349,6 +360,48 @@ export default function TrainingsPage() {
           <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz eğitim oluşturulmadı. İlk eğitimi ekleyerek başlayın.</div>
         )}
       </div>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !deletingId) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eğitimi sil</DialogTitle>
+            <DialogDescription>
+              &quot;{deleteTarget?.title}&quot; eğitimini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={!!deletingId} onClick={() => setDeleteTarget(null)}>Vazgeç</Button>
+            <Button
+              disabled={!!deletingId}
+              style={{ background: 'var(--color-error)', color: 'white' }}
+              onClick={() => deleteTarget && confirmDelete(deleteTarget, false)}
+            >
+              {deletingId ? 'Siliniyor...' : 'Evet, sil'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!forceTarget} onOpenChange={(open) => { if (!open && !deletingId) setForceTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Devam eden sınavlar var</DialogTitle>
+            <DialogDescription>
+              {forceTarget?.activeAttemptCount} personelin bu eğitimde devam eden sınavı bulunuyor. Yine de silmek (arşivlemek) istiyor musunuz? Devam eden sınavlar iptal edilecek.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={!!deletingId} onClick={() => setForceTarget(null)}>Vazgeç</Button>
+            <Button
+              disabled={!!deletingId}
+              style={{ background: 'var(--color-error)', color: 'white' }}
+              onClick={() => forceTarget && confirmDelete(forceTarget.training, true)}
+            >
+              {deletingId ? 'Siliniyor...' : 'Yine de sil'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

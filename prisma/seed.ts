@@ -612,6 +612,7 @@ async function main() {
         assignmentId: assignment.id,
         userId: assignment.userId,
         trainingId: assignment.trainingId,
+        organizationId: org.id,
         attemptNumber: 1,
         preExamScore: 80.0,
         postExamScore: 90.0,

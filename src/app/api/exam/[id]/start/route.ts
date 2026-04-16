@@ -20,7 +20,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       userId: dbUser!.id,
       training: { organizationId: dbUser!.organizationId! },
     },
-    include: { training: true },
+    select: {
+      id: true,
+      trainingId: true,
+      status: true,
+      currentAttempt: true,
+      maxAttempts: true,
+      training: {
+        select: {
+          startDate: true,
+          endDate: true,
+          examOnly: true,
+          title: true,
+        },
+      },
+    },
   })
 
   if (!assignment) return errorResponse('Eğitim atanması bulunamadı', 404)
@@ -145,7 +159,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           assignmentId,
           userId: dbUser!.id,
           trainingId: assignment.trainingId,
-          organizationId: dbUser!.organizationId,
+          organizationId: dbUser!.organizationId!,
           attemptNumber: newAttemptNumber,
           status: 'post_exam',
           postExamStartedAt: new Date(),
@@ -171,7 +185,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         assignmentId,
         userId: dbUser!.id,
         trainingId: assignment.trainingId,
-        organizationId: dbUser!.organizationId,
+        organizationId: dbUser!.organizationId!,
         attemptNumber: newAttemptNumber,
         status: initialStatus,
         ...(skipPreExam

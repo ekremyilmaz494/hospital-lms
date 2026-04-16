@@ -56,7 +56,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     description?: string
     durationSeconds: number
     sortOrder?: number
-    mediaType?: 'video' | 'pdf'
+    mediaType?: 'video' | 'pdf' | 'audio'
     pageCount?: number
   }>(request)
 
@@ -65,6 +65,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const mediaType = body.mediaType || 'video'
+
+  const allowedContentTypes: Record<'video' | 'pdf' | 'audio', RegExp> = {
+    video: /^video\/(mp4|webm|quicktime|x-matroska|ogg)$/i,
+    pdf: /^application\/pdf$/i,
+    audio: /^audio\/(mpeg|mp4|mp3|ogg|wav|webm|x-m4a|aac)$/i,
+  }
+  const allowedRe = allowedContentTypes[mediaType as 'video' | 'pdf' | 'audio']
+  if (!allowedRe || !allowedRe.test(body.contentType)) {
+    return errorResponse('Desteklenmeyen dosya tipi. Yalnızca video, PDF ve ses dosyaları yüklenebilir.', 400)
+  }
+
   const key = mediaType === 'pdf'
     ? documentKey(dbUser!.organizationId!, id, body.filename)
     : videoKey(dbUser!.organizationId!, id, body.filename)
