@@ -28,9 +28,9 @@ pnpm test:e2e -- --grep "login"                     # İsimle filtre
 
 # Prisma
 pnpm db:generate  # Client generate → src/generated/prisma
-pnpm db:migrate   # Migration çalıştır
+pnpm db:migrate   # Migration çalıştır (şema değişikliğinde ZORUNLU)
 pnpm db:studio    # DB GUI
-pnpm db:push      # Schema'yı DB'ye zorla senkronize et (dev)
+pnpm db:push      # ⚠️ YASAK — sadece tek seferlik yerel deneme. Migration dosyası üretmez, drift yaratır.
 
 # Scriptler
 node scripts/seed-demo.js        # Demo data
@@ -139,10 +139,14 @@ return jsonResponse(data, 200, { 'Cache-Control': 'private, max-age=30' });
 - Form işlemleri Server Actions ile
 - Her route için `loading.tsx`, `error.tsx`, `not-found.tsx`
 
-### Veritabanı
+### Veritabanı (KRİTİK)
 - Ham SQL yerine Prisma Client
 - Transaction gerektiren işlemlerde `prisma.$transaction()`
-- Schema değişikliği → `pnpm db:generate` + `pnpm db:migrate`
+- **Şema değişikliği workflow'u:** `pnpm db:migrate dev --name <açıklayıcı-isim>` ZORUNLU. Bu komut hem `schema.prisma`'yı hem `prisma/migrations/`'ı senkron tutar + Prisma client'ı yeniden üretir
+- **`pnpm db:push` YASAK** — migration dosyası üretmez, prod DB ile `migrations/` arasında drift yaratır (Nisan 2026'da 8 tablo + 40 kolon drift oldu, fresh ortam kurulumunu kırdı)
+- Her `schema.prisma` commit'inde `prisma/migrations/` altında yeni klasör olmalı
+- Migration SQL'i fresh DB'de çalışmalı: `UPDATE`/`ALTER` için `IF EXISTS` veya `DO $$` bloğu kullan
+- CI'da drift detector çalışır (`.github/workflows/ci.yml` → "Migration drift check"). Drift varsa PR merge edilemez
 
 ### UI / Frontend
 - Mevcut shadcn/ui component'lerini kullan, sıfırdan yazma
@@ -250,7 +254,7 @@ Her kod değişikliğinden sonra sırayla uygula. Kullanıcıdan onay bekleme:
 7. Hata mesajları Türkçe
 8. Güvenlik açığı gördüğünde hemen uyar
 9. Önemli değişiklikten sonra test yazmayı hatırlat
-10. Her şema değişikliğinden sonra `pnpm db:generate` + `pnpm db:push` hatırlat
+10. Her şema değişikliğinde `pnpm db:migrate dev --name <isim>` öner — `db:push` ASLA önerme (drift yaratır)
 
 ---
 
