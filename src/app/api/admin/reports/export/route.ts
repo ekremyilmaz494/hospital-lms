@@ -152,7 +152,7 @@ export async function GET(request: Request) {
   if (roleError) return roleError
 
   const allowed = await checkRateLimit(`report-export:${dbUser!.organizationId}`, 5, 60)
-  if (!allowed) return errorResponse('Cok fazla disa aktarma istegi. Lutfen bekleyin.', 429)
+  if (!allowed) return errorResponse('Çok fazla dışa aktarma isteği. Lütfen bekleyin.', 429)
 
   const orgId = dbUser!.organizationId!
   const { searchParams } = new URL(request.url)
@@ -651,6 +651,6 @@ export async function GET(request: Request) {
     })
   } catch (err) {
     logger.error('report-export', 'Export failed', { error: err })
-    return errorResponse('Rapor disa aktarma sirasinda hata olustu', 500)
+    return errorResponse('Rapor dışa aktarma sırasında hata oluştu', 500)
   }
 }

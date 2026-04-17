@@ -19,15 +19,20 @@ import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
+type StaffStatus = 'star' | 'normal' | 'risk' | 'new';
+type FailureStatus = 'failed' | 'locked';
+
 interface ReportsData {
   overviewStats: { title: string; value: number | string; icon: string; accentColor: string; trend?: { value: number; label: string; isPositive: boolean } }[];
   monthlyData: { month: string; tamamlanan: number; basarisiz: number }[];
   trainingData: { name: string; atanan: number; tamamlayan: number; basarili: number; basarisiz: number; ort: number }[];
-  staffPerformance: { name: string; dept: string; completed: number; avgScore: number; status: string; color: string }[];
+  staffPerformance: { name: string; dept: string; completed: number; avgScore: number; status: StaffStatus; color: string }[];
   departmentData: { dept: string; personel: number; tamamlanma: number; ortPuan: number; basarisiz: number; color: string }[];
-  failureData: { name: string; dept: string; training: string; attempts: number; lastScore: number; status: string; assignmentId: string }[];
+  failureData: { name: string; dept: string; training: string; attempts: number; maxAttempts: number; lastScore: number; status: FailureStatus; assignmentId: string }[];
   durationData: { training: string; video: number; sinav: number }[];
   scoreComparisonData: { training: string; fullTitle: string; preScore: number; postScore: number; improvement: number; sampleSize: number }[];
+  availableDepartments: { id: string; name: string }[];
+  truncated: { trainings: { shown: number; total: number } | null; staff: { shown: number; total: number } | null };
 }
 
 const iconMap: Record<string, typeof Users> = { GraduationCap, Users, Target, Award };
@@ -49,15 +54,17 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
   const filterQuery = useMemo(() => {
     const p = new URLSearchParams();
     if (dateFrom) p.set('from', new Date(dateFrom).toISOString());
     if (dateTo) p.set('to', new Date(dateTo + 'T23:59:59').toISOString());
+    if (departmentId) p.set('departmentId', departmentId);
     return p.toString() ? `?${p.toString()}` : '';
-  }, [dateFrom, dateTo]);
-  const hasFilters = !!(dateFrom || dateTo);
+  }, [dateFrom, dateTo, departmentId]);
+  const hasFilters = !!(dateFrom || dateTo || departmentId);
 
   const { data, isLoading, error, refetch } = useFetch<ReportsData>(`/api/admin/reports${filterQuery}`);
 
@@ -69,6 +76,7 @@ export default function ReportsPage() {
       const params = new URLSearchParams({ format });
       if (dateFrom) params.set('from', new Date(dateFrom).toISOString());
       if (dateTo) params.set('to', new Date(dateTo + 'T23:59:59').toISOString());
+      if (departmentId) params.set('departmentId', departmentId);
       const res = await fetch(`/api/admin/reports/export?${params.toString()}`);
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
@@ -104,6 +112,10 @@ export default function ReportsPage() {
   const failureData = data?.failureData ?? [];
   const durationData = data?.durationData ?? [];
   const scoreComparisonData = data?.scoreComparisonData ?? [];
+  const availableDepartments = data?.availableDepartments ?? [];
+  const truncated = data?.truncated ?? { trainings: null, staff: null };
+  const hasTruncation = !!(truncated.trainings || truncated.staff);
+  const lockedCount = failureData.filter(f => f.status === 'locked').length;
 
   return (
     <div className="space-y-6">
@@ -129,13 +141,13 @@ export default function ReportsPage() {
           {hasFilters && <span className="rounded-full bg-current/20 px-1.5 py-0.5 text-xs">aktif</span>}
         </button>
         {hasFilters && (
-          <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }} className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); setDepartmentId(''); }} className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
             <X className="h-3 w-3" /> Filtreleri Temizle
           </button>
         )}
       </div>
       {showFilters && (
-        <div className="flex items-center gap-4 rounded-xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+        <div className="flex flex-wrap items-center gap-4 rounded-xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Başlangıç:</label>
             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
@@ -147,6 +159,33 @@ export default function ReportsPage() {
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
               className="h-9 rounded-lg border px-3 text-sm"
               style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }} />
+          </div>
+          {availableDepartments.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Departman:</label>
+              <select value={departmentId} onChange={e => setDepartmentId(e.target.value)}
+                className="h-9 rounded-lg border px-3 text-sm"
+                style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}>
+                <option value="">Tümü</option>
+                {availableDepartments.map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
+      {hasTruncation && (
+        <div className="flex items-start gap-3 rounded-xl p-4" style={{ background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning)' }}>
+          <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-warning)' }} />
+          <div className="flex-1 text-xs">
+            <p className="font-semibold" style={{ color: 'var(--color-warning)' }}>Veri kırpıldı — filtre uygulayın</p>
+            <p className="mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+              {truncated.trainings && <>{truncated.trainings.total} eğitimden {truncated.trainings.shown} tanesi gösteriliyor. </>}
+              {truncated.staff && <>{truncated.staff.total} personelden {truncated.staff.shown} tanesi gösteriliyor. </>}
+              Daha doğru sonuç için tarih aralığı veya departman filtresi uygulayın.
+            </p>
           </div>
         </div>
       )}
@@ -198,7 +237,7 @@ export default function ReportsPage() {
                 <div className="rounded-2xl border p-6 h-full" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
                   <h3 className="text-sm font-bold mb-4">En İyi Performans</h3>
                   <div className="space-y-3">
-                    {staffPerformance.filter(s => s.status === 'star').slice(0, 4).map((s, i) => (
+                    {staffPerformance.filter(s => s.status === 'star').sort((a, b) => b.avgScore - a.avgScore).slice(0, 4).map((s, i) => (
                       <div key={s.name} className="flex items-center gap-3">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: i === 0 ? 'var(--color-accent)' : 'var(--color-border)' }}>{i + 1}</span>
                         <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">{s.name}</p><p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{s.dept}</p></div>
@@ -209,13 +248,28 @@ export default function ReportsPage() {
                   <div className="my-4 h-px" style={{ background: 'var(--color-border)' }} />
                   <h3 className="text-sm font-bold mb-4 flex items-center gap-2"><AlertTriangle className="h-3.5 w-3.5" style={{ color: 'var(--color-error)' }} />Risk Altında</h3>
                   <div className="space-y-3">
-                    {staffPerformance.filter(s => s.status === 'risk').length > 0 ? staffPerformance.filter(s => s.status === 'risk').map((s) => (
-                      <div key={s.name} className="flex items-center gap-3">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'var(--color-error-bg)' }}><TrendingDown className="h-3 w-3" style={{ color: 'var(--color-error)' }} /></div>
-                        <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">{s.name}</p><p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{s.dept}</p></div>
-                        <span className="text-sm font-bold font-mono" style={{ color: 'var(--color-error)' }}>{s.avgScore}%</span>
-                      </div>
-                    )) : <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Risk altında personel yok</p>}
+                    {(() => {
+                      const riskList = staffPerformance.filter(s => s.status === 'risk').sort((a, b) => a.avgScore - b.avgScore);
+                      if (riskList.length === 0) {
+                        return <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Risk altında personel yok</p>;
+                      }
+                      const visible = riskList.slice(0, 5);
+                      const remaining = riskList.length - visible.length;
+                      return <>
+                        {visible.map((s) => (
+                          <div key={s.name} className="flex items-center gap-3">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'var(--color-error-bg)' }}><TrendingDown className="h-3 w-3" style={{ color: 'var(--color-error)' }} /></div>
+                            <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">{s.name}</p><p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{s.dept}</p></div>
+                            <span className="text-sm font-bold font-mono" style={{ color: 'var(--color-error)' }}>{s.avgScore}%</span>
+                          </div>
+                        ))}
+                        {remaining > 0 && (
+                          <button type="button" onClick={() => setActiveTab('staff')} className="w-full rounded-lg px-3 py-2 text-xs font-semibold hover:bg-(--color-surface-hover)" style={{ color: 'var(--color-error)', background: 'var(--color-error-bg)' }}>
+                            +{remaining} kişi daha — tümünü gör →
+                          </button>
+                        )}
+                      </>;
+                    })()}
                   </div>
                 </div>
               </BlurFade>
@@ -329,11 +383,11 @@ export default function ReportsPage() {
 
       {activeTab === 'failure' && (
         <div className="space-y-6">
-          {failureData.filter(f => f.status === 'locked').length > 0 && (
+          {lockedCount > 0 && (
             <BlurFade delay={0.05}>
               <div className="flex items-center gap-4 rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, var(--color-error), #991b1b)', boxShadow: '0 4px 20px rgba(220, 38, 38, 0.2)' }}>
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}><AlertTriangle className="h-6 w-6 text-white" /></div>
-                <div><p className="text-lg font-bold text-white">{failureData.filter(f => f.status === 'locked').length} personel kilitlendi</p><p className="text-sm text-white/70">3 deneme hakkını tüketen personeller yeni hak bekliyor</p></div>
+                <div><p className="text-lg font-bold text-white">{lockedCount} personel kilitlendi</p><p className="text-sm text-white/70">Tüm deneme haklarını tüketen personeller yeni hak bekliyor</p></div>
               </div>
             </BlurFade>
           )}
@@ -346,10 +400,19 @@ export default function ReportsPage() {
                     <tbody>
                       {failureData.map((f, i) => (
                         <tr key={i} className="transition-colors duration-100 hover:bg-(--color-surface-hover)" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                          <td className="px-5 py-4 text-sm font-semibold">{f.name}</td>
+                          <td className="px-5 py-4 text-sm font-semibold">
+                            <div className="flex items-center gap-2">
+                              {f.name}
+                              {f.status === 'locked' && (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>
+                                  <AlertTriangle className="h-2.5 w-2.5" /> KİLİTLİ
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-4 py-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>{f.dept}</td>
                           <td className="px-4 py-4 text-sm">{f.training}</td>
-                          <td className="px-4 py-4 text-sm font-mono font-semibold" style={{ color: 'var(--color-error)' }}>{f.attempts}/3</td>
+                          <td className="px-4 py-4 text-sm font-mono font-semibold" style={{ color: 'var(--color-error)' }}>{f.attempts}/{f.maxAttempts}</td>
                           <td className="px-4 py-4 text-sm font-mono font-bold" style={{ color: 'var(--color-error)' }}>{f.lastScore}%</td>
                           <td className="px-4 py-4">
                             <Button size="sm" className="gap-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: 'var(--color-primary)' }} onClick={async () => {
