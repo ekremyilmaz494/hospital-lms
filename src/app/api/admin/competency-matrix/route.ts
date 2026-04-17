@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
   try {
     const result = await withCache(cacheKey, 300, async () => {
-    const [staff, totalStaffCount, trainings] = await Promise.all([
+    const [staff, totalStaffCount, trainings, allDepartments] = await Promise.all([
       prisma.user.findMany({
         where: staffWhere,
         skip,
@@ -48,24 +48,18 @@ export async function GET(request: Request) {
           id: true,
           firstName: true,
           lastName: true,
-          title: true,
-          departmentRel: { select: { name: true, color: true } },
+          departmentRel: { select: { id: true, name: true } },
           assignments: {
             where: { training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } } },
             select: {
               trainingId: true,
               status: true,
-              completedAt: true,
               examAttempts: {
                 orderBy: { attemptNumber: 'desc' },
                 take: 1,
-                select: { postExamScore: true, isPassed: true },
+                select: { postExamScore: true },
               },
             },
-          },
-          certificates: {
-            where: { training: { organizationId: orgId } },
-            select: { trainingId: true, issuedAt: true, expiresAt: true },
           },
         },
         orderBy: [{ lastName: 'asc' }],
@@ -73,65 +67,51 @@ export async function GET(request: Request) {
       prisma.user.count({ where: staffWhere }),
       prisma.training.findMany({
         where: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } },
-        select: { id: true, title: true, category: true, isCompulsory: true, passingScore: true },
-        orderBy: [{ isCompulsory: 'desc' }, { category: 'asc' }, { title: 'asc' }],
+        select: { id: true, title: true, isCompulsory: true },
+        orderBy: [{ isCompulsory: 'desc' }, { title: 'asc' }],
+      }),
+      prisma.department.findMany({
+        where: { organizationId: orgId, isActive: true },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
       }),
     ])
 
     // Matris oluştur: her personel için her eğitimin durumu
     const matrix = staff.map(s => {
       const assignmentMap = new Map(s.assignments.map(a => [a.trainingId, a]))
-      const certMap = new Map(s.certificates.map(c => [c.trainingId, c]))
 
       const cells = trainings.map(t => {
         const assignment = assignmentMap.get(t.id)
-        const cert = certMap.get(t.id)
-
         if (!assignment) {
-          return { trainingId: t.id, state: 'unassigned' as const }
+          return { trainingId: t.id, state: 'unassigned' as const, score: null }
         }
-
         const score = assignment.examAttempts[0]?.postExamScore
           ? Number(assignment.examAttempts[0].postExamScore)
           : null
-
-        let certStatus: 'valid' | 'expiring' | 'expired' | null = null
-        if (cert?.expiresAt) {
-          const daysLeft = Math.ceil((new Date(cert.expiresAt).getTime() - Date.now()) / 86400000)
-          certStatus = daysLeft < 0 ? 'expired' : daysLeft <= 30 ? 'expiring' : 'valid'
-        } else if (cert) {
-          certStatus = 'valid'
-        }
-
         return {
           trainingId: t.id,
           state: assignment.status as string,
           score,
-          completedAt: assignment.completedAt?.toISOString() ?? null,
-          certStatus,
-          certExpiresAt: cert?.expiresAt?.toISOString() ?? null,
         }
       })
 
+      const passedCount = s.assignments.filter(a => a.status === 'passed').length
       return {
         id: s.id,
         name: `${s.firstName} ${s.lastName}`,
-        title: s.title,
         department: s.departmentRel?.name ?? '',
-        departmentColor: s.departmentRel?.color ?? '#0d9668',
         cells,
-        // Özet istatistikler
-        totalAssigned: s.assignments.length,
-        totalPassed: s.assignments.filter(a => a.status === 'passed').length,
         completionRate: s.assignments.length > 0
-          ? Math.round((s.assignments.filter(a => a.status === 'passed').length / s.assignments.length) * 100)
+          ? Math.round((passedCount / s.assignments.length) * 100)
           : 0,
       }
     })
 
     return {
-      trainings: trainings.map(t => ({ id: t.id, title: t.title, category: t.category, isCompulsory: t.isCompulsory })),
+      trainings: trainings.map(t => ({ id: t.id, title: t.title, isCompulsory: t.isCompulsory })),
       staff: matrix,
+      departments: allDepartments,
       summary: {
         totalStaff: totalStaffCount,
         totalTrainings: trainings.length,

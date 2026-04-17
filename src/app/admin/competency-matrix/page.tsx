@@ -1,19 +1,24 @@
 'use client';
 
-import { CheckCircle, XCircle, Clock, Minus, AlertTriangle, ArrowRight, Search } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Minus, AlertTriangle, Search, Lock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-interface Cell { trainingId: string; state: string; score?: number | null; certStatus?: string | null }
+interface Cell { trainingId: string; state: string; score?: number | null }
 interface StaffRow { id: string; name: string; department: string; cells: Cell[]; completionRate: number }
 interface Training { id: string; title: string; isCompulsory: boolean }
+interface Department { id: string; name: string }
 interface MatrixData {
   trainings: Training[];
   staff: StaffRow[];
-  summary: { totalStaff: number; totalTrainings: number; compulsoryTrainings: number }
+  departments: Department[];
+  summary: { totalStaff: number; totalTrainings: number; compulsoryTrainings: number };
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 const stateConfig: Record<string, { icon: typeof CheckCircle; bg: string; border: string; color: string; label: string }> = {
@@ -21,27 +26,51 @@ const stateConfig: Record<string, { icon: typeof CheckCircle; bg: string; border
   failed:      { icon: XCircle,     bg: 'var(--color-error-bg)',    border: 'var(--color-error)',    color: 'var(--color-error)',    label: 'Başarısız' },
   in_progress: { icon: Clock,       bg: 'var(--color-warning-bg)', border: 'var(--color-warning)', color: 'var(--color-warning)', label: 'Devam' },
   assigned:    { icon: Clock,       bg: 'var(--color-info-bg)',     border: 'var(--color-info)',     color: 'var(--color-info)',     label: 'Atandı' },
+  locked:      { icon: Lock,        bg: 'var(--color-error-bg)',    border: 'var(--color-error)',    color: 'var(--color-error)',    label: 'Kilitli' },
   unassigned:  { icon: Minus,       bg: 'transparent',              border: 'var(--color-border)',   color: 'var(--color-text-muted)', label: 'Atanmadı' },
 };
 
 const nameHue = (name: string) => name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
 
 export default function CompetencyMatrixPage() {
-  const { data, isLoading } = useFetch<MatrixData>('/api/admin/competency-matrix');
-  const [deptFilter, setDeptFilter] = useState('all');
-  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [departmentId, setDepartmentId] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  if (isLoading) return <PageLoading />;
+  // Search için 300ms debounce — her tuş vuruşunda API'ye gitme
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  // Filtre değişince ilk sayfaya dön — render sırasında senkron reset (useEffect yerine)
+  const filterKey = `${debouncedSearch}|${departmentId}`;
+  const [lastFilterKey, setLastFilterKey] = useState(filterKey);
+  if (filterKey !== lastFilterKey) {
+    setLastFilterKey(filterKey);
+    setPage(1);
+  }
+
+  const url = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (departmentId) params.set('departmentId', departmentId);
+    return `/api/admin/competency-matrix?${params.toString()}`;
+  }, [page, debouncedSearch, departmentId]);
+
+  const { data, isLoading } = useFetch<MatrixData>(url);
+
+  if (isLoading && !data) return <PageLoading />;
 
   const trainings = data?.trainings ?? [];
   const staff = data?.staff ?? [];
-  const departments = [...new Set(staff.map(s => s.department))].sort();
-
-  const filtered = staff.filter(s => {
-    const matchesDept = deptFilter === 'all' || s.department === deptFilter;
-    const matchesSearch = search.trim() === '' || s.name.toLowerCase().includes(search.toLowerCase());
-    return matchesDept && matchesSearch;
-  });
+  const departments = data?.departments ?? [];
+  const totalStaff = data?.summary.totalStaff ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+  const currentPage = data?.page ?? page;
+  const isFiltered = Boolean(debouncedSearch || departmentId);
 
   const summaryCards = [
     { label: 'Toplam Personel', value: data?.summary.totalStaff ?? 0, color: 'var(--color-primary)', bg: 'var(--color-primary-light)', icon: '👥' },
@@ -52,7 +81,7 @@ export default function CompetencyMatrixPage() {
   return (
     <div className="space-y-6">
       <BlurFade delay={0}>
-        <PageHeader title="Yetkinlik Matrisi" subtitle={`${staff.length} personel × ${trainings.length} eğitim`} />
+        <PageHeader title="Yetkinlik Matrisi" subtitle={`${totalStaff} personel × ${trainings.length} eğitim`} />
       </BlurFade>
 
       {/* Summary cards */}
@@ -95,8 +124,8 @@ export default function CompetencyMatrixPage() {
             <input
               type="text"
               placeholder="Personel ara…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
               className="w-full bg-transparent text-sm outline-none"
               style={{ color: 'var(--color-text-primary)' }}
             />
@@ -104,8 +133,8 @@ export default function CompetencyMatrixPage() {
 
           {/* Department filter */}
           <select
-            value={deptFilter}
-            onChange={e => setDeptFilter(e.target.value)}
+            value={departmentId}
+            onChange={e => setDepartmentId(e.target.value)}
             className="rounded-xl border px-3 py-2 text-sm font-medium outline-none"
             style={{
               background: 'var(--color-surface)',
@@ -114,14 +143,17 @@ export default function CompetencyMatrixPage() {
               cursor: 'pointer',
             }}
           >
-            <option value="all">Tüm Departmanlar ({staff.length})</option>
-            {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            <option value="">Tüm Departmanlar</option>
+            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
 
-          {filtered.length !== staff.length && (
+          {isFiltered && (
             <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-              {filtered.length} sonuç
+              {totalStaff} sonuç
             </span>
+          )}
+          {isLoading && data && (
+            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Yükleniyor…</span>
           )}
         </div>
       </BlurFade>
@@ -188,7 +220,7 @@ export default function CompetencyMatrixPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s, si) => {
+                {staff.map((s, si) => {
                   const rate = s.completionRate;
                   const rateColor = rate >= 80 ? 'var(--color-success)' : rate >= 50 ? 'var(--color-warning)' : 'var(--color-error)';
                   const hue = nameHue(s.name);
@@ -196,7 +228,7 @@ export default function CompetencyMatrixPage() {
                     <tr
                       key={s.id}
                       style={{
-                        borderBottom: si < filtered.length - 1 ? '1px solid var(--color-border)' : 'none',
+                        borderBottom: si < staff.length - 1 ? '1px solid var(--color-border)' : 'none',
                         transition: 'background 0.15s',
                       }}
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg)')}
@@ -278,9 +310,40 @@ export default function CompetencyMatrixPage() {
             </table>
           </div>
 
-          {filtered.length === 0 && (
+          {staff.length === 0 && (
             <div className="py-16 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
               Personel bulunamadı
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div
+              className="flex items-center justify-between px-5 py-3"
+              style={{ borderTop: '1px solid var(--color-border)' }}
+            >
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                Sayfa {currentPage} / {totalPages} · toplam {totalStaff} kayıt
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1 || isLoading}
+                  className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Önceki
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages || isLoading}
+                  className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                >
+                  Sonraki <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           )}
         </div>

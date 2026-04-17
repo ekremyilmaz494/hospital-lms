@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
   try {
     // Bağımsız sorgular paralel — DB round-trip: 2 → 1
-    const [attempts, allAttempts] = await Promise.all([
+    const [gainAttempts, allAttempts] = await Promise.all([
       // Pre + post skoru olan attempts: öğrenme kazanımını ölçmek için
       prisma.examAttempt.findMany({
         where: {
@@ -37,19 +37,14 @@ export async function GET(request: Request) {
         },
         select: {
           trainingId: true,
-          attemptNumber: true,
           preExamScore: true,
           postExamScore: true,
-          isPassed: true,
           postExamCompletedAt: true,
-          training: {
-            select: { title: true, category: true, isCompulsory: true },
-          },
         },
-        orderBy: { postExamCompletedAt: 'asc' },
+        orderBy: { postExamCompletedAt: 'desc' },
         take: 2000,
       }),
-      // Tüm attempt'ler (pass rate için)
+      // Tüm post-exam attempt'leri — pass rate, post-score ort. ve trend bu kaynaktan
       prisma.examAttempt.findMany({
         where: {
           training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } },
@@ -60,13 +55,16 @@ export async function GET(request: Request) {
           isPassed: true,
           postExamScore: true,
           postExamCompletedAt: true,
+          training: {
+            select: { title: true, category: true, isCompulsory: true },
+          },
         },
         orderBy: { postExamCompletedAt: 'desc' },
         take: 2000,
       }),
     ])
 
-    // Training bazlı gruplama
+    // Training bazlı gruplama — allAttempts'ten inşa (tüm denemeler dahil)
     const trainingMap = new Map<
       string,
       {
@@ -78,14 +76,11 @@ export async function GET(request: Request) {
         gains: number[]
         passCount: number
         failCount: number
-        monthlyData: Record<string, { pass: number; fail: number; avgPost: number; count: number }>
       }
     >()
 
-    for (const a of attempts) {
-      const pre = Number(a.preExamScore)
+    for (const a of allAttempts) {
       const post = Number(a.postExamScore)
-
       if (!trainingMap.has(a.trainingId)) {
         trainingMap.set(a.trainingId, {
           title: a.training.title,
@@ -96,67 +91,43 @@ export async function GET(request: Request) {
           gains: [],
           passCount: 0,
           failCount: 0,
-          monthlyData: {},
         })
       }
-
       const entry = trainingMap.get(a.trainingId)!
-      entry.preScores.push(pre)
       entry.postScores.push(post)
-      entry.gains.push(post - pre)
       if (a.isPassed) entry.passCount++
       else entry.failCount++
-
-      // Aylık trend
-      if (a.postExamCompletedAt) {
-        const month = a.postExamCompletedAt.toISOString().slice(0, 7) // "YYYY-MM"
-        if (!entry.monthlyData[month]) {
-          entry.monthlyData[month] = { pass: 0, fail: 0, avgPost: 0, count: 0 }
-        }
-        const md = entry.monthlyData[month]
-        md.count++
-        md.avgPost = md.avgPost + (post - md.avgPost) / md.count // running avg
-        if (a.isPassed) md.pass++
-        else md.fail++
-      }
     }
 
-    // Pass rate için allAttempts de ekle (pre skoru olmayan denemeler için)
-    for (const a of allAttempts) {
-      if (!trainingMap.has(a.trainingId)) continue // zaten yukarıda eklenmişse atla
-      // sadece aylık trend için
+    // Pre+post olan denemeler: sadece öğrenme kazanımı için
+    for (const a of gainAttempts) {
+      const entry = trainingMap.get(a.trainingId)
+      if (!entry) continue // olmamalı ama savunmacı
+      const pre = Number(a.preExamScore)
+      const post = Number(a.postExamScore)
+      entry.preScores.push(pre)
+      entry.gains.push(post - pre)
     }
 
     const avg = (arr: number[]) =>
       arr.length === 0 ? null : Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 10) / 10
 
+    // Kategori agregasyonunda çift yuvarlama olmasın diye ham passCount'u yan map'te tutuyoruz
+    const rawPassCountByTraining = new Map<string, number>()
     const trainingEffectiveness = Array.from(trainingMap.entries()).map(([id, d]) => {
       const total = d.passCount + d.failCount
       const passRate = total > 0 ? Math.round((d.passCount / total) * 100) : 0
-      const avgPre = avg(d.preScores)
-      const avgPost = avg(d.postScores)
-      const avgGain = avg(d.gains)
-
-      const monthlyTrend = Object.entries(d.monthlyData)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([month, md]) => ({
-          month,
-          passRate: md.count > 0 ? Math.round((md.pass / md.count) * 100) : 0,
-          avgPostScore: Math.round(md.avgPost * 10) / 10,
-          attemptCount: md.count,
-        }))
-
+      rawPassCountByTraining.set(id, d.passCount)
       return {
         id,
         title: d.title,
         category: d.category,
         isCompulsory: d.isCompulsory,
-        avgPreScore: avgPre,
-        avgPostScore: avgPost,
-        avgLearningGain: avgGain,
+        avgPreScore: avg(d.preScores),
+        avgPostScore: avg(d.postScores),
+        avgLearningGain: avg(d.gains),
         passRate,
         totalAttempts: total,
-        monthlyTrend,
       }
     })
 
@@ -164,7 +135,7 @@ export async function GET(request: Request) {
     trainingEffectiveness.sort((a, b) => (b.avgLearningGain ?? 0) - (a.avgLearningGain ?? 0))
 
     // Genel özet
-    const allGains = attempts.map(a => Number(a.postExamScore) - Number(a.preExamScore))
+    const allGains = gainAttempts.map(a => Number(a.postExamScore) - Number(a.preExamScore))
     const allPassCount = allAttempts.filter(a => a.isPassed).length
     const overallPassRate =
       allAttempts.length > 0 ? Math.round((allPassCount / allAttempts.length) * 100) : 0
@@ -195,7 +166,7 @@ export async function GET(request: Request) {
       gm.sumPost += Number(a.postExamScore)
       if (a.isPassed) gm.pass++
     }
-    for (const a of attempts) {
+    for (const a of gainAttempts) {
       if (!a.postExamCompletedAt) continue
       const key = getGroupKey(a.postExamCompletedAt)
       if (!globalGrouped[key]) continue
@@ -215,7 +186,7 @@ export async function GET(request: Request) {
         attemptCount: gm.total,
       }))
 
-    // Kategori bazlı özet
+    // Kategori bazlı özet — ham passCount ile, çift yuvarlama drift'i olmadan
     const categoryMap: Record<
       string,
       { count: number; sumGain: number; gainCount: number; pass: number; total: number }
@@ -225,7 +196,7 @@ export async function GET(request: Request) {
       if (!categoryMap[cat]) categoryMap[cat] = { count: 0, sumGain: 0, gainCount: 0, pass: 0, total: 0 }
       categoryMap[cat].count++
       categoryMap[cat].total += t.totalAttempts
-      categoryMap[cat].pass += Math.round(t.passRate * t.totalAttempts / 100)
+      categoryMap[cat].pass += rawPassCountByTraining.get(t.id) ?? 0
       if (t.avgLearningGain !== null) {
         categoryMap[cat].sumGain += t.avgLearningGain
         categoryMap[cat].gainCount++
