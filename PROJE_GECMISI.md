@@ -5598,4 +5598,105 @@ Lint warning'ler değişmedi. Build/test bu oturumda çalıştırılmadı (TypeS
 
 ---
 
-*Son güncelleme: 17 Nisan 2026 — Oturum 49*
+## Oturum 50 — 17 Nisan 2026: Yetkinlik/Etkinlik Denetimi + Prisma 7 Drift Tamiri + Prod Deploy Otomasyonu
+
+### Bağlam
+Yarın ilk müşteri canlıya alınacak. Session üç büyük dilime bölündü: (1) yetkinlik matrisi + etkinlik analizi sayfalarında veri doğruluğu denetimi, (2) Prisma 7 migration drift'inin temizlenmesi + Prisma 7 breaking change'lerine uyum, (3) canlı deploy için otomasyon (migrate-on-prod script + label-gated auto-merge) + üç aşamalı deploy fail chain'in çözülmesi.
+
+### 1. Yetkinlik Matrisi & Etkinlik Analizi Denetimi
+**Tespitler:**
+- `competency-matrix` full-table client-side pagination → büyük org'larda tüm veri transfer ediliyordu.
+- `effectiveness` API'si `allAttempts` ile `attempts` map'lerini karıştırıyordu — kategori ortalamaları yanlış kaynaktan besleniyordu.
+- Kategori pass-rate çift yuvarlama: önce eğitim bazında `Math.round`, sonra kategori ortalamasında tekrar round.
+- `monthlyTrend` payload tüketilmiyor ama hesaplanıyordu (ölü yük).
+- Kullanılmayan client alanları: `certStatus`, `completedAt`, `isPassed`, `passingScore`, `title`, `category`, `departmentColor`.
+
+**Çözümler:**
+- `src/app/admin/competency-matrix/page.tsx` — server-side pagination + debounced search + `locked` state (`Lock` icon).
+- `src/app/api/admin/competency-matrix/route.ts` — `allDepartments` query, ölü payload temizlendi.
+- `src/app/api/admin/effectiveness/route.ts` — `trainingMap` `allAttempts`'tan yeniden kuruldu, `attempts` → `gainAttempts` rename, `rawPassCountByTraining: Map` ile double-round fix, `monthlyTrend` kaldırıldı.
+
+### 2. Prisma 7 Migration Drift'i (18 tablo + 5 FK)
+`prisma migrate diff --from-migrations --to-schema-datamodel`:
+- 18 model `@default(uuid())` kullanıyordu ama migration'lar `gen_random_uuid()` ile yazılmıştı. Prisma 7 bunu drift sayıyor.
+- 5 FK relation'ın DB'de adı vardı ama schema'da `map:` yoktu.
+
+**Çözüm (sıfır DB değişikliği):**
+```
+@default(uuid()) → @default(dbgenerated("gen_random_uuid()"))
+@relation(...) → @relation(..., map: "<fk_name>")
+```
+18 model: AccreditationReport, AccreditationStandard, CompetencyAnswer, CompetencyCategory, CompetencyEvaluation, CompetencyForm, CompetencyItem, HisIntegration, SmgActivity, SmgCategory, SmgPeriod, SmgTarget, SyncLog, TrainingFeedback{Answer, Category, Form, Item, Response}. 5 FK: SmgActivity/SmgCategory/SmgTarget ilişkileri.
+
+**Prisma 7 breaking change'leri:**
+- `prisma migrate dev --shadow-database-url=...` flag kaldırıldı → `prisma.config.ts` içinde `datasource: { shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"] }` field'ına taşındı.
+- `SHADOW_DB_URL` env ismi → `SHADOW_DATABASE_URL` (config field adıyla eşleşmesi için). CI workflow güncellendi.
+
+### 3. Rules of Hooks İhlali — featured-trainings-section
+`useTransform` conditional JSX içinde çağrılıyordu (map callback'te). Component en üstüne hoist edildi.
+
+### 4. İkili Vercel Projesi Temizliği
+Repo hem `hospital-lms` hem `hospital-lms-uajo` projesine bağlıydı. Eksik env'li `hospital-lms` silindi, `hospital-lms-uajo` → `hospital-lms` olarak rename edildi. `.vercel/project.json` güncellendi: projectId `prj_noHKG2OM1X2CoGg0IUFMWYfcDA3C`.
+
+**Gotcha:** Rename sonrası canlı domain hâlâ `hospital-lms-uajo.vercel.app` — `hospital-lms.vercel.app` alias'ı otomatik re-assign olmadı.
+
+### 5. Otomatik Migration (migrate-on-prod.js)
+**Problem:** Build komutuna `prisma migrate deploy` direkt koymak PR preview build'lerinde de tetikliyor → prod DB'ye ghost migration denemesi.
+
+**Çözüm:** `scripts/migrate-on-prod.js` — saf Node.js:
+```js
+if (process.env.VERCEL_ENV === 'production') {
+  execSync('prisma migrate deploy', { stdio: 'inherit' });
+} else {
+  console.log('skip');
+}
+```
+`package.json` build: `node scripts/migrate-on-prod.js && prisma generate && next build`. Local Windows build'te `VERCEL_ENV` unset → skip. Preview → skip. Production → migration.
+
+### 6. Label-Gated Auto-Merge Workflow
+**Problem:** Solo geliştirici + canlı müşteri. Her PR otomatik merge riskli ama her PR manuel merge yorucu.
+
+**Çözüm:** `.github/workflows/auto-merge.yml` — sadece repo owner'ın PR'larında + `auto-merge` label'ı varsa `gh pr merge --auto --squash --delete-branch`. Trivial fix → label ekle, otomatik merge. Kritik değişiklik → label'sız, manuel review.
+
+### 7. Üç Aşamalı Prod Deploy Fail Chain
+**Aşama 1 — P1001 IPv6:** `Can't reach db.<ref>.supabase.co:5432` — Supabase direct host IPv6-only, Vercel IPv4. Fix: DIRECT_URL session pooler'a.
+
+**Aşama 2 — Tenant not found:** Pooler username'e project ref eklenmemiş. Fix: `postgres` → `postgres.pkkkyyajfmusurcoovwt`.
+
+**Aşama 3 — Yanlış cluster:** Fix: `aws-0-eu-central-1` → `aws-1-eu-central-1`. Supabase dashboard'dan Session pooler URI kopyalanarak doğrulandı.
+
+**Final DIRECT_URL:** Session pooler URI → `aws-1-eu-central-1.pooler.supabase.com:5432` host + project-id (user+password redacted)
+
+Build log: `Applying migration 20260417120000_add_feedback_snapshot` + `All migrations have been successfully applied`.
+
+### 8. Prod Sağlık Doğrulaması
+`hospital-lms-uajo.vercel.app` otomatik curl sweep — tüm public 200, tüm auth-gated 307/401 (hiç 500 yok), feedback endpoint'leri 401 (migration kanıt), warm TTFB 319ms, cache HIT, CSP aktif.
+
+### Güvenlik İhmali
+DIRECT_URL screenshot'ında password (`14521452Aa.14521452`) açıkça görünüyordu. Rotation müşteri demosu sonrasına ertelendi. Rotation: Supabase → Settings → Database → Reset password → DATABASE_URL + DIRECT_URL güncelle → Redeploy.
+
+### Alınan Dersler
+1. **Prisma 7 `@default(uuid())` ≠ `gen_random_uuid()`** — önceki migration'lar DB-side generate kullandıysa schema'ya `dbgenerated()` yaz.
+2. **FK relation'lara `map:` zorunlu** — DB'de constraint adı varsa schema'da da `map:` ile tanımla.
+3. **Supabase pooler host'u cluster-spesifik** — aws-0/aws-1/aws-2 projeye göre. Dashboard'dan kopyala, tahmin etme.
+4. **Pooler username'de project ref zorunlu** — `postgres.<ref>` formatı.
+5. **DIRECT_URL direct host (IPv6-only) Vercel'den erişilemez** — session pooler (port 5432) zorunlu. Transaction pooler (6543) migrate için çalışmaz.
+6. **`VERCEL_ENV === 'production'` guard** — build script'te env guard'lı Node script. Preview build'lerin prod DB'ye dokunmasını engeller.
+7. **Label-gated auto-merge** — solo + canlı müşteri kombosu için ideal.
+8. **useTransform koşulsuz çağrılmalı** — conditional JSX'te değil, component top-level'da.
+9. **Vercel project rename alias'ı otomatik taşımaz** — eski alias projeyle birlikte kalır.
+10. **Screenshot güvenliği** — env var editör'ünde password bazen plain text görünür, paylaşmadan önce maskele.
+
+### Değiştirilen Dosyalar
+**API & sayfa:** `src/app/admin/competency-matrix/page.tsx`, `src/app/api/admin/competency-matrix/route.ts`, `src/app/api/admin/effectiveness/route.ts`, `src/app/api/exam/[id]/scorm/tracking/route.ts`, `src/components/landing/featured-trainings-section.tsx`.
+**Schema & config:** `prisma/schema.prisma`, `prisma.config.ts`, `.github/workflows/ci.yml`.
+**Deploy otomasyonu:** `scripts/migrate-on-prod.js` (yeni), `package.json`, `.github/workflows/auto-merge.yml` (yeni), `.vercel/project.json`.
+
+### Açık Kalan İşler (Demo Sonrası)
+1. Supabase DB password rotate + env var güncelle + redeploy.
+2. `auto-merge` label-gated workflow PR'ını merge et.
+3. `hospital-lms.vercel.app` alias'ını manuel register (isteğe bağlı).
+
+---
+
+*Son güncelleme: 17 Nisan 2026 — Oturum 50*
