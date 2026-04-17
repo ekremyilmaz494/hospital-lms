@@ -51,7 +51,7 @@ export default function StaffDetailPage() {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
   }
 
-  if (!staff) {
+  if (!staff || !id) {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Personel bulunamadı</div></div>;
   }
 
@@ -148,10 +148,10 @@ export default function StaffDetailPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {trainingHistory.map((t, i) => {
+                      {trainingHistory.map((t) => {
                         const st = statusMap[t.status] || statusMap.assigned;
                         return (
-                          <tr key={i} className="clickable-row" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                          <tr key={t.trainingId} className="clickable-row" style={{ borderBottom: '1px solid var(--color-border)' }}>
                             <td className="px-3 py-3 font-semibold">{t.title}</td>
                             <td className="px-3 py-3 font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>{t.attempt}/{t.maxAttempts}</td>
                             <td className="px-3 py-3 font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>{t.preScore !== null ? `${t.preScore}%` : '—'}</td>

@@ -202,6 +202,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     prisma.examAttempt.updateMany({
       where: {
         userId: id,
+        // Multi-tenant guard: examAttempt user'ı aynı organizasyonda olmalı (CLAUDE.md)
+        user: { organizationId: dbUser!.organizationId! },
         status: { in: ['pre_exam', 'watching_videos', 'post_exam'] },
       },
       data: { status: 'expired', isPassed: false, postExamCompletedAt: new Date() },

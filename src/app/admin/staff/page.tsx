@@ -296,16 +296,21 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
     if (selected.size === 0) return;
     setSaving(true);
     try {
-      await Promise.all([...selected].map(id =>
+      const results = await Promise.all([...selected].map(id =>
         fetch(`/api/admin/staff/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ departmentId: deptId }),
         })
       ));
-      toast(`${selected.size} personel departmana eklendi`, 'success');
-      onSaved();
-      onClose();
+      const failed = results.filter(r => !r.ok).length;
+      const succeeded = results.length - failed;
+      if (succeeded > 0) toast(`${succeeded} personel departmana eklendi`, 'success');
+      if (failed > 0) toast(`${failed} personel eklenemedi`, 'error');
+      if (succeeded > 0) {
+        onSaved();
+        onClose();
+      }
     } catch {
       toast('Bir hata oluştu', 'error');
     } finally {
@@ -436,6 +441,7 @@ export default function StaffPage() {
   const [newDeptColor, setNewDeptColor] = useState(DEPARTMENT_COLORS[0]);
   const [editingDept, setEditingDept] = useState<{ id: string; name: string; color: string } | null>(null);
   const [editDeptSaving, setEditDeptSaving] = useState(false);
+  const [deletingDeptId, setDeletingDeptId] = useState<string | null>(null);
 
   if (isLoading) {
     return <PageLoading />;
@@ -604,9 +610,12 @@ export default function StaffPage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="gap-2 text-red-500"
+                            disabled={deletingDeptId === dept.id}
                             onClick={async (e) => {
                               e.stopPropagation();
+                              if (deletingDeptId) return;
                               if (!confirm('Bu departmanı silmek istediğinize emin misiniz? (İçindeki personeller boşa düşecektir)')) return;
+                              setDeletingDeptId(dept.id);
                               try {
                                 const res = await fetch(`/api/admin/departments/${dept.id}`, { method: 'DELETE' });
                                 const resData = await res.json().catch(() => ({}));
@@ -616,10 +625,12 @@ export default function StaffPage() {
                                 refetch();
                               } catch (err) {
                                 toast(err instanceof Error ? err.message : 'Departman silinemedi', 'error');
+                              } finally {
+                                setDeletingDeptId(null);
                               }
                             }}
                           >
-                            <Trash2 className="h-4 w-4" /> Departmanı Sil
+                            <Trash2 className="h-4 w-4" /> {deletingDeptId === dept.id ? 'Siliniyor...' : 'Departmanı Sil'}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -782,8 +793,11 @@ export default function StaffPage() {
                   variant="outline"
                   className="gap-2 rounded-xl text-red-500"
                   style={{ borderColor: 'var(--color-error)' }}
+                  disabled={deletingDeptId === selectedDept}
                   onClick={async () => {
+                    if (deletingDeptId) return;
                     if (!confirm(`"${selectedDeptData.name}" departmanını silmek istediğinize emin misiniz?`)) return;
+                    setDeletingDeptId(selectedDept);
                     try {
                       const res = await fetch(`/api/admin/departments/${selectedDept}`, { method: 'DELETE' });
                       const resData = await res.json().catch(() => ({}));
@@ -793,10 +807,12 @@ export default function StaffPage() {
                       refetch();
                     } catch (err) {
                       toast(err instanceof Error ? err.message : 'Departman silinemedi', 'error');
+                    } finally {
+                      setDeletingDeptId(null);
                     }
                   }}
                 >
-                  <Trash2 className="h-4 w-4" /> Sil
+                  <Trash2 className="h-4 w-4" /> {deletingDeptId === selectedDept ? 'Siliniyor...' : 'Sil'}
                 </Button>
               </div>
             </div>

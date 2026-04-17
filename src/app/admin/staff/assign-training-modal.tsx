@@ -39,7 +39,8 @@ interface Props {
  */
 export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, onSuccess }: Props) {
   const { toast } = useToast();
-  const { data, isLoading } = useFetch<TrainingsResponse>('/api/admin/trainings?limit=100');
+  // Yalnızca yayında olan eğitimler atanabilir — arşivlenmiş/taslak eğitimler hariç (feedback_archived_training_filter)
+  const { data, isLoading } = useFetch<TrainingsResponse>('/api/admin/trainings?limit=100&publishStatus=published');
 
   const [selectedTrainings, setSelectedTrainings] = useState<string[]>([]);
   const [search, setSearch] = useState('');

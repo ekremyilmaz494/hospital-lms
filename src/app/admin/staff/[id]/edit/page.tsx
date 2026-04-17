@@ -72,10 +72,19 @@ export default function EditStaffPage() {
     if (!validate()) return;
     setSaving(true);
     try {
+      // Sadece güncellenebilir alanları gönder — id/email/initials gibi serverdan gelen alanları body'ye koyma
       const res = await fetch(`/api/admin/staff/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, departmentId: formData.departmentId || undefined, department: formData.department || undefined }),
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          title: formData.title,
+          departmentId: formData.departmentId || undefined,
+          department: formData.department || undefined,
+          isActive: formData.isActive,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -180,7 +189,7 @@ export default function EditStaffPage() {
                   <Building2 className="h-3.5 w-3.5" /> Departman
                 </Label>
                 <select
-                  value={formData.departmentId || formData.department || ''}
+                  value={formData.departmentId ?? ''}
                   onChange={(e) => {
                     update('departmentId', e.target.value);
                     const selectedName = departments.find(d => d.id === e.target.value)?.name;
