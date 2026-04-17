@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/shared/page-header';
 import { PageLoading } from '@/components/shared/page-loading';
-import { exportExcel, exportPDF } from '@/lib/export';
 import { useToast } from '@/components/shared/toast';
 
 interface ResponseItem {
@@ -43,18 +42,45 @@ function FeedbackResponsesContent() {
   const [page, setPage] = useState(1);
   const [trainingFilter, setTrainingFilter] = useState(searchParams.get('trainingId') ?? '');
   const [passedFilter, setPassedFilter] = useState<'all' | 'true' | 'false'>('all');
+  const [exporting, setExporting] = useState(false);
 
-  const buildExportData = () => ({
-    headers: ['Tarih', 'Eğitim', 'Katılımcı', 'Departman', 'Durum', 'Genel Puan'],
-    rows: (data?.items ?? []).map(r => [
-      new Date(r.submittedAt).toLocaleDateString('tr-TR'),
-      r.trainingTitle,
-      r.participant?.name ?? 'Anonim',
-      r.participant?.departmentName ?? '—',
-      r.isPassed ? 'Geçti' : 'Kaldı',
-      r.overallScore !== null ? r.overallScore.toFixed(2) : '—',
-    ]),
-  });
+  const runExport = async (format: 'xlsx' | 'pdf') => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ format });
+      if (trainingFilter) params.set('trainingId', trainingFilter);
+      if (passedFilter !== 'all') params.set('isPassed', passedFilter);
+
+      const res = await fetch(`/api/admin/feedback/responses/export?${params}`);
+      if (!res.ok) {
+        const msg = res.status === 429
+          ? 'Çok fazla dışa aktarma isteği. Lütfen biraz bekleyin.'
+          : 'Dışa aktarma başarısız oldu.';
+        toast(msg, 'error');
+        return;
+      }
+
+      const blob = await res.blob();
+      const cd = res.headers.get('content-disposition') ?? '';
+      const match = cd.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? `geri-bildirim.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
+
+      const urlObj = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = urlObj;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(urlObj);
+
+      toast(format === 'pdf' ? 'PDF indirildi' : 'Excel indirildi', 'success');
+    } catch {
+      toast('Dışa aktarma başarısız oldu.', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -108,13 +134,13 @@ function FeedbackResponsesContent() {
         </div>
 
         <div className="flex gap-2 ml-auto">
-          <Button variant="outline" size="sm" onClick={() => exportExcel(buildExportData())}
-            disabled={!data || data.items.length === 0}
+          <Button variant="outline" size="sm" onClick={() => runExport('xlsx')}
+            disabled={exporting || !data || data.total === 0}
             className="gap-1.5">
             <Download className="w-3.5 h-3.5" /> Excel
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { exportPDF(buildExportData(), 'Geri Bildirim Yanıtları'); toast('PDF hazırlanıyor', 'success'); }}
-            disabled={!data || data.items.length === 0}
+          <Button variant="outline" size="sm" onClick={() => runExport('pdf')}
+            disabled={exporting || !data || data.total === 0}
             className="gap-1.5">
             <FileText className="w-3.5 h-3.5" /> PDF
           </Button>

@@ -66,6 +66,11 @@ function addConditionalColor(row: ExcelJS.Row, colKey: string, value: number, th
 
 // ── Data fetcher (reports API ile aynı mantık) ──
 
+// Vercel serverless RAM guard — 5000 eğitim + 5000 personel güvenli üst sınır.
+// Aşılırsa raporda uyarı gösterilir (sessizce kırpmak yerine).
+const REPORT_TRAINING_CAP = 5000
+const REPORT_STAFF_CAP = 5000
+
 async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
   const assignmentDateFilter = dateFrom || dateTo ? {
     assignedAt: {
@@ -81,9 +86,11 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
     },
   } : {}
 
-  const [org, staffCount, trainings, staff, departments, avgScoreResult] = await Promise.all([
+  const [org, staffCount, totalTrainings, totalStaff, trainings, staff, departments, avgScoreResult] = await Promise.all([
     prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } }),
     prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
+    prisma.training.count({ where: { organizationId: orgId } }),
+    prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
     prisma.training.findMany({
       where: { organizationId: orgId },
       include: {
@@ -97,7 +104,7 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
         videos: { select: { durationSeconds: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 500,
+      take: REPORT_TRAINING_CAP,
     }),
     prisma.user.findMany({
       where: { organizationId: orgId, role: 'staff' },
@@ -111,7 +118,8 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
         },
         departmentRel: { select: { name: true } },
       },
-      take: 2000,
+      orderBy: { createdAt: 'desc' },
+      take: REPORT_STAFF_CAP,
     }),
     prisma.department.findMany({
       where: { organizationId: orgId },
@@ -128,7 +136,12 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
     }),
   ])
 
-  return { org, staffCount, trainings, staff, departments, avgScoreResult }
+  const truncated = {
+    trainings: totalTrainings > REPORT_TRAINING_CAP ? { shown: trainings.length, total: totalTrainings } : null,
+    staff: totalStaff > REPORT_STAFF_CAP ? { shown: staff.length, total: totalStaff } : null,
+  }
+
+  return { org, staffCount, trainings, staff, departments, avgScoreResult, truncated }
 }
 
 export async function GET(request: Request) {
@@ -150,7 +163,7 @@ export async function GET(request: Request) {
   const dateTo = toParam ? new Date(toParam) : undefined
 
   try {
-    const { org, staffCount, trainings, staff, departments, avgScoreResult } = await fetchReportData(orgId, dateFrom, dateTo)
+    const { org, staffCount, trainings, staff, departments, avgScoreResult, truncated } = await fetchReportData(orgId, dateFrom, dateTo)
 
     const orgName = org?.name ?? 'Devakent Hastanesi'
     const dateStr = new Date().toISOString().slice(0, 10)
@@ -235,24 +248,35 @@ export async function GET(request: Request) {
       doc.text(tr(orgName), pw / 2, 30, { align: 'center' })
       doc.setFontSize(16)
       doc.setTextColor(50)
-      doc.text('Egitim Performans Raporu', pw / 2, 42, { align: 'center' })
+      doc.text(tr('Eğitim Performans Raporu'), pw / 2, 42, { align: 'center' })
       doc.setFontSize(10)
       doc.setTextColor(120)
-      doc.text(`Rapor Tarihi: ${dateLabel}`, pw / 2, 50, { align: 'center' })
+      doc.text(`${tr('Rapor Tarihi')}: ${dateLabel}`, pw / 2, 50, { align: 'center' })
+      let cursorY = 56
       if (dateFrom || dateTo) {
-        const filterText = `Filtre: ${dateFrom ? dateFrom.toLocaleDateString('tr-TR') : '...'} - ${dateTo ? dateTo.toLocaleDateString('tr-TR') : '...'}`
-        doc.text(filterText, pw / 2, 56, { align: 'center' })
+        const filterText = `${tr('Filtre')}: ${dateFrom ? dateFrom.toLocaleDateString('tr-TR') : '...'} - ${dateTo ? dateTo.toLocaleDateString('tr-TR') : '...'}`
+        doc.text(filterText, pw / 2, cursorY, { align: 'center' })
+        cursorY += 6
+      }
+      if (truncated.trainings || truncated.staff) {
+        doc.setTextColor(220, 38, 38)
+        const parts: string[] = []
+        if (truncated.trainings) parts.push(`${truncated.trainings.total} egitimden ${truncated.trainings.shown} tanesi`)
+        if (truncated.staff) parts.push(`${truncated.staff.total} personelden ${truncated.staff.shown} tanesi`)
+        doc.text(tr(`Uyari: ${parts.join(', ')} raporda gosteriliyor. Filtre uygulayin.`), pw / 2, cursorY, { align: 'center' })
+        doc.setTextColor(120)
+        cursorY += 6
       }
 
       // Divider
       doc.setDrawColor(13, 150, 104)
       doc.setLineWidth(0.5)
-      doc.line(40, 62, pw - 40, 62)
+      doc.line(40, cursorY, pw - 40, cursorY)
 
       // Summary boxes
       autoTable(doc, {
-        startY: 70,
-        head: [['Aktif Personel', 'Toplam Atama', 'Basarili', 'Basarisiz', 'Basari Orani', 'Ort. Puan']],
+        startY: cursorY + 8,
+        head: [[tr('Aktif Personel'), tr('Toplam Atama'), tr('Başarılı'), tr('Başarısız'), tr('Başarı Oranı'), tr('Ort. Puan')]],
         body: [[String(staffCount), String(totalAssigned), String(passedCount), String(failedCount), `%${completionRate}`, String(avgScore)]],
         theme: 'grid',
         headStyles: { fillColor: [13, 150, 104], fontSize: 9, halign: 'center' },
@@ -264,11 +288,11 @@ export async function GET(request: Request) {
       doc.addPage()
       doc.setFontSize(14)
       doc.setTextColor(30)
-      doc.text('Egitim Bazli Rapor', 14, 15)
+      doc.text(tr('Eğitim Bazlı Rapor'), 14, 15)
 
       autoTable(doc, {
         startY: 22,
-        head: [['Egitim', 'Atanan', 'Tamamlayan', 'Basarisiz', 'Ort. Puan', 'Basari %']],
+        head: [[tr('Eğitim'), tr('Atanan'), tr('Tamamlayan'), tr('Başarısız'), tr('Ort. Puan'), tr('Başarı %')]],
         body: trainingRows.map(t => {
           const title = tr(t.title)
           return [
@@ -296,15 +320,15 @@ export async function GET(request: Request) {
       doc.addPage()
       doc.setFontSize(14)
       doc.setTextColor(30)
-      doc.text('Personel Performans Raporu', 14, 15)
+      doc.text(tr('Personel Performans Raporu'), 14, 15)
 
       autoTable(doc, {
         startY: 22,
-        head: [['Ad Soyad', 'Departman', 'Atanan', 'Basarili', 'Basarisiz', 'Ort. Puan', 'Durum']],
+        head: [[tr('Ad Soyad'), tr('Departman'), tr('Atanan'), tr('Başarılı'), tr('Başarısız'), tr('Ort. Puan'), tr('Durum')]],
         body: staffRows.map(s => [
           tr(s.name), tr(s.dept),
           String(s.totalAssigned), String(s.completed), String(s.failed),
-          String(s.avgScore), s.status,
+          String(s.avgScore), tr(s.status),
         ]),
         theme: 'striped',
         headStyles: { fillColor: [13, 150, 104], fontSize: 8 },
@@ -324,11 +348,11 @@ export async function GET(request: Request) {
       doc.addPage()
       doc.setFontSize(14)
       doc.setTextColor(30)
-      doc.text('Departman Analizi', 14, 15)
+      doc.text(tr('Departman Analizi'), 14, 15)
 
       autoTable(doc, {
         startY: 22,
-        head: [['Departman', 'Personel', 'Basarili', 'Basarisiz', 'Basari Orani']],
+        head: [[tr('Departman'), tr('Personel'), tr('Başarılı'), tr('Başarısız'), tr('Başarı Oranı')]],
         body: deptRows.map(d => [tr(d.name), String(d.personel), String(d.passed), String(d.failed), `%${d.rate}`]),
         theme: 'striped',
         headStyles: { fillColor: [13, 150, 104], fontSize: 9 },
@@ -349,11 +373,11 @@ export async function GET(request: Request) {
         doc.addPage()
         doc.setFontSize(14)
         doc.setTextColor(220, 38, 38)
-        doc.text(`Basarisiz Personel (${failureRows.length})`, 14, 15)
+        doc.text(tr(`Başarısız Personel (${failureRows.length})`), 14, 15)
 
         autoTable(doc, {
           startY: 22,
-          head: [['Ad Soyad', 'Departman', 'Egitim', 'Deneme', 'Son Puan']],
+          head: [[tr('Ad Soyad'), tr('Departman'), tr('Eğitim'), tr('Deneme'), tr('Son Puan')]],
           body: failureRows.map(f => {
             const training = tr(f.training)
             return [tr(f.name), tr(f.dept), training.length > 35 ? training.slice(0, 35) + '...' : training, String(f.attempts), String(f.lastScore)]
@@ -370,11 +394,11 @@ export async function GET(request: Request) {
         doc.addPage()
         doc.setFontSize(14)
         doc.setTextColor(30)
-        doc.text('On Sinav / Son Sinav Karsilastirma', 14, 15)
+        doc.text(tr('Ön Sınav / Son Sınav Karşılaştırma'), 14, 15)
 
         autoTable(doc, {
           startY: 22,
-          head: [['Egitim', 'On Sinav', 'Son Sinav', 'Gelisim', 'Orneklem']],
+          head: [[tr('Eğitim'), tr('Ön Sınav'), tr('Son Sınav'), tr('Gelişim'), tr('Örneklem')]],
           body: scoreComparison.map(s => {
             const title = tr(s.title)
             return [
@@ -405,8 +429,8 @@ export async function GET(request: Request) {
         doc.setFontSize(8)
         doc.setTextColor(150)
         const ph = doc.internal.pageSize.getHeight()
-        doc.text(`${tr(orgName)} — Egitim Performans Raporu`, 14, ph - 8)
-        doc.text(`Sayfa ${i}/${totalPages}`, pw - 14, ph - 8, { align: 'right' })
+        doc.text(`${tr(orgName)} — ${tr('Eğitim Performans Raporu')}`, 14, ph - 8)
+        doc.text(`${tr('Sayfa')} ${i}/${totalPages}`, pw - 14, ph - 8, { align: 'right' })
         doc.text(dateLabel, pw / 2, ph - 8, { align: 'center' })
       }
 
@@ -437,8 +461,18 @@ export async function GET(request: Request) {
     wb.created = new Date()
 
     // Sheet 1: Ozet
-    const wsOzet = wb.addWorksheet('Genel Ozet')
-    addSummaryHeader(wsOzet, orgName, `Egitim Performans Raporu — ${dateLabel}`)
+    const wsOzet = wb.addWorksheet('Genel Özet')
+    addSummaryHeader(wsOzet, orgName, `Eğitim Performans Raporu — ${dateLabel}`)
+
+    if (truncated.trainings || truncated.staff) {
+      const parts: string[] = []
+      if (truncated.trainings) parts.push(`${truncated.trainings.total} eğitimden ${truncated.trainings.shown} tanesi`)
+      if (truncated.staff) parts.push(`${truncated.staff.total} personelden ${truncated.staff.shown} tanesi`)
+      const warnRow = wsOzet.addRow([`⚠️ ${parts.join(', ')} raporda gösteriliyor. Filtre uygulayın.`])
+      warnRow.font = { bold: true, color: { argb: 'FFDC2626' }, size: 10 }
+      wsOzet.mergeCells(warnRow.number, 1, warnRow.number, 4)
+      wsOzet.addRow([])
+    }
 
     wsOzet.columns = [
       { key: 'metric', width: 30 },
