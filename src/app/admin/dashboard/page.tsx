@@ -4,8 +4,9 @@ import { useState } from 'react';
 import {
   Users, GraduationCap, TrendingUp, AlertTriangle, Trophy, Activity, Clock,
   Plus, Send, Download, Building2, UserPlus, ShieldCheck,
-  Radio, BookOpen, RefreshCw,
+  Radio, BookOpen, RefreshCw, ChevronRight,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useRealtimeExams } from '@/hooks/use-realtime-exams';
 import type { LiveExamAttempt } from '@/hooks/use-realtime-exams';
 import Link from 'next/link';
@@ -82,20 +83,11 @@ function elapsedLabel(startedAt: string): string {
   return `${Math.floor(mins / 60)} sa önce`;
 }
 
-/** G7.6 — Realtime in-progress exam list for admin dashboard */
-function LiveExamsWidget() {
+/** G7.6 — Kompakt tetikleyici kart; detay modal içinde açılır */
+function LiveExamsCard() {
   const { attempts, isLoading, activeCount, isConnected, refetch } = useRealtimeExams();
+  const [open, setOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    const start = Date.now();
-    await refetch();
-    // Minimum 800ms spin so the user clearly sees the refresh happened
-    const elapsed = Date.now() - start;
-    const remaining = Math.max(0, 800 - elapsed);
-    setTimeout(() => setRefreshing(false), remaining);
-  };
 
   const { data: fallbackData } = useFetch<{ attempts: LiveExamAttempt[] }>(
     !isConnected && !isLoading ? '/api/admin/in-progress-exams' : null
@@ -103,110 +95,140 @@ function LiveExamsWidget() {
   const displayExams = isConnected ? attempts : (fallbackData?.attempts ?? attempts);
   const displayCount = isConnected ? activeCount : displayExams.filter(a => ['pre_exam', 'watching_videos', 'post_exam'].includes(a.status)).length;
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const start = Date.now();
+    await refetch();
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, 800 - elapsed);
+    setTimeout(() => setRefreshing(false), remaining);
+  };
+
   return (
-    <div
-      className="rounded-2xl border p-5"
-      style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
-    >
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
-            <Radio className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
-            {displayCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full" style={{ background: 'var(--color-success)', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-            )}
-          </div>
-          <div>
-            <h3 className="text-[15px] font-bold">Anlık Sınavlar</h3>
-            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Şu an sınav yapan personel</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 hover:bg-[var(--color-surface-hover)] disabled:opacity-60"
-            title="Yenile"
-            style={{
-              background: refreshing ? 'var(--color-primary-light)' : 'transparent',
-            }}
-          >
-            <RefreshCw
-              className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="group flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
+        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+      >
+        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--color-primary-light)' }}>
+          <Radio className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
+          {displayCount > 0 && (
+            <span
+              className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2"
               style={{
-                color: refreshing ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                background: 'var(--color-success)',
+                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
               }}
             />
-          </button>
-          <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: isConnected ? 'var(--color-success-bg)' : 'var(--color-warning-bg)' }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: isConnected ? 'var(--color-success)' : 'var(--color-warning)', animation: isConnected ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none' }} />
-            <span className="text-[10px] font-semibold" style={{ color: isConnected ? 'var(--color-success)' : 'var(--color-warning)' }}>
-              {isConnected ? 'Canlı' : 'Çevrimdışı'}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: displayCount > 0 ? 'var(--color-success-bg)' : 'var(--color-bg)' }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: displayCount > 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }} />
-            <span className="text-[12px] font-semibold" style={{ color: displayCount > 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
-              {isLoading ? '...' : `${displayCount} aktif`}
-            </span>
-          </div>
+          )}
         </div>
-      </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold leading-tight">Anlık Sınavlar</p>
+          <p className="text-[11px] leading-tight truncate" style={{ color: 'var(--color-text-muted)' }}>
+            {isLoading ? 'Yükleniyor…' : `${displayCount} aktif · ${isConnected ? 'Canlı' : 'Çevrimdışı'}`}
+          </p>
+        </div>
+        <span
+          className="inline-flex min-w-5.5 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-bold"
+          style={{
+            background: displayCount > 0 ? 'var(--color-success-bg)' : 'var(--color-bg)',
+            color: displayCount > 0 ? 'var(--color-success)' : 'var(--color-text-muted)',
+          }}
+        >
+          {isLoading ? '…' : displayCount}
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5" style={{ color: 'var(--color-text-muted)' }} />
+      </button>
 
-      {/* List */}
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2].map(i => (
-            <div key={i} className="h-12 animate-pulse rounded-xl" style={{ background: 'var(--color-bg)' }} />
-          ))}
-        </div>
-      ) : displayExams.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl mb-3" style={{ background: 'var(--color-bg)' }}>
-            <BookOpen className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
-          </div>
-          <p className="text-[13px]" style={{ color: 'var(--color-text-muted)' }}>Şu an aktif sınav yok</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {displayExams.slice(0, 8).map((attempt: LiveExamAttempt) => {
-            const st = examStatusLabel[attempt.status] ?? examStatusLabel.pre_exam;
-            return (
-              <div
-                key={attempt.id}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5"
-                style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
-              >
-                <div
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                  style={{ background: 'var(--color-primary)' }}
-                >
-                  {attempt.user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="truncate text-[13px] font-semibold">{attempt.user.name}</p>
-                  <p className="truncate text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                    {attempt.training.title.length > 32 ? attempt.training.title.slice(0, 32) + '…' : attempt.training.title}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span
-                    className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
-                    style={{ background: st.bg, color: st.color }}
-                  >
-                    {st.label}
-                  </span>
-                  <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
-                    {elapsedLabel(attempt.startedAt)}
-                  </span>
-                </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
+                <Radio className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
               </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+              <div>
+                <DialogTitle className="text-[15px] font-bold">Anlık Sınavlar</DialogTitle>
+                <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Şu an sınav yapan personel</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-(--color-surface-hover) disabled:opacity-60"
+                title="Yenile"
+                style={{ background: refreshing ? 'var(--color-primary-light)' : 'transparent' }}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} style={{ color: refreshing ? 'var(--color-primary)' : 'var(--color-text-muted)' }} />
+              </button>
+              <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: isConnected ? 'var(--color-success-bg)' : 'var(--color-warning-bg)' }}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: isConnected ? 'var(--color-success)' : 'var(--color-warning)', animation: isConnected ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none' }} />
+                <span className="text-[10px] font-semibold" style={{ color: isConnected ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                  {isConnected ? 'Canlı' : 'Çevrimdışı'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="max-h-[60vh] overflow-y-auto">
+            {isLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-12 animate-pulse rounded-xl" style={{ background: 'var(--color-bg)' }} />
+                ))}
+              </div>
+            ) : displayExams.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl mb-3" style={{ background: 'var(--color-bg)' }}>
+                  <BookOpen className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
+                </div>
+                <p className="text-[13px]" style={{ color: 'var(--color-text-muted)' }}>Şu an aktif sınav yok</p>
+              </div>
+            ) : (
+              <div className="space-y-2 pr-1">
+                {displayExams.map((attempt: LiveExamAttempt) => {
+                  const st = examStatusLabel[attempt.status] ?? examStatusLabel.pre_exam;
+                  return (
+                    <div
+                      key={attempt.id}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                      style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+                    >
+                      <div
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                        style={{ background: 'var(--color-primary)' }}
+                      >
+                        {attempt.user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate text-[13px] font-semibold">{attempt.user.name}</p>
+                        <p className="truncate text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                          {attempt.training.title.length > 32 ? attempt.training.title.slice(0, 32) + '…' : attempt.training.title}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span
+                          className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+                          style={{ background: st.bg, color: st.color }}
+                        >
+                          {st.label}
+                        </span>
+                        <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
+                          {elapsedLabel(attempt.startedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -317,22 +339,7 @@ export default function AdminDashboard() {
         </div>
       </BlurFade>
 
-      {/* G7.6 — Live In-Progress Exams (Supabase Realtime — always independent) */}
-      <BlurFade delay={0.02}>
-        <LiveExamsWidget />
-      </BlurFade>
-
-      {/* Risk Merkezi — overdue + compliance + expiring certs tabbed card */}
-      <RiskCenter
-        overdueTrainings={overdueTrainings}
-        complianceAlerts={complianceAlerts}
-        expiringCerts={expiringCerts}
-        isLoading={compliance.isLoading || stats.isLoading || certs.isLoading}
-        sendingReminder={sendingReminder}
-        onSendReminder={handleSendReminder}
-      />
-
-      {/* ── Stats Section (polling: 60s) ── */}
+      {/* ── Stats Section (polling: 60s) — ilk ekran KPI'ları ── */}
       {stats.error ? (
         <SectionError message={stats.error} onRetry={stats.refetch} />
       ) : (
@@ -348,6 +355,21 @@ export default function AdminDashboard() {
           </div>
         </>
       )}
+
+      {/* Anlık Sınavlar + Risk Merkezi — kompakt tetikleyici; modal'da açılır */}
+      <BlurFade delay={0.02}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <LiveExamsCard />
+          <RiskCenter
+            overdueTrainings={overdueTrainings}
+            complianceAlerts={complianceAlerts}
+            expiringCerts={expiringCerts}
+            isLoading={compliance.isLoading || stats.isLoading || certs.isLoading}
+            sendingReminder={sendingReminder}
+            onSendReminder={handleSendReminder}
+          />
+        </div>
+      </BlurFade>
 
       {/* ── Charts Section ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

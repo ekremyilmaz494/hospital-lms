@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Shield, CalendarClock, Send, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, Shield, CalendarClock, Send, ShieldAlert, ChevronRight } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { BlurFade } from '@/components/ui/blur-fade';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { AlertSkeleton } from '@/components/shared/skeletons';
 
 interface OverdueTraining {
@@ -71,119 +71,144 @@ export function RiskCenter({
 
   const firstWithData = tabs.find(t => t.count > 0)?.key ?? 'overdue';
   const [active, setActive] = useState<TabKey>(firstWithData);
+  const [open, setOpen] = useState(false);
 
   const totalRisk = overdueTrainings.length + complianceAlerts.length + criticalCertsCount;
+  const totalItems = overdueTrainings.length + complianceAlerts.length + expiringCerts.length;
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-        <AlertSkeleton />
+      <div className="rounded-xl border px-4 py-3" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+        <div className="h-9 w-full animate-pulse rounded-lg" style={{ background: 'var(--color-bg)' }} />
       </div>
     );
   }
 
-  if (totalRisk === 0 && overdueTrainings.length === 0 && complianceAlerts.length === 0 && expiringCerts.length === 0) {
-    return null;
-  }
+  const hasUrgent = totalRisk > 0;
+  const triggerIconBg = hasUrgent ? 'var(--color-error-bg)' : 'var(--color-success-bg)';
+  const triggerIconColor = hasUrgent ? 'var(--color-error)' : 'var(--color-success)';
+  const badgeBg = hasUrgent ? 'var(--color-error-bg)' : 'var(--color-bg)';
+  const badgeColor = hasUrgent ? 'var(--color-error)' : 'var(--color-text-muted)';
 
   return (
-    <BlurFade delay={0.02}>
-      <div
-        className="rounded-2xl border overflow-hidden"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="group flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
+        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-4 py-4 md:px-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--color-error-bg)' }}>
-              <ShieldAlert className="h-5 w-5" style={{ color: 'var(--color-error)' }} />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-[15px] font-bold truncate">Risk Merkezi</h3>
-              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                {totalRisk > 0 ? `${totalRisk} acil madde bekliyor` : 'Aciliyet yok, izleme listesi'}
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/admin/reports"
-            className="shrink-0 text-[11px] md:text-xs font-semibold"
-            style={{ color: 'var(--color-primary)' }}
-          >
-            Rapor →
-          </Link>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: triggerIconBg }}>
+          <ShieldAlert className="h-4.5 w-4.5" style={{ color: triggerIconColor }} />
         </div>
-
-        {/* Tabs */}
-        <div
-          className="flex gap-1 overflow-x-auto px-2 py-2 md:px-4"
-          style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)' }}
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold leading-tight">Risk Merkezi</p>
+          <p className="text-[11px] leading-tight truncate" style={{ color: 'var(--color-text-muted)' }}>
+            {hasUrgent ? `${totalRisk} acil · ${totalItems} izlenen` : 'Aciliyet yok, izleme listesi'}
+          </p>
+        </div>
+        <span
+          className="inline-flex min-w-5.5 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-bold"
+          style={{ background: badgeBg, color: badgeColor }}
         >
-          {tabs.map(t => {
-            const isActive = active === t.key;
-            const Icon = t.icon;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setActive(t.key)}
-                className="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold transition-colors duration-150"
-                style={{
-                  background: isActive ? 'var(--color-surface)' : 'transparent',
-                  color: isActive ? t.tone : 'var(--color-text-muted)',
-                  border: isActive ? `1px solid ${t.tone}30` : '1px solid transparent',
-                }}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{t.label}</span>
-                {t.count > 0 && (
-                  <span
-                    className="inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-                    style={{
-                      background: isActive ? t.tone : 'var(--color-border)',
-                      color: isActive ? '#fff' : 'var(--color-text-secondary)',
-                    }}
-                  >
-                    {t.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+          {totalItems}
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5" style={{ color: 'var(--color-text-muted)' }} />
+      </button>
 
-        {/* Content */}
-        <div className="p-4 md:p-6">
-          {active === 'overdue' && (
-            overdueTrainings.length === 0 ? (
-              <EmptyState icon={AlertTriangle} label="Geciken eğitim yok" />
-            ) : (
-              <OverdueList
-                items={overdueTrainings}
-                sendingReminder={sendingReminder}
-                onSendReminder={onSendReminder}
-              />
-            )
-          )}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <div className="flex items-center justify-between gap-3 pb-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: triggerIconBg }}>
+                <ShieldAlert className="h-5 w-5" style={{ color: triggerIconColor }} />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="text-[15px] font-bold truncate">Risk Merkezi</DialogTitle>
+                <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                  {hasUrgent ? `${totalRisk} acil madde bekliyor` : 'Aciliyet yok, izleme listesi'}
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/admin/reports"
+              className="shrink-0 text-[11px] md:text-xs font-semibold"
+              style={{ color: 'var(--color-primary)' }}
+              onClick={() => setOpen(false)}
+            >
+              Rapor →
+            </Link>
+          </div>
 
-          {active === 'compliance' && (
-            complianceAlerts.length === 0 ? (
-              <EmptyState icon={Shield} label="Uyum alarmı yok" />
-            ) : (
-              <ComplianceList items={complianceAlerts} />
-            )
-          )}
+          <div
+            className="flex gap-1 overflow-x-auto px-1 py-2 -mx-1"
+            style={{ borderBottom: '1px solid var(--color-border)' }}
+          >
+            {tabs.map(t => {
+              const isActive = active === t.key;
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setActive(t.key)}
+                  className="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold transition-colors duration-150"
+                  style={{
+                    background: isActive ? 'var(--color-bg)' : 'transparent',
+                    color: isActive ? t.tone : 'var(--color-text-muted)',
+                    border: isActive ? `1px solid ${t.tone}30` : '1px solid transparent',
+                  }}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{t.label}</span>
+                  {t.count > 0 && (
+                    <span
+                      className="inline-flex min-w-4.5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                      style={{
+                        background: isActive ? t.tone : 'var(--color-border)',
+                        color: isActive ? '#fff' : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-          {active === 'certs' && (
-            expiringCerts.length === 0 ? (
-              <EmptyState icon={CalendarClock} label="Yaklaşan sertifika yok" />
-            ) : (
-              <CertsList items={expiringCerts} />
-            )
-          )}
-        </div>
-      </div>
-    </BlurFade>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {active === 'overdue' && (
+              overdueTrainings.length === 0 ? (
+                <EmptyState icon={AlertTriangle} label="Geciken eğitim yok" />
+              ) : (
+                <OverdueList
+                  items={overdueTrainings}
+                  sendingReminder={sendingReminder}
+                  onSendReminder={onSendReminder}
+                />
+              )
+            )}
+
+            {active === 'compliance' && (
+              complianceAlerts.length === 0 ? (
+                <EmptyState icon={Shield} label="Uyum alarmı yok" />
+              ) : (
+                <ComplianceList items={complianceAlerts} />
+              )
+            )}
+
+            {active === 'certs' && (
+              expiringCerts.length === 0 ? (
+                <EmptyState icon={CalendarClock} label="Yaklaşan sertifika yok" />
+              ) : (
+                <CertsList items={expiringCerts} />
+              )
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -191,11 +216,11 @@ export function RiskCenter({
 
 function EmptyState({ icon: Icon, label }: { icon: typeof AlertTriangle; label: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-8">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl mb-3" style={{ background: 'var(--color-bg)' }}>
-        <Icon className="h-6 w-6" style={{ color: 'var(--color-success)' }} />
+    <div className="flex items-center justify-center gap-2.5 py-3">
+      <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: 'var(--color-bg)' }}>
+        <Icon className="h-4 w-4" style={{ color: 'var(--color-success)' }} />
       </div>
-      <p className="text-[13px]" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+      <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
     </div>
   );
 }
