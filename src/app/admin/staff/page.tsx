@@ -443,17 +443,11 @@ export default function StaffPage() {
   const [editDeptSaving, setEditDeptSaving] = useState(false);
   const [deletingDeptId, setDeletingDeptId] = useState<string | null>(null);
 
-  if (isLoading) {
-    return <PageLoading />;
-  }
-
-  // API hatası olsa bile sayfayı boş veri ile render et (backend henüz yapılandırılmamış olabilir)
-
-  const allStaff = data?.staff ?? [];
-  const allDepartments = data?.departments ?? [];
-  const statsData = data?.stats ?? { totalStaff: 0, activeStaff: 0, departmentCount: 0, avgScore: 0 };
-
-  const filteredStaff = allStaff;
+  // ⚠️ Rules of Hooks: tüm hook çağrıları early return'ün ÜSTÜNDE olmalı.
+  // Referans stabilliği için `data` değiştikçe array üret — downstream useMemo'ların
+  // her render'da recompute olmasını engeller.
+  const allStaff = useMemo(() => data?.staff ?? [], [data]);
+  const allDepartments = useMemo(() => data?.departments ?? [], [data]);
 
   // ── Departman/Staff lookup map'leri (O(1) erişim, her render'da find() yerine) ──
   const departmentMap = useMemo(
@@ -470,8 +464,6 @@ export default function StaffPage() {
     }
     return map;
   }, [allStaff]);
-
-  const selectedDeptData = selectedDept ? departmentMap.get(selectedDept) : null;
 
   // ── Columns ──
   const columns: ColumnDef<Staff>[] = useMemo(() => [
@@ -550,6 +542,16 @@ export default function StaffPage() {
       ),
     },
   ], [departmentMap]);
+
+  // Early return — artık tüm hook'lar çağrıldıktan SONRA
+  if (isLoading) {
+    return <PageLoading />;
+  }
+
+  // API hatası olsa bile sayfayı boş veri ile render et (backend henüz yapılandırılmamış olabilir)
+  const statsData = data?.stats ?? { totalStaff: 0, activeStaff: 0, departmentCount: 0, avgScore: 0 };
+  const filteredStaff = allStaff;
+  const selectedDeptData = selectedDept ? departmentMap.get(selectedDept) : null;
 
   return (
     <div className="space-y-6">
