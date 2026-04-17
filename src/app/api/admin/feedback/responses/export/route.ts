@@ -9,19 +9,9 @@ import {
   createAuditLog,
 } from '@/lib/api-helpers'
 import { calculateOverallScore, type FeedbackQuestionType } from '@/lib/feedback-helpers'
+import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
-
-/**
- * jsPDF Helvetica fontu Türkçe karakterleri desteklemediği için ASCII'ye dönüştür.
- */
-const TR_MAP: Record<string, string> = {
-  'ğ': 'g', 'Ğ': 'G', 'ü': 'u', 'Ü': 'U', 'ş': 's', 'Ş': 'S',
-  'ı': 'i', 'İ': 'I', 'ö': 'o', 'Ö': 'O', 'ç': 'c', 'Ç': 'C',
-}
-function tr(text: string): string {
-  return text.replace(/[ğĞüÜşŞıİöÖçÇ]/g, (c) => TR_MAP[c] ?? c)
-}
 
 /** CSV formula injection koruması — ExcelJS hücreleri için. */
 function sanitizeCell(value: unknown): string | number {
@@ -31,7 +21,9 @@ function sanitizeCell(value: unknown): string | number {
   return str
 }
 
-// Vercel serverless RAM guard — 10k satır güvenli.
+// Vercel serverless RAM guard. Bu cap'e ulaşıldığında sessizce kesmek yerine
+// 413 (Payload Too Large) döner — admin tarih/filtre daraltması için
+// yönlendirilir. Rapor bütünlüğü korunur.
 const MAX_ROWS = 10_000
 
 /**
@@ -77,45 +69,58 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [org, total, responses] = await Promise.all([
+    // Önce org + count paralel — count düşük maliyetli, 10k+ ise büyük
+    // findMany'yi hiç tetiklemeden 413 döneriz.
+    const [org, total] = await Promise.all([
       prisma.organization.findUnique({
         where: { id: dbUser.organizationId },
         select: { name: true },
       }),
       prisma.trainingFeedbackResponse.count({ where }),
-      prisma.trainingFeedbackResponse.findMany({
-        where,
-        orderBy: { submittedAt: 'desc' },
-        take: MAX_ROWS,
-        select: {
-          id: true,
-          includeName: true,
-          isPassed: true,
-          submittedAt: true,
-          training: { select: { id: true, title: true } },
-          user: {
-            select: {
-              firstName: true,
-              lastName: true,
-              departmentRel: { select: { name: true } },
-            },
-          },
-          answers: {
-            select: {
-              score: true,
-              item: { select: { questionType: true } },
-            },
+    ])
+
+    if (total > MAX_ROWS) {
+      return errorResponse(
+        `Sonuç ${total.toLocaleString('tr-TR')} kayıt — dışa aktarma limiti ${MAX_ROWS.toLocaleString('tr-TR')}. Lütfen tarih aralığı veya eğitim filtresi uygulayarak sonucu daraltın.`,
+        413,
+      )
+    }
+
+    const responses = await prisma.trainingFeedbackResponse.findMany({
+      where,
+      orderBy: { submittedAt: 'desc' },
+      take: MAX_ROWS,
+      select: {
+        id: true,
+        includeName: true,
+        isPassed: true,
+        submittedAt: true,
+        training: { select: { id: true, title: true } },
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            departmentRel: { select: { name: true } },
           },
         },
-      }),
-    ])
+        answers: {
+          select: {
+            score: true,
+            itemSnapshot: true,
+            item: { select: { questionType: true } },
+          },
+        },
+      },
+    })
 
     const rows = responses.map(r => {
       const overall = calculateOverallScore(
-        r.answers.map(a => ({
-          score: a.score,
-          questionType: a.item.questionType as FeedbackQuestionType,
-        })),
+        r.answers.map(a => {
+          // Snapshot fallback: item silinse bile questionType korunur
+          const snap = a.itemSnapshot as { questionType?: string } | null
+          const qt = (snap?.questionType ?? a.item?.questionType ?? 'text') as FeedbackQuestionType
+          return { score: a.score, questionType: qt }
+        }),
       )
       const name = r.includeName && r.user
         ? `${r.user.firstName ?? ''} ${r.user.lastName ?? ''}`.trim()
@@ -133,42 +138,40 @@ export async function GET(request: Request) {
     const orgName = org?.name ?? 'Hastane'
     const dateStr = new Date().toISOString().slice(0, 10)
     const dateLabel = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })
-    const truncated = total > MAX_ROWS
 
     // ── PDF ──
     if (format === 'pdf') {
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      // Liberation Sans — Türkçe karakter desteği (ğ, ü, ş, ı, İ, ö, ç).
+      await applyTurkishFont(doc)
       const pw = doc.internal.pageSize.getWidth()
 
       doc.setFontSize(16)
       doc.setTextColor(13, 150, 104)
-      doc.text(tr(orgName), pw / 2, 18, { align: 'center' })
+      doc.setFont(TURKISH_FONT_FAMILY, 'bold')
+      doc.text(orgName, pw / 2, 18, { align: 'center' })
       doc.setFontSize(13)
       doc.setTextColor(30)
-      doc.text(tr('Geri Bildirim Yanıtları'), pw / 2, 26, { align: 'center' })
+      doc.text('Geri Bildirim Yanıtları', pw / 2, 26, { align: 'center' })
+      doc.setFont(TURKISH_FONT_FAMILY, 'normal')
       doc.setFontSize(9)
       doc.setTextColor(120)
-      doc.text(`${tr('Rapor Tarihi')}: ${dateLabel} — ${tr('Toplam')}: ${rows.length}${truncated ? ` / ${total}` : ''}`, pw / 2, 32, { align: 'center' })
-
-      if (truncated) {
-        doc.setTextColor(220, 38, 38)
-        doc.text(tr(`Uyari: ${total} yanittan ilk ${MAX_ROWS} tanesi gosteriliyor. Filtre uygulayin.`), pw / 2, 38, { align: 'center' })
-      }
+      doc.text(`Rapor Tarihi: ${dateLabel} — Toplam: ${rows.length}`, pw / 2, 32, { align: 'center' })
 
       autoTable(doc, {
-        startY: truncated ? 44 : 38,
-        head: [[tr('Tarih'), tr('Eğitim'), tr('Katılımcı'), tr('Departman'), tr('Durum'), tr('Genel Puan')]],
+        startY: 38,
+        head: [['Tarih', 'Eğitim', 'Katılımcı', 'Departman', 'Durum', 'Genel Puan']],
         body: rows.map(r => [
           new Date(r.submittedAt).toLocaleDateString('tr-TR'),
-          tr(r.trainingTitle.length > 45 ? r.trainingTitle.slice(0, 45) + '...' : r.trainingTitle),
-          tr(r.name),
-          tr(r.department),
-          tr(r.status),
+          r.trainingTitle.length > 45 ? r.trainingTitle.slice(0, 45) + '...' : r.trainingTitle,
+          r.name,
+          r.department,
+          r.status,
           r.overallScore !== null ? r.overallScore.toFixed(2) : '—',
         ]),
         theme: 'striped',
-        headStyles: { fillColor: [13, 150, 104], fontSize: 9 },
-        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [13, 150, 104], fontSize: 9, font: TURKISH_FONT_FAMILY, fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2, font: TURKISH_FONT_FAMILY },
         columnStyles: { 1: { cellWidth: 80 } },
         alternateRowStyles: { fillColor: [245, 248, 250] },
       })
@@ -178,9 +181,10 @@ export async function GET(request: Request) {
         doc.setPage(i)
         doc.setFontSize(8)
         doc.setTextColor(150)
+        doc.setFont(TURKISH_FONT_FAMILY, 'normal')
         const ph = doc.internal.pageSize.getHeight()
-        doc.text(`${tr(orgName)} — ${tr('Geri Bildirim Yanıtları')}`, 14, ph - 8)
-        doc.text(`${tr('Sayfa')} ${i}/${totalPages}`, pw - 14, ph - 8, { align: 'right' })
+        doc.text(`${orgName} — Geri Bildirim Yanıtları`, 14, ph - 8)
+        doc.text(`Sayfa ${i}/${totalPages}`, pw - 14, ph - 8, { align: 'right' })
       }
 
       const pdfBuffer = doc.output('arraybuffer')
@@ -217,7 +221,7 @@ export async function GET(request: Request) {
     titleRow.height = 24
     ws.mergeCells(titleRow.number, 1, titleRow.number, 6)
 
-    const subtitleRow = ws.addRow([`Rapor Tarihi: ${dateLabel} · Toplam: ${rows.length}${truncated ? ` (ilk ${MAX_ROWS} / ${total})` : ''}`])
+    const subtitleRow = ws.addRow([`Rapor Tarihi: ${dateLabel} · Toplam: ${rows.length}`])
     subtitleRow.font = { size: 10, color: { argb: 'FF666666' } }
     ws.mergeCells(subtitleRow.number, 1, subtitleRow.number, 6)
     ws.addRow([])

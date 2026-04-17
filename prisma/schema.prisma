@@ -1224,6 +1224,9 @@ model TrainingFeedbackResponse {
   includeName    Boolean  @default(false) @map("include_name")
   isPassed       Boolean  @map("is_passed")
   submittedAt    DateTime @default(now()) @map("submitted_at") @db.Timestamptz
+  // Submit anındaki form yapısının donmuş kopyası (categories + items).
+  // Admin sonradan form'u düzenlese bile detay sayfası geçmişi korur.
+  formSnapshot   Json?    @map("form_snapshot") @db.JsonB
 
   form         TrainingFeedbackForm     @relation(fields: [formId], references: [id], onDelete: Restrict)
   attempt      ExamAttempt              @relation(fields: [attemptId], references: [id], onDelete: Cascade)
@@ -1238,14 +1241,18 @@ model TrainingFeedbackResponse {
 }
 
 model TrainingFeedbackAnswer {
-  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  responseId String  @map("response_id") @db.Uuid
-  itemId     String  @map("item_id") @db.Uuid
-  score      Int?
-  textAnswer String? @map("text_answer") @db.Text
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  responseId   String  @map("response_id") @db.Uuid
+  // Item silinse bile cevap korunur (SetNull). Analytics ve detay sayfası
+  // itemSnapshot'tan okur — tarihsel bütünlük bozulmaz.
+  itemId       String? @map("item_id") @db.Uuid
+  // Cevap verildiği andaki item metadata (text, questionType, categoryName).
+  itemSnapshot Json?   @map("item_snapshot") @db.JsonB
+  score        Int?
+  textAnswer   String? @map("text_answer") @db.Text
 
   response TrainingFeedbackResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
-  item     TrainingFeedbackItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  item     TrainingFeedbackItem?    @relation(fields: [itemId], references: [id], onDelete: SetNull)
 
   @@unique([responseId, itemId])
   @@index([responseId], map: "idx_tfb_answers_response")

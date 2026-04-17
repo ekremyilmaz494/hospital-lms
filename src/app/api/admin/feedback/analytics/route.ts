@@ -94,23 +94,39 @@ export async function GET(request: Request) {
       })
     }
 
-    // Tüm answer'ları aggregate için çek
+    // Tüm answer'ları aggregate için çek.
+    // itemId null olabilir (item silindikten sonra) — snapshot fallback'i
+    // questionType'ı korur, ama itemId-bazlı aggregation'a giremez (hangi
+    // item'a ait bilinmiyor artık). Overall/recommendation hesapları için
+    // snapshot yeterli.
     const answers = await prisma.trainingFeedbackAnswer.findMany({
       where: { response: where },
       select: {
         itemId: true,
         score: true,
+        itemSnapshot: true,
         item: { select: { questionType: true, categoryId: true } },
       },
     })
 
-    const answersWithType = answers.map(a => ({
-      itemId: a.itemId,
-      score: a.score,
-      questionType: a.item.questionType as FeedbackQuestionType,
-    }))
+    const answersWithType = answers.map(a => {
+      const snap = a.itemSnapshot as { questionType?: string } | null
+      const qt = (snap?.questionType ?? a.item?.questionType ?? 'text') as FeedbackQuestionType
+      return {
+        itemId: a.itemId, // null olabilir
+        score: a.score,
+        questionType: qt,
+      }
+    })
 
-    const itemAggregates = aggregateItemScores(answersWithType)
+    // Item-bazlı aggregation: silinmiş itemlar (itemId=null) kategoriye
+    // bağlanamaz, bu yüzden kategori detayından dışlanır. Overall/recommendation
+    // ise tüm cevaplar üzerinden hesaplanır (aşağıda).
+    const itemAggregates = aggregateItemScores(
+      answersWithType
+        .filter((a): a is typeof a & { itemId: string } => a.itemId !== null)
+        .map(a => ({ itemId: a.itemId, score: a.score, questionType: a.questionType })),
+    )
 
     // Kategori bazında birleştir
     const categories = form.categories.map(cat => {
