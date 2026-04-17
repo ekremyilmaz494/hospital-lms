@@ -15,5 +15,8 @@ export default defineConfig({
     // bu yüzden session pooler URL'i kullanılır. Runtime Prisma Client ise DATABASE_URL'i
     // `src/lib/prisma.ts` içinde env'den doğrudan okur (bu config'ten bağımsız).
     url: process.env["DIRECT_URL"],
+    // Prisma 7'de `--shadow-database-url` CLI flag'i kaldırıldı; migrate diff/dev için
+    // shadow DB URL'i config'te tanımlanmalı. CI'da SHADOW_DATABASE_URL env'den okunur.
+    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 });

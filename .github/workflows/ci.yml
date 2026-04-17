@@ -46,13 +46,13 @@ jobs:
 
       - name: Migration drift check (schema.prisma ↔ migrations senkron mu?)
         env:
-          SHADOW_DB_URL: postgresql://ci:ci@localhost:5432/ci_shadow  # secret-scanner-disable-line
+          SHADOW_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_shadow  # secret-scanner-disable-line
         run: |
           pnpm prisma migrate diff \
             --from-migrations ./prisma/migrations \
             --to-schema ./prisma/schema.prisma \
-            --shadow-database-url "$SHADOW_DB_URL" \
             --exit-code
+        # Prisma 7: shadow DB URL prisma.config.ts'te SHADOW_DATABASE_URL env'inden okunur.
         # exit 0 = drift yok, exit 2 = drift var (PR bloklanır)
         # Drift varsa: pnpm db:migrate dev --name <açıklayıcı-isim> çalıştır
 
