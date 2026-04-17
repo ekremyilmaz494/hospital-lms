@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -46,6 +46,15 @@ function LoginForm() {
   // Prevent open redirect — only allow relative paths starting with /
   const redirectTo = rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : null;
   const isTimeout = searchParams.get('reason') === 'timeout';
+  const urlReason = searchParams.get('reason');
+  const urlMsg = searchParams.get('msg');
+
+  // KVKK reddi sonrası mesajı göster (URL'den gelen)
+  useEffect(() => {
+    if (urlReason === 'kvkk-rejected' && urlMsg) {
+      setError(urlMsg);
+    }
+  }, [urlReason, urlMsg]);
 
   // White-label branding: ?org=slug parametresiyle hastane markasi yuklenir
   const orgSlug = searchParams.get('org');
@@ -141,7 +150,30 @@ function LoginForm() {
 
   if (pendingRedirect) {
     return (
-      <KvkkNoticeModal onDismiss={() => { window.location.href = pendingRedirect; }} />
+      <KvkkNoticeModal
+        onAcknowledge={() => {
+          window.location.href = pendingRedirect;
+        }}
+        onReject={async () => {
+          // httpOnly cookie'leri server üzerinden temizle — client signOut tek başına yetmez.
+          try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+          } catch {
+            // Yok say — yine de local state'i temizleyip sayfayı yenileyeceğiz
+          }
+          try {
+            const supabase = createClient();
+            await supabase.auth.signOut();
+          } catch {
+            // Yok say
+          }
+          useAuthStore.getState().logout();
+          // Full reload — middleware fresh cookie state ile tekrar değerlendirsin,
+          // kullanıcı login'e reddet mesajıyla dönsün
+          const msg = encodeURIComponent('Sisteme giriş için KVKK Aydınlatma Metni\'ni onaylamanız gerekmektedir.');
+          window.location.href = `/auth/login?reason=kvkk-rejected&msg=${msg}`;
+        }}
+      />
     );
   }
 
