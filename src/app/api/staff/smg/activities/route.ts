@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { createSmgActivitySchema } from '@/lib/validations'
 
 export async function POST(request: Request) {
@@ -46,6 +46,22 @@ export async function POST(request: Request) {
       organizationId: dbUser!.organizationId!,
       approvalStatus: 'PENDING',
     },
+  })
+
+  await createAuditLog({
+    userId: dbUser!.id,
+    organizationId: dbUser!.organizationId,
+    action: 'CREATE',
+    entityType: 'SmgActivity',
+    entityId: activity.id,
+    newData: {
+      title: activity.title,
+      activityType: activity.activityType,
+      categoryId: activity.categoryId,
+      smgPoints: activity.smgPoints,
+      completionDate: activity.completionDate,
+    },
+    request,
   })
 
   return jsonResponse(activity, 201)

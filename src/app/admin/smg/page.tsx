@@ -126,6 +126,12 @@ export default function AdminSmgPage() {
           ...(status === 'REJECTED' && reason ? { rejectionReason: reason } : {}),
         }),
       });
+      setSelectedActivities(prev => {
+        if (!prev.has(activityId)) return prev;
+        const next = new Set(prev);
+        next.delete(activityId);
+        return next;
+      });
       refetchActivities?.();
     } finally {
       setApproving(null);
@@ -191,6 +197,14 @@ export default function AdminSmgPage() {
   const handlePeriodSubmit = async () => {
     if (!periodForm.name || !periodForm.startDate || !periodForm.endDate || !periodForm.requiredPoints) {
       toast('Tüm alanlar zorunludur.', 'error');
+      return;
+    }
+    if (new Date(periodForm.startDate) >= new Date(periodForm.endDate)) {
+      toast('Bitiş tarihi, başlangıç tarihinden sonra olmalıdır.', 'error');
+      return;
+    }
+    if (Number(periodForm.requiredPoints) < 1) {
+      toast('Hedef puan en az 1 olmalıdır.', 'error');
       return;
     }
     setPeriodSubmitting(true);
@@ -545,7 +559,12 @@ export default function AdminSmgPage() {
             <Button variant="outline" onClick={() => setPeriodModalOpen(false)} disabled={periodSubmitting} className="rounded-xl">
               İptal
             </Button>
-            <Button onClick={handlePeriodSubmit} disabled={periodSubmitting} className="gap-1.5 rounded-xl">
+            <Button
+              onClick={handlePeriodSubmit}
+              disabled={periodSubmitting}
+              className="gap-1.5 rounded-xl"
+              style={{ background: 'var(--color-primary)', color: 'white' }}
+            >
               {periodSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               Oluştur
             </Button>

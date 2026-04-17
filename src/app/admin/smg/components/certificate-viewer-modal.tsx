@@ -19,14 +19,17 @@ interface CertificateResponse {
 export function CertificateViewerModal({ activityId, open, onOpenChange }: Props) {
   const [data, setData] = useState<CertificateResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     if (!open || !activityId) {
       setData(null);
+      setImageError(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
+    setImageError(false);
     fetch(`/api/admin/smg/activities/${activityId}/certificate`)
       .then(r => r.json())
       .then(json => {
@@ -65,10 +68,25 @@ export function CertificateViewerModal({ activityId, open, onOpenChange }: Props
               src={data.url}
               className="w-full h-[65vh] border-0 rounded-xl"
               title="Sertifika"
+              sandbox=""
+              referrerPolicy="no-referrer"
             />
           ) : data.type === 'image' ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={data.url} className="max-w-full max-h-[65vh] object-contain mx-auto rounded-xl" alt="Sertifika" />
+            imageError ? (
+              <div className="flex flex-col items-center gap-3 py-12" style={{ color: 'var(--color-text-muted)' }}>
+                <FileX className="h-12 w-12" />
+                <p className="text-sm">Görüntü yüklenemedi. Dosya taşınmış veya erişilemiyor olabilir.</p>
+              </div>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={data.url}
+                className="max-w-full max-h-[65vh] object-contain mx-auto rounded-xl"
+                alt="Sertifika"
+                referrerPolicy="no-referrer"
+                onError={() => setImageError(true)}
+              />
+            )
           ) : (
             <div className="flex flex-col items-center gap-3 py-12" style={{ color: 'var(--color-text-muted)' }}>
               <FileX className="h-12 w-12" />

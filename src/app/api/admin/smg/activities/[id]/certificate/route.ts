@@ -28,9 +28,27 @@ export async function GET(
 
   const cert = activity.certificateUrl
   const isS3Key = cert.startsWith('smg/') || cert.startsWith('certificates/')
-  const url = isS3Key ? await getDownloadUrl(cert) : cert
 
-  // content type tespiti
+  let url: string | null = null
+  if (isS3Key) {
+    url = await getDownloadUrl(cert)
+  } else {
+    // Harici URL — yalnızca HTTPS kabul edilir; javascript:, data:, http: XSS/phishing riski taşır
+    try {
+      const parsed = new URL(cert)
+      if (parsed.protocol === 'https:') {
+        url = cert
+      }
+    } catch {
+      // geçersiz URL
+    }
+  }
+
+  if (!url) {
+    return jsonResponse({ url: null, type: null }, 200, headers)
+  }
+
+  // content type tespiti — dosya uzantısına göre
   const lower = cert.toLowerCase()
   let type: 'pdf' | 'image' | null = null
   if (lower.endsWith('.pdf')) type = 'pdf'

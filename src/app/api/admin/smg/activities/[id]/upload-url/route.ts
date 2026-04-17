@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { getUploadUrl } from '@/lib/s3'
+import { logger } from '@/lib/logger'
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
 
@@ -34,12 +35,20 @@ export async function POST(
   const safeFilename = body.filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
   const key = `smg/${dbUser!.organizationId}/${id}/${Date.now()}-${safeFilename}`
 
-  const uploadUrl = await getUploadUrl(key, body.contentType)
+  // DB güncellemesi presigned URL üretiminden önce yapılır.
+  // Böylece DB hata verirse client'a asla kullanılacak URL verilmez
+  // ve S3'te orphan key oluşma riski ortadan kalkar.
+  try {
+    await prisma.smgActivity.update({
+      where: { id },
+      data: { certificateUrl: key },
+    })
+  } catch (err) {
+    logger.error('SmgUploadUrl', 'DB update failed', { activityId: id, err })
+    return errorResponse('Sertifika kaydı güncellenemedi. Lütfen tekrar deneyin.', 500)
+  }
 
-  await prisma.smgActivity.update({
-    where: { id },
-    data: { certificateUrl: key },
-  })
+  const uploadUrl = await getUploadUrl(key, body.contentType)
 
   await createAuditLog({
     userId: dbUser!.id,

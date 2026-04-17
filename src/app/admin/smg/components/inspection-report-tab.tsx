@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Download, Printer, ChevronDown, ChevronRight, FileCheck2 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { Button } from '@/components/ui/button';
@@ -62,6 +63,8 @@ interface InspectionReportData {
 
 interface Props {
   periods: Period[];
+  /** URL query string ile period persistansı. Varsayılan false — ana sayfa sekmesinde tema temiz kalsın diye. */
+  syncWithUrl?: boolean;
 }
 
 function rateColor(rate: number) {
@@ -70,9 +73,26 @@ function rateColor(rate: number) {
   return { bg: 'var(--color-error-bg)', fg: 'var(--color-error)' };
 }
 
-export function InspectionReportTab({ periods }: Props) {
-  const [periodId, setPeriodId] = useState(periods[0]?.id ?? '');
+export function InspectionReportTab({ periods, syncWithUrl = false }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlPeriodId = syncWithUrl ? (searchParams?.get('periodId') ?? '') : '';
+
+  const [periodId, setPeriodId] = useState(urlPeriodId || periods[0]?.id || '');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // URL ↔ state senkronu (yalnızca syncWithUrl=true olduğunda)
+  useEffect(() => {
+    if (!syncWithUrl) return;
+    if (urlPeriodId !== periodId) {
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      if (periodId) params.set('periodId', periodId);
+      else params.delete('periodId');
+      router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodId, syncWithUrl]);
 
   const url = periodId ? `/api/admin/smg/inspection-report?periodId=${periodId}` : '/api/admin/smg/inspection-report';
   const { data, isLoading } = useFetch<InspectionReportData>(url);
