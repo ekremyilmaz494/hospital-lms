@@ -454,6 +454,16 @@ export const updateStandaloneExamSchema = z.object({
   endDate: z.string().datetime().optional(),
   isCompulsory: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  publishStatus: z.enum(['draft', 'published', 'archived']).optional(),
+  randomizeQuestions: z.boolean().optional(),
+  randomQuestionCount: z.coerce.number().int().min(1).nullable().optional(),
+  questions: z.array(z.object({
+    id: z.string().uuid().optional(),
+    text: z.string().min(5, 'Soru metni en az 5 karakter olmalı'),
+    points: z.coerce.number().int().min(1).max(100).default(10),
+    correctOptionIndex: z.coerce.number().int().min(0).max(3),
+    options: z.array(z.string().min(1)).length(4, 'Her soru için 4 şık gereklidir'),
+  })).max(200).optional(),
 })
 
 // ── SORU BANKASI ──

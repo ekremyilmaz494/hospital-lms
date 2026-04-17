@@ -203,6 +203,35 @@ export async function invalidateOrgCache(orgId: string, entity: string): Promise
   }
 }
 
+/**
+ * Invalidate all cache keys matching the given prefix (e.g., "standalone-exams:{orgId}:").
+ * Unlike invalidateOrgCache, this does not force the `cache:` prefix — useful for legacy
+ * key naming patterns. Uses Redis SCAN for pattern matching and also clears L1 memory cache.
+ */
+export async function invalidateByPrefix(prefix: string): Promise<void> {
+  const redis = getRedis()
+  if (redis) {
+    try {
+      let cursor = '0'
+      do {
+        const result: [string, string[]] = await redis.scan(cursor, { match: `${prefix}*`, count: 100 })
+        cursor = result[0]
+        const keys = result[1]
+        if (keys.length > 0) {
+          await Promise.all(keys.map((k: string) => redis.del(k)))
+        }
+      } while (cursor !== '0')
+    } catch {
+      resetRedis()
+    }
+  }
+  for (const k of Array.from(memoryCache.keys())) {
+    if (k.startsWith(prefix)) {
+      memoryCache.delete(k)
+    }
+  }
+}
+
 // ── Rate Limiting ──
 
 /** Validates rate limit keys to reject unsafe characters (injection prevention) */

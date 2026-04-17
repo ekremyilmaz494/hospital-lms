@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
-  Info, FileQuestion, ArrowLeft, Save, Plus, Trash2, GripVertical, Loader2,
+  ArrowLeft, Save, Plus, Trash2, GripVertical, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,11 +37,13 @@ interface ExamData {
   isCompulsory: boolean;
   isActive: boolean;
   publishStatus: string;
+  randomizeQuestions?: boolean;
+  attemptCount?: number;
   questions: {
     id: string;
     text: string;
-    sortOrder: number;
-    options: { id: string; text: string; isCorrect: boolean; sortOrder: number }[];
+    points?: number;
+    options: { id: string; text: string; isCorrect: boolean; order?: number }[];
   }[];
 }
 
@@ -61,11 +63,16 @@ export default function EditExamPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isCompulsory, setIsCompulsory] = useState(false);
+  const [randomizeQuestions, setRandomizeQuestions] = useState(false);
+  const [hasAttempts, setHasAttempts] = useState(false);
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
 
   useEffect(() => {
     fetch(`/api/admin/standalone-exams/${examId}`)
-      .then(r => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error('load-failed');
+        return r.json();
+      })
       .then((exam: ExamData) => {
         setTitle(exam.title);
         setDescription(exam.description ?? '');
@@ -75,13 +82,15 @@ export default function EditExamPage() {
         setStartDate(exam.startDate.split('T')[0]);
         setEndDate(exam.endDate.split('T')[0]);
         setIsCompulsory(exam.isCompulsory);
+        setRandomizeQuestions(exam.randomizeQuestions ?? false);
+        setHasAttempts((exam.attemptCount ?? 0) > 0);
         setQuestions(
-          exam.questions.map((q, i) => ({
+          exam.questions.map((q) => ({
             id: q.id,
             text: q.text,
-            points: 10,
-            options: q.options.map(o => o.text),
-            correct: q.options.findIndex(o => o.isCorrect),
+            points: q.points ?? 10,
+            options: q.options.map((o) => o.text),
+            correct: q.options.findIndex((o) => o.isCorrect),
           }))
         );
         setLoading(false);
@@ -102,21 +111,42 @@ export default function EditExamPage() {
 
   const handleSave = async () => {
     if (!title.trim()) { toast('Sınav adı gerekli', 'error'); return; }
+    if (new Date(endDate) <= new Date(startDate)) {
+      toast('Bitiş tarihi başlangıç tarihinden sonra olmalı', 'error');
+      return;
+    }
+    const validQuestions = questions.filter(
+      (q) => q.text.trim().length >= 5 && q.options.every((o) => o.trim().length > 0) && q.correct >= 0,
+    );
+    if (questions.length !== validQuestions.length) {
+      toast('Tüm sorularda metin (min 5 karakter), 4 şık ve doğru cevap gerekli', 'error');
+      return;
+    }
     setSaving(true);
     try {
+      const body: Record<string, unknown> = {
+        title,
+        description,
+        passingScore,
+        maxAttempts,
+        examDurationMinutes,
+        startDate: new Date(startDate).toISOString(),
+        endDate: new Date(endDate).toISOString(),
+        isCompulsory,
+        randomizeQuestions,
+      };
+      if (!hasAttempts) {
+        body.questions = validQuestions.map((q) => ({
+          text: q.text,
+          points: q.points,
+          correctOptionIndex: q.correct,
+          options: q.options,
+        }));
+      }
       const res = await fetch(`/api/admin/standalone-exams/${examId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          description,
-          passingScore,
-          maxAttempts,
-          examDurationMinutes,
-          startDate: new Date(startDate).toISOString(),
-          endDate: new Date(endDate).toISOString(),
-          isCompulsory,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Güncelleme başarısız');
@@ -196,20 +226,33 @@ export default function EditExamPage() {
           </div>
           <div>
             <Label>Süre (dk)</Label>
-            <Input type="number" min={1} max={180} value={examDurationMinutes} onChange={(e) => setExamDurationMinutes(Number(e.target.value))} className="mt-1" />
+            <Input type="number" min={5} max={180} value={examDurationMinutes} onChange={(e) => setExamDurationMinutes(Number(e.target.value))} className="mt-1" />
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setIsCompulsory(v => !v)}
-            className="relative inline-flex shrink-0 cursor-pointer rounded-full"
-            style={{ width: 48, height: 26, background: isCompulsory ? 'var(--color-primary)' : 'var(--color-border)', transition: 'background 0.25s' }}
-          >
-            <span className="absolute rounded-full bg-white" style={{ width: 20, height: 20, top: 3, left: isCompulsory ? 25 : 3, boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.25s' }} />
-          </button>
-          <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Zorunlu Sınav</span>
+        <div className="mt-4 flex flex-wrap items-center gap-6">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsCompulsory((v) => !v)}
+              className="relative inline-flex shrink-0 cursor-pointer rounded-full"
+              style={{ width: 48, height: 26, background: isCompulsory ? 'var(--color-primary)' : 'var(--color-border)', transition: 'background 0.25s' }}
+            >
+              <span className="absolute rounded-full bg-white" style={{ width: 20, height: 20, top: 3, left: isCompulsory ? 25 : 3, boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.25s' }} />
+            </button>
+            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Zorunlu Sınav</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setRandomizeQuestions((v) => !v)}
+              className="relative inline-flex shrink-0 cursor-pointer rounded-full"
+              style={{ width: 48, height: 26, background: randomizeQuestions ? 'var(--color-primary)' : 'var(--color-border)', transition: 'background 0.25s' }}
+            >
+              <span className="absolute rounded-full bg-white" style={{ width: 20, height: 20, top: 3, left: randomizeQuestions ? 25 : 3, boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.25s' }} />
+            </button>
+            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Soruları Karıştır</span>
+          </div>
         </div>
       </div>
 
@@ -217,10 +260,17 @@ export default function EditExamPage() {
       <div className="rounded-2xl border p-6" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold">{questions.length} Soru</h3>
-          <Button onClick={addQuestion} variant="outline" className="gap-2 rounded-xl">
-            <Plus className="h-4 w-4" /> Soru Ekle
-          </Button>
+          {!hasAttempts && (
+            <Button onClick={addQuestion} variant="outline" className="gap-2 rounded-xl">
+              <Plus className="h-4 w-4" /> Soru Ekle
+            </Button>
+          )}
         </div>
+        {hasAttempts && (
+          <div className="mb-4 rounded-xl border p-3 text-xs" style={{ background: 'var(--color-warning-bg)', borderColor: 'var(--color-warning)', color: 'var(--color-warning)' }}>
+            Sınava katılım başladığı için sorular değiştirilemez. Değişiklik için önce sınavı arşivleyin veya yeni bir sınav oluşturun.
+          </div>
+        )}
 
         <div className="space-y-4">
           {questions.map((q, qi) => (
@@ -232,20 +282,24 @@ export default function EditExamPage() {
                     <span className="text-xs font-bold" style={{ color: 'var(--color-text-muted)' }}>S{qi + 1}</span>
                     <Input
                       value={q.text}
+                      readOnly={hasAttempts}
                       onChange={(e) => setQuestions(prev => prev.map((p, i) => i === qi ? { ...p, text: e.target.value } : p))}
                       placeholder="Soru metni..."
                       className="flex-1"
                     />
-                    <Button variant="ghost" size="icon" onClick={() => removeQuestion(qi)}>
-                      <Trash2 className="h-4 w-4" style={{ color: 'var(--color-error)' }} />
-                    </Button>
+                    {!hasAttempts && (
+                      <Button variant="ghost" size="icon" onClick={() => removeQuestion(qi)}>
+                        <Trash2 className="h-4 w-4" style={{ color: 'var(--color-error)' }} />
+                      </Button>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {q.options.map((opt, oi) => (
                       <div key={oi} className="flex items-center gap-2">
                         <button
+                          disabled={hasAttempts}
                           onClick={() => setQuestions(prev => prev.map((p, i) => i === qi ? { ...p, correct: oi } : p))}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold"
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold disabled:cursor-not-allowed"
                           style={{
                             borderColor: q.correct === oi ? 'var(--color-success)' : 'var(--color-border)',
                             background: q.correct === oi ? 'var(--color-success)' : 'transparent',
@@ -256,6 +310,7 @@ export default function EditExamPage() {
                         </button>
                         <Input
                           value={opt}
+                          readOnly={hasAttempts}
                           onChange={(e) => {
                             const newOptions = [...q.options];
                             newOptions[oi] = e.target.value;

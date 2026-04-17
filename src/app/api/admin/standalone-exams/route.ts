@@ -12,7 +12,7 @@ import {
 } from '@/lib/api-helpers'
 import { createStandaloneExamSchema } from '@/lib/validations'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
-import { getCached, setCached, invalidateCache } from '@/lib/redis'
+import { getCached, setCached, invalidateByPrefix } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 
 export async function GET(request: Request) {
@@ -26,9 +26,16 @@ export async function GET(request: Request) {
   const { page, limit, search, skip } = safePagination(searchParams)
   const category = searchParams.get('category')
 
+  const includeArchived = searchParams.get('includeArchived') === 'true'
+
   const where: Record<string, unknown> = {
     organizationId: dbUser!.organizationId!,
     examOnly: true,
+  }
+
+  if (!includeArchived) {
+    where.isActive = true
+    where.publishStatus = { not: 'archived' }
   }
 
   if (search) {
@@ -40,7 +47,7 @@ export async function GET(request: Request) {
   if (category) where.category = category
 
   // Redis cache: 5 dk TTL
-  const cacheKey = `standalone-exams:${dbUser!.organizationId!}:${page}:${search ?? ''}:${category ?? ''}`
+  const cacheKey = `standalone-exams:${dbUser!.organizationId!}:${page}:${search ?? ''}:${category ?? ''}:${includeArchived ? 'inc' : 'exc'}`
   const cached = await getCached<object>(cacheKey)
   if (cached) return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 
@@ -179,6 +186,8 @@ export async function POST(request: Request) {
             startDate: new Date(examData.startDate),
             endDate: new Date(examData.endDate),
             isCompulsory: examData.isCompulsory,
+            randomizeQuestions: examData.randomizeQuestions ?? false,
+            randomQuestionCount: examData.randomQuestionCount ?? null,
             examOnly: true,
             organizationId: dbUser!.organizationId!,
             createdById: dbUser!.id,
@@ -254,11 +263,11 @@ export async function POST(request: Request) {
 
     revalidatePath('/admin/exams')
 
-    // Cache invalidation — org bazlı key'leri temizle
+    // Cache invalidation — org bazlı tüm sayfaları ve rapor cache'ini temizle
     try {
       await Promise.all([
-        invalidateCache(`standalone-exams:${dbUser!.organizationId!}:1::`),
-        invalidateCache(`reports:${dbUser!.organizationId!}:all:all:all`),
+        invalidateByPrefix(`standalone-exams:${dbUser!.organizationId!}:`),
+        invalidateByPrefix(`reports:${dbUser!.organizationId!}:`),
         invalidateDashboardCache(dbUser!.organizationId!),
       ])
     } catch {}
