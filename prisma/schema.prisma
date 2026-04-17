@@ -674,7 +674,7 @@ model DepartmentTrainingRule {
 
 // ── SMG AKTİVİTELERİ ──
 model SmgActivity {
-  id             String    @id @default(uuid()) @db.Uuid
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId         String    @map("user_id") @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   activityType   String    @map("activity_type") @db.VarChar(50)
@@ -695,7 +695,7 @@ model SmgActivity {
   user         User         @relation("UserSmgActivities", fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   approver     User?        @relation("SmgApprovals", fields: [approvedBy], references: [id], onDelete: SetNull)
-  category     SmgCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  category     SmgCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull, map: "smg_activities_category_fkey")
 
   @@unique([userId, activityType, title, completionDate], map: "idx_smg_activities_unique")
   @@index([userId], map: "idx_smg_activities_user")
@@ -706,7 +706,7 @@ model SmgActivity {
 
 // ── SMG DÖNEMLERİ ──
 model SmgPeriod {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   name           String   @db.VarChar(255)
   startDate      DateTime @map("start_date") @db.Date
@@ -724,7 +724,7 @@ model SmgPeriod {
 
 // ── SMG KATEGORİLERİ (SKS Uyumlu) ──
 model SmgCategory {
-  id                   String   @id @default(uuid()) @db.Uuid
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId       String   @map("organization_id") @db.Uuid
   name                 String   @db.VarChar(255)
   code                 String   @db.VarChar(50)
@@ -735,7 +735,7 @@ model SmgCategory {
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "smg_categories_org_fkey")
   activities   SmgActivity[]
 
   @@unique([organizationId, code], map: "idx_smg_categories_org_code")
@@ -745,7 +745,7 @@ model SmgCategory {
 
 // ── SMG HEDEFLERİ (Unvana/Kişiye Göre) ──
 model SmgTarget {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   periodId       String   @map("period_id") @db.Uuid
   unvan          String?  @db.VarChar(100)
@@ -753,9 +753,9 @@ model SmgTarget {
   requiredPoints Int      @map("required_points")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  organization Organization @relation("SmgTargetOrg", fields: [organizationId], references: [id], onDelete: Cascade)
-  period       SmgPeriod    @relation(fields: [periodId], references: [id], onDelete: Cascade)
-  user         User?        @relation("SmgTargetOverrides", fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization @relation("SmgTargetOrg", fields: [organizationId], references: [id], onDelete: Cascade, map: "smg_targets_org_fkey")
+  period       SmgPeriod    @relation(fields: [periodId], references: [id], onDelete: Cascade, map: "smg_targets_period_fkey")
+  user         User?        @relation("SmgTargetOverrides", fields: [userId], references: [id], onDelete: SetNull, map: "smg_targets_user_fkey")
 
   // NOT: Unique kısıtı artık migration'da 3 ayrı partial unique index olarak tanımlı
   // (PostgreSQL NULL semantiği ayrımı için). Bkz: 20260416120000_smg_targets_partial_unique.
@@ -820,7 +820,7 @@ model OrganizationContentLibrary {
 
 // ── HIS ENTEGRASYONU ──
 model HisIntegration {
-  id             String    @id @default(uuid()) @db.Uuid
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   name           String    @db.VarChar(255)
   baseUrl        String    @map("base_url") @db.VarChar(500)
@@ -844,7 +844,7 @@ model HisIntegration {
 
 // ── SENKRONIZASYON LOGLARI ──
 model SyncLog {
-  id               String    @id @default(uuid()) @db.Uuid
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId   String    @map("organization_id") @db.Uuid
   integrationId    String    @map("integration_id") @db.Uuid
   syncType         String    @map("sync_type") @db.VarChar(30)
@@ -867,7 +867,7 @@ model SyncLog {
 // ── 360° YETKİNLİK DEĞERLENDİRME ──
 
 model CompetencyForm {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   title          String   @db.VarChar(255)
   description    String?  @db.Text
@@ -886,7 +886,7 @@ model CompetencyForm {
 }
 
 model CompetencyCategory {
-  id     String @id @default(uuid()) @db.Uuid
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   formId String @map("form_id") @db.Uuid
   name   String @db.VarChar(255)
   weight Int    @default(0)
@@ -900,7 +900,7 @@ model CompetencyCategory {
 }
 
 model CompetencyItem {
-  id          String  @id @default(uuid()) @db.Uuid
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   categoryId  String  @map("category_id") @db.Uuid
   text        String  @db.VarChar(500)
   description String? @db.Text
@@ -914,7 +914,7 @@ model CompetencyItem {
 }
 
 model CompetencyEvaluation {
-  id            String    @id @default(uuid()) @db.Uuid
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   formId        String    @map("form_id") @db.Uuid
   subjectId     String    @map("subject_id") @db.Uuid
   evaluatorId   String    @map("evaluator_id") @db.Uuid
@@ -939,7 +939,7 @@ model CompetencyEvaluation {
 }
 
 model CompetencyAnswer {
-  id           String  @id @default(uuid()) @db.Uuid
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   evaluationId String  @map("evaluation_id") @db.Uuid
   itemId       String  @map("item_id") @db.Uuid
   score        Int
@@ -971,7 +971,7 @@ model PushSubscription {
 
 // ── AKREDİTASYON STANDARTLARI (global — organizasyona bağlı değil) ──
 model AccreditationStandard {
-  id                         String   @id @default(uuid()) @db.Uuid
+  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   code                       String   @unique @db.VarChar(50)
   title                      String   @db.VarChar(500)
   description                String?  @db.Text
@@ -987,7 +987,7 @@ model AccreditationStandard {
 
 // ── AKREDİTASYON RAPORLARI ──
 model AccreditationReport {
-  id                    String   @id @default(uuid()) @db.Uuid
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId        String   @map("organization_id") @db.Uuid
   title                 String   @db.VarChar(500)
   standardBody          String   @map("standard_body") @db.VarChar(20)
@@ -1169,7 +1169,7 @@ model AiGoogleConnection {
 // ──────────────────────────────────────────────────────────────
 
 model TrainingFeedbackForm {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @unique @map("organization_id") @db.Uuid
   title          String   @default("Eğitim Değerlendirme Anket Formu") @db.VarChar(255)
   description    String?  @db.Text
@@ -1186,7 +1186,7 @@ model TrainingFeedbackForm {
 }
 
 model TrainingFeedbackCategory {
-  id     String @id @default(uuid()) @db.Uuid
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   formId String @map("form_id") @db.Uuid
   name   String @db.VarChar(255)
   order  Int    @default(0)
@@ -1199,7 +1199,7 @@ model TrainingFeedbackCategory {
 }
 
 model TrainingFeedbackItem {
-  id           String  @id @default(uuid()) @db.Uuid
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   categoryId   String  @map("category_id") @db.Uuid
   text         String  @db.VarChar(500)
   // likert_5 (1-5) | yes_partial_no (1=Evet, 2=Kısmen, 3=Hayır) | text (serbest metin)
@@ -1215,7 +1215,7 @@ model TrainingFeedbackItem {
 }
 
 model TrainingFeedbackResponse {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   formId         String   @map("form_id") @db.Uuid
   attemptId      String   @unique @map("attempt_id") @db.Uuid
   trainingId     String   @map("training_id") @db.Uuid
@@ -1238,7 +1238,7 @@ model TrainingFeedbackResponse {
 }
 
 model TrainingFeedbackAnswer {
-  id         String  @id @default(uuid()) @db.Uuid
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   responseId String  @map("response_id") @db.Uuid
   itemId     String  @map("item_id") @db.Uuid
   score      Int?
