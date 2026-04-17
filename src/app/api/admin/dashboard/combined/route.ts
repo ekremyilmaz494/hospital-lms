@@ -5,6 +5,58 @@ import { logger } from '@/lib/logger'
 
 const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' }
 
+// Audit log action → Türkçe etiket. Bilinmeyenler için action'ı okunur hale getir.
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  login: 'giriş yaptı',
+  logout: 'çıkış yaptı',
+  self_register: 'kendini kaydetti',
+  password_changed: 'şifresini değiştirdi',
+  'password.changed': 'şifresini değiştirdi',
+  profile_update: 'profilini güncelledi',
+  'profile.updated': 'profilini güncelledi',
+  'training.create.full': 'yeni eğitim oluşturdu',
+  'training.update': 'bir eğitimi güncelledi',
+  'training.delete': 'bir eğitimi sildi',
+  bulk_assign: 'toplu eğitim ataması yaptı',
+  send_reminder: 'hatırlatma gönderdi',
+  'certificate.created_manual': 'manuel sertifika oluşturdu',
+  'certificate.revoked': 'bir sertifikayı iptal etti',
+  'certificate.restored': 'bir sertifikayı yeniden aktif etti',
+  certificate_download: 'sertifika indirdi',
+  'report.export': 'rapor dışa aktardı',
+  'data.export': 'veri dışa aktardı',
+  'standalone_exam.create': 'bağımsız sınav oluşturdu',
+  'standalone_exam.export': 'bağımsız sınav sonuçlarını dışa aktardı',
+  'feedback.submitted': 'geri bildirim gönderdi',
+  'feedback_form.updated': 'geri bildirim formunu güncelledi',
+  reset_attempt: 'sınav denemesini sıfırladı',
+  scorm_upload: 'SCORM paketi yükledi',
+  scorm_certificate_created: 'SCORM sertifikası oluşturdu',
+  'department.members.add': 'departmana üye ekledi',
+  'department.members.remove': 'departmandan üye çıkardı',
+  duplicate: 'kopyaladı',
+  create: 'oluşturdu',
+  delete: 'sildi',
+  accreditation_report_generated: 'akreditasyon raporu oluşturdu',
+  accreditation_action_plan_created: 'akreditasyon aksiyon planı oluşturdu',
+  'invoice.sent': 'fatura gönderdi',
+  'payment.checkout.start': 'ödeme başlattı',
+  question_bank_import: 'soru bankası içe aktardı',
+  'question_bank.import': 'soru bankası içe aktardı',
+  ai_generation_start: 'AI içerik üretimi başlattı',
+  ai_generation_save_to_library: 'AI içeriği kütüphaneye kaydetti',
+  restore_preview: 'yedek önizlemesi yaptı',
+  restore_executed: 'yedekten geri yükledi',
+}
+
+function translateAuditAction(raw: string): string {
+  const direct = AUDIT_ACTION_LABELS[raw]
+  if (direct) return direct
+  // Fallback: snake_case/dot.notation → "işlem gerçekleştirdi" yerine anlaşılır etiket
+  const normalized = raw.replace(/[._]/g, ' ')
+  return `"${normalized}" işlemi gerçekleştirdi`
+}
+
 async function fetchStats(orgId: string) {
   const cacheKey = `dashboard:stats:${orgId}`
   const cached = await getCached<object>(cacheKey)
@@ -13,21 +65,22 @@ async function fetchStats(orgId: string) {
   // Archived/inactive training'ler dashboard sayımlarından dışarı
   const trainingScope = { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } }
 
-  const [staffCount, activeStaffCount, trainingCount, activeTrainingCount, statusCounts, compulsoryTrainings, overdueCount] = await Promise.all([
+  const [staffCount, activeStaffCount, publishedTrainingCount, activeTrainingCount, statusCounts, compulsoryTrainings, overdueCount] = await Promise.all([
     prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
     prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
-    prisma.training.count({ where: { organizationId: orgId, publishStatus: { not: 'archived' } } }),
+    // "Toplam yayındaki" — draft hariç, archived hariç, active
+    prisma.training.count({ where: { ...trainingScope, publishStatus: 'published' } }),
     prisma.training.count({ where: trainingScope }),
     prisma.trainingAssignment.groupBy({ by: ['status'], where: { training: trainingScope }, _count: true }),
     prisma.training.findMany({
       where: { ...trainingScope, isCompulsory: true },
       select: { id: true, title: true, complianceDeadline: true, regulatoryBody: true, assignments: { select: { status: true } } },
     }),
-    // Geciken eğitim: süresi dolmuş ama tamamlanmamış atamalar
+    // Geciken eğitim: süresi dolmuş, henüz tamamlanmamış. Failed = tamamlandı (kaldı), overdue değil.
     prisma.trainingAssignment.count({
       where: {
         training: { ...trainingScope, endDate: { lt: new Date() } },
-        status: { notIn: ['passed'] },
+        status: { notIn: ['passed', 'failed'] },
       },
     }),
   ])
@@ -42,7 +95,10 @@ async function fetchStats(orgId: string) {
 
   const compulsoryAssignments = compulsoryTrainings.flatMap(t => t.assignments)
   const compulsoryCompleted = compulsoryAssignments.filter(a => a.status === 'passed').length
-  const complianceRate = compulsoryAssignments.length > 0 ? Math.round((compulsoryCompleted / compulsoryAssignments.length) * 100) : 100
+  // Hiç zorunlu eğitim ataması yoksa "—" göster (yanıltıcı %100 yerine)
+  const hasCompliance = compulsoryAssignments.length > 0
+  const complianceRate = hasCompliance ? Math.round((compulsoryCompleted / compulsoryAssignments.length) * 100) : 0
+  const complianceValue: number | string = hasCompliance ? `%${complianceRate}` : '—'
 
   const complianceAlerts = compulsoryTrainings
     .filter(t => t.complianceDeadline && new Date(t.complianceDeadline) > now)
@@ -69,10 +125,10 @@ async function fetchStats(orgId: string) {
   const data = {
     stats: [
       { title: 'Toplam Personel', value: staffCount, icon: 'Users', accentColor: 'var(--color-primary)', trend: { value: activeStaffCount, label: 'aktif', isPositive: true } },
-      { title: 'Aktif Egitim', value: activeTrainingCount, icon: 'GraduationCap', accentColor: 'var(--color-info)', trend: { value: trainingCount, label: 'toplam', isPositive: true } },
+      { title: 'Aktif Egitim', value: activeTrainingCount, icon: 'GraduationCap', accentColor: 'var(--color-info)', trend: { value: publishedTrainingCount, label: 'yayında', isPositive: true } },
       { title: 'Tamamlanma Orani', value: `%${completionRate}`, icon: 'TrendingUp', accentColor: 'var(--color-success)', trend: { value: completedCount, label: 'tamamlanan', isPositive: true } },
       { title: 'Geciken Egitim', value: overdueCount, icon: 'AlertTriangle', accentColor: 'var(--color-error)', trend: { value: failedCount, label: 'basarisiz', isPositive: false } },
-      { title: 'Uyum Orani', value: `%${complianceRate}`, icon: 'ShieldCheck', accentColor: complianceRate >= 80 ? 'var(--color-success)' : complianceRate >= 60 ? 'var(--color-warning)' : 'var(--color-error)', trend: { value: compulsoryTrainings.length, label: 'zorunlu egitim', isPositive: complianceRate >= 80 } },
+      { title: 'Uyum Orani', value: complianceValue, icon: 'ShieldCheck', accentColor: !hasCompliance ? 'var(--color-text-muted)' : complianceRate >= 80 ? 'var(--color-success)' : complianceRate >= 60 ? 'var(--color-warning)' : 'var(--color-error)', trend: { value: compulsoryTrainings.length, label: 'zorunlu egitim', isPositive: complianceRate >= 80 } },
     ],
     complianceAlerts,
     statusDistribution,
@@ -204,25 +260,39 @@ async function fetchActivity(orgId: string) {
 
   const performerMap = new Map<string, { name: string; department: string; scores: number[]; courses: number; initials: string }>()
   for (const a of topPerformerData) {
-    const score = Number(a.examAttempts[0]?.postExamScore ?? a.examAttempts[0]?.preExamScore ?? 0)
+    // status='passed' olduğundan postExamScore olmalı — yoksa skoru sayma, ama course count'ı artır
+    const rawScore = a.examAttempts[0]?.postExamScore
+    const score = rawScore != null ? Number(rawScore) : null
     const existing = performerMap.get(a.userId)
-    if (existing) { existing.scores.push(score); existing.courses++ }
-    else {
+    if (existing) {
+      if (score != null) existing.scores.push(score)
+      existing.courses++
+    } else {
       const fn = a.user.firstName ?? '', ln = a.user.lastName ?? ''
-      performerMap.set(a.userId, { name: `${fn} ${ln}`, department: a.user.departmentRel?.name ?? '', scores: [score], courses: 1, initials: `${fn[0] ?? ''}${ln[0] ?? ''}`.toUpperCase() })
+      performerMap.set(a.userId, {
+        name: `${fn} ${ln}`,
+        department: a.user.departmentRel?.name ?? '',
+        scores: score != null ? [score] : [],
+        courses: 1,
+        initials: `${fn[0] ?? ''}${ln[0] ?? ''}`.toUpperCase(),
+      })
     }
   }
 
   const data = {
     topPerformers: Array.from(performerMap.values())
+      .filter(p => p.scores.length > 0)
       .map(p => ({ ...p, score: Math.round(p.scores.reduce((a, b) => a + b, 0) / p.scores.length), color: 'var(--color-primary)' }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 4),
     recentActivity: recentLogs.map(log => ({
-      action: log.action,
+      action: translateAuditAction(log.action),
       user: log.user ? `${log.user.firstName} ${log.user.lastName}` : 'Sistem',
       time: log.createdAt.toISOString(),
-      type: log.action.includes('delete') ? 'error' : log.action.includes('create') ? 'success' : 'info',
+      type: log.action.includes('delete') || log.action.includes('revoke') ? 'error'
+        : log.action.includes('create') || log.action.includes('passed') ? 'success'
+        : log.action.includes('fail') ? 'warning'
+        : 'info',
     })),
   }
 
@@ -239,7 +309,11 @@ async function fetchCerts(orgId: string) {
   const sixtyDays = new Date(now.getTime() + 60 * 86400000)
 
   const expiringCertsData = await prisma.certificate.findMany({
-    where: { training: { organizationId: orgId }, expiresAt: { gte: now, lte: sixtyDays } },
+    where: {
+      training: { organizationId: orgId },
+      expiresAt: { gte: now, lte: sixtyDays },
+      revokedAt: null, // iptal edilmiş sertifikalar "yaklaşıyor" listesinde çıkmasın
+    },
     include: { user: { select: { firstName: true, lastName: true } }, training: { select: { title: true } } },
     orderBy: { expiresAt: 'asc' },
     take: 10,

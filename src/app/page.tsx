@@ -15,8 +15,20 @@ export const metadata: Metadata = {
   },
 };
 
+const ScrollStorySection = dynamic(() =>
+  import("@/components/landing/scroll-story-section").then((m) => ({
+    default: m.ScrollStorySection,
+  }))
+);
+
 const StatsSection = dynamic(() =>
   import("./(landing)/stats-section").then((m) => ({ default: m.StatsSection }))
+);
+
+const FeaturedTrainingsSection = dynamic(() =>
+  import("@/components/landing/featured-trainings-section").then((m) => ({
+    default: m.FeaturedTrainingsSection,
+  }))
 );
 
 const FeaturesSection = dynamic(() =>
@@ -35,7 +47,9 @@ export default function LandingPage() {
   return (
     <div style={{ backgroundColor: "#f5f0e6" }}>
       <HeroSection />
+      <ScrollStorySection />
       <StatsSection />
+      <FeaturedTrainingsSection />
       <FeaturesSection />
       <CtaSection />
       <TestimonialsSection />

@@ -5,12 +5,18 @@ import { useRouter, usePathname } from 'next/navigation';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
 import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
+import { MobileSidebarDrawer } from '@/components/layouts/mobile-sidebar-drawer';
+import { MobileBottomNav, type MobileBottomNavItem } from '@/components/layouts/mobile-bottom-nav';
 import { adminNav } from '@/components/layouts/sidebar/sidebar-config';
+import { LayoutDashboard, Users as UsersIcon, GraduationCap, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useLayoutBranding } from '@/hooks/use-layout-branding';
+import { useMobile } from '@/hooks/use-mobile';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 import { AiGenerationPoller } from '@/components/providers/ai-generation-poller';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
+import { createClient } from '@/lib/supabase/client';
+import { useAuthStore } from '@/store/auth-store';
 
 const roleLabels: Record<string, string> = {
   admin: 'Hastane Admin',
@@ -18,12 +24,21 @@ const roleLabels: Record<string, string> = {
   staff: 'Personel',
 };
 
+const adminBottomNavItems: readonly MobileBottomNavItem[] = [
+  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, rootHref: '/admin/dashboard' },
+  { href: '/admin/staff',     label: 'Personel',  icon: UsersIcon },
+  { href: '/admin/trainings', label: 'Eğitim',    icon: GraduationCap },
+  { href: '/admin/reports',   label: 'Rapor',     icon: BarChart3 },
+];
+
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const isMobile = useMobile();
   useEffect(() => {
     const saved = localStorage.getItem('sidebar:admin:collapsed');
     if (saved === 'false') setSidebarCollapsed(false);
@@ -62,9 +77,20 @@ export default function AdminLayout({
   }, [isLoading, user, isSetupPage, router]);
 
   const toggleSidebar = () => {
+    if (isMobile) {
+      setMobileDrawerOpen(true);
+      return;
+    }
     const next = !sidebarCollapsed;
     setSidebarCollapsed(next);
     localStorage.setItem('sidebar:admin:collapsed', String(next));
+  };
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    useAuthStore.getState().setUser(null);
+    router.push('/auth/login');
   };
 
   useEffect(() => {
@@ -90,20 +116,37 @@ export default function AdminLayout({
   return (
     <TooltipProvider>
       <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
-        <AppSidebar
+        {/* Sidebar: sadece md ve üzerinde göster */}
+        <div className="hidden md:block">
+          <AppSidebar
+            navGroups={adminNav}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleSidebar}
+            orgName={branding?.orgName || user?.department || ''}
+            orgCode={branding?.orgCode || ''}
+            orgLogoUrl={branding?.orgLogoUrl ?? undefined}
+            userName={fullName}
+            userRole={displayRole}
+            userInitials={initials}
+          />
+        </div>
+
+        {/* Mobil sidebar drawer */}
+        <MobileSidebarDrawer
+          open={mobileDrawerOpen}
+          onClose={() => setMobileDrawerOpen(false)}
           navGroups={adminNav}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={toggleSidebar}
           orgName={branding?.orgName || user?.department || ''}
-          orgCode={branding?.orgCode || ''}
           orgLogoUrl={branding?.orgLogoUrl ?? undefined}
           userName={fullName}
           userRole={displayRole}
           userInitials={initials}
+          onLogout={handleLogout}
         />
+
         <main
           className="min-h-screen"
-          style={{ marginLeft: 72 }}
+          style={{ marginLeft: isMobile ? 0 : 72 }}
         >
           <ImpersonationBanner />
           <AiGenerationPoller />
@@ -115,8 +158,12 @@ export default function AdminLayout({
             userRole={displayRole}
             userInitials={initials}
           />
-          <div className="p-8">{children}</div>
+          <div className="p-4 pb-20 md:p-8 md:pb-8">{children}</div>
         </main>
+        <MobileBottomNav
+          items={adminBottomNavItems}
+          onMorePress={() => setMobileDrawerOpen(true)}
+        />
       </div>
     </TooltipProvider>
   );

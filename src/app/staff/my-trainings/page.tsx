@@ -4,14 +4,13 @@ import { useState, useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import {
-  BookOpen, BookOpenText, Clock, CheckCircle2, XCircle, Lock, Play,
-  ArrowRight, ArrowUpRight, ClipboardCheck, AlertOctagon,
-  Library, Stethoscope, HeartPulse, Activity, ShieldCheck, Microscope,
-  FlaskConical, Syringe, Scale, Sparkles, Award,
+  BookOpen, Clock, CheckCircle2, Lock, Play, ArrowRight, ClipboardCheck,
+  AlertOctagon, Stethoscope, HeartPulse, Activity, ShieldCheck, Microscope,
+  FlaskConical, Syringe, Scale, Award, BookOpenText, TrendingUp, Hash,
+  CalendarDays, ChevronRight, Target, Flame,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
-import { PageLoading } from '@/components/shared/page-loading';
 import { MandatoryFeedbackBanner } from '@/components/shared/mandatory-feedback-banner';
 
 interface Training {
@@ -32,85 +31,85 @@ interface Training {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Tema — proje paletine bağlı (sage var(--brand-600) + amber #f59e0b)
-   Mockup'ın layout yapısı korunur, renkler projenin CSS var'ları
+   KLİNİK PALET — proje CSS değişkenlerine bağlı tema tokenları.
+   Dekoratif değil; her renk bir klinik anlam taşır (triyaj kodu).
    ───────────────────────────────────────────────────────────── */
-const T = {
-  // Yüzeyler — proje bg/surface
-  bg:                  'var(--color-bg)',
-  surfaceLowest:       'var(--color-surface)',
-  surfaceLow:          'var(--color-bg)',
-  surface:             'var(--color-surface)',
-  surfaceHigh:         'var(--color-border)',
-  // Primary — sage yeşili (mockup'ın forest green'i yerine)
-  primary:             'var(--color-primary)',
-  primaryContainer:    'var(--brand-800)',
-  primaryDeep:         '#022c22',
-  primaryFixed:        'var(--color-primary-light)',
-  primaryFixedDim:     'color-mix(in srgb, var(--brand-600) calc(0.28 * 100%), transparent)',
-  onPrimaryContainer:  'rgba(255,255,255,0.88)',
-  // Secondary — başarı yeşili (olive yerine)
-  secondary:           'var(--color-success)',
-  secondaryContainer:  'var(--color-success-bg)',
-  secondaryFixed:      'var(--color-success-bg)',
-  onSecondaryContainer:'var(--color-success)',
-  // Tertiary — amber (gold yerine)
-  tertiary:            'var(--color-accent)',
-  tertiaryContainer:   'var(--color-accent-light)',
-  tertiaryFixedDim:    'var(--color-accent)',
-  // Error
-  error:               'var(--color-error)',
-  errorContainer:      'var(--color-error-bg)',
-  onErrorContainer:    'var(--color-error)',
-  // Typography
-  onSurface:           'inherit',
-  onSurfaceVariant:    'var(--color-text-muted)',
-  outlineVariant:      'var(--color-border)',
+const C = {
+  surface:    'var(--color-surface)',
+  bg:         'var(--color-bg)',
+  border:     'var(--color-border)',
+  text:       'var(--color-text)',
+  textMuted:  'var(--color-text-muted)',
+  // Triyaj renkleri (sol kenar şeritleri için)
+  primary:    'var(--color-primary)',
+  primaryLt:  'var(--color-primary-light)',
+  primaryDk:  'var(--brand-800)',
+  success:    'var(--color-success)',
+  successBg:  'var(--color-success-bg)',
+  warning:    'var(--color-warning)',
+  warningBg:  'var(--color-warning-bg)',
+  error:      'var(--color-error)',
+  errorBg:    'var(--color-error-bg)',
+  accent:     'var(--color-accent)',
+  accentLt:   'var(--color-accent-light)',
 } as const;
 
-/* Category → representative clinical icon for hero panel */
+/* Kategori → klinik ikon eşlemesi (Türkçe anahtarlar) */
 const categoryIcon = (category: string): LucideIcon => {
-  const key = (category || '').toLowerCase();
-  if (key.includes('enfeksiyon')) return Microscope;
-  if (key.includes('hasta') || key.includes('hak')) return HeartPulse;
-  if (key.includes('radyoloji')) return Activity;
-  if (key.includes('güvenl') || key.includes('guvenl') || key.includes('osha')) return ShieldCheck;
-  if (key.includes('kvkk') || key.includes('veri')) return ShieldCheck;
-  if (key.includes('laboratuv') || key.includes('laboratuar')) return FlaskConical;
-  if (key.includes('ilk yardım') || key.includes('ilaç')) return Syringe;
-  if (key.includes('etik') || key.includes('hukuk')) return Scale;
-  if (key.includes('tıbbi') || key.includes('klinik')) return Stethoscope;
+  const k = (category || '').toLowerCase();
+  if (k.includes('enfeksiyon')) return Microscope;
+  if (k.includes('hasta') || k.includes('hak')) return HeartPulse;
+  if (k.includes('radyoloji')) return Activity;
+  if (k.includes('güvenl') || k.includes('guvenl') || k.includes('osha')) return ShieldCheck;
+  if (k.includes('kvkk') || k.includes('veri')) return ShieldCheck;
+  if (k.includes('laboratuv') || k.includes('laboratuar')) return FlaskConical;
+  if (k.includes('ilk yardım') || k.includes('ilaç')) return Syringe;
+  if (k.includes('etik') || k.includes('hukuk')) return Scale;
+  if (k.includes('tıbbi') || k.includes('klinik')) return Stethoscope;
   return BookOpenText;
 };
 
 type StatusKey = 'assigned' | 'in_progress' | 'passed' | 'failed' | 'locked';
 const statusLabel: Record<StatusKey, string> = {
-  assigned: 'Atandı', in_progress: 'Devam Ediyor', passed: 'Başarılı', failed: 'Başarısız', locked: 'Kilitli',
+  assigned: 'Atandı',
+  in_progress: 'Devam Ediyor',
+  passed: 'Başarılı',
+  failed: 'Başarısız',
+  locked: 'Kilitli',
 };
 
 export default function MyTrainingsPage() {
-  const { data: rawData, isLoading, error } = useFetch<{ data: Training[] } | Training[]>('/api/staff/my-trainings');
+  const { data: rawData, isLoading, error } =
+    useFetch<{ data: Training[] } | Training[]>('/api/staff/my-trainings');
   const [activeTab, setActiveTab] = useState<'trainings' | 'exams'>('trainings');
 
   const allItems: Training[] = useMemo(
-    () => Array.isArray(rawData) ? rawData : (rawData as { data: Training[] })?.data ?? [],
+    () => (Array.isArray(rawData) ? rawData : (rawData as { data: Training[] })?.data ?? []),
     [rawData]
   );
 
   const {
     trainingList, examCount, trainingCount,
     activeTrainings, exhaustedTrainings, completedTrainings, lockedTrainings,
-    totalCount, activeCount, completedCount, averageScore,
+    totalCount, activeCount, completedCount, averageScore, urgentCount,
   } = useMemo(() => {
-    const list = allItems.filter((t) => activeTab === 'exams' ? t.examOnly : !t.examOnly);
-    const isExhaustedFailed = (t: Training) => t.status === 'failed' && t.attempt >= t.maxAttempts;
-    const active = list.filter(t => (t.status === 'assigned' || t.status === 'in_progress' || t.status === 'failed') && !isExhaustedFailed(t));
-    const exhausted = list.filter(t => isExhaustedFailed(t));
-    const completed = list.filter(t => t.status === 'passed');
-    const lockedList = list.filter(t => t.status === 'locked');
-    const passed = list.filter(t => t.status === 'passed').length;
-    const scores = list.filter(t => t.score).map(t => t.score!);
-    const avgScore = scores.length ? `%${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)}` : '—';
+    const list = allItems.filter((t) => (activeTab === 'exams' ? t.examOnly : !t.examOnly));
+    const isExhaustedFailed = (t: Training) =>
+      t.status === 'failed' && t.attempt >= t.maxAttempts;
+    const active = list.filter(
+      (t) =>
+        (t.status === 'assigned' || t.status === 'in_progress' || t.status === 'failed') &&
+        !isExhaustedFailed(t)
+    );
+    const exhausted = list.filter(isExhaustedFailed);
+    const completed = list.filter((t) => t.status === 'passed');
+    const lockedList = list.filter((t) => t.status === 'locked');
+    const passed = completed.length;
+    const scores = list.filter((t) => t.score).map((t) => t.score!);
+    const avg = scores.length
+      ? `%${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)}`
+      : '—';
+    const urgent = active.filter((t) => t.daysLeft !== undefined && t.daysLeft <= 3).length;
 
     return {
       trainingList: list,
@@ -123,22 +122,34 @@ export default function MyTrainingsPage() {
       totalCount: list.length,
       activeCount: active.length,
       completedCount: passed,
-      averageScore: avgScore,
+      averageScore: avg,
+      urgentCount: urgent,
     };
   }, [allItems, activeTab]);
 
-  if (isLoading) return <PageLoading />;
+  if (isLoading) return <TrainingsSkeleton />;
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-sm" style={{ color: T.error }}>{error}</div>
+      <div className="flex items-center justify-center min-h-[40vh] px-4">
+        <div className="text-center max-w-sm">
+          <div
+            className="inline-flex h-14 w-14 items-center justify-center rounded-2xl mb-4"
+            style={{ background: C.errorBg }}
+          >
+            <AlertOctagon className="h-6 w-6" style={{ color: C.error }} />
+          </div>
+          <p className="text-[14px] font-bold mb-1" style={{ color: C.error }}>
+            Eğitimler yüklenemedi
+          </p>
+          <p className="text-[12px]" style={{ color: C.textMuted }}>{error}</p>
+        </div>
       </div>
     );
   }
 
-
   return (
     <div
+      className="pb-24 sm:pb-8"
       style={{
         fontFamily: 'var(--font-display), system-ui, sans-serif',
         fontVariantNumeric: 'tabular-nums',
@@ -146,225 +157,206 @@ export default function MyTrainingsPage() {
     >
       <MandatoryFeedbackBanner />
 
-      {/* ═══════ PAGE HEADER ═══════ */}
+      {/* ═══════ HEADER — editorial, az dekoratif ═══════ */}
       <BlurFade delay={0}>
-        <header className="mb-4 sm:mb-8 relative overflow-hidden rounded-2xl px-6 py-6 sm:px-8 sm:py-8"
-          style={{ background: `linear-gradient(135deg, ${T.primaryContainer}28 0%, ${T.surfaceLowest} 55%)`, border: `1.5px solid ${T.primary}20` }}
-        >
-          {/* Decorative background — medical cross */}
-          <svg
-            aria-hidden
-            viewBox="0 0 200 200"
-            className="pointer-events-none absolute -right-6 -top-6 w-52 h-52 sm:w-72 sm:h-72 opacity-[0.18]"
-            fill={T.primary}
-          >
-            <rect x="75" y="10" width="50" height="180" rx="14" />
-            <rect x="10" y="75" width="180" height="50" rx="14" />
-          </svg>
-          {/* Second smaller cross — bottom left */}
-          <svg
-            aria-hidden
-            viewBox="0 0 200 200"
-            className="pointer-events-none absolute -left-10 -bottom-10 w-36 h-36 sm:w-48 sm:h-48 opacity-[0.08]"
-            fill={T.secondary}
-          >
-            <rect x="75" y="10" width="50" height="180" rx="14" />
-            <rect x="10" y="75" width="180" height="50" rx="14" />
-          </svg>
-          {/* Decorative glow */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-12 -bottom-12 w-72 h-72 rounded-full opacity-30"
-            style={{ background: `radial-gradient(circle at center, ${T.primary} 0%, transparent 65%)` }}
-          />
-          {/* Ring 1 */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute right-14 top-3 w-28 h-28 rounded-full"
-            style={{ border: `2.5px solid ${T.primary}50` }}
-          />
-          {/* Ring 2 — smaller inner */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute right-20 top-9 w-16 h-16 rounded-full"
-            style={{ border: `1.5px solid ${T.primary}30` }}
-          />
-
-          {/* Content */}
-          <div className="relative z-10">
+        <header className="mb-5 sm:mb-7">
+          <div className="flex items-end justify-between gap-3 mb-1">
             <span
-              className="text-[10px] font-extrabold tracking-[0.22em] uppercase mb-2 sm:mb-3 block"
-              style={{ color: T.secondary }}
+              className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-[0.18em] uppercase"
+              style={{ color: C.textMuted }}
             >
-              LMS · Eğitim Portalı
+              <span
+                className="inline-block w-2 h-2 rounded-full"
+                style={{ background: C.success }}
+                aria-hidden
+              />
+              EĞİTİM PORTALI
             </span>
-            <h1
-              className="text-[26px] sm:text-[42px] font-black tracking-[-0.03em] leading-[0.95] mb-3 sm:mb-4"
-              style={{ color: T.primary }}
-            >
-              Eğitimlerim
-            </h1>
-            <p className="text-[13px] sm:text-[15px] leading-relaxed max-w-2xl" style={{ color: T.onSurfaceVariant }}>
-              Atanan eğitimlerinizi takip edin, sertifikalarınızı görüntüleyin ve profesyonel gelişiminizi sürdürün.
-            </p>
+            {urgentCount > 0 && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
+                style={{ background: C.warningBg, color: C.warning }}
+              >
+                <Flame className="h-3 w-3" />
+                {urgentCount} acil
+              </span>
+            )}
           </div>
+          <h1
+            className="text-[28px] sm:text-[36px] font-black tracking-[-0.025em] leading-[1.05]"
+            style={{ color: C.text, fontFamily: 'var(--font-display)' }}
+          >
+            Eğitimlerim
+          </h1>
+          <p
+            className="text-[12.5px] sm:text-[13.5px] mt-1.5 max-w-xl leading-relaxed"
+            style={{ color: C.textMuted }}
+          >
+            Atanan eğitimleri tamamla, sınavlardan geç, sertifikalarını topla.
+          </p>
         </header>
       </BlurFade>
 
-      {/* ═══════ STATS BENTO — hover flips to primary ═══════ */}
-      <BlurFade delay={0.05}>
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 sm:mb-8">
-          <StatCell icon={Library} label="Toplam Eğitim"  value={totalCount.toString()}      hoverBg={T.primary}          hoverText={T.primaryFixed} />
-          <StatCell icon={Clock}   label="Devam Eden"     value={activeCount.toString()}     hoverBg={T.tertiaryContainer} hoverText={T.primary}       />
-          <StatCell icon={CheckCircle2} label="Tamamlanan" value={completedCount.toString()} hoverBg={T.secondary}        hoverText={T.secondaryFixed} isGreen />
-          <StatCell icon={Activity} label="Ortalama Puan" value={averageScore}               hoverBg={T.primaryContainer}  hoverText={T.primaryFixed} />
+      {/* ═══════ KPI ŞERİTİ — clinical metric strip ═══════ */}
+      <BlurFade delay={0.04}>
+        <section
+          className="mb-5 sm:mb-7 rounded-2xl overflow-hidden"
+          style={{
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            boxShadow: '0 1px 0 rgba(2,36,31,0.02)',
+          }}
+        >
+          <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0"
+            style={{ borderColor: C.border }}
+          >
+            <Kpi icon={BookOpen}     label="Toplam Eğitim" value={totalCount.toString()} accent={C.primary} />
+            <Kpi icon={Clock}        label="Devam Eden"    value={activeCount.toString()} accent={C.accent} />
+            <Kpi icon={CheckCircle2} label="Tamamlanan"    value={completedCount.toString()} accent={C.success} />
+            <Kpi icon={TrendingUp}   label="Ortalama Puan" value={averageScore} accent={C.primaryDk} highlight />
+          </div>
         </section>
       </BlurFade>
 
-      {/* ═══════ TAB SWITCHER ═══════ */}
-      <BlurFade delay={0.07}>
+      {/* ═══════ TAB SWITCHER — underline editorial, ARIA tablist ═══════ */}
+      <BlurFade delay={0.06}>
         <div
-          className="flex gap-1 p-1.5 rounded-full mb-6 sm:mb-10 w-full sm:w-fit"
-          style={{
-            background: 'rgba(255,255,255,0.6)',
-            backdropFilter: 'blur(32px)',
-            WebkitBackdropFilter: 'blur(32px)',
-            border: `1px solid ${T.secondary}18`,
-            boxShadow: '0 2px 12px rgba(2,36,31,0.04)',
-          }}
+          role="tablist"
+          aria-label="Eğitim tipi filtresi"
+          className="flex items-center gap-1 mb-5 sm:mb-7 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto"
+          style={{ borderBottom: `1px solid ${C.border}` }}
         >
           {([
             { id: 'trainings' as const, label: 'Eğitimler', count: trainingCount, Icon: BookOpen },
-            { id: 'exams' as const,     label: 'Sınavlar',  count: examCount,     Icon: ClipboardCheck },
-          ]).map(tab => {
+            { id: 'exams' as const, label: 'Sınavlar', count: examCount, Icon: ClipboardCheck },
+          ]).map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                role="tab"
+                id={`tab-${tab.id}`}
+                aria-selected={isActive}
+                aria-controls={`panel-${tab.id}`}
+                tabIndex={isActive ? 0 : -1}
                 onClick={() => setActiveTab(tab.id)}
-                aria-pressed={isActive}
-                className="flex flex-1 sm:flex-initial items-center justify-center gap-2 sm:gap-2.5 rounded-full px-4 sm:px-5 py-2.5 text-[13px] font-bold transition-all duration-300"
+                className="relative inline-flex items-center gap-2 px-3 sm:px-4 min-h-11 text-[13px] font-bold whitespace-nowrap transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 rounded-t-md"
                 style={{
-                  background: isActive ? T.primary : 'transparent',
-                  color:      isActive ? '#ffffff' : T.onSurfaceVariant,
+                  color: isActive ? C.primary : C.textMuted,
+                  ['--tw-ring-color' as string]: C.primary,
                 }}
               >
-                <tab.Icon className="h-4 w-4" />
+                <tab.Icon className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
                 {tab.label}
                 <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                  className="rounded-full px-1.5 py-0.5 text-[10px] font-mono font-bold leading-none"
                   style={{
-                    background: isActive ? 'rgba(255,255,255,0.14)' : T.surfaceHigh,
-                    color:      isActive ? '#ffffff' : T.onSurfaceVariant,
+                    background: isActive ? C.primaryLt : C.bg,
+                    color: isActive ? C.primary : C.textMuted,
                   }}
+                  aria-label={`${tab.count} adet`}
                 >
                   {tab.count}
                 </span>
+                {isActive && (
+                  <span
+                    aria-hidden
+                    className="absolute left-0 right-0 -bottom-px h-[2px]"
+                    style={{ background: C.primary }}
+                  />
+                )}
               </button>
             );
           })}
         </div>
       </BlurFade>
 
-
-      {/* ═══════ ACTIVE — hero split cards ═══════ */}
+      {/* ═══════ AKTİF EĞİTİMLER — clinical chart card ═══════ */}
       {activeTrainings.length > 0 && (
-        <section className="mb-8">
-          <SectionHead
-            title="Aktif Eğitimler"
-            count={activeTrainings.length}
-            badgeBg={T.primary}
-            accent={T.primary}
-            delay={0.1}
-          />
-          <div className="space-y-3">
+        <Section title="Aktif Eğitimler" count={activeTrainings.length} accent={C.primary} delay={0.08}>
+          <div className="space-y-2.5">
             {activeTrainings.map((t, i) => (
-              <BlurFade key={t.id} delay={0.12 + i * 0.04}>
-                <ActiveHeroCard training={t} />
+              <BlurFade key={t.id} delay={0.1 + i * 0.03}>
+                <ActiveCard training={t} />
               </BlurFade>
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
-      {/* ═══════ COMPLETED — bento grid ═══════ */}
+      {/* ═══════ TAMAMLANAN — bento (asimetrik) ═══════ */}
       {completedTrainings.length > 0 && (
-        <section className="mb-8">
-          <SectionHead
-            title="Tamamlanan Eğitimler"
-            count={completedTrainings.length}
-            badgeBg={T.secondary}
-            accent={T.primary}
-            delay={0.14}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
+        <Section
+          title="Tamamlanan Eğitimler"
+          count={completedTrainings.length}
+          accent={C.success}
+          delay={0.12}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
             {completedTrainings.map((t, i) => (
-              <BlurFade key={t.id} delay={0.16 + i * 0.03}>
+              <BlurFade key={t.id} delay={0.14 + i * 0.025}>
                 <CompletedCard training={t} />
               </BlurFade>
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
-      {/* ═══════ FAILED — left-border archive ═══════ */}
+      {/* ═══════ BAŞARISIZ — kırmızı sol şeritli arşiv ═══════ */}
       {exhaustedTrainings.length > 0 && (
-        <section className="mb-6">
-          <SectionHead
-            title="Başarısız Eğitimler"
-            count={exhaustedTrainings.length}
-            badgeBg={T.error}
-            accent={T.primary}
-            delay={0.18}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <Section
+          title="Başarısız Eğitimler"
+          count={exhaustedTrainings.length}
+          accent={C.error}
+          delay={0.16}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
             {exhaustedTrainings.map((t, i) => (
-              <BlurFade key={t.id} delay={0.20 + i * 0.03}>
-                <FailedCard training={t} />
+              <BlurFade key={t.id} delay={0.18 + i * 0.025}>
+                <ArchiveCard training={t} variant="failed" />
               </BlurFade>
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
-      {/* ═══════ LOCKED — admin tarafından kilitlenmiş ═══════ */}
+      {/* ═══════ KİLİTLİ — amber sol şeritli arşiv ═══════ */}
       {lockedTrainings.length > 0 && (
-        <section className="mb-6">
-          <SectionHead
-            title="Kilitlenmiş Eğitimler"
-            count={lockedTrainings.length}
-            badgeBg={T.tertiary}
-            accent={T.primary}
-            delay={0.22}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <Section
+          title="Kilitlenmiş Eğitimler"
+          count={lockedTrainings.length}
+          accent={C.accent}
+          delay={0.2}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
             {lockedTrainings.map((t, i) => (
-              <BlurFade key={t.id} delay={0.24 + i * 0.03}>
-                <LockedCard training={t} />
+              <BlurFade key={t.id} delay={0.22 + i * 0.025}>
+                <ArchiveCard training={t} variant="locked" />
               </BlurFade>
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
       {/* ═══════ EMPTY ═══════ */}
       {trainingList.length === 0 && (
-        <BlurFade delay={0.12}>
+        <BlurFade delay={0.1}>
           <div
-            className="text-center py-24 rounded-2xl"
-            style={{ background: T.surfaceLow, border: `1px solid ${T.outlineVariant}40` }}
+            className="text-center py-16 sm:py-24 rounded-2xl"
+            style={{ background: C.surface, border: `1px dashed ${C.border}` }}
           >
             <div
-              className="inline-flex h-16 w-16 items-center justify-center rounded-full mb-5"
-              style={{ background: T.surfaceHigh }}
+              className="inline-flex h-14 w-14 items-center justify-center rounded-2xl mb-4"
+              style={{ background: C.primaryLt }}
             >
-              <BookOpen className="h-6 w-6" style={{ color: T.onSurfaceVariant }} />
+              <BookOpen className="h-6 w-6" style={{ color: C.primary }} strokeWidth={1.75} />
             </div>
-            <p className="text-[17px] font-black mb-1.5" style={{ color: T.primary }}>
-              Henüz eğitim atanmadı
+            <p className="text-[15px] font-bold mb-1" style={{ color: C.text }}>
+              Henüz {activeTab === 'exams' ? 'sınav' : 'eğitim'} atanmadı
             </p>
-            <p className="text-[13px] max-w-sm mx-auto" style={{ color: T.onSurfaceVariant }}>
-              Yöneticiniz size bir eğitim atadığında burada görünecek.
+            <p className="text-[12px] max-w-xs mx-auto" style={{ color: C.textMuted }}>
+              Yöneticiniz size {activeTab === 'exams' ? 'bir sınav' : 'bir eğitim'} atadığında
+              burada görünecek.
             </p>
           </div>
         </BlurFade>
@@ -377,436 +369,491 @@ export default function MyTrainingsPage() {
    SUB-COMPONENTS
    ═══════════════════════════════════════════════════════════════ */
 
-function StatCell({
-  icon: Icon, label, value, hoverBg, hoverText, isGreen = false,
+function Kpi({
+  icon: Icon, label, value, accent, highlight = false,
 }: {
-  icon: LucideIcon; label: string; value: string;
-  hoverBg: string; hoverText: string; isGreen?: boolean;
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  accent: string;
+  highlight?: boolean;
 }) {
-  const [hover, setHover] = useState(false);
-  const baseBg = isGreen ? `${T.secondaryContainer}50` : T.surfaceLow;
-  const baseIcon = isGreen ? T.secondary : T.primary;
-
   return (
     <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      className="p-3 sm:p-5 rounded-2xl flex flex-col justify-between transition-all duration-500 cursor-default"
+      className="px-4 py-4 sm:px-5 sm:py-5 relative"
       style={{
-        background: hover ? hoverBg : baseBg,
-        minHeight: 'clamp(90px, 18vw, 140px)',
+        borderColor: C.border,
+        background: highlight ? `linear-gradient(180deg, ${accent}06 0%, transparent 100%)` : 'transparent',
       }}
     >
-      <Icon
-        className="h-6 w-6 sm:h-9 sm:w-9 mb-3 sm:mb-6 transition-colors duration-500"
-        style={{ color: hover ? hoverText : baseIcon }}
-        strokeWidth={1.5}
-      />
-      <div>
-        <div
-          className="text-[24px] sm:text-[40px] font-black leading-none tracking-tight mb-1 sm:mb-1.5 transition-colors duration-500"
-          style={{ color: hover ? '#ffffff' : T.primary }}
-        >
-          {value}
-        </div>
-        <div
-          className="text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.12em] transition-colors duration-500"
-          style={{ color: hover ? hoverText : T.onSurfaceVariant }}
+      <div className="flex items-center justify-between mb-2 sm:mb-3">
+        <span
+          className="text-[9.5px] font-bold uppercase tracking-[0.16em]"
+          style={{ color: C.textMuted }}
         >
           {label}
-        </div>
+        </span>
+        <Icon className="h-3.5 w-3.5" style={{ color: accent }} strokeWidth={2.25} />
+      </div>
+      <div
+        className="text-[24px] sm:text-[28px] font-black leading-none tracking-tight"
+        style={{ color: C.text, fontFamily: 'var(--font-display)' }}
+      >
+        {value}
       </div>
     </div>
   );
 }
 
-function SectionHead({
-  title, count, badgeBg, accent, delay = 0,
-}: { title: string; count: number; badgeBg: string; accent: string; delay?: number }) {
+function Section({
+  title, count, accent, delay = 0, children,
+}: {
+  title: string;
+  count: number;
+  accent: string;
+  delay?: number;
+  children: React.ReactNode;
+}) {
   return (
-    <BlurFade delay={delay}>
-      <div className="flex items-center gap-4 mb-4 sm:mb-6">
-        <h2 className="text-[22px] sm:text-[26px] font-black tracking-tight" style={{ color: accent }}>
-          {title}
-        </h2>
-        <span
-          className="rounded-full px-3 py-1 text-[10px] font-bold text-white"
-          style={{ background: badgeBg }}
-        >
-          {count}
-        </span>
-      </div>
-    </BlurFade>
+    <section className="mb-7 sm:mb-9">
+      <BlurFade delay={delay}>
+        <div className="flex items-baseline gap-3 mb-3 sm:mb-4">
+          <span
+            aria-hidden
+            className="block w-1 h-5 rounded-full"
+            style={{ background: accent }}
+          />
+          <h2
+            className="text-[15px] sm:text-[17px] font-black tracking-tight"
+            style={{ color: C.text }}
+          >
+            {title}
+          </h2>
+          <span
+            className="text-[11px] font-mono font-bold rounded-full px-2 py-0.5"
+            style={{ background: C.bg, color: C.textMuted, border: `1px solid ${C.border}` }}
+          >
+            {count}
+          </span>
+        </div>
+      </BlurFade>
+      {children}
+    </section>
   );
 }
 
-function ActiveHeroCard({ training: t }: { training: Training }) {
+function ActiveCard({ training: t }: { training: Training }) {
   const Icon = categoryIcon(t.category);
   const isUrgent = t.daysLeft !== undefined && t.daysLeft <= 3;
-  const status = (statusLabel[t.status as StatusKey] ?? t.status);
+  const isStarted = t.status === 'in_progress' || t.progress > 0;
+  const isFailedRetry = t.status === 'failed';
+  const accent = isFailedRetry ? C.warning : isUrgent ? C.error : isStarted ? C.accent : C.primary;
+  const status = statusLabel[t.status as StatusKey] ?? t.status;
 
   return (
-    <Link href={`/staff/my-trainings/${t.id}`} className="block group">
+    <Link
+      href={`/staff/my-trainings/${t.id}`}
+      className="block group rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      style={{ ['--tw-ring-color' as string]: accent }}
+      aria-label={`${t.title} eğitimi · Durum: ${status} · Kategori: ${t.category || 'Genel'}${isUrgent ? ` · Son ${t.daysLeft} gün` : ''}`}
+    >
       <article
-        className="rounded-2xl overflow-hidden flex flex-col md:flex-row transition-[transform,box-shadow] duration-500 group-hover:-translate-y-1"
+        className="relative overflow-hidden rounded-xl transition-[transform,box-shadow] duration-300 group-hover:-translate-y-0.5 group-active:translate-y-0"
         style={{
-          background: T.surfaceLowest,
-          boxShadow: '0 20px 40px -20px rgba(2, 36, 31, 0.12), 0 4px 12px rgba(2, 36, 31, 0.04)',
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          boxShadow: '0 1px 2px rgba(2,36,31,0.04)',
         }}
       >
-        {/* Left: gradient panel with icon */}
-        <div
-          className="md:w-[28%] h-28 sm:h-40 md:h-auto relative overflow-hidden shrink-0"
-          style={{
-            background: `linear-gradient(135deg, ${T.primary} 0%, ${T.primaryContainer} 55%, ${T.primaryDeep} 110%)`,
-          }}
-        >
-          {/* Decorative rings */}
-          <div
-            aria-hidden
-            className="absolute -right-16 -top-16 w-64 h-64 rounded-full"
-            style={{ background: `radial-gradient(circle at center, ${T.primaryFixedDim}25 0%, transparent 60%)` }}
-          />
-          <div
-            aria-hidden
-            className="absolute -left-20 -bottom-20 w-48 h-48 rounded-full"
-            style={{ background: `radial-gradient(circle at center, ${T.tertiaryContainer}20 0%, transparent 60%)` }}
-          />
+        {/* Sol triyaj şeridi — status'a göre renk */}
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 bottom-0 w-1"
+          style={{ background: accent }}
+        />
 
-          {/* Big icon */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div
-              className="p-5 rounded-3xl transition-transform duration-500 group-hover:scale-105 group-hover:rotate-3"
-              style={{
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                backdropFilter: 'blur(12px)',
-              }}
-            >
-              <Icon className="h-7 w-7 sm:h-10 sm:w-10" style={{ color: T.primaryFixed }} strokeWidth={1.5} />
-            </div>
-          </div>
-
-          {/* Category tag */}
-          <div className="absolute top-5 left-5">
+        {/* İçerik — mobile vertical, sm+ horizontal */}
+        <div className="pl-4 pr-4 py-4 sm:pl-5 sm:pr-5 sm:py-5">
+          {/* Top meta row */}
+          <div className="flex items-center gap-2 mb-2.5 flex-wrap">
             <span
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
-              style={{
-                background: 'rgba(255,255,255,0.12)',
-                color: T.primaryFixed,
-                backdropFilter: 'blur(12px)',
-              }}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em]"
+              style={{ background: `${accent}15`, color: accent }}
             >
+              <span
+                className="w-1 h-1 rounded-full"
+                style={{ background: accent }}
+                aria-hidden
+              />
+              {status}
+            </span>
+            <span className="text-[10.5px] font-bold uppercase tracking-[0.12em]" style={{ color: C.textMuted }}>
               {t.category || 'Genel'}
             </span>
+            {isUrgent && (
+              <span
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold"
+                style={{ background: C.errorBg, color: C.error }}
+              >
+                <Flame className="h-2.5 w-2.5" />
+                Son {t.daysLeft} gün
+              </span>
+            )}
           </div>
 
-          {/* Urgency badge */}
-          {isUrgent && (
-            <div className="absolute bottom-5 left-5">
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em]"
-                style={{ background: T.tertiaryContainer, color: T.primary }}
-              >
-                <Sparkles className="h-3 w-3" />
-                Son {t.daysLeft} Gün
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Right: content */}
-        <div className="p-4 sm:p-5 md:p-7 flex-1 flex flex-col justify-between min-w-0">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9.5px] font-bold uppercase tracking-[0.14em]"
-                style={{ background: T.secondaryContainer, color: T.onSecondaryContainer }}
-              >
-                {status}
-              </span>
-              <span className="text-[11px] font-mono" style={{ color: T.onSurfaceVariant }}>
-                Bitiş: <strong style={{ color: isUrgent ? T.error : T.onSurface }}>{t.deadline}</strong>
-              </span>
-              {t.examOnly && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[9.5px] font-bold uppercase tracking-[0.14em]"
-                  style={{ background: `${T.tertiaryContainer}30`, color: T.tertiary }}
-                >
-                  Sadece Sınav
-                </span>
-              )}
-            </div>
-
-            <h3
-              className="text-[18px] sm:text-[22px] font-black leading-[1.1] tracking-tight mb-3"
-              style={{ color: T.primary }}
-            >
-              {t.title}
-            </h3>
-
-            {/* Inline stats ruler */}
-            <dl
-              className="grid grid-cols-3 gap-2 sm:gap-3 py-2 sm:py-3 border-y mb-3 sm:mb-4"
-              style={{ borderColor: `${T.outlineVariant}60` }}
-            >
-              <MiniStat label="Deneme"   value={`${t.attempt ?? 0} / ${t.maxAttempts ?? 3}`} />
-              <MiniStat label="İlerleme" value={`%${t.progress ?? 0}`} accent={T.secondary} />
-              {t.examOnly ? (
-                <MiniStat label="Süre" value={`${t.examDurationMinutes ?? '—'} dk`} />
-              ) : t.daysLeft !== undefined ? (
-                <MiniStat label="Kalan" value={`${t.daysLeft} gün`} accent={isUrgent ? T.error : undefined} />
-              ) : (
-                <MiniStat label="Soru" value={`${t.questionCount ?? '—'}`} />
-              )}
-            </dl>
-          </div>
-
-          {/* CTA row */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 sm:justify-between">
-            <span className="text-[11px]" style={{ color: T.onSurfaceVariant }}>
-              {t.status === 'assigned' ? 'Eğitime başlamak için hazırsınız' : 'Kaldığınız yerden devam edin'}
-            </span>
-            <button
-              type="button"
-              className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-[13px] font-extrabold transition-all duration-300 w-full sm:w-auto"
+          {/* Title row — icon + title side by side */}
+          <div className="flex items-start gap-3 mb-3">
+            <div
+              className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-lg"
               style={{
-                background: T.primary,
-                color: '#ffffff',
-                boxShadow: `0 4px 14px ${T.primary}33`,
+                background: `${accent}10`,
+                border: `1px solid ${accent}25`,
               }}
             >
-              <Play className="h-[13px] w-[13px]" fill="currentColor" />
-              {t.status === 'assigned' ? 'Başla' : 'Devam Et'}
-              <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-            </button>
+              <Icon className="h-5 w-5" style={{ color: accent }} strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <h3
+                className="text-[14px] sm:text-[15px] font-black leading-[1.25] tracking-tight"
+                style={{ color: C.text }}
+              >
+                {t.title}
+              </h3>
+              <p className="text-[11px] mt-0.5 font-mono" style={{ color: C.textMuted }}>
+                <CalendarDays className="inline h-3 w-3 -mt-0.5 mr-1" />
+                Bitiş: <span style={{ color: isUrgent ? C.error : C.text, fontWeight: 700 }}>{t.deadline || '—'}</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Progress bar — sadece progress > 0 ise */}
+          {isStarted && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: C.textMuted }}>
+                  İlerleme
+                </span>
+                <span className="text-[11px] font-mono font-bold" style={{ color: accent }}>
+                  %{t.progress}
+                </span>
+              </div>
+              <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: C.border }}>
+                <div
+                  className="h-full rounded-full transition-[width] duration-700"
+                  style={{ width: `${t.progress}%`, background: accent }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Stats grid + CTA — bottom (mobile: wrap CTA below if cramped) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
+            <dl className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-x-4 text-[11px] font-mono" style={{ color: C.textMuted }}>
+              <div className="flex items-center gap-1">
+                <Hash className="h-3 w-3" />
+                <span style={{ color: C.text, fontWeight: 700 }}>{Math.max(t.attempt, 1)}</span>/{t.maxAttempts}
+              </div>
+              {t.examOnly ? (
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  <span style={{ color: C.text, fontWeight: 700 }}>{t.examDurationMinutes ?? '—'}</span>dk
+                </div>
+              ) : t.daysLeft !== undefined ? (
+                <div className="flex items-center gap-1">
+                  <Target className="h-3 w-3" />
+                  <span style={{ color: isUrgent ? C.error : C.text, fontWeight: 700 }}>{t.daysLeft}</span>g kaldı
+                </div>
+              ) : t.questionCount ? (
+                <div className="flex items-center gap-1">
+                  <ClipboardCheck className="h-3 w-3" />
+                  <span style={{ color: C.text, fontWeight: 700 }}>{t.questionCount}</span> soru
+                </div>
+              ) : null}
+            </dl>
+            <span
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg px-4 min-h-11 min-w-11 text-[12.5px] font-bold transition-colors"
+              style={{
+                background: accent,
+                color: '#ffffff',
+                boxShadow: `0 1px 0 ${accent}40`,
+              }}
+              aria-hidden
+            >
+              <Play className="h-3.5 w-3.5" fill="currentColor" />
+              <span>{isStarted || isFailedRetry ? 'Devam' : 'Başla'}</span>
+              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+            </span>
           </div>
         </div>
       </article>
     </Link>
-  );
-}
-
-function MiniStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
-  return (
-    <div>
-      <dt
-        className="text-[9px] font-bold uppercase tracking-[0.16em] mb-1"
-        style={{ color: T.onSurfaceVariant }}
-      >
-        {label}
-      </dt>
-      <dd
-        className="text-[15px] font-extrabold font-mono"
-        style={{ color: accent ?? T.primary }}
-      >
-        {value}
-      </dd>
-    </div>
   );
 }
 
 function CompletedCard({ training: t }: { training: Training }) {
   const Icon = categoryIcon(t.category);
-  const scoreColor =
-    (t.score ?? 0) >= 80 ? T.secondary :
-    (t.score ?? 0) >= 60 ? T.tertiary :
-    T.error;
-  const isLocked = t.status === 'locked';
-  const isTopScore = !isLocked && (t.score ?? 0) >= 95;
+  const score = t.score ?? 0;
+  const scoreColor = score >= 85 ? C.success : score >= 70 ? C.primary : score >= 60 ? C.accent : C.error;
+  const scoreTier = score >= 95 ? 'Mükemmel' : score >= 85 ? 'Yüksek' : score >= 70 ? 'İyi' : score >= 60 ? 'Orta' : 'Düşük';
+  const isTop = score >= 95;
 
   return (
-    <Link href={`/staff/my-trainings/${t.id}`} className="block group">
+    <Link
+      href={`/staff/my-trainings/${t.id}`}
+      className="block group rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      style={{ ['--tw-ring-color' as string]: C.primary }}
+      aria-label={`${t.title} eğitimi · Tamamlandı · Skor: %${score} (${scoreTier})`}
+    >
       <article
-        className="rounded-2xl p-4 sm:p-5 transition-all duration-500 group-hover:-translate-y-2 relative"
+        className="rounded-xl p-4 sm:p-5 h-full flex flex-col transition-[transform,box-shadow,border-color] duration-300 group-hover:-translate-y-0.5"
         style={{
-          background: T.surfaceLowest,
-          boxShadow: isTopScore
-            ? `0 12px 30px -12px ${T.secondary}40, 0 2px 8px rgba(0,0,0,0.04)`
-            : '0 8px 24px -12px rgba(2,36,31,0.12), 0 2px 6px rgba(0,0,0,0.03)',
-          opacity: isLocked ? 0.6 : 1,
+          background: C.surface,
+          border: `1px solid ${isTop ? `${C.success}40` : C.border}`,
+          boxShadow: isTop
+            ? `0 4px 14px -8px ${C.success}50, 0 1px 0 rgba(0,0,0,0.02)`
+            : '0 1px 2px rgba(2,36,31,0.04)',
         }}
       >
-        <div className="flex justify-between items-start mb-7">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-2 mb-4">
           <div
-            className="p-3 rounded-2xl"
-            style={{ background: `${T.secondary}10` }}
+            className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+            style={{ background: C.successBg }}
           >
-            <Icon className="h-6 w-6" style={{ color: T.secondary }} strokeWidth={1.75} />
+            <Icon className="h-4 w-4" style={{ color: C.success }} strokeWidth={2} />
           </div>
-          <div className="flex items-center gap-2">
-            {isTopScore && (
-              <Award
-                className="h-5 w-5 shrink-0"
-                style={{ color: T.tertiary }}
-                strokeWidth={2}
-                aria-label="Yüksek skor"
-              />
-            )}
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1.5">
+              {isTop && <Award className="h-3.5 w-3.5" style={{ color: C.accent }} aria-hidden />}
+              <span
+                className="text-[22px] font-black leading-none font-mono"
+                style={{ color: scoreColor }}
+                aria-hidden
+              >
+                %{score}
+              </span>
+            </div>
             <span
-              className="text-[22px] font-black leading-none"
+              className="text-[9px] font-bold uppercase tracking-[0.16em] mt-0.5 block"
               style={{ color: scoreColor }}
+              aria-hidden
             >
-              %{t.score ?? 0}
+              {scoreTier}
             </span>
           </div>
         </div>
 
+        {/* Title */}
         <h4
-          className="text-[16px] sm:text-[17px] font-black leading-[1.2] tracking-tight mb-2 min-h-[2.5rem]"
-          style={{ color: T.primary }}
+          className="text-[13.5px] font-black leading-[1.3] tracking-tight mb-2 line-clamp-2 flex-1"
+          style={{ color: C.text }}
         >
           {t.title}
         </h4>
 
-        <div className="flex items-center gap-2 text-[11px] font-mono mb-6" style={{ color: T.onSurfaceVariant }}>
-          <span>{t.category || 'Genel'}</span>
-          <span aria-hidden>·</span>
-          <span>{t.deadline}</span>
-          {isLocked && (
+        {/* Meta */}
+        <div className="flex items-center gap-2 text-[10.5px] font-mono mb-3" style={{ color: C.textMuted }}>
+          <span className="font-bold uppercase tracking-[0.12em]">{t.category || 'Genel'}</span>
+          {t.deadline && (
             <>
               <span aria-hidden>·</span>
-              <span className="inline-flex items-center gap-1 font-bold" style={{ color: T.error }}>
-                <Lock className="h-3 w-3" />
-                Kilitli
-              </span>
+              <span>{t.deadline}</span>
             </>
           )}
         </div>
 
-        {/* Progress bar */}
-        <div
-          className="w-full h-[3px] rounded-full overflow-hidden mb-6"
-          style={{ background: T.surfaceHigh }}
-        >
+        {/* Skor barı */}
+        <div className="w-full h-[3px] rounded-full overflow-hidden mb-3" style={{ background: C.border }}>
           <div
-            className="h-full rounded-full transition-all duration-1000"
-            style={{
-              width: `${t.score ?? 0}%`,
-              background: scoreColor,
-            }}
+            className="h-full rounded-full transition-[width] duration-1000"
+            style={{ width: `${score}%`, background: scoreColor }}
           />
         </div>
 
+        {/* CTA */}
         <div
-          className="w-full text-center text-[13px] font-bold py-2.5 rounded-full transition-all duration-300 flex items-center justify-center gap-2 group-hover:gap-3"
-          style={{
-            border: `1px solid ${T.outlineVariant}50`,
-            color: T.primary,
-          }}
+          className="flex items-center justify-between text-[11.5px] font-bold pt-2"
+          style={{ borderTop: `1px solid ${C.border}`, color: C.textMuted }}
         >
-          Detayı Görüntüle
-          <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          <span>Detayları Görüntüle</span>
+          <ChevronRight
+            className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
+            style={{ color: C.primary }}
+          />
         </div>
       </article>
     </Link>
   );
 }
 
-function FailedCard({ training: t }: { training: Training }) {
+function ArchiveCard({
+  training: t,
+  variant,
+}: {
+  training: Training;
+  variant: 'failed' | 'locked';
+}) {
+  const isLocked = variant === 'locked';
+  const accent = isLocked ? C.accent : C.error;
+  const accentBg = isLocked ? C.accentLt : C.errorBg;
+  const StateIcon = isLocked ? Lock : AlertOctagon;
+  const stateLabel = isLocked ? 'Eğitim Kilitlendi' : 'Haklar Tükendi';
+  const description = isLocked
+    ? 'Bu eğitim yönetici tarafından kilitlenmiştir. Detaylar için akademik birim yöneticinize başvurunuz.'
+    : `Bu eğitim için tanımlanan ${t.maxAttempts} deneme hakkının tamamı kullanılmıştır. Ek deneme hakkı için akademik birim yöneticinize başvurunuz.`;
+
   return (
-    <Link href={`/staff/my-trainings/${t.id}`} className="block group">
+    <Link
+      href={`/staff/my-trainings/${t.id}`}
+      className="block group rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      style={{ ['--tw-ring-color' as string]: accent }}
+      aria-label={`${t.title} eğitimi · ${stateLabel}`}
+    >
       <article
-        className="rounded-2xl p-4 sm:p-6 transition-all duration-300 group-hover:-translate-y-0.5"
+        className="relative overflow-hidden rounded-xl p-4 sm:p-5 h-full transition-[transform,box-shadow] duration-300 group-hover:-translate-y-0.5"
         style={{
-          background: T.surfaceLowest,
-          borderLeft: `4px solid ${T.error}`,
-          boxShadow: `0 6px 20px -12px ${T.error}30, 0 2px 4px rgba(0,0,0,0.03)`,
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          boxShadow: '0 1px 2px rgba(2,36,31,0.04)',
         }}
       >
-        <div className="flex items-center gap-4 mb-3">
-          <div
-            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center"
-            style={{ background: `${T.error}12` }}
-          >
-            <AlertOctagon className="h-5 w-5" style={{ color: T.error }} />
+        {/* Sol triyaj şeridi */}
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 bottom-0 w-1"
+          style={{ background: accent }}
+        />
+
+        <div className="pl-3 sm:pl-4">
+          <div className="flex items-start gap-3 mb-3">
+            <div
+              className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center"
+              style={{ background: accentBg }}
+            >
+              <StateIcon className="h-4.5 w-4.5" style={{ color: accent }} strokeWidth={2} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4
+                className="text-[14px] font-black leading-[1.25] tracking-tight mb-0.5 line-clamp-2"
+                style={{ color: C.text }}
+              >
+                {t.title}
+              </h4>
+              <span
+                className="text-[10px] font-bold uppercase tracking-[0.16em]"
+                style={{ color: accent }}
+              >
+                {stateLabel}
+              </span>
+            </div>
+            {!isLocked && t.score !== undefined && (
+              <div className="text-right shrink-0 hidden sm:block">
+                <div
+                  className="text-[18px] font-black font-mono leading-none"
+                  style={{ color: C.error }}
+                >
+                  %{t.score ?? 0}
+                </div>
+                <div className="text-[8.5px] font-bold uppercase tracking-[0.14em] mt-0.5" style={{ color: C.textMuted }}>
+                  Son skor
+                </div>
+              </div>
+            )}
           </div>
-          <div className="min-w-0">
-            <h4
-              className="text-[15px] font-black truncate mb-0.5"
-              style={{ color: T.primary }}
-            >
-              {t.title}
-            </h4>
+
+          <p className="text-[12px] leading-relaxed mb-3" style={{ color: C.textMuted }}>
+            {description}
+          </p>
+
+          <div
+            className="flex items-center justify-between text-[11px] font-mono pt-3"
+            style={{ borderTop: `1px solid ${C.border}` }}
+          >
+            <span style={{ color: C.textMuted }}>
+              {isLocked ? (t.category || 'Genel') : `Son tarih: ${t.deadline || '—'}`}
+            </span>
             <span
-              className="text-[10px] font-bold uppercase tracking-[0.18em]"
-              style={{ color: T.error }}
+              className="inline-flex items-center gap-1 font-bold transition-transform duration-200 group-hover:translate-x-0.5"
+              style={{ color: accent }}
+              aria-hidden
             >
-              Haklar Tükendi
+              Yöneticiye Başvur
+              <ArrowRight className="h-3 w-3" />
             </span>
           </div>
-          <div className="ml-auto shrink-0 text-right hidden sm:block">
-            <div className="text-[9px] font-bold uppercase tracking-wider" style={{ color: T.onSurfaceVariant }}>
-              Son Skor
-            </div>
-            <div className="text-[18px] font-black font-mono leading-none mt-0.5" style={{ color: T.error }}>
-              %{t.score ?? 0}
-            </div>
-          </div>
-        </div>
-
-        <p className="text-[12.5px] leading-relaxed mb-4" style={{ color: T.onSurfaceVariant }}>
-          Bu eğitim için tanımlanan {t.maxAttempts} deneme hakkının tamamı kullanılmıştır. Ek deneme hakkı için akademik birim yöneticinize başvurunuz.
-        </p>
-
-        <div className="flex items-center justify-between text-[11px] font-mono pt-3 border-t" style={{ borderColor: `${T.outlineVariant}40`, color: T.onSurfaceVariant }}>
-          <span>Son tarih: {t.deadline}</span>
-          <span className="inline-flex items-center gap-1 font-bold transition-transform duration-300 group-hover:translate-x-0.5" style={{ color: T.error }}>
-            Yöneticiye Başvur
-            <ArrowRight className="h-3 w-3" />
-          </span>
         </div>
       </article>
     </Link>
   );
 }
 
-function LockedCard({ training: t }: { training: Training }) {
+/* ─────────────────────────────────────────────────────────────
+   SKELETON — sayfa-spesifik shimmer placeholder.
+   PageLoading global spinner yerine layout'u koruyarak yükle.
+   ───────────────────────────────────────────────────────────── */
+function TrainingsSkeleton() {
   return (
-    <Link href={`/staff/my-trainings/${t.id}`} className="block group">
-      <article
-        className="rounded-2xl p-4 sm:p-6 transition-all duration-300 group-hover:-translate-y-0.5"
-        style={{
-          background: T.surfaceLowest,
-          borderLeft: `4px solid ${T.tertiary}`,
-          boxShadow: `0 6px 20px -12px ${T.tertiary}30, 0 2px 4px rgba(0,0,0,0.03)`,
-        }}
+    <div
+      role="status"
+      aria-busy="true"
+      aria-label="Eğitimler yükleniyor"
+      className="pb-24 sm:pb-8 motion-safe:animate-pulse"
+      style={{ fontFamily: 'var(--font-display), system-ui, sans-serif' }}
+    >
+      {/* Header */}
+      <div className="mb-5 sm:mb-7">
+        <div className="h-3 w-32 rounded mb-3" style={{ background: C.border }} />
+        <div className="h-9 w-56 rounded mb-2" style={{ background: C.border }} />
+        <div className="h-3 w-72 max-w-full rounded" style={{ background: C.border }} />
+      </div>
+
+      {/* KPI strip */}
+      <div
+        className="mb-5 sm:mb-7 rounded-2xl overflow-hidden grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0"
+        style={{ background: C.surface, border: `1px solid ${C.border}`, borderColor: C.border }}
       >
-        <div className="flex items-center gap-4 mb-3">
-          <div
-            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center"
-            style={{ background: `${T.tertiary}12` }}
-          >
-            <Lock className="h-5 w-5" style={{ color: T.tertiary }} />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="px-4 py-4 sm:px-5 sm:py-5">
+            <div className="h-2.5 w-20 rounded mb-3" style={{ background: C.border }} />
+            <div className="h-7 w-16 rounded" style={{ background: C.border }} />
           </div>
-          <div className="min-w-0">
-            <h4
-              className="text-[15px] font-black truncate mb-0.5"
-              style={{ color: T.primary }}
-            >
-              {t.title}
-            </h4>
-            <span
-              className="text-[10px] font-bold uppercase tracking-[0.18em]"
-              style={{ color: T.tertiary }}
-            >
-              Eğitim Kilitlendi
-            </span>
-          </div>
-        </div>
+        ))}
+      </div>
 
-        <p className="text-[12.5px] leading-relaxed mb-4" style={{ color: T.onSurfaceVariant }}>
-          Bu eğitim yönetici tarafından kilitlenmiştir. Detaylar için akademik birim yöneticinize başvurunuz.
-        </p>
+      {/* Tab strip */}
+      <div className="flex gap-3 mb-5 sm:mb-7" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div className="h-11 w-28 rounded-t" style={{ background: C.border }} />
+        <div className="h-11 w-24 rounded-t" style={{ background: C.bg }} />
+      </div>
 
-        <div className="flex items-center justify-between text-[11px] font-mono pt-3 border-t" style={{ borderColor: `${T.outlineVariant}40`, color: T.onSurfaceVariant }}>
-          <span>{t.category || 'Genel'}</span>
-          <span className="inline-flex items-center gap-1 font-bold transition-transform duration-300 group-hover:translate-x-0.5" style={{ color: T.tertiary }}>
-            Detayı Görüntüle
-            <ArrowRight className="h-3 w-3" />
-          </span>
+      {/* Active card skeletons */}
+      <div className="mb-7">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-1 h-5 rounded-full" style={{ background: C.border }} />
+          <div className="h-4 w-32 rounded" style={{ background: C.border }} />
         </div>
-      </article>
-    </Link>
+        <div className="space-y-2.5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-xl p-4 sm:p-5"
+              style={{ background: C.surface, border: `1px solid ${C.border}` }}
+            >
+              <div className="flex gap-3 mb-3">
+                <div className="h-10 w-10 rounded-lg shrink-0" style={{ background: C.border }} />
+                <div className="flex-1">
+                  <div className="h-3 w-2/3 rounded mb-2" style={{ background: C.border }} />
+                  <div className="h-2.5 w-1/3 rounded" style={{ background: C.border }} />
+                </div>
+                <div className="h-11 w-24 rounded-lg shrink-0" style={{ background: C.border }} />
+              </div>
+              <div className="h-1 w-full rounded-full" style={{ background: C.border }} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <span className="sr-only">Eğitimler yükleniyor, lütfen bekleyin.</span>
+    </div>
   );
 }

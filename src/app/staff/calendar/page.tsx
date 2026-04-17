@@ -1,23 +1,26 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2,
-  BookOpen, AlertTriangle, X, ArrowRight, Play, Target, Layers, ClipboardList,
+  BookOpen, AlertTriangle, X, ArrowRight, Play, Target, Layers, ClipboardList, Lock,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 
 /* ─── Types ─── */
+// API normalize eder: DB 'passed' → 'completed'. 'locked' arşivlenmemiş ama admin'in kilitlediği atama.
+type CalendarStatus = 'assigned' | 'in_progress' | 'completed' | 'failed' | 'locked';
+
 interface CalendarEvent {
   id: string;
   title: string;
   start: string;
   end: string;
-  category: string;
-  status: 'assigned' | 'in_progress' | 'completed' | 'failed';
+  category: string | null;
+  status: CalendarStatus;
   trainingId: string;
   eventType: 'training' | 'exam';
 }
@@ -34,18 +37,12 @@ const STATUS_CONFIG = {
   in_progress: { label: 'Devam Ediyor', color: 'var(--color-warning)', bg: 'var(--color-warning-bg)', icon: Clock },
   completed: { label: 'Tamamlandı', color: 'var(--color-success)', bg: 'var(--color-success-bg)', icon: CheckCircle2 },
   failed: { label: 'Başarısız', color: 'var(--color-error)', bg: 'var(--color-error-bg)', icon: AlertTriangle },
-} as const;
+  locked: { label: 'Kilitli', color: 'var(--color-text-muted)', bg: 'var(--color-bg)', icon: Lock },
+} as const satisfies Record<CalendarStatus, { label: string; color: string; bg: string; icon: typeof BookOpen }>;
 
 /* ─── Helpers ─── */
 function isSameDay(d1: Date, d2: Date) {
   return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-}
-
-function isDateInRange(date: Date, start: Date, end: Date) {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const s = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
-  const e = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
-  return d >= s && d <= e;
 }
 
 function getDaysInMonth(year: number, month: number) {
@@ -78,7 +75,11 @@ export default function CalendarPage() {
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
-  const { data: calendarData, isLoading, error } = useFetch<{ events: CalendarEvent[]; total: number }>('/api/staff/calendar');
+  // ?month= göndermiyoruz: API default -3/+6 ay penceresi döndürüyor. Bu sayede
+  // hem ay navigasyonu hem de "yaklaşan 30 gün son tarihler" tek fetch ile kapsanır.
+  const { data: calendarData, isLoading, error } = useFetch<{ events: CalendarEvent[]; total: number }>(
+    '/api/staff/calendar',
+  );
   const events = calendarData?.events ?? null;
 
   const goToPrevMonth = useCallback(() => {
@@ -144,17 +145,11 @@ export default function CalendarPage() {
       start.setHours(0, 0, 0, 0);
       end.setHours(0, 0, 0, 0);
 
-      // Show events on key dates only (not every day in range):
-      // - Exams: only on the end date (deadline)
-      // - Trainings: on start date + end date
-      const keyDates: Date[] = [];
-      if (evt.eventType === 'exam') {
+      // Key tarihler: başlangıç ve bitiş. Tek günlük olaylarda (start == end) tek kez eklenir.
+      // Sınav da olsa eğitim de olsa başlangıç günü bilgisi kullanıcı için önemli.
+      const keyDates: Date[] = [start];
+      if (start.getTime() !== end.getTime()) {
         keyDates.push(end);
-      } else {
-        keyDates.push(start);
-        if (start.getTime() !== end.getTime()) {
-          keyDates.push(end);
-        }
       }
 
       keyDates.forEach(d => {
@@ -175,13 +170,14 @@ export default function CalendarPage() {
     return eventsByDate.get(date.toDateString()) ?? [];
   }, [selectedDay, year, month, eventsByDate]);
 
-  // Upcoming deadlines (next 30 days)
+  // Yaklaşan son tarihler: önümüzdeki 30 gün, aksiyon alınabilir (tamamlanmamış/başarısız/kilitli olmayan) atamalar
   const upcomingDeadlines = useMemo(() => {
     if (!events) return [];
     return events
       .filter(e => {
         const days = daysUntil(e.end);
-        return days >= 0 && days <= 30 && e.status !== 'completed';
+        const actionable = e.status === 'assigned' || e.status === 'in_progress';
+        return days >= 0 && days <= 30 && actionable;
       })
       .sort((a, b) => new Date(a.end).getTime() - new Date(b.end).getTime())
       .slice(0, 5);
@@ -219,10 +215,10 @@ export default function CalendarPage() {
     <div className="space-y-6">
       {/* Header */}
       <BlurFade delay={0}>
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-4">
             <div
-              className="flex h-12 w-12 items-center justify-center rounded-2xl"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
               style={{
                 background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
                 boxShadow: '0 4px 14px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
@@ -230,7 +226,7 @@ export default function CalendarPage() {
             >
               <CalendarIcon className="h-6 w-6 text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-lg sm:text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
                 Eğitim Takvimi
               </h1>
@@ -242,7 +238,7 @@ export default function CalendarPage() {
           {!isCurrentMonth && (
             <button
               onClick={goToToday}
-              className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-transform duration-200 hover:scale-[1.02]"
+              className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl px-4 py-2.5 min-h-11 sm:min-h-0 text-[13px] font-semibold transition-transform duration-200 hover:scale-[1.02]"
               style={{
                 background: 'var(--color-primary-light)',
                 color: 'var(--color-primary)',
@@ -285,17 +281,19 @@ export default function CalendarPage() {
         </div>
       </BlurFade>
 
-      {/* Main Grid: Calendar + Sidebar */}
+      {/* Main Grid: Calendar + Sidebar
+          Mobile (lg altı): Seçili gün paneli varsa sidebar calendar'ın ÜSTÜNDE gösterilir,
+          aksi halde calendar üstte, "Yaklaşan Son Tarihler" altta kalır. Desktop: 320px sağda. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         {/* Calendar Card */}
-        <BlurFade delay={0.06}>
+        <BlurFade delay={0.06} className={`${selectedDay !== null ? 'order-2' : 'order-1'} lg:order-0`}>
           <div
             className="rounded-2xl border overflow-hidden"
             style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
           >
             {/* Month Navigation */}
             <div
-              className="flex items-center justify-between px-6 py-4"
+              className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4"
               style={{ borderBottom: '1px solid var(--color-border)' }}
             >
               <button
@@ -307,8 +305,8 @@ export default function CalendarPage() {
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
-              <div className="text-center">
-                <h3 className="text-base font-bold" style={{ fontFamily: 'var(--font-display)' }}>
+              <div className="text-center flex-1 min-w-0 px-2">
+                <h3 className="text-sm sm:text-base font-bold truncate" style={{ fontFamily: 'var(--font-display)' }}>
                   {MONTHS_TR[month]} {year}
                 </h3>
               </div>
@@ -342,7 +340,10 @@ export default function CalendarPage() {
                 const isToday = cell.isCurrentMonth && isSameDay(cell.date, today);
                 const isSelected = cell.isCurrentMonth && cell.day === selectedDay;
                 const dayEvents = eventsByDate.get(cell.date.toDateString()) ?? [];
-                const hasDeadline = dayEvents.some(e => isSameDay(new Date(e.end), cell.date) && e.status !== 'completed');
+                const hasDeadline = dayEvents.some(e =>
+                  isSameDay(new Date(e.end), cell.date) &&
+                  (e.status === 'assigned' || e.status === 'in_progress'),
+                );
                 const isPast = cell.date < today && !isToday;
 
                 return (
@@ -405,9 +406,8 @@ export default function CalendarPage() {
                         {/* Mobile: colored dots */}
                         <div className="mt-1 flex items-center gap-1 sm:hidden">
                           {dayEvents.slice(0, 3).map(evt => {
-                            const rawSt = evt.status as string;
-                            const stKey = (rawSt === 'passed' ? 'completed' : rawSt) as keyof typeof STATUS_CONFIG;
-                            const dotColor = evt.eventType === 'exam' ? 'var(--color-accent)' : (STATUS_CONFIG[stKey] ?? STATUS_CONFIG.assigned).color;
+                            const cfg = STATUS_CONFIG[evt.status] ?? STATUS_CONFIG.assigned;
+                            const dotColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
                             return <span key={evt.id} className="h-1.5 w-1.5 rounded-full" style={{ background: dotColor }} />;
                           })}
                           {dayEvents.length > 3 && (
@@ -417,9 +417,7 @@ export default function CalendarPage() {
                         {/* Desktop: full pills */}
                         <div className="mt-1 hidden sm:flex flex-col gap-0.5 w-full min-w-0">
                           {dayEvents.slice(0, 2).map(evt => {
-                            const rawStatus = evt.status as string;
-                            const statusKey = (rawStatus === 'passed' ? 'completed' : rawStatus) as keyof typeof STATUS_CONFIG;
-                            const cfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.assigned;
+                            const cfg = STATUS_CONFIG[evt.status] ?? STATUS_CONFIG.assigned;
                             const pillColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
                             const PillIcon = evt.eventType === 'exam' ? ClipboardList : BookOpen;
                             return (
@@ -453,7 +451,7 @@ export default function CalendarPage() {
 
             {/* Legend */}
             <div
-              className="flex flex-wrap items-center gap-2 px-6 py-3"
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 sm:px-6 py-2 sm:py-3"
               style={{ borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)' }}
             >
               {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
@@ -486,8 +484,8 @@ export default function CalendarPage() {
           </div>
         </BlurFade>
 
-        {/* Right Sidebar */}
-        <div className="space-y-4">
+        {/* Right Sidebar — mobilde seçili gün varsa calendar'ın üstüne geçer */}
+        <div className={`space-y-4 ${selectedDay !== null ? 'order-1' : 'order-2'} lg:order-0`}>
           {/* Selected Day Panel */}
           {selectedDay !== null && (
             <BlurFade delay={0}>
@@ -535,9 +533,7 @@ export default function CalendarPage() {
                     </div>
                   ) : (
                     selectedDayEvents.map(evt => {
-                      const rawSt = evt.status as string;
-                      const statusKey = (rawSt === 'passed' ? 'completed' : rawSt) as keyof typeof STATUS_CONFIG;
-                      const cfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.assigned;
+                      const cfg = STATUS_CONFIG[evt.status] ?? STATUS_CONFIG.assigned;
                       const Icon = evt.eventType === 'exam' ? ClipboardList : cfg.icon;
                       const iconBg = evt.eventType === 'exam' ? 'var(--color-accent-light)' : cfg.bg;
                       const iconColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
@@ -576,7 +572,7 @@ export default function CalendarPage() {
                                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: cfg.color }} />
                                 {cfg.label}
                               </span>
-                              {days >= 0 && days <= 7 && evt.status !== 'completed' && (
+                              {days >= 0 && days <= 7 && (evt.status === 'assigned' || evt.status === 'in_progress') && (
                                 <span
                                   className="rounded-full px-2 py-0.5 text-[10px] font-bold"
                                   style={{
@@ -634,9 +630,7 @@ export default function CalendarPage() {
                 ) : (
                   upcomingDeadlines.map(evt => {
                     const days = daysUntil(evt.end);
-                    const rawSt2 = evt.status as string;
-                    const statusKey2 = (rawSt2 === 'passed' ? 'completed' : rawSt2) as keyof typeof STATUS_CONFIG;
-                    const cfg = STATUS_CONFIG[statusKey2] ?? STATUS_CONFIG.assigned;
+                    const cfg = STATUS_CONFIG[evt.status] ?? STATUS_CONFIG.assigned;
                     const urgency = days <= 3 ? 'var(--color-error)' : days <= 7 ? 'var(--color-warning)' : 'var(--color-text-muted)';
                     return (
                       <Link

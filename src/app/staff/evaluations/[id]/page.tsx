@@ -36,10 +36,10 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
           onClick={() => onChange(n)}
           onMouseEnter={() => setHovered(n)}
           onMouseLeave={() => setHovered(0)}
-          className="transition-transform hover:scale-110"
+          className="flex items-center justify-center min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 transition-transform hover:scale-110"
         >
           <Star
-            className="h-8 w-8"
+            className="h-10 w-10 sm:h-8 sm:w-8"
             fill={(hovered || value) >= n ? 'var(--color-warning)' : 'none'}
             style={{ color: (hovered || value) >= n ? 'var(--color-warning)' : 'var(--color-border)' }}
           />
@@ -181,7 +181,7 @@ export default function EvaluationWizardPage() {
                 <button
                   key={cat.id}
                   onClick={() => setCurrentCatIdx(i)}
-                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium transition-all"
+                  className="flex items-center gap-1 text-xs px-3 py-2 sm:px-2.5 sm:py-1 min-h-9 sm:min-h-0 rounded-full font-medium transition-all"
                   style={{
                     background: i === currentCatIdx ? 'var(--color-primary)' : catComplete ? 'var(--color-success-bg)' : 'var(--color-surface-2)',
                     color: i === currentCatIdx ? 'white' : catComplete ? 'var(--color-success)' : 'var(--color-text-secondary)',
@@ -242,22 +242,22 @@ export default function EvaluationWizardPage() {
 
       {/* Navigation */}
       <BlurFade delay={0.1}>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
           <Button
             variant="outline"
             onClick={() => setCurrentCatIdx(i => i - 1)}
             disabled={currentCatIdx === 0}
-            className="gap-1.5 rounded-xl"
+            className="w-full sm:w-auto gap-1.5 rounded-xl min-h-[44px]"
           >
             <ChevronLeft className="h-4 w-4" /> Önceki
           </Button>
 
           {!isLastCat ? (
-            <Button onClick={handleNext} className="gap-1.5 rounded-xl">
+            <Button onClick={handleNext} className="w-full sm:w-auto gap-1.5 rounded-xl min-h-[44px]">
               Kaydet ve Devam <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={handleSubmit} disabled={submitting} className="gap-1.5 rounded-xl"
+            <Button onClick={handleSubmit} disabled={submitting} className="w-full sm:w-auto gap-1.5 rounded-xl min-h-[44px]"
               style={{ background: 'var(--color-success)' }}>
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               <CheckCircle className="h-4 w-4" /> Değerlendirmeyi Tamamla

@@ -381,7 +381,7 @@ export default function StaffCertificatesPage() {
                       <code className="flex-1 text-[11px] font-mono font-semibold truncate" style={{ color: 'var(--color-primary)' }}>
                         {cert.certificateCode}
                       </code>
-                      <button onClick={() => copyCode(cert.certificateCode)} aria-label="Sertifika kodunu kopyala" className="shrink-0 p-2 sm:p-1 rounded-lg sm:rounded hover:bg-[var(--color-surface-hover)]">
+                      <button onClick={() => copyCode(cert.certificateCode)} aria-label="Sertifika kodunu kopyala" className="shrink-0 flex h-11 w-11 sm:h-7 sm:w-7 items-center justify-center rounded-lg sm:rounded hover:bg-[var(--color-surface-hover)]">
                         <Copy className="h-4 w-4 sm:h-3.5 sm:w-3.5" style={{ color: 'var(--color-text-muted)' }} />
                       </button>
                     </div>
@@ -389,7 +389,7 @@ export default function StaffCertificatesPage() {
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
-                        className="flex-1 gap-1.5 rounded-xl text-[12px] h-9"
+                        className="flex-1 gap-1.5 rounded-xl text-[12px] h-11 sm:h-9"
                         style={{ borderColor: 'var(--color-border)' }}
                         onClick={() => setSelected(cert)}
                       >
@@ -397,7 +397,7 @@ export default function StaffCertificatesPage() {
                       </Button>
                       <Button
                         variant="outline"
-                        className="flex-1 gap-1.5 rounded-xl text-[12px] h-9"
+                        className="flex-1 gap-1.5 rounded-xl text-[12px] h-11 sm:h-9"
                         style={{ borderColor: 'var(--color-border)' }}
                         disabled={pdfLoading}
                         onClick={() => handleDownloadPDF(cert)}
@@ -444,7 +444,7 @@ export default function StaffCertificatesPage() {
               <button
                 onClick={() => setSelected(null)}
                 aria-label="Kapat"
-                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--color-bg)]"
+                className="flex h-11 w-11 sm:h-8 sm:w-8 items-center justify-center rounded-lg hover:bg-[var(--color-bg)]"
               >
                 <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
               </button>

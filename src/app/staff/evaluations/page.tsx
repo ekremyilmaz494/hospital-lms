@@ -70,7 +70,7 @@ export default function StaffEvaluationsPage() {
                     </p>
                   </div>
                   <Link href={`/staff/evaluations/${ev.id}`}
-                    className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 transition-colors"
+                    className="flex items-center justify-center gap-1 text-xs font-semibold px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg shrink-0 min-h-11 sm:min-h-0 transition-colors"
                     style={{ background: 'var(--color-primary)', color: 'white' }}>
                     Başla <ArrowRight className="h-3.5 w-3.5" />
                   </Link>

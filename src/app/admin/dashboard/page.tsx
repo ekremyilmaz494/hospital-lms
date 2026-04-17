@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import {
-  Users, GraduationCap, TrendingUp, AlertTriangle, Trophy, Activity, Clock, ArrowRight,
-  Plus, Send, Download, Shield, Building2, CalendarClock, UserPlus, ShieldCheck,
+  Users, GraduationCap, TrendingUp, AlertTriangle, Trophy, Activity, Clock,
+  Plus, Send, Download, Building2, UserPlus, ShieldCheck,
   Radio, BookOpen, RefreshCw,
 } from 'lucide-react';
 import { useRealtimeExams } from '@/hooks/use-realtime-exams';
@@ -20,16 +20,15 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
 import { PageHeader } from '@/components/shared/page-header';
 import { ChartCard } from '@/components/shared/chart-card';
-import { Button } from '@/components/ui/button';
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/components/shared/toast';
-import { StatCardSkeleton, TableSkeleton, ListSkeleton, AlertSkeleton, SectionError, ChartSkeleton } from '@/components/shared/skeletons';
+import { StatCardSkeleton, ListSkeleton, SectionError, ChartSkeleton } from '@/components/shared/skeletons';
+import { RiskCenter } from './risk-center';
 
 // Küçük UI bileşenleri — static import (< 5KB)
 import { BlurFade } from '@/components/ui/blur-fade';
 import { MagicCard } from '@/components/ui/magic-card';
-import { BorderBeam } from '@/components/ui/border-beam';
 const MatrixMiniWidget = dynamic(() => import('./matrix-mini-widget').then(m => ({ default: m.MatrixMiniWidget })), {
   ssr: false,
   loading: () => <div className="animate-pulse rounded-2xl border h-64" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />,
@@ -143,7 +142,7 @@ function LiveExamsWidget() {
           <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: isConnected ? 'var(--color-success-bg)' : 'var(--color-warning-bg)' }}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: isConnected ? 'var(--color-success)' : 'var(--color-warning)', animation: isConnected ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none' }} />
             <span className="text-[10px] font-semibold" style={{ color: isConnected ? 'var(--color-success)' : 'var(--color-warning)' }}>
-              {isConnected ? 'Canlı' : 'Önbellek'}
+              {isConnected ? 'Canlı' : 'Çevrimdışı'}
             </span>
           </div>
           <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: displayCount > 0 ? 'var(--color-success-bg)' : 'var(--color-bg)' }}>
@@ -323,76 +322,23 @@ export default function AdminDashboard() {
         <LiveExamsWidget />
       </BlurFade>
 
+      {/* Risk Merkezi — overdue + compliance + expiring certs tabbed card */}
+      <RiskCenter
+        overdueTrainings={overdueTrainings}
+        complianceAlerts={complianceAlerts}
+        expiringCerts={expiringCerts}
+        isLoading={compliance.isLoading || stats.isLoading || certs.isLoading}
+        sendingReminder={sendingReminder}
+        onSendReminder={handleSendReminder}
+      />
+
       {/* ── Stats Section (polling: 60s) ── */}
       {stats.error ? (
         <SectionError message={stats.error} onRetry={stats.refetch} />
       ) : (
         <>
-          {/* Warning Banner — depends on compliance + certs */}
-          {!compliance.isLoading && !certs.isLoading && (overdueTrainings.length > 0 || expiringCerts.filter(c => c.daysLeft <= 7).length > 0) && (
-            <BlurFade delay={0.02}>
-              <div className="relative overflow-hidden flex items-center gap-4 rounded-2xl px-6 py-4" style={{ background: 'linear-gradient(135deg, var(--color-accent), #92400e)', boxShadow: '0 4px 20px rgba(245, 158, 11, 0.15)' }}>
-                <BorderBeam size={100} duration={8} colorFrom="#fbbf24" colorTo="#f59e0b" />
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                  <AlertTriangle className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-white">{overdueTrainings.length} personelin eğitimi gecikmiş, {expiringCerts.filter(c => c.daysLeft <= 7).length} sertifika süresi dolmak üzere!</p>
-                  <p className="text-xs text-white/60">Acil müdahale gerekiyor.</p>
-                </div>
-                <Link href="/admin/reports" className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-transform duration-200 hover:scale-105" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
-                  Detayları Gör <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </BlurFade>
-          )}
-
-          {/* Compliance Alerts */}
-          {stats.isLoading ? (
-            <AlertSkeleton />
-          ) : complianceAlerts.length > 0 ? (
-            <BlurFade delay={0.02}>
-              <div className="rounded-2xl p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--color-error-bg)' }}>
-                      <Shield className="h-4 w-4" style={{ color: 'var(--color-error)' }} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>Uyum Alarmları</h3>
-                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Zorunlu eğitim deadline yaklaşıyor</p>
-                    </div>
-                  </div>
-                  <Link href="/admin/compliance" className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
-                    Tümünü Gör →
-                  </Link>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {complianceAlerts.map((alert, i) => (
-                    <div key={i} className="flex items-start gap-3 rounded-xl p-3" style={{
-                      background: alert.status === 'critical' || alert.status === 'overdue' ? 'var(--color-error-bg)' : 'var(--color-warning-bg, #fffbeb)',
-                      border: `1px solid ${alert.status === 'critical' || alert.status === 'overdue' ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)'}30`,
-                    }}>
-                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" style={{ color: alert.status === 'critical' || alert.status === 'overdue' ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)' }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{alert.training}</p>
-                        {alert.regulatoryBody && <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{alert.regulatoryBody}</p>}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs font-bold" style={{ color: alert.status === 'critical' || alert.status === 'overdue' ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)' }}>
-                            {alert.status === 'overdue' ? 'Süre Doldu!' : `${alert.daysLeft} gün`}
-                          </span>
-                          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>· %{alert.complianceRate} uyumlu</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </BlurFade>
-          ) : null}
-
           {/* Stat Cards */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
             {stats.isLoading
               ? Array.from({ length: 5 }).map((_, i) => <StatCardSkeleton key={i} />)
               : statCards.map((stat, i) => (
@@ -455,146 +401,24 @@ export default function AdminDashboard() {
         </BlurFade>
       </div>
 
-      {/* ── Department Comparison + Certificate Expiry ── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Department Comparison — from charts endpoint */}
-        <BlurFade delay={0}>
-          {charts.error ? (
-            <SectionError message={charts.error} onRetry={charts.refetch} />
-          ) : charts.isLoading ? (
-            <ChartSkeleton />
-          ) : (
-            <ChartCard title="Departman Karşılaştırması" icon={<Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
-              {departmentComparison.length > 0 ? (
-                <div className="h-64">
-                  <DepartmentBar data={departmentComparison} />
-                </div>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-sm text-center px-4" style={{ color: 'var(--color-text-muted)' }}>Personele eğitim atandığında departman karşılaştırması burada görünecek</div>
-              )}
-            </ChartCard>
-          )}
-        </BlurFade>
-
-        {/* Certificate Expiry Tracker — from certs endpoint */}
-        <BlurFade delay={0}>
-          {certs.error ? (
-            <SectionError message={certs.error} onRetry={certs.refetch} />
-          ) : certs.isLoading ? (
-            <ListSkeleton rows={3} />
-          ) : (
-            <MagicCard gradientColor="rgba(220, 38, 38, 0.04)" gradientOpacity={0.4} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-              <div className="p-6">
-                <div className="mb-5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-error-bg)' }}>
-                      <Shield className="h-4 w-4" style={{ color: 'var(--color-error)' }} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold">Sertifika Süreleri</h3>
-                      <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Yaklaşan sertifika yenilemeleri</p>
-                    </div>
-                  </div>
-                </div>
-                {expiringCerts.length > 0 ? (
-                  <div className="space-y-3">
-                    {expiringCerts.map((c) => (
-                      <div key={c.name} className="flex items-center gap-3 rounded-xl p-3 transition-colors duration-150 hover:bg-(--color-surface-hover)" style={{ border: '1px solid var(--color-border)' }}>
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: c.status === 'critical' ? 'var(--color-error-bg)' : c.status === 'warning' ? 'var(--color-warning-bg)' : 'var(--color-success-bg)' }}>
-                          <CalendarClock className="h-5 w-5" style={{ color: c.status === 'critical' ? 'var(--color-error)' : c.status === 'warning' ? 'var(--color-warning)' : 'var(--color-success)' }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold truncate">{c.name}</p>
-                          <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{c.cert}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-xs font-mono" style={{ color: 'var(--color-text-muted)' }}>{c.expiryDate}</p>
-                          <p className="text-xs font-bold" style={{ color: c.status === 'critical' ? 'var(--color-error)' : c.status === 'warning' ? 'var(--color-warning)' : 'var(--color-success)' }}>
-                            {c.daysLeft} gün
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitim atamaları yapıldıkça veriler burada görünecek.</div>
-                )}
+      {/* ── Department Comparison (full width) ── */}
+      <BlurFade delay={0}>
+        {charts.error ? (
+          <SectionError message={charts.error} onRetry={charts.refetch} />
+        ) : charts.isLoading ? (
+          <ChartSkeleton />
+        ) : (
+          <ChartCard title="Departman Karşılaştırması" icon={<Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
+            {departmentComparison.length > 0 ? (
+              <div className="h-64">
+                <DepartmentBar data={departmentComparison} />
               </div>
-            </MagicCard>
-          )}
-        </BlurFade>
-      </div>
-
-      {/* ── Overdue Table — from compliance endpoint (polling: 120s) ── */}
-      {compliance.error ? (
-        <SectionError message={compliance.error} onRetry={compliance.refetch} />
-      ) : compliance.isLoading ? (
-        <TableSkeleton rows={3} />
-      ) : overdueTrainings.length > 0 ? (
-        <BlurFade delay={0}>
-          <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-error-bg)' }}>
-                  <AlertTriangle className="h-4 w-4" style={{ color: 'var(--color-error)' }} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold">Geciken Eğitimler</h3>
-                  <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{overdueTrainings.length} personel eğitim süresini aşmış</p>
-                </div>
-              </div>
-              <Link href="/admin/reports" className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
-                Tümünü Gör
-              </Link>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ background: 'var(--color-bg)' }}>
-                  <th className="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Personel</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Departman</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Eğitim</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Son Tarih</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Gecikme</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overdueTrainings.map((t, i) => (
-                  <tr key={i} className="clickable-row" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td className="px-6 py-3.5">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar className="h-8 w-8"><AvatarFallback className="text-[10px] font-bold text-white" style={{ background: t.color }}>{t.name.split(' ').map(n => n[0]).join('')}</AvatarFallback></Avatar>
-                        <span className="font-semibold">{t.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5" style={{ color: 'var(--color-text-secondary)' }}>{t.dept}</td>
-                    <td className="px-4 py-3.5">{t.training}</td>
-                    <td className="px-4 py-3.5 font-mono text-xs" style={{ color: 'var(--color-text-muted)' }}>{t.dueDate}</td>
-                    <td className="px-4 py-3.5">
-                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>
-                        {t.daysOverdue} gün gecikmiş
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5 rounded-lg text-xs"
-                        style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
-                        disabled={sendingReminder === t.assignmentId}
-                        onClick={() => handleSendReminder(t.assignmentId, t.name)}
-                      >
-                        <Send className="h-3 w-3" />
-                        {sendingReminder === t.assignmentId ? 'Gönderiliyor...' : 'Hatırlat'}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </BlurFade>
-      ) : null}
+            ) : (
+              <div className="h-64 flex items-center justify-center text-sm text-center px-4" style={{ color: 'var(--color-text-muted)' }}>Personele eğitim atandığında departman karşılaştırması burada görünecek</div>
+            )}
+          </ChartCard>
+        )}
+      </BlurFade>
 
       {/* Competency Matrix Widget */}
       <BlurFade delay={0}>
@@ -675,7 +499,7 @@ export default function AdminDashboard() {
                           <p className="text-sm"><span className="font-semibold">{item.user}</span> <span style={{ color: 'var(--color-text-secondary)' }}>{item.action}</span></p>
                           <div className="flex items-center gap-1 mt-0.5">
                             <Clock className="h-3 w-3" style={{ color: 'var(--color-text-muted)' }} />
-                            <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>{item.time}</span>
+                            <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>{elapsedLabel(item.time)}</span>
                           </div>
                         </div>
                       </div>

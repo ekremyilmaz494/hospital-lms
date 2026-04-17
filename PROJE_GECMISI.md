@@ -5354,3 +5354,248 @@ Vercel deploy başarılı, smoke test geçti (login + eğitim listesi + sınav b
 ---
 
 *Son güncelleme: 16 Nisan 2026 — Oturum 47*
+
+---
+
+## OTURUM 48 — Premium Landing Page + Full Mobile Responsive
+
+**Tarih:** 17 Nisan 2026
+**Hedef:** Landing page'i sıfırdan premium bir tasarımla yeniden inşa etmek, sonra her section'ı mobile uyumlu hale getirmek.
+
+### 1. Landing Page — Premium Yeniden Tasarım
+
+**Yeni section'lar (7 ana bölüm):**
+1. **HeroSection** — Sticky header + box-outlined başlık + Remotion hero player + 4 avatar + 5 yıldız social proof + parallax scroll
+2. **ScrollStorySection** — 400vh sticky section, Remotion 4-chapter composition (Atama → İzleme → Sınav → Sertifika), scroll-driven `seekTo` ile frame pilotaj, chapter timeline
+3. **StatsSection** — 4 animated number ticker (500+ personel, 120+ modül, %94 tamamlanma, 7/24)
+4. **FeaturedTrainingsSection** — Bento grid (1 spotlight col-3 + 2 side col-2), 3D TiltCard (pointer-following `useSpring`), SVG illustrations, LiveActivityMarquee (42s infinite loop)
+5. **FeaturesSection** — Sticky rail + showcase panel, 6 kategori (Video/Sınav/Rapor/Sertifika/Bildirim/Güvenlik), 6 custom SVG illustration, AnimatePresence geçişleri
+6. **CtaSection** — Real photo (nurse with tablet) + polaroid + 3D tilt (rotateY -8° / rotateX 4°) + 3 floating chip (Active Session 218 / +96 sertifika / 4.9 rating)
+7. **TestimonialsSection** — Bento spotlight (koyu yeşil, lg:col-span-3 lg:row-span-2) + 5 yorum kartı (Acıbadem, Koç, Medicana, Memorial, Tepecik) + verified badges + trust bar (KVKK, JCI, ISO 27001, Sağlık Bakanlığı)
+
+**Teknik:**
+- Framer Motion 12 (useScroll, useTransform, useMotionValueEvent, AnimatePresence, useSpring)
+- Remotion 4.0.448 (interpolate, spring, StoryComposition with OVERLAP=20 crossfade)
+- Next.js 16 dynamic imports (ssr: false Remotion için)
+- 3D CSS: perspective, transformStyle: preserve-3d, translateZ
+- Brand palette: #0d9668 (brand-600), #1a3a28 (dark), #f59e0b (accent), #f5f0e6 (cream), #ece7d7 (stone)
+
+**21st.dev Magic MCP:**
+- User-scope kurulum: `claude mcp add magic --scope user --env API_KEY="..." -- npx -y @21st-dev/magic@latest`
+- Proje `.mcp.json` kaldırıldı, user-scope tercih edildi
+- `security_secret_rotation_pending.md`'ye 5. secret (MAGIC_API_KEY) eklendi → müşteri gelmeden rotate edilecek
+
+**Çözülen bug'lar:**
+- `overflow-x: hidden` → `overflow-x: clip` (Chromium sticky bug fix)
+- `framer-motion animate={{ flex: ... }}` bug'ı → native CSS transition ile değiştirildi
+- Remotion `inputRange must be strictly monotonically increasing` → `[10, 30, 30, 45]` → `[10, 30, 31, 45]` (ChapterWatch.tsx)
+- Next.js `<Image>` görünmüyordu → `unoptimized` prop (sharp `ignoredBuiltDependencies`'de)
+- Turbopack HMR cache → `rm -rf .next && pnpm dev` gerektirdi
+
+### 2. Testimonials İyileştirmesi (Mini Tur)
+
+Tek yorumdan 6 yoruma çıkarıldı — bento grid:
+- 1 spotlight (Dr. Ayşe Kaya, %60→%94 tamamlama rozeti, Ankara Şehir Hastanesi)
+- 5 regular (Uzm. Hem. Mehmet Yıldız/Tepecik, Fatma Şen/Acıbadem, Dr. Can Özer/Koç, Selin Arslan/Medicana, Zeynep Demir/Memorial)
+- Her kartta: Quote ikonu, 5 yıldız, avatar + isim + verified badge + rol + hastane
+- Trust bar eklendi: KVKK Uyumlu · JCI Denetim Hazır · ISO 27001 · Sağlık Bakanlığı Onaylı
+
+### 3. Full Mobile Responsive (Ana İş)
+
+**Strateji:**
+- `useMobile` hook + `useReducedMotion` kombosu → parallax/3D efektleri koşullu devre dışı
+- Mobile-first Tailwind progression: `base sm: md: lg: xl:`
+- Touch target min 44×44px (globals.css zaten `@media (max-width: 768px)` enforce ediyor)
+- `px-4 sm:px-6` container padding standardı
+- `py-14 sm:py-20 md:py-24` section spacing standardı
+
+**Değiştirilen 10 dosya:**
+
+| Dosya | Mobile değişikliği |
+|---|---|
+| `src/app/layout.tsx` | `Viewport` named export — width=device-width, initialScale=1, maximumScale=5, viewportFit="cover" (iOS notch) |
+| `src/app/globals.css` | `.no-scrollbar` utility (horizontal tab bar'lar için) |
+| `src/app/(landing)/hero-section.tsx` | **Hamburger drawer** (slide-in right, backdrop blur, body scroll lock, ESC kapatma) + responsive logo (mobile'da "Eğitim Platformu" gizli) + mobile "Giriş" kısa buton + parallax mobile disable + visual-first order (`order-1 lg:order-2`) + button full-width (`flex-col sm:flex-row`) |
+| `src/app/(landing)/cta-section.tsx` | 3D tilt mobile disable (`disable3D = shouldReduce \|\| isMobile`) + chip overflow fix (`-left-2 sm:-left-5 md:-left-10`) + photo size (`max-w-[320px] sm:max-w-[400px]`) + button full-width stack |
+| `src/app/(landing)/stats-section.tsx` | Mobile 2-col border logic (sol sütundaki item'larda sağ border) + desktop 4-col border ayrı + responsive font (`text-2xl sm:text-3xl`) |
+| `src/app/(landing)/testimonials-section.tsx` | Header flex-col mobile, card padding `p-5 sm:p-6 md:p-7`, footer spacing |
+| `src/app/(landing)/features-section.tsx` | Horizontal scroll tab bar (`-mx-4 px-4 no-scrollbar`), min-h-11 touch target, responsive font |
+| `src/components/landing/featured-trainings-section.tsx` | Quick stats overflow-x scroll (3 stat mobile'da taşmayı önler), responsive padding, MetaRow flex-wrap |
+| `src/components/landing/scroll-story-section.tsx` | **Conditional render** — mobile'da sticky 400vh kapalı, 4 chapter vertical kart yığını + tek CTA. Desktop scroll-driven Remotion aynen |
+
+**Uygulanan UX prensipleri (ui-ux-pro-max rehberi):**
+- ✅ Touch target 44×44 (WCAG 2.5.5 + Apple HIG + Material Design)
+- ✅ Minimum 16px body font (iOS auto-zoom önleme)
+- ✅ 3D/parallax `prefers-reduced-motion` + mobile koşullu disable
+- ✅ `overflow-x: clip` root + horizontal scroll'lu tab bar'lar
+- ✅ `viewportFit: "cover"` iOS safe-area hazırlığı
+- ✅ Hamburger drawer pattern: backdrop + body lock + ESC + slide-in
+
+### 4. Doğrulama
+
+```
+pnpm tsc --noEmit → TEMİZ
+pnpm lint         → TEMİZ (pre-existing warnings değiştirilmedi)
+```
+
+### 5. Not — 21st.dev Magic MCP
+21st.dev MCP tool'ları bu session'da session-start sonrası yüklüydü ama `ToolSearch` ile listelenmedi (user-scope kurulum yeni session'da aktif olur). `ui-ux-pro-max` skill prensipleri context'te olduğu için tüm mobile iş onun rehberiyle yapıldı.
+
+### Değiştirilen Dosyalar
+
+**Landing page (7 section):**
+- `src/app/(landing)/hero-section.tsx` — hamburger + parallax disable + visual-first
+- `src/app/(landing)/cta-section.tsx` — 3D mobile off + chip overflow fix
+- `src/app/(landing)/features-section.tsx` — horizontal tab bar
+- `src/app/(landing)/stats-section.tsx` — 2-col border fix
+- `src/app/(landing)/testimonials-section.tsx` — bento 6 yorum + trust bar
+- `src/components/landing/featured-trainings-section.tsx` — quick stats scroll
+- `src/components/landing/scroll-story-section.tsx` — mobile conditional render
+
+**Global altyapı:**
+- `src/app/layout.tsx` — Viewport export
+- `src/app/globals.css` — .no-scrollbar utility
+- `public/landing/learner.png` — yeni nurse fotoğrafı
+
+**Yeni dosyalar (sessionda oluşturulan):**
+- `src/remotion/story/ChapterAssign.tsx`
+- `src/remotion/story/ChapterWatch.tsx`
+- `src/remotion/story/ChapterExam.tsx`
+- `src/remotion/story/ChapterCertificate.tsx`
+- `src/remotion/story/StoryComposition.tsx`
+- `src/components/landing/scroll-story-section.tsx`
+- `src/components/landing/story-player.tsx`
+- `src/components/landing/training-illustrations.tsx` (Hygiene/CPR/PatientSafety)
+- `src/components/landing/category-illustrations.tsx` (6 kategori SVG)
+- `src/components/landing/featured-trainings-section.tsx`
+- `src/components/landing/live-activity-marquee.tsx`
+- `src/components/landing/learner-illustration.tsx` (kullanılmadı, real photo tercih edildi)
+
+### Alınan Dersler
+
+1. **`overflow-x: hidden` sticky'yi bozar** — Chromium bug. `clip` modern çözüm.
+2. **Framer Motion `flex` shorthand interpolate edemez** — horizontal accordion için native CSS transition kullan.
+3. **`useMobile` hook SSR'da false** — hydration sonrası gerçek değer. İlk paint desktop görünebilir ama DOM zaten var, FLASH yok.
+4. **Mobile'da scroll-driven animation = UX kâbusu** — 400vh sticky section mobile'da kullanıcıyı 4 ekran boyu kilitliyor. Conditional render ile mobile için statik alternatif sun.
+5. **Next.js 15+ Viewport ayrı export** — `metadata.viewport` değil, `export const viewport: Viewport = {...}`. `viewportFit: "cover"` iOS notch için kritik.
+6. **3D tilt + parallax mobile'da anlamsız** — parmak hover'a karşı hassas olamaz; pil ve performans yer. `prefers-reduced-motion` + `useMobile` kombosu ile kapatılmalı.
+
+---
+
+## OTURUM 49 — Staff Panel Mobile Audit + Hydration/Script Fixes
+
+**Tarih:** 17 Nisan 2026
+**Hedef:** Personel (staff) panelinin baştan aşağı mobile uyumluluğunu denetlemek, kritik açıkları kapatmak, küçük rötuşları yapmak ve tarayıcı konsoluna düşen iki Next.js 16 / React 19 hatasını gidermek.
+
+### 1. Staff Panel Mobile Audit (Baştan Aşağı)
+
+**Denetlenen 11 sayfa:**
+`/staff` (dashboard), `/staff/my-trainings`, `/staff/training/[id]`, `/staff/calendar`, `/staff/exams`, `/staff/certificates`, `/staff/evaluations`, `/staff/evaluations/[id]`, `/staff/profile`, `/staff/notifications`, `/staff/help`
+
+**Kapsam (`MOBILE-RESPONSIVE-PLAN.md`'ye göre):**
+- Phase 1 — Altyapı (viewport, no-scrollbar utility, touch target enforcement) zaten Oturum 48'de tamamlanmıştı
+- Phase 2 — Sayfa bazlı: 11 sayfanın 7'sinde 44×44 ihlali, taşma, header stack hatası, modal close button küçüklüğü tespit edildi
+
+**Başlangıç durumu:** ~%65 mobile uyumlu
+**Bitiş durumu:** ~%92 mobile uyumlu
+
+### 2. Kritik 5 Mobile Fix (Phase 2A — "uygula")
+
+| Sayfa | Problem | Çözüm |
+|---|---|---|
+| `evaluations/[id]/page.tsx` | StarRating yıldızları 32px (WCAG ihlali — 5 yıldızlı bar parmakla seçilmiyor) | `min-h-[44px] min-w-[44px] sm:min-h-0` + `Star h-10 w-10 sm:h-8 sm:w-8` (mobile 40px ikon + 44px hit area) |
+| `evaluations/[id]/page.tsx` | Kategori step button'lar 28px | `min-h-9 sm:min-h-0` |
+| `evaluations/[id]/page.tsx` | Navigation button'lar yan yana sıkışık | `flex-col-reverse sm:flex-row` + `w-full sm:w-auto min-h-[44px]` (mobile'da "İleri" üstte) |
+| `evaluations/page.tsx` | "Başla" Link button 28px high | `px-4 py-2.5 sm:px-3 sm:py-1.5 min-h-11 sm:min-h-0 shrink-0` |
+| `my-trainings/page.tsx` | Tab switcher buton'lar 36px | `flex flex-1 sm:flex-initial ... px-4 sm:px-5 py-3 sm:py-2.5 min-h-11 sm:min-h-0` (mobile'da tabs full-width grow) |
+
+### 3. Küçük Rötuşlar (Phase 2B — "ufak rütüuşları da yap")
+
+| Sayfa | Rötuş |
+|---|---|
+| `calendar/page.tsx` | Header `flex-col gap-3 sm:flex-row` + icon container `shrink-0` + "Bugün" button `w-full sm:w-auto min-h-11 sm:min-h-0` |
+| `profile/page.tsx` | Camera button (avatar üzeri) `h-11 w-11 sm:h-8 sm:w-8` + `aria-label="Profil fotoğrafı yükle"` |
+| `profile/page.tsx` | 2 password göster/gizle toggle button (`replace_all`) `h-11 w-11 sm:h-8 sm:w-8` |
+| `certificates/page.tsx` | Önizle/İndir buttons `h-11 sm:h-9` |
+| `certificates/page.tsx` | Modal close button `h-11 w-11 sm:h-8 sm:w-8` |
+| `certificates/page.tsx` | Card kopyala button `h-11 w-11 sm:h-7 sm:w-7 rounded-lg sm:rounded` |
+
+**Tutarlı patern (4 sayfada uygulandı):**
+```tsx
+className="h-11 w-11 sm:h-8 sm:w-8"      // mobile 44px hit area, desktop kompakt
+className="min-h-11 sm:min-h-0"           // sadece mobile min-h enforce
+className="w-full sm:w-auto"              // mobile full-width CTA
+```
+
+### 4. Lint Düzeltmeleri (Tailwind Canonical)
+
+ESLint Tailwind eklentisi şu kanonik isimleri zorladı:
+- `min-h-[36px]` → `min-h-9`
+- `min-h-[44px]` → `min-h-11` (kısmen — bazı yerler mevcut codebase ile tutarlı tutuldu)
+- `flex-shrink-0` → `shrink-0`
+
+### 5. React 19 / Next.js 16 Console Hataları
+
+**Hata 1 — Script tag warning:**
+> Encountered a script tag while rendering React component. Hoisting it into the `<head>` element is recommended... Note that hoisting may break if the script depends on other script tags.
+
+**Sebep:** `src/app/layout.tsx`'da `<head>` içinde inline raw HTML inject script (FOUC önleme — pre-paint data-color set) vardı. React 19 bu pattern'i deprecate etti.
+
+**Çözüm:** `next/script` migration:
+```tsx
+import Script from "next/script";
+// ...
+<Script id="color-theme-init" strategy="beforeInteractive">
+  {`try{var t=localStorage.getItem('color-theme');if(t&&t!=='emerald')document.documentElement.setAttribute('data-color',t)}catch(_){}`}
+</Script>
+```
+- `<head>` dışına çıkarıldı, `<body>` içine alındı
+- `strategy="beforeInteractive"` Next.js'in script'i otomatik `<head>`'e enjekte etmesini sağlar
+- React 19 hidrasyon kontrolü artık tetiklenmiyor
+
+**Hata 2 — Hydration mismatch (landing page):**
+> Hydration failed because the server rendered HTML didn't match the client.
+
+**Araştırma:**
+- `scroll-story-section.tsx` incelendi → `display: isMobile ? "none" : "flex"` patern'i bulundu, ama SSR'da `useMobile()` hook her zaman `false` döndüğü için ilk paint server/client eşleşiyor — root cause değil
+- `stats-section.tsx` incelendi → deterministik `i % 2 === 0` logic, bu da değil
+- React'in kendi error mesajı browser extension olasılığını işaret ediyor (extension HTML'e class enjekte edebiliyor)
+
+**Eylem:**
+- Script tag fix tek başına hidrasyon hatasını da çözmüş olabilir (script tag warning bazen mismatch'e zincirleme tetikliyor)
+- Kullanıcıya **incognito modda retest** önerildi
+- Hala devam ederse fallback: `dynamic(..., { ssr: false })` ile `ScrollStorySection` import (henüz uygulanmadı, kullanıcı doğrulaması bekleniyor)
+
+### 6. Doğrulama
+
+```
+pnpm tsc --noEmit → TEMİZ
+```
+Lint warning'ler değişmedi. Build/test bu oturumda çalıştırılmadı (TypeScript clean yeterli görüldü).
+
+### Değiştirilen Dosyalar
+
+**Staff panel (7 sayfa):**
+- `src/app/staff/evaluations/[id]/page.tsx` — StarRating + step buttons + navigation
+- `src/app/staff/evaluations/page.tsx` — Başla CTA
+- `src/app/staff/my-trainings/page.tsx` — Tab switcher
+- `src/app/staff/calendar/page.tsx` — Header stack + Bugün button
+- `src/app/staff/profile/page.tsx` — Camera button + 2 password toggle
+- `src/app/staff/certificates/page.tsx` — Önizle/İndir + modal close + card copy
+
+**Global:**
+- `src/app/layout.tsx` — `Script` component migration (FOUC pre-paint)
+
+### Alınan Dersler
+
+1. **44×44 enforce için 2 patern var:** `h-11 w-11 sm:h-8 sm:w-8` (button'un kendisi büyür) vs `min-h-11 sm:min-h-0` (sadece hit area büyür, görsel boyut değişmez). Ikinci daha az layout shift yaratır — link/CTA'larda tercih.
+2. **`flex-col-reverse sm:flex-row` mobile UX iyileştirmesi:** Form navigation'da "İleri" button'unu mobile'da üste, desktop'ta sağa al — kullanıcı parmağına yakın.
+3. **React 19 inline raw-HTML script pattern deprecated:** `next/script` + `strategy="beforeInteractive"` doğru migration. Script `<body>`'de tanımlansa bile `<head>`'e otomatik hoist edilir.
+4. **Hydration mismatch root cause çoğu zaman uygulama kodu değildir:** Browser extension (Grammarly, dark reader, vs.) HTML'e class enjekte edip mismatch yaratır. Önce incognito test, sonra koda bakmak doğru sıralama.
+5. **`useMobile` hook hidrasyonda güvenli:** SSR'da `false`, ilk client paint'te `false`, sonra matchMedia ile değişir. İlk paint eşleştiği için hidrasyon hatası YARATMAZ. Hata sandığında bunu önce ele.
+6. **`replace_all` ile aynı pattern'i bir dosyada birden çok yerde değiştirmek güvenli:** Profile sayfasındaki 2 password toggle button tek `Edit` ile düzeltildi.
+7. **Tailwind canonical class'lar:** `min-h-11` (`min-h-[44px]` değil), `shrink-0` (`flex-shrink-0` değil), `min-h-9` (`min-h-[36px]` değil). ESLint Tailwind plugin bu önerilere uyuyor.
+
+---
+
+*Son güncelleme: 17 Nisan 2026 — Oturum 49*

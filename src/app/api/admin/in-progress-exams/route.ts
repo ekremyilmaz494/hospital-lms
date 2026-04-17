@@ -19,7 +19,8 @@ export async function GET() {
 
   const data = await withCache(`in-progress-exams:${organizationId}`, 30, async () => {
     const IN_PROGRESS_STATUSES = ['pre_exam', 'watching_videos', 'post_exam']
-    const STALE_THRESHOLD = new Date(Date.now() - 4 * 60 * 60 * 1000)
+    // 2 saat: en uzun sınav süresi + video + tolerans. Daha eski attempt'ler stale kabul edilir (cron/cleanup düşürür).
+    const STALE_THRESHOLD = new Date(Date.now() - 2 * 60 * 60 * 1000)
 
     const attempts = await prisma.examAttempt.findMany({
       where: {

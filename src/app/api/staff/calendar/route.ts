@@ -1,6 +1,27 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
+
+/**
+ * Normalize TrainingAssignment.status → UI status.
+ * DB 'passed' iş kuralında "başarıyla tamamlandı" demek; UI katmanı bunu 'completed' olarak görür.
+ * Böylece UI'da her yerde status kıyaslaması tutarlı olur.
+ */
+type CalendarStatus = 'assigned' | 'in_progress' | 'completed' | 'failed' | 'locked'
+
+function normalizeStatus(raw: string): CalendarStatus {
+  if (raw === 'passed') return 'completed'
+  if (
+    raw === 'assigned' ||
+    raw === 'in_progress' ||
+    raw === 'completed' ||
+    raw === 'failed' ||
+    raw === 'locked'
+  ) {
+    return raw
+  }
+  return 'assigned'
+}
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -11,55 +32,72 @@ export async function GET(request: Request) {
 
   if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
-  // B8.3/G8.3 — ?month=YYYY-MM filtresi: o aya ait veya o ayı kapsayan eğitimleri döndür
+  // ?month=YYYY-MM → o ayı kapsayan atamalar. Yoksa -3 / +6 ay pencere (navigasyon için).
   const { searchParams } = new URL(request.url)
-  const monthParam = searchParams.get('month') // örn. "2026-03"
-  let dateFilter: { startDate?: { lte: Date }; endDate?: { gte: Date } } | undefined
+  const monthParam = searchParams.get('month')
 
+  let rangeStart: Date
+  let rangeEnd: Date
   if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
-    const [year, month] = monthParam.split('-').map(Number)
-    const monthStart = new Date(year, month - 1, 1)
-    const monthEnd = new Date(year, month, 0, 23, 59, 59, 999) // ayın son günü
-    // Eğitim süresi ay ile kesişiyor mu? startDate <= ayBiti && endDate >= ayBaslangici
-    dateFilter = { startDate: { lte: monthEnd }, endDate: { gte: monthStart } }
+    const [y, m] = monthParam.split('-').map(Number)
+    rangeStart = new Date(y, m - 1, 1)
+    rangeEnd = new Date(y, m, 0, 23, 59, 59, 999)
+  } else {
+    const now = new Date()
+    rangeStart = new Date(now.getFullYear(), now.getMonth() - 3, 1)
+    rangeEnd = new Date(now.getFullYear(), now.getMonth() + 7, 0, 23, 59, 59, 999)
   }
 
   try {
-    const { page, limit } = safePagination(searchParams)
-
+    // my-trainings ile aynı görünürlük kuralı: arşivli / pasif eğitim gösterme.
+    // Aksi halde staff tıklayamayacağı (404 dönen) eğitim görür.
     const where = {
       userId: dbUser!.id,
       training: {
         organizationId: dbUser!.organizationId!,
-        ...(dateFilter ?? {}),
+        isActive: true,
+        publishStatus: { not: 'archived' },
+        startDate: { lte: rangeEnd },
+        endDate: { gte: rangeStart },
       },
     }
 
-    const [assignments, total] = await Promise.all([
-      prisma.trainingAssignment.findMany({
-        where,
-        include: {
-          training: { select: { id: true, title: true, category: true, startDate: true, endDate: true, examDurationMinutes: true, examOnly: true } },
+    const assignments = await prisma.trainingAssignment.findMany({
+      where,
+      select: {
+        id: true,
+        status: true,
+        training: {
+          select: {
+            id: true,
+            title: true,
+            category: true,
+            startDate: true,
+            endDate: true,
+            examOnly: true,
+          },
         },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.trainingAssignment.count({ where }),
-    ])
+      },
+      // Takvim ay-bazlı görüntülüyor; tek pencere için 500 üst sınır pratikte yeterli.
+      take: 500,
+    })
 
-    // Transform to calendar events
     const events = assignments.map(a => ({
       id: a.id,
       title: a.training.title,
       start: a.training.startDate.toISOString(),
       end: a.training.endDate.toISOString(),
       category: a.training.category,
-      status: a.status,
+      status: normalizeStatus(a.status),
       trainingId: a.training.id,
-      eventType: a.training.examOnly ? 'exam' as const : 'training' as const,
+      eventType: a.training.examOnly ? ('exam' as const) : ('training' as const),
     }))
 
-    return jsonResponse({ events, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+    return jsonResponse(
+      { events, total: events.length },
+      200,
+      { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' }
+    )
   } catch (err) {
     logger.error('Staff Calendar', 'Takvim yüklenemedi', err)
     return errorResponse('Takvim yüklenemedi', 503)

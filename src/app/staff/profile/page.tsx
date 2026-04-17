@@ -305,9 +305,10 @@ export default function ProfilePage() {
                     onChange={handleAvatarUpload}
                   />
                   <button
-                    className="absolute bottom-0 left-16 flex h-10 w-10 sm:h-8 sm:w-8 items-center justify-center rounded-full border-2 shadow-md transition-transform duration-200 hover:scale-110 active:scale-95"
+                    className="absolute bottom-0 left-16 flex h-11 w-11 sm:h-8 sm:w-8 items-center justify-center rounded-full border-2 shadow-md transition-transform duration-200 hover:scale-110 active:scale-95"
                     style={{ background: 'var(--color-primary)', borderColor: 'var(--color-surface)', color: 'white' }}
                     onClick={() => avatarInputRef.current?.click()}
+                    aria-label="Profil foto\u011fraf\u0131 y\u00fckle"
                   >
                     <Camera className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                   </button>
@@ -554,7 +555,7 @@ export default function ProfilePage() {
                     <button
                       type="button"
                       onClick={() => setShowCurrent(!showCurrent)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 flex h-11 w-11 sm:h-8 sm:w-8 items-center justify-center rounded-md"
                       style={{ color: 'var(--color-text-muted)' }}
                     >
                       {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -579,7 +580,7 @@ export default function ProfilePage() {
                       <button
                         type="button"
                         onClick={() => setShowNew(!showNew)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 flex h-11 w-11 sm:h-8 sm:w-8 items-center justify-center rounded-md"
                         style={{ color: 'var(--color-text-muted)' }}
                       >
                         {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

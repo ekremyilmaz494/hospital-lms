@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Plus_Jakarta_Sans, Inter, JetBrains_Mono, Space_Grotesk, Outfit, Bricolage_Grotesque, Syne, DM_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
@@ -46,6 +47,14 @@ export const metadata: Metadata = {
   description: "Hastane personeli için eğitim ve sınav yönetim platformu",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover", // iOS safe-area support
+  themeColor: "#0d9668",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -59,16 +68,14 @@ export default function RootLayout({
       className={`${plusJakarta.variable} ${inter.variable} ${jetbrainsMono.variable} ${spaceGrotesk.variable} ${outfit.variable} ${bricolage.variable} ${syne.variable} ${dmSans.variable}`}
     >
       <head>
-        {/* Pre-paint data-color set — FOUC önler, cascade ilk paint'te devreye girer */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('color-theme');if(t&&t!=='emerald')document.documentElement.setAttribute('data-color',t)}catch(_){}`,
-          }}
-        />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0d9668" />
       </head>
       <body className="app-bg antialiased" suppressHydrationWarning>
+        {/* Pre-paint data-color set — FOUC önler, beforeInteractive head'e enjekte eder */}
+        <Script id="color-theme-init" strategy="beforeInteractive">
+          {`try{var t=localStorage.getItem('color-theme');if(t&&t!=='emerald')document.documentElement.setAttribute('data-color',t)}catch(_){}`}
+        </Script>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

@@ -2,16 +2,25 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, BookOpen, Award, MoreHorizontal } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Award, MoreHorizontal, type LucideIcon } from 'lucide-react'
 
-const NAV_ITEMS = [
-  { href: '/staff/dashboard',    label: 'Ana Sayfa',   icon: LayoutDashboard },
+export interface MobileBottomNavItem {
+  href: string
+  label: string
+  icon: LucideIcon
+  /** Optional: href that identifies the root of this section for active-state matching */
+  rootHref?: string
+}
+
+const DEFAULT_STAFF_ITEMS: readonly MobileBottomNavItem[] = [
+  { href: '/staff/dashboard',    label: 'Ana Sayfa',   icon: LayoutDashboard, rootHref: '/staff/dashboard' },
   { href: '/staff/my-trainings', label: 'Eğitimlerim', icon: BookOpen },
   { href: '/staff/certificates', label: 'Sertifikalar', icon: Award },
 ] as const
 
 interface MobileBottomNavProps {
   onMorePress?: () => void;
+  items?: readonly MobileBottomNavItem[];
 }
 
 /**
@@ -19,7 +28,7 @@ interface MobileBottomNavProps {
  * md breakpoint üzerinde gizlenir.
  * 4. item "Daha Fazla" — sidebar drawer'ı açar (iOS tab bar convention).
  */
-export function MobileBottomNav({ onMorePress }: MobileBottomNavProps) {
+export function MobileBottomNav({ onMorePress, items = DEFAULT_STAFF_ITEMS }: MobileBottomNavProps) {
   const pathname = usePathname()
 
   return (
@@ -33,8 +42,9 @@ export function MobileBottomNav({ onMorePress }: MobileBottomNavProps) {
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-        const isActive = pathname === href || (href !== '/staff/dashboard' && pathname.startsWith(href))
+      {items.map(({ href, label, icon: Icon, rootHref }) => {
+        const root = rootHref ?? href
+        const isActive = pathname === href || (pathname !== root && pathname.startsWith(href))
         return (
           <Link
             key={href}
