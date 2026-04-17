@@ -6,7 +6,7 @@
     "predev": "node scripts/predev.js",
     "dev": "next dev --turbopack",
     "dev:clean": "rm -rf .next && pnpm predev && next dev --turbopack",
-    "build": "prisma generate && next build",
+    "build": "node scripts/migrate-on-prod.js && prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
