@@ -70,12 +70,12 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0d9668" />
-      </head>
-      <body className="app-bg antialiased" suppressHydrationWarning>
-        {/* Pre-paint data-color set — FOUC önler, beforeInteractive head'e enjekte eder */}
+        {/* Pre-paint data-color set — FOUC önler. Next 16'da beforeInteractive root layout head'inde olmalı. */}
         <Script id="color-theme-init" strategy="beforeInteractive">
           {`try{var t=localStorage.getItem('color-theme');if(t&&t!=='emerald')document.documentElement.setAttribute('data-color',t)}catch(_){}`}
         </Script>
+      </head>
+      <body className="app-bg antialiased" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
