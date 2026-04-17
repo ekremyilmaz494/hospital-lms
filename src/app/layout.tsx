@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import { Plus_Jakarta_Sans, Inter, JetBrains_Mono, Space_Grotesk, Outfit, Bricolage_Grotesque, Syne, DM_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
@@ -70,10 +69,13 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0d9668" />
-        {/* Pre-paint data-color set — FOUC önler. Next 16'da beforeInteractive root layout head'inde olmalı. */}
-        <Script id="color-theme-init" strategy="beforeInteractive">
-          {`try{var t=localStorage.getItem('color-theme');if(t&&t!=='emerald')document.documentElement.setAttribute('data-color',t)}catch(_){}`}
-        </Script>
+        {/* Pre-paint data-color set — FOUC önler. Next 16 App Router'da native script + dangerouslySetInnerHTML zorunlu (next/script beforeInteractive artık desteklenmiyor). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('color-theme');if(t&&t!=='emerald')document.documentElement.setAttribute('data-color',t)}catch(_){}`,
+          }}
+        />
+
       </head>
       <body className="app-bg antialiased" suppressHydrationWarning>
         <ThemeProvider

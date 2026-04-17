@@ -70,7 +70,9 @@ export function VideoTrainingIllustration({ className }: IllProps) {
       {/* Waveform below */}
       <g transform="translate(50, 220)">
         {Array.from({ length: 28 }).map((_, i) => {
-          const h = 4 + Math.abs(Math.sin(i * 0.5)) * 18;
+          const round = (n: number) => Math.round(n * 100) / 100;
+          const h = round(4 + Math.abs(Math.sin(i * 0.5)) * 18);
+          const hMin = round(h * 0.3);
           return (
             <rect
               key={i}
@@ -84,7 +86,7 @@ export function VideoTrainingIllustration({ className }: IllProps) {
             >
               <animate
                 attributeName="height"
-                values={`${h};${h * 0.3};${h}`}
+                values={`${h};${hMin};${h}`}
                 dur={`${1 + (i % 3) * 0.4}s`}
                 repeatCount="indefinite"
               />
