@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
 import {
@@ -455,16 +455,32 @@ export default function StaffPage() {
 
   const filteredStaff = allStaff;
 
-  const selectedDeptData = selectedDept ? allDepartments.find(d => d.id === selectedDept) : null;
+  // ── Departman/Staff lookup map'leri (O(1) erişim, her render'da find() yerine) ──
+  const departmentMap = useMemo(
+    () => new Map(allDepartments.map(d => [d.id, d])),
+    [allDepartments]
+  );
+  const staffByDeptMap = useMemo(() => {
+    const map = new Map<string, Staff[]>();
+    for (const s of allStaff) {
+      if (!s.departmentId) continue;
+      const list = map.get(s.departmentId);
+      if (list) list.push(s);
+      else map.set(s.departmentId, [s]);
+    }
+    return map;
+  }, [allStaff]);
+
+  const selectedDeptData = selectedDept ? departmentMap.get(selectedDept) : null;
 
   // ── Columns ──
-  const columns: ColumnDef<Staff>[] = [
+  const columns: ColumnDef<Staff>[] = useMemo(() => [
     {
       accessorKey: 'name',
       header: 'Personel',
       size: 250,
       cell: ({ row }) => {
-        const dept = allDepartments.find(d => d.id === row.original.departmentId);
+        const dept = departmentMap.get(row.original.departmentId ?? '');
         return (
           <div className="flex items-center gap-3">
             <Avatar className="h-9 w-9 shrink-0">
@@ -483,7 +499,7 @@ export default function StaffPage() {
       header: 'Departman',
       size: 140,
       cell: ({ row }) => {
-        const dept = allDepartments.find(d => d.id === row.original.departmentId);
+        const dept = departmentMap.get(row.original.departmentId ?? '');
         const color = dept?.color || 'var(--color-primary)';
         return (
           <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold truncate" style={{ background: `${color}15`, color }}>
@@ -533,7 +549,7 @@ export default function StaffPage() {
         <StaffActions staff={row.original} />
       ),
     },
-  ];
+  ], [departmentMap]);
 
   return (
     <div className="space-y-6">
@@ -642,8 +658,7 @@ export default function StaffPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="flex -space-x-2">
-                          {allStaff
-                            .filter(s => s.departmentId === dept.id)
+                          {(staffByDeptMap.get(dept.id) ?? [])
                             .slice(0, 3)
                             .map((s) => (
                               <Avatar key={s.id} className="h-7 w-7 border-2" style={{ borderColor: 'var(--color-surface)' }}>
@@ -905,7 +920,7 @@ export default function StaffPage() {
 
       {showAddStaff && <NewStaffModal onClose={() => setShowAddStaff(false)} departments={allDepartments} onSaved={refetch} />}
       {showAssignStaff && selectedDept && (() => {
-        const dept = allDepartments.find(d => d.id === selectedDept);
+        const dept = departmentMap.get(selectedDept);
         return dept ? (
           <AssignStaffModal
             deptId={selectedDept}

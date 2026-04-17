@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, getAuthUserWithWriteGuard, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
+import { createServiceClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -50,12 +52,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const staff = await prisma.user.findFirst({
     where: { id, organizationId: dbUser!.organizationId! },
-    include: {
+    select: {
+      id: true, firstName: true, lastName: true, email: true,
+      phone: true, departmentId: true, title: true, isActive: true,
       assignments: {
-        include: { training: true, examAttempts: true },
         orderBy: { assignedAt: 'desc' },
+        select: {
+          trainingId: true, status: true, maxAttempts: true, assignedAt: true,
+          training: { select: { title: true } },
+          examAttempts: {
+            select: { preExamScore: true, postExamScore: true, createdAt: true },
+          },
+        },
       },
-      _count: { select: { assignments: true, examAttempts: true } },
     },
   })
 
@@ -196,7 +205,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } }) // perf-check-disable-line
   if (!existing) return errorResponse('Personel bulunamadı', 404)
 
-  // B4.4 — Soft delete: deactivate + aktif sınavları iptal et (multi-tenant güvenli)
+  // KVKK "unutulma hakkı" için ?purge=true — Auth kaydını da sil (geri alınamaz).
+  // Varsayılan: soft delete (isActive=false), Auth kaydı korunur → kullanıcı giriş yapamaz ama
+  // geçmiş sınav/sertifika referansları bozulmaz.
+  const { searchParams } = new URL(request.url)
+  const purge = searchParams.get('purge') === 'true'
+
+  // Soft delete: deactivate + aktif sınavları iptal et (multi-tenant güvenli)
   await prisma.$transaction([
     prisma.user.updateMany({ where: { id, organizationId: dbUser!.organizationId! }, data: { isActive: false } }),
     prisma.examAttempt.updateMany({
@@ -210,10 +225,22 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }),
   ])
 
+  // KVKK purge: Auth tarafındaki kaydı da sil. DB'de kullanıcı soft-deleted kalır
+  // (audit/sertifika referansları için) ama tekrar login olması imkansız hale gelir.
+  if (purge) {
+    try {
+      const supabase = await createServiceClient()
+      await supabase.auth.admin.deleteUser(id)
+    } catch (err) {
+      logger.error('staff-delete', 'Auth user purge basarisiz — orphan auth user', { userId: id, err })
+      return errorResponse('Auth kaydı silinemedi, destek ekibiyle görüşün', 500)
+    }
+  }
+
   await createAuditLog({
     userId: dbUser!.id,
     organizationId: dbUser!.organizationId!,
-    action: 'deactivate',
+    action: purge ? 'purge' : 'deactivate',
     entityType: 'user',
     entityId: id,
     request,
@@ -224,5 +251,5 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
   try { await invalidateOrgCache(dbUser!.organizationId!, 'staff') } catch {}
 
-  return jsonResponse({ success: true })
+  return jsonResponse({ success: true, purged: purge })
 }

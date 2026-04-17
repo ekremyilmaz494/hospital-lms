@@ -40,7 +40,8 @@ interface Props {
 export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, onSuccess }: Props) {
   const { toast } = useToast();
   // Yalnızca yayında olan eğitimler atanabilir — arşivlenmiş/taslak eğitimler hariç (feedback_archived_training_filter)
-  const { data, isLoading } = useFetch<TrainingsResponse>('/api/admin/trainings?limit=100&publishStatus=published');
+  // Limit 500: hastane başına ortalama eğitim sayısı 100'ün altında, 500 güvenli tavan
+  const { data, isLoading } = useFetch<TrainingsResponse>('/api/admin/trainings?limit=500&publishStatus=published');
 
   const [selectedTrainings, setSelectedTrainings] = useState<string[]>([]);
   const [search, setSearch] = useState('');
