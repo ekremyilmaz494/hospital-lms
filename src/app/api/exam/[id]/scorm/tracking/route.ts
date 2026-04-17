@@ -1,3 +1,4 @@
+import { addMonths } from 'date-fns'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
@@ -30,7 +31,7 @@ export async function GET(
       orderBy: { createdAt: 'desc' },
     })
 
-    return jsonResponse(attempt)
+    return jsonResponse(attempt, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
   } catch (err) {
     logger.error('SCORM Tracking', 'SCORM attempt sorgulama hatasi', err)
     return errorResponse('SCORM verisi alınamadı', 500)
@@ -166,7 +167,7 @@ export async function PATCH(
         if (examAttempt) {
           const certCode = `SCORM-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
           const expiresAt = training?.renewalPeriodMonths
-            ? new Date(Date.now() + training.renewalPeriodMonths * 30 * 24 * 60 * 60 * 1000)
+            ? addMonths(new Date(), training.renewalPeriodMonths)
             : null
 
           const cert = await prisma.certificate.create({

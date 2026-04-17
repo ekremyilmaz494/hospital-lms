@@ -232,7 +232,7 @@ export default function CompliancePage() {
                     return (
                       <Link
                         key={d.id}
-                        href={`/admin/trainings/${d.id}/assignments`}
+                        href={`/admin/trainings/${d.id}`}
                         className="flex items-center justify-between rounded-xl px-4 py-2.5 hover:-translate-y-0.5 transition-transform"
                         style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
                       >
@@ -273,8 +273,8 @@ export default function CompliancePage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr style={{ background: 'var(--color-bg)' }}>
-                        {['Eğitim', 'Düzenleyici', 'Son Tarih', 'Durum', 'Başarılı', 'Kalan', 'Atanmamış', 'Uyum %', ''].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
+                        {['Eğitim', 'Son Tarih', 'Durum', 'Personel Durumu', 'Uyum', ''].map((h, i) => (
+                          <th key={h || `col-${i}`} className="px-4 py-3 text-left text-[11px] font-semibold uppercase whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -287,48 +287,61 @@ export default function CompliancePage() {
                         return (
                           <Fragment key={t.id}>
                             <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                              <td className="px-4 py-3 font-semibold whitespace-nowrap">
+                              <td className="px-4 py-3">
                                 <button
                                   type="button"
                                   onClick={() => setExpandedId(isOpen ? null : t.id)}
-                                  className="inline-flex items-center gap-1.5 hover:underline"
+                                  className="inline-flex items-center gap-1.5 font-semibold hover:underline text-left"
                                 >
                                   <ChevronDown
-                                    className="h-3.5 w-3.5 transition-transform"
+                                    className="h-3.5 w-3.5 shrink-0 transition-transform"
                                     style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
                                   />
-                                  {t.title}
+                                  <span>{t.title}</span>
                                 </button>
-                                {t.category && (
-                                  <span className="ml-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-                                    {t.category}
-                                  </span>
+                                {(t.category || t.regulatoryBody) && (
+                                  <div className="mt-1 ml-5 flex flex-wrap items-center gap-1.5">
+                                    {t.category && (
+                                      <span className="rounded-md px-1.5 py-0.5 text-[10px] font-medium" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+                                        {t.category}
+                                      </span>
+                                    )}
+                                    {t.regulatoryBody && (
+                                      <span className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
+                                        {t.regulatoryBody}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </td>
-                              <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{t.regulatoryBody ?? '—'}</td>
-                              <td className="px-4 py-3 text-xs font-mono whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
-                                {t.complianceDeadline?.split('T')[0] ?? '—'}
-                                {t.renewalPeriodMonths && (
-                                  <div className="text-[10px]">{t.renewalPeriodMonths} ay periyot</div>
+                              <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
+                                <div className="font-mono">{t.complianceDeadline?.split('T')[0] ?? '—'}</div>
+                                {t.daysLeft !== null && (
+                                  <div className="text-[10px] mt-0.5" style={{ color: t.daysLeft < 0 ? 'var(--color-error)' : t.daysLeft <= 30 ? 'var(--color-warning)' : 'var(--color-text-muted)' }}>
+                                    {t.daysLeft < 0 ? `${Math.abs(t.daysLeft)} gün geçti` : `${t.daysLeft} gün kaldı`}
+                                  </div>
                                 )}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 <span className="rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                               </td>
-                              <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
-                                <span style={{ color: 'var(--color-success)' }}>{t.stats.passed}</span>
-                                <span style={{ color: 'var(--color-text-muted)' }}> / {t.stats.totalAssigned}</span>
-                              </td>
-                              <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
-                                {t.stats.failed > 0 && <span style={{ color: 'var(--color-error)' }}>{t.stats.failed}K </span>}
-                                {t.stats.inProgress > 0 && <span style={{ color: 'var(--color-warning)' }}>{t.stats.inProgress}D </span>}
-                                {t.stats.notStarted > 0 && <span style={{ color: 'var(--color-text-muted)' }}>{t.stats.notStarted}B</span>}
-                                {remaining === 0 && <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
-                              </td>
-                              <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
-                                {t.stats.unassigned > 0
-                                  ? <span style={{ color: 'var(--color-error)' }}>{t.stats.unassigned}</span>
-                                  : <span style={{ color: 'var(--color-text-muted)' }}>0</span>}
+                              <td className="px-4 py-3 text-xs whitespace-nowrap">
+                                <div>
+                                  <span className="font-bold" style={{ color: 'var(--color-success)' }}>{t.stats.passed}</span>
+                                  <span style={{ color: 'var(--color-text-muted)' }}> / {t.stats.totalAssigned} tamamladı</span>
+                                </div>
+                                {remaining > 0 && (
+                                  <div className="text-[10px] mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+                                    {t.stats.inProgress > 0 && <span style={{ color: 'var(--color-warning)' }}>{t.stats.inProgress} devam</span>}
+                                    {t.stats.notStarted > 0 && <span style={{ color: 'var(--color-text-muted)' }}>{t.stats.notStarted} başlamadı</span>}
+                                    {t.stats.failed > 0 && <span style={{ color: 'var(--color-error)' }}>{t.stats.failed} başarısız</span>}
+                                  </div>
+                                )}
+                                {t.stats.unassigned > 0 && (
+                                  <div className="text-[10px] mt-0.5 font-bold" style={{ color: 'var(--color-error)' }}>
+                                    {t.stats.unassigned} kişiye atanmamış
+                                  </div>
+                                )}
                               </td>
                               <td className="px-4 py-3 min-w-35">
                                 <div className="flex items-center gap-2">
@@ -339,11 +352,6 @@ export default function CompliancePage() {
                                     %{t.stats.trueComplianceRate}
                                   </span>
                                 </div>
-                                {t.stats.complianceRate !== t.stats.trueComplianceRate && (
-                                  <div className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                                    atamada %{t.stats.complianceRate}
-                                  </div>
-                                )}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 <div className="flex items-center gap-1.5">
@@ -358,7 +366,7 @@ export default function CompliancePage() {
                                     {remindingId === t.id ? '...' : 'Hatırlat'}
                                   </Button>
                                   <Link
-                                    href={`/admin/trainings/${t.id}/assignments`}
+                                    href={`/admin/trainings/${t.id}`}
                                     className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] h-7"
                                     style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
                                     title="Atamaları göster"
@@ -371,7 +379,7 @@ export default function CompliancePage() {
 
                             {isOpen && (
                               <tr style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
-                                <td colSpan={9} className="px-6 py-4">
+                                <td colSpan={6} className="px-6 py-4">
                                   {t.nonCompliantStaff.length === 0 ? (
                                     <p className="text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>
                                       Tamamlamayan personel yok — bu eğitim için tam uyum sağlandı.

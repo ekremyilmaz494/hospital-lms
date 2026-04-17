@@ -48,7 +48,13 @@ export async function POST(request: Request) {
       status: true,
       isPassed: true,
       trainingId: true,
-      training: { select: { organizationId: true } },
+      training: {
+        select: {
+          organizationId: true,
+          isActive: true,
+          publishStatus: true,
+        },
+      },
       feedbackResponse: { select: { id: true } },
     },
   })
@@ -56,6 +62,11 @@ export async function POST(request: Request) {
   if (!attempt) return errorResponse('Sınav denemesi bulunamadı', 404)
   if (attempt.status !== 'completed') return errorResponse('Önce sınavı tamamlamalısınız', 400)
   if (attempt.feedbackResponse) return errorResponse('Bu sınav için zaten geri bildirim gönderdiniz', 409)
+  // Archived/pasif eğitime feedback yasak — eski attempt'ler için bile. Exam akışı
+  // zaten engelliyor ama savunmacı kat: doğrudan POST edilirse yakalanır.
+  if (!attempt.training.isActive || attempt.training.publishStatus === 'archived') {
+    return errorResponse('Bu eğitim artık aktif değil, geri bildirim kabul edilmiyor', 400)
+  }
 
   // Kullanıcı+training bazlı idempotency: aynı eğitim için ikinci feedback engellenir.
   // attempt.userId üzerinden bağlıyoruz — anonim (userId=null) kayıtlar da yakalanır.
@@ -68,14 +79,32 @@ export async function POST(request: Request) {
   })
   if (priorResponse) return errorResponse('Bu eğitim için zaten geri bildirim gönderdiniz', 409)
 
-  // Aktif form + tüm item'ları çek — answer validation için
+  // Aktif form + tüm item'ları çek — validation + snapshot için.
+  // Snapshot: submit anındaki form yapısı donmuş olarak response'a yazılır,
+  // admin sonradan form'u düzenlese bile detay sayfası orijinal soruyu gösterir.
   const form = await prisma.trainingFeedbackForm.findFirst({
     where: { organizationId: dbUser.organizationId, isActive: true },
     select: {
       id: true,
+      title: true,
+      description: true,
+      documentCode: true,
       categories: {
+        orderBy: { order: 'asc' },
         select: {
-          items: { select: { id: true, questionType: true, isRequired: true } },
+          id: true,
+          name: true,
+          order: true,
+          items: {
+            orderBy: { order: 'asc' },
+            select: {
+              id: true,
+              text: true,
+              questionType: true,
+              isRequired: true,
+              order: true,
+            },
+          },
         },
       },
     },
@@ -85,6 +114,33 @@ export async function POST(request: Request) {
 
   const allItems = form.categories.flatMap(c => c.items)
   const itemMap = new Map(allItems.map(i => [i.id, i]))
+
+  // Her item için hangi kategoriye ait olduğunu bilmek gerek (itemSnapshot için)
+  const itemCategoryMap = new Map<string, { categoryId: string; categoryName: string; categoryOrder: number }>()
+  for (const cat of form.categories) {
+    for (const item of cat.items) {
+      itemCategoryMap.set(item.id, { categoryId: cat.id, categoryName: cat.name, categoryOrder: cat.order })
+    }
+  }
+
+  // Form snapshot — response.formSnapshot olarak yazılır
+  const formSnapshot = {
+    title: form.title,
+    description: form.description,
+    documentCode: form.documentCode,
+    categories: form.categories.map(c => ({
+      id: c.id,
+      name: c.name,
+      order: c.order,
+      items: c.items.map(i => ({
+        id: i.id,
+        text: i.text,
+        questionType: i.questionType,
+        isRequired: i.isRequired,
+        order: i.order,
+      })),
+    })),
+  }
 
   // İki yönlü validasyon:
   // 1) Gönderilen itemId'ler formdan mı?
@@ -118,12 +174,26 @@ export async function POST(request: Request) {
           userId: includeName ? dbUser.id : null,
           includeName,
           isPassed: attempt.isPassed,
+          formSnapshot,
           answers: {
-            create: answers.map(a => ({
-              itemId: a.itemId,
-              score: typeof a.score === 'number' ? a.score : null,
-              textAnswer: a.textAnswer ?? null,
-            })),
+            create: answers.map(a => {
+              const item = itemMap.get(a.itemId)!
+              const cat = itemCategoryMap.get(a.itemId)!
+              return {
+                itemId: a.itemId,
+                itemSnapshot: {
+                  text: item.text,
+                  questionType: item.questionType,
+                  isRequired: item.isRequired,
+                  order: item.order,
+                  categoryId: cat.categoryId,
+                  categoryName: cat.categoryName,
+                  categoryOrder: cat.categoryOrder,
+                },
+                score: typeof a.score === 'number' ? a.score : null,
+                textAnswer: a.textAnswer ?? null,
+              }
+            }),
           },
         },
         select: { id: true, submittedAt: true },

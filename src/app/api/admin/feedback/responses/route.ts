@@ -68,6 +68,7 @@ export async function GET(request: Request) {
           answers: {
             select: {
               score: true,
+              itemSnapshot: true,
               item: { select: { questionType: true } },
             },
           },
@@ -77,10 +78,12 @@ export async function GET(request: Request) {
 
     const items = responses.map(r => {
       const overall = calculateOverallScore(
-        r.answers.map(a => ({
-          score: a.score,
-          questionType: a.item.questionType as FeedbackQuestionType,
-        })),
+        r.answers.map(a => {
+          // Snapshot öncelikli — item silinse bile questionType kaybolmaz.
+          const snap = a.itemSnapshot as { questionType?: string } | null
+          const qt = (snap?.questionType ?? a.item?.questionType ?? 'text') as FeedbackQuestionType
+          return { score: a.score, questionType: qt }
+        }),
       )
       return {
         id: r.id,

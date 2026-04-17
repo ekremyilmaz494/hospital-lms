@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto'
+import { addMonths } from 'date-fns'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { submitExamSchema } from '@/lib/validations'
@@ -234,7 +235,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!existingCert) {
       const code = `CERT-${randomBytes(16).toString('hex').toUpperCase()}`
       const expiresAt = attempt.training.renewalPeriodMonths
-        ? new Date(Date.now() + attempt.training.renewalPeriodMonths * 30 * 24 * 60 * 60 * 1000)
+        ? addMonths(new Date(), attempt.training.renewalPeriodMonths)
         : null
       await prisma.certificate.create({
         data: {

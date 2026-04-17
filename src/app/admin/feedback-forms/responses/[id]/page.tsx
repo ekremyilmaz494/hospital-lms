@@ -14,6 +14,7 @@ interface ItemDetail {
 interface CategoryDetail { id: string; name: string; order: number; items: ItemDetail[]; }
 interface ResponseDetail {
   id: string; submittedAt: string; isPassed: boolean;
+  overallScore: number | null;
   training: { id: string; title: string };
   form: { id: string; title: string; documentCode: string | null; categories: CategoryDetail[] };
   participant: { id: string; name: string; email: string; title: string | null; departmentName: string | null } | null;
@@ -51,10 +52,8 @@ export default function FeedbackResponseDetailPage() {
     </div>
   );
 
-  const allScores = data.form.categories.flatMap(c =>
-    c.items.filter(i => i.questionType === 'likert_5' && i.answer?.score !== null).map(i => i.answer!.score!)
-  );
-  const overall = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : null;
+  // Server-side hesaplanıyor (listedeki ile aynı rounding — `calculateOverallScore`)
+  const overall = data.overallScore;
   const overallCol = overall === null ? 'var(--color-text-muted)' : scoreColor(overall, 5);
 
   return (
