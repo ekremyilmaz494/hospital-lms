@@ -1,29 +1,31 @@
-name: Auto-enable auto-merge
+name: Auto-enable auto-merge (label gated)
 
-# Solo geliştirici workflow'u — repo sahibi tarafından açılan her PR'da
-# "auto-merge when checks pass" özelliğini otomatik etkinleştirir.
+# Solo geliştirici workflow'u — SADECE `auto-merge` label'ı eklenmiş PR'larda
+# GitHub'ın "auto-merge when checks pass" özelliğini otomatik etkinleştirir.
 #
-# Neden: Solo dev senaryosunda PR review zorunluluğu yok ama CI'ı beklemek
-# şart. Manuel "Enable auto-merge" butonuna basma adımı sıkıcı.
-# Bu workflow o butonu otomatik bastırır; CI yeşil olunca merge tetiklenir.
+# Neden label gate:
+# - Müşteri canlıda → her PR otomatik merge riskli (CI yakalamayan bug canlıya gider)
+# - Güvenli fix'lerde `auto-merge` label'ı eklenince iş kolaylaşır
+# - Kritik değişikliklerde label'sız bırak → manuel review + manuel merge
+#
+# Nasıl kullanılır:
+#   1. PR'ı aç
+#   2. Trivial fix/typo/doc ise PR sayfasında sağdan "auto-merge" label'ı ekle
+#   3. CI yeşil olunca PR kendiliğinden squash-merge olur
+#   4. Label yoksa hiçbir şey olmaz — normal merge akışı
 #
 # Gereksinim: Repo Settings → General → "Allow auto-merge" checkbox'ı açık olmalı.
-# (Tek seferlik toggle; kod ile yapılamaz, dashboard'dan açılır.)
-#
-# Davranış:
-# - Sadece repo sahibi (ekremyilmaz494) tarafından açılan PR'lara uygulanır
-# - Squash + branch silme ile merge eder
-# - PR draft'sa veya başka biri açtıysa hiçbir şey yapmaz
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [labeled, opened, reopened, ready_for_review]
 
 jobs:
   enable-auto-merge:
     if: >-
       github.event.pull_request.draft == false &&
-      github.event.pull_request.user.login == github.repository_owner
+      github.event.pull_request.user.login == github.repository_owner &&
+      contains(github.event.pull_request.labels.*.name, 'auto-merge')
     runs-on: ubuntu-latest
     permissions:
       contents: write
