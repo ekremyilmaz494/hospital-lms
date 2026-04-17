@@ -44,6 +44,8 @@ export function CategoriesTab() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const openCreate = () => {
     setEditingId(null);
@@ -99,33 +101,49 @@ export function CategoriesTab() {
     }
   };
 
-  const handleDelete = async (c: Category) => {
-    if (!confirm(`"${c.name}" kategorisini silmek istediğinize emin misiniz?`)) return;
-    const res = await fetch(`/api/admin/smg/categories/${c.id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast(err.error ?? 'Silme başarısız.', 'error');
-      return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/smg/categories/${deleteTarget.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast(err.error ?? 'Silme başarısız.', 'error');
+        return;
+      }
+      toast('Kategori silindi.', 'success');
+      setDeleteTarget(null);
+      refetch?.();
+    } finally {
+      setDeleting(false);
     }
-    toast('Kategori silindi.', 'success');
-    refetch?.();
   };
 
   const handleSeedStandards = async () => {
     setSeeding(true);
     try {
       let success = 0;
-      let skipped = 0;
+      const failures: string[] = [];
       for (const c of STANDARD_CATEGORIES) {
         const res = await fetch('/api/admin/smg/categories', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(c),
         });
-        if (res.ok) success++;
-        else skipped++;
+        if (res.ok) {
+          success++;
+        } else {
+          const err = await res.json().catch(() => ({}));
+          failures.push(`${c.name}: ${err.error ?? res.statusText}`);
+        }
       }
-      toast(`${success} kategori eklendi${skipped > 0 ? `, ${skipped} mevcut atlandı` : ''}.`, 'success');
+      if (success > 0 && failures.length === 0) {
+        toast(`${success} kategori eklendi.`, 'success');
+      } else if (success > 0) {
+        toast(`${success} kategori eklendi, ${failures.length} mevcut atlandı.`, 'success');
+      } else {
+        toast(`Hiç kategori eklenemedi: ${failures[0] ?? 'bilinmeyen hata'}`, 'error');
+      }
       refetch?.();
     } finally {
       setSeeding(false);
@@ -190,7 +208,7 @@ export function CategoriesTab() {
                       <button onClick={() => openEdit(c)} className="p-1.5 rounded-lg transition-colors" style={{ background: 'var(--color-surface-2)' }}>
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => handleDelete(c)} className="p-1.5 rounded-lg transition-colors" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>
+                      <button onClick={() => setDeleteTarget(c)} className="p-1.5 rounded-lg transition-colors" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -203,43 +221,136 @@ export function CategoriesTab() {
       )}
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogContent className="sm:max-w-lg rounded-2xl">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Kategoriyi Düzenle' : 'Yeni Kategori'}</DialogTitle>
+            <DialogTitle className="text-lg font-bold" style={{ color: 'var(--color-text)' }}>
+              {editingId ? 'Kategoriyi Düzenle' : 'Yeni Kategori Ekle'}
+            </DialogTitle>
+            <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+              SKS denetimi için kullanılacak SMG aktivite kategorisi tanımlayın.
+            </p>
           </DialogHeader>
-          <div className="space-y-3 py-2">
+          <div className="space-y-4 py-2">
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Ad *</label>
-              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="rounded-xl" />
+              <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>
+                Ad <span style={{ color: 'var(--color-error)' }}>*</span>
+              </label>
+              <Input
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Örn: Kurum İçi Eğitim"
+                className="rounded-xl"
+              />
             </div>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Kod * (BÜYÜK_HARF)</label>
-              <Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className="rounded-xl" placeholder="KURUM_ICI_EGITIM" />
+              <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>
+                Kod <span style={{ color: 'var(--color-error)' }}>*</span>
+              </label>
+              <Input
+                value={form.code}
+                onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                placeholder="KURUM_ICI_EGITIM"
+                className="rounded-xl font-mono"
+              />
+              <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                Yalnızca büyük harf ve alt çizgi. Sistemde benzersiz olmalı.
+              </p>
             </div>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Açıklama</label>
-              <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="rounded-xl" />
+              <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>
+                Açıklama <span className="font-normal" style={{ color: 'var(--color-text-muted)' }}>(opsiyonel)</span>
+              </label>
+              <Input
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Bu kategori hangi aktiviteleri kapsar?"
+                className="rounded-xl"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Maks. Puan/Aktivite</label>
-                <Input type="number" min={1} value={form.maxPointsPerActivity} onChange={e => setForm(f => ({ ...f, maxPointsPerActivity: e.target.value }))} className="rounded-xl" />
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>
+                  Maks. Puan/Aktivite
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={form.maxPointsPerActivity}
+                  onChange={e => setForm(f => ({ ...f, maxPointsPerActivity: e.target.value }))}
+                  placeholder="Sınırsız"
+                  className="rounded-xl"
+                />
+                <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Boş bırakılırsa sınırsız</p>
               </div>
               <div>
-                <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Sıra</label>
-                <Input type="number" min={0} value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: e.target.value }))} className="rounded-xl" />
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>
+                  Sıra
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.sortOrder}
+                  onChange={e => setForm(f => ({ ...f, sortOrder: e.target.value }))}
+                  className="rounded-xl"
+                />
+                <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Listede görünme sırası</p>
               </div>
             </div>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} style={{ accentColor: 'var(--color-primary)' }} />
-              <span style={{ color: 'var(--color-text)' }}>Aktif</span>
+            <label
+              className="flex items-center gap-2 text-sm cursor-pointer p-2.5 rounded-xl border"
+              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-2)' }}
+            >
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))}
+                className="h-4 w-4"
+                style={{ accentColor: 'var(--color-primary)' }}
+              />
+              <span className="font-medium" style={{ color: 'var(--color-text)' }}>Aktif</span>
+              <span className="text-xs ml-auto" style={{ color: 'var(--color-text-muted)' }}>
+                Pasif kategoriler personel formunda görünmez
+              </span>
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)} disabled={submitting} className="rounded-xl">İptal</Button>
-            <Button onClick={handleSubmit} disabled={submitting} className="gap-1.5 rounded-xl">
+            <Button variant="outline" onClick={() => setModalOpen(false)} disabled={submitting} className="rounded-xl">
+              İptal
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="gap-1.5 rounded-xl"
+              style={{ background: 'var(--color-primary)', color: 'white' }}
+            >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {editingId ? 'Güncelle' : 'Oluştur'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="sm:max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Kategoriyi Sil</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm py-2" style={{ color: 'var(--color-text-secondary)' }}>
+            <span className="font-semibold" style={{ color: 'var(--color-text)' }}>"{deleteTarget?.name}"</span>{' '}
+            kategorisini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting} className="rounded-xl">
+              İptal
+            </Button>
+            <Button
+              onClick={confirmDelete}
+              disabled={deleting}
+              className="gap-1.5 rounded-xl"
+              style={{ background: 'var(--color-error)', color: 'white' }}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Sil
             </Button>
           </DialogFooter>
         </DialogContent>

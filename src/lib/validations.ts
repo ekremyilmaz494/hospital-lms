@@ -289,7 +289,13 @@ export const createSmgActivitySchema = z.object({
   provider: z.string().max(255).optional(),
   completionDate: z.string().date(),
   smgPoints: z.coerce.number().int().min(1).max(999),
-  certificateUrl: z.string().url().optional().or(z.literal('')).transform(v => v || undefined),
+  certificateUrl: z
+    .string()
+    .url()
+    .refine(v => v.startsWith('https://'), { message: 'Sertifika URL\'i güvenli (https://) olmalıdır' })
+    .optional()
+    .or(z.literal(''))
+    .transform(v => v || undefined),
 })
 
 // ── SMG KATEGORİ ŞEMALARI ──

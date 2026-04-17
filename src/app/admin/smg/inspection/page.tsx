@@ -38,7 +38,7 @@ export default function InspectionPage() {
 
       <div className="rounded-2xl border overflow-hidden"
         style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-        <InspectionReportTab periods={periods} />
+        <InspectionReportTab periods={periods} syncWithUrl />
       </div>
     </div>
   );
