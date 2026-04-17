@@ -52,9 +52,14 @@ export async function GET(request: Request) {
     // Archived/inactive training'ler raporlardan dışarı — atama sayımları, ortalamalar ve listeler etkilenmemeli
     const trainingScope = { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } }
 
-    const [staffCount, trainingCount, assignmentStatusGroups, avgScoreResult, trainings, staff, departments] = await Promise.all([
+    // DoS koruması — kapasite aşılırsa UI'da uyarı göster
+    const TRAINING_CAP = 500
+    const STAFF_CAP = 2000
+
+    const [staffCount, trainingCount, totalStaffForCap, assignmentStatusGroups, avgScoreResult, trainings, staff, departments, availableDepartments] = await Promise.all([
       prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true, ...userDeptFilter } }),
       prisma.training.count({ where: trainingScope }),
+      prisma.user.count({ where: { organizationId: orgId, role: 'staff', ...userDeptFilter } }),
       prisma.trainingAssignment.groupBy({
         by: ['status'],
         where: { training: trainingScope, user: { ...userDeptFilter }, ...assignmentDateFilter },
@@ -67,39 +72,71 @@ export async function GET(request: Request) {
       // Training-based report (max 500 — DoS koruması)
       prisma.training.findMany({
         where: trainingScope,
-        include: {
+        select: {
+          id: true,
+          title: true,
+          maxAttempts: true,
+          examDurationMinutes: true,
           assignments: {
             where: { user: { ...userDeptFilter }, ...assignmentDateFilter },
-            include: { examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, preExamScore: true, isPassed: true } } },
+            select: {
+              id: true,
+              status: true,
+              assignedAt: true,
+              examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, preExamScore: true, isPassed: true, attemptNumber: true } },
+            },
           },
           videos: { select: { durationSeconds: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: 500,
+        take: TRAINING_CAP,
       }),
       // Staff-based report (max 2000 — DoS koruması)
       prisma.user.findMany({
         where: { organizationId: orgId, role: 'staff', ...userDeptFilter },
-        include: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          departmentRel: { select: { name: true } },
           assignments: {
             where: { ...assignmentDateFilter, training: { isActive: true, publishStatus: { not: 'archived' } } },
-            include: { training: { select: { title: true } }, examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true, status: true } } },
-          },
-          departmentRel: { select: { name: true } },
-        },
-        take: 2000,
-      }),
-      // Departments
-      prisma.department.findMany({
-        where: { organizationId: orgId, ...(departmentId ? { id: departmentId } : {}) },
-        include: {
-          users: {
-            where: { role: 'staff', isActive: true },
-            include: {
-              assignments: { where: { ...assignmentDateFilter, training: { isActive: true, publishStatus: { not: 'archived' } } }, select: { status: true } },
+            select: {
+              id: true,
+              status: true,
+              training: { select: { title: true, maxAttempts: true } },
+              examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true, status: true, attemptNumber: true } },
             },
           },
         },
+        take: STAFF_CAP,
+      }),
+      // Departments — exam score'ları da gerekli (ortPuan hesabı için)
+      prisma.department.findMany({
+        where: { organizationId: orgId, ...(departmentId ? { id: departmentId } : {}) },
+        select: {
+          id: true,
+          name: true,
+          color: true,
+          users: {
+            where: { role: 'staff', isActive: true },
+            select: {
+              assignments: {
+                where: { ...assignmentDateFilter, training: { isActive: true, publishStatus: { not: 'archived' } } },
+                select: {
+                  status: true,
+                  examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+      // Departman seçici için
+      prisma.department.findMany({
+        where: { organizationId: orgId },
+        select: { id: true, name: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
     ])
 
@@ -150,63 +187,83 @@ export async function GET(request: Request) {
       }
     })
 
-    // Staff performance
+    // Staff performance — status key'leri semantic (İngilizce); UI display ayrı karar verir
+    // 'new' = atama var ama henüz sınava girmemiş (score yok) → risk sayılmaz
+    // 'risk' = SADECE sınava girmiş ve düşük puan almış olanlar
+    const STAR_MIN = 80
+    const NORMAL_MIN = 50
     const staffPerformance = staff.map(s => {
       const completed = s.assignments.filter(a => a.status === 'passed').length
       const scores = s.assignments
         .map(a => a.examAttempts[0]?.postExamScore)
         .filter(sc => sc != null)
         .map(Number)
-      const avg = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
-      const statusLabel = avg >= 80 ? 'Yıldız' : avg >= 50 ? 'Normal' : s.assignments.length > 0 ? 'Risk' : 'Yeni'
+      const hasScores = scores.length > 0
+      const avg = hasScores ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+      let statusKey: 'star' | 'normal' | 'risk' | 'new'
+      if (!hasScores) statusKey = 'new'
+      else if (avg >= STAR_MIN) statusKey = 'star'
+      else if (avg >= NORMAL_MIN) statusKey = 'normal'
+      else statusKey = 'risk'
       return {
         name: `${s.firstName} ${s.lastName}`,
         dept: s.departmentRel?.name ?? '',
         completed,
         avgScore: avg,
-        status: statusLabel,
-        color: statusLabel === 'Yıldız' ? 'var(--color-success)' : statusLabel === 'Risk' ? 'var(--color-error)' : 'var(--color-info)',
+        status: statusKey,
+        color: statusKey === 'star' ? 'var(--color-success)' : statusKey === 'risk' ? 'var(--color-error)' : 'var(--color-info)',
       }
     })
 
-    // Department data
+    // Department data — ortPuan gerçekten hesaplanıyor
     const departmentData = departments.map(d => {
       const totalDeptAssignments = d.users.flatMap(u => u.assignments)
       const passedDept = totalDeptAssignments.filter(a => a.status === 'passed').length
       const failedDept = totalDeptAssignments.filter(a => a.status === 'failed').length
+      const deptScores = totalDeptAssignments
+        .map(a => a.examAttempts[0]?.postExamScore)
+        .filter(s => s != null)
+        .map(Number)
+      const ortPuan = deptScores.length > 0
+        ? Math.round(deptScores.reduce((a, b) => a + b, 0) / deptScores.length)
+        : 0
       return {
         dept: d.name,
         personel: d.users.length,
         tamamlanma: totalDeptAssignments.length > 0 ? Math.round((passedDept / totalDeptAssignments.length) * 100) : 0,
-        ortPuan: 0, // Would need exam scores — simplified
+        ortPuan,
         basarisiz: failedDept,
         color: d.color || 'var(--color-primary)',
       }
     })
 
-    // Failure data
+    // Failure data — attempts gerçek attemptNumber, locked status maxAttempts'a göre
     const failureData = staff.flatMap(s =>
       s.assignments
         .filter(a => a.status === 'failed')
         .map(a => {
-          const lastScore = a.examAttempts[0]?.postExamScore ? Number(a.examAttempts[0].postExamScore) : 0
+          const lastAttempt = a.examAttempts[0]
+          const attemptsUsed = lastAttempt?.attemptNumber ?? 0
+          const maxAttempts = a.training?.maxAttempts ?? 3
+          const lastScore = lastAttempt?.postExamScore ? Number(lastAttempt.postExamScore) : 0
           return {
             assignmentId: a.id,
             name: `${s.firstName} ${s.lastName}`,
             dept: s.departmentRel?.name ?? '',
             training: a.training?.title ?? '',
-            attempts: a.examAttempts.length,
+            attempts: attemptsUsed,
+            maxAttempts,
             lastScore,
-            status: 'failed',
+            status: attemptsUsed >= maxAttempts ? 'locked' : 'failed',
           }
         })
     )
 
-    // Duration data
+    // Duration data — dakika cinsinden (video seconds → minutes, sınav zaten dakika)
     const durationData = trainings.map(t => ({
       training: t.title,
-      video: t.videos.reduce((sum, v) => sum + v.durationSeconds, 0),
-      sinav: (t.examDurationMinutes ?? 30) * 60,
+      video: Math.round(t.videos.reduce((sum, v) => sum + v.durationSeconds, 0) / 60),
+      sinav: t.examDurationMinutes ?? 30,
     }))
 
     // G6.5 — Pre/post score comparison per training
@@ -233,6 +290,12 @@ export async function GET(request: Request) {
       })
       .filter(d => d.sampleSize > 0)
 
+    // Truncation uyarısı — UI banner'da gösterilir
+    const truncated = {
+      trainings: trainingCount > TRAINING_CAP ? { shown: trainings.length, total: trainingCount } : null,
+      staff: totalStaffForCap > STAFF_CAP ? { shown: staff.length, total: totalStaffForCap } : null,
+    }
+
     const responseData = {
       overviewStats,
       monthlyData,
@@ -242,6 +305,8 @@ export async function GET(request: Request) {
       failureData,
       durationData,
       scoreComparisonData,
+      availableDepartments,
+      truncated,
     }
 
     await setCached(cacheKey, responseData, 600) // 10 dk TTL
