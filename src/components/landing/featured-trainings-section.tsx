@@ -116,6 +116,11 @@ function TiltCard({
   );
   const shineX = useTransform(mouseX, [-0.5, 0.5], ["20%", "80%"]);
   const shineY = useTransform(mouseY, [-0.5, 0.5], ["20%", "80%"]);
+  // Hook koşulsuz çağrılmalı (rules-of-hooks) — render kararı style'dan sonraki JSX'te
+  const shineBackground = useTransform(
+    [shineX, shineY],
+    ([x, y]) => `radial-gradient(circle at ${x} ${y}, rgba(255,255,255,0.15) 0%, transparent 50%)`,
+  );
 
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (shouldReduce) return;
@@ -148,13 +153,7 @@ function TiltCard({
         <motion.div
           aria-hidden
           className="pointer-events-none absolute inset-0 rounded-[inherit] mix-blend-overlay z-30"
-          style={{
-            background: useTransform(
-              [shineX, shineY],
-              ([x, y]) =>
-                `radial-gradient(circle at ${x} ${y}, rgba(255,255,255,0.15) 0%, transparent 50%)`,
-            ),
-          }}
+          style={{ background: shineBackground }}
         />
       )}
       {children}
