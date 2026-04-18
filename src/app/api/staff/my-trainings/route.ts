@@ -72,10 +72,13 @@ export async function GET(request: Request) {
       const latestAttempt = a.examAttempts[0]
 
       // Calculate progress: 3 steps (pre-exam, videos, post-exam)
+      // Not: `!== null` KULLANMA — optional chaining latestAttempt yokken
+      // `undefined` döndürür ve `undefined !== null` = true, yani atanmış ama
+      // hiç başlamamış eğitimler %100 görünürdü. `!= null` ikisini de eler.
       let completedSteps = 0
-      const preExamDone = latestAttempt?.preExamCompletedAt !== null
-      const videosDone = latestAttempt?.videosCompletedAt !== null
-      const postExamDone = latestAttempt?.postExamCompletedAt !== null
+      const preExamDone = latestAttempt?.preExamCompletedAt != null
+      const videosDone = latestAttempt?.videosCompletedAt != null
+      const postExamDone = latestAttempt?.postExamCompletedAt != null
       if (preExamDone) completedSteps++
       if (videosDone) completedSteps++
       if (postExamDone) completedSteps++

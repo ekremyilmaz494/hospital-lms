@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import { PageLoading } from '@/components/shared/page-loading';
 import { Button } from '@/components/ui/button';
-import { exportExcel, exportPDF } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -65,6 +64,7 @@ export default function TrainingDetailPage() {
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [downloadingCompletion, setDownloadingCompletion] = useState<'pdf' | 'excel' | null>(null);
+  const [downloadingTab, setDownloadingTab] = useState<'pdf' | 'excel' | null>(null);
   const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
   const [resetting, setResetting] = useState(false);
 
@@ -297,25 +297,53 @@ export default function TrainingDetailPage() {
           </div>
           {activeTab !== 'videos' && (
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => {
-                try {
-                  const exportData = activeTab === 'staff'
-                    ? { headers: ['Ad Soyad', 'Departman', 'Durum', 'Ön Sınav', 'Son Sınav', 'Deneme'], rows: assignedStaff.map(s => [s.name, s.department, statusMap[s.status]?.label ?? s.status, s.preScore ?? '-', s.postScore ?? '-', s.attempt]) }
-                    : { headers: ['#', 'Soru', 'Puan'], rows: trainingQuestions.map((q, i) => [i + 1, q.text, q.points]) };
-                  exportExcel(exportData);
-                } catch (e) { toast((e as Error).message, 'error'); }
-              }}>
-                <Download className="h-3.5 w-3.5" /> Excel
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs rounded-lg"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                disabled={downloadingTab === 'excel'}
+                onClick={async () => {
+                  setDownloadingTab('excel');
+                  try {
+                    const res = await fetch(`/api/admin/trainings/${id}/tab-export?tab=${activeTab}&format=excel`);
+                    if (!res.ok) throw new Error('Rapor oluşturulamadı');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${activeTab === 'staff' ? 'personel_durumu' : 'sorular'}.xlsx`;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  } catch { toast('Excel raporu indirilemedi', 'error'); }
+                  finally { setDownloadingTab(null); }
+                }}
+              >
+                <Download className="h-3.5 w-3.5" /> {downloadingTab === 'excel' ? 'Hazırlanıyor...' : 'Excel'}
               </Button>
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => {
-                try {
-                  const exportData = activeTab === 'staff'
-                    ? { headers: ['Ad Soyad', 'Departman', 'Durum', 'Ön Sınav', 'Son Sınav', 'Deneme'], rows: assignedStaff.map(s => [s.name, s.department, statusMap[s.status]?.label ?? s.status, s.preScore ?? '-', s.postScore ?? '-', s.attempt]) }
-                    : { headers: ['#', 'Soru', 'Puan'], rows: trainingQuestions.map((q, i) => [i + 1, q.text, q.points]) };
-                  exportPDF(exportData, training.title);
-                } catch (e) { toast((e as Error).message, 'error'); }
-              }}>
-                <FileText className="h-3.5 w-3.5" /> PDF
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs rounded-lg"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                disabled={downloadingTab === 'pdf'}
+                onClick={async () => {
+                  setDownloadingTab('pdf');
+                  try {
+                    const res = await fetch(`/api/admin/trainings/${id}/tab-export?tab=${activeTab}&format=pdf`);
+                    if (!res.ok) throw new Error('Rapor oluşturulamadı');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${activeTab === 'staff' ? 'personel_durumu' : 'sorular'}.pdf`;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  } catch { toast('PDF raporu indirilemedi', 'error'); }
+                  finally { setDownloadingTab(null); }
+                }}
+              >
+                <FileText className="h-3.5 w-3.5" /> {downloadingTab === 'pdf' ? 'Hazırlanıyor...' : 'PDF'}
               </Button>
             </div>
           )}

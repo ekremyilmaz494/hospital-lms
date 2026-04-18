@@ -141,7 +141,6 @@ export const adminNav: NavGroup[] = [
   {
     label: 'SİSTEM',
     items: [
-      { title: 'Aboneliğim', href: '/admin/subscription', icon: CreditCard },
       {
         title: 'Ayarlar',
         href: '/admin/settings',
