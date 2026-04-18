@@ -32,13 +32,18 @@ export async function POST(request: Request) {
   const { trainingIds, userIds, maxAttempts } = parsed.data
 
   try {
-    // Eğitimler bu organizasyona ait mi?
+    // Eğitimler bu organizasyona ait ve aktif mi? Arşivli eğitime yeni atama yapılamaz.
     const trainings = await prisma.training.findMany({
-      where: { id: { in: trainingIds }, organizationId: orgId },
+      where: {
+        id: { in: trainingIds },
+        organizationId: orgId,
+        isActive: true,
+        publishStatus: { not: 'archived' },
+      },
       select: { id: true, title: true },
     })
     if (trainings.length !== trainingIds.length) {
-      return errorResponse('Bazı eğitimler kurumunuza ait değil', 403)
+      return errorResponse('Bazı eğitimler kurumunuza ait değil veya arşivlenmiş', 403)
     }
 
     // Kullanıcılar bu organizasyona ait mi?

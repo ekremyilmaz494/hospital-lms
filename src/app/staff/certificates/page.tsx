@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  Award, Download, CheckCircle2, AlertTriangle, Copy, Eye, X,
+  Award, Download, CheckCircle2, AlertTriangle, Copy, Eye, X, Archive,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BlurFade } from '@/components/ui/blur-fade';
@@ -16,7 +16,7 @@ interface Certificate {
   issuedAt: string;
   expiresAt: string | null;
   isExpired: boolean;
-  training: { title: string; category: string };
+  training: { title: string; category: string; isArchived?: boolean };
   score: number;
   attemptNumber: number;
   user?: { firstName?: string; lastName?: string; organization?: { name?: string } };
@@ -360,11 +360,23 @@ export default function StaffCertificatesPage() {
                     </div>
 
                     <h3 className="text-[14px] font-bold mb-1 line-clamp-2">{cert.training.title}</h3>
-                    {cert.training.category && (
-                      <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-md mb-3" style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}>
-                        {cert.training.category}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-wrap mb-3">
+                      {cert.training.category && (
+                        <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-md" style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}>
+                          {cert.training.category}
+                        </span>
+                      )}
+                      {cert.training.isArchived && (
+                        <span
+                          className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-md"
+                          style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}
+                          title="Bu eğitim artık aktif değil — sertifikanız geçerliliğini korur"
+                        >
+                          <Archive className="h-2.5 w-2.5" /> Arşivlenmiş
+                        </span>
+                      )}
+                    </div>
+
 
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       <div className="rounded-xl p-3 text-center" style={{ background: 'var(--color-bg)' }}>

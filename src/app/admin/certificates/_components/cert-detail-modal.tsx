@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Award, Copy, Download, Ban, RotateCcw, AlertTriangle } from 'lucide-react'
+import { Award, Copy, Download, Ban, RotateCcw, AlertTriangle, Archive } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/shared/toast'
 import type { Certificate } from '../_types'
@@ -139,11 +139,22 @@ export function CertDetailModal({ cert, onClose, onMutated, onDownload, isPdfPen
           <div className="text-center pb-5" style={{ borderBottom: '1px solid var(--color-border)' }}>
             <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>Tamamlanan Eğitim</p>
             <p className="text-base font-bold">{cert.training.title}</p>
-            {cert.training.category && (
-              <span className="inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-                {cert.training.category}
-              </span>
-            )}
+            <div className="flex items-center justify-center gap-1.5 mt-1 flex-wrap">
+              {cert.training.category && (
+                <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+                  {cert.training.category}
+                </span>
+              )}
+              {cert.training.isArchived && (
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}
+                  title="Eğitim arşivlenmiş — sertifika geçerliliğini korur"
+                >
+                  <Archive className="h-3 w-3" /> Arşivlenmiş Eğitim
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">

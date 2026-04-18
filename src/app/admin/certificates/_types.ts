@@ -11,6 +11,7 @@ export interface CertTraining {
   id: string
   title: string
   category: string
+  isArchived: boolean
 }
 
 export interface Certificate {

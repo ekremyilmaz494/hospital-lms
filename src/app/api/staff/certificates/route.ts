@@ -29,7 +29,7 @@ export async function GET(request: Request) {
         prisma.certificate.findMany({
           where,
           include: {
-            training: { select: { title: true, category: true } },
+            training: { select: { title: true, category: true, isActive: true, publishStatus: true } },
             attempt: { select: { postExamScore: true, attemptNumber: true } },
           },
           orderBy: { issuedAt: 'desc' },
@@ -54,6 +54,7 @@ export async function GET(request: Request) {
           training: {
             title: c.training.title,
             category: c.training.category ?? '',
+            isArchived: !c.training.isActive || c.training.publishStatus === 'archived',
           },
           score: c.attempt.postExamScore ? Number(c.attempt.postExamScore) : 0,
           attemptNumber: c.attempt.attemptNumber,

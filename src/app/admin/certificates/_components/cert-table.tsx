@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar, CheckCircle2, AlertTriangle, Clock, Copy, Eye, Ban } from 'lucide-react'
+import { Calendar, CheckCircle2, AlertTriangle, Clock, Copy, Eye, Ban, Archive } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useToast } from '@/components/shared/toast'
 import type { Certificate } from '../_types'
@@ -74,7 +74,18 @@ export function CertTable({ certificates, onSelect, showTrainingColumn = true }:
               {showTrainingColumn && (
                 <td className="px-4 py-3.5">
                   <div>
-                    <p className="font-medium">{cert.training.title}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-medium">{cert.training.title}</p>
+                      {cert.training.isArchived && (
+                        <span
+                          className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                          style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}
+                          title="Eğitim arşivlenmiş — sertifika geçerliliğini korur"
+                        >
+                          <Archive className="h-2.5 w-2.5" /> Arşivlenmiş
+                        </span>
+                      )}
+                    </div>
                     {cert.training.category && (
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md mt-0.5 inline-block" style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}>
                         {cert.training.category}
