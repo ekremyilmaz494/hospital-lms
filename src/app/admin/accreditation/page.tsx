@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   ClipboardCheck, CheckCircle2, AlertTriangle, XCircle,
   RefreshCw, Download, Plus, ChevronDown, Loader2, FileText,
+  Pencil, Trash2, Lock, X,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useToast } from '@/components/shared/toast';
@@ -20,7 +21,20 @@ interface AccreditationStandard {
   standardBody: string;
   requiredTrainingCategories: string[];
   requiredCompletionRate: number;
+  isCustom?: boolean;
+  organizationId?: string | null;
 }
+
+const TRAINING_CATEGORY_OPTIONS = [
+  { value: 'enfeksiyon', label: 'Enfeksiyon' },
+  { value: 'is-guvenligi', label: 'İş Güvenliği' },
+  { value: 'hasta-haklari', label: 'Hasta Hakları' },
+  { value: 'radyoloji', label: 'Radyoloji' },
+  { value: 'laboratuvar', label: 'Laboratuvar' },
+  { value: 'eczane', label: 'Eczane' },
+  { value: 'acil', label: 'Acil Servis' },
+  { value: 'genel', label: 'Genel Eğitim' },
+] as const;
 
 interface FindingRecord {
   standardCode: string;
@@ -112,6 +126,8 @@ export default function AccreditationPage() {
   // Tab 1: Standartlar
   const [standards, setStandards] = useState<AccreditationStandard[]>([]);
   const [loadingStandards, setLoadingStandards] = useState(false);
+  const [editingStandard, setEditingStandard] = useState<AccreditationStandard | null>(null);
+  const [showStandardModal, setShowStandardModal] = useState(false);
 
   // Tab 2: Simülasyon
   const [simPeriodStart, setSimPeriodStart] = useState(() => {
@@ -145,6 +161,21 @@ export default function AccreditationPage() {
       setLoadingStandards(false);
     }
   }, [selectedBody, toast]);
+
+  const handleDeleteStandard = useCallback(async (id: string) => {
+    if (!window.confirm('Bu standardı silmek istediğinize emin misiniz?')) return;
+    try {
+      const res = await fetch(`/api/admin/accreditation/standards/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error ?? 'Silme başarısız');
+      }
+      toast('Standart silindi', 'success');
+      loadStandards();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Silme başarısız', 'error');
+    }
+  }, [toast, loadStandards]);
 
   const loadReports = useCallback(async () => {
     setLoadingReports(true);
@@ -387,13 +418,31 @@ export default function AccreditationPage() {
         ══════════════════════════════════ */}
         {activeTab === 'standards' && (
           <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                Resmi standartlar <ShieldLockInline /> kilitli · kuruma özel olanları düzenleyebilirsiniz
+              </div>
+              <button
+                type="button"
+                onClick={() => { setEditingStandard(null); setShowStandardModal(true); }}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '8px 14px', borderRadius: 10, border: 'none',
+                  background: 'var(--color-primary)', color: 'white',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <Plus size={14} /> Yeni Standart
+              </button>
+            </div>
+
             {loadingStandards ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
                 <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-text-muted)' }} />
               </div>
             ) : standards.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-muted)', fontSize: 14 }}>
-                Bu standart için kayıt bulunamadı.
+                Bu standart için kayıt bulunamadı. Yeni standart eklemek için yukarıdaki butona basın.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -401,12 +450,14 @@ export default function AccreditationPage() {
                   <BlurFade key={std.id} delay={0.03 * i}>
                     <div style={{
                       background: 'var(--color-card, #fff)', borderRadius: 14,
-                      border: '1px solid var(--color-border, #e2e8f0)',
+                      border: std.isCustom
+                        ? '1px solid color-mix(in srgb, var(--brand-600) calc(0.35 * 100%), transparent)'
+                        : '1px solid var(--color-border, #e2e8f0)',
                       padding: '16px 20px',
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                             <span style={{
                               fontSize: 11, fontWeight: 700, color: 'var(--color-primary)',
                               background: 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)', padding: '1px 7px', borderRadius: 6,
@@ -416,6 +467,24 @@ export default function AccreditationPage() {
                             <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                               {std.title}
                             </span>
+                            {std.isCustom ? (
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
+                                background: 'color-mix(in srgb, var(--brand-600) calc(0.12 * 100%), transparent)',
+                                color: 'var(--color-primary)',
+                              }}>
+                                KURUMA ÖZEL
+                              </span>
+                            ) : (
+                              <span title="Resmi standart — düzenlenemez" style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 3,
+                                fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 6,
+                                background: 'var(--color-surface-hover, #f1f5f9)',
+                                color: 'var(--color-text-muted)',
+                              }}>
+                                🔒 RESMİ
+                              </span>
+                            )}
                           </div>
                           {std.description && (
                             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 8px' }}>
@@ -423,27 +492,69 @@ export default function AccreditationPage() {
                             </p>
                           )}
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {std.requiredTrainingCategories.map(cat => (
-                              <span key={cat} style={{
-                                fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 8,
-                                background: 'var(--color-surface-hover, #f1f5f9)', color: 'var(--color-text-muted)',
-                              }}>
-                                {cat}
-                              </span>
-                            ))}
+                            {std.requiredTrainingCategories.map(cat => {
+                              const opt = TRAINING_CATEGORY_OPTIONS.find(o => o.value === cat);
+                              return (
+                                <span key={cat} style={{
+                                  fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 8,
+                                  background: 'var(--color-surface-hover, #f1f5f9)', color: 'var(--color-text-muted)',
+                                }}>
+                                  {opt?.label ?? cat}
+                                </span>
+                              );
+                            })}
                           </div>
                         </div>
-                        <div style={{ textAlign: 'center', minWidth: 80 }}>
-                          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-primary)' }}>
-                            %{std.requiredCompletionRate}
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                          <div style={{ textAlign: 'center', minWidth: 72 }}>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-primary)' }}>
+                              %{std.requiredCompletionRate}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>gerekli oran</div>
                           </div>
-                          <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>gerekli oran</div>
+                          {std.isCustom && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <button
+                                type="button"
+                                onClick={() => { setEditingStandard(std); setShowStandardModal(true); }}
+                                title="Düzenle"
+                                style={{
+                                  padding: 6, borderRadius: 8, border: '1px solid var(--color-border)',
+                                  background: 'var(--color-card, #fff)', color: 'var(--color-text-muted)',
+                                  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                }}
+                              >
+                                <Pencil size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteStandard(std.id)}
+                                title="Sil"
+                                style={{
+                                  padding: 6, borderRadius: 8, border: '1px solid var(--color-border)',
+                                  background: 'var(--color-card, #fff)', color: 'var(--color-destructive, #dc2626)',
+                                  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
                   </BlurFade>
                 ))}
               </div>
+            )}
+
+            {showStandardModal && (
+              <StandardFormModal
+                initial={editingStandard}
+                defaultBody={selectedBody}
+                onClose={() => { setShowStandardModal(false); setEditingStandard(null); }}
+                onSaved={() => { setShowStandardModal(false); setEditingStandard(null); loadStandards(); }}
+              />
             )}
           </div>
         )}
@@ -857,6 +968,273 @@ export default function AccreditationPage() {
       </BlurFade>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+// ── Yardımcı: Kilit ikonu inline ──
+function ShieldLockInline() {
+  return (
+    <Lock
+      size={11}
+      style={{ display: 'inline-block', verticalAlign: '-1px', margin: '0 2px', color: 'var(--color-text-muted)' }}
+    />
+  );
+}
+
+// ── Standart Form Modal ──
+
+interface StandardFormModalProps {
+  initial: AccreditationStandard | null;
+  defaultBody: StandardBody;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardFormModalProps) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [code, setCode] = useState(initial?.code ?? '');
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [standardBody, setStandardBody] = useState<StandardBody>(
+    (initial?.standardBody as StandardBody | undefined) ?? defaultBody,
+  );
+  const [categories, setCategories] = useState<string[]>(initial?.requiredTrainingCategories ?? []);
+  const [rate, setRate] = useState<number>(initial?.requiredCompletionRate ?? 80);
+
+  const toggleCategory = (v: string) => {
+    setCategories(prev => prev.includes(v) ? prev.filter(c => c !== v) : [...prev, v]);
+  };
+
+  const handleSubmit = async () => {
+    if (!code.trim()) return toast('Kod zorunlu', 'error');
+    if (!title.trim()) return toast('Başlık zorunlu', 'error');
+    if (categories.length === 0) return toast('En az bir eğitim kategorisi seçin', 'error');
+    if (rate < 0 || rate > 100) return toast('Oran 0–100 arası olmalı', 'error');
+
+    setSaving(true);
+    try {
+      const url = initial
+        ? `/api/admin/accreditation/standards/${initial.id}`
+        : '/api/admin/accreditation/standards';
+      const method = initial ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: code.trim(),
+          title: title.trim(),
+          description: description.trim() || null,
+          standardBody,
+          requiredTrainingCategories: categories,
+          requiredCompletionRate: rate,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? 'Kaydetme başarısız');
+      toast(initial ? 'Standart güncellendi' : 'Standart oluşturuldu', 'success');
+      onSaved();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Kaydetme başarısız', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--color-card, #fff)', borderRadius: 16,
+          width: '100%', maxWidth: 560, maxHeight: '90vh',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+        }}
+      >
+        <div style={{
+          padding: '16px 20px', borderBottom: '1px solid var(--color-border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
+              {initial ? 'Standart Düzenle' : 'Yeni Standart'}
+            </h3>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-text-muted)' }}>
+              Kuruma özel akreditasyon standardı tanımlayın
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: 6, borderRadius: 8, border: 'none',
+              background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer',
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div style={{ padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 5 }}>
+                Kod *
+              </label>
+              <input
+                value={code}
+                onChange={e => setCode(e.target.value)}
+                placeholder="örn: KRM.EH.1"
+                maxLength={50}
+                style={{
+                  width: '100%', padding: '8px 10px', borderRadius: 8,
+                  border: '1px solid var(--color-border)', fontSize: 13, fontFamily: 'var(--font-mono)',
+                  background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 5 }}>
+                Standart Kuruluşu *
+              </label>
+              <select
+                value={standardBody}
+                onChange={e => setStandardBody(e.target.value as StandardBody)}
+                style={{
+                  width: '100%', padding: '8px 10px', borderRadius: 8,
+                  border: '1px solid var(--color-border)', fontSize: 13,
+                  background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                }}
+              >
+                {STANDARD_BODIES.map(b => (
+                  <option key={b.value} value={b.value}>{b.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 5 }}>
+              Başlık *
+            </label>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="örn: El Hijyeni Uyumluluğu"
+              maxLength={500}
+              style={{
+                width: '100%', padding: '8px 10px', borderRadius: 8,
+                border: '1px solid var(--color-border)', fontSize: 13,
+                background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 5 }}>
+              Açıklama
+            </label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={2}
+              maxLength={2000}
+              placeholder="Standardın ne kapsadığı..."
+              style={{
+                width: '100%', padding: '8px 10px', borderRadius: 8,
+                border: '1px solid var(--color-border)', fontSize: 13, resize: 'vertical',
+                background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 6 }}>
+              Zorunlu Eğitim Kategorileri * ({categories.length} seçili)
+            </label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {TRAINING_CATEGORY_OPTIONS.map(opt => {
+                const active = categories.includes(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => toggleCategory(opt.value)}
+                    style={{
+                      padding: '6px 12px', borderRadius: 999,
+                      border: `1px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                      background: active ? 'var(--color-primary)' : 'var(--color-bg, #f8fafc)',
+                      color: active ? '#fff' : 'var(--color-text-secondary)',
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 5 }}>
+              Minimum Tamamlanma Oranı: %{rate}
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={rate}
+              onChange={e => setRate(Number(e.target.value))}
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+
+        <div style={{
+          padding: '12px 20px', borderTop: '1px solid var(--color-border)',
+          display: 'flex', justifyContent: 'flex-end', gap: 8,
+        }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            style={{
+              padding: '8px 14px', borderRadius: 10,
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-card, #fff)', color: 'var(--color-text-secondary)',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            İptal
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={saving}
+            style={{
+              padding: '8px 16px', borderRadius: 10, border: 'none',
+              background: 'var(--color-primary)', color: '#fff',
+              fontSize: 13, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
+              opacity: saving ? 0.7 : 1,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {saving && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+            {initial ? 'Güncelle' : 'Oluştur'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
