@@ -73,7 +73,7 @@ export default function ReportsPage() {
   const handleExport = async (format: 'pdf' | 'xlsx') => {
     setDownloading(format);
     try {
-      const params = new URLSearchParams({ format });
+      const params = new URLSearchParams({ format, section: activeTab });
       if (dateFrom) params.set('from', new Date(dateFrom).toISOString());
       if (dateTo) params.set('to', new Date(dateTo + 'T23:59:59').toISOString());
       if (departmentId) params.set('departmentId', departmentId);
@@ -86,7 +86,9 @@ export default function ReportsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `rapor-${new Date().toISOString().slice(0, 10)}.${format}`;
+      const tabLabel = tabs.find(t => t.id === activeTab)?.label ?? 'Rapor';
+      const safeLabel = tabLabel.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      a.download = `rapor-${safeLabel}-${new Date().toISOString().slice(0, 10)}.${format}`;
       a.click();
       URL.revokeObjectURL(url);
       toast(`${format.toUpperCase()} raporu indirildi`, 'success');

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Settings, Save, Building2,
-  GraduationCap, Bell, Palette,
+  Bell, Palette,
   ChevronRight, CheckCircle2,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
@@ -14,7 +14,6 @@ import { useToast } from '@/components/shared/toast';
 
 const tabLoading = () => <div className="h-64 animate-pulse rounded-lg m-8" style={{ background: 'var(--color-bg)' }} />;
 const HospitalTab = dynamic(() => import('./hospital-tab'), { ssr: false, loading: tabLoading });
-const TrainingTab = dynamic(() => import('./training-tab'), { ssr: false, loading: tabLoading });
 const NotificationTab = dynamic(() => import('./notification-tab'), { ssr: false, loading: tabLoading });
 const BrandingTab = dynamic(() => import('./branding-tab'), { ssr: false, loading: tabLoading });
 
@@ -60,7 +59,6 @@ const defaultSettings: SettingsData = {
 
 const tabs = [
   { id: 'hospital', label: 'Kurum', icon: Building2 },
-  { id: 'training', label: 'Eğitim', icon: GraduationCap },
   { id: 'branding', label: 'Marka', icon: Palette },
   { id: 'notifications', label: 'Bildirimler', icon: Bell },
 ] as const;
@@ -139,7 +137,7 @@ export default function AdminSettingsPage() {
                 Platform Ayarları
               </h1>
               <p className="text-[13px]" style={{ color: 'var(--color-text-muted)' }}>
-                Kurum bilgileri, eğitim yapılandırması ve bildirim tercihleri
+                Kurum bilgileri, marka ve bildirim tercihleri
               </p>
             </div>
           </div>
@@ -223,7 +221,6 @@ export default function AdminSettingsPage() {
             }}
           >
             {activeTab === 'hospital' && <HospitalTab {...tabProps} />}
-            {activeTab === 'training' && <TrainingTab {...tabProps} />}
             {activeTab === 'branding' && <BrandingTab {...tabProps} />}
             {activeTab === 'notifications' && <NotificationTab {...tabProps} />}
           </div>

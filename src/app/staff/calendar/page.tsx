@@ -400,14 +400,15 @@ export default function CalendarPage() {
                       />
                     )}
 
-                    {/* Event indicators — dots on mobile, pills on desktop */}
+                    {/* Event indicators — dots on mobile, pills on desktop.
+                        Sadece eventType rengi (Eğitim/Sınav); status ayrıntısı gün paneline taşındı,
+                        takvim lejantında bilişsel yük azaldı. */}
                     {cell.isCurrentMonth && dayEvents.length > 0 && (
                       <>
                         {/* Mobile: colored dots */}
                         <div className="mt-1 flex items-center gap-1 sm:hidden">
                           {dayEvents.slice(0, 3).map(evt => {
-                            const cfg = STATUS_CONFIG[evt.status] ?? STATUS_CONFIG.assigned;
-                            const dotColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
+                            const dotColor = evt.eventType === 'exam' ? 'var(--color-accent)' : 'var(--color-info)';
                             return <span key={evt.id} className="h-1.5 w-1.5 rounded-full" style={{ background: dotColor }} />;
                           })}
                           {dayEvents.length > 3 && (
@@ -417,8 +418,7 @@ export default function CalendarPage() {
                         {/* Desktop: full pills */}
                         <div className="mt-1 hidden sm:flex flex-col gap-0.5 w-full min-w-0">
                           {dayEvents.slice(0, 2).map(evt => {
-                            const cfg = STATUS_CONFIG[evt.status] ?? STATUS_CONFIG.assigned;
-                            const pillColor = evt.eventType === 'exam' ? 'var(--color-accent)' : cfg.color;
+                            const pillColor = evt.eventType === 'exam' ? 'var(--color-accent)' : 'var(--color-info)';
                             const PillIcon = evt.eventType === 'exam' ? ClipboardList : BookOpen;
                             return (
                               <div
@@ -449,19 +449,13 @@ export default function CalendarPage() {
               })}
             </div>
 
-            {/* Legend */}
+            {/* Legend — sadeleştirildi: takvim "ne zaman?" sorusuna cevap verir.
+                Status (Atandı/Devam/Başarısız/Kilitli) bilgisi gün paneli ve
+                Eğitimlerim sayfasında rozet olarak görünür; burada tekrar edilmez. */}
             <div
               className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 sm:px-6 py-2 sm:py-3"
               style={{ borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)' }}
             >
-              {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-                <div key={key} className="flex items-center gap-1.5 rounded-full px-2.5 py-1">
-                  <span className="h-2 w-2 rounded-full" style={{ background: cfg.color }} />
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
-                    {cfg.label}
-                  </span>
-                </div>
-              ))}
               <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1">
                 <BookOpen className="h-3 w-3" style={{ color: 'var(--color-info)' }} />
                 <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
