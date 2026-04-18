@@ -11,8 +11,8 @@ const HERO_END_FRAME = 165;
  * kompozisyonunu canlı oynatır.
  *
  * durationInFrames 165'te kesildi (tam 180 değil) çünkü HeroComposition'ın
- * son 15 frame'i bir exit fade — landing'de logo solmasın, Player son frame'de
- * durur.
+ * son 15 frame'i bir exit fade — landing loop'ta ekran solmasın.
+ * loop=true ile 5.5sn'de bir baştan başlar, ziyaretçi sürekli canlı görsel görür.
  */
 export function HeroPlayer() {
   return (
@@ -32,7 +32,7 @@ export function HeroPlayer() {
         durationInFrames={HERO_END_FRAME}
         fps={HERO_FPS}
         autoPlay
-        loop={false}
+        loop
         controls={false}
         clickToPlay={false}
         doubleClickToFullscreen={false}
