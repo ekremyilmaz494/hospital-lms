@@ -4,8 +4,8 @@ import React, { useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Library, Clock, Star, CheckCircle2, Plus, Layers, X, ArrowRight,
-  Video, ChevronDown, Film, Play, Sparkles, Search,
-  BookOpen, GraduationCap, Folder, Eye, Upload, AlertCircle,
+  Film, Sparkles, Search,
+  BookOpen, GraduationCap, Upload, AlertCircle, Trash2,
 } from 'lucide-react'
 import { generateVideoThumbnail } from '@/lib/video-thumbnail'
 import { useFetch } from '@/hooks/use-fetch'
@@ -18,8 +18,6 @@ import {
   type ContentLibraryCategoryKey,
   type ContentLibraryDifficulty,
 } from '@/lib/content-library-categories'
-import { TRAINING_CATEGORIES } from '@/lib/training-categories'
-import { CategoryIcon } from '@/components/shared/category-icon'
 
 interface ContentLibraryItem {
   id: string
@@ -195,9 +193,88 @@ interface ContentCardProps {
   item: ContentLibraryItem
   onInstall: (id: string) => Promise<void>
   installing: boolean
+  onDelete: (item: ContentLibraryItem) => void
+  deleting: boolean
 }
 
-function ContentCard({ item, onInstall, installing }: ContentCardProps) {
+// ── Silme Onay Modali ─────────────────────────────────────────────────────
+
+interface DeleteConfirmModalProps {
+  item: ContentLibraryItem
+  loading: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}
+
+function DeleteConfirmModal({ item, loading, onCancel, onConfirm }: DeleteConfirmModalProps) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backdropFilter: 'blur(12px)', background: 'rgba(0,0,0,0.5)' }}
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl"
+        style={{
+          background: 'var(--color-surface)',
+          borderColor: 'color-mix(in srgb, var(--color-error) 30%, var(--color-border))',
+          animation: 'modalIn 0.2s ease-out',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-4 px-6 pt-6 pb-4">
+          <div
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+            style={{ background: 'var(--color-error-bg)' }}
+          >
+            <AlertCircle className="h-6 w-6" style={{ color: 'var(--color-error)' }} />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold font-heading" style={{ fontSize: '16px', color: 'var(--color-text-primary)' }}>
+              İçeriği silmek istediğinize emin misiniz?
+            </h3>
+            <p className="mt-1 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                &ldquo;{item.title}&rdquo;
+              </span>{' '}
+              kalıcı olarak silinecek. Depolamadaki dosyalar da kaldırılacak.
+            </p>
+            <p className="mt-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              Eğer bu içerik bir eğitimde kullanılıyorsa silme reddedilecek — önce ilgili eğitimi silmelisiniz.
+            </p>
+          </div>
+        </div>
+
+        <div
+          className="flex items-center justify-end gap-2 border-t px-6 py-4"
+          style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}
+        >
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="rounded-xl px-4 py-2 text-sm font-semibold transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+            style={{ border: '1.5px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+          >
+            Vazgeç
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:shadow-lg disabled:opacity-60"
+            style={{ background: 'var(--color-error)' }}
+          >
+            <Trash2 className="h-4 w-4" />
+            {loading ? 'Siliniyor...' : 'Evet, sil'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ContentCard({ item, onInstall, installing, onDelete, deleting }: ContentCardProps) {
   const router = useRouter()
   const cat = CONTENT_LIBRARY_CATEGORIES[item.category as ContentLibraryCategoryKey]
   const diff = CONTENT_LIBRARY_DIFFICULTY[item.difficulty as ContentLibraryDifficulty]
@@ -267,15 +344,33 @@ function ContentCard({ item, onInstall, installing }: ContentCardProps) {
           </span>
         </div>
 
-        {/* Installed badge */}
-        {item.isInstalled && (
-          <div className="absolute top-3 right-3">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full backdrop-blur-md"
-              style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-              <CheckCircle2 className="h-4 w-4" style={{ color: 'var(--color-success)' }} />
+        {/* Top-right badges */}
+        <div className="absolute top-3 right-3 flex items-center gap-2">
+          {item.isOwned && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete(item) }}
+              disabled={deleting}
+              title="İçeriği sil"
+              aria-label="İçeriği sil"
+              className="flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-white backdrop-blur-md transition-all duration-200 hover:scale-105 hover:shadow-lg disabled:opacity-50"
+              style={{
+                background: 'var(--color-error)',
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--color-error) 40%, transparent)',
+                border: '1.5px solid rgba(255,255,255,0.2)',
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Sil
+            </button>
+          )}
+          {item.isInstalled && (
+            <div className="flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-md"
+              style={{ background: 'rgba(255,255,255,0.95)', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
+              <CheckCircle2 className="h-5 w-5" style={{ color: 'var(--color-success)' }} />
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* İçerik */}
@@ -362,306 +457,37 @@ function ContentCard({ item, onInstall, installing }: ContentCardProps) {
   )
 }
 
-// ── Eğitim Videoları Tipleri ───────────────────────────────────────────────
+// ── Eğitim Videolarım Tipleri ──────────────────────────────────────────────
+//
+// my-videos API'si ContentLibrary öğelerini döndürür — yalnızca bu kurumun
+// eğitimlerinde kullanılan olanlar (Training.sourceLibraryId ile bağlı).
 
-interface TrainingVideoItem {
+interface UsedTrainingRef {
   id: string
   title: string
-  durationSeconds: number
-  sortOrder: number
-  description: string | null
-  createdAt: string
+  publishStatus: string
 }
 
-interface MyTrainingItem {
-  id: string
-  title: string
-  category: string
-  publishStatus: string
-  videoCount: number
-  totalDurationSeconds: number
-  createdAt: string
-  videos: TrainingVideoItem[]
+interface MyVideoLibraryItem extends Omit<ContentLibraryItem, 'isInstalled'> {
+  usageCount: number
+  usedInTrainings: UsedTrainingRef[]
 }
 
 interface MyVideosData {
-  trainings: MyTrainingItem[]
-}
-
-// ── Süre Formatlama ────────────────────────────────────────────────────────
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-  if (h > 0) return `${h}sa ${m}dk`
-  if (m > 0) return s > 0 ? `${m}dk ${s}sn` : `${m}dk`
-  return `${s}sn`
-}
-
-// ── Video Önizleme Modalı ─────────────────────────────────────────────────
-
-interface VideoPreviewModalProps {
-  videoId: string
-  videoTitle: string
-  trainingTitle: string
-  durationSeconds: number
-  onClose: () => void
-}
-
-function VideoPreviewModal({ videoId, videoTitle, trainingTitle, durationSeconds, onClose }: VideoPreviewModalProps) {
-  React.useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-3xl overflow-hidden rounded-2xl border"
-        style={{
-          background: 'var(--color-surface)',
-          borderColor: 'color-mix(in srgb, var(--color-border) 50%, transparent)',
-          boxShadow: '0 32px 64px rgba(0,0,0,0.3)',
-          animation: 'modalIn 0.2s ease-out',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor: 'var(--color-border)' }}>
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wider truncate" style={{ color: 'var(--color-text-muted)' }}>{trainingTitle}</p>
-            <p className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>{videoTitle}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--color-surface-hover)]"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div style={{ background: '#000' }}>
-          <video
-            src={`/api/stream/${videoId}`}
-            controls
-            autoPlay
-            controlsList="nodownload"
-            className="w-full"
-            style={{ maxHeight: '60vh' }}
-          />
-        </div>
-
-        <div className="flex items-center justify-between px-5 py-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
-          <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{videoTitle}</span>
-          <span className="text-xs font-bold tabular-nums" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>
-            {formatDuration(durationSeconds)}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Eğitim Video Kartı (Accordion) ────────────────────────────────────────
-
-interface TrainingVideoCardProps {
-  item: MyTrainingItem
-  isExpanded: boolean
-  onToggle: () => void
-  onPlayVideo: (v: TrainingVideoItem) => void
-}
-
-function TrainingVideoCard({ item, isExpanded, onToggle, onPlayVideo }: TrainingVideoCardProps) {
-  const router = useRouter()
-  const cat = TRAINING_CATEGORIES.find(c => c.value === item.category)
-
-  const statusStyle =
-    item.publishStatus === 'published'
-      ? { bg: 'var(--color-success-bg)', color: 'var(--color-success)', label: 'Yayında', dot: 'var(--color-success)' }
-      : item.publishStatus === 'draft'
-        ? { bg: 'var(--color-surface-hover)', color: 'var(--color-text-muted)', label: 'Taslak', dot: 'var(--color-text-muted)' }
-        : { bg: 'var(--color-warning-bg, #fef3c7)', color: 'var(--color-warning, #d97706)', label: 'Arşiv', dot: 'var(--color-warning, #d97706)' }
-
-  return (
-    <div
-      className="overflow-hidden rounded-2xl border transition-all duration-200"
-      style={{
-        background: 'var(--color-surface)',
-        borderColor: isExpanded ? 'var(--color-primary)' : 'var(--color-border)',
-        boxShadow: isExpanded
-          ? '0 8px 24px -4px color-mix(in srgb, var(--color-primary) 15%, transparent), 0 0 0 1px var(--color-primary)'
-          : 'var(--shadow-sm)',
-      }}
-    >
-      {/* Kart Başlığı */}
-      <button
-        onClick={onToggle}
-        className="flex w-full items-start gap-3.5 p-4 text-left transition-colors hover:bg-[var(--color-surface-hover)]"
-      >
-        {/* Kategori ikonu — larger, with bg */}
-        <div
-          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl"
-          style={{
-            background: isExpanded
-              ? 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, #000))'
-              : 'var(--color-bg)',
-            boxShadow: isExpanded ? '0 4px 12px color-mix(in srgb, var(--color-primary) 25%, transparent)' : 'none',
-            transition: 'background 0.2s, box-shadow 0.2s',
-          }}
-        >
-          {isExpanded
-          ? <Folder className="h-5 w-5 text-white" />
-          : <CategoryIcon name={cat?.icon ?? 'BookOpen'} className="h-5 w-5" style={{ color: cat?.color ?? 'var(--color-primary)' }} />
-        }
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3
-              className="flex-1 truncate font-bold font-heading leading-snug"
-              style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}
-            >
-              {item.title}
-            </h3>
-            <div
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-transform duration-200"
-              style={{
-                background: isExpanded ? 'var(--color-primary-light)' : 'transparent',
-                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-              }}
-            >
-              <ChevronDown className="h-3.5 w-3.5" style={{ color: isExpanded ? 'var(--color-primary)' : 'var(--color-text-muted)' }} />
-            </div>
-          </div>
-
-          {/* Meta bilgiler */}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {/* Status dot + label */}
-            <span className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: statusStyle.color }}>
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: statusStyle.dot }} />
-              {statusStyle.label}
-            </span>
-
-            <span className="text-[10px]" style={{ color: 'var(--color-border)' }}>·</span>
-
-            {/* Kategori */}
-            <span className="flex items-center gap-1 text-[11px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
-              <CategoryIcon name={cat?.icon ?? 'BookOpen'} className="h-3 w-3" style={{ color: cat?.color ?? 'var(--color-text-muted)' }} />
-              {cat?.label ?? item.category}
-            </span>
-
-            <span className="text-[10px]" style={{ color: 'var(--color-border)' }}>·</span>
-
-            {/* Video + süre */}
-            <span className="flex items-center gap-1 text-[11px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
-              <Film className="h-3 w-3" />
-              {item.videoCount} video
-            </span>
-
-            <span className="text-[10px]" style={{ color: 'var(--color-border)' }}>·</span>
-
-            <span className="flex items-center gap-1 text-[11px] font-medium tabular-nums" style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
-              <Clock className="h-3 w-3" />
-              {formatDuration(item.totalDurationSeconds)}
-            </span>
-          </div>
-        </div>
-      </button>
-
-      {/* Accordion İçeriği — smooth CSS grid animation */}
-      <div
-        className="grid transition-[grid-template-rows] duration-300 ease-out"
-        style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
-      >
-        <div className="overflow-hidden">
-          <div
-            className="border-t transition-opacity duration-300"
-            style={{
-              borderColor: 'var(--color-border)',
-              opacity: isExpanded ? 1 : 0,
-            }}
-          >
-            <div className="p-3 space-y-1">
-              {item.videos.map((video, idx) => (
-                <div
-                  key={video.id}
-                  className="group/row flex items-center gap-3 rounded-xl px-3 py-2.5 cursor-pointer transition-colors hover:bg-[var(--color-bg)]"
-                  onClick={() => onPlayVideo(video)}
-                >
-                  {/* Sıra numarası */}
-                  <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold tabular-nums"
-                    style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}
-                  >
-                    {idx + 1}
-                  </div>
-
-                  {/* Video ikonu / Play butonu */}
-                  <div className="relative h-4 w-4 shrink-0">
-                    <Video className="h-4 w-4 transition-opacity group-hover/row:opacity-0" style={{ color: 'var(--color-text-muted)' }} />
-                    <Play className="absolute inset-0 h-4 w-4 opacity-0 transition-opacity group-hover/row:opacity-100" style={{ color: 'var(--color-primary)' }} />
-                  </div>
-
-                  {/* Başlık */}
-                  <span
-                    className="flex-1 truncate text-sm font-medium transition-colors group-hover/row:text-[var(--color-primary)]"
-                    style={{ color: 'var(--color-text-primary)' }}
-                  >
-                    {video.title}
-                  </span>
-
-                  {/* Play label on hover */}
-                  <span
-                    className="shrink-0 text-[10px] font-bold uppercase tracking-wider opacity-0 transition-opacity group-hover/row:opacity-100"
-                    style={{ color: 'var(--color-primary)' }}
-                  >
-                    Oynat
-                  </span>
-
-                  {/* Süre */}
-                  <span
-                    className="shrink-0 text-xs font-semibold tabular-nums"
-                    style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}
-                  >
-                    {formatDuration(video.durationSeconds)}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Eğitime Git butonu */}
-            <div className="flex justify-end px-4 pb-3">
-              <button
-                onClick={() => router.push(`/admin/trainings/${item.id}/edit`)}
-                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary)]"
-                style={{ color: 'var(--color-text-secondary)' }}
-              >
-                Eğitime Git
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  items: MyVideoLibraryItem[]
 }
 
 // ── Kendi Eğitim Videolarım Sekmesi ────────────────────────────────────────
+//
+// Bu sekme yalnızca bu kurumun bir eğitiminde kullanılmış ContentLibrary
+// öğelerini listeler. Platform Kütüphanesi'yle aynı kart layoutunu kullanır;
+// ek olarak her kartın altında "Kullanıldığı eğitim(ler)" bilgisi gösterilir.
 
 function MyVideosTab() {
+  const router = useRouter()
   const { data, isLoading, error } = useFetch<MyVideosData>('/api/admin/content-library/my-videos')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [previewVideo, setPreviewVideo] = useState<{
-    id: string; title: string; durationSeconds: number; trainingTitle: string
-  } | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   if (isLoading) return <PageLoading />
   if (error) return (
@@ -670,101 +496,119 @@ function MyVideosTab() {
     </div>
   )
 
-  const allTrainings = data?.trainings ?? []
-  const totalVideos = allTrainings.reduce((s, t) => s + t.videoCount, 0)
-  const totalDuration = allTrainings.reduce((s, t) => s + t.totalDurationSeconds, 0)
-  const publishedCount = allTrainings.filter(t => t.publishStatus === 'published').length
+  const allItems = data?.items ?? []
+  const afterCategory = categoryFilter
+    ? allItems.filter(i => i.category === categoryFilter)
+    : allItems
+  const filtered = searchQuery
+    ? afterCategory.filter(i => i.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    : afterCategory
 
-  const filtered = categoryFilter
-    ? allTrainings.filter(t => t.category === categoryFilter)
-    : allTrainings
-
-  const usedCategories = TRAINING_CATEGORIES.filter(
-    cat => allTrainings.some(t => t.category === cat.value)
+  const totalDurationMin = allItems.reduce((s, i) => s + i.duration, 0)
+  const totalSmg = allItems.reduce((s, i) => s + i.smgPoints, 0)
+  const linkedTrainingIds = new Set(
+    allItems.flatMap(i => i.usedInTrainings.map(t => t.id))
   )
 
   return (
     <div className="space-y-5">
-      {/* Stats row */}
-      {allTrainings.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { label: 'Toplam Eğitim', value: allTrainings.length, icon: GraduationCap, color: 'var(--color-primary)' },
-            { label: 'Toplam Video', value: totalVideos, icon: Film, color: 'var(--color-info)' },
-            { label: 'Yayında', value: publishedCount, icon: Eye, color: 'var(--color-success)' },
-            { label: 'Toplam Süre', value: formatDuration(totalDuration), icon: Clock, color: 'var(--color-accent)' },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="flex items-center gap-3 rounded-xl border px-4 py-3"
-              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-            >
+      {/* Stats + Search bar */}
+      {allItems.length > 0 && (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center">
+            {[
+              { label: 'İçerik', value: allItems.length, icon: Library, color: 'var(--color-primary)' },
+              { label: 'Eğitimde', value: linkedTrainingIds.size, icon: GraduationCap, color: 'var(--color-info)' },
+              { label: 'Süre', value: `${totalDurationMin}dk`, icon: Clock, color: 'var(--color-accent)' },
+              { label: 'SMG', value: totalSmg, icon: Star, color: 'var(--color-accent)' },
+            ].map(stat => (
               <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                style={{ background: `color-mix(in srgb, ${stat.color} 10%, transparent)` }}
+                key={stat.label}
+                className="flex items-center gap-3 rounded-xl border px-4 py-2.5"
+                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
               >
-                <stat.icon className="h-4 w-4" style={{ color: stat.color }} />
+                <div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                  style={{ background: `color-mix(in srgb, ${stat.color} 10%, transparent)` }}
+                >
+                  <stat.icon className="h-4 w-4" style={{ color: stat.color }} />
+                </div>
+                <div>
+                  <p className="text-base font-bold font-heading leading-none" style={{ color: 'var(--color-text-primary)' }}>
+                    {stat.value}
+                  </p>
+                  <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                    {stat.label}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-lg font-bold font-heading leading-none" style={{ color: 'var(--color-text-primary)' }}>
-                  {stat.value}
-                </p>
-                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                  {stat.label}
-                </p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
+            <input
+              type="text"
+              placeholder="İçerik ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="rounded-xl border py-2 pl-9 pr-4 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
+              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', width: '220px' }}
+            />
+          </div>
         </div>
       )}
 
       {/* Kategori Filtreleri */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setCategoryFilter(null)}
-          className="rounded-xl px-4 py-2 text-[11px] font-bold transition-all duration-200"
-          style={{
-            background: !categoryFilter ? 'var(--color-primary)' : 'var(--color-surface)',
-            color: !categoryFilter ? '#fff' : 'var(--color-text-muted)',
-            border: `1.5px solid ${!categoryFilter ? 'var(--color-primary)' : 'var(--color-border)'}`,
-            boxShadow: !categoryFilter ? '0 4px 12px color-mix(in srgb, var(--color-primary) 25%, transparent)' : 'none',
-          }}
-        >
-          Tümü ({allTrainings.length})
-        </button>
+      {allItems.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setCategoryFilter(null)}
+            className="rounded-xl px-4 py-2 text-[11px] font-bold transition-all duration-200"
+            style={{
+              background: !categoryFilter ? 'var(--color-primary)' : 'var(--color-surface)',
+              color: !categoryFilter ? '#fff' : 'var(--color-text-muted)',
+              border: `1.5px solid ${!categoryFilter ? 'var(--color-primary)' : 'var(--color-border)'}`,
+              boxShadow: !categoryFilter ? '0 4px 12px color-mix(in srgb, var(--color-primary) 25%, transparent)' : 'none',
+            }}
+          >
+            Tümü ({allItems.length})
+          </button>
+          {Object.entries(CONTENT_LIBRARY_CATEGORIES).map(([key, cfg]) => {
+            const count = allItems.filter(i => i.category === key).length
+            if (count === 0) return null
+            const active = categoryFilter === key
+            return (
+              <button
+                key={key}
+                onClick={() => setCategoryFilter(active ? null : key)}
+                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[11px] font-bold transition-all duration-200"
+                style={{
+                  background: active ? cfg.color : 'var(--color-surface)',
+                  color: active ? '#fff' : 'var(--color-text-muted)',
+                  border: `1.5px solid ${active ? cfg.color : 'var(--color-border)'}`,
+                  boxShadow: active ? `0 4px 12px color-mix(in srgb, ${cfg.color} 25%, transparent)` : 'none',
+                }}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: active ? '#fff' : cfg.color }}
+                />
+                {cfg.label} ({count})
+              </button>
+            )
+          })}
+        </div>
+      )}
 
-        {usedCategories.map(cat => {
-          const count = allTrainings.filter(t => t.category === cat.value).length
-          const active = categoryFilter === cat.value
-          return (
-            <button
-              key={cat.value}
-              onClick={() => setCategoryFilter(active ? null : cat.value)}
-              className="rounded-xl px-4 py-2 text-[11px] font-bold transition-all duration-200"
-              style={{
-                background: active ? 'var(--color-primary)' : 'var(--color-surface)',
-                color: active ? '#fff' : 'var(--color-text-muted)',
-                border: `1.5px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                boxShadow: active ? '0 4px 12px color-mix(in srgb, var(--color-primary) 25%, transparent)' : 'none',
-              }}
-            >
-              <CategoryIcon name={cat.icon} className="h-3.5 w-3.5" style={{ color: active ? '#fff' : (cat.color ?? 'var(--color-text-muted)') }} />
-              {cat.label} ({count})
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Eğitim Kartları */}
+      {/* İçerik Kartları */}
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 items-start">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map(item => (
-            <TrainingVideoCard
+            <MyVideoCard
               key={item.id}
               item={item}
-              isExpanded={expandedId === item.id}
-              onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
-              onPlayVideo={(v) => setPreviewVideo({ ...v, trainingTitle: item.title })}
+              onNavigate={(trainingId) => router.push(`/admin/trainings/${trainingId}/edit`)}
             />
           ))}
         </div>
@@ -777,43 +621,183 @@ function MyVideosTab() {
             className="flex h-16 w-16 items-center justify-center rounded-2xl"
             style={{ background: 'var(--color-bg)' }}
           >
-            <Film className="h-8 w-8" style={{ color: 'var(--color-text-muted)' }} />
+            {searchQuery ? (
+              <Search className="h-8 w-8" style={{ color: 'var(--color-text-muted)' }} />
+            ) : (
+              <Film className="h-8 w-8" style={{ color: 'var(--color-text-muted)' }} />
+            )}
           </div>
           <div className="text-center">
             <p className="text-sm font-bold" style={{ color: 'var(--color-text-secondary)' }}>
-              {categoryFilter ? 'Bu kategoride video bulunamadı' : 'İçerik kütüphanesine video yüklemek için "Video Yükle" butonunu kullanın.'}
+              {searchQuery
+                ? `"${searchQuery}" için sonuç bulunamadı`
+                : categoryFilter
+                  ? 'Bu kategoride kullanılan içerik yok'
+                  : 'Henüz bir eğitime bağlanmış içerik yok'}
             </p>
             <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              {categoryFilter
-                ? 'Filtreyi temizleyerek tümünü görün'
-                : 'Yeni eğitim oluştururken video yüklediğinizde burada görünür'
-              }
+              {searchQuery
+                ? 'Farklı bir arama deneyin'
+                : categoryFilter
+                  ? 'Filtreyi temizleyerek tümünü görün'
+                  : 'Platform Kütüphanesi\'nden bir içeriği eğitim olarak atadığınızda burada görünür'}
             </p>
           </div>
-          {categoryFilter && (
+          {(categoryFilter || searchQuery) && (
             <button
-              onClick={() => setCategoryFilter(null)}
+              onClick={() => { setCategoryFilter(null); setSearchQuery('') }}
               className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-colors hover:bg-[var(--color-surface-hover)]"
               style={{ border: '1.5px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
             >
-              <X className="h-3.5 w-3.5" /> Filtreyi Temizle
+              <X className="h-3.5 w-3.5" /> Filtreleri Temizle
             </button>
           )}
         </div>
       )}
-
-      {previewVideo && (
-        <VideoPreviewModal
-          videoId={previewVideo.id}
-          videoTitle={previewVideo.title}
-          durationSeconds={previewVideo.durationSeconds}
-          trainingTitle={previewVideo.trainingTitle}
-          onClose={() => setPreviewVideo(null)}
-        />
-      )}
     </div>
   )
 }
+
+// ── Eğitim Videolarım Kartı ────────────────────────────────────────────────
+//
+// ContentCard'ın kompakt varyantı. Install butonu yok — aksiyon alanında
+// içeriği kullanan eğitim(ler)e link verir. Birden fazla eğitim varsa ilki,
+// yoksa ilkinin edit sayfasına yönlendirir.
+
+interface MyVideoCardProps {
+  item: MyVideoLibraryItem
+  onNavigate: (trainingId: string) => void
+}
+
+function MyVideoCard({ item, onNavigate }: MyVideoCardProps) {
+  const cat = CONTENT_LIBRARY_CATEGORIES[item.category as ContentLibraryCategoryKey]
+  const diff = CONTENT_LIBRARY_DIFFICULTY[item.difficulty as ContentLibraryDifficulty]
+  const catColor = cat?.color ?? 'var(--color-primary)'
+  const primaryTraining = item.usedInTrainings[0]
+
+  return (
+    <div
+      className="group relative flex flex-col overflow-hidden rounded-2xl border transition-all duration-300 hover:-translate-y-1"
+      style={{
+        background: 'var(--color-surface)',
+        borderColor: 'var(--color-border)',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = `0 12px 32px -8px color-mix(in srgb, ${catColor} 20%, transparent)`
+        e.currentTarget.style.borderColor = `color-mix(in srgb, ${catColor} 30%, var(--color-border))`
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = 'var(--shadow-sm)'
+        e.currentTarget.style.borderColor = 'var(--color-border)'
+      }}
+    >
+      {/* Thumbnail */}
+      <div className="relative h-36 shrink-0 overflow-hidden">
+        {item.thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={item.thumbnailUrl}
+            alt={item.title}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+        ) : (
+          <div
+            className="flex h-full w-full items-center justify-center"
+            style={{
+              background: `linear-gradient(135deg, color-mix(in srgb, ${catColor} 12%, var(--color-surface)), color-mix(in srgb, ${catColor} 25%, var(--color-surface)))`,
+            }}
+          >
+            <Library className="h-12 w-12 opacity-20" style={{ color: catColor }} />
+          </div>
+        )}
+
+        {/* Kategori / zorluk rozetleri */}
+        <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+          <span
+            className="rounded-lg px-2.5 py-1 text-[10px] font-bold backdrop-blur-md"
+            style={{ background: `color-mix(in srgb, ${catColor} 90%, #000)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+          >
+            {cat?.label ?? item.category}
+          </span>
+          <span
+            className="rounded-lg px-2 py-1 text-[10px] font-bold backdrop-blur-md"
+            style={{ background: `color-mix(in srgb, ${diff?.color ?? '#888'} 90%, #000)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+          >
+            {diff?.label ?? item.difficulty}
+          </span>
+        </div>
+
+        {/* Kullanım rozeti */}
+        <div className="absolute top-3 right-3">
+          <div
+            className="flex items-center gap-1 rounded-full px-2.5 py-1 backdrop-blur-md"
+            style={{ background: 'rgba(255,255,255,0.95)', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+          >
+            <GraduationCap className="h-3.5 w-3.5" style={{ color: 'var(--color-success)' }} />
+            <span className="text-[10px] font-bold" style={{ color: 'var(--color-success)' }}>
+              {item.usageCount} eğitim
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* İçerik */}
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <h3 className="line-clamp-2 font-bold font-heading leading-snug" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
+          {item.title}
+        </h3>
+        {item.description && (
+          <p className="line-clamp-2 text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+            {item.description}
+          </p>
+        )}
+
+        {/* Stats */}
+        <div
+          className="flex items-center gap-3 rounded-xl px-3 py-2"
+          style={{ background: 'var(--color-bg)' }}
+        >
+          <div className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
+            <span className="text-xs font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>
+              {item.duration} dk
+            </span>
+          </div>
+          <div className="h-3 w-px" style={{ background: 'var(--color-border)' }} />
+          <div className="flex items-center gap-1.5">
+            <Star className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
+            <span className="text-xs font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
+              {item.smgPoints} SMG
+            </span>
+          </div>
+        </div>
+
+        {/* Eğitim linki */}
+        {primaryTraining && (
+          <div className="mt-auto pt-1">
+            <button
+              onClick={() => onNavigate(primaryTraining.id)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition-colors hover:bg-[var(--color-surface-hover)]"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <GraduationCap className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-primary)' }} />
+                <span className="truncate">
+                  {item.usageCount > 1
+                    ? `${primaryTraining.title} +${item.usageCount - 1}`
+                    : primaryTraining.title}
+                </span>
+              </span>
+              <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 
 // ── İçerik Yükleme Modalı ────────────────────────────────────────────────
 
@@ -1281,6 +1265,8 @@ function PlatformLibraryTab() {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [installingId, setInstallingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ContentLibraryItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   if (isLoading) return <PageLoading />
@@ -1315,6 +1301,24 @@ function PlatformLibraryTab() {
     }
   }
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
+    const target = deleteTarget
+    setDeletingId(target.id)
+    try {
+      const res = await fetch(`/api/admin/content-library/${target.id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Silme başarısız')
+      toast(json.message ?? 'İçerik silindi', 'success')
+      setDeleteTarget(null)
+      refetch()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className="space-y-5">
       {showBulkModal && (
@@ -1329,6 +1333,15 @@ function PlatformLibraryTab() {
         <UploadContentModal
           onClose={() => setShowUploadModal(false)}
           onSuccess={refetch}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          item={deleteTarget}
+          loading={deletingId === deleteTarget.id}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={handleDeleteConfirm}
         />
       )}
 
@@ -1449,6 +1462,8 @@ function PlatformLibraryTab() {
               item={item}
               onInstall={handleInstall}
               installing={installingId === item.id}
+              onDelete={setDeleteTarget}
+              deleting={deletingId === item.id}
             />
           ))}
         </div>
