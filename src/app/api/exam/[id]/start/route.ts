@@ -32,12 +32,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           endDate: true,
           examOnly: true,
           title: true,
+          isActive: true,
+          publishStatus: true,
         },
       },
     },
   })
 
   if (!assignment) return errorResponse('Eğitim atanması bulunamadı', 404)
+
+  // Arşivli eğitim: yeni sınav başlatılamaz (in-progress attempt'ler resume'a izin verilir)
+  if (!assignment.training.isActive || assignment.training.publishStatus === 'archived') {
+    return errorResponse('Bu eğitim arşivlenmiş, yeni sınav başlatılamaz.', 403)
+  }
 
   // ── Zorunlu geri bildirim kilidi ──
   // Kullanıcının başka bir eğitim için bekleyen zorunlu feedback'i varsa,
