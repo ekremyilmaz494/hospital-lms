@@ -330,8 +330,8 @@ export function FeaturedTrainingsSection() {
             </p>
           </div>
 
-          {/* Quick stats — horizontal scroll on mobile to avoid overflow */}
-          <div className="flex items-stretch gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0">
+          {/* Quick stats — mobile: 3-col grid (always visible), desktop: flex row */}
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:items-stretch sm:gap-3">
             {[
               { label: "Bu hafta tamamlanan", value: "847" },
               { label: "Aktif öğrenci", value: "218" },
@@ -339,7 +339,7 @@ export function FeaturedTrainingsSection() {
             ].map((s) => (
               <div
                 key={s.label}
-                className="flex flex-col justify-between p-4 rounded-2xl min-w-[110px] sm:min-w-[120px] flex-shrink-0"
+                className="flex flex-col justify-between p-3 sm:p-4 rounded-2xl sm:min-w-[120px] sm:flex-shrink-0"
                 style={{
                   backgroundColor: "rgba(255,255,255,0.7)",
                   border: "1px solid rgba(26,58,40,0.06)",
@@ -347,13 +347,13 @@ export function FeaturedTrainingsSection() {
                 }}
               >
                 <p
-                  className="text-[10px] font-black tracking-[0.14em] uppercase"
+                  className="text-[9px] sm:text-[10px] font-black tracking-[0.12em] sm:tracking-[0.14em] uppercase leading-tight"
                   style={{ color: "#4a7060" }}
                 >
                   {s.label}
                 </p>
                 <p
-                  className="text-2xl font-black mt-2 font-mono"
+                  className="text-xl sm:text-2xl font-black mt-2 font-mono"
                   style={{ color: "#1a3a28" }}
                 >
                   {s.value}

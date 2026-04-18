@@ -88,7 +88,7 @@ export function TrainingCatalogSection() {
             hidden: {},
             visible: { transition: { staggerChildren: shouldReduce ? 0 : 0.04 } },
           }}
-          className="flex flex-wrap gap-2.5 sm:gap-3"
+          className="flex flex-wrap justify-center sm:justify-start gap-2 sm:gap-3"
         >
           {TRAININGS.map((label) => (
             <motion.span
