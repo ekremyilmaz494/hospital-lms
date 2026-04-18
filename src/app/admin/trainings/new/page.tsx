@@ -67,6 +67,7 @@ export default function NewTrainingPage() {
   const [passingScore, setPassingScore] = useState(70);
   const [maxAttempts, setMaxAttempts] = useState(3);
   const [examDurationMinutes, setExamDurationMinutes] = useState(30);
+  const [smgPoints, setSmgPoints] = useState(10);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   // Compliance alanları
@@ -495,7 +496,7 @@ export default function NewTrainingPage() {
                   style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
                 >
                   <p className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>Sınav Ayarları</p>
-                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
                         <Target className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
@@ -516,6 +517,14 @@ export default function NewTrainingPage() {
                         <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Süre (dk)</Label>
                       </div>
                       <Input type="number" value={examDurationMinutes} onChange={(e) => setExamDurationMinutes(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Award className="h-3.5 w-3.5" style={{ color: 'var(--color-success)' }} />
+                        <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>SMG Puanı</Label>
+                      </div>
+                      <Input type="number" min={0} max={999} value={smgPoints} onChange={(e) => setSmgPoints(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
+                      <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Eğitim geçilince staff&apos;a yazılacak SMG puanı</p>
                     </div>
                   </div>
                 </div>
@@ -1455,6 +1464,7 @@ export default function NewTrainingPage() {
                       passingScore: Number(passingScore) || 70,
                       maxAttempts: Number(maxAttempts) || 3,
                       examDurationMinutes: Number(examDurationMinutes) || 30,
+                      smgPoints: Math.max(0, Math.min(999, Number(smgPoints) || 0)),
                       startDate: new Date(startDate).toISOString(),
                       endDate: new Date(endDate).toISOString(),
                       isCompulsory,

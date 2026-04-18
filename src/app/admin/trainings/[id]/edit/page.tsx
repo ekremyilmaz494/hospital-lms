@@ -20,6 +20,7 @@ interface TrainingEditData {
   maxAttempts: number;
   feedbackMandatory: boolean;
   examDurationMinutes: number;
+  smgPoints: number;
   startDate: string;
   endDate: string;
 }
@@ -47,6 +48,7 @@ export default function EditTrainingPage() {
         maxAttempts: data.maxAttempts || 3,
         feedbackMandatory: data.feedbackMandatory ?? false,
         examDurationMinutes: data.examDurationMinutes || 30,
+        smgPoints: typeof data.smgPoints === 'number' ? data.smgPoints : 10,
         startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
         endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
       });
@@ -76,6 +78,9 @@ export default function EditTrainingPage() {
     }
     if (!Number.isFinite(d.examDurationMinutes) || d.examDurationMinutes < 1 || d.examDurationMinutes > 600) {
       return 'Sınav süresi 1 ile 600 dakika arasında olmalıdır.';
+    }
+    if (!Number.isFinite(d.smgPoints) || d.smgPoints < 0 || d.smgPoints > 999) {
+      return 'SMG puanı 0 ile 999 arasında olmalıdır.';
     }
     if (d.startDate && d.endDate && new Date(d.startDate) > new Date(d.endDate)) {
       return 'Son tarih başlangıç tarihinden önce olamaz.';
@@ -172,7 +177,7 @@ export default function EditTrainingPage() {
             <h3 className="text-base font-bold">Sınav Ayarları</h3>
           </div>
 
-          <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-5 lg:grid-cols-5">
             <div>
               <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
                 <Target className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} /> Baraj Puanı
@@ -190,6 +195,12 @@ export default function EditTrainingPage() {
                 <Clock className="h-3.5 w-3.5" style={{ color: 'var(--color-error)' }} /> Süre (dk)
               </Label>
               <Input type="number" value={formData.examDurationMinutes} onChange={(e) => setFormData({ ...formData, examDurationMinutes: Number(e.target.value) })} className="h-10 rounded-xl font-mono" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                <Award className="h-3.5 w-3.5" style={{ color: 'var(--color-success)' }} /> SMG Puanı
+              </Label>
+              <Input type="number" min={0} max={999} value={formData.smgPoints} onChange={(e) => setFormData({ ...formData, smgPoints: Number(e.target.value) })} className="h-10 rounded-xl font-mono" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
             </div>
             <div>
               <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
