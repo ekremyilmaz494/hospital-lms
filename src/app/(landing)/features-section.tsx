@@ -218,33 +218,34 @@ export function FeaturesSection() {
         >
           <div>
             <p
-              className="text-[10px] sm:text-xs font-black tracking-[0.22em] uppercase mb-3"
+              className="text-[10px] sm:text-xs font-extrabold tracking-[0.18em] uppercase mb-3"
               style={{ color: "var(--brand-600)" }}
             >
-              Platform Özellikleri
+              Platform Modülleri
             </p>
             <h2
-              className="text-2xl sm:text-3xl md:text-4xl xl:text-[2.75rem] font-black leading-[1.05] tracking-tight"
-              style={{ color: "#1a3a28", maxWidth: 720 }}
+              className="text-2xl sm:text-3xl md:text-4xl xl:text-[2.75rem] font-extrabold leading-[1.05]"
+              style={{ color: "#1a3a28", maxWidth: 740, letterSpacing: "-0.025em" }}
             >
-              Neden Devakent?{" "}
-              <span style={{ color: "var(--brand-600)" }}>Altı yüzü, bir arada.</span>
+              Bir platform,{" "}
+              <span style={{ color: "var(--brand-600)" }}>çoklu modül.</span>
             </h2>
-            <p className="mt-3 sm:mt-4 text-sm sm:text-base leading-relaxed max-w-[500px]" style={{ color: "#4a7060" }}>
-              Personel eğitiminin yaşam döngüsü — atama, izleme, sınav, sertifika,
-              bildirim, güvenlik — hepsini tek platform üstlenir.
+            <p className="mt-3 sm:mt-4 text-sm sm:text-base leading-relaxed max-w-[520px]" style={{ color: "#3d5e51" }}>
+              Personel eğitiminin yaşam döngüsü — atama, video izleme, sınav,
+              sertifika, bildirim ve güvenlik — hepsi tek altyapı üstünde,
+              gerçek zamanlı senkron çalışır.
             </p>
           </div>
 
           <div
-            className="flex items-center gap-2 text-[11px] font-black tracking-[0.2em] uppercase"
-            style={{ color: "#4a7060" }}
+            className="flex items-center gap-2 text-[11px] font-extrabold tracking-[0.18em] uppercase"
+            style={{ color: "#3d5e51" }}
           >
             <span
               className="w-1.5 h-1.5 rounded-full animate-pulse"
               style={{ backgroundColor: "var(--brand-600)" }}
             />
-            Bir kategoriye tıkla
+            Bir modüle tıkla
           </div>
         </motion.div>
 
@@ -480,6 +481,53 @@ export function FeaturesSection() {
             </AnimatePresence>
           </div>
         </div>
+
+        {/* "Yakında" yol haritası */}
+        <motion.div
+          initial={{ opacity: 0, y: shouldReduce ? 0 : 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.6, ease: EASE }}
+          className="mt-10 sm:mt-12 rounded-3xl p-6 sm:p-7 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 md:gap-8"
+          style={{
+            backgroundColor: "rgba(255,255,255,0.55)",
+            border: "1px solid rgba(26,58,40,0.08)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div className="min-w-0">
+            <p
+              className="text-[10px] sm:text-xs font-extrabold tracking-[0.18em] uppercase mb-2"
+              style={{ color: "#b45309" }}
+            >
+              Yol Haritası — Yakında
+            </p>
+            <p
+              className="text-base sm:text-lg font-bold leading-snug"
+              style={{ color: "#1a3a28", letterSpacing: "-0.01em" }}
+            >
+              Eğitim ilk modül. İK yönetimi, kalite uyum, denetim
+              hazırlığı ve hasta operasyonları yolda.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 md:flex-shrink-0">
+            {["İK Yönetimi", "Kalite Uyum", "Denetim", "Hasta Ops."].map(
+              (item) => (
+                <span
+                  key={item}
+                  className="px-3 py-1.5 rounded-full text-[11px] font-bold tracking-[0.06em]"
+                  style={{
+                    backgroundColor: "rgba(180,83,9,0.1)",
+                    color: "#b45309",
+                    border: "1px solid rgba(180,83,9,0.25)",
+                  }}
+                >
+                  {item}
+                </span>
+              )
+            )}
+          </div>
+        </motion.div>
       </div>
     </section>
   );

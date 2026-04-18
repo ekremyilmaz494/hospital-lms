@@ -14,7 +14,7 @@ export function CtaSection() {
   const disable3D = shouldReduce || isMobile;
 
   return (
-    <section id="guvenlik" className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
       <motion.div
         initial={{ opacity: 0, y: shouldReduce ? 0 : 40 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -130,10 +130,10 @@ export function CtaSection() {
                 <CheckCircle className="w-4 h-4 text-white" strokeWidth={2.5} />
               </div>
               <div className="leading-tight">
-                <p className="text-[10px] font-black tracking-[0.18em] uppercase" style={{ color: "#6dba92" }}>
-                  Aktif Oturum
+                <p className="text-[10px] font-extrabold tracking-[0.16em] uppercase" style={{ color: "#6dba92" }}>
+                  Realtime
                 </p>
-                <p className="text-sm font-black text-white font-mono">218 personel</p>
+                <p className="text-sm font-extrabold text-white">Anlık senkron</p>
               </div>
             </motion.div>
 
@@ -151,11 +151,11 @@ export function CtaSection() {
               }}
             >
               <div className="leading-tight">
-                <p className="text-[10px] font-black tracking-[0.18em] uppercase" style={{ color: "#78350f" }}>
-                  Bu Hafta
+                <p className="text-[10px] font-extrabold tracking-[0.16em] uppercase" style={{ color: "#78350f" }}>
+                  Otomatik
                 </p>
-                <p className="text-sm font-black font-mono" style={{ color: "#1a3a28" }}>
-                  +96 sertifika
+                <p className="text-sm font-extrabold" style={{ color: "#1a3a28" }}>
+                  Sertifika + QR
                 </p>
               </div>
               <span
@@ -188,11 +188,11 @@ export function CtaSection() {
                   </svg>
                 ))}
               </span>
-              <span className="text-[11px] font-black" style={{ color: "#1a3a28" }}>
-                4.9
+              <span className="text-[11px] font-extrabold" style={{ color: "#1a3a28" }}>
+                Beta
               </span>
-              <span className="text-[10px]" style={{ color: "#4a7060" }}>
-                / 500+
+              <span className="text-[10px]" style={{ color: "#3d5e51" }}>
+                erken erişim
               </span>
             </motion.div>
           </div>
@@ -224,38 +224,41 @@ export function CtaSection() {
             className="relative"
           >
             <p
-              className="text-xs font-black tracking-[0.22em] uppercase mb-4"
+              className="text-xs font-extrabold tracking-[0.18em] uppercase mb-4"
               style={{ color: "#6dba92" }}
             >
-              — İhtiyacınız Olan Her Şey
+              — Tek Sözleşme, Tüm Operasyon
             </p>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white leading-[1.05] tracking-tight mb-4 sm:mb-5">
-              Sağlıklı Personel,
+            <h2
+              className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-[1.05] mb-4 sm:mb-5"
+              style={{ letterSpacing: "-0.025em" }}
+            >
+              Eğitimden uyuma,
               <br />
-              <span style={{ color: "var(--brand-600)" }}>Güçlü Hastane.</span>
+              <span style={{ color: "var(--brand-600)" }}>tek panelden yönetin.</span>
             </h2>
             <p
-              className="text-[15px] leading-relaxed mb-8 max-w-[440px]"
+              className="text-[15px] leading-relaxed mb-8 max-w-[460px]"
               style={{ color: "#a7f3d0" }}
             >
-              Atama, izleme, sınav, sertifika ve raporlama — hastane eğitim
-              döngüsünün tamamı tek platformda.
+              Atama, video izleme, sınav, sertifika doğrulama ve raporlama —
+              sağlık kurumunuzun eğitim döngüsü tek platformda, gerçek zamanlı.
             </p>
 
             {/* Feature bullets */}
             <ul className="space-y-2.5 mb-8">
               {[
-                "7/24 kesintisiz erişim",
-                "KVKK & GDPR uyumlu güvenli altyapı",
-                "Otomatik sertifika & QR doğrulama",
+                "Multi-tenant izolasyon — her kurum kendi alanında",
+                "KVKK uyumlu altyapı, RLS ile satır seviyesinde güvenlik",
+                "QR doğrulamalı sertifika, denetime hazır audit log",
               ].map((item) => (
                 <li
                   key={item}
-                  className="flex items-center gap-2.5 text-[14px]"
+                  className="flex items-start gap-2.5 text-[14px] leading-snug"
                   style={{ color: "#a7f3d0" }}
                 >
                   <CheckCircle
-                    className="w-4 h-4 flex-shrink-0"
+                    className="w-4 h-4 flex-shrink-0 mt-0.5"
                     style={{ color: "var(--brand-600)" }}
                     strokeWidth={2.5}
                   />
@@ -267,21 +270,21 @@ export function CtaSection() {
             <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4">
               <Link
                 href="/auth/login"
-                className="inline-flex items-center justify-center gap-2 px-7 h-12 sm:h-auto sm:py-3.5 rounded-full text-sm font-black uppercase tracking-[0.08em] transition-transform hover:scale-105"
+                className="inline-flex items-center justify-center gap-2 px-7 h-12 sm:h-auto sm:py-3.5 rounded-full text-sm font-bold uppercase tracking-[0.12em] transition-transform hover:scale-105"
                 style={{
                   backgroundColor: "#f59e0b",
                   color: "#1a3a28",
                   boxShadow: "0 12px 32px rgba(245,158,11,0.35)",
                 }}
               >
-                Hemen Başlayın <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
+                Demo Talep Et <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
               </Link>
               <Link
-                href="#ozellikler"
-                className="inline-flex items-center justify-center sm:justify-start gap-2 text-xs font-black tracking-[0.14em] uppercase transition-opacity hover:opacity-70 h-12 sm:h-auto"
+                href="#sss"
+                className="inline-flex items-center justify-center sm:justify-start gap-2 text-xs font-bold tracking-[0.14em] uppercase transition-opacity hover:opacity-70 h-12 sm:h-auto"
                 style={{ color: "#a7f3d0" }}
               >
-                Özelliklere Göz At
+                Sıkça Sorulanlar
                 <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
               </Link>
             </div>
