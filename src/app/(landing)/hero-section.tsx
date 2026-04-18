@@ -8,11 +8,11 @@ import {
   ChevronRight,
   ArrowRight,
   Play,
-  Star,
   Menu,
   X,
 } from "lucide-react";
 import { useMobile } from "@/hooks/use-mobile";
+import { LogoMark, KLINOVA_COLORS } from "@/components/brand";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -41,9 +41,9 @@ function HeroVisualFallback() {
 }
 
 const NAV_ITEMS = [
-  { label: "Hakkında", href: "#hakkinda" },
-  { label: "Özellikler", href: "#ozellikler" },
-  { label: "Güvenlik", href: "#guvenlik" },
+  { label: "Platform", href: "#platform" },
+  { label: "Modüller", href: "#ozellikler" },
+  { label: "Eğitim Kataloğu", href: "#katalog" },
   { label: "SSS", href: "#sss" },
 ] as const;
 
@@ -105,22 +105,42 @@ export function HeroSection() {
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-            <div
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-white font-black text-base sm:text-lg flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, var(--brand-600), #1a3a28)" }}
-            >
-              D
-            </div>
+          <Link href="/" className="flex items-center gap-3 sm:gap-3.5 min-w-0">
+            <LogoMark
+              size={48}
+              variant="transparent"
+              animated
+              className="flex-shrink-0"
+            />
             <div className="leading-none min-w-0">
-              <p className="font-bold text-sm sm:text-base truncate" style={{ color: "#1a3a28" }}>
-                Devakent Hastanesi
+              <p
+                className="truncate text-[20px] sm:text-[24px]"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 700,
+                  letterSpacing: "-0.04em",
+                  color: KLINOVA_COLORS.slate,
+                  lineHeight: 1.05,
+                }}
+              >
+                <span style={{ fontWeight: 800 }}>Klin</span>
+                <span style={{ fontWeight: 500, color: KLINOVA_COLORS.cyanDeep }}>
+                  ova
+                </span>
               </p>
               <p
-                className="hidden sm:block text-[10px] font-bold tracking-widest uppercase truncate"
-                style={{ color: "var(--brand-600)" }}
+                className="hidden sm:block text-[11px] truncate"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 600,
+                  letterSpacing: "0.22em",
+                  textTransform: "uppercase",
+                  color: KLINOVA_COLORS.indigoDeep,
+                  marginTop: 4,
+                  opacity: 0.75,
+                }}
               >
-                Eğitim Platformu
+                Operasyon Platformu
               </p>
             </div>
           </Link>
@@ -144,16 +164,16 @@ export function HeroSection() {
               className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105"
               style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
             >
-              Giriş Yap <ChevronRight className="w-4 h-4" />
+              Demo Talep Et <ChevronRight className="w-4 h-4" />
             </Link>
 
             {/* Mobile compact login */}
             <Link
               href="/auth/login"
-              className="sm:hidden inline-flex items-center justify-center rounded-full text-xs font-black uppercase tracking-wide px-4 h-11"
+              className="sm:hidden inline-flex items-center justify-center rounded-full text-xs font-bold uppercase tracking-[0.12em] px-4 h-11"
               style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
             >
-              Giriş
+              Demo
             </Link>
 
             {/* Mobile hamburger */}
@@ -207,7 +227,7 @@ export function HeroSection() {
                 style={{ borderColor: "rgba(26,58,40,0.08)" }}
               >
                 <span
-                  className="text-xs font-black tracking-[0.2em] uppercase"
+                  className="text-xs font-extrabold tracking-[0.18em] uppercase"
                   style={{ color: "var(--brand-600)" }}
                 >
                   Menü
@@ -236,7 +256,7 @@ export function HeroSection() {
                       <a
                         href={href}
                         onClick={() => setMenuOpen(false)}
-                        className="flex items-center justify-between px-4 py-4 rounded-2xl text-lg font-black transition-colors"
+                        className="flex items-center justify-between px-4 py-4 rounded-2xl text-lg font-extrabold transition-colors"
                         style={{ color: "#1a3a28" }}
                       >
                         {label}
@@ -258,20 +278,20 @@ export function HeroSection() {
                 <Link
                   href="/auth/login"
                   onClick={() => setMenuOpen(false)}
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 h-12 rounded-full text-sm font-black uppercase tracking-wide"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 h-12 rounded-full text-sm font-bold uppercase tracking-[0.12em]"
                   style={{
                     backgroundColor: "#f59e0b",
                     color: "#1a3a28",
                     boxShadow: "0 8px 24px rgba(245,158,11,0.35)",
                   }}
                 >
-                  Eğitimlere Başla <ArrowRight className="w-4 h-4" />
+                  Demo Talep Et <ArrowRight className="w-4 h-4" />
                 </Link>
                 <p
                   className="text-[11px] text-center mt-3"
-                  style={{ color: "#4a7060" }}
+                  style={{ color: "#3d5e51" }}
                 >
-                  500+ hastanenin güvendiği platform
+                  Beta dönemine özel: ilk kurumlara erken erişim
                 </p>
               </div>
             </motion.aside>
@@ -289,14 +309,14 @@ export function HeroSection() {
             initial="hidden"
             animate="visible"
             variants={textVariants}
-            className="inline-flex items-center gap-2 text-[10px] sm:text-xs font-bold tracking-[0.18em] sm:tracking-[0.2em] uppercase px-3 sm:px-4 py-1.5 rounded-full border mb-5 sm:mb-7"
+            className="inline-flex items-center gap-2 text-[10px] sm:text-xs font-bold tracking-[0.16em] sm:tracking-[0.18em] uppercase px-3 sm:px-4 py-1.5 rounded-full border mb-5 sm:mb-7"
             style={{ color: "var(--brand-600)", borderColor: "var(--brand-600)" }}
           >
             <span
               className="w-1.5 h-1.5 rounded-full"
               style={{ backgroundColor: "var(--brand-600)" }}
             />
-            Personel Eğitim Platformu
+            Sağlık Kurumları için Operasyon Platformu
           </motion.span>
 
           <motion.h1
@@ -304,19 +324,19 @@ export function HeroSection() {
             initial="hidden"
             animate="visible"
             variants={textVariants}
-            className="text-[2.25rem] sm:text-[2.75rem] xl:text-[3.5rem] font-black leading-[1.0] mb-5 sm:mb-6 tracking-tight"
-            style={{ color: "#1a3a28" }}
+            className="text-[2.25rem] sm:text-[2.75rem] xl:text-[3.5rem] font-extrabold leading-[1.05] mb-5 sm:mb-6"
+            style={{ color: "#1a3a28", letterSpacing: "-0.025em" }}
           >
+            Hastane{" "}
             <span
-              className="inline-block border-[3px] border-current px-2 mr-2 mb-1 align-middle"
+              className="inline-block border-[3px] border-current px-2 mr-1 mb-1 align-middle"
               style={{ borderColor: "#1a3a28" }}
             >
-              Eğitimi
+              operasyonunuz
             </span>
-            Yönet,
+            ,
             <br />
-            Başarıyı{" "}
-            <span style={{ color: "var(--brand-600)" }}>Ölç.</span>
+            <span style={{ color: "var(--brand-600)" }}>tek platformda.</span>
           </motion.h1>
 
           <motion.p
@@ -324,11 +344,11 @@ export function HeroSection() {
             initial="hidden"
             animate="visible"
             variants={textVariants}
-            className="text-base sm:text-base leading-relaxed max-w-[400px] mb-8 sm:mb-10"
-            style={{ color: "#4a7060" }}
+            className="text-base sm:text-[17px] leading-relaxed max-w-[460px] mb-8 sm:mb-10"
+            style={{ color: "#3d5e51" }}
           >
-            Hastane personellerinize video tabanlı eğitimler atayın, sınav
-            yapın ve performansı gerçek zamanlı takip edin.
+            Personel eğitiminden sertifika doğrulamaya, sınav yönetiminden
+            KVKK uyumuna — sağlık kurumlarınız için uçtan uca otomasyon.
           </motion.p>
 
           <motion.div
@@ -340,17 +360,17 @@ export function HeroSection() {
           >
             <Link
               href="/auth/login"
-              className="inline-flex items-center justify-center gap-2 px-7 h-12 sm:h-auto sm:py-3.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105 shadow-lg"
+              className="inline-flex items-center justify-center gap-2 px-7 h-12 sm:h-auto sm:py-3.5 rounded-full text-sm font-bold uppercase tracking-[0.12em] transition-transform hover:scale-105 shadow-lg"
               style={{
                 backgroundColor: "#f59e0b",
                 color: "#1a3a28",
                 boxShadow: "0 8px 32px rgba(245,158,11,0.35)",
               }}
             >
-              Eğitimlere Başla <ArrowRight className="w-4 h-4" />
+              Demo Talep Et <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              href="/auth/login"
+              href="#ozellikler"
               className="inline-flex items-center justify-center gap-2 text-sm font-semibold transition-opacity hover:opacity-60 h-12 sm:h-auto"
               style={{ color: "#1a3a28" }}
             >
@@ -360,7 +380,7 @@ export function HeroSection() {
               >
                 <Play className="w-3 h-3 ml-0.5" />
               </div>
-              Demo İzle
+              Modülleri İncele
             </Link>
           </motion.div>
 
@@ -371,32 +391,41 @@ export function HeroSection() {
             variants={textVariants}
             className="flex items-center gap-4"
           >
-            <div className="flex -space-x-2.5">
-              {(
-                [
-                  { bg: "var(--brand-600)", letter: "A" },
-                  { bg: "#1a3a28", letter: "M" },
-                  { bg: "#b45309", letter: "F" },
-                  { bg: "var(--brand-600)", letter: "K" },
-                ] as const
-              ).map(({ bg, letter }) => (
-                <div
-                  key={letter}
-                  className="w-9 h-9 rounded-full border-[2.5px] flex items-center justify-center text-white text-xs font-bold"
-                  style={{ backgroundColor: bg, borderColor: "#f5f0e6" }}
-                >
-                  {letter}
-                </div>
-              ))}
+            <div
+              className="flex items-center gap-2 px-3.5 py-2 rounded-full"
+              style={{
+                backgroundColor: "rgba(13,150,104,0.08)",
+                border: "1px solid rgba(13,150,104,0.25)",
+              }}
+            >
+              <span
+                className="relative inline-flex w-2 h-2 rounded-full"
+                style={{ backgroundColor: "#0d9668" }}
+              >
+                <span
+                  className="absolute inset-0 rounded-full animate-ping"
+                  style={{ backgroundColor: "#0d9668", opacity: 0.5 }}
+                />
+              </span>
+              <span
+                className="text-[11px] font-bold tracking-[0.12em] uppercase"
+                style={{ color: "var(--brand-600)" }}
+              >
+                Beta
+              </span>
             </div>
             <div>
-              <div className="flex items-center gap-0.5 mb-0.5">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-3.5 h-3.5 fill-[#f59e0b] text-[#f59e0b]" />
-                ))}
-              </div>
-              <p className="text-xs font-medium" style={{ color: "#4a7060" }}>
-                500+ aktif kullanıcı tarafından güveniliyor
+              <p
+                className="text-sm font-bold leading-tight"
+                style={{ color: "#1a3a28" }}
+              >
+                Erken erişim programı açık
+              </p>
+              <p
+                className="text-xs leading-tight mt-0.5"
+                style={{ color: "#3d5e51" }}
+              >
+                İlk kurumlara özel avantajlarla katılın
               </p>
             </div>
           </motion.div>

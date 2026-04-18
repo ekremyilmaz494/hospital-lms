@@ -79,19 +79,59 @@ export const HeroComposition: React.FC = () => {
             top: "50%",
             transform: `translate(-50%, -50%) scale(${logoScale})`,
             opacity: logoOpacity,
-            width: 80,
-            height: 80,
-            borderRadius: 20,
-            background: `linear-gradient(135deg, ${BRAND}, ${DARK})`,
+            width: 110,
+            height: 110,
+            borderRadius: 26,
+            background: "linear-gradient(135deg, #6366F1 0%, #06B6D4 100%)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 44,
-            fontWeight: 900,
-            color: "white",
+            boxShadow: "0 20px 50px rgba(99,102,241,0.45)",
           }}
         >
-          D
+          <svg viewBox="0 0 64 64" width={78} height={78} style={{ overflow: "visible" }}>
+            <defs>
+              <radialGradient id="hero-klinova-glow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#67E8F9" stopOpacity="0.55" />
+                <stop offset="100%" stopColor="#67E8F9" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+
+            <path
+              d="M 8 34 L 20 34 L 23 28 L 26 40 L 30 12 L 34 52 L 38 28 L 42 34 L 56 34"
+              fill="none"
+              stroke="white"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.92"
+            />
+
+            <circle cx="30" cy="12" r="10" fill="url(#hero-klinova-glow)" />
+            <path
+              d="M 30 5 L 31.6 10.4 L 37 12 L 31.6 13.6 L 30 19 L 28.4 13.6 L 23 12 L 28.4 10.4 Z"
+              fill="white"
+            />
+            <circle cx="30" cy="12" r="1.6" fill="white" />
+          </svg>
+        </div>
+
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: `translate(-50%, calc(-50% + 92px)) scale(${logoScale})`,
+            opacity: logoOpacity,
+            fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+            fontSize: 26,
+            letterSpacing: "-0.035em",
+            lineHeight: 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span style={{ fontWeight: 800, color: "white" }}>Klin</span>
+          <span style={{ fontWeight: 500, color: "#67E8F9" }}>ova</span>
         </div>
 
         <DashboardCard

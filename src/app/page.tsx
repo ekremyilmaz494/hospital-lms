@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { HeroSection } from "./(landing)/hero-section";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Devakent Hastanesi - Personel Egitim ve Sinav Yonetim Sistemi",
-  description:
-    "Hastane personeli icin video tabanli egitim, sinav, sertifika ve akreditasyon yonetim platformu. 500+ hastane tarafindan tercih ediliyor.",
+  title: `${BRAND.name} — ${BRAND.shortDesc}`,
+  description: BRAND.longDesc,
   openGraph: {
-    title: "Devakent Hastanesi - Personel Egitim ve Sinav Yonetim Sistemi",
-    description:
-      "Hastane personelinizi egitimler, sinavlar ve sertifikalarla yonetin. KVKK uyumlu, 7/24 erisim.",
+    title: `${BRAND.name} — ${BRAND.shortDesc}`,
+    description: BRAND.longDesc,
     type: "website",
     locale: "tr_TR",
   },
@@ -35,8 +34,18 @@ const FeaturesSection = dynamic(() =>
   import("./(landing)/features-section").then((m) => ({ default: m.FeaturesSection }))
 );
 
+const TrainingCatalogSection = dynamic(() =>
+  import("./(landing)/training-catalog-section").then((m) => ({
+    default: m.TrainingCatalogSection,
+  }))
+);
+
 const CtaSection = dynamic(() =>
   import("./(landing)/cta-section").then((m) => ({ default: m.CtaSection }))
+);
+
+const FaqSection = dynamic(() =>
+  import("./(landing)/faq-section").then((m) => ({ default: m.FaqSection }))
 );
 
 const TestimonialsSection = dynamic(() =>
@@ -51,7 +60,9 @@ export default function LandingPage() {
       <StatsSection />
       <FeaturedTrainingsSection />
       <FeaturesSection />
+      <TrainingCatalogSection />
       <CtaSection />
+      <FaqSection />
       <TestimonialsSection />
     </div>
   );

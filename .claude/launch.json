@@ -12,6 +12,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["db:studio"],
       "port": 5555
+    },
+    {
+      "name": "Remotion Verify",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["exec", "remotion", "studio", "src/remotion/index.ts", "--port", "3002", "--no-open"],
+      "port": 3002
     }
   ]
 }

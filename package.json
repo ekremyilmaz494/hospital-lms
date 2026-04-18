@@ -28,7 +28,11 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "test:load": "k6 run scripts/load-test.js",
     "verify:backup": "node scripts/verify-backup.js",
-    "remotion:studio": "remotion studio src/remotion/index.ts"
+    "remotion:studio": "remotion studio src/remotion/index.ts --port 3001",
+    "brand:reveal": "remotion render src/remotion/index.ts KlinovaLogoReveal public/brand/klinova-reveal.mp4",
+    "brand:splash": "remotion render src/remotion/index.ts KlinovaSplash public/brand/klinova-splash.mp4",
+    "brand:intro": "remotion render src/remotion/index.ts KlinovaIntro public/brand/klinova-intro.mp4",
+    "brand:splash-png": "remotion still src/remotion/index.ts KlinovaSplash public/brand/klinova-splash.png --frame=30"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
