@@ -227,10 +227,34 @@ CREATE POLICY "admin_question_bank_options_all" ON question_bank_options FOR ALL
   ));
 
 -- ACCREDITATION STANDARDS
+-- Super admin: tam erişim.
+-- Admin: globalleri (organization_id IS NULL) okur; kendi kurumunun standartlarını CRUD eder.
 CREATE POLICY "super_admin_accreditation_standards_all" ON accreditation_standards
   FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+
 CREATE POLICY "admin_accreditation_standards_select" ON accreditation_standards
-  FOR SELECT USING (true);
+  FOR SELECT USING (
+    organization_id IS NULL
+    OR organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
+
+CREATE POLICY "admin_accreditation_standards_insert" ON accreditation_standards
+  FOR INSERT WITH CHECK (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
+
+CREATE POLICY "admin_accreditation_standards_update" ON accreditation_standards
+  FOR UPDATE USING (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
+
+CREATE POLICY "admin_accreditation_standards_delete" ON accreditation_standards
+  FOR DELETE USING (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
 
 -- ACCREDITATION REPORTS
 CREATE POLICY "super_admin_accreditation_reports_all" ON accreditation_reports

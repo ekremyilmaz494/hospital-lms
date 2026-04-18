@@ -51,9 +51,17 @@ export async function generateAccreditationReport(params: {
 }): Promise<AccreditationReportData> {
   const { organizationId, standardBody, periodStart, periodEnd, generatedBy } = params
 
-  // a) Bu standart için aktif standartları getir
+  // a) Bu standart için aktif standartları getir:
+  // global (organizationId=null) + bu kuruma özel standartlar
   const standards = await prisma.accreditationStandard.findMany({
-    where: { standardBody, isActive: true },
+    where: {
+      standardBody,
+      isActive: true,
+      OR: [
+        { organizationId: null },
+        { organizationId },
+      ],
+    },
     orderBy: { code: 'asc' },
   })
 

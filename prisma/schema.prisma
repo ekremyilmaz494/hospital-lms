@@ -96,6 +96,7 @@ model Organization {
   competencyForms        CompetencyForm[]
   syncLogs               SyncLog[]
   accreditationReports   AccreditationReport[]
+  accreditationStandards AccreditationStandard[]     @relation("OrgAccreditationStandards")
   trainingCategories     TrainingCategory[]
   questionBank           QuestionBank[]
   // AI İçerik Stüdyosu
@@ -258,6 +259,7 @@ model User {
   evaluatorEvaluations    CompetencyEvaluation[]       @relation("EvaluationEvaluator")
   pushSubscriptions       PushSubscription[]
   accreditationReports    AccreditationReport[]
+  createdAccreditationStandards AccreditationStandard[] @relation("AccreditationStandardCreator")
   // AI İçerik Stüdyosu
   aiGenerations           AiGeneration[]               @relation("UserAiGenerations")
   aiEvaluations           AiGeneration[]               @relation("AiEvaluator")
@@ -969,19 +971,34 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
-// ── AKREDİTASYON STANDARTLARI (global — organizasyona bağlı değil) ──
+// ── AKREDİTASYON STANDARTLARI ──
+//
+// `organizationId` NULL ise: global (resmi JCI/ISO/TJC/OSHA standartları —
+// seed ile yüklenir, admin düzenleyemez).
+// `organizationId` dolu ise: o hastaneye özel ek standart — hospital admin
+// kendisi oluşturur/düzenler/siler.
+//
+// Uniqueness: (code, organization_id) — aynı kod birden fazla hastanede
+// kullanılabilir ama bir hastane içinde tekil.
 model AccreditationStandard {
-  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code                       String   @unique @db.VarChar(50)
-  title                      String   @db.VarChar(500)
-  description                String?  @db.Text
-  standardBody               String   @map("standard_body") @db.VarChar(20)
-  requiredTrainingCategories Json     @default("[]") @map("required_training_categories")
-  requiredCompletionRate     Int      @default(80) @map("required_completion_rate")
-  isActive                   Boolean  @default(true) @map("is_active")
-  createdAt                  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                       String        @db.VarChar(50)
+  title                      String        @db.VarChar(500)
+  description                String?       @db.Text
+  standardBody               String        @map("standard_body") @db.VarChar(20)
+  requiredTrainingCategories Json          @default("[]") @map("required_training_categories")
+  requiredCompletionRate     Int           @default(80) @map("required_completion_rate")
+  isActive                   Boolean       @default(true) @map("is_active")
+  organizationId             String?       @map("organization_id") @db.Uuid
+  createdById                String?       @map("created_by") @db.Uuid
+  createdAt                  DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                  DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization? @relation("OrgAccreditationStandards", fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?         @relation("AccreditationStandardCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([standardBody], map: "idx_accreditation_standards_body")
+  @@index([organizationId], map: "idx_accreditation_standards_org")
   @@map("accreditation_standards")
 }
 
