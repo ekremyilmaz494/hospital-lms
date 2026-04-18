@@ -391,29 +391,6 @@ export function HeroSection() {
             variants={textVariants}
             className="flex items-center gap-4"
           >
-            <div
-              className="flex items-center gap-2 px-3.5 py-2 rounded-full"
-              style={{
-                backgroundColor: "rgba(13,150,104,0.08)",
-                border: "1px solid rgba(13,150,104,0.25)",
-              }}
-            >
-              <span
-                className="relative inline-flex w-2 h-2 rounded-full"
-                style={{ backgroundColor: "#0d9668" }}
-              >
-                <span
-                  className="absolute inset-0 rounded-full animate-ping"
-                  style={{ backgroundColor: "#0d9668", opacity: 0.5 }}
-                />
-              </span>
-              <span
-                className="text-[11px] font-bold tracking-[0.12em] uppercase"
-                style={{ color: "var(--brand-600)" }}
-              >
-                Beta
-              </span>
-            </div>
             <div>
               <p
                 className="text-sm font-bold leading-tight"
