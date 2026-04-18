@@ -100,6 +100,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     maxAttempts: training.maxAttempts,
     feedbackMandatory: training.feedbackMandatory,
     examDurationMinutes: training.examDurationMinutes,
+    smgPoints: training.smgPoints,
     startDate: training.startDate,
     endDate: training.endDate,
     isActive: training.isActive,

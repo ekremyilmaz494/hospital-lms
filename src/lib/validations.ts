@@ -95,6 +95,7 @@ const trainingBaseSchema = z.object({
   maxAttempts: z.coerce.number().int().min(1).max(10).default(3),
   feedbackMandatory: z.coerce.boolean().default(false),
   examDurationMinutes: z.coerce.number().int().min(1).max(180).default(30),
+  smgPoints: z.coerce.number().int().min(0).max(999).default(10),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   // G5.4 — Training state machine
