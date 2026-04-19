@@ -605,7 +605,7 @@ export default function NewTrainingPage() {
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <Label className="text-xs font-medium mb-2 block" style={{ color: 'var(--color-text-muted)' }}>Yenileme Süresi (Ay)</Label>
+                      <Label className="text-xs font-medium mb-2 block" style={{ color: 'var(--color-text-muted)' }}>Sertifika Yenileme Süresi (Ay)</Label>
                       <Input
                         type="number"
                         min={1}
