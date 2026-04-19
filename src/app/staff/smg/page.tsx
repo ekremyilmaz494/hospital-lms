@@ -162,9 +162,17 @@ export default function StaffSmgPage() {
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
               </div>
             )}
-            <Button onClick={() => setModalOpen(true)} size="sm" className="gap-1.5 rounded-xl w-full sm:w-auto min-h-[44px] sm:min-h-0">
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl w-full sm:w-auto min-h-11 sm:min-h-0 px-4 py-2 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-shadow"
+              style={{
+                background: 'var(--color-primary)',
+                border: '1px solid var(--color-primary-hover)',
+              }}
+            >
               <Plus className="h-4 w-4" /> Aktivite Ekle
-            </Button>
+            </button>
           </div>
         </div>
       </BlurFade>

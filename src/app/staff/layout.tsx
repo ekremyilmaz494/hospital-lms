@@ -94,8 +94,11 @@ export default function StaffLayout({
 
         {/* Ana içerik: masaüstünde sidebar durumuna göre kayar, mobilde sabit */}
         <main
-          className="min-h-screen pb-16 md:pb-0"
-          style={{ marginLeft: isMobile ? 0 : 72 }}
+          className="min-h-screen md:pb-0"
+          style={{
+            marginLeft: isMobile ? 0 : 72,
+            paddingBottom: isMobile ? 'calc(64px + env(safe-area-inset-bottom) + 1rem)' : undefined,
+          }}
         >
           <ImpersonationBanner />
           <AppTopbar

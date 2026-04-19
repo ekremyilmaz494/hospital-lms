@@ -47,7 +47,7 @@ export default function StaffEvaluationsPage() {
         <div className="rounded-2xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
           <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
             <Clock className="h-4 w-4" style={{ color: 'var(--color-warning)' }} />
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Bekleyen Değerlendirmelerim</h2>
+            <h2 className="font-semibold" style={{ color: 'var(--color-text)', fontSize: '0.875rem', lineHeight: 1.4 }}>Bekleyen Değerlendirmelerim</h2>
             {pending.length > 0 && (
               <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>{pending.length}</span>
             )}
@@ -86,7 +86,7 @@ export default function StaffEvaluationsPage() {
         <div className="rounded-2xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
           <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
             <Award className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Hakkımdaki Değerlendirmeler</h2>
+            <h2 className="font-semibold" style={{ color: 'var(--color-text)', fontSize: '0.875rem', lineHeight: 1.4 }}>Hakkımdaki Değerlendirmeler</h2>
           </div>
           {mySubjectEvals.length === 0 ? (
             <div className="py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz hakkınızda bir değerlendirme başlatılmadı.</div>

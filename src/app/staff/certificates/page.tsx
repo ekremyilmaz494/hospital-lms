@@ -359,15 +359,15 @@ export default function StaffCertificatesPage() {
         </div>
       ) : (
         <div
-          className="flex flex-col items-center justify-center rounded-2xl border py-20"
+          className="flex flex-col items-center justify-center rounded-2xl border py-16 px-6 text-center"
           style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
         >
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl mb-4" style={{ background: 'var(--color-bg)' }}>
             <Award className="h-7 w-7" style={{ color: 'var(--color-text-muted)' }} />
           </div>
-          <p className="text-[14px] font-semibold mb-1">Eğitimleri başarıyla tamamladığınızda sertifikalarınız burada görünecek.</p>
-          <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
-            Eğitimleri tamamladığınızda sertifikalarınız burada görünecek
+          <p className="text-[14px] font-semibold mb-1 max-w-xs">Henüz sertifikanız yok</p>
+          <p className="text-[12px] max-w-xs" style={{ color: 'var(--color-text-muted)' }}>
+            Eğitimleri başarıyla tamamladığınızda sertifikalarınız burada görünecek.
           </p>
         </div>
       )}
