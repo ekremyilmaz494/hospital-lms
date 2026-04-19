@@ -5699,4 +5699,79 @@ DIRECT_URL screenshot'ında password (`14521452Aa.14521452`) açıkça görünü
 
 ---
 
-*Son güncelleme: 17 Nisan 2026 — Oturum 50*
+## OTURUM 51 — 19 NİSAN 2026: SMS MFA (NETGSM) ENTEGRASYONU
+
+### Motivasyon
+Hedef hastanenin bilişim departmanı giriş güvenliği için **SMS ile iki faktörlü doğrulama** istedi. Mevcut MFA altyapısı Supabase Auth'un native TOTP'si — SMS factor desteklemiyor. Çözüm: TOTP'nin yanına paralel bir SMS MFA katmanı kurmak, hastane admin'inin org seviyesinde aç/kapat edebileceği bir toggle sağlamak.
+
+### Kararlar
+- **Sağlayıcı: NetGSM** — Türkiye pazarında kurumsal sağlık için de facto standart. İleti Merkezi eşit kalitede ama müşteri IT'si için NetGSM tanıdık isim. OTP kanalı IYS muafiyetli (ticari mesaj değil).
+- **Kod: 6 hane, 5 dk TTL** — kriptografik güvenli üretim (rejection sampling, modulo bias yok), HMAC-SHA256 hash ile Redis'te saklama (plaintext yok).
+- **Güvenilir cihaz: 7 gün** — kullanıcı "beni hatırla" işaretlerse aynı cihazda SMS tekrar istenmiyor. 256-bit token httpOnly cookie'de; DB'de sadece SHA-256 hash.
+- **Org toggle (paralel MFA)**: `Organization.smsMfaEnabled` — TOTP kaldırılmadı, SMS yanına eklendi. Her hastane kendine göre karar verir.
+- **Zorunluluk: org açıkken SMS bypass edilemez** — `hlms-sms-pending` cookie'si login'de set ediliyor, middleware bu cookie varsa kullanıcıyı tüm protected route'lardan `/auth/sms-verify`'a atıyor. Cookie-only check → middleware'de DB sorgusu yok (performans).
+- **Super admin muaf** — platform operatörü, hastane policy'sinden etkilenmez.
+- **Mock mode** — `NETGSM_USERCODE` env'de yoksa SMS gitmiyor, kod dev server console'una basılıyor. NetGSM üyelik onayı beklenmeden geliştirme/test mümkün.
+
+### Mimari (Akış)
+1. Kullanıcı email+şifre ile login → `/api/auth/login` → Supabase auth OK
+2. `login` route org.smsMfaEnabled kontrol eder → true VE trusted device yoksa → `hlms-sms-pending=1` cookie set + response `{ smsMfaRequired: true, phoneMissing }`
+3. Client `phoneMissing` ise `/auth/phone-setup`'a, değilse `/auth/sms-verify`'a yönlendirir
+4. `sms-verify` sayfası mount'ta `POST /api/auth/sms/send` çağırır — 6 haneli kod üretilir, Redis'te 5 dk TTL ile HMAC hash'li saklanır, NetGSM üzerinden SMS atılır
+5. Kullanıcı kodu girer → `POST /api/auth/sms/verify` → timing-safe karşılaştırma → başarılıysa:
+   - `hlms-sms-pending` cookie silinir, `hlms-sms-verified` cookie set edilir (session ömrü)
+   - `User.phoneVerifiedAt` ilk doğrulamada set edilir
+   - `rememberDevice=true` ise `trusted_devices` tablosuna kayıt + 7 gün httpOnly cookie
+6. Client role bazlı dashboard'a yönlendirir (`window.location.href` ile full reload — `onAuthStateChange` race'inden kaçınmak için, CLAUDE.md kuralı)
+
+### Güvenlik Önlemleri
+- **Attempt counter**: 5 yanlış deneme sonrası kayıt silinir, "yeni kod talep edin" mesajı
+- **Rate limit — send**: 10 dk / 3 SMS (maliyet koruması)
+- **Rate limit — verify**: 5 dk / 10 deneme (brute-force koruması)
+- **HMAC-SHA256 secret rotation**: `OTP_HMAC_SECRET` değişirse tüm aktif OTP'ler geçersiz (kasıtlı)
+- **Phone mismatch detection**: Redis'teki kaydın phone'u ile oturum phone'u eşleşmezse saldırı işareti, `warn` log
+- **Timing-safe comparison**: `crypto.timingSafeEqual` — timing attack'a karşı
+- **One-shot use**: Başarılı verify sonrası kayıt silinir, aynı kod ikinci kez kullanılamaz
+
+### Yeni Dosyalar
+**DB:**
+- `prisma/migrations/20260419140000_add_sms_mfa/migration.sql` — 3 kolon + 1 tablo + RLS policy
+
+**Backend:**
+- `src/lib/sms/types.ts` — `SmsProvider` interface (ileride sağlayıcı değişimi için)
+- `src/lib/sms/netgsm.ts` — NetGSM REST API client + mock mode
+- `src/lib/auth/sms-otp.ts` — OTP generate/verify core logic (Redis + HMAC)
+- `src/lib/auth/trusted-device.ts` — 7 gün trusted device token yönetimi
+- `src/lib/auth/sms-session.ts` — session cookie + layout guard helpers
+
+**API routes:**
+- `src/app/api/auth/sms/send/route.ts` — SMS gönder (rate-limited)
+- `src/app/api/auth/sms/verify/route.ts` — kod doğrula + trusted device + cookie update
+- `src/app/api/auth/phone-setup/route.ts` — telefon kaydet (TR format validate, +90XXX... normalize)
+- `src/app/api/admin/settings/sms-mfa/route.ts` — admin GET/POST toggle + audit log
+
+**UI:**
+- `src/app/auth/sms-verify/page.tsx` — 6 haneli kod input + "beni hatırla" + 60sn resend cooldown
+- `src/app/auth/phone-setup/page.tsx` — TR telefon giriş formu
+- `src/app/admin/settings/security/page.tsx` — SMS MFA toggle (custom switch, confirm modal)
+
+### Değiştirilen Dosyalar
+- `prisma/schema.prisma` — `Organization.smsMfaEnabled`, `User.phoneVerifiedAt`, yeni `TrustedDevice` modeli
+- `src/app/api/auth/login/route.ts` — SMS MFA branch (password auth sonrası cookie set + response)
+- `src/app/auth/login/page.tsx` — `smsMfaRequired` / `phoneMissing` redirect handling
+- `src/lib/supabase/middleware.ts` — `hlms-sms-pending` cookie guard (dashboard'a izin vermiyor, /auth/sms-verify'a atıyor)
+- `supabase-rls.sql` — `trusted_devices` RLS kaydı
+
+### Migration Workflow Notu
+Supabase cloud DB'ye manuel SQL Editor ile uygulandı (migration dosyası fresh DB'lere otomatik aktarılacak). Prisma migration history `prisma migrate resolve --applied 20260419140000_add_sms_mfa` ile senkronize edildi. `migrate dev` Supabase pooler üzerinden çalışmıyor (cross-schema FK introspection hatası) — mevcut pattern gibi manuel SQL + resolve yaklaşımı izlendi.
+
+### Açık Kalan İşler
+1. **NetGSM üyeliği**: Kurumsal hesap + sender ID onayı (1-2 iş günü). Credential alınınca `.env.local`'a `NETGSM_USERCODE`, `NETGSM_PASSWORD`, `NETGSM_MSGHEADER` eklenecek.
+2. **`OTP_HMAC_SECRET` üret**: `openssl rand -base64 48` ile 32+ karakter secret, `.env.local` + Vercel env'e eklenecek.
+3. **Trusted device cleanup cron**: Süresi dolmuş `trusted_devices` kayıtlarını silen cron eklenmeli (`/api/cron/cleanup` içine).
+4. **Test user UAT**: Bir hastane admin'iyle canlı test — gerçek SMS alımı, 7 gün trusted device persist, yanlış kod senaryoları.
+5. **Admin "phone eksik personel" raporu**: SMS MFA enable edilmeden önce admin'in eksik telefonları görebileceği bir liste (bu PR kapsamında yok).
+
+---
+
+*Son güncelleme: 19 Nisan 2026 — Oturum 51 (SMS MFA)*

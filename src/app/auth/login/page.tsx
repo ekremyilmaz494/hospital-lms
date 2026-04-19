@@ -92,6 +92,12 @@ function LoginForm() {
         return;
       }
 
+      // SMS MFA gerekiyorsa: telefon yoksa phone-setup'a, varsa direkt sms-verify'a
+      if (data.smsMfaRequired) {
+        router.push(data.phoneMissing ? '/auth/phone-setup' : '/auth/sms-verify');
+        return;
+      }
+
       // İlk girişte şifre değiştirme zorunluluğu
       if (data.mustChangePassword) {
         router.push('/auth/change-password?reason=first-login');

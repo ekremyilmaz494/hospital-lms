@@ -7,6 +7,16 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity-logger'
+import { isDeviceTrusted } from '@/lib/auth/trusted-device'
+
+/**
+ * "SMS MFA pending" sentinel cookie.
+ * Login sonrası org.smsMfaEnabled=true VE cihaz trusted değilse set edilir.
+ * Middleware bu cookie'yi gören protected route isabetinde kullanıcıyı
+ * /auth/sms-verify'a yönlendirir. /api/auth/sms/verify başarılı olunca silinir.
+ */
+const SMS_PENDING_COOKIE = 'hlms-sms-pending'
+const SMS_PENDING_TTL = 15 * 60 // 15 dk — SMS doğrulama için makul süre
 
 /**
  * "Bu cihazda oturumumu açık tut (7 gün)" sentinel cookie.
@@ -107,7 +117,16 @@ export async function POST(request: NextRequest) {
     // ── Orphan user detection + active check ──
     const dbUser = await prisma.user.findUnique({
       where: { id: data.user.id },
-      select: { id: true, mustChangePassword: true, isActive: true, role: true, organizationId: true }
+      select: {
+        id: true,
+        mustChangePassword: true,
+        isActive: true,
+        role: true,
+        organizationId: true,
+        phone: true,
+        phoneVerifiedAt: true,
+        organization: { select: { smsMfaEnabled: true } },
+      }
     })
 
     if (!dbUser) {
@@ -141,6 +160,32 @@ export async function POST(request: NextRequest) {
         mfaRequired: true,
         factorId: activeFactor.id,
       })
+    }
+
+    // ── SMS MFA check ──
+    // Org smsMfaEnabled=true ise cihaz trusted olmadıkça SMS doğrulaması ZORUNLU.
+    // Super admin platform operatörü, hastane policy'sinden muaf.
+    const smsMfaEnabled = dbUser.organization?.smsMfaEnabled ?? false
+    if (smsMfaEnabled && role !== 'super_admin') {
+      const deviceTrusted = await isDeviceTrusted(data.user.id).catch(() => false)
+      if (!deviceTrusted) {
+        const cookieStore = await cookies()
+        cookieStore.set(SMS_PENDING_COOKIE, '1', {
+          path: '/',
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: SMS_PENDING_TTL,
+        })
+
+        logger.info('auth:login', 'SMS MFA gerekli', { userId: data.user.id, hasPhone: !!dbUser.phone })
+        return jsonResponse({
+          smsMfaRequired: true,
+          phoneMissing: !dbUser.phone,
+          // Telefonun son 4 hanesi — UI'da "****3456 numaralı telefonunuza kod gönderildi" göstermek için
+          phoneMasked: dbUser.phone ? `****${dbUser.phone.slice(-4)}` : null,
+        })
+      }
     }
 
     // Başarılı giriş — fail counter sıfırla

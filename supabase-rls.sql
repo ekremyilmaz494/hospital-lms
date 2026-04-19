@@ -46,6 +46,7 @@ ALTER TABLE competency_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE competency_evaluations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE competency_answers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trusted_devices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE training_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE question_bank ENABLE ROW LEVEL SECURITY;
 ALTER TABLE question_bank_options ENABLE ROW LEVEL SECURITY;
@@ -200,6 +201,9 @@ CREATE POLICY "staff_comp_answers_own" ON competency_answers FOR ALL USING (EXIS
 
 -- PUSH SUBSCRIPTIONS
 CREATE POLICY "user_push_subscriptions_own" ON push_subscriptions FOR ALL USING (user_id = auth.uid());
+
+-- TRUSTED DEVICES (SMS MFA)
+CREATE POLICY "user_trusted_devices_own" ON trusted_devices FOR ALL USING (user_id = auth.uid());
 
 -- TRAINING CATEGORIES
 CREATE POLICY "super_admin_training_categories_all" ON training_categories

@@ -163,6 +163,16 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
+    // ── SMS MFA pending guard ──
+    // Login endpoint'i SMS MFA gerektiren orgların user'larına 'hlms-sms-pending=1'
+    // cookie'si set eder. Bu cookie varsa kullanıcı SMS'i tamamlamadan hiçbir
+    // protected route'a giremez. Verify endpoint'i cookie'yi siler.
+    // Cookie-only kontrol → middleware'de DB sorgusu YOK (performans).
+    const smsPending = request.cookies.get('hlms-sms-pending')?.value === '1'
+    if (smsPending && !pathname.startsWith('/auth/sms-verify') && !pathname.startsWith('/auth/phone-setup') && !pathname.startsWith('/auth/logout')) {
+      return NextResponse.redirect(new URL('/auth/sms-verify', request.url))
+    }
+
     // Role-based access control — app_metadata tercih edilir (kullanıcı değiştiremez)
     const role = sanitizeRole(user.app_metadata?.role ?? user.user_metadata?.role)
 
