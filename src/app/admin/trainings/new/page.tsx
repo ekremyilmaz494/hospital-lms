@@ -558,7 +558,7 @@ export default function NewTrainingPage() {
                     </button>
                   </div>
                   {isCompulsory && (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
                         <div className="flex items-center gap-1.5 mb-2">
                           <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-warning, #f59e0b)' }} />
@@ -585,20 +585,6 @@ export default function NewTrainingPage() {
                           style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: 'var(--radius-lg)' }}
                         />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <RefreshCw className="h-3.5 w-3.5" style={{ color: 'var(--color-warning, #f59e0b)' }} />
-                          <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Yenileme (Ay)</Label>
-                        </div>
-                        <Input
-                          type="number"
-                          value={renewalPeriodMonths}
-                          onChange={(e) => setRenewalPeriodMonths(e.target.value ? Number(e.target.value) : '')}
-                          placeholder="örn. 12"
-                          className="h-10"
-                          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }}
-                        />
-                      </div>
                     </div>
                   )}
                   {!isCompulsory && (
@@ -606,6 +592,43 @@ export default function NewTrainingPage() {
                       Bu eğitim zorunlu değil. Zorunlu olarak işaretlerseniz uyum takibi yapılır.
                     </p>
                   )}
+                </div>
+
+                {/* Sertifika Geçerliliği — zorunlu eğitimden bağımsız, her eğitim için geçerli */}
+                <div
+                  className="rounded-xl p-5"
+                  style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <RefreshCw className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+                    <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Sertifika Geçerliliği</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-xs font-medium mb-2 block" style={{ color: 'var(--color-text-muted)' }}>Yenileme Süresi (Ay)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={120}
+                        value={renewalPeriodMonths}
+                        onChange={(e) => setRenewalPeriodMonths(e.target.value ? Number(e.target.value) : '')}
+                        placeholder="örn. 12 (boş = süresiz)"
+                        className="h-10"
+                        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }}
+                      />
+                      <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                        Sertifika bu süre sonunda yenilenmelidir. Boş bırakılırsa süresiz geçerli olur.
+                      </p>
+                    </div>
+                    {isCompulsory && renewalPeriodMonths === '' && (
+                      <div className="flex items-start gap-2 rounded-lg p-3" style={{ background: 'var(--color-warning-bg, #fffbeb)', border: '1px solid var(--color-warning, #f59e0b)' }}>
+                        <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0" style={{ color: 'var(--color-warning, #f59e0b)' }} />
+                        <p className="text-xs" style={{ color: 'var(--color-text-primary)' }}>
+                          Zorunlu eğitimler için İSG/KVKK denetim gerekliliklerine göre yenileme süresi tanımlanması önerilir.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1470,7 +1493,7 @@ export default function NewTrainingPage() {
                       isCompulsory,
                       complianceDeadline: isCompulsory && complianceDeadline ? new Date(complianceDeadline).toISOString() : null,
                       regulatoryBody: isCompulsory && regulatoryBody ? regulatoryBody : null,
-                      renewalPeriodMonths: isCompulsory && renewalPeriodMonths !== '' ? Number(renewalPeriodMonths) : null,
+                      renewalPeriodMonths: renewalPeriodMonths !== '' ? Number(renewalPeriodMonths) : null,
                       videos: videos.filter(v => v.url).map(v => ({ title: v.title || v.file?.name || (v.contentType === 'audio' ? 'Ses' : v.contentType === 'pdf' ? 'Doküman' : 'Video'), url: v.url, contentType: v.contentType, pageCount: v.pageCount, durationSeconds: v.durationSeconds, documentKey: v.documentKey })),
                       questions,
                       selectedDepts,
