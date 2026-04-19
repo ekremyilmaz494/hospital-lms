@@ -11,7 +11,6 @@ import { CertFilterBar } from './_components/cert-filter-bar'
 import { CertGroup } from './_components/cert-group'
 import { CertTable } from './_components/cert-table'
 import { CertDetailModal } from './_components/cert-detail-modal'
-import { CertPdfTemplate } from './_components/cert-pdf-template'
 import { useCertFilters } from './_hooks/use-cert-filters'
 import { useCertPdf, type BundleFormat } from './_hooks/use-cert-pdf'
 import type { Certificate, CertPageData, FilterState, ViewMode } from './_types'
@@ -37,7 +36,7 @@ export default function CertificatesPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode)
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null)
 
-  const { certPdfRef, isPending, downloadSingle, downloadGroup, downloadAll } = useCertPdf()
+  const { isPending, downloadSingle, downloadGroup, downloadAll } = useCertPdf()
 
   const stats = data?.stats ?? { totalCerts: 0, activeCerts: 0, expiredCerts: 0, revokedCerts: 0, expiringSoon: 0 }
   const trainingsWithoutRenewal = data?.trainingsWithoutRenewal ?? []
@@ -200,11 +199,8 @@ export default function CertificatesPage() {
             onDownload={() => downloadSingle(selectedCert)}
             isPdfPending={isPending(`single:${selectedCert.id}`)}
           />
-          <CertPdfTemplate ref={certPdfRef} cert={selectedCert} />
         </>
       )}
-
-      {!selectedCert && <CertPdfTemplate ref={certPdfRef} cert={null} />}
 
       {groups.length > 0 && viewMode === 'grouped' && filtered.length > 0 && (
         <p

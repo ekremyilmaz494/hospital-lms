@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useToast } from '@/components/shared/toast'
 import type { Certificate, FilterState } from '../_types'
 
@@ -56,27 +56,16 @@ async function downloadBlobFrom(url: string, filename: string, onErr: (msg: stri
 export function useCertPdf() {
   const { toast } = useToast()
   const [pendingKey, setPendingKey] = useState<string | null>(null)
-  const certPdfRef = useRef<HTMLDivElement>(null)
 
   const downloadSingle = useCallback(async (cert: Certificate) => {
-    if (!certPdfRef.current) return
     setPendingKey(`single:${cert.id}`)
     try {
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import('html2canvas-pro'),
-        import('jspdf'),
-      ])
-      const el = certPdfRef.current
-      el.style.display = 'block'
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
-      el.style.display = 'none'
-      const imgData = canvas.toDataURL('image/png')
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-      doc.addImage(imgData, 'PNG', 0, 0, 297, 210)
-      doc.save(`sertifika-${cert.certificateCode}.pdf`)
-      toast('Sertifika PDF olarak indirildi', 'success')
-    } catch {
-      toast('PDF oluşturulamadı', 'error')
+      const ok = await downloadBlobFrom(
+        `/api/certificates/${cert.id}/pdf`,
+        `sertifika-${cert.certificateCode}.pdf`,
+        (msg) => toast(msg, 'error'),
+      )
+      if (ok) toast('Sertifika PDF olarak indirildi', 'success')
     } finally {
       setPendingKey(null)
     }
@@ -116,7 +105,6 @@ export function useCertPdf() {
   }, [toast])
 
   return {
-    certPdfRef,
     pendingKey,
     isPending: (key: string) => pendingKey === key,
     downloadSingle,

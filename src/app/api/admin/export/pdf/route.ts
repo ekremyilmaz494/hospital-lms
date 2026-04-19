@@ -1,9 +1,17 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 import { jsPDF } from 'jspdf'
+import { drawCertificatePage as drawCertPageShared, type CertDrawData } from '@/lib/pdf/cert-design'
+import { applyTurkishFont } from '@/lib/pdf/helpers/font'
+import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
 
 const BRAND_RGB: [number, number, number] = [13, 150, 104]
+
+function formatDateTR(date: Date): string {
+  return date.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })
+}
 const PAGE_BOTTOM_MARGIN = 280
 const LINE_HEIGHT = 7
 
@@ -33,7 +41,7 @@ export async function GET(request: Request) {
   const org = await prisma.organization.findUnique({ where: { id: orgId } })
 
   if (type === 'certificates') {
-    return generateCertificatesPdf(request, orgId, org?.name ?? '')
+    return generateCertificatesPdf(request, orgId, org?.name ?? '', org?.logoUrl ?? null)
   }
 
   const doc = new jsPDF()
@@ -168,7 +176,7 @@ export async function GET(request: Request) {
   })
 }
 
-async function generateCertificatesPdf(request: Request, orgId: string, orgName: string): Promise<Response> {
+async function generateCertificatesPdf(request: Request, orgId: string, orgName: string, orgLogoUrl: string | null): Promise<Response> {
   const { searchParams } = new URL(request.url)
   const trainingId = searchParams.get('trainingId') ?? undefined
   const category = searchParams.get('category') ?? undefined
@@ -216,7 +224,7 @@ async function generateCertificatesPdf(request: Request, orgId: string, orgName:
   })
 
   if (format === 'bundle') {
-    return renderCertificateBundlePdf(filtered, orgName, trainingId)
+    return renderCertificateBundlePdf(filtered, orgName, orgLogoUrl, trainingId)
   }
 
   return renderCertificateListPdf(filtered, orgName, trainingId)
@@ -325,7 +333,12 @@ function renderCertificateListPdf(certs: CertListItem[], orgName: string, traini
   })
 }
 
-function renderCertificateBundlePdf(certs: CertListItem[], orgName: string, trainingId?: string): Response {
+async function renderCertificateBundlePdf(
+  certs: CertListItem[],
+  orgName: string,
+  orgLogoUrl: string | null,
+  trainingId?: string,
+): Promise<Response> {
   const MAX_BUNDLE = 200
   if (certs.length > MAX_BUNDLE) {
     return errorResponse(`Sertifika paketi en fazla ${MAX_BUNDLE} sertifika içerebilir. Filtre daraltın.`, 400)
@@ -335,12 +348,27 @@ function renderCertificateBundlePdf(certs: CertListItem[], orgName: string, trai
   }
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-  const pageW = 297
-  const pageH = 210
+  await applyTurkishFont(doc)
+
+  const logoDataUrl = await resolveOrgLogoDataUrl(orgLogoUrl)
+  const now = new Date()
 
   certs.forEach((c, i) => {
     if (i > 0) doc.addPage('a4', 'landscape')
-    drawCertificatePage(doc, c, orgName, pageW, pageH)
+    const score = c.attempt.postExamScore ? Number(c.attempt.postExamScore) : null
+    const data: CertDrawData = {
+      fullName: `${c.user.firstName} ${c.user.lastName}`,
+      trainingTitle: c.training.title,
+      organizationName: orgName,
+      organizationLogoDataUrl: logoDataUrl,
+      issuedAtText: formatDateTR(c.issuedAt),
+      expiresAtText: c.expiresAt ? formatDateTR(c.expiresAt) : null,
+      isExpired: !!c.expiresAt && c.expiresAt < now,
+      isRevoked: !!c.revokedAt,
+      certificateCode: c.certificateCode,
+      score,
+    }
+    drawCertPageShared(doc, data)
   })
 
   const pdfBuffer = doc.output('arraybuffer')
@@ -353,140 +381,3 @@ function renderCertificateBundlePdf(certs: CertListItem[], orgName: string, trai
   })
 }
 
-function drawCertificatePage(doc: jsPDF, c: CertListItem, orgName: string, w: number, h: number) {
-  const now = new Date()
-  const isRevoked = !!c.revokedAt
-  const isExpired = !isRevoked && !!c.expiresAt && c.expiresAt < now
-
-  doc.setFillColor(248, 250, 252)
-  doc.rect(0, 0, w, h, 'F')
-
-  doc.setDrawColor(...BRAND_RGB)
-  doc.setLineWidth(1.2)
-  doc.rect(8, 8, w - 16, h - 16)
-  doc.setLineWidth(0.3)
-  doc.setDrawColor(203, 213, 225)
-  doc.rect(11, 11, w - 22, h - 22)
-
-  doc.setFillColor(...BRAND_RGB)
-  doc.rect(w / 2 - 35, 12, 70, 2, 'F')
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(28)
-  doc.setTextColor(15, 23, 42)
-  doc.text('TAMAMLAMA SERTİFİKASI', w / 2, 35, { align: 'center' })
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(11)
-  doc.setTextColor(100, 116, 139)
-  doc.text(`Devakent Hastanesi — ${orgName}`, w / 2, 43, { align: 'center' })
-
-  doc.setDrawColor(203, 213, 225)
-  doc.setLineWidth(0.3)
-  doc.line(w / 2 - 50, 52, w / 2 + 50, 52)
-
-  doc.setFontSize(9)
-  doc.setTextColor(148, 163, 184)
-  doc.text('BU SERTİFİKA', w / 2, 62, { align: 'center' })
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(24)
-  doc.setTextColor(15, 23, 42)
-  doc.text(`${c.user.firstName} ${c.user.lastName}`, w / 2, 74, { align: 'center' })
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(100, 116, 139)
-  const subtitle = [c.user.departmentRel?.name, c.user.title].filter(Boolean).join(' · ') || 'Personel'
-  doc.text(subtitle, w / 2, 81, { align: 'center' })
-
-  doc.setFontSize(10)
-  doc.setTextColor(148, 163, 184)
-  doc.text('adlı personele, aşağıdaki eğitimi başarıyla tamamladığı için verilmiştir.', w / 2, 92, { align: 'center' })
-
-  doc.line(w / 2 - 50, 100, w / 2 + 50, 100)
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
-  doc.setTextColor(...BRAND_RGB)
-  doc.text(c.training.title, w / 2, 112, { align: 'center' })
-
-  if (c.training.category) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(100, 116, 139)
-    doc.text(c.training.category, w / 2, 119, { align: 'center' })
-  }
-
-  const boxY = 130
-  const boxW = 55
-  const gap = 8
-  const totalW = boxW * 3 + gap * 2
-  const startX = (w - totalW) / 2
-
-  const score = c.attempt.postExamScore ? `${Number(c.attempt.postExamScore)}%` : '-'
-  const statusText = isRevoked ? 'İptal Edilmiş' : isExpired ? 'Süresi Dolmuş' : 'Aktif'
-
-  ;[
-    { label: 'PUAN', value: score },
-    { label: 'DENEME', value: `${c.attempt.attemptNumber}.` },
-    { label: 'DURUM', value: statusText },
-  ].forEach((b, idx) => {
-    const x = startX + idx * (boxW + gap)
-    doc.setFillColor(241, 245, 249)
-    doc.rect(x, boxY, boxW, 20, 'F')
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.setTextColor(148, 163, 184)
-    doc.text(b.label, x + boxW / 2, boxY + 7, { align: 'center' })
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
-    doc.setTextColor(15, 23, 42)
-    doc.text(b.value, x + boxW / 2, boxY + 15, { align: 'center' })
-  })
-
-  doc.setDrawColor(226, 232, 240)
-  doc.setLineWidth(0.3)
-  doc.line(30, 170, w - 30, 170)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
-  doc.setTextColor(148, 163, 184)
-  doc.text('SERTİFİKA KODU', 30, 178)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(...BRAND_RGB)
-  doc.text(c.certificateCode, 30, 184)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
-  doc.setTextColor(148, 163, 184)
-  doc.text('VERİLİŞ TARİHİ', w / 2, 178, { align: 'center' })
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(15, 23, 42)
-  doc.text(c.issuedAt.toLocaleDateString('tr-TR'), w / 2, 184, { align: 'center' })
-
-  if (c.expiresAt) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.setTextColor(148, 163, 184)
-    doc.text('GEÇERLİLİK TARİHİ', w - 30, 178, { align: 'right' })
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(isExpired ? 220 : 15, isExpired ? 38 : 23, isExpired ? 38 : 42)
-    doc.text(c.expiresAt.toLocaleDateString('tr-TR'), w - 30, 184, { align: 'right' })
-  }
-
-  doc.setFillColor(...BRAND_RGB)
-  doc.rect(w / 2 - 25, h - 16, 50, 1.5, 'F')
-
-  if (isRevoked) {
-    doc.setFillColor(239, 68, 68)
-    doc.setTextColor(255)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(14)
-    doc.rect(w / 2 - 35, h / 2 - 5, 70, 12, 'F')
-    doc.text('İPTAL EDİLMİŞ', w / 2, h / 2 + 3, { align: 'center' })
-  }
-}

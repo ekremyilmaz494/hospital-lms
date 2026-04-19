@@ -59,7 +59,7 @@ export default function TrainingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { data, isLoading, error, refetch } = useFetch<{ trainings: Training[]; total: number }>('/api/admin/trainings');
-  const { data: staffData } = useFetch<{ staff: { id: string; name: string; department: string }[] }>('/api/admin/staff');
+  const { data: staffData } = useFetch<{ staff: { id: string; name: string; department: string }[] }>('/api/admin/staff?limit=500');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [showBulkAssign, setShowBulkAssign] = useState(false);

@@ -43,19 +43,34 @@ function TransitionContent() {
       : '/staff/my-trainings';
 
   // examOnly guard: pre→videos geçişinde examOnly ise post-exam'e yönlendir
+  // Passed guard: videos→post geçişinde kullanıcı zaten geçmişse post-exam'e DEĞİL,
+  // my-trainings'e yönlendir (review modda tekrar izlemenin sonunda yanlış akış önlenir).
+  const [passedGuardChecked, setPassedGuardChecked] = useState(!isVideosToPost);
   useEffect(() => {
-    if (!isPreToVideos) return;
+    if (!isPreToVideos && !isVideosToPost) return;
     fetch(`/api/exam/${id}/start`, { method: 'POST' })
-      .then(res => res.json())
-      .then(attempt => {
-        if (attempt?.examOnly) {
+      .then(async res => {
+        const data = await res.json().catch(() => null);
+        if (isPreToVideos && data?.examOnly) {
           router.replace(`/exam/${id}/post-exam`);
+          return;
+        }
+        if (isVideosToPost) {
+          // /start passed assignment için 400 döner — bu durumda my-trainings'e git
+          const alreadyPassed = !res.ok && typeof data?.error === 'string' && data.error.includes('başarıyla tamamladınız');
+          if (alreadyPassed) {
+            router.replace('/staff/my-trainings');
+            return;
+          }
+          setPassedGuardChecked(true);
         }
       })
-      .catch(() => {});
-  }, [id, isPreToVideos, router]);
+      .catch(() => {
+        if (isVideosToPost) setPassedGuardChecked(true);
+      });
+  }, [id, isPreToVideos, isVideosToPost, router]);
 
-  const shouldCountdown = !isPostResult;
+  const shouldCountdown = !isPostResult && passedGuardChecked;
 
   const navigate = () => {
     if (navigatedRef.current) return;

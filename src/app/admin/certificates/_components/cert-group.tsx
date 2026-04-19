@@ -30,7 +30,7 @@ export function CertGroup({ group, defaultOpen = false, onSelectCert, onDownload
 
   return (
     <div
-      className="rounded-2xl border overflow-hidden mb-3"
+      className={`relative rounded-2xl border mb-3 ${menuOpen ? 'z-40' : 'z-0'}`}
       style={{
         background: 'var(--color-surface)',
         borderColor: 'var(--color-border)',
@@ -38,7 +38,7 @@ export function CertGroup({ group, defaultOpen = false, onSelectCert, onDownload
       }}
     >
       <div
-        className="flex items-center gap-3 px-5 py-3.5"
+        className="relative z-20 flex items-center gap-3 px-5 py-3.5"
         style={{ borderBottom: open ? '1px solid var(--color-border)' : 'none' }}
       >
         <button

@@ -21,6 +21,7 @@ import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 import { AssignTrainingModal } from './assign-training-modal';
 import { BulkImportDialog } from './bulk-import-dialog';
+import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
 
 // ── Types ──
 interface Staff {
@@ -127,65 +128,99 @@ function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: () => voi
         onOpenChange={setAssignTrainingOpen}
       />
 
-      {confirmDelete && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0, 0, 0, 0.5)' }}
-          onClick={() => !deleting && setConfirmDelete(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl shadow-xl"
-            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6">
-              <div className="flex items-start gap-3 mb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>
-                  <Trash2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>Personeli sil</h2>
-                  <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    <strong>{staff.name}</strong> ({staff.email}) için bir seçim yapın.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => handleDelete(false)}
-                  disabled={deleting}
-                  className="w-full text-left rounded-xl p-4 border transition-colors disabled:opacity-50 hover:bg-(--color-surface-hover)"
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  <div className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>Pasifleştir (önerilen)</div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    Personel giriş yapamaz, ama geçmiş sınav ve sertifika kayıtları korunur.
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleDelete(true)}
-                  disabled={deleting}
-                  className="w-full text-left rounded-xl p-4 border transition-colors disabled:opacity-50"
-                  style={{ borderColor: 'var(--color-error)', background: 'var(--color-error-bg)' }}
-                >
-                  <div className="font-semibold text-sm" style={{ color: 'var(--color-error)' }}>Kalıcı olarak sil (KVKK)</div>
-                  <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    Kullanıcı hesabı tamamen silinir. Bu işlem geri alınamaz.
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 p-6 pt-0">
-              <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+      <PremiumModal
+        isOpen={confirmDelete}
+        onClose={() => !deleting && setConfirmDelete(false)}
+        eyebrow="Tehlikeli İşlem"
+        title="Personeli sil"
+        subtitle={`${staff.name} (${staff.email}) için bir seçim yap.`}
+        size="md"
+        disableEscape={deleting}
+        footer={
+          <PremiumModalFooter
+            actions={
+              <PremiumButton variant="ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>
                 Vazgeç
-              </Button>
+              </PremiumButton>
+            }
+          />
+        }
+      >
+        <div className="sdx-choices">
+          <button
+            onClick={() => handleDelete(false)}
+            disabled={deleting}
+            className="sdx-choice sdx-soft"
+          >
+            <div className="sdx-choice-head">
+              <span className="sdx-badge sdx-badge-soft">Önerilen</span>
+              <h4>Pasifleştir</h4>
             </div>
-          </div>
+            <p>Personel giriş yapamaz, ancak geçmiş sınav ve sertifika kayıtları korunur. Daha sonra yeniden aktifleştirilebilir.</p>
+          </button>
+
+          <button
+            onClick={() => handleDelete(true)}
+            disabled={deleting}
+            className="sdx-choice sdx-hard"
+          >
+            <div className="sdx-choice-head">
+              <span className="sdx-badge sdx-badge-hard">KVKK · Geri alınamaz</span>
+              <h4>Kalıcı olarak sil</h4>
+            </div>
+            <p>Kullanıcı hesabı ve kişisel veriler tamamen kaldırılır. Bu işlem geri alınamaz.</p>
+          </button>
         </div>
-      )}
+
+        <style jsx>{`
+          .sdx-choices { display: grid; gap: 12px; }
+          .sdx-choice {
+            text-align: left;
+            padding: 18px 20px;
+            border-radius: 14px;
+            background: #ffffff;
+            border: 1px solid #ebe7df;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6);
+            cursor: pointer;
+            transition: border-color 160ms ease, transform 220ms cubic-bezier(0.16,1,0.3,1), background 160ms ease;
+            font-family: inherit;
+          }
+          .sdx-choice:hover:not(:disabled) { transform: translateY(-1px); }
+          .sdx-choice:disabled { opacity: 0.5; cursor: not-allowed; }
+          .sdx-soft:hover:not(:disabled) { border-color: #0a0a0a; }
+          .sdx-hard { border-color: #e9c9c0; background: #fdf5f2; }
+          .sdx-hard:hover:not(:disabled) { border-color: #b3261e; background: #faeae4; }
+          .sdx-choice-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+          .sdx-choice h4 {
+            font-family: var(--font-editorial, serif);
+            font-size: 18px;
+            font-weight: 500;
+            font-variation-settings: 'opsz' 36;
+            color: #0a0a0a;
+            margin: 0;
+            letter-spacing: -0.01em;
+          }
+          .sdx-hard h4 { color: #7a1d14; }
+          .sdx-choice p {
+            font-size: 13px;
+            line-height: 1.55;
+            color: #6b6a63;
+            margin: 0;
+          }
+          .sdx-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+          }
+          .sdx-badge-soft { background: #f0ece1; color: #5c5a4e; }
+          .sdx-badge-hard { background: #b3261e; color: #fff; }
+        `}</style>
+      </PremiumModal>
     </>
   );
 }
@@ -253,104 +288,165 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
   });
 
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} />
-      <div
-        className="relative w-full max-w-lg rounded-2xl p-6 space-y-5"
-        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-lg)' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Yeni Personel Ekle</h3>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Personel bilgilerini girin</p>
+    <PremiumModal
+      isOpen
+      onClose={() => { if (!saving) onClose(); }}
+      eyebrow="Personel Kaydı"
+      title="Yeni personel ekle"
+      subtitle="Hesabı oluşturur ve giriş bilgilerini e-posta ile iletir."
+      size="lg"
+      disableEscape={saving}
+      footer={
+        !saved ? (
+          <PremiumModalFooter
+            summary={<span>Zorunlu alanlar <em style={{ fontStyle: 'italic', color: '#0a0a0a' }}>*</em> ile işaretli</span>}
+            actions={
+              <>
+                <PremiumButton variant="ghost" onClick={onClose} disabled={saving}>İptal</PremiumButton>
+                <PremiumButton onClick={handleSave} loading={saving} icon={<Save className="h-4 w-4" />}>
+                  {saving ? 'Kaydediliyor' : 'Personel Ekle'}
+                </PremiumButton>
+              </>
+            }
+          />
+        ) : null
+      }
+    >
+      {saved ? (
+        <div className="nsm-saved">
+          <div className="nsm-saved-icon">
+            <UserPlus className="h-6 w-6" />
           </div>
-          <button onClick={onClose} aria-label="Kapat" className="rounded-lg p-2 hover:bg-(--color-surface-hover)">
-            <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
-          </button>
+          <h4>Personel başarıyla eklendi</h4>
+          <p>Giriş bilgileri {form.email} adresine gönderildi.</p>
         </div>
-
-        {saved ? (
-          <div className="flex flex-col items-center gap-3 py-8">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--color-success-bg)' }}>
-              <UserPlus className="h-6 w-6" style={{ color: 'var(--color-success)' }} />
+      ) : (
+        <div className="nsm-form">
+          <div className="nsm-row">
+            <div className="nsm-field">
+              <Label className="nsm-label">Ad *</Label>
+              <Input placeholder="Personel adı" className="h-10" value={form.ad} onChange={(e) => setForm(f => ({ ...f, ad: e.target.value }))} style={fieldStyle('ad')} />
+              {errors.ad && <p className="nsm-err">{errors.ad}</p>}
             </div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--color-success)' }}>Personel başarıyla eklendi!</p>
+            <div className="nsm-field">
+              <Label className="nsm-label">Soyad *</Label>
+              <Input placeholder="Personel soyadı" className="h-10" value={form.soyad} onChange={(e) => setForm(f => ({ ...f, soyad: e.target.value }))} style={fieldStyle('soyad')} />
+              {errors.soyad && <p className="nsm-err">{errors.soyad}</p>}
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Ad *</Label>
-                <Input placeholder="Personel adı" className="h-10" value={form.ad} onChange={(e) => setForm(f => ({ ...f, ad: e.target.value }))} style={fieldStyle('ad')} />
-                {errors.ad && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.ad}</p>}
-              </div>
-              <div>
-                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Soyad *</Label>
-                <Input placeholder="Personel soyadı" className="h-10" value={form.soyad} onChange={(e) => setForm(f => ({ ...f, soyad: e.target.value }))} style={fieldStyle('soyad')} />
-                {errors.soyad && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.soyad}</p>}
-              </div>
+          <div className="nsm-row">
+            <div className="nsm-field">
+              <Label className="nsm-label">E-posta *</Label>
+              <Input type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} style={fieldStyle('email')} />
+              {errors.email && <p className="nsm-err">{errors.email}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>E-posta *</Label>
-                <Input type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} style={fieldStyle('email')} />
-                {errors.email && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.email}</p>}
-              </div>
-              <div>
-                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Şifre</Label>
-                <Input type="password" placeholder="Boş bırakın — sistem üretir" className="h-10" value={form.sifre} onChange={(e) => setForm(f => ({ ...f, sifre: e.target.value }))} style={fieldStyle('sifre')} />
-                {errors.sifre ? (
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.sifre}</p>
-                ) : (
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    Boş bırakırsanız otomatik üretilip personelin e-postasına gönderilir.
-                  </p>
-                )}
-              </div>
+            <div className="nsm-field">
+              <Label className="nsm-label">Şifre</Label>
+              <Input type="password" placeholder="Boş bırakın — sistem üretir" className="h-10" value={form.sifre} onChange={(e) => setForm(f => ({ ...f, sifre: e.target.value }))} style={fieldStyle('sifre')} />
+              {errors.sifre ? (
+                <p className="nsm-err">{errors.sifre}</p>
+              ) : (
+                <p className="nsm-hint">Otomatik üretilip personelin e-postasına gönderilir.</p>
+              )}
             </div>
-            <div>
-              <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Telefon</Label>
-              <Input placeholder="05XX XXX XX XX" className="h-10" value={form.telefon} onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))} style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
-              {errors.telefon && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.telefon}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Departman *</Label>
-                <select
-                  className="w-full rounded-lg border px-3 py-2.5 text-sm h-10"
-                  style={{ ...fieldStyle('departman'), color: 'var(--color-text-primary)' }}
-                  value={form.departman}
-                  onChange={(e) => setForm(f => ({ ...f, departman: e.target.value }))}
-                >
-                  <option value="">Seçin...</option>
-                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-                {errors.departman && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.departman}</p>}
-              </div>
-              <div>
-                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Unvan</Label>
-                <Input placeholder="örn. Hemşire" className="h-10" value={form.unvan} onChange={(e) => setForm(f => ({ ...f, unvan: e.target.value }))} style={fieldStyle('unvan')} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={onClose} className="rounded-lg" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                İptal
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={saving}
-                className="gap-2 rounded-lg font-semibold text-white"
-                style={{ background: 'var(--color-primary)' }}
+          </div>
+          <div className="nsm-field">
+            <Label className="nsm-label">Telefon</Label>
+            <Input placeholder="05XX XXX XX XX" className="h-10" value={form.telefon} onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))} style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
+            {errors.telefon && <p className="nsm-err">{errors.telefon}</p>}
+          </div>
+          <div className="nsm-row">
+            <div className="nsm-field">
+              <Label className="nsm-label">Departman *</Label>
+              <select
+                className="nsm-select"
+                style={{ ...fieldStyle('departman') }}
+                value={form.departman}
+                onChange={(e) => setForm(f => ({ ...f, departman: e.target.value }))}
               >
-                {saving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Save className="h-4 w-4" />}
-                {saving ? 'Kaydediliyor...' : 'Personel Ekle'}
-              </Button>
+                <option value="">Seçin...</option>
+                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+              {errors.departman && <p className="nsm-err">{errors.departman}</p>}
             </div>
-          </>
-        )}
-      </div>
-    </div>
+            <div className="nsm-field">
+              <Label className="nsm-label">Unvan</Label>
+              <Input placeholder="örn. Hemşire" className="h-10" value={form.unvan} onChange={(e) => setForm(f => ({ ...f, unvan: e.target.value }))} style={fieldStyle('unvan')} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .nsm-form { display: flex; flex-direction: column; gap: 18px; }
+        .nsm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 640px) { .nsm-row { grid-template-columns: 1fr; } }
+        .nsm-field { display: flex; flex-direction: column; }
+        :global(.nsm-label) {
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #6b6a63;
+          margin-bottom: 6px;
+          display: block;
+        }
+        .nsm-err {
+          font-size: 11px;
+          color: #b3261e;
+          margin-top: 6px;
+          font-weight: 500;
+        }
+        .nsm-hint {
+          font-size: 11px;
+          color: #8a8578;
+          margin-top: 6px;
+          font-style: italic;
+        }
+        .nsm-select {
+          width: 100%;
+          height: 40px;
+          border-radius: 8px;
+          border: 1px solid #ebe7df;
+          background: #ffffff;
+          padding: 0 12px;
+          font-size: 14px;
+          color: #0a0a0a;
+          font-family: inherit;
+        }
+        .nsm-select:focus { outline: 2px solid #0a0a0a; outline-offset: 1px; }
+
+        .nsm-saved {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          padding: 32px 20px;
+          gap: 14px;
+        }
+        .nsm-saved-icon {
+          width: 56px;
+          height: 56px;
+          border-radius: 999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #0a0a0a;
+          color: #fafaf7;
+        }
+        .nsm-saved h4 {
+          font-family: var(--font-editorial, serif);
+          font-size: 22px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 42;
+          color: #0a0a0a;
+          margin: 0;
+          letter-spacing: -0.01em;
+        }
+        .nsm-saved p { font-size: 13px; color: #6b6a63; margin: 0; }
+      `}</style>
+    </PremiumModal>
   );
 }
 
@@ -373,7 +469,7 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
 
   const toggle = (id: string) => setSelected(prev => {
     const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
+    if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
 
@@ -404,28 +500,44 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
   };
 
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} />
-      <div
-        className="relative w-full max-w-md rounded-2xl p-6 flex flex-col gap-4"
-        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-lg)', maxHeight: '80vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Personel Ekle</h3>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{deptName} departmanına personel ata</p>
-          </div>
-          <button onClick={onClose} aria-label="Kapat" className="rounded-lg p-2 hover:bg-(--color-surface-hover)">
-            <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
-          </button>
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+    <PremiumModal
+      isOpen
+      onClose={() => { if (!saving) onClose(); }}
+      eyebrow="Departman Ataması"
+      title="Personel ekle"
+      subtitle={`${deptName} departmanına personel ata.`}
+      size="md"
+      disableEscape={saving}
+      footer={
+        <PremiumModalFooter
+          summary={
+            <span>
+              {selected.size > 0
+                ? <><strong style={{ color: '#0a0a0a' }}>{selected.size.toString().padStart(2, '0')}</strong> personel seçildi</>
+                : 'Personel seç'}
+            </span>
+          }
+          actions={
+            <>
+              <PremiumButton variant="ghost" onClick={onClose} disabled={saving}>İptal</PremiumButton>
+              <PremiumButton
+                onClick={handleAssign}
+                disabled={selected.size === 0}
+                loading={saving}
+                icon={<UserPlus className="h-4 w-4" />}
+              >
+                {saving ? 'Ekleniyor' : 'Ekle'}
+              </PremiumButton>
+            </>
+          }
+        />
+      }
+    >
+      <div className="asm-root">
+        <div className="asm-search">
+          <Search className="asm-search-icon" />
           <input
-            className="w-full h-10 rounded-xl border pl-9 pr-4 text-sm outline-none"
-            style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            className="asm-search-input"
             placeholder="İsim veya e-posta ile ara..."
             aria-label="Personel ara"
             value={search}
@@ -434,68 +546,164 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
           />
         </div>
 
-        <div className="overflow-y-auto flex-1 space-y-1.5 min-h-0" style={{ maxHeight: '340px' }}>
+        <div className="asm-list">
           {available.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-10">
-              <Users className="h-8 w-8" style={{ color: 'var(--color-text-muted)' }} />
-              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                {search ? 'Sonuç bulunamadı' : 'Eklenebilecek personel yok'}
-              </p>
+            <div className="asm-empty">
+              <Users className="h-7 w-7" />
+              <p>{search ? 'Sonuç bulunamadı' : 'Eklenebilecek personel yok'}</p>
             </div>
-          ) : available.map(s => {
+          ) : available.map((s, i) => {
             const isSelected = selected.has(s.id);
             return (
               <button
                 key={s.id}
                 onClick={() => toggle(s.id)}
-                className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150"
-                style={{
-                  background: isSelected ? 'var(--color-primary-bg)' : 'var(--color-bg)',
-                  border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                }}
+                className={`asm-row ${isSelected ? 'asm-row-on' : ''}`}
+                style={{ animationDelay: `${Math.min(i * 18, 240)}ms` }}
               >
                 <Avatar className="h-9 w-9 shrink-0">
-                  <AvatarFallback className="text-xs font-semibold text-white" style={{ background: 'var(--color-primary)' }}>{s.initials}</AvatarFallback>
+                  <AvatarFallback className="text-xs font-semibold text-white" style={{ background: '#0a0a0a' }}>{s.initials}</AvatarFallback>
                 </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate">{s.name}</p>
-                  <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
+                <div className="asm-row-body">
+                  <p className="asm-row-name">{s.name}</p>
+                  <p className="asm-row-meta">
                     {s.email}{s.department ? ` · ${s.department}` : ' · Departmansız'}
                   </p>
                 </div>
-                <div
-                  className="h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center"
-                  style={{
-                    borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                    background: isSelected ? 'var(--color-primary)' : 'transparent',
-                  }}
-                >
-                  {isSelected && <span className="text-[10px] text-white font-bold">✓</span>}
+                <div className={`asm-check ${isSelected ? 'asm-check-on' : ''}`}>
+                  {isSelected && <span>✓</span>}
                 </div>
               </button>
             );
           })}
         </div>
-
-        <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
-          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            {selected.size > 0 ? `${selected.size} personel seçildi` : 'Personel seçin'}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} className="rounded-lg" style={{ borderColor: 'var(--color-border)' }}>İptal</Button>
-            <Button
-              onClick={handleAssign}
-              disabled={selected.size === 0 || saving}
-              className="gap-2 rounded-lg font-semibold text-white"
-              style={{ background: 'var(--color-primary)' }}
-            >
-              {saving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <UserPlus className="h-4 w-4" />}
-              {saving ? 'Ekleniyor...' : 'Ekle'}
-            </Button>
-          </div>
-        </div>
       </div>
-    </div>
+
+      <style jsx>{`
+        .asm-root { display: flex; flex-direction: column; gap: 14px; }
+        .asm-search {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+        :global(.asm-search-icon) {
+          position: absolute;
+          left: 14px;
+          width: 16px;
+          height: 16px;
+          color: #8a8578;
+          pointer-events: none;
+        }
+        .asm-search-input {
+          width: 100%;
+          height: 44px;
+          padding: 0 14px 0 40px;
+          border-radius: 10px;
+          border: 1px solid #ebe7df;
+          background: #ffffff;
+          font-size: 14px;
+          color: #0a0a0a;
+          outline: none;
+          font-family: inherit;
+          transition: border-color 160ms ease, box-shadow 160ms ease;
+        }
+        .asm-search-input:focus {
+          border-color: #0a0a0a;
+          box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.06);
+        }
+
+        .asm-list {
+          max-height: 340px;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding-right: 4px;
+        }
+        .asm-list::-webkit-scrollbar { width: 8px; }
+        .asm-list::-webkit-scrollbar-track { background: transparent; }
+        .asm-list::-webkit-scrollbar-thumb { background: #ebe7df; border-radius: 4px; }
+
+        .asm-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          text-align: left;
+          padding: 10px 12px;
+          border-radius: 10px;
+          background: #ffffff;
+          border: 1px solid #ebe7df;
+          cursor: pointer;
+          font-family: inherit;
+          opacity: 0;
+          animation: asm-in 320ms cubic-bezier(0.16,1,0.3,1) forwards;
+          transition: border-color 160ms ease, background 160ms ease;
+        }
+        @keyframes asm-in {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .asm-row:hover { border-color: #c8c2b0; }
+        .asm-row-on {
+          background: #0a0a0a;
+          border-color: #0a0a0a;
+        }
+        .asm-row-on .asm-row-name,
+        .asm-row-on .asm-row-meta { color: #fafaf7; }
+        .asm-row-on .asm-row-meta { opacity: 0.7; }
+
+        .asm-row-body { flex: 1; min-width: 0; }
+        .asm-row-name {
+          font-size: 13px;
+          font-weight: 600;
+          color: #0a0a0a;
+          margin: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .asm-row-meta {
+          font-size: 11px;
+          color: #6b6a63;
+          margin: 2px 0 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .asm-check {
+          flex-shrink: 0;
+          width: 22px;
+          height: 22px;
+          border-radius: 999px;
+          border: 1.5px solid #d9d4c4;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: transparent;
+          color: #fafaf7;
+          font-size: 11px;
+          font-weight: 700;
+          transition: background 160ms ease, border-color 160ms ease;
+        }
+        .asm-check-on {
+          background: #fafaf7;
+          border-color: #fafaf7;
+          color: #0a0a0a;
+        }
+
+        .asm-empty {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+          padding: 40px 20px;
+          color: #8a8578;
+        }
+        .asm-empty p { font-size: 13px; margin: 0; }
+      `}</style>
+    </PremiumModal>
   );
 }
 
@@ -950,74 +1158,171 @@ export default function StaffPage() {
       )}
 
       {/* Edit Department Modal */}
-      {editingDept && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center p-4" onClick={() => setEditingDept(null)}>
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} />
-          <div
-            className="relative w-full max-w-sm rounded-2xl p-6 space-y-5"
-            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-lg)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Departman Düzenle</h3>
-              <button onClick={() => setEditingDept(null)} className="rounded-lg p-2 hover:bg-(--color-surface-hover)">
-                <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
-              </button>
-            </div>
-            <div>
-              <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Departman Adı</Label>
+      <PremiumModal
+        isOpen={!!editingDept}
+        onClose={() => { if (!editDeptSaving) setEditingDept(null); }}
+        eyebrow="Departman"
+        title="Departmanı düzenle"
+        subtitle="Ad ve renk aynı anda güncellenir."
+        size="md"
+        disableEscape={editDeptSaving}
+        footer={
+          <PremiumModalFooter
+            actions={
+              <>
+                <PremiumButton variant="ghost" onClick={() => setEditingDept(null)} disabled={editDeptSaving}>İptal</PremiumButton>
+                <PremiumButton
+                  disabled={!editingDept?.name.trim()}
+                  loading={editDeptSaving}
+                  icon={<Save className="h-4 w-4" />}
+                  onClick={async () => {
+                    if (!editingDept) return;
+                    setEditDeptSaving(true);
+                    try {
+                      const res = await fetch(`/api/admin/departments/${editingDept.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: editingDept.name, color: editingDept.color }),
+                      });
+                      if (!res.ok) throw new Error('Güncellenemedi');
+                      toast('Departman güncellendi', 'success');
+                      setEditingDept(null);
+                      refetch();
+                    } catch {
+                      toast('Departman güncellenemedi', 'error');
+                    } finally {
+                      setEditDeptSaving(false);
+                    }
+                  }}
+                >
+                  {editDeptSaving ? 'Kaydediliyor' : 'Kaydet'}
+                </PremiumButton>
+              </>
+            }
+          />
+        }
+      >
+        {editingDept && (
+          <div className="edm-form">
+            <div className="edm-field">
+              <Label className="edm-label">Departman Adı</Label>
               <Input
                 value={editingDept.name}
                 onChange={(e) => setEditingDept({ ...editingDept, name: e.target.value })}
                 className="h-10"
-                style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
+                style={{ background: '#ffffff', borderColor: '#ebe7df' }}
               />
             </div>
-            <div>
-              <Label className="text-xs font-medium mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>Renk</Label>
-              <div className="flex flex-wrap gap-2">
-                {DEPARTMENT_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setEditingDept({ ...editingDept, color: c })}
-                    className="h-7 w-7 rounded-full transition-transform duration-150 hover:scale-110"
-                    style={{ background: c, outline: editingDept.color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }}
-                  />
-                ))}
+
+            <div className="edm-field">
+              <Label className="edm-label">Renk</Label>
+              <div className="edm-swatches">
+                {DEPARTMENT_COLORS.map((c) => {
+                  const active = editingDept.color === c;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => setEditingDept({ ...editingDept, color: c })}
+                      className={`edm-swatch ${active ? 'edm-swatch-on' : ''}`}
+                      style={{ background: c }}
+                      aria-label={`Renk: ${c}`}
+                    >
+                      {active && <span className="edm-swatch-check">✓</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setEditingDept(null)} className="rounded-lg" style={{ borderColor: 'var(--color-border)' }}>İptal</Button>
-              <Button
-                disabled={!editingDept.name.trim() || editDeptSaving}
-                className="gap-2 rounded-lg font-semibold text-white"
-                style={{ background: editingDept.color }}
-                onClick={async () => {
-                  setEditDeptSaving(true);
-                  try {
-                    const res = await fetch(`/api/admin/departments/${editingDept.id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ name: editingDept.name, color: editingDept.color }),
-                    });
-                    if (!res.ok) throw new Error('Güncellenemedi');
-                    toast('Departman güncellendi', 'success');
-                    setEditingDept(null);
-                    refetch();
-                  } catch {
-                    toast('Departman güncellenemedi', 'error');
-                  } finally {
-                    setEditDeptSaving(false);
-                  }
-                }}
-              >
-                {editDeptSaving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Save className="h-4 w-4" />}
-                {editDeptSaving ? 'Kaydediliyor...' : 'Kaydet'}
-              </Button>
+
+            <div className="edm-preview">
+              <span className="edm-preview-label">Önizleme</span>
+              <div className="edm-preview-card" style={{ borderColor: `${editingDept.color}40`, background: `${editingDept.color}0c` }}>
+                <div className="edm-preview-icon" style={{ background: `${editingDept.color}20`, color: editingDept.color }}>
+                  <Building2 className="h-4 w-4" />
+                </div>
+                <span className="edm-preview-name">{editingDept.name || 'Departman adı'}</span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        <style jsx>{`
+          .edm-form { display: flex; flex-direction: column; gap: 22px; }
+          .edm-field { display: flex; flex-direction: column; }
+          :global(.edm-label) {
+            font-family: var(--font-display, system-ui);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #6b6a63;
+            margin-bottom: 8px;
+            display: block;
+          }
+          .edm-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+          .edm-swatch {
+            width: 32px;
+            height: 32px;
+            border-radius: 999px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            transition: transform 220ms cubic-bezier(0.16,1,0.3,1);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+          }
+          .edm-swatch:hover { transform: scale(1.08); }
+          .edm-swatch-on {
+            border-color: #0a0a0a;
+            transform: scale(1.05);
+          }
+          .edm-swatch-check { text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+
+          .edm-preview {
+            padding-top: 8px;
+            border-top: 1px solid #ebe7df;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+          .edm-preview-label {
+            font-family: var(--font-display, system-ui);
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #8a8578;
+          }
+          .edm-preview-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid;
+          }
+          .edm-preview-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .edm-preview-name {
+            font-family: var(--font-editorial, serif);
+            font-size: 16px;
+            font-weight: 500;
+            font-variation-settings: 'opsz' 32;
+            color: #0a0a0a;
+            letter-spacing: -0.005em;
+          }
+        `}</style>
+      </PremiumModal>
 
       {showAddStaff && <NewStaffModal onClose={() => setShowAddStaff(false)} departments={allDepartments} onSaved={refetch} />}
       {showAssignStaff && selectedDept && (() => {

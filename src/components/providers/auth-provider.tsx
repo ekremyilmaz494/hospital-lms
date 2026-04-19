@@ -1,15 +1,40 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { usePresenceTracker } from '@/hooks/use-presence-tracker';
+import type { User } from '@/types/database';
 
 const DB_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 dakika — deaktive kullanıcı penceresi
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+interface AuthProviderProps {
+  children: React.ReactNode;
+  /**
+   * Server-side hydrated user. Root layout `app/layout.tsx` içinde Supabase session'dan
+   * türetilir. Login sonrası full-reload'da skeleton flash'ı önler — client hydration
+   * tamamlanmadan store doldurulmuş olur, admin/staff/super-admin layout'ları ilk render'da
+   * doğrudan içerik gösterir.
+   */
+  initialUser?: User | null;
+}
+
+export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const { setUser, setUserIfChanged, setLoading, setSessionTimeout } = useAuthStore();
+
+  // Render sırasında (useEffect'ten ÖNCE) bir defaya mahsus Zustand'ı hydrate et.
+  // Böylece children ilk render'da `user` dolu + `isLoading=false` görür, skeleton basmaz.
+  const hydratedRef = useRef(false);
+  if (!hydratedRef.current) {
+    hydratedRef.current = true;
+    if (initialUser) {
+      useAuthStore.setState({ user: initialUser, isAuthenticated: true, isLoading: false });
+    } else {
+      // Session yok → loading'i kapat, login sayfası/public route render olsun
+      useAuthStore.setState({ isLoading: false });
+    }
+  }
   // G3.2 — Track this user's presence in the global active-users channel
   usePresenceTracker();
   const router = useRouter();

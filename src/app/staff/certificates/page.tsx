@@ -22,29 +22,11 @@ interface Certificate {
   user?: { firstName?: string; lastName?: string; organization?: { name?: string } };
 }
 
-/** Greek key corner ornament SVG */
-function CornerOrnament({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 60 60" className={className} fill="#1e1e1e">
-      {/* Outer frame */}
-      <rect x="0" y="0" width="60" height="7" />
-      <rect x="0" y="0" width="7" height="60" />
-      <rect x="0" y="53" width="60" height="7" />
-      <rect x="53" y="0" width="7" height="60" />
-      {/* Inner key */}
-      <rect x="14" y="18" width="32" height="5" />
-      <rect x="22" y="14" width="5" height="32" />
-      {/* Center block */}
-      <rect x="23" y="23" width="14" height="14" />
-    </svg>
-  );
-}
-
-/** Gold seal SVG */
+/** Gold medal seal SVG */
 function GoldSeal() {
-  const points = 24;
-  const outerR = 28;
-  const innerR = 24;
+  const points = 16;
+  const outerR = 26;
+  const innerR = 20;
   let d = '';
   for (let i = 0; i < points; i++) {
     const a1 = (i * 2 * Math.PI) / points;
@@ -55,191 +37,143 @@ function GoldSeal() {
     d += `L${30 + innerR * Math.cos(a2)},${30 + innerR * Math.sin(a2)} `;
     if (i === points - 1) d += `L${30 + outerR * Math.cos(a3)},${30 + outerR * Math.sin(a3)} Z`;
   }
-
   return (
-    <svg viewBox="0 0 60 60" className="h-14 w-14 sm:h-16 sm:w-16">
-      <path d={d} fill="#B48C32" />
-      <circle cx="30" cy="30" r="20" fill="#966E1E" />
-      <circle cx="30" cy="30" r="17" fill="#B48C32" />
-      <circle cx="30" cy="30" r="13" fill="#966E1E" />
-      {/* Star */}
+    <svg viewBox="0 0 60 60" className="h-12 w-12">
+      <path d={d} fill="#c9a961" />
+      <circle cx="30" cy="30" r="17" fill="#a5823c" />
+      <circle cx="30" cy="30" r="14" fill="#c9a961" />
+      <circle cx="30" cy="30" r="11" fill="#a5823c" />
       <polygon
-        points="30,19 32.5,26 40,26 34,30.5 36,38 30,33.5 24,38 26,30.5 20,26 27.5,26"
-        fill="#B48C32"
+        points="30,20 32,26.5 39,26.5 33.5,30.5 35.5,37 30,33 24.5,37 26.5,30.5 21,26.5 28,26.5"
+        fill="#e6c88a"
       />
-      <text x="30" y="46" textAnchor="middle" fill="white" fontSize="4" fontWeight="bold" fontFamily="sans-serif">BASARI</text>
     </svg>
   );
 }
 
-/** Premium HTML certificate preview — professional design */
+/** yeniii.png style certificate preview — navy corners + gold accents */
 function CertificatePreview({ cert }: { cert: Certificate }) {
   const fullName = cert.user ? `${cert.user.firstName ?? ''} ${cert.user.lastName ?? ''}`.trim() : '';
-  const orgName = cert.user?.organization?.name ?? 'Devakent Hastanesi';
+  const orgLogo = (cert.user?.organization as { logoUrl?: string | null } | undefined)?.logoUrl ?? '/logos/devakent.png';
+  const issued = new Date(cert.issuedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const expiryLabel = cert.expiresAt
+    ? `${new Date(cert.expiresAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}${cert.isExpired ? ' (Süresi Dolmuş)' : ''}`
+    : 'Süresiz';
+
+  const NAVY = '#0b1e3f';
+  const NAVY_DARK = '#06142d';
+  const NAVY_MID = '#16305a';
+  const GOLD = '#c9a961';
+  const GOLD_DARK = '#a5823c';
+  const GOLD_LIGHT = '#e6c88a';
+  const CREAM = '#faf6eb';
 
   return (
     <div
       className="relative w-full overflow-hidden select-none"
       style={{
-        background: `
-          repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(200,210,220,0.15) 6px, rgba(200,210,220,0.15) 7px),
-          repeating-linear-gradient(-45deg, transparent, transparent 6px, rgba(200,210,220,0.15) 6px, rgba(200,210,220,0.15) 7px),
-          #fcfdfe
-        `,
+        background: CREAM,
         borderRadius: '4px',
-        fontFamily: 'Georgia, "Times New Roman", serif',
         aspectRatio: '1.414 / 1',
-        minHeight: '280px',
+        minHeight: '300px',
+        border: `1px solid ${GOLD}`,
       }}
     >
-      {/* Top-left diagonal stripes */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
-        <div
-          className="absolute"
-          style={{
-            top: 0, left: 0,
-            width: '40%', height: '45%',
-            background: 'var(--brand-600)',
-            clipPath: 'polygon(0 0, 100% 0, 0 100%)',
-          }}
-        />
-        <div
-          className="absolute"
-          style={{
-            top: 0, left: 0,
-            width: '33%', height: '38%',
-            background: '#1e1e1e',
-            clipPath: 'polygon(0 0, 100% 0, 0 100%)',
-          }}
-        />
-        <div
-          className="absolute"
-          style={{
-            top: 0, left: 0,
-            width: '23%', height: '26%',
-            background: 'var(--brand-600)',
-            clipPath: 'polygon(0 0, 100% 0, 0 100%)',
-          }}
-        />
+      {/* Top-left corner block */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-0" style={{ width: '30%', height: '40%' }}>
+          <div className="absolute inset-0" style={{ background: NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+          <div className="absolute inset-0" style={{ background: NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
+          <div className="absolute inset-0" style={{ background: GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
+        </div>
+        {/* Top-right */}
+        <div className="absolute top-0 right-0" style={{ width: '30%', height: '40%', transform: 'scaleX(-1)' }}>
+          <div className="absolute inset-0" style={{ background: NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+          <div className="absolute inset-0" style={{ background: NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
+          <div className="absolute inset-0" style={{ background: GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
+        </div>
+        {/* Bottom-left */}
+        <div className="absolute bottom-0 left-0" style={{ width: '30%', height: '40%', transform: 'scaleY(-1)' }}>
+          <div className="absolute inset-0" style={{ background: NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+          <div className="absolute inset-0" style={{ background: NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
+          <div className="absolute inset-0" style={{ background: GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
+        </div>
+        {/* Bottom-right */}
+        <div className="absolute bottom-0 right-0" style={{ width: '30%', height: '40%', transform: 'scale(-1, -1)' }}>
+          <div className="absolute inset-0" style={{ background: NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+          <div className="absolute inset-0" style={{ background: NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
+          <div className="absolute inset-0" style={{ background: GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
+        </div>
       </div>
-
-      {/* Bottom-right diagonal stripes */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
-        <div
-          className="absolute"
-          style={{
-            bottom: 0, right: 0,
-            width: '40%', height: '45%',
-            background: '#1e1e1e',
-            clipPath: 'polygon(100% 100%, 0 100%, 100% 0)',
-          }}
-        />
-        <div
-          className="absolute"
-          style={{
-            bottom: 0, right: 0,
-            width: '30%', height: '35%',
-            background: 'var(--brand-600)',
-            clipPath: 'polygon(100% 100%, 0 100%, 100% 0)',
-          }}
-        />
-        <div
-          className="absolute"
-          style={{
-            bottom: 0, right: 0,
-            width: '19%', height: '22%',
-            background: 'var(--brand-800)',
-            clipPath: 'polygon(100% 100%, 0 100%, 100% 0)',
-          }}
-        />
-      </div>
-
-      {/* Corner ornaments */}
-      <CornerOrnament className="absolute top-2 left-2 w-8 h-8 sm:w-10 sm:h-10" />
-      <CornerOrnament className="absolute top-2 right-2 w-8 h-8 sm:w-10 sm:h-10 -scale-x-100" />
-      <CornerOrnament className="absolute bottom-2 left-2 w-8 h-8 sm:w-10 sm:h-10 -scale-y-100" />
-      <CornerOrnament className="absolute bottom-2 right-2 w-8 h-8 sm:w-10 sm:h-10 -scale-x-100 -scale-y-100" />
 
       {/* Content */}
-      <div className="relative h-full flex flex-col items-center justify-between px-8 py-5 sm:px-12 sm:py-6">
-        {/* Header */}
-        <div className="flex flex-col items-center gap-0.5 w-full">
-          {/* Green diamond logo */}
-          <div
-            className="w-4 h-4 sm:w-5 sm:h-5 rotate-45 mb-1"
-            style={{ background: 'var(--brand-600)' }}
-          />
-          <span className="text-[8px] sm:text-[9px] font-sans font-bold tracking-[0.3em] uppercase" style={{ color: '#94a3b8' }}>
-            {orgName}
-          </span>
-
-          <h1 className="text-[18px] sm:text-[22px] font-bold tracking-[0.15em] uppercase mt-1" style={{ color: 'var(--brand-600)' }}>
-            SERTİFİKA
+      <div className="relative h-full flex flex-col items-center justify-between px-8 pt-6 pb-4 sm:px-14 sm:pt-7 sm:pb-5" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+        {/* Header: logo + title */}
+        <div className="flex flex-col items-center gap-1 w-full">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={orgLogo} alt="Hastane Logosu" className="h-10 sm:h-12 object-contain" style={{ maxWidth: '55%' }} />
+          <h1 className="text-[22px] sm:text-[30px] font-bold tracking-[0.05em] mt-1" style={{ color: GOLD_DARK, letterSpacing: '0.08em' }}>
+            BAŞARI SERTİFİKASI
           </h1>
-          <span className="text-[10px] sm:text-[11px] font-sans tracking-[0.2em] uppercase" style={{ color: '#1e1e1e' }}>
-            BAŞARI BELGESİ
-          </span>
-
-          {/* Separator */}
-          <div className="h-px w-20 mt-1" style={{ background: 'linear-gradient(90deg, transparent, var(--brand-600), transparent)' }} />
+          <div className="flex items-center gap-2 w-full max-w-[60%] mt-0.5">
+            <div className="flex-1 h-px" style={{ background: GOLD }} />
+            <div className="w-1.5 h-1.5 rotate-45" style={{ background: GOLD }} />
+            <div className="flex-1 h-px" style={{ background: GOLD }} />
+          </div>
         </div>
 
         {/* Body */}
-        <div className="flex flex-col items-center gap-1.5 text-center">
-          <p className="text-[8px] sm:text-[9px] font-sans tracking-[0.15em] uppercase" style={{ color: '#94a3b8' }}>
-            Bu sertifika aşağıdaki kişiye verilmiştir
-          </p>
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="text-[10px] sm:text-[11px] italic" style={{ color: '#6e737d' }}>Bu sertifika,</p>
           {fullName && (
-            <p className="text-[16px] sm:text-[20px] font-bold italic" style={{ color: '#0f172a' }}>
+            <p className="text-[18px] sm:text-[24px] font-bold tracking-wide uppercase" style={{ color: NAVY, fontFamily: 'system-ui, sans-serif' }}>
               {fullName}
             </p>
           )}
-          {/* Name underline */}
-          <div className="h-px w-32 sm:w-40" style={{ background: 'var(--brand-600)' }} />
-
-          <p className="text-[8px] font-sans tracking-widest uppercase mt-1" style={{ color: '#94a3b8' }}>
-            Eğitim
-          </p>
-          <p className="text-[11px] sm:text-[13px] font-bold max-w-[200px] leading-snug" style={{ color: 'var(--brand-600)' }}>
+          <p className="text-[11px] sm:text-[13px] font-semibold max-w-[70%] leading-tight" style={{ color: NAVY_MID }}>
             {cert.training.title}
           </p>
-
-          {cert.score != null && (
-            <div className="mt-1">
-              <span className="text-[8px] font-sans tracking-wider uppercase" style={{ color: '#94a3b8' }}>Puan: </span>
-              <span className="text-[12px] font-bold font-mono" style={{ color: '#0f172a' }}>{cert.score}%</span>
+          <p className="text-[9px] sm:text-[10px]" style={{ color: '#232837' }}>
+            eğitimini başarıyla tamamlamıştır.
+          </p>
+          <div className="mt-1 text-[8px] sm:text-[9px]" style={{ color: '#232837', fontFamily: 'system-ui, sans-serif' }}>
+            <div>Veriliş Tarihi: <span className="font-semibold">{issued}</span></div>
+            <div style={{ color: cert.isExpired ? '#c82828' : '#232837' }}>
+              Geçerlilik Tarihi: <span className="font-semibold">{expiryLabel}</span>
             </div>
-          )}
-        </div>
-
-        {/* Footer: Date | Seal | Signature */}
-        <div className="w-full flex items-end justify-between">
-          {/* Date */}
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-[8px] font-sans tracking-wider uppercase" style={{ color: '#94a3b8' }}>Tarih</span>
-            <div className="h-px w-16" style={{ background: '#1e1e1e' }} />
-            <span className="text-[9px] font-bold font-mono" style={{ color: '#0f172a' }}>
-              {new Date(cert.issuedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
-            </span>
-            {cert.isExpired && (
-              <span className="text-[7px] font-sans" style={{ color: '#dc2626' }}>Süresi Dolmuş</span>
+            {cert.score != null && (
+              <div style={{ color: GOLD_DARK }} className="font-bold mt-0.5">Sınav Puanı: %{cert.score}</div>
             )}
           </div>
+        </div>
 
-          {/* Gold seal */}
+        {/* Footer: signatures + gold seal */}
+        <div className="w-full flex items-end justify-between px-2" style={{ fontFamily: 'system-ui, sans-serif' }}>
+          <div className="flex flex-col items-center gap-0.5" style={{ width: '28%' }}>
+            <div className="h-px w-full" style={{ background: NAVY }} />
+            <span className="text-[9px] font-bold" style={{ color: NAVY }}>Yetkili İmza</span>
+            <span className="text-[7px]" style={{ color: '#6e737d' }}>Official</span>
+          </div>
           <div className="flex flex-col items-center -mb-1">
             <GoldSeal />
-            <p className="text-[7px] font-mono mt-0.5" style={{ color: '#94a3b8' }}>
-              {cert.certificateCode.slice(0, 18)}
-            </p>
           </div>
-
-          {/* Signature */}
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-[8px] font-sans tracking-wider uppercase" style={{ color: '#94a3b8' }}>İmza</span>
-            <div className="h-px w-16" style={{ background: '#1e1e1e' }} />
+          <div className="flex flex-col items-center gap-0.5" style={{ width: '28%' }}>
+            <div className="h-px w-full" style={{ background: NAVY }} />
+            <span className="text-[9px] font-bold" style={{ color: NAVY }}>Eğitmen İmza</span>
+            <span className="text-[7px]" style={{ color: '#6e737d' }}>Mühür</span>
           </div>
         </div>
+        <p className="absolute bottom-1 left-0 right-0 text-center text-[6px]" style={{ color: '#6e737d', fontFamily: 'system-ui, sans-serif' }}>
+          Sertifika Kodu: {cert.certificateCode}
+        </p>
       </div>
     </div>
   );
