@@ -16,8 +16,8 @@ export interface NovaStarProps {
  */
 export function NovaStar({
   size = 80,
-  color = KLINOVA_COLORS.white,
-  glowColor = KLINOVA_COLORS.cyanSoft,
+  color = KLINOVA_COLORS.surfaceWhite,
+  glowColor = KLINOVA_COLORS.LEGACY_cyanSoft,
   burstStartFrame = 0,
 }: NovaStarProps) {
   const frame = useCurrentFrame();

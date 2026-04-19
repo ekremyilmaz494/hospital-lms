@@ -50,17 +50,17 @@ export function LogoMark({
     variant === "gradient"
       ? `url(#${gradId})`
       : variant === "mono-light"
-        ? KLINOVA_COLORS.white
+        ? KLINOVA_COLORS.surfaceWhite
         : variant === "mono-dark"
-          ? KLINOVA_COLORS.slate
+          ? KLINOVA_COLORS.LEGACY_slate
           : "transparent";
 
   const strokeColor =
     variant === "transparent"
       ? `url(#${gradId})`
       : variant === "mono-light"
-        ? KLINOVA_COLORS.slate
-        : KLINOVA_COLORS.white;
+        ? KLINOVA_COLORS.LEGACY_slate
+        : KLINOVA_COLORS.surfaceWhite;
 
   const strokeOpacity = variant === "mono-light" ? 0.35 : 1;
 
@@ -68,8 +68,8 @@ export function LogoMark({
     variant === "transparent"
       ? `url(#${gradId})`
       : variant === "mono-light"
-        ? KLINOVA_COLORS.slate
-        : KLINOVA_COLORS.white;
+        ? KLINOVA_COLORS.LEGACY_slate
+        : KLINOVA_COLORS.surfaceWhite;
 
   return (
     <svg
@@ -85,14 +85,14 @@ export function LogoMark({
 
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={KLINOVA_COLORS.indigo} />
-          <stop offset="100%" stopColor={KLINOVA_COLORS.cyan} />
+          <stop offset="0%" stopColor={KLINOVA_COLORS.LEGACY_indigo} />
+          <stop offset="100%" stopColor={KLINOVA_COLORS.LEGACY_cyan} />
         </linearGradient>
 
         <radialGradient id={glowId} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={KLINOVA_COLORS.cyanSoft} stopOpacity="0.6" />
-          <stop offset="60%" stopColor={KLINOVA_COLORS.cyanSoft} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={KLINOVA_COLORS.cyanSoft} stopOpacity="0" />
+          <stop offset="0%" stopColor={KLINOVA_COLORS.LEGACY_cyanSoft} stopOpacity="0.6" />
+          <stop offset="60%" stopColor={KLINOVA_COLORS.LEGACY_cyanSoft} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={KLINOVA_COLORS.LEGACY_cyanSoft} stopOpacity="0" />
         </radialGradient>
       </defs>
 
@@ -130,7 +130,7 @@ export function LogoMark({
           animate={{ strokeDashoffset: 0 }}
           transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }}
           style={{
-            filter: `drop-shadow(0 0 3px ${KLINOVA_COLORS.cyanSoft})`,
+            filter: `drop-shadow(0 0 3px ${KLINOVA_COLORS.LEGACY_cyanSoft})`,
           }}
         />
       ) : null}

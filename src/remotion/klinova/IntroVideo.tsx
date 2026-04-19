@@ -59,7 +59,7 @@ const SCENE_SCRIPT = {
 
 export const IntroVideo: React.FC = () => {
   return (
-    <AbsoluteFill style={{ backgroundColor: KLINOVA_COLORS.slate }}>
+    <AbsoluteFill style={{ backgroundColor: KLINOVA_COLORS.LEGACY_slate }}>
       <Sequence from={0} durationInFrames={150}>
         <LogoReveal tagline="Hastane personeli için dijital eğitim platformu" />
       </Sequence>
@@ -69,7 +69,7 @@ export const IntroVideo: React.FC = () => {
           eyebrow="01 — Sorun"
           title={SCENE_SCRIPT.problem.title}
           body={SCENE_SCRIPT.problem.body}
-          accent={KLINOVA_COLORS.cyanSoft}
+          accent={KLINOVA_COLORS.LEGACY_cyanSoft}
         />
       </Sequence>
 
@@ -78,7 +78,7 @@ export const IntroVideo: React.FC = () => {
           eyebrow="02 — Çözüm"
           title={SCENE_SCRIPT.solution.title}
           body={SCENE_SCRIPT.solution.body}
-          accent={KLINOVA_COLORS.indigoSoft}
+          accent={KLINOVA_COLORS.LEGACY_indigoSoft}
         />
       </Sequence>
 
@@ -87,7 +87,7 @@ export const IntroVideo: React.FC = () => {
           eyebrow="03 — Özellik"
           title={SCENE_SCRIPT.feature1.title}
           body={SCENE_SCRIPT.feature1.body}
-          accent={KLINOVA_COLORS.cyanSoft}
+          accent={KLINOVA_COLORS.LEGACY_cyanSoft}
         />
       </Sequence>
 
@@ -96,7 +96,7 @@ export const IntroVideo: React.FC = () => {
           eyebrow="04 — Özellik"
           title={SCENE_SCRIPT.feature2.title}
           body={SCENE_SCRIPT.feature2.body}
-          accent={KLINOVA_COLORS.indigoSoft}
+          accent={KLINOVA_COLORS.LEGACY_indigoSoft}
         />
       </Sequence>
 
@@ -128,7 +128,7 @@ function Scene({ eyebrow, title, body, accent }: SceneProps) {
   return (
     <AbsoluteFill
       style={{
-        background: `linear-gradient(135deg, ${KLINOVA_COLORS.slate} 0%, ${KLINOVA_COLORS.slateMid} 100%)`,
+        background: `linear-gradient(135deg, ${KLINOVA_COLORS.LEGACY_slate} 0%, ${KLINOVA_COLORS.LEGACY_slateMid} 100%)`,
         padding: "0 120px",
         justifyContent: "center",
       }}
@@ -168,7 +168,7 @@ function Scene({ eyebrow, title, body, accent }: SceneProps) {
           fontFamily: KLINOVA_TYPOGRAPHY.display,
           fontSize: 72,
           fontWeight: 700,
-          color: KLINOVA_COLORS.white,
+          color: KLINOVA_COLORS.surfaceWhite,
           letterSpacing: "-0.03em",
           lineHeight: 1.05,
           maxWidth: 900,
@@ -204,7 +204,7 @@ function CTAScene({ title, body }: { title: string; body: string }) {
   return (
     <AbsoluteFill
       style={{
-        background: `linear-gradient(135deg, ${KLINOVA_COLORS.indigoDeep} 0%, ${KLINOVA_COLORS.cyanDeep} 100%)`,
+        background: `linear-gradient(135deg, ${KLINOVA_COLORS.LEGACY_indigoDeep} 0%, ${KLINOVA_COLORS.LEGACY_cyanDeep} 100%)`,
         alignItems: "center",
         justifyContent: "center",
       }}
@@ -221,7 +221,7 @@ function CTAScene({ title, body }: { title: string; body: string }) {
             fontFamily: KLINOVA_TYPOGRAPHY.display,
             fontSize: 80,
             fontWeight: 800,
-            color: KLINOVA_COLORS.white,
+            color: KLINOVA_COLORS.surfaceWhite,
             letterSpacing: "-0.04em",
             marginBottom: 24,
           }}

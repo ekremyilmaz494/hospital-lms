@@ -26,8 +26,8 @@ export function Wordmark({ size = 40, variant = "gradient", className }: Wordmar
     variant === "gradient"
       ? `url(#${gradId})`
       : variant === "light"
-        ? KLINOVA_COLORS.white
-        : KLINOVA_COLORS.slate;
+        ? KLINOVA_COLORS.surfaceWhite
+        : KLINOVA_COLORS.LEGACY_slate;
 
   return (
     <svg
@@ -43,8 +43,8 @@ export function Wordmark({ size = 40, variant = "gradient", className }: Wordmar
 
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor={KLINOVA_COLORS.indigo} />
-          <stop offset="100%" stopColor={KLINOVA_COLORS.cyan} />
+          <stop offset="0%" stopColor={KLINOVA_COLORS.LEGACY_indigo} />
+          <stop offset="100%" stopColor={KLINOVA_COLORS.LEGACY_cyan} />
         </linearGradient>
       </defs>
 

@@ -63,14 +63,14 @@ export const LogoReveal: React.FC<LogoRevealProps> = ({
   return (
     <AbsoluteFill
       style={{
-        background: `radial-gradient(ellipse at center, ${KLINOVA_COLORS.slateMid} 0%, ${KLINOVA_COLORS.slate} 70%)`,
+        background: `radial-gradient(ellipse at center, ${KLINOVA_COLORS.LEGACY_slateMid} 0%, ${KLINOVA_COLORS.LEGACY_slate} 70%)`,
         opacity: exitOpacity,
       }}
     >
       <AbsoluteFill
         style={{
           opacity: bgProgress * 0.35,
-          background: `radial-gradient(circle at 30% 40%, ${KLINOVA_COLORS.indigo}44 0%, transparent 50%), radial-gradient(circle at 70% 60%, ${KLINOVA_COLORS.cyan}33 0%, transparent 50%)`,
+          background: `radial-gradient(circle at 30% 40%, ${KLINOVA_COLORS.LEGACY_indigo}44 0%, transparent 50%), radial-gradient(circle at 70% 60%, ${KLINOVA_COLORS.LEGACY_cyan}33 0%, transparent 50%)`,
         }}
       />
 
@@ -87,7 +87,7 @@ export const LogoReveal: React.FC<LogoRevealProps> = ({
             <PulseWave
               width={500}
               height={200}
-              strokeColor={KLINOVA_COLORS.white}
+              strokeColor={KLINOVA_COLORS.surfaceWhite}
               strokeWidth={4}
               drawStartFrame={10}
               drawDurationFrames={40}
@@ -127,10 +127,10 @@ export const LogoReveal: React.FC<LogoRevealProps> = ({
               alignItems: "baseline",
             }}
           >
-            <span style={{ fontWeight: 800, color: KLINOVA_COLORS.white }}>
+            <span style={{ fontWeight: 800, color: KLINOVA_COLORS.surfaceWhite }}>
               Klin
             </span>
-            <span style={{ fontWeight: 500, color: KLINOVA_COLORS.cyanSoft }}>
+            <span style={{ fontWeight: 500, color: KLINOVA_COLORS.LEGACY_cyanSoft }}>
               ova
             </span>
           </div>

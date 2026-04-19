@@ -41,26 +41,18 @@ export const KLINOVA_COLORS = {
   danger: "#DC2626",
   info: "#0891B2",            // cyan-deep — bilgi iletişimi için korundu
 
-  // ── Legacy (geriye dönük — Remotion videolarında hâlâ kullanılıyor)
-  // YENI KOD YAZARKEN BUNLARI KULLANMA.
+  // ── Legacy (geriye dönük — Remotion videoları + eski logo SVG'leri)
+  // YENI KOD YAZARKEN BUNLARI KULLANMA. Yeni iş LogoMark/Wordmark'a
+  // dokunduğunda bu referansları semantik alanlara göçürüp LEGACY_* sabitlerini
+  // kaldırmayı hedefle.
   LEGACY_indigo: "#6366F1",
   LEGACY_indigoDeep: "#4F46E5",
+  LEGACY_indigoSoft: "#C7D2FE",
   LEGACY_cyan: "#06B6D4",
   LEGACY_cyanDeep: "#0891B2",
+  LEGACY_cyanSoft: "#A5F3FC",
   LEGACY_slate: "#0F172A",
-
-  // ── Legacy alias'ları (LogoMark, Wordmark, Remotion komponentlerinin eski
-  // API'sini kırmamak için). Rebrand öncesi bu isimler doğrudan kullanılıyordu;
-  // şimdi yeni kod LEGACY_* veya yeni semantik alanları kullanmalı.
-  white: "#FFFFFF",
-  slate: "#0F172A",
-  slateMid: "#334155",
-  indigo: "#6366F1",
-  indigoDeep: "#4F46E5",
-  indigoSoft: "#C7D2FE",
-  cyan: "#06B6D4",
-  cyanDeep: "#0891B2",
-  cyanSoft: "#A5F3FC",
+  LEGACY_slateMid: "#334155",
 } as const;
 
 export const KLINOVA_GRADIENT = {

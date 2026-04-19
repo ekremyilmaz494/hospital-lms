@@ -23,7 +23,7 @@ const PATH_LENGTH = 720;
 export function PulseWave({
   width = 500,
   height = 200,
-  strokeColor = KLINOVA_COLORS.white,
+  strokeColor = KLINOVA_COLORS.surfaceWhite,
   strokeWidth = 4,
   drawStartFrame = 0,
   drawDurationFrames = 40,

@@ -48,7 +48,7 @@ export const SplashScreen: React.FC = () => {
   return (
     <AbsoluteFill
       style={{
-        background: `linear-gradient(135deg, ${KLINOVA_COLORS.indigoDeep} 0%, ${KLINOVA_COLORS.cyanDeep} 100%)`,
+        background: `linear-gradient(135deg, ${KLINOVA_COLORS.LEGACY_indigoDeep} 0%, ${KLINOVA_COLORS.LEGACY_cyanDeep} 100%)`,
         alignItems: "center",
         justifyContent: "center",
         opacity: finalOpacity,
@@ -74,7 +74,7 @@ export const SplashScreen: React.FC = () => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: `0 24px 80px ${KLINOVA_COLORS.slate}66`,
+            boxShadow: `0 24px 80px ${KLINOVA_COLORS.LEGACY_slate}66`,
           }}
         >
           <NovaStar size={120} burstStartFrame={5} />
@@ -85,7 +85,7 @@ export const SplashScreen: React.FC = () => {
             fontFamily: KLINOVA_TYPOGRAPHY.display,
             fontSize: 56,
             fontWeight: 700,
-            color: KLINOVA_COLORS.white,
+            color: KLINOVA_COLORS.surfaceWhite,
             letterSpacing: "-0.03em",
             lineHeight: 1,
           }}
