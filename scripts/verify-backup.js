@@ -35,19 +35,32 @@ async function checkDatabase() {
   const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 10000 });
   try {
     // Son yedek kontrolü
+    // verified=true filtresi zorunlu: status='completed' olup verified=false olan
+    // yedekler okunamaz dosyalar olabilir (deep verification başarısız).
     const backupResult = await pool.query(
-      "SELECT created_at, status, verified FROM db_backups WHERE status = 'completed' ORDER BY created_at DESC LIMIT 1"
+      "SELECT created_at, status, verified FROM db_backups WHERE status = 'completed' AND verified = true ORDER BY created_at DESC LIMIT 1"
     );
     if (backupResult.rows.length === 0) {
-      fail('Son Yedek', 'Hiç tamamlanmış yedek bulunamadı');
+      fail('Son Yedek', 'Doğrulanmış (verified=true) yedek bulunamadı');
     } else {
       const lastBackup = backupResult.rows[0];
       const hoursAgo = (Date.now() - new Date(lastBackup.created_at).getTime()) / 3600000;
       if (hoursAgo > 24) {
-        fail('Son Yedek', `Son yedek ${hoursAgo.toFixed(1)} saat önce — 24 saat limitini aştı!`);
+        fail('Son Yedek', `Son doğrulanmış yedek ${hoursAgo.toFixed(1)} saat önce — 24 saat limitini aştı!`);
       } else {
         pass('Son Yedek', `${hoursAgo.toFixed(1)} saat önce, verified: ${lastBackup.verified}`);
       }
+    }
+
+    // verification_failed sayısını da raporla
+    const failedResult = await pool.query(
+      "SELECT COUNT(*) AS cnt FROM db_backups WHERE status IN ('verification_failed', 'failed') AND created_at > NOW() - INTERVAL '7 days'"
+    );
+    const failedCount = parseInt(failedResult.rows[0].cnt);
+    if (failedCount > 0) {
+      fail('Başarısız Yedekler', `Son 7 günde ${failedCount} yedek başarısız — logları incele`);
+    } else {
+      pass('Başarısız Yedekler', 'Son 7 günde başarısız yedek yok');
     }
 
     // Organizasyon sayısı kontrolü

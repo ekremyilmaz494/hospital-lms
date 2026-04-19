@@ -1,74 +1,11 @@
-import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUser, requireRole, jsonResponse, createAuditLog } from '@/lib/api-helpers'
 import { uploadBuffer, backupKey } from '@/lib/s3'
-import { logger } from '@/lib/logger'
+import { encryptBackup } from '@/lib/backup-crypto'
 
-/**
- * KVKK uyumlu PII maskeleme — backup verisindeki hassas alanları maskeler.
- * TC No: sadece son 4 hane, Telefon: sadece son 3 hane, Email: domain korunur.
- */
-function sanitizeUsersForBackup(users: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
-  return users.map(u => ({
-    ...u,
-    phone: typeof u.phone === 'string' && u.phone.length > 3
-      ? `${'*'.repeat(u.phone.length - 3)}${u.phone.slice(-3)}`
-      : u.phone ?? null,
-  }))
-}
-
-/**
- * AES-256-GCM ile backup verisini sifreler.
- * Anahtar: BACKUP_ENCRYPTION_KEY env variable (32 byte hex).
- * Dondurulen format: iv(12 byte hex) + ':' + authTag(16 byte hex) + ':' + ciphertext(hex)
- */
-function encryptBackup(plaintext: string): { encrypted: string; isEncrypted: boolean } {
-  const key = process.env.BACKUP_ENCRYPTION_KEY
-  if (!key || key.length !== 64) {
-    logger.warn('Backup', 'BACKUP_ENCRYPTION_KEY tanimlanmamis veya gecersiz — backup sifrelenmeden kaydedilecek')
-    return { encrypted: plaintext, isEncrypted: false }
-  }
-
-  const iv = crypto.randomBytes(12)
-  const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(key, 'hex'), iv)
-  const encryptedBuf = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
-  const authTag = cipher.getAuthTag()
-
-  const result = `${iv.toString('hex')}:${authTag.toString('hex')}:${encryptedBuf.toString('hex')}`
-  return { encrypted: result, isEncrypted: true }
-}
-
-/**
- * AES-256-GCM ile sifrelenmiş backup verisini çözer.
- * Format: iv(12 byte hex) + ':' + authTag(16 byte hex) + ':' + ciphertext(hex)
- * Sifrelenmemis veriyi olduğu gibi döndürür.
- */
-export function decryptBackup(data: string): string {
-  const key = process.env.BACKUP_ENCRYPTION_KEY
-  if (!key || key.length !== 64) return data
-
-  // Sifrelenmis format kontrolü: iv:authTag:ciphertext (hex:hex:hex)
-  const parts = data.split(':')
-  if (parts.length !== 3 || parts[0].length !== 24) {
-    // Sifrelenmemis data — olduğu gibi dön
-    return data
-  }
-
-  try {
-    const [ivHex, authTagHex, ciphertextHex] = parts
-    const iv = Buffer.from(ivHex, 'hex')
-    const authTag = Buffer.from(authTagHex, 'hex')
-    const ciphertext = Buffer.from(ciphertextHex, 'hex')
-
-    const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(key, 'hex'), iv)
-    decipher.setAuthTag(authTag)
-    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()])
-    return decrypted.toString('utf8')
-  } catch {
-    // Decrypt başarısız — muhtemelen sifrelenmemis data, olduğu gibi dön
-    return data
-  }
-}
+// decryptBackup artık @/lib/backup-crypto'dan import edilir. Download endpoint'i
+// doğrudan oradan çeker — bu dosyadan re-export sadece geriye dönük uyumluluk için.
+export { decryptBackup } from '@/lib/backup-crypto'
 
 export async function GET(_request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -116,7 +53,11 @@ export async function POST(request: Request) {
 
   const orgId = dbUser!.organizationId!
 
-  const [users, departments, trainings, assignments, attempts, examAnswers, videoProgress, notifications, certificates] = await Promise.all([
+  const auditLogCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+
+  const [organization, subscription, users, departments, trainings, assignments, attempts, examAnswers, videoProgress, notifications, certificates, auditLogs] = await Promise.all([
+    prisma.organization.findUnique({ where: { id: orgId } }),
+    prisma.organizationSubscription.findUnique({ where: { organizationId: orgId } }),
     prisma.user.findMany({ where: { organizationId: orgId } }),
     prisma.department.findMany({ where: { organizationId: orgId } }),
     prisma.training.findMany({
@@ -129,16 +70,32 @@ export async function POST(request: Request) {
     prisma.videoProgress.findMany({ where: { attempt: { training: { organizationId: orgId } } } }),
     prisma.notification.findMany({ where: { organizationId: orgId } }),
     prisma.certificate.findMany({ where: { training: { organizationId: orgId } } }),
+    prisma.auditLog.findMany({ where: { organizationId: orgId, createdAt: { gte: auditLogCutoff } } }),
   ])
 
-  // KVKK: Hassas PII verilerini maskele
-  const sanitizedUsers = sanitizeUsersForBackup(users as unknown as Array<Record<string, unknown>>)
-
-  const backupData = { users: sanitizedUsers, departments, trainings, assignments, attempts, examAnswers, videoProgress, notifications, certificates, exportedAt: new Date().toISOString() }
+  // Yedek dosyası restore kaynağı olarak kullanılır; PII maskelenmez.
+  // Koruma: S3 at-rest encryption + AES-256-GCM (encryptBackup) + IAM.
+  const backupData = {
+    organization,
+    subscription,
+    users,
+    departments,
+    trainings,
+    assignments,
+    attempts,
+    examAnswers,
+    videoProgress,
+    notifications,
+    certificates,
+    auditLogs,
+    exportedAt: new Date().toISOString(),
+    organizationId: orgId,
+    schemaVersion: 2,
+  }
   const jsonBlob = JSON.stringify(backupData)
 
   // AES-256-GCM ile sifreleme (BACKUP_ENCRYPTION_KEY varsa)
-  const { encrypted, isEncrypted } = encryptBackup(jsonBlob)
+  const { data: encrypted, isEncrypted } = encryptBackup(jsonBlob)
   const sizeMb = Buffer.byteLength(encrypted) / (1024 * 1024)
   const key = backupKey(orgId)
   const buffer = Buffer.from(encrypted, 'utf-8')
