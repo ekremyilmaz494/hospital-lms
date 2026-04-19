@@ -29,8 +29,18 @@ CREATE INDEX IF NOT EXISTS idx_trusted_devices_user    ON trusted_devices (user_
 CREATE INDEX IF NOT EXISTS idx_trusted_devices_expires ON trusted_devices (expires_at);
 
 -- ── RLS ──
--- Kullanıcı kendi cihazlarını görür/yönetir; service_role tüm tabloya erişir (zaten RLS bypass'lı)
-ALTER TABLE trusted_devices ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "user_trusted_devices_own" ON trusted_devices
-  FOR ALL USING (user_id = auth.uid());
+-- Kullanıcı kendi cihazlarını görür/yönetir; service_role tüm tabloya erişir (zaten RLS bypass'lı).
+-- `auth.uid()` sadece Supabase'de tanımlı — CI shadow DB'sinde `auth` schema yok,
+-- o yüzden varlığı kontrol ediliyor. Supabase dışı ortamlarda RLS policy skip edilir.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'auth') THEN
+    EXECUTE 'ALTER TABLE trusted_devices ENABLE ROW LEVEL SECURITY';
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'trusted_devices' AND policyname = 'user_trusted_devices_own'
+    ) THEN
+      EXECUTE 'CREATE POLICY "user_trusted_devices_own" ON trusted_devices FOR ALL USING (user_id = auth.uid())';
+    END IF;
+  END IF;
+END $$;
