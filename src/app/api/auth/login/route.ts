@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { cookies } from 'next/headers'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { getRateLimitCount, incrementRateLimit, deleteRateLimit, getRedis } from '@/lib/redis'
 import { createLoginClient } from '@/lib/supabase/server'
@@ -6,6 +7,15 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity-logger'
+
+/**
+ * "Bu cihazda oturumumu açık tut (7 gün)" sentinel cookie.
+ * Supabase token'ını her refresh'te middleware bu cookie'yi okuyup auth
+ * cookie'lerine 7 gün maxAge ekliyor (yoksa Supabase default'u session-only
+ * olduğu için tarayıcı kapanınca oturum düşüyordu).
+ */
+const REMEMBER_ME_COOKIE = 'hlms-remember-me'
+const SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60
 
 /**
  * Trusted IP extraction for Vercel deployments.
@@ -138,6 +148,26 @@ export async function POST(request: NextRequest) {
       deleteRateLimit(`login:${normalizedEmail}`),
       deleteRateLimit(`login-fail:${normalizedEmail}`),
     ]).catch(() => {})
+
+    // "7 gün açık tut" sentinel cookie — middleware refresh'te okuyup maxAge uygulayacak
+    const cookieStore = await cookies()
+    if (rememberMe) {
+      cookieStore.set(REMEMBER_ME_COOKIE, '1', {
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: SEVEN_DAYS_SECONDS,
+      })
+    } else {
+      // Önceki login'den kalan sentinel varsa temizle
+      cookieStore.set(REMEMBER_ME_COOKIE, '', {
+        path: '/',
+        expires: new Date(0),
+        httpOnly: true,
+        sameSite: 'lax',
+      })
+    }
 
     logger.info('auth:login', 'Basarili giris', { userId: data.user?.id, role })
 

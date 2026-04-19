@@ -1,9 +1,11 @@
+import { randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, checkWritePermission } from '@/lib/api-helpers'
 import { createUserSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
+import { sendStaffWelcomeEmail } from '@/lib/email'
 import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 
@@ -167,11 +169,15 @@ export async function POST(request: Request) {
     resolvedDeptName = dept.name
   }
 
+  // Şifre opsiyonel — boş gelirse güvenli şifre üret (mail ile personele gönderilecek)
+  const effectivePassword = parsed.data.password ||
+    ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1')
+
   let result
   try {
     result = await createAuthUser({
       email: parsed.data.email,
-      password: parsed.data.password,
+      password: effectivePassword,
       firstName: parsed.data.firstName,
       lastName: parsed.data.lastName,
       role: 'staff',
@@ -179,6 +185,7 @@ export async function POST(request: Request) {
       phone: parsed.data.phone,
       departmentId: parsed.data.departmentId,
       title: parsed.data.title,
+      mustChangePassword: true,
     })
   } catch (err) {
     if (err instanceof AuthUserError) {
@@ -208,6 +215,23 @@ export async function POST(request: Request) {
 
   try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
   try { await invalidateOrgCache(dbUser!.organizationId!, 'staff') } catch {}
+
+  // Hoş geldiniz maili — fire-and-forget, hesap oluşumunu bloklamaz
+  try {
+    const org = await prisma.organization.findUnique({
+      where: { id: dbUser!.organizationId! },
+      select: { name: true },
+    })
+    await sendStaffWelcomeEmail({
+      to: user.email,
+      staffName: `${user.firstName} ${user.lastName}`,
+      hospitalName: org?.name ?? 'Hastane',
+      tempPassword: effectivePassword,
+      loginUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`,
+    })
+  } catch (err) {
+    logger.warn('Admin Staff', `Hoş geldiniz maili gönderilemedi: ${user.email}`, err instanceof Error ? err.message : err)
+  }
 
   return jsonResponse(user, 201)
 }

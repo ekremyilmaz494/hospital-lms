@@ -66,9 +66,30 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 };
 
 // ── Staff Actions Component ──
-function StaffActions({ staff }: { staff: Staff }) {
+function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: () => void }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [assignTrainingOpen, setAssignTrainingOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async (purge: boolean) => {
+    setDeleting(true);
+    try {
+      const url = `/api/admin/staff/${staff.id}${purge ? '?purge=true' : ''}`;
+      const res = await fetch(url, { method: 'DELETE' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Silme başarısız');
+      toast(purge ? `${staff.name} kalıcı olarak silindi` : `${staff.name} pasifleştirildi`, 'success');
+      setConfirmDelete(false);
+      onChanged();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Silme başarısız', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -86,18 +107,85 @@ function StaffActions({ staff }: { staff: Staff }) {
           <DropdownMenuItem className="gap-2" onClick={() => setAssignTrainingOpen(true)}>
             <GraduationCap className="h-4 w-4" /> Eğitim Ata
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
           <DropdownMenuItem className="gap-2" onClick={() => window.location.href = `mailto:${staff.email}`}>
             <Mail className="h-4 w-4" /> E-posta Gönder
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="gap-2 text-red-500"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="h-4 w-4" /> Sil
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
       <AssignTrainingModal
         staffId={staff.id}
         staffName={staff.name}
         open={assignTrainingOpen}
         onOpenChange={setAssignTrainingOpen}
       />
+
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0, 0, 0, 0.5)' }}
+          onClick={() => !deleting && setConfirmDelete(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl shadow-xl"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>Personeli sil</h2>
+                  <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    <strong>{staff.name}</strong> ({staff.email}) için bir seçim yapın.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleDelete(false)}
+                  disabled={deleting}
+                  className="w-full text-left rounded-xl p-4 border transition-colors disabled:opacity-50 hover:bg-(--color-surface-hover)"
+                  style={{ borderColor: 'var(--color-border)' }}
+                >
+                  <div className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>Pasifleştir (önerilen)</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Personel giriş yapamaz, ama geçmiş sınav ve sertifika kayıtları korunur.
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleDelete(true)}
+                  disabled={deleting}
+                  className="w-full text-left rounded-xl p-4 border transition-colors disabled:opacity-50"
+                  style={{ borderColor: 'var(--color-error)', background: 'var(--color-error-bg)' }}
+                >
+                  <div className="font-semibold text-sm" style={{ color: 'var(--color-error)' }}>Kalıcı olarak sil (KVKK)</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Kullanıcı hesabı tamamen silinir. Bu işlem geri alınamaz.
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 p-6 pt-0">
+              <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                Vazgeç
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -121,8 +209,8 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
     if (!form.soyad.trim()) e.soyad = 'Soyad zorunludur';
     if (!form.email.trim()) e.email = 'E-posta zorunludur';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Geçerli bir e-posta girin';
-    if (!form.sifre.trim()) e.sifre = 'Şifre zorunludur';
-    else if (form.sifre.length < 8) e.sifre = 'Şifre en az 8 karakter olmalıdır';
+    // Şifre opsiyonel — boşsa backend üretir, doluysa en az 8 karakter
+    if (form.sifre.trim() && form.sifre.length < 8) e.sifre = 'Şifre en az 8 karakter olmalıdır';
     if (form.telefon && !/^0\d{10}$/.test(form.telefon.replace(/\s/g, ''))) e.telefon = 'Geçerli telefon formatı: 05XX XXX XX XX';
     if (!form.departman) e.departman = 'Departman seçiniz';
     setErrors(e);
@@ -143,7 +231,7 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
           phone: form.telefon || undefined,
           departmentId: form.departman || undefined,
           title: form.unvan || undefined,
-          password: form.sifre,
+          password: form.sifre.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -210,9 +298,15 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
                 {errors.email && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.email}</p>}
               </div>
               <div>
-                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Şifre *</Label>
-                <Input type="password" placeholder="En az 8 karakter" className="h-10" value={form.sifre} onChange={(e) => setForm(f => ({ ...f, sifre: e.target.value }))} style={fieldStyle('sifre')} />
-                {errors.sifre && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.sifre}</p>}
+                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Şifre</Label>
+                <Input type="password" placeholder="Boş bırakın — sistem üretir" className="h-10" value={form.sifre} onChange={(e) => setForm(f => ({ ...f, sifre: e.target.value }))} style={fieldStyle('sifre')} />
+                {errors.sifre ? (
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.sifre}</p>
+                ) : (
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Boş bırakırsanız otomatik üretilip personelin e-postasına gönderilir.
+                  </p>
+                )}
               </div>
             </div>
             <div>
@@ -530,10 +624,10 @@ export default function StaffPage() {
     {
       id: 'actions', header: '', size: 50,
       cell: ({ row }) => (
-        <StaffActions staff={row.original} />
+        <StaffActions staff={row.original} onChanged={refetch} />
       ),
     },
-  ], [departmentMap]);
+  ], [departmentMap, refetch]);
 
   // Early return — artık tüm hook'lar çağrıldıktan SONRA
   if (isLoading) {

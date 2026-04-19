@@ -202,6 +202,82 @@ export async function sendHospitalWelcomeEmail(params: {
   })
 }
 
+/**
+ * Toplu personel yüklemesi (ya da tekil personel kaydı) sonrası
+ * personele gönderilen "Hoş Geldiniz" e-postası.
+ *
+ * İçerik: hastane adı, e-posta, geçici şifre, giriş linki, ilk girişte
+ * şifre değiştirme uyarısı. Admin panelinden yapılan kayıtlarda kullanılır —
+ * bu yüzden tonu kurumsal + kısa tutuldu (kullanıcı "davet" beklemiyor,
+ * zaten İK/yöneticisi bilgilendirmiş olabilir).
+ */
+export async function sendStaffWelcomeEmail(params: {
+  to: string
+  staffName: string
+  hospitalName: string
+  tempPassword: string
+  loginUrl: string
+}) {
+  const { to, staffName, hospitalName, tempPassword, loginUrl } = params
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc; padding: 24px;">
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 22px; letter-spacing: -0.3px;">${escapeHtml(hospitalName)}</h1>
+        <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 13px;">Personel Eğitim Yönetim Sistemi</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">Hesabınız oluşturuldu</h2>
+        <p style="color: #475569; line-height: 1.6;">Sayın ${escapeHtml(staffName)},</p>
+        <p style="color: #475569; line-height: 1.6;">
+          <strong>${escapeHtml(hospitalName)}</strong> personel eğitim sistemine hesabınız tanımlanmıştır.
+          Atanan eğitimleri takip etmek, sınavlara katılmak ve sertifikalarınızı görüntülemek için
+          aşağıdaki bilgilerle sisteme giriş yapabilirsiniz.
+        </p>
+
+        <div style="background: #f1f5f9; padding: 18px 20px; border-radius: 10px; margin: 20px 0;">
+          <p style="margin: 0 0 8px; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Giriş Bilgileri</p>
+          <p style="margin: 6px 0; color: #0f172a; font-size: 14px;">
+            <span style="color: #64748b; display: inline-block; width: 110px;">E-posta</span>
+            <strong>${escapeHtml(to)}</strong>
+          </p>
+          <p style="margin: 6px 0; color: #0f172a; font-size: 14px;">
+            <span style="color: #64748b; display: inline-block; width: 110px;">Geçici şifre</span>
+            <code style="background: white; border: 1px solid #e2e8f0; padding: 4px 10px; border-radius: 6px; font-family: 'JetBrains Mono', Menlo, monospace; font-size: 13px; color: #0f172a;">${escapeHtml(tempPassword)}</code>
+          </p>
+        </div>
+
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 20px 0;">
+          <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
+            <strong>Güvenlik:</strong> İlk girişinizde şifrenizi değiştirmeniz gerekmektedir.
+            Geçici şifreyi kimseyle paylaşmayınız.
+          </p>
+        </div>
+
+        <div style="text-align: center; margin: 28px 0 8px;">
+          <a href="${escapeHtml(loginUrl)}"
+             style="display: inline-block; background: #0d9668; color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.2px;">
+            Sisteme Giriş Yap
+          </a>
+        </div>
+
+        <p style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin-top: 28px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+          Bu e-posta sistem tarafından otomatik olarak gönderilmiştir. Hesabınızla ilgili sorularınız için
+          lütfen hastane yöneticiniz veya İnsan Kaynakları departmanı ile iletişime geçiniz.
+        </p>
+      </div>
+      <p style="color: #cbd5e1; font-size: 11px; text-align: center; margin-top: 16px;">
+        ${escapeHtml(hospitalName)} · Personel Eğitim Yönetim Sistemi
+      </p>
+    </div>
+  `
+
+  await sendEmail({
+    to,
+    subject: `${hospitalName} · Hesabınız oluşturuldu`,
+    html,
+  })
+}
+
 // Yaklaşan eğitim deadline hatırlatması (3/1 gün kala)
 export function upcomingTrainingReminderEmail(staffName: string, trainingTitle: string, dueDate: string, daysLeft: number) {
   const urgencyColor = daysLeft <= 1 ? '#dc2626' : '#f59e0b'

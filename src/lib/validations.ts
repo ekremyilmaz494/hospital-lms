@@ -67,10 +67,11 @@ export const createUserSchema = z.object({
   email: z.string().min(1).max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
+  // Opsiyonel — boş bırakılırsa backend güvenli şifre üretir + hoş geldiniz maili ile gönderir
   password: z.string().min(8).max(128).regex(
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
     'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir'
-  ),
+  ).optional(),
   role: z.enum(['admin', 'staff']),
   organizationId: z.string().uuid({ message: 'Geçersiz organizasyon kimliği' }).optional(),
   phone: z.string().max(20).optional(),

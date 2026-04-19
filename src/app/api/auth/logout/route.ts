@@ -27,6 +27,7 @@ export async function POST() {
     'sb-access-token',
     'sb-refresh-token',
     'supabase-auth-token',
+    'hlms-remember-me', // "7 gün açık tut" sentinel cookie
   ]
   // Also clear any sb-<project>-auth-token pattern cookies
   supabaseCookieNames.forEach((name) => {

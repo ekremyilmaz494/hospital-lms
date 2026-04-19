@@ -97,6 +97,14 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
+  // "7 gün açık tut" sentinel — login'de yazılır (hlms-remember-me).
+  // Varsa Supabase auth cookie'lerinin refresh'inde de 7 gün maxAge zorlanır,
+  // yoksa Supabase default'u session-only olduğu için tarayıcı kapanınca
+  // oturum düşüyordu. Sadece "-auth-token" içeren cookie'lere uygulanır ki
+  // x-org-slug gibi diğer cookie'leri etkilemesin.
+  const rememberMe = request.cookies.get('hlms-remember-me')?.value === '1'
+  const REMEMBER_ME_MAX_AGE = 7 * 24 * 60 * 60
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -110,9 +118,12 @@ export async function updateSession(request: NextRequest) {
             request.cookies.set(name, value)
           )
           supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const finalOptions = rememberMe && name.includes('-auth-token')
+              ? { ...options, maxAge: REMEMBER_ME_MAX_AGE }
+              : options
+            supabaseResponse.cookies.set(name, value, finalOptions)
+          })
         },
       },
     }

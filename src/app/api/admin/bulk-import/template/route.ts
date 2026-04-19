@@ -36,7 +36,6 @@ export async function GET() {
     { header: 'Ad',        key: 'ad',       width: 18 },
     { header: 'Soyad',     key: 'soyad',    width: 18 },
     { header: 'E-posta',   key: 'email',    width: 32 },
-    { header: 'Şifre',     key: 'sifre',    width: 22 },
     { header: 'Telefon',   key: 'telefon',  width: 16 },
     { header: 'Departman', key: 'departman', width: 20 },
     { header: 'Unvan',     key: 'unvan',    width: 22 },
@@ -59,7 +58,6 @@ export async function GET() {
     {
       ad: 'Ayşe', soyad: 'Yılmaz',
       email: 'ayse.yilmaz@hastane.com',
-      sifre: '', // boş bırak → sistem otomatik şifre üretir
       telefon: '05551234567',
       departman: deptNames[0] || 'Acil Servis',
       unvan: 'Hemşire',
@@ -67,7 +65,6 @@ export async function GET() {
     {
       ad: 'Mehmet', soyad: 'Demir',
       email: 'mehmet.demir@hastane.com',
-      sifre: 'Baslangic2026!', // kendi şifren varsa yaz
       telefon: '05559876543',
       departman: deptNames[1] || deptNames[0] || 'Dahiliye',
       unvan: 'Doktor',
@@ -75,7 +72,6 @@ export async function GET() {
     {
       ad: 'Fatma', soyad: 'Kaya',
       email: 'fatma.kaya@hastane.com',
-      sifre: '',
       telefon: '', // telefon opsiyonel, boş bırakılabilir
       departman: deptNames[2] || deptNames[0] || 'Yoğun Bakım',
       unvan: 'Başhemşire',
@@ -83,7 +79,6 @@ export async function GET() {
     {
       ad: 'Ali', soyad: 'Çelik',
       email: 'ali.celik@hastane.com',
-      sifre: '',
       telefon: '05321112233',
       departman: '', // departman opsiyonel (atama sonradan yapılabilir)
       unvan: '',
@@ -101,16 +96,16 @@ export async function GET() {
   const separatorRow = sheet.getRow(exampleRows.length + 2)
   separatorRow.getCell(1).value = '↓ Örnek satırları silip kendi personelinizi buraya girin ↓'
   separatorRow.getCell(1).font = { bold: true, color: { argb: 'FF0D9668' }, size: 10 }
-  sheet.mergeCells(`A${exampleRows.length + 2}:G${exampleRows.length + 2}`)
+  sheet.mergeCells(`A${exampleRows.length + 2}:F${exampleRows.length + 2}`)
   separatorRow.alignment = { horizontal: 'center' }
 
-  // Departman için dropdown doğrulaması — F sütunu
+  // Departman için dropdown doğrulaması — E sütunu (şifre kaldırıldıktan sonra)
   // Örnek satırları (2-5) + ayırıcı SONRASI (7-500) — ayırıcı satırını (6) atla
   if (deptNames.length > 0) {
     const separatorIdx = exampleRows.length + 2 // 6
     for (let r = 2; r <= 500; r++) {
       if (r === separatorIdx) continue
-      sheet.getCell(`F${r}`).dataValidation = {
+      sheet.getCell(`E${r}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: [`Departmanlar!$A$2:$A$${deptNames.length + 1}`],
@@ -145,12 +140,12 @@ export async function GET() {
     'TOPLU PERSONEL YÜKLEME — KULLANIM KILAVUZU',
     '',
     'ZORUNLU ALANLAR: Ad, Soyad, E-posta',
-    'OPSİYONEL ALANLAR: Şifre, Telefon, Departman, Unvan',
+    'OPSİYONEL ALANLAR: Telefon, Departman, Unvan',
     '',
-    'ŞIFRE:',
-    '  • Boş bırakırsanız sistem otomatik güvenli şifre üretir.',
-    '  • Kendi şifrenizi yazacaksanız: en az 8 karakter, büyük+küçük harf, rakam, özel karakter (!@#$%).',
-    '  • Örnek: Baslangic2026!, Hastane123!',
+    'ŞIFRE (otomatik):',
+    '  • Şifre sütunu YOKTUR — sistem her personel için güvenli şifre üretir.',
+    '  • Geçici şifre, personelin e-posta adresine otomatik olarak gönderilir.',
+    '  • Personel ilk girişinde şifresini değiştirmek zorundadır.',
     '',
     'E-POSTA:',
     '  • Benzersiz olmalı, daha önce sistemde kayıtlı olmamalı.',

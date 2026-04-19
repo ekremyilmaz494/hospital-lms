@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
+import { sendStaffWelcomeEmail } from '@/lib/email'
 import ExcelJS from 'exceljs'
 
 // ── Header Alias Map ──────────────────────────────────────────────────────
@@ -346,6 +347,15 @@ export async function POST(request: Request) {
   const results: { email: string; name: string; status: 'created' | 'failed'; tempPassword?: string; error?: string }[] = []
   const createdUserIds: string[] = []
 
+  // Hoş geldiniz maili için hastane adı (tek sorgu, loop öncesi)
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { name: true },
+  })
+  const hospitalName = org?.name ?? 'Hastane'
+  const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`
+  const emailPromises: Promise<void>[] = []
+
   for (const row of validRows) {
     const pwd = row.password || ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1')
     try {
@@ -359,10 +369,24 @@ export async function POST(request: Request) {
         phone: row.phone || undefined,
         departmentId: row.deptId,
         title: row.title || undefined,
+        mustChangePassword: true,
       })
       createdUserIds.push(newUser.id)
       created++
       results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'created', tempPassword: pwd })
+
+      // Hoş geldiniz maili — fire-and-forget. Mail hatası hesap oluşumunu bozmaz.
+      emailPromises.push(
+        sendStaffWelcomeEmail({
+          to: row.email,
+          staffName: `${row.firstName} ${row.lastName}`,
+          hospitalName,
+          tempPassword: pwd,
+          loginUrl,
+        }).catch(err => {
+          logger.warn('bulk-import', `Hoş geldiniz maili gönderilemedi: ${row.email}`, err instanceof Error ? err.message : err)
+        }),
+      )
     } catch (err) {
       failed++
       const errMsg = err instanceof AuthUserError || err instanceof DbUserError
@@ -373,6 +397,10 @@ export async function POST(request: Request) {
       logger.error('Bulk Import', `Failed for ${row.email}`, err instanceof Error ? err.message : err)
     }
   }
+
+  // Tüm mail gönderimlerini bekle — serverless fonksiyon kesilmeden tamamlansın
+  // (her promise zaten kendi .catch'ini içeriyor, allSettled sadece bekliyor)
+  await Promise.allSettled(emailPromises)
 
   await createAuditLog({
     userId: dbUser!.id,
