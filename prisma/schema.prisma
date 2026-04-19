@@ -997,6 +997,7 @@ model AccreditationStandard {
   organization Organization? @relation("OrgAccreditationStandards", fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy    User?         @relation("AccreditationStandardCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
+  @@unique([code, organizationId], map: "uq_accreditation_standards_code_org")
   @@index([standardBody], map: "idx_accreditation_standards_body")
   @@index([organizationId], map: "idx_accreditation_standards_org")
   @@map("accreditation_standards")
