@@ -18,10 +18,8 @@ import {
   TrendingUp,
   Library,
   Star,
-  Plug,
   ClipboardCheck,
   ClipboardList,
-  Tags,
   Sparkles,
   Activity,
   MessageSquare,
@@ -45,10 +43,18 @@ export interface NavGroup {
 // Tamamlanınca true yapılır veya NEXT_PUBLIC_ENABLE_BETA=true ile geçici açılır.
 const BETA_MODULES_ENABLED = process.env.NEXT_PUBLIC_ENABLE_BETA === 'true';
 
+// ─────────────────────────────────────────────────────────
+// SUPER ADMIN
+// ─────────────────────────────────────────────────────────
 export const superAdminNav: NavGroup[] = [
   {
     items: [
       { title: 'Dashboard', href: '/super-admin/dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'MÜŞTERİ YÖNETİMİ',
+    items: [
       {
         title: 'Hastaneler',
         href: '/super-admin/hospitals',
@@ -60,6 +66,11 @@ export const superAdminNav: NavGroup[] = [
       },
       { title: 'Abonelikler', href: '/super-admin/subscriptions', icon: CreditCard },
       { title: 'İçerik Kütüphanesi', href: '/super-admin/content-library', icon: Library },
+    ],
+  },
+  {
+    label: 'RAPORLAMA & DENETİM',
+    items: [
       { title: 'Raporlar', href: '/super-admin/reports', icon: BarChart3 },
       { title: 'Audit Log', href: '/super-admin/audit-logs', icon: Shield },
     ],
@@ -73,10 +84,18 @@ export const superAdminNav: NavGroup[] = [
   },
 ];
 
+// ─────────────────────────────────────────────────────────
+// ADMIN — 4 mental grup (Genel / Eğitim / Personel / Uyum+Sistem)
+// ─────────────────────────────────────────────────────────
 export const adminNav: NavGroup[] = [
   {
     items: [
       { title: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'EĞİTİM & DEĞERLENDİRME',
+    items: [
       {
         title: 'Eğitimler',
         href: '/admin/trainings',
@@ -101,6 +120,11 @@ export const adminNav: NavGroup[] = [
       ...(BETA_MODULES_ENABLED
         ? [{ title: 'AI İçerik Stüdyosu', href: '/admin/ai-content-studio', icon: Sparkles, badge: 'Beta' } satisfies NavItem]
         : []),
+    ],
+  },
+  {
+    label: 'PERSONEL & YETKİNLİK',
+    items: [
       {
         title: 'Personel',
         href: '/admin/staff',
@@ -110,9 +134,24 @@ export const adminNav: NavGroup[] = [
         ],
       },
       { title: 'Sertifikalar', href: '/admin/certificates', icon: Award },
-      { title: 'Uyum Raporu', href: '/admin/compliance', icon: ShieldCheck },
       { title: 'Yetkinlik Matrisi', href: '/admin/competency-matrix', icon: Grid3x3 },
+      {
+        title: 'SMG Takibi',
+        href: '/admin/smg',
+        icon: Star,
+        children: [
+          { title: 'Genel Bakış', href: '/admin/smg' },
+          { title: 'SKS Denetim Raporu', href: '/admin/smg/inspection' },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'UYUM & RAPORLAMA',
+    items: [
+      { title: 'Uyum Raporu', href: '/admin/compliance', icon: ShieldCheck },
       { title: 'Etkinlik Analizi', href: '/admin/effectiveness', icon: TrendingUp },
+      { title: 'Akreditasyon', href: '/admin/accreditation', icon: ClipboardCheck },
       {
         title: 'Geri Bildirim',
         href: '/admin/feedback-forms',
@@ -123,19 +162,9 @@ export const adminNav: NavGroup[] = [
           { title: 'Analitik', href: '/admin/feedback-forms/analytics' },
         ],
       },
-      {
-        title: 'SMG Takibi',
-        href: '/admin/smg',
-        icon: Star,
-        children: [
-          { title: 'Genel Bakış', href: '/admin/smg' },
-          { title: 'SKS Denetim Raporu', href: '/admin/smg/inspection' },
-        ],
-      },
       { title: 'Raporlar', href: '/admin/reports', icon: BarChart3 },
       { title: 'Bildirimler', href: '/admin/notifications', icon: Bell },
       { title: 'İşlem Geçmişi', href: '/admin/audit-logs', icon: History },
-      { title: 'Akreditasyon', href: '/admin/accreditation', icon: ClipboardCheck },
     ],
   },
   {
@@ -156,6 +185,9 @@ export const adminNav: NavGroup[] = [
   },
 ];
 
+// ─────────────────────────────────────────────────────────
+// STAFF — günlük kullanıcı, 2 grup yeter
+// ─────────────────────────────────────────────────────────
 export const staffNav: NavGroup[] = [
   {
     items: [

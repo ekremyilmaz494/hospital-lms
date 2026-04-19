@@ -75,7 +75,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["remotion", "@remotion/cli"],
   // macOS: Desktop iCloud-synced; build output iCloud sync tetiklemesin.
   // Vercel (CI): .next'te kalır (Vercel build environment). Local: /tmp'e yaz.
-  distDir: process.env.VERCEL ? '.next' : '/tmp/hospital-lms-next',
+  // Next 16.2+ Turbopack distDir'in project içinde olmasını zorunlu kılıyor (projectPath dışına çıkılamıyor).
+  // macOS iCloud sync sorunu için predev script'i provenance temizliyor.
+  distDir: '.next',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.supabase.co' },
