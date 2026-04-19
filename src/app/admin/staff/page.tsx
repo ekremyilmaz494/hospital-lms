@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
 import {
   Users, Plus, Upload, MoreHorizontal, Eye, Edit, GraduationCap, Mail,
-  Building2, Trash2, UserPlus, ChevronRight, Search, X, Save
+  Building2, Trash2, UserPlus, ChevronRight, Search, X, Save, History
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -20,13 +20,13 @@ import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 import { AssignTrainingModal } from './assign-training-modal';
+import { BulkImportDialog } from './bulk-import-dialog';
 
 // ── Types ──
 interface Staff {
   id: string;
   name: string;
   email: string;
-  tcNo: string;
   department: string;
   departmentId: string | null;
   title: string;
@@ -107,7 +107,7 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [form, setForm] = useState({ ad: '', soyad: '', email: '', sifre: '', tc: '', telefon: '', departman: '', unvan: '' });
+  const [form, setForm] = useState({ ad: '', soyad: '', email: '', sifre: '', telefon: '', departman: '', unvan: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -123,7 +123,6 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Geçerli bir e-posta girin';
     if (!form.sifre.trim()) e.sifre = 'Şifre zorunludur';
     else if (form.sifre.length < 8) e.sifre = 'Şifre en az 8 karakter olmalıdır';
-    if (form.tc && !/^\d{11}$/.test(form.tc)) e.tc = 'TC Kimlik No 11 haneli olmalıdır';
     if (form.telefon && !/^0\d{10}$/.test(form.telefon.replace(/\s/g, ''))) e.telefon = 'Geçerli telefon formatı: 05XX XXX XX XX';
     if (!form.departman) e.departman = 'Departman seçiniz';
     setErrors(e);
@@ -141,7 +140,6 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
           firstName: form.ad,
           lastName: form.soyad,
           email: form.email,
-          tcNo: form.tc || undefined,
           phone: form.telefon || undefined,
           departmentId: form.departman || undefined,
           title: form.unvan || undefined,
@@ -217,17 +215,10 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
                 {errors.sifre && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.sifre}</p>}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>TC Kimlik No</Label>
-                <Input placeholder="11 haneli TC No" maxLength={11} className="h-10" value={form.tc} onChange={(e) => setForm(f => ({ ...f, tc: e.target.value.replace(/\D/g, '').slice(0, 11) }))} style={{ ...fieldStyle('tc'), fontFamily: 'var(--font-mono)' }} />
-                {errors.tc && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.tc}</p>}
-              </div>
-              <div>
-                <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Telefon</Label>
-                <Input placeholder="05XX XXX XX XX" className="h-10" value={form.telefon} onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))} style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
-                {errors.telefon && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.telefon}</p>}
-              </div>
+            <div>
+              <Label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>Telefon</Label>
+              <Input placeholder="05XX XXX XX XX" className="h-10" value={form.telefon} onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))} style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
+              {errors.telefon && <p className="text-[11px] mt-1" style={{ color: 'var(--color-error)' }}>{errors.telefon}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -435,6 +426,7 @@ export default function StaffPage() {
   }, []);
   const [showAddDept, setShowAddDept] = useState(false);
   const [showAddStaff, setShowAddStaff] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [showAssignStaff, setShowAssignStaff] = useState(false);
   const [isSavingDept, setIsSavingDept] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
@@ -555,12 +547,25 @@ export default function StaffPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Personel Yönetimi"
-        subtitle="Departmanları ve personelleri görüntüle, yönet"
-        action={{ label: 'Yeni Personel', icon: Plus, onClick: () => setShowAddStaff(true) }}
-        secondaryAction={{ label: 'Excel', icon: Upload, onClick: () => document.getElementById('excel-import')?.click() }}
-      />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <PageHeader
+            title="Personel Yönetimi"
+            subtitle="Departmanları ve personelleri görüntüle, yönet"
+            action={{ label: 'Yeni Personel', icon: Plus, onClick: () => setShowAddStaff(true) }}
+            secondaryAction={{ label: 'Toplu Yükle', icon: Upload, onClick: () => setShowBulkImport(true) }}
+          />
+        </div>
+        <button
+          onClick={() => router.push('/admin/staff/imports')}
+          className="mt-2 inline-flex items-center gap-1.5 text-xs px-3 h-8 rounded-md hover:bg-(--color-surface-hover) transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          title="Toplu yükleme geçmişi"
+        >
+          <History className="h-3.5 w-3.5" />
+          Yükleme Geçmişi
+        </button>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -845,7 +850,7 @@ export default function StaffPage() {
       {activeView === 'all' && (
         <BlurFade delay={0.05}>
           <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <DataTable columns={columns} data={allStaff} searchKey="name" searchPlaceholder="Personel ara (isim, TC, e-posta)..." onRowClick={(staff) => router.push(`/admin/staff/${(staff as { id: string }).id}`)} totalCount={data?.total} pageCount={data?.totalPages} currentPage={currentPage} onPageChange={setCurrentPage} onSearchChange={handleSearch} />
+            <DataTable columns={columns} data={allStaff} searchKey="name" searchPlaceholder="Personel ara (isim, e-posta)..." onRowClick={(staff) => router.push(`/admin/staff/${(staff as { id: string }).id}`)} totalCount={data?.total} pageCount={data?.totalPages} currentPage={currentPage} onPageChange={setCurrentPage} onSearchChange={handleSearch} />
           </div>
         </BlurFade>
       )}
@@ -933,28 +938,10 @@ export default function StaffPage() {
           />
         ) : null;
       })()}
-      <input
-        id="excel-import"
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        className="hidden"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          e.target.value = '';
-          toast(`"${file.name}" okunuyor...`, 'info');
-          try {
-            const formData = new FormData();
-            formData.append('file', file);
-            const res = await fetch('/api/admin/bulk-import', { method: 'POST', body: formData });
-            const result = await res.json();
-            if (!res.ok) throw new Error(result.error || 'Import başarısız');
-            toast(`${result.created} personel eklendi${result.failed > 0 ? `, ${result.failed} başarısız` : ''}`, result.created > 0 ? 'success' : 'error');
-            if (result.created > 0) refetch();
-          } catch (err) {
-            toast(err instanceof Error ? err.message : 'Excel dosyası işlenemedi', 'error');
-          }
-        }}
+      <BulkImportDialog
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        onImported={refetch}
       />
     </div>
   );
