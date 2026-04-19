@@ -150,7 +150,61 @@
 
 ## Periyodik Testler
 
-- [ ] **Aylik**: Rastgele bir organizasyonun yedegini indirip JSON yapisini dogrula
-- [ ] **3 Aylik**: Tam kurtarma simulasyonu (test ortaminda)
+- [ ] **Aylik**: `node scripts/restore-drill.js` — en yeni verified yedegin restore edilebilirligini dry-run olarak dogrula (DB'ye yazmaz)
+- [ ] **3 Aylik**: Tam kurtarma simulasyonu (staging ortaminda, gercek restore)
 - [ ] **6 Aylik**: RPO/RTO hedeflerini gozden gecir ve guncelle
 - [ ] **Yillik**: Felaket kurtarma planini tum ekiple tekrar gozden gecir
+
+---
+
+## S3 Lifecycle Policy (90 Gun Retention)
+
+Yedek bucket'indaki `backups/` prefix'i icin otomatik silme politikasi:
+
+```json
+{
+  "Rules": [
+    {
+      "ID": "backup-retention-90d",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "backups/" },
+      "Expiration": { "Days": 90 },
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 30 }
+    }
+  ]
+}
+```
+
+**Uygulama:** AWS Console > S3 > Bucket > Management > Lifecycle rules > Create rule.
+Veya CLI:
+```bash
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket <bucket-name> \
+  --lifecycle-configuration file://lifecycle.json
+```
+
+**Dikkat:** Retention'i azaltmadan once `db_backups` tablosundaki ilgili kayitlari
+da temizlemek gerekir, aksi halde UI'da "dosya yok" hatalari gorunur.
+
+---
+
+## BACKUP_ENCRYPTION_KEY Rotasyonu
+
+Anahtar sizdirma veya periyodik guvenlik politikasi gerektirdiginde:
+
+1. **Yeni anahtar uret:** `openssl rand -hex 32` (64 karakter hex)
+2. **Env guncelle (Vercel):**
+   - `BACKUP_ENCRYPTION_KEY_OLD` = eski anahtar
+   - `BACKUP_ENCRYPTION_KEY` = yeni anahtar
+3. **Deploy et.** `decryptBackup` once yeni anahtari dener, basarisiz olursa
+   eski anahtara fallback yapar (bkz. `src/lib/backup-crypto.ts`).
+4. **Re-encrypt (opsiyonel):** Tum eski yedekleri manuel olarak indirip yeni
+   anahtarla yeniden yazabilirsiniz. Pratikte 90 gunluk retention doldugunda
+   eski yedekler silineceginden `BACKUP_ENCRYPTION_KEY_OLD` 90 gun sonra
+   kaldirilabilir.
+5. **Dogrula:** `node scripts/restore-drill.js` calistir — eski ve yeni
+   anahtarla cozulmus yedekler icin hem `encrypted=true, oldKey=false/true`
+   durumlarini raporlar.
+
+**Kritik:** `BACKUP_ENCRYPTION_KEY_OLD`'u erken silmeyin — rotasyondan sonra
+90 gunluk geri alma penceresi icin gereklidir.

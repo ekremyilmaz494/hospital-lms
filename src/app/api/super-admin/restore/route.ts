@@ -10,8 +10,12 @@ import {
 } from '@/lib/api-helpers'
 import { downloadBuffer } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
+import { decryptBackup } from '@/lib/backup-crypto'
 
-/** Expected shape of a backup JSON file (mirrors backup cron output) */
+/**
+ * Expected shape of a backup JSON file (mirrors backup cron output).
+ * schemaVersion 1: v1 (9 arrays). schemaVersion 2+: organization, subscription, auditLogs eklendi.
+ */
 interface BackupData {
   users: unknown[]
   departments: unknown[]
@@ -24,7 +28,12 @@ interface BackupData {
   certificates: unknown[]
   exportedAt: string
   organizationId: string
-  organizationName: string
+  organizationName?: string
+  // v2+ alanları — v1 yedeklerde yok, undefined geçebilir
+  organization?: Record<string, unknown> | null
+  subscription?: Record<string, unknown> | null
+  auditLogs?: unknown[]
+  schemaVersion?: number
 }
 
 /** Validate that parsed JSON has the expected backup structure */
@@ -50,7 +59,9 @@ function isValidBackupData(data: unknown): data is BackupData {
 
   if (typeof d.exportedAt !== 'string') return false
   if (typeof d.organizationId !== 'string') return false
-  if (typeof d.organizationName !== 'string') return false
+
+  // v2+ opsiyonel alanlar — varsa tip kontrol
+  if (d.auditLogs !== undefined && !Array.isArray(d.auditLogs)) return false
 
   return true
 }
@@ -114,17 +125,23 @@ export async function POST(request: Request) {
       return errorResponse('Yedek dosyası S3\'den indirilemedi.', 500)
     }
 
-    // ── Parse JSON ──
+    // ── Decrypt + Parse JSON ──
+    // Cron/manual backup BACKUP_ENCRYPTION_KEY varsa AES-256-GCM ile şifrelenir.
+    // decryptBackup şifrelenmemiş veriyi olduğu gibi döner; şifreli + auth tag
+    // başarısız olursa Error atar, bozuk veriyi sessizce geçirmeyiz.
     let backupData: BackupData
     try {
-      const jsonString = rawBuffer.toString('utf-8')
+      const rawString = rawBuffer.toString('utf-8')
+      const jsonString = decryptBackup(rawString)
       const parsed: unknown = JSON.parse(jsonString)
       if (!isValidBackupData(parsed)) {
         return errorResponse('Yedek dosyasının yapısı geçersiz veya bozuk.', 400)
       }
       backupData = parsed
-    } catch {
-      return errorResponse('Yedek dosyası JSON olarak ayrıştırılamadı.', 400)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata'
+      console.error('[Restore] Decrypt/parse failed:', msg)
+      return errorResponse('Yedek dosyası çözülemedi veya ayrıştırılamadı (şifreleme anahtarı uyuşmuyor olabilir).', 400)
     }
 
     // ── Record counts for preview / summary ──
@@ -138,6 +155,9 @@ export async function POST(request: Request) {
       videoProgress: backupData.videoProgress.length,
       notifications: backupData.notifications.length,
       certificates: backupData.certificates.length,
+      auditLogs: backupData.auditLogs?.length ?? 0,
+      hasOrganization: backupData.organization ? 1 : 0,
+      hasSubscription: backupData.subscription ? 1 : 0,
     }
 
     // ── Preview mode ──
@@ -174,6 +194,10 @@ export async function POST(request: Request) {
 
     await prisma.$transaction(async (tx) => {
       // Delete existing data in dependency order (children first)
+      // AuditLog'ları sil — restore edilecekler ile çakışmamalı
+      if (backupData.auditLogs && backupData.auditLogs.length > 0) {
+        await tx.auditLog.deleteMany({ where: { organizationId: orgId } })
+      }
       await tx.certificate.deleteMany({ where: { training: { organizationId: orgId } } })
       await tx.videoProgress.deleteMany({ where: { attempt: { training: { organizationId: orgId } } } })
       await tx.examAnswer.deleteMany({ where: { attempt: { training: { organizationId: orgId } } } })
@@ -207,6 +231,27 @@ export async function POST(request: Request) {
 
       // ── Re-insert data ──
 
+      // Organization metadata (v2+). Mevcut kaydı güncelle — id aynı, relation'lar etkilenmez.
+      if (backupData.organization) {
+        const o = backupData.organization as Record<string, unknown>
+        // id ve ilişki alanlarını ayır
+        const { id: _id, createdAt: _ca, updatedAt: _ua, ...orgUpdate } = o
+        await tx.organization.update({
+          where: { id: orgId },
+          data: orgUpdate as Parameters<typeof tx.organization.update>[0]['data'],
+        })
+      }
+
+      // Subscription (v2+). Plan'a referans verir — planId'nin hâlâ mevcut olması beklenir.
+      if (backupData.subscription) {
+        const s = backupData.subscription as Record<string, unknown>
+        await tx.organizationSubscription.upsert({
+          where: { organizationId: orgId },
+          create: s as Parameters<typeof tx.organizationSubscription.create>[0]['data'],
+          update: s as Parameters<typeof tx.organizationSubscription.update>[0]['data'],
+        })
+      }
+
       // Departments
       if (backupData.departments.length > 0) {
         for (const dept of backupData.departments) {
@@ -229,79 +274,83 @@ export async function POST(request: Request) {
         })
       }
 
-      // Trainings with nested videos and questions
+      // Trainings + nested children. Parent per-row (nested relation sayısı değişken),
+      // çocuklar `createMany` ile toplu insert. Tek-satır yerine N-satır round-trip.
+      const allVideos: Record<string, unknown>[] = []
+      const allQuestions: Record<string, unknown>[] = []
+      const allOptions: Record<string, unknown>[] = []
+
       for (const trn of backupData.trainings) {
         const t = trn as Record<string, unknown>
         const videos = (t.videos ?? []) as Record<string, unknown>[]
         const questions = (t.questions ?? []) as Record<string, unknown>[]
-
-        // Create training without nested relations
         const { videos: _v, questions: _q, ...trainingData } = t
         await tx.training.create({
           data: trainingData as Parameters<typeof tx.training.create>[0]['data'],
         })
-
-        // Insert videos
-        for (const video of videos) {
-          await tx.trainingVideo.create({
-            data: video as Parameters<typeof tx.trainingVideo.create>[0]['data'],
-          })
-        }
-
-        // Insert questions and options
-        for (const question of questions) {
-          const opts = ((question as Record<string, unknown>).options ?? []) as Record<string, unknown>[]
-          const { options: _opts, ...questionData } = question as Record<string, unknown>
-          await tx.question.create({
-            data: questionData as Parameters<typeof tx.question.create>[0]['data'],
-          })
-          for (const opt of opts) {
-            await tx.questionOption.create({
-              data: opt as Parameters<typeof tx.questionOption.create>[0]['data'],
-            })
-          }
+        allVideos.push(...videos)
+        for (const q of questions) {
+          const opts = ((q.options ?? []) as Record<string, unknown>[])
+          const { options: _opts, ...questionData } = q
+          allQuestions.push(questionData)
+          allOptions.push(...opts)
         }
       }
 
-      // Assignments
-      for (const a of backupData.assignments) {
-        await tx.trainingAssignment.create({
-          data: a as Parameters<typeof tx.trainingAssignment.create>[0]['data'],
+      // createMany: tek round-trip toplu insert. Büyük kurumlarda transaction
+      // timeout marjını ciddi şekilde rahatlatır.
+      if (allVideos.length > 0) {
+        await tx.trainingVideo.createMany({
+          data: allVideos as NonNullable<Parameters<typeof tx.trainingVideo.createMany>[0]>['data'],
+        })
+      }
+      if (allQuestions.length > 0) {
+        await tx.question.createMany({
+          data: allQuestions as NonNullable<Parameters<typeof tx.question.createMany>[0]>['data'],
+        })
+      }
+      if (allOptions.length > 0) {
+        await tx.questionOption.createMany({
+          data: allOptions as NonNullable<Parameters<typeof tx.questionOption.createMany>[0]>['data'],
         })
       }
 
-      // Attempts
-      for (const a of backupData.attempts) {
-        await tx.examAttempt.create({
-          data: a as Parameters<typeof tx.examAttempt.create>[0]['data'],
+      if (backupData.assignments.length > 0) {
+        await tx.trainingAssignment.createMany({
+          data: backupData.assignments as NonNullable<Parameters<typeof tx.trainingAssignment.createMany>[0]>['data'],
+        })
+      }
+      if (backupData.attempts.length > 0) {
+        await tx.examAttempt.createMany({
+          data: backupData.attempts as NonNullable<Parameters<typeof tx.examAttempt.createMany>[0]>['data'],
+        })
+      }
+      if (backupData.examAnswers.length > 0) {
+        await tx.examAnswer.createMany({
+          data: backupData.examAnswers as NonNullable<Parameters<typeof tx.examAnswer.createMany>[0]>['data'],
+        })
+      }
+      if (backupData.videoProgress.length > 0) {
+        await tx.videoProgress.createMany({
+          data: backupData.videoProgress as NonNullable<Parameters<typeof tx.videoProgress.createMany>[0]>['data'],
+        })
+      }
+      if (backupData.notifications.length > 0) {
+        await tx.notification.createMany({
+          data: backupData.notifications as NonNullable<Parameters<typeof tx.notification.createMany>[0]>['data'],
+        })
+      }
+      if (backupData.certificates.length > 0) {
+        await tx.certificate.createMany({
+          data: backupData.certificates as NonNullable<Parameters<typeof tx.certificate.createMany>[0]>['data'],
         })
       }
 
-      // Exam answers
-      for (const a of backupData.examAnswers) {
-        await tx.examAnswer.create({
-          data: a as Parameters<typeof tx.examAnswer.create>[0]['data'],
-        })
-      }
-
-      // Video progress
-      for (const vp of backupData.videoProgress) {
-        await tx.videoProgress.create({
-          data: vp as Parameters<typeof tx.videoProgress.create>[0]['data'],
-        })
-      }
-
-      // Notifications
-      for (const n of backupData.notifications) {
-        await tx.notification.create({
-          data: n as Parameters<typeof tx.notification.create>[0]['data'],
-        })
-      }
-
-      // Certificates
-      for (const c of backupData.certificates) {
-        await tx.certificate.create({
-          data: c as Parameters<typeof tx.certificate.create>[0]['data'],
+      // AuditLog (v2+). Hash zinciri yedekteki sırayı korur; createMany sırayı
+      // ekleme sırasıyla korur (Postgres'te aynı batch'te order preserved).
+      if (backupData.auditLogs && backupData.auditLogs.length > 0) {
+        await tx.auditLog.createMany({
+          data: backupData.auditLogs as NonNullable<Parameters<typeof tx.auditLog.createMany>[0]>['data'],
         })
       }
     }, { timeout: 120_000 }) // 2 minute timeout for large restores
