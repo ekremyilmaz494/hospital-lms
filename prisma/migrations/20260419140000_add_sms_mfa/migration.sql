@@ -13,20 +13,39 @@ ALTER TABLE users
   ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMPTZ;
 
 -- ── TRUSTED DEVICES ──
-CREATE TABLE IF NOT EXISTS trusted_devices (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash   VARCHAR(128) NOT NULL UNIQUE,
-  user_agent   TEXT,
-  ip_address   VARCHAR(45),
-  last_used_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  expires_at   TIMESTAMPTZ NOT NULL,
-  revoked_at   TIMESTAMPTZ,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+-- Canonical Prisma output ile bire bir uyumlu. ID default yok (Prisma @default(uuid())
+-- client-side üretim). CURRENT_TIMESTAMP kullanılıyor (now() yerine) — Prisma migrate diff
+-- uyumu için. FK ismi ve ON UPDATE CASCADE explicit.
+CREATE TABLE IF NOT EXISTS "trusted_devices" (
+  "id"           UUID NOT NULL,
+  "user_id"      UUID NOT NULL,
+  "token_hash"   VARCHAR(128) NOT NULL,
+  "user_agent"   TEXT,
+  "ip_address"   VARCHAR(45),
+  "last_used_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "expires_at"   TIMESTAMPTZ NOT NULL,
+  "revoked_at"   TIMESTAMPTZ,
+  "created_at"   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT "trusted_devices_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX IF NOT EXISTS idx_trusted_devices_user    ON trusted_devices (user_id);
-CREATE INDEX IF NOT EXISTS idx_trusted_devices_expires ON trusted_devices (expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS "trusted_devices_token_hash_key" ON "trusted_devices"("token_hash");
+CREATE INDEX IF NOT EXISTS "idx_trusted_devices_user"    ON "trusted_devices"("user_id");
+CREATE INDEX IF NOT EXISTS "idx_trusted_devices_expires" ON "trusted_devices"("expires_at");
+
+-- FK: ON DELETE CASCADE ON UPDATE CASCADE (Prisma canonical)
+-- IF NOT EXISTS guard: yeniden uygulanırsa çakışma olmasın
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'trusted_devices_user_id_fkey'
+  ) THEN
+    ALTER TABLE "trusted_devices"
+      ADD CONSTRAINT "trusted_devices_user_id_fkey"
+      FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
 -- ── RLS ──
 -- Kullanıcı kendi cihazlarını görür/yönetir; service_role tüm tabloya erişir (zaten RLS bypass'lı).
