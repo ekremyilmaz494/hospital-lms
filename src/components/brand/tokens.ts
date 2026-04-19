@@ -48,6 +48,19 @@ export const KLINOVA_COLORS = {
   LEGACY_cyan: "#06B6D4",
   LEGACY_cyanDeep: "#0891B2",
   LEGACY_slate: "#0F172A",
+
+  // ── Legacy alias'ları (LogoMark, Wordmark, Remotion komponentlerinin eski
+  // API'sini kırmamak için). Rebrand öncesi bu isimler doğrudan kullanılıyordu;
+  // şimdi yeni kod LEGACY_* veya yeni semantik alanları kullanmalı.
+  white: "#FFFFFF",
+  slate: "#0F172A",
+  slateMid: "#334155",
+  indigo: "#6366F1",
+  indigoDeep: "#4F46E5",
+  indigoSoft: "#C7D2FE",
+  cyan: "#06B6D4",
+  cyanDeep: "#0891B2",
+  cyanSoft: "#A5F3FC",
 } as const;
 
 export const KLINOVA_GRADIENT = {
