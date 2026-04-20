@@ -317,9 +317,9 @@ export default function VideoPlayerPage() {
         <style>{`
           .vd-page-empty { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; gap: 10px; max-width: 420px; margin: 0 auto; }
           .vd-page-empty-icon { width: 56px; height: 56px; border-radius: 999px; background: #fdf5f2; color: #b3261e; display: flex; align-items: center; justify-content: center; }
-          .vd-page-empty h2 { font-family: var(--font-editorial, serif); font-size: 20px; color: #0a0a0a; margin: 0; }
-          .vd-page-empty p { font-size: 13px; color: #6b6a63; margin: 0; }
-          .vd-page-empty-link { background: none; border: none; color: #0a0a0a; font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+          .vd-page-empty h2 { font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; font-size: 20px; color: #0a1628; margin: 0; }
+          .vd-page-empty p { font-size: 13px; color: #5b6478; margin: 0; }
+          .vd-page-empty-link { background: none; border: none; color: #0a1628; font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 8px; }
         `}</style>
       </div>
     );
@@ -345,14 +345,15 @@ export default function VideoPlayerPage() {
         </div>
         <style>{`
           .vd-empty { min-height: 80vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; gap: 12px; max-width: 440px; margin: 0 auto; }
-          .vd-empty-icon { width: 64px; height: 64px; border-radius: 999px; background: #faf8f2; color: #0a0a0a; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
-          .vd-empty h2 { font-family: var(--font-editorial, serif); font-size: 22px; font-weight: 500; color: #0a0a0a; margin: 0; }
-          .vd-empty p { font-size: 13px; color: #6b6a63; margin: 0; }
+          .vd-empty-icon { width: 64px; height: 64px; border-radius: 999px; background: #faf7f2; color: #0a1628; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+          .vd-empty h2 { font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; font-size: 22px; font-weight: 500; color: #0a1628; margin: 0; }
+          .vd-empty p { font-size: 13px; color: #5b6478; margin: 0; }
           .vd-empty-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
           .vd-btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 999px; font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; border: 1px solid transparent; cursor: pointer; text-decoration: none; }
-          .vd-btn-ghost { background: transparent; color: #6b6a63; border-color: #ebe7df; }
-          .vd-btn-ghost:hover { border-color: #0a0a0a; color: #0a0a0a; }
-          .vd-btn-primary { background: #0a0a0a; color: #fafaf7; }
+          .vd-btn-ghost { background: transparent; color: #5b6478; border-color: #e5e0d5; }
+          .vd-btn-ghost:hover { border-color: #0a1628; color: #0a1628; }
+          .vd-btn-primary { background: #0a1628; color: #faf7f2; border-color: #c9a961; }
+        .vd-btn-primary :global(svg) { color: #c9a961; }
           .vd-btn-primary:hover { background: #1a1a1a; }
         `}</style>
       </div>

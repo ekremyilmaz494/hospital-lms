@@ -1,19 +1,25 @@
 'use client';
 
+/**
+ * Bildirim Merkezi — "Clinical Editorial" redesign.
+ * Gazete/kardiyograf dili: timeline spine, day diamond notches, mono caps,
+ * Jakarta Sans bold display + Inter body + JetBrains mono meta.
+ */
+
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  Bell, Check, CheckCheck, AlertTriangle, Info, CheckCircle, Zap,
-  BellOff, Search, X, Filter, BookOpen, Calendar, Award,
-  MessageSquare, Megaphone, Clock3, Sparkles, Inbox, ChevronRight,
+  Check, CheckCheck, AlertTriangle, Info, CheckCircle, Zap,
+  BellOff, Search, X, BookOpen, Award, MessageSquare, Megaphone,
+  Clock3, Sparkles, Inbox, ChevronRight, Filter,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import {
-  Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle,
-} from '@/components/ui/sheet';
+
+/* ─────────────────────────────────────────────────────
+   Domain
+   ───────────────────────────────────────────────────── */
 
 interface Notification {
   id: string;
@@ -33,45 +39,47 @@ type TypeKey =
 
 interface TypeMeta {
   label: string;
-  icon: typeof Bell;
-  color: string;
-  tint: string;
+  icon: typeof Info;
+  ink: string;
 }
 
 const TYPE_META: Record<string, TypeMeta> = {
-  error:                 { label: 'Acil',         icon: Zap,            color: 'var(--color-error)',    tint: 'var(--color-error-bg)' },
-  warning:               { label: 'Uyarı',        icon: AlertTriangle,  color: 'var(--color-warning)',  tint: 'var(--color-warning-bg)' },
-  info:                  { label: 'Bilgi',        icon: Info,           color: 'var(--color-info)',     tint: 'var(--color-info-bg)' },
-  success:               { label: 'Başarılı',     icon: CheckCircle,    color: 'var(--color-success)',  tint: 'var(--color-success-bg)' },
-  reminder:              { label: 'Hatırlatma',   icon: Clock3,         color: '#d97706',               tint: '#fef3c7' },
-  assignment:            { label: 'Yeni Eğitim',  icon: BookOpen,       color: '#0d9668',               tint: '#d1fae5' },
-  announcement:          { label: 'Duyuru',       icon: Megaphone,      color: '#4f46e5',               tint: '#e0e7ff' },
-  competency_evaluation: { label: 'Yetkinlik',    icon: MessageSquare,  color: '#7c3aed',               tint: '#ede9fe' },
-  subscription_expiry:   { label: 'Abonelik',     icon: Sparkles,       color: '#e11d48',               tint: '#ffe4e6' },
+  error:                 { label: 'ACİL',            icon: Zap,           ink: '#b3261e' },
+  warning:               { label: 'UYARI',           icon: AlertTriangle, ink: '#b4820b' },
+  info:                  { label: 'BİLGİ',           icon: Info,          ink: '#2c55b8' },
+  success:               { label: 'BAŞARI',          icon: CheckCircle,   ink: '#0a7a47' },
+  reminder:              { label: 'HATIRLATMA',      icon: Clock3,        ink: '#b4820b' },
+  assignment:            { label: 'EĞİTİM',          icon: BookOpen,      ink: '#1a3a28' },
+  announcement:          { label: 'DUYURU',          icon: Megaphone,     ink: '#0b1e3f' },
+  competency_evaluation: { label: 'YETKİNLİK',       icon: MessageSquare, ink: '#2c55b8' },
+  subscription_expiry:   { label: 'ABONELİK',        icon: Sparkles,      ink: '#8a5a11' },
 };
+
+const FILTER_TYPES: TypeKey[] = [
+  'assignment', 'reminder', 'announcement', 'competency_evaluation',
+  'warning', 'info', 'success', 'error',
+];
 
 function getTypeMeta(t: string): TypeMeta {
   return TYPE_META[t] ?? TYPE_META.info;
 }
 
-const FILTER_TYPES: TypeKey[] = [
-  'reminder', 'assignment', 'announcement', 'competency_evaluation',
-  'warning', 'info', 'success', 'error',
-];
+/* ─── Date helpers ─── */
+
+type Bucket = 'today' | 'yesterday' | 'thisWeek' | 'older';
+
+const BUCKET_LABEL: Record<Bucket, string> = {
+  today: 'BUGÜN',
+  yesterday: 'DÜN',
+  thisWeek: 'BU HAFTA',
+  older: 'DAHA ÖNCE',
+};
 
 function startOfDay(d: Date): number {
   const c = new Date(d);
   c.setHours(0, 0, 0, 0);
   return c.getTime();
 }
-
-type Bucket = 'today' | 'yesterday' | 'thisWeek' | 'older';
-const BUCKET_LABEL: Record<Bucket, string> = {
-  today: 'Bugün',
-  yesterday: 'Dün',
-  thisWeek: 'Bu Hafta',
-  older: 'Daha Önce',
-};
 
 function bucketOf(dateStr: string): Bucket {
   const today = startOfDay(new Date());
@@ -86,7 +94,7 @@ function bucketOf(dateStr: string): Bucket {
 function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'Az önce';
+  if (minutes < 1) return 'az önce';
   if (minutes < 60) return `${minutes} dk`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} saat`;
@@ -99,27 +107,41 @@ function formatExactTime(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatLongDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+/* ─── Design tokens (editorial palette) ─── */
+
+const INK = '#0a1628';
+const INK_SOFT = '#5b6478';
+const CREAM = '#faf7f2';
+const RULE = '#e5e0d5';
+const GOLD = '#c9a961';
+const OLIVE = '#1a3a28';
+
+/* ─────────────────────────────────────────────────────
+   Page
+   ───────────────────────────────────────────────────── */
+
+type ViewFilter = 'all' | 'unread' | 'today' | 'week';
+
 export default function StaffNotificationsPage() {
   const { toast } = useToast();
   const { data, isLoading, error, refetch } =
     useFetch<{ notifications: Notification[]; unreadCount: number }>('/api/staff/notifications');
 
-  // Action state
   const [markingAll, setMarkingAll] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
-
-  // Optimistic overlays
   const [optimisticReadIds, setOptimisticReadIds] = useState<Set<string>>(new Set());
   const [optimisticAllRead, setOptimisticAllRead] = useState(false);
 
-  // UI state
   const [search, setSearch] = useState('');
   const [activeTypes, setActiveTypes] = useState<Set<TypeKey>>(new Set());
-  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [viewFilter, setViewFilter] = useState<ViewFilter>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false);
 
-  // Apply optimistic state
   const allNotifications = useMemo(() => {
     const raw = data?.notifications ?? [];
     return raw.map(n =>
@@ -132,27 +154,22 @@ export default function StaffNotificationsPage() {
     ? 0
     : Math.max(0, rawUnreadCount - optimisticReadIds.size);
 
-  // Stats
-  const stats = useMemo(() => {
-    const total = allNotifications.length;
-    const unread = allNotifications.filter(n => !n.isRead).length;
-    const weekTs = Date.now() - 7 * 86_400_000;
-    const week = allNotifications.filter(n => new Date(n.createdAt).getTime() >= weekTs).length;
-    return { total, unread, week };
-  }, [allNotifications]);
-
-  // Type-based counts (for filter chip badges)
   const typeCounts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const n of allNotifications) c[n.type] = (c[n.type] ?? 0) + 1;
     return c;
   }, [allNotifications]);
 
-  // Filter pipeline
   const filtered = useMemo(() => {
     const q = search.trim().toLocaleLowerCase('tr-TR');
+    const now = Date.now();
+    const dayAgo = now - 86_400_000;
+    const weekAgo = now - 7 * 86_400_000;
+
     return allNotifications.filter(n => {
-      if (showUnreadOnly && n.isRead) return false;
+      if (viewFilter === 'unread' && n.isRead) return false;
+      if (viewFilter === 'today' && new Date(n.createdAt).getTime() < dayAgo) return false;
+      if (viewFilter === 'week' && new Date(n.createdAt).getTime() < weekAgo) return false;
       if (activeTypes.size > 0 && !activeTypes.has(n.type as TypeKey)) return false;
       if (q) {
         const hay = `${n.title} ${n.message} ${n.relatedTraining?.title ?? ''}`.toLocaleLowerCase('tr-TR');
@@ -160,9 +177,8 @@ export default function StaffNotificationsPage() {
       }
       return true;
     });
-  }, [allNotifications, search, activeTypes, showUnreadOnly]);
+  }, [allNotifications, search, activeTypes, viewFilter]);
 
-  // Group by date bucket
   const grouped = useMemo(() => {
     const buckets: Record<Bucket, Notification[]> = { today: [], yesterday: [], thisWeek: [], older: [] };
     for (const n of filtered) buckets[bucketOf(n.createdAt)].push(n);
@@ -172,7 +188,6 @@ export default function StaffNotificationsPage() {
   const visibleIds = useMemo(() => filtered.map(n => n.id), [filtered]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selected.has(id));
 
-  // Selection helpers
   const toggleSelect = useCallback((id: string) => {
     setSelected(prev => {
       const next = new Set(prev);
@@ -185,7 +200,6 @@ export default function StaffNotificationsPage() {
   }, [allVisibleSelected, visibleIds]);
   const clearSelection = useCallback(() => setSelected(new Set()), []);
 
-  // Mark single as read
   const handleMarkRead = useCallback(async (id: string) => {
     setOptimisticReadIds(prev => new Set(prev).add(id));
     setMarkingId(id);
@@ -202,7 +216,6 @@ export default function StaffNotificationsPage() {
     }
   }, [refetch, toast]);
 
-  // Mark selected as read
   const handleMarkSelectedRead = useCallback(async () => {
     if (selected.size === 0) return;
     const ids = [...selected];
@@ -221,7 +234,6 @@ export default function StaffNotificationsPage() {
     }
   }, [selected, refetch, toast]);
 
-  // Mark all as read
   const handleMarkAllRead = useCallback(async () => {
     if (rawUnreadCount === 0) return;
     setOptimisticAllRead(true);
@@ -250,438 +262,471 @@ export default function StaffNotificationsPage() {
   const clearAllFilters = useCallback(() => {
     setActiveTypes(new Set());
     setSearch('');
-    setShowUnreadOnly(false);
+    setViewFilter('all');
   }, []);
 
-  // Keyboard: Esc clears selection
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && selected.size > 0) clearSelection();
+      if (e.key === 'Escape') {
+        if (selected.size > 0) clearSelection();
+        else if (typeMenuOpen) setTypeMenuOpen(false);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selected.size, clearSelection]);
+  }, [selected.size, clearSelection, typeMenuOpen]);
 
-  if (isLoading) return <NotificationsSkeleton />;
+  /*
+   * Cream theme bleeds into layout: override <main>'s bg and --color-bg-rgb
+   * so the topbar (which uses rgba(var(--color-bg-rgb), 0.85)) also inherits cream.
+   * Restored on unmount — other pages get their default bg back.
+   */
+  useEffect(() => {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const el = main as HTMLElement;
+    const prevBg = el.style.backgroundColor;
+    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
+    el.style.backgroundColor = CREAM;
+    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
+    return () => {
+      el.style.backgroundColor = prevBg;
+      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
+      else el.style.removeProperty('--color-bg-rgb');
+    };
+  }, []);
 
-  if (error) {
-    return (
-      <div
-        className="flex flex-col items-center justify-center rounded-3xl border py-20 text-center"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-      >
-        <AlertTriangle className="mb-4 h-10 w-10" style={{ color: 'var(--color-error)' }} />
-        <p className="text-sm font-semibold">Bildirimler yüklenemedi</p>
-        <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>{error}</p>
-      </div>
-    );
-  }
+  if (isLoading) return <EditorialSkeleton />;
+  if (error) return <EditorialError message={error} onRetry={refetch} />;
 
-  const hasAnyFilter = search.length > 0 || activeTypes.size > 0 || showUnreadOnly;
+  const hasAnyFilter = search.length > 0 || activeTypes.size > 0 || viewFilter !== 'all';
   const totalAfterFilter = filtered.length;
-  const filterChipsActive = activeTypes.size + (showUnreadOnly ? 1 : 0);
 
-  return (
-    <div className="relative pb-32 lg:pb-8">
-      {/* ── HEADER ──────────────────────────────────────────────── */}
-      <header className="mb-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p
-              className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.18em]"
-              style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}
-            >
-              EY · Personel Paneli
-            </p>
-            <h1
-              className="text-[28px] sm:text-[34px] font-bold leading-tight tracking-tight"
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
-              Bildirim Merkezi
-            </h1>
-            <p className="mt-1.5 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-              Eğitim atamaları, hatırlatmalar ve duyurular tek bir yerde.
-            </p>
-          </div>
+  const todayStr = new Date().toLocaleDateString('tr-TR', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+  }).toUpperCase();
 
-          <button
-            onClick={handleMarkAllRead}
-            disabled={markingAll || unreadCount === 0}
-            className="group inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold transition-all duration-200 hover:-translate-y-px active:translate-y-0 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{
-              background: unreadCount > 0 ? 'var(--color-primary)' : 'var(--color-surface)',
-              color: unreadCount > 0 ? 'white' : 'var(--color-text-muted)',
-              border: unreadCount > 0 ? 'none' : '1px solid var(--color-border)',
-              boxShadow: unreadCount > 0 ? '0 6px 20px rgba(13, 150, 104, 0.25)' : 'none',
-            }}
-          >
-            <CheckCheck className="h-4 w-4" />
-            {markingAll ? 'İşaretleniyor…' : 'Tümünü Okundu'}
-          </button>
-        </div>
-
-        {/* Stat tiles */}
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          <StatTile label="Toplam" value={stats.total} />
-          <StatTile label="Okunmamış" value={stats.unread} accent />
-          <StatTile label="Bu Hafta" value={stats.week} />
-        </div>
-      </header>
-
-      {/* ── TOOLBAR ─────────────────────────────────────────────── */}
-      <div
-        className="sticky top-16 z-20 mb-5 -mx-4 sm:mx-0 px-4 sm:px-0 py-3 sm:py-0 border-b sm:border-0"
-        style={{
-          background: 'rgba(var(--color-bg-rgb, 241, 245, 249), 0.92)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderColor: 'var(--color-border)',
-        }}
-      >
-        <div className="flex items-center gap-2">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-              style={{ color: 'var(--color-text-muted)' }}
-            />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Bildirimlerde ara…"
-              className="h-11 rounded-xl pl-10 pr-9 text-sm"
-              style={{
-                background: 'var(--color-surface)',
-                borderColor: 'var(--color-border)',
-              }}
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                aria-label="Aramayı temizle"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 hover:bg-[var(--color-bg)]"
-              >
-                <X className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-              </button>
-            )}
-          </div>
-
-          {/* Filter trigger (mobile) */}
-          <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
-            <SheetTrigger
-              className="lg:hidden relative inline-flex h-11 w-11 items-center justify-center rounded-xl border"
-              aria-label="Filtreler"
-              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-            >
-              <Filter className="h-4.5 w-4.5" style={{ color: 'var(--color-text-secondary)' }} />
-              {filterChipsActive > 0 && (
-                <span
-                  className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
-                  style={{ background: 'var(--color-primary)' }}
-                >
-                  {filterChipsActive}
-                </span>
-              )}
-            </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] p-0">
-              <SheetHeader className="border-b px-5 py-4" style={{ borderColor: 'var(--color-border)' }}>
-                <SheetTitle className="text-base font-bold">Filtreler</SheetTitle>
-              </SheetHeader>
-              <FilterBody
-                activeTypes={activeTypes}
-                showUnreadOnly={showUnreadOnly}
-                typeCounts={typeCounts}
-                onToggleType={toggleType}
-                onToggleUnread={() => setShowUnreadOnly(v => !v)}
-                onClear={clearAllFilters}
-              />
-            </SheetContent>
-          </Sheet>
-        </div>
-
-        {/* Inline chip rail (lg+) */}
-        <div className="hidden lg:flex mt-3 flex-wrap items-center gap-2">
-          <FilterChip
-            active={showUnreadOnly}
-            onClick={() => setShowUnreadOnly(v => !v)}
-            color="var(--color-primary)"
-            tint="var(--color-primary-light)"
-          >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--color-primary)' }} />
-            Sadece okunmamış
-          </FilterChip>
-          {FILTER_TYPES.map(t => {
-            const m = getTypeMeta(t);
-            const c = typeCounts[t] ?? 0;
-            if (c === 0) return null;
-            return (
-              <FilterChip
-                key={t}
-                active={activeTypes.has(t)}
-                onClick={() => toggleType(t)}
-                color={m.color}
-                tint={m.tint}
-              >
-                <m.icon className="h-3.5 w-3.5" />
-                {m.label}
-                <span className="font-mono text-[10px] opacity-70">{c}</span>
-              </FilterChip>
-            );
-          })}
-          {hasAnyFilter && (
-            <button
-              onClick={clearAllFilters}
-              className="ml-1 inline-flex items-center gap-1 text-[12px] font-semibold underline decoration-dotted underline-offset-4"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              Filtreleri temizle
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── SELECT-ALL BAR (when any items visible) ─────────────── */}
-      {visibleIds.length > 0 && (
-        <div className="mb-3 flex items-center justify-between px-1">
-          <label className="inline-flex items-center gap-2 cursor-pointer">
-            <Checkbox checked={allVisibleSelected} onCheckedChange={selectAllVisible} />
-            <span className="text-[12px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
-              {selected.size > 0
-                ? `${selected.size} seçildi`
-                : `${totalAfterFilter} bildirim`}
-            </span>
-          </label>
-          {hasAnyFilter && totalAfterFilter !== allNotifications.length && (
-            <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
-              {totalAfterFilter} / {allNotifications.length}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* ── LIST ────────────────────────────────────────────────── */}
-      {totalAfterFilter === 0 ? (
-        <EmptyState hasFilters={hasAnyFilter} onClearFilters={clearAllFilters} />
-      ) : (
-        <div className="space-y-8">
-          {(['today', 'yesterday', 'thisWeek', 'older'] as Bucket[]).map(bucket => {
-            const items = grouped[bucket];
-            if (items.length === 0) return null;
-            return (
-              <section key={bucket}>
-                {/* Date label with timeline rule */}
-                <div className="mb-3 flex items-center gap-3">
-                  <span
-                    className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em]"
-                    style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
-                  >
-                    <Calendar className="h-3 w-3" />
-                    {BUCKET_LABEL[bucket]}
-                  </span>
-                  <div className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
-                  <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
-                    {items.length}
-                  </span>
-                </div>
-
-                <ul className="space-y-2">
-                  {items.map(n => (
-                    <NotificationCard
-                      key={n.id}
-                      notification={n}
-                      selected={selected.has(n.id)}
-                      onToggleSelect={() => toggleSelect(n.id)}
-                      onMarkRead={() => handleMarkRead(n.id)}
-                      isMarking={markingId === n.id}
-                      anySelected={selected.size > 0}
-                    />
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── BULK ACTION BAR (sticky bottom when selected) ───────── */}
-      {selected.size > 0 && (
-        <div
-          className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 lg:px-8"
-          style={{
-            background: 'linear-gradient(to top, var(--color-bg) 60%, transparent)',
-          }}
-        >
-          <div
-            className="mx-auto flex max-w-3xl items-center justify-between gap-3 rounded-2xl px-4 py-3"
-            style={{
-              background: 'var(--color-text-primary)',
-              color: 'white',
-              boxShadow: '0 16px 40px -12px rgba(0,0,0,0.45)',
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <span
-                className="inline-flex h-7 min-w-[28px] items-center justify-center rounded-full px-2 text-[12px] font-bold"
-                style={{ background: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}
-              >
-                {selected.size}
-              </span>
-              <span className="text-[13px] font-medium">bildirim seçildi</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleMarkSelectedRead}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-2 text-[12px] font-semibold transition-colors hover:bg-white/25"
-              >
-                <Check className="h-3.5 w-3.5" />
-                Okundu
-              </button>
-              <button
-                onClick={clearSelection}
-                aria-label="Seçimi temizle"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 transition-colors hover:bg-white/20"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ──────────────────────────────────────────────────────────────
-   Sub-components
-   ────────────────────────────────────────────────────────────── */
-
-function StatTile({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
   return (
     <div
-      className="rounded-2xl border px-4 py-3"
-      style={{
-        background: accent
-          ? 'linear-gradient(135deg, var(--color-primary-light), var(--color-surface))'
-          : 'var(--color-surface)',
-        borderColor: accent ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'var(--color-border)',
-      }}
+      className="-mx-4 -my-4 md:-mx-8 md:-my-8"
+      style={{ backgroundColor: CREAM, minHeight: 'calc(100vh - 64px)' }}
     >
-      <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-text-muted)' }}>
-        {label}
-      </p>
-      <p
-        className="mt-1 text-2xl font-bold tabular-nums"
+      <div className="px-6 pt-6 pb-24 sm:px-10 lg:px-16">
+        {/* ═══════════════ MASTHEAD ═══════════════ */}
+        <header>
+          {/* Top meta rail */}
+          <div
+            className="flex items-center justify-between border-y py-2 text-[10px] tracking-[0.22em]"
+            style={{
+              borderColor: INK,
+              color: INK,
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            <span>№ 01 — HASTANE LMS</span>
+            <span>{todayStr}</span>
+          </div>
+
+          {/* Title zone — asymmetric split */}
+          <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-[1fr_auto] md:items-end">
+            <div>
+              <p
+                className="mb-3 text-[11px] uppercase tracking-[0.3em]"
+                style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+              >
+                Bildirim Merkezi
+              </p>
+              <h1
+                className="font-bold leading-[0.95] tracking-[-0.02em]"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 'clamp(2.5rem, 5vw, 3.75rem)',
+                  color: INK,
+                  fontWeight: 800,
+                }}
+              >
+                Bildirimler<span style={{ color: GOLD }}>.</span>
+              </h1>
+              <p
+                className="mt-3 max-w-lg text-[14px] leading-relaxed"
+                style={{ color: INK_SOFT }}
+              >
+                Eğitim atamaları, sınav hatırlatmaları ve resmi duyurular — tek bir akışta, tarih sırasına göre.
+              </p>
+            </div>
+
+            {/* Unread counter — editorial stat */}
+            <div className="flex items-end gap-6 md:flex-col md:items-end md:gap-1">
+              <StatBlock value={unreadCount} label="OKUNMAMIŞ" accent={unreadCount > 0} />
+            </div>
+          </div>
+
+          {/* Thick rule */}
+          <div className="mt-10 h-[3px]" style={{ backgroundColor: INK }} />
+        </header>
+
+        {/* ═══════════════ CONTROL STRIP ═══════════════ */}
+        <div
+          className="sticky top-0 z-20 -mx-6 mt-0 border-b bg-[var(--stripe-bg)] px-6 py-3 backdrop-blur sm:-mx-10 sm:px-10 lg:-mx-16 lg:px-16"
+          style={{
+            ['--stripe-bg' as string]: 'rgba(250,247,242,0.92)',
+            borderColor: RULE,
+          }}
+        >
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            {/* Search */}
+            <div className="relative flex min-w-[240px] flex-1 items-center">
+              <Search className="pointer-events-none absolute left-0 h-3.5 w-3.5" style={{ color: INK_SOFT }} />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Bildirim ara…"
+                className="w-full bg-transparent py-1.5 pl-6 pr-7 text-[13px] outline-none"
+                style={{
+                  color: INK,
+                  borderBottom: `1px solid ${search ? INK : RULE}`,
+                  fontFamily: 'var(--font-body)',
+                }}
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  aria-label="Aramayı temizle"
+                  className="absolute right-0 p-1"
+                  style={{ color: INK_SOFT }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Segmented view filter — typographic, no buttons */}
+            <nav
+              aria-label="Görünüm filtresi"
+              className="flex items-center gap-3 text-[11px] tracking-[0.14em]"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              {(['all', 'unread', 'today', 'week'] as ViewFilter[]).map((v, i) => (
+                <span key={v} className="inline-flex items-center gap-3">
+                  {i > 0 && <span style={{ color: RULE }}>·</span>}
+                  <button
+                    type="button"
+                    onClick={() => setViewFilter(v)}
+                    aria-pressed={viewFilter === v}
+                    className="uppercase transition-colors duration-150"
+                    style={{
+                      color: viewFilter === v ? INK : INK_SOFT,
+                      borderBottom: viewFilter === v ? `2px solid ${GOLD}` : '2px solid transparent',
+                      paddingBottom: '2px',
+                      fontWeight: viewFilter === v ? 700 : 500,
+                    }}
+                  >
+                    {v === 'all' ? 'Tümü' : v === 'unread' ? 'Okunmamış' : v === 'today' ? 'Bugün' : 'Hafta'}
+                  </button>
+                </span>
+              ))}
+            </nav>
+
+            {/* Type menu trigger */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setTypeMenuOpen(o => !o)}
+                className="inline-flex items-center gap-2 border px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] transition-colors duration-150"
+                style={{
+                  borderColor: activeTypes.size > 0 ? INK : RULE,
+                  color: INK,
+                  backgroundColor: activeTypes.size > 0 ? CREAM : 'transparent',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: 600,
+                }}
+                aria-expanded={typeMenuOpen}
+              >
+                <Filter className="h-3 w-3" />
+                Tip
+                {activeTypes.size > 0 && (
+                  <span
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold"
+                    style={{ backgroundColor: INK, color: CREAM }}
+                  >
+                    {activeTypes.size}
+                  </span>
+                )}
+              </button>
+
+              {typeMenuOpen && (
+                <div
+                  className="absolute right-0 top-full z-30 mt-2 w-64 border bg-white shadow-lg"
+                  style={{ borderColor: INK, boxShadow: '8px 8px 0 rgba(10,22,40,0.08)' }}
+                >
+                  <div
+                    className="border-b px-4 py-2 text-[10px] tracking-[0.2em]"
+                    style={{ borderColor: RULE, color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                  >
+                    TİPE GÖRE FİLTRELE
+                  </div>
+                  <ul className="max-h-72 overflow-auto py-1">
+                    {FILTER_TYPES.map(t => {
+                      const m = getTypeMeta(t);
+                      const c = typeCounts[t] ?? 0;
+                      const active = activeTypes.has(t);
+                      return (
+                        <li key={t}>
+                          <button
+                            onClick={() => toggleType(t)}
+                            disabled={c === 0}
+                            className="flex w-full items-center justify-between gap-2 px-4 py-2 text-left text-[12px] transition-colors duration-100 hover:bg-[var(--hover-bg)] disabled:opacity-40"
+                            style={{
+                              ['--hover-bg' as string]: CREAM,
+                              color: INK,
+                              fontFamily: 'var(--font-body)',
+                            }}
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <span
+                                className="inline-block h-2 w-2"
+                                style={{ backgroundColor: m.ink }}
+                              />
+                              <span className="tracking-[0.08em]">{m.label}</span>
+                              {active && <Check className="h-3 w-3" style={{ color: GOLD }} />}
+                            </span>
+                            <span
+                              className="text-[10px] tabular-nums"
+                              style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                            >
+                              {c}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Mark all */}
+            <button
+              type="button"
+              onClick={handleMarkAllRead}
+              disabled={markingAll || unreadCount === 0}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] transition-colors duration-150 disabled:opacity-30"
+              style={{
+                backgroundColor: unreadCount > 0 ? INK : 'transparent',
+                color: unreadCount > 0 ? CREAM : INK_SOFT,
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                border: unreadCount > 0 ? 'none' : `1px solid ${RULE}`,
+              }}
+            >
+              <CheckCheck className="h-3 w-3" />
+              {markingAll ? 'İşleniyor…' : 'Tümünü Okundu'}
+            </button>
+          </div>
+
+          {/* Active filter summary */}
+          {hasAnyFilter && (
+            <div
+              className="mt-2 flex items-center gap-3 text-[10px] tracking-[0.18em]"
+              style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+            >
+              <span>{totalAfterFilter} / {allNotifications.length} GÖSTERİLİYOR</span>
+              <button
+                onClick={clearAllFilters}
+                className="underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]"
+                style={{ ['--ink' as string]: INK }}
+              >
+                FİLTRELERİ TEMİZLE
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ═══════════════ SELECTION STRIP ═══════════════ */}
+        {visibleIds.length > 0 && (
+          <div className="mt-6 flex items-center justify-between border-b pb-3" style={{ borderColor: RULE }}>
+            <label className="inline-flex cursor-pointer items-center gap-3">
+              <Checkbox checked={allVisibleSelected} onCheckedChange={selectAllVisible} />
+              <span
+                className="text-[10px] tracking-[0.2em]"
+                style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+              >
+                {selected.size > 0 ? `${selected.size} SEÇİLDİ` : 'TÜMÜNÜ SEÇ'}
+              </span>
+            </label>
+            <span
+              className="text-[10px] tabular-nums tracking-[0.14em]"
+              style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+            >
+              TOPLAM {allNotifications.length.toString().padStart(3, '0')}
+            </span>
+          </div>
+        )}
+
+        {/* ═══════════════ TIMELINE FEED ═══════════════ */}
+        {totalAfterFilter === 0 ? (
+          <EditorialEmptyState hasFilters={hasAnyFilter} onClearFilters={clearAllFilters} />
+        ) : (
+          <div className="relative mt-10 pb-8">
+            {/* Vertical spine — fixed at 14px across breakpoints for clean alignment */}
+            <div
+              aria-hidden="true"
+              className="absolute bottom-0 left-[14px] top-0 w-[2px]"
+              style={{ backgroundColor: INK }}
+            />
+
+            {(['today', 'yesterday', 'thisWeek', 'older'] as Bucket[]).map(bucket => {
+              const items = grouped[bucket];
+              if (items.length === 0) return null;
+              return (
+                <section key={bucket} className="relative mb-10 last:mb-0">
+                  {/* Day row — explicit grid (Tailwind 4 arbitrary cols can be flaky, use inline) */}
+                  <header
+                    className="grid items-center gap-3 md:gap-4"
+                    style={{ gridTemplateColumns: '30px max-content 1fr max-content' }}
+                  >
+                    <div className="relative flex h-4 items-center justify-center">
+                      <span
+                        aria-hidden="true"
+                        className="absolute h-4 w-4 rounded-full"
+                        style={{ backgroundColor: CREAM }}
+                      />
+                      <span
+                        aria-hidden="true"
+                        className="relative h-2.5 w-2.5 rotate-45"
+                        style={{ backgroundColor: GOLD }}
+                      />
+                    </div>
+                    <h2
+                      className="text-[11px] tracking-[0.3em] whitespace-nowrap"
+                      style={{ color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                    >
+                      {BUCKET_LABEL[bucket]}
+                    </h2>
+                    <span className="block h-px w-full" style={{ backgroundColor: RULE }} />
+                    <span
+                      className="text-[10px] tabular-nums tracking-[0.14em] whitespace-nowrap"
+                      style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                    >
+                      {items.length.toString().padStart(2, '0')}
+                    </span>
+                  </header>
+
+                  <ul className="mt-8 list-none space-y-4 p-0">
+                    {items.map((n, idx) => (
+                      <NotificationEntry
+                        key={n.id}
+                        notification={n}
+                        index={idx + 1}
+                        selected={selected.has(n.id)}
+                        onToggleSelect={() => toggleSelect(n.id)}
+                        onMarkRead={() => handleMarkRead(n.id)}
+                        isMarking={markingId === n.id}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ═══════════════ BULK ACTION BAR ═══════════════ */}
+        {selected.size > 0 && (
+          <div
+            className="fixed inset-x-0 bottom-0 z-40 px-6 pb-6 pt-3"
+            style={{
+              background: `linear-gradient(to top, ${CREAM} 60%, transparent)`,
+            }}
+          >
+            <div
+              className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-5 py-3"
+              style={{
+                backgroundColor: INK,
+                color: CREAM,
+                boxShadow: `8px 8px 0 ${GOLD}`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className="px-2 py-0.5 text-[11px] font-bold tracking-[0.14em]"
+                  style={{ backgroundColor: GOLD, color: INK, fontFamily: 'var(--font-mono)' }}
+                >
+                  {selected.size}
+                </span>
+                <span className="text-[12px] tracking-[0.14em]" style={{ fontFamily: 'var(--font-mono)' }}>
+                  BİLDİRİM SEÇİLDİ
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleMarkSelectedRead}
+                  className="inline-flex items-center gap-1.5 border px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] transition-colors duration-150 hover:bg-white/10"
+                  style={{ borderColor: CREAM, color: CREAM, fontFamily: 'var(--font-mono)' }}
+                >
+                  <Check className="h-3 w-3" />
+                  Okundu
+                </button>
+                <button
+                  onClick={clearSelection}
+                  aria-label="Seçimi temizle"
+                  className="p-1.5 transition-colors duration-150 hover:bg-white/10"
+                  style={{ color: CREAM }}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   Sub-components
+   ───────────────────────────────────────────────────── */
+
+function StatBlock({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
+  return (
+    <div className="text-right">
+      <div
+        className="leading-none tabular-nums"
         style={{
           fontFamily: 'var(--font-display)',
-          color: accent ? 'var(--color-primary)' : 'var(--color-text-primary)',
+          fontSize: 'clamp(3rem, 6vw, 4.5rem)',
+          fontWeight: 800,
+          color: accent ? INK : INK_SOFT,
+          letterSpacing: '-0.04em',
         }}
       >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function FilterChip({
-  children, active, onClick, color, tint,
-}: {
-  children: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-  color: string;
-  tint: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className="group inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all duration-150 hover:-translate-y-px active:translate-y-0"
-      style={{
-        background: active ? tint : 'var(--color-surface)',
-        borderColor: active ? color : 'var(--color-border)',
-        color: active ? color : 'var(--color-text-secondary)',
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function FilterBody({
-  activeTypes, showUnreadOnly, typeCounts,
-  onToggleType, onToggleUnread, onClear,
-}: {
-  activeTypes: Set<TypeKey>;
-  showUnreadOnly: boolean;
-  typeCounts: Record<string, number>;
-  onToggleType: (t: TypeKey) => void;
-  onToggleUnread: () => void;
-  onClear: () => void;
-}) {
-  return (
-    <div className="px-5 py-4">
-      <button
-        onClick={onToggleUnread}
-        className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left"
-        style={{
-          background: showUnreadOnly ? 'var(--color-primary-light)' : 'var(--color-bg)',
-          color: showUnreadOnly ? 'var(--color-primary)' : 'var(--color-text-primary)',
-        }}
-      >
-        <span className="inline-flex items-center gap-2 text-[13px] font-semibold">
-          <span className="h-2 w-2 rounded-full" style={{ background: 'var(--color-primary)' }} />
-          Sadece okunmamış
-        </span>
-        <Checkbox checked={showUnreadOnly} onCheckedChange={onToggleUnread} />
-      </button>
-
-      <p className="mt-5 mb-2 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-text-muted)' }}>
-        Tip
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {FILTER_TYPES.map(t => {
-          const m = getTypeMeta(t);
-          const c = typeCounts[t] ?? 0;
-          if (c === 0) return null;
-          return (
-            <FilterChip
-              key={t}
-              active={activeTypes.has(t)}
-              onClick={() => onToggleType(t)}
-              color={m.color}
-              tint={m.tint}
-            >
-              <m.icon className="h-3.5 w-3.5" />
-              {m.label}
-              <span className="font-mono text-[10px] opacity-70">{c}</span>
-            </FilterChip>
-          );
-        })}
+        {value.toString().padStart(2, '0')}
       </div>
-
-      <button
-        onClick={onClear}
-        className="mt-5 w-full rounded-xl py-3 text-[13px] font-semibold"
+      <div
+        className="mt-1 text-[10px] tracking-[0.3em]"
         style={{
-          background: 'var(--color-bg)',
-          color: 'var(--color-text-secondary)',
+          color: accent ? GOLD : INK_SOFT,
+          fontFamily: 'var(--font-mono)',
+          fontWeight: 700,
         }}
       >
-        Tümünü temizle
-      </button>
+        {label}
+      </div>
     </div>
   );
 }
 
-function NotificationCard({
-  notification: n, selected, onToggleSelect, onMarkRead, isMarking, anySelected,
+function NotificationEntry({
+  notification: n, index, selected, onToggleSelect, onMarkRead, isMarking,
 }: {
   notification: Notification;
+  index: number;
   selected: boolean;
   onToggleSelect: () => void;
   onMarkRead: () => void;
   isMarking: boolean;
-  anySelected: boolean;
 }) {
   const m = getTypeMeta(n.type);
   const Icon = m.icon;
@@ -689,204 +734,301 @@ function NotificationCard({
 
   return (
     <li
-      className="group relative overflow-hidden rounded-2xl transition-all duration-200"
-      style={{
-        background: 'var(--color-surface)',
-        border: `1px solid ${selected ? m.color : 'var(--color-border)'}`,
-        boxShadow: unread ? '0 1px 0 rgba(0,0,0,0.02)' : 'none',
-      }}
+      className="grid items-start gap-3 md:gap-4"
+      style={{ gridTemplateColumns: '30px 1fr' }}
     >
-      {/* Vertical accent stripe (left) */}
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-[3px]"
-        style={{ background: unread ? m.color : 'transparent' }}
-      />
-
-      <div className="flex items-start gap-3 p-4 pl-5 sm:p-5 sm:pl-6">
-        {/* Checkbox: visible on hover OR when selection mode active */}
-        <div
-          className={[
-            'pt-1 transition-opacity duration-150',
-            anySelected || selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
-          ].join(' ')}
-        >
-          <Checkbox checked={selected} onCheckedChange={onToggleSelect} aria-label="Bildirimi seç" />
-        </div>
-
-        {/* Icon tile */}
-        <div
-          className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+      {/* Spine column — cream mask covers spine, connector dot on top */}
+      <div className="relative flex justify-center pt-5">
+        <span
+          aria-hidden="true"
+          className="absolute left-1/2 top-[18px] h-3.5 w-3.5 -translate-x-1/2 rounded-full"
+          style={{ backgroundColor: CREAM }}
+        />
+        <span
+          aria-hidden="true"
+          className="relative h-2 w-2 rounded-full"
           style={{
-            background: m.tint,
-            color: m.color,
-            boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${m.color} 18%, transparent)`,
+            backgroundColor: unread ? INK : CREAM,
+            border: `1.5px solid ${INK}`,
           }}
-        >
-          <Icon className="h-[18px] w-[18px]" strokeWidth={2.2} />
-        </div>
+        />
+      </div>
 
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h3
-              className="text-[14px] font-semibold leading-tight"
-              style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-display)' }}
-            >
-              {n.title}
-            </h3>
-            <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-              style={{ background: m.tint, color: m.color }}
-            >
-              {m.label}
-            </span>
-            {unread && (
-              <span
-                className="inline-flex h-1.5 w-1.5 rounded-full"
-                style={{ background: m.color, boxShadow: `0 0 0 3px color-mix(in srgb, ${m.color} 24%, transparent)` }}
-                aria-label="Okunmamış"
-              />
-            )}
+      <article
+        className="group relative border bg-white transition-[border-color] duration-200"
+        style={{
+          borderTopColor: selected ? INK : RULE,
+          borderRightColor: selected ? INK : RULE,
+          borderBottomColor: selected ? INK : RULE,
+          borderLeftWidth: unread ? '3px' : '1px',
+          borderLeftColor: unread ? m.ink : (selected ? INK : RULE),
+        }}
+      >
+        <div className="flex gap-4 p-4 sm:p-5">
+          {/* Checkbox */}
+          <div className="pt-0.5">
+            <Checkbox
+              checked={selected}
+              onCheckedChange={onToggleSelect}
+              aria-label="Seç"
+            />
           </div>
 
-          <p
-            className="mt-1.5 text-[13px] leading-relaxed"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
-            {n.message}
-          </p>
-
-          {/* Footer row */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <time
-              className="inline-flex items-center gap-1 text-[11px] font-mono tabular-nums"
-              style={{ color: 'var(--color-text-muted)' }}
-              dateTime={n.createdAt}
-              title={new Date(n.createdAt).toLocaleString('tr-TR')}
-            >
-              <Clock3 className="h-3 w-3" />
-              {formatRelativeTime(n.createdAt)}
-              <span className="opacity-60">· {formatExactTime(n.createdAt)}</span>
-            </time>
-
-            {n.relatedTrainingId && (
-              <Link
-                href={`/staff/my-trainings`}
-                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors"
-                style={{
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-primary)',
-                }}
-              >
-                <Award className="h-3 w-3" />
-                <span className="max-w-[180px] truncate">
-                  {n.relatedTraining?.title ?? 'Eğitime Git'}
+          {/* Content */}
+          <div className="min-w-0 flex-1">
+            {/* Top meta row — magazine section label style */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="inline-flex items-center gap-2">
+                <Icon className="h-3 w-3" style={{ color: m.ink }} strokeWidth={2.5} />
+                <span
+                  className="text-[10px] tracking-[0.22em]"
+                  style={{ color: m.ink, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                >
+                  {m.label}
                 </span>
-                <ChevronRight className="h-3 w-3" />
-              </Link>
-            )}
-          </div>
-        </div>
+                <span className="text-[10px]" style={{ color: RULE }}>|</span>
+                <span
+                  className="text-[10px] tracking-[0.14em] tabular-nums"
+                  style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                >
+                  {index.toString().padStart(2, '0')}
+                </span>
+              </div>
 
-        {/* Actions */}
-        <div className="flex items-center">
-          {unread ? (
-            <button
-              onClick={onMarkRead}
-              disabled={isMarking}
-              aria-label="Okundu işaretle"
-              title="Okundu işaretle"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-150 hover:scale-105 active:scale-95 disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+              <time
+                className="text-[10px] tabular-nums"
+                dateTime={n.createdAt}
+                title={`${formatLongDate(n.createdAt)} · ${formatExactTime(n.createdAt)}`}
+                style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+              >
+                {formatRelativeTime(n.createdAt)}
+                <span className="opacity-60"> · {formatExactTime(n.createdAt)}</span>
+              </time>
+            </div>
+
+            {/* Title */}
+            <h3
+              className="mt-2 leading-snug tracking-tight"
               style={{
-                background: 'var(--color-bg)',
-                color: 'var(--color-text-secondary)',
-                border: '1px solid var(--color-border)',
+                fontFamily: 'var(--font-display)',
+                color: INK,
+                fontWeight: 700,
+                fontSize: '1.0625rem',
               }}
             >
-              <Check className="h-4 w-4" />
-            </button>
-          ) : (
-            <div className="flex h-10 w-10 items-center justify-center" aria-label="Okundu" title="Okundu">
-              <CheckCircle className="h-4 w-4" style={{ color: 'var(--color-text-muted)', opacity: 0.4 }} />
+              {n.title}
+              {unread && (
+                <span
+                  aria-label="Okunmamış"
+                  className="ml-2 inline-block h-1.5 w-1.5 rounded-full align-middle"
+                  style={{ backgroundColor: GOLD }}
+                />
+              )}
+            </h3>
+
+            {/* Message */}
+            <p
+              className="mt-1.5 text-[13.5px] leading-relaxed"
+              style={{ color: INK_SOFT, fontFamily: 'var(--font-body)' }}
+            >
+              {n.message}
+            </p>
+
+            {/* Related training link */}
+            {n.relatedTrainingId && (
+              <div className="mt-3">
+                <Link
+                  href={`/staff/my-trainings`}
+                  className="group/link inline-flex items-center gap-1.5 text-[11px] tracking-[0.12em] uppercase transition-colors duration-150"
+                  style={{
+                    color: OLIVE,
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 700,
+                    borderBottom: `1px solid ${OLIVE}`,
+                    paddingBottom: '2px',
+                  }}
+                >
+                  <Award className="h-3 w-3" />
+                  <span className="max-w-[240px] truncate">
+                    {n.relatedTraining?.title ?? 'Eğitime Git'}
+                  </span>
+                  <ChevronRight className="h-3 w-3 transition-transform duration-150 group-hover/link:translate-x-0.5" />
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Action */}
+          {unread && (
+            <div className="flex shrink-0 items-start">
+              <button
+                onClick={onMarkRead}
+                disabled={isMarking}
+                aria-label="Okundu işaretle"
+                title="Okundu işaretle"
+                className="inline-flex h-8 w-8 items-center justify-center transition-colors duration-150 disabled:opacity-50"
+                style={{
+                  border: `1px solid ${RULE}`,
+                  color: INK_SOFT,
+                  backgroundColor: 'transparent',
+                }}
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
             </div>
           )}
         </div>
-      </div>
+      </article>
     </li>
   );
 }
 
-function EmptyState({ hasFilters, onClearFilters }: { hasFilters: boolean; onClearFilters: () => void }) {
+function EditorialEmptyState({
+  hasFilters, onClearFilters,
+}: {
+  hasFilters: boolean;
+  onClearFilters: () => void;
+}) {
   return (
-    <div
-      className="relative overflow-hidden rounded-3xl border px-6 py-16 text-center"
-      style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-    >
-      {/* Decorative dotted grid */}
-      <svg
-        aria-hidden
-        className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.06]"
-        xmlns="http://www.w3.org/2000/svg"
+    <div className="mt-20 flex flex-col items-center py-16 text-center">
+      {/* Dashed plate */}
+      <div
+        className="relative mb-8 flex h-20 w-20 items-center justify-center"
+        style={{
+          border: `1.5px dashed ${INK}`,
+          backgroundColor: CREAM,
+        }}
       >
-        <defs>
-          <pattern id="empty-dots" x="0" y="0" width="14" height="14" patternUnits="userSpaceOnUse">
-            <circle cx="1" cy="1" r="1" fill="currentColor" style={{ color: 'var(--color-text-primary)' }} />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#empty-dots)" />
-      </svg>
-
-      <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl"
-        style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
-      >
-        {hasFilters ? <Inbox className="h-7 w-7" /> : <BellOff className="h-7 w-7" />}
+        {hasFilters ? (
+          <Inbox className="h-8 w-8" style={{ color: INK }} strokeWidth={1.5} />
+        ) : (
+          <BellOff className="h-8 w-8" style={{ color: INK }} strokeWidth={1.5} />
+        )}
       </div>
-      <h3
-        className="relative text-[16px] font-bold"
-        style={{ fontFamily: 'var(--font-display)' }}
+
+      {/* "— KAYIT YOK —" style typographic mark */}
+      <div
+        className="mb-6 flex items-center gap-4"
+        style={{ fontFamily: 'var(--font-mono)' }}
       >
-        {hasFilters ? 'Eşleşen bildirim yok' : 'Şu an bildiriminiz yok'}
+        <span style={{ color: INK_SOFT }}>—</span>
+        <span
+          className="text-[11px] tracking-[0.32em]"
+          style={{ color: INK, fontWeight: 700 }}
+        >
+          {hasFilters ? 'EŞLEŞME YOK' : 'KAYIT YOK'}
+        </span>
+        <span style={{ color: INK_SOFT }}>—</span>
+      </div>
+
+      <h3
+        className="max-w-md leading-tight tracking-tight"
+        style={{
+          fontFamily: 'var(--font-display)',
+          color: INK,
+          fontSize: '1.5rem',
+          fontWeight: 700,
+        }}
+      >
+        {hasFilters ? 'Aramanıza uygun bildirim bulunamadı' : 'Şu an hiç bildiriminiz yok'}
       </h3>
+
       <p
-        className="relative mx-auto mt-1.5 max-w-sm text-[13px] leading-relaxed"
-        style={{ color: 'var(--color-text-muted)' }}
+        className="mt-3 max-w-md text-[14px] leading-relaxed"
+        style={{ color: INK_SOFT }}
       >
         {hasFilters
-          ? 'Filtrelerinizi gevşetip tekrar deneyin. Aramayı temizleyebilir veya tip filtresini kaldırabilirsiniz.'
-          : 'Yeni bir eğitim atandığında, hatırlatma yapıldığında veya hastane duyurusu yayımlandığında burada görünecek.'}
+          ? 'Filtreleri temizleyip tekrar deneyin veya arama terimini değiştirin.'
+          : 'Yeni bir eğitim atandığında, sınav hatırlatması yapıldığında veya hastane duyurusu yayımlandığında burada görünecek.'}
       </p>
+
       {hasFilters && (
         <button
           onClick={onClearFilters}
-          className="relative mt-6 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-semibold"
-          style={{ background: 'var(--color-primary)', color: 'white' }}
+          className="mt-8 inline-flex items-center gap-2 px-4 py-2 text-[11px] uppercase tracking-[0.18em] transition-colors duration-150"
+          style={{
+            backgroundColor: INK,
+            color: CREAM,
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 700,
+          }}
         >
-          <X className="h-3.5 w-3.5" />
-          Filtreleri temizle
+          <X className="h-3 w-3" />
+          Filtreleri Temizle
         </button>
       )}
     </div>
   );
 }
 
-function NotificationsSkeleton() {
+function EditorialError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="animate-pulse">
-      <div className="mb-8">
-        <div className="mb-2 h-3 w-32 rounded" style={{ background: 'var(--color-border)' }} />
-        <div className="h-9 w-72 rounded-lg" style={{ background: 'var(--color-border)' }} />
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          {[0, 1, 2].map(i => (
-            <div key={i} className="h-20 rounded-2xl" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }} />
+    <div
+      className="-mx-4 -my-4 md:-mx-8 md:-my-8"
+      style={{ backgroundColor: CREAM, minHeight: 'calc(100vh - 64px)' }}
+    >
+      <div className="px-6 pt-10 pb-24 sm:px-10 lg:px-16">
+        <div
+          className="flex items-center gap-4 text-[10px] tracking-[0.22em]"
+          style={{ color: '#b3261e', fontFamily: 'var(--font-mono)' }}
+        >
+          <span>—</span>
+          <span style={{ fontWeight: 700 }}>HATA</span>
+          <span className="h-px flex-1" style={{ backgroundColor: '#b3261e' }} />
+        </div>
+        <h1
+          className="mt-6 leading-tight tracking-tight"
+          style={{
+            fontFamily: 'var(--font-display)',
+            color: INK,
+            fontSize: 'clamp(2rem, 4vw, 2.75rem)',
+            fontWeight: 800,
+          }}
+        >
+          Bildirimler yüklenemedi<span style={{ color: '#b3261e' }}>.</span>
+        </h1>
+        <p className="mt-4 max-w-lg text-[14px] leading-relaxed" style={{ color: INK_SOFT }}>
+          {message || 'Sunucuya bağlanırken bir sorun oluştu. İnternet bağlantınızı kontrol edin ve tekrar deneyin.'}
+        </p>
+        <button
+          onClick={onRetry}
+          className="mt-8 inline-flex items-center gap-2 px-4 py-2 text-[11px] uppercase tracking-[0.18em] transition-colors duration-150"
+          style={{
+            backgroundColor: INK,
+            color: CREAM,
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 700,
+          }}
+        >
+          Tekrar Dene
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EditorialSkeleton() {
+  return (
+    <div
+      className="-mx-4 -my-4 md:-mx-8 md:-my-8"
+      style={{ backgroundColor: CREAM, minHeight: 'calc(100vh - 64px)' }}
+    >
+      <div className="animate-pulse px-6 pt-6 sm:px-10 lg:px-16">
+        <div className="h-4 border-y py-2" style={{ borderColor: INK }} />
+        <div className="mt-8 grid gap-8 md:grid-cols-[1fr_auto]">
+          <div>
+            <div className="mb-3 h-3 w-40 rounded" style={{ backgroundColor: RULE }} />
+            <div className="h-12 w-80 rounded" style={{ backgroundColor: RULE }} />
+            <div className="mt-4 h-4 w-96 rounded" style={{ backgroundColor: RULE }} />
+          </div>
+          <div className="h-20 w-32" style={{ backgroundColor: RULE }} />
+        </div>
+        <div className="mt-10 h-[3px]" style={{ backgroundColor: INK }} />
+        <div className="mt-10 space-y-3 pl-14">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="h-24 border" style={{ borderColor: RULE, backgroundColor: 'white' }} />
           ))}
         </div>
-      </div>
-      <div className="mb-5 h-11 rounded-xl" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }} />
-      <div className="space-y-2">
-        {[0, 1, 2, 3].map(i => (
-          <div key={i} className="h-24 rounded-2xl" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }} />
-        ))}
       </div>
     </div>
   );

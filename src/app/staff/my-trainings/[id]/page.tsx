@@ -1,15 +1,28 @@
 'use client';
 
+/**
+ * Eğitim detayı — "Clinical Editorial" redesign.
+ * Tüm iş mantığı korundu: step progression, retry mode, exam-only, expired, pass/fail states.
+ * Dil: cream + ink + gold + serif display + mono caps + radial dot bg.
+ */
+
+import { useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import type { LucideIcon } from 'lucide-react';
 import {
   ArrowLeft, Video, FileQuestion, CheckCircle2, Clock, Play, Target,
-  Calendar, BookOpen, Award, ChevronRight, Lock, AlertTriangle, RefreshCw,
+  Calendar, Award, ChevronRight, Lock, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
-import { PageLoading } from '@/components/shared/page-loading';
-import { Chip } from './_components/chip';
-import { Banner } from './_components/banner';
+
+/* ─── Editorial palette ─── */
+const INK = '#0a1628';
+const INK_SOFT = '#5b6478';
+const CREAM = '#faf7f2';
+const RULE = '#e5e0d5';
+const GOLD = '#c9a961';
+const OLIVE = '#1a3a28';
 
 interface TrainingVideo {
   title: string;
@@ -44,53 +57,111 @@ export default function TrainingDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = typeof params?.id === 'string' ? params.id : null;
-
   const apiUrl = id ? `/api/staff/my-trainings/${id}` : null;
 
   const { data: training, isLoading, error, refetch } = useFetch<TrainingDetail>(apiUrl);
 
-  if (isLoading) return <PageLoading />;
+  /* Cream theme cascade */
+  useEffect(() => {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const el = main as HTMLElement;
+    const prevBg = el.style.backgroundColor;
+    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
+    el.style.backgroundColor = CREAM;
+    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
+    return () => {
+      el.style.backgroundColor = prevBg;
+      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
+      else el.style.removeProperty('--color-bg-rgb');
+    };
+  }, []);
+
+  const pageShell = (children: React.ReactNode) => (
+    <div
+      className="relative -mx-4 -my-4 md:-mx-8 md:-my-8 min-h-full"
+      style={{
+        backgroundColor: CREAM,
+        color: INK,
+        fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
+        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(10, 22, 40, 0.035) 1px, transparent 0)',
+        backgroundSize: '24px 24px',
+      }}
+    >
+      <div className="relative px-6 sm:px-10 lg:px-16 pt-5 pb-16 max-w-5xl mx-auto">
+        {children}
+      </div>
+    </div>
+  );
+
+  if (isLoading) return pageShell(<DetailSkeleton />);
 
   if (error) {
-    return (
-      <div className="td-empty">
-        <div className="td-empty-icon"><AlertTriangle className="h-6 w-6" /></div>
-        <h2>
-          {error === 'Eğitim ataması bulunamadı' || error.includes('not found') || error.includes('404')
-            ? 'Eğitime erişilemiyor'
-            : 'Eğitim yüklenemedi'}
-        </h2>
-        <p>
-          {error === 'Eğitim ataması bulunamadı' || error.includes('not found') || error.includes('404')
-            ? 'Bu eğitime erişim yetkiniz yok veya eğitim bulunamadı.'
-            : error}
-        </p>
-        <div className="td-empty-actions">
-          <Link href="/staff/my-trainings" className="td-empty-link">← Eğitimlerime Dön</Link>
-          <button onClick={refetch} className="td-empty-link td-empty-link-strong">
-            <RefreshCw className="h-3 w-3" /> Tekrar Dene
-          </button>
+    const notFound = error === 'Eğitim ataması bulunamadı' || error.includes('not found') || error.includes('404');
+    return pageShell(
+      <div
+        className="mt-10 grid items-start gap-4 p-5"
+        style={{
+          gridTemplateColumns: '4px 44px 1fr',
+          backgroundColor: '#fdf5f2',
+          border: `1px solid #e9c9c0`,
+          borderRadius: '4px',
+        }}
+      >
+        <span style={{ backgroundColor: '#b3261e', alignSelf: 'stretch', borderRadius: '2px' }} />
+        <div
+          className="flex items-center justify-center"
+          style={{ width: 44, height: 44, backgroundColor: '#b3261e', borderRadius: '2px' }}
+        >
+          <AlertTriangle className="h-5 w-5" style={{ color: CREAM }} />
         </div>
-        <style>{`
-          .td-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 60px 20px; gap: 10px; max-width: 420px; margin: 0 auto; }
-          .td-empty-icon { width: 56px; height: 56px; border-radius: 999px; background: #fdf5f2; color: #b3261e; display: flex; align-items: center; justify-content: center; }
-          .td-empty h2 { font-family: var(--font-editorial, serif); font-size: 20px; color: #0a0a0a; margin: 0; }
-          .td-empty p { font-size: 13px; color: #6b6a63; margin: 0; }
-          .td-empty-actions { display: flex; gap: 20px; margin-top: 6px; }
-          .td-empty-link { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-display, system-ui); font-size: 12px; font-weight: 600; color: #6b6a63; text-decoration: none; background: none; border: none; cursor: pointer; }
-          .td-empty-link-strong { color: #0a0a0a; }
-          .td-empty-link:hover { color: #0a7a47; }
-        `}</style>
-      </div>
+        <div>
+          <p
+            className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: '#b3261e', fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+          >
+            Erişim hatası
+          </p>
+          <h2
+            className="mt-1 text-[18px] font-semibold tracking-[-0.01em]"
+            style={{ color: '#7a1d14', fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+          >
+            {notFound ? 'Eğitime erişilemiyor' : 'Eğitim yüklenemedi'}
+          </h2>
+          <p className="mt-1 text-[13px]" style={{ color: '#7a1d14' }}>
+            {notFound ? 'Bu eğitime erişim yetkin yok veya eğitim bulunamadı.' : error}
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Link
+              href="/staff/my-trainings"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+              style={{
+                color: INK, border: `1px solid ${INK}`, borderRadius: '2px',
+                fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+              }}
+            >
+              <ArrowLeft className="h-3 w-3" style={{ color: GOLD }} />
+              Eğitimlerime Dön
+            </Link>
+            <button
+              onClick={refetch}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+              style={{
+                color: CREAM, backgroundColor: INK, borderRadius: '2px',
+                fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+              }}
+            >
+              <RefreshCw className="h-3 w-3" style={{ color: GOLD }} />
+              Tekrar Dene
+            </button>
+          </div>
+        </div>
+      </div>,
     );
   }
 
   if (!training) {
-    return (
-      <div className="td-empty">
-        <p>Eğitim bulunamadı.</p>
-      </div>
-    );
+    return pageShell(<p className="mt-10 text-[13px]" style={{ color: INK_SOFT }}>Eğitim bulunamadı.</p>);
   }
 
   const videos = training.videos ?? [];
@@ -113,7 +184,7 @@ export default function TrainingDetailPage() {
   const examId = training.assignmentId || training.id;
   let ctaHref = `/exam/${examId}/post-exam`;
   let ctaLabel = 'Sınava Başla';
-  let ctaIcon: typeof Play = Award;
+  let ctaIcon: LucideIcon = Award;
   if (isExamOnly) {
     ctaHref = `/exam/${examId}/post-exam`; ctaLabel = 'Sınava Başla'; ctaIcon = Award;
   } else if (isRetry) {
@@ -125,146 +196,312 @@ export default function TrainingDetailPage() {
     else if (currentStep === 2) { ctaHref = `/exam/${examId}/post-exam`; ctaLabel = 'Son Sınava Başla'; ctaIcon = Award; }
   }
 
-  const steps = isExamOnly
-    ? [
-        { label: 'Sınav', desc: 'Değerlendirme sınavı', icon: Award, done: training.postExamCompleted },
-      ]
+  const steps: { label: string; desc: string; icon: LucideIcon; done: boolean; score?: number }[] = isExamOnly
+    ? [{ label: 'Sınav', desc: 'Değerlendirme sınavı', icon: Award, done: training.postExamCompleted }]
     : isRetry
-    ? [
-        { label: 'Eğitim Videoları', desc: `${videos.length} video`, icon: Video, done: training.videosCompleted },
-        { label: 'Son Sınav', desc: 'Değerlendirme sınavı', icon: Award, done: training.postExamCompleted },
-      ]
-    : [
-        { label: 'Ön Sınav', desc: 'Bilgi seviyesi testi', icon: FileQuestion, done: training.preExamCompleted, score: training.preExamScore },
-        { label: 'Eğitim Videoları', desc: `${videos.length} video`, icon: Video, done: training.videosCompleted },
-        { label: 'Son Sınav', desc: 'Değerlendirme sınavı', icon: Award, done: training.postExamCompleted },
-      ];
+      ? [
+          { label: 'Eğitim Videoları', desc: `${videos.length} video`, icon: Video, done: training.videosCompleted },
+          { label: 'Son Sınav',        desc: 'Değerlendirme sınavı',  icon: Award, done: training.postExamCompleted },
+        ]
+      : [
+          { label: 'Ön Sınav',         desc: 'Bilgi seviyesi testi',  icon: FileQuestion, done: training.preExamCompleted, score: training.preExamScore },
+          { label: 'Eğitim Videoları', desc: `${videos.length} video`, icon: Video, done: training.videosCompleted },
+          { label: 'Son Sınav',        desc: 'Değerlendirme sınavı',  icon: Award, done: training.postExamCompleted },
+        ];
 
   const CtaIcon = ctaIcon;
 
-  return (
-    <div className="td-page">
-      {/* ═══════ Editorial Hero ═══════ */}
-      <section className="td-hero">
-        <button onClick={() => router.back()} className="td-back" aria-label="Geri dön">
-          <ArrowLeft className="h-4 w-4" />
-          <span>Eğitimlerim</span>
-        </button>
+  return pageShell(
+    <>
+      {/* Back */}
+      <button
+        onClick={() => router.back()}
+        className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] mb-6"
+        style={{
+          color: INK,
+          border: `1px solid ${RULE}`,
+          borderRadius: '2px',
+          backgroundColor: 'transparent',
+          fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+          transition: 'background-color 160ms ease',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(10, 22, 40, 0.05)'; }}
+        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+      >
+        <ArrowLeft className="h-3 w-3" style={{ color: GOLD }} />
+        Eğitimlerim
+      </button>
 
-        <div className="td-hero-meta">
-          <span className="td-eyebrow">{training.category || 'Eğitim'}</span>
-          <span className="td-attempt">
-            Deneme <strong>{Math.max(training.currentAttempt ?? 0, 1).toString().padStart(2, '0')}</strong>/<strong>{(training.maxAttempts ?? 3).toString().padStart(2, '0')}</strong>
+      {/* ───── Masthead ───── */}
+      <header
+        className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 pb-5"
+        style={{ borderBottom: `3px solid ${INK}` }}
+      >
+        <div className="flex items-end gap-4 min-w-0">
+          <p
+            className="text-[10px] font-semibold uppercase tracking-[0.18em] shrink-0"
+            style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+          >
+            № Eğitim · {(training.category || 'GENEL').toUpperCase()}
+          </p>
+        </div>
+
+        <span
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
+          style={{
+            color: INK, backgroundColor: 'rgba(201, 169, 97, 0.12)',
+            border: `1px solid ${GOLD}`, borderRadius: '2px',
+            fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+          }}
+        >
+          Deneme {Math.max(training.currentAttempt ?? 0, 1).toString().padStart(2, '0')}
+          <span style={{ color: GOLD }}>/</span>
+          {(training.maxAttempts ?? 3).toString().padStart(2, '0')}
+        </span>
+      </header>
+
+      <h1
+        className="mt-5 text-[32px] sm:text-[44px] leading-[1.05] font-semibold tracking-[-0.025em]"
+        style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+      >
+        {training.title}
+        <span style={{ color: GOLD }}>.</span>
+      </h1>
+
+      {training.description && (
+        <p className="mt-3 text-[14px] leading-relaxed max-w-2xl" style={{ color: INK_SOFT }}>
+          {training.description}
+        </p>
+      )}
+
+      {/* Meta chips */}
+      <div className="mt-5 flex flex-wrap gap-2">
+        <MetaChip icon={Calendar} label="Son tarih" value={training.deadline || '—'} tone={{ ink: '#1f3a7a', bg: '#eef2fb', soft: '#2c55b8' }} />
+        <MetaChip icon={Clock}    label="Süre"      value={`${training.examDuration ?? 30} dk`} tone={{ ink: '#6a4e11', bg: '#fef6e7', soft: '#b4820b' }} />
+        <MetaChip icon={Target}   label="Geçme"     value={`%${training.passingScore ?? 70}`} tone={{ ink: '#0d2010', bg: '#eaf6ef', soft: OLIVE }} />
+      </div>
+
+      {/* Overall progress */}
+      <div
+        className="mt-6 p-4"
+        style={{
+          backgroundColor: '#ffffff',
+          border: `1px solid ${RULE}`,
+          borderLeft: `4px solid ${OLIVE}`,
+          borderRadius: '4px',
+        }}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span
+            className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+            style={{ color: OLIVE, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+          >
+            Genel ilerleme
+          </span>
+          <span
+            className="text-[11px] font-semibold tabular-nums tracking-[0.1em]"
+            style={{ color: INK, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+          >
+            {completedSteps.toString().padStart(2, '0')}/{totalSteps.toString().padStart(2, '0')} · <span style={{ color: OLIVE }}>%{overallProgress}</span>
           </span>
         </div>
-
-        <h1 className="td-title">{training.title}</h1>
-        {training.description && <p className="td-desc">{training.description}</p>}
-
-        <div className="td-chips">
-          <Chip icon={<Calendar className="h-3 w-3" />} label="Son tarih" value={training.deadline || '—'} />
-          <Chip icon={<Clock className="h-3 w-3" />} label="Süre" value={`${training.examDuration ?? 30} dk`} />
-          <Chip icon={<Target className="h-3 w-3" />} label="Geçme" value={`%${training.passingScore ?? 70}`} />
+        <div
+          className="relative h-[8px] w-full overflow-hidden"
+          style={{ backgroundColor: RULE, borderRadius: '1px' }}
+        >
+          <div
+            className="absolute left-0 top-0 h-full"
+            style={{
+              width: `${overallProgress}%`,
+              backgroundColor: OLIVE,
+              transition: 'width 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          />
         </div>
-
-        <div className="td-progress">
-          <div className="td-progress-bar">
-            <div className="td-progress-fill" style={{ width: `${overallProgress}%` }} />
-          </div>
-          <span className="td-progress-text">
-            <strong>{completedSteps.toString().padStart(2, '0')}</strong>/<strong>{totalSteps.toString().padStart(2, '0')}</strong> aşama
-          </span>
-        </div>
-      </section>
+      </div>
 
       {/* Expired banner */}
       {training.isExpired && !allDone && (
-        <Banner tone="err" icon={<AlertTriangle className="h-4 w-4" />}>
-          <h3>Bu eğitimin süresi dolmuş</h3>
-          <p>Eğitim süresi <strong>{training.deadline}</strong> tarihinde sona erdi. Sınava giriş yapılamaz.</p>
-        </Banner>
+        <EditorialBanner
+          tone="error"
+          icon={AlertTriangle}
+          title="Bu eğitimin süresi dolmuş"
+          description={`Eğitim süresi ${training.deadline} tarihinde sona erdi. Sınava giriş yapılamaz.`}
+        />
       )}
 
       {/* Retry banner */}
       {isRetry && training.status !== 'failed' && !training.isExpired && (
-        <Banner tone="amber" icon={<RefreshCw className="h-4 w-4" />}>
-          <h3><em>{training.currentAttempt}.</em> deneme hakkındasın</h3>
-          <p>
-            {training.lastAttemptScore !== undefined && `Önceki deneme puanı: %${training.lastAttemptScore}. `}
-            Ön sınav atlandı. Videoları izleyip son sınava gir. (Toplam {training.maxAttempts} hak)
-          </p>
-        </Banner>
+        <EditorialBanner
+          tone="warning"
+          icon={RefreshCw}
+          title={`${training.currentAttempt}. deneme hakkındasın`}
+          description={`${training.lastAttemptScore !== undefined ? `Önceki deneme puanı: %${training.lastAttemptScore}. ` : ''}Ön sınav atlandı. Videoları izleyip son sınava gir. (Toplam ${training.maxAttempts} hak)`}
+        />
       )}
 
-      {/* ═══════ Steps timeline ═══════ */}
-      <section className="td-steps">
-        {steps.map((step, idx) => {
-          const isCurrent = idx === currentStep && !allDone;
-          const isDone = step.done;
-          const isLocked = idx > currentStep;
-          const StepIcon = step.icon;
-          return (
-            <div
-              key={idx}
-              className={`td-step ${isDone ? 'td-step-done' : isCurrent ? 'td-step-current' : isLocked ? 'td-step-locked' : ''}`}
+      {/* ───── Steps ───── */}
+      <section className="mt-10">
+        <header
+          className="grid items-end gap-4 pb-3"
+          style={{ gridTemplateColumns: '40px 1fr', borderBottom: `3px solid ${GOLD}` }}
+        >
+          <span
+            className="text-[13px] font-semibold tracking-[0.2em]"
+            style={{ color: GOLD, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+          >
+            §
+          </span>
+          <div>
+            <h2
+              className="text-[22px] leading-tight font-semibold tracking-[-0.02em]"
+              style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
             >
-              <div className="td-step-num">
-                {isDone ? <CheckCircle2 className="h-5 w-5" /> : isLocked ? <Lock className="h-4 w-4" /> : <StepIcon className="h-5 w-5" />}
-              </div>
-              <div className="td-step-body">
-                <span className="td-step-eyebrow">Aşama {(idx + 1).toString().padStart(2, '0')}</span>
-                <h3>{step.label}</h3>
-                <p>{step.desc}</p>
-                {'score' in step && step.score !== undefined && isDone && (
-                  <span className="td-step-score">Puan: %{step.score}</span>
-                )}
-              </div>
-              {idx < steps.length - 1 && <span className="td-step-connector" aria-hidden />}
-            </div>
-          );
-        })}
+              İlerleme aşamaları
+            </h2>
+            <p
+              className="mt-0.5 text-[10px] uppercase tracking-[0.16em]"
+              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+            >
+              {isExamOnly ? 'Tek aşama' : isRetry ? '2 aşama (deneme modu)' : '3 aşama'}
+            </p>
+          </div>
+        </header>
+
+        <div className="mt-5 relative">
+          {/* Spine */}
+          <div
+            aria-hidden
+            className="absolute top-5 bottom-5"
+            style={{ left: 21, width: 2, backgroundColor: RULE }}
+          />
+
+          <ul className="space-y-3">
+            {steps.map((step, idx) => (
+              <StepRow
+                key={idx}
+                step={step}
+                idx={idx}
+                isCurrent={idx === currentStep && !allDone}
+                isLocked={idx > currentStep}
+              />
+            ))}
+          </ul>
+        </div>
       </section>
 
-      {/* ═══════ Video list (after pre-exam OR retry) ═══════ */}
+      {/* ───── Videos ───── */}
       {(training.preExamCompleted || isRetry) && videos.length > 0 && !allDone && (
-        <section className="td-videos">
-          <header className="td-videos-head">
+        <section className="mt-12">
+          <header
+            className="grid items-end gap-4 pb-3"
+            style={{ gridTemplateColumns: '40px 1fr max-content', borderBottom: `3px solid ${OLIVE}` }}
+          >
+            <span
+              className="text-[13px] font-semibold tracking-[0.2em]"
+              style={{ color: OLIVE, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+            >
+              ▶
+            </span>
             <div>
-              <span className="td-card-eyebrow">İçerik</span>
-              <h3 className="td-card-title">Eğitim Videoları</h3>
+              <h2
+                className="text-[20px] leading-tight font-semibold tracking-[-0.02em]"
+                style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+              >
+                Eğitim videoları
+              </h2>
+              <p
+                className="mt-0.5 text-[10px] uppercase tracking-[0.16em]"
+                style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+              >
+                %{videoProgress} tamamlandı · {completedVideos.toString().padStart(2, '0')}/{videos.length.toString().padStart(2, '0')}
+              </p>
             </div>
-            <div className="td-videos-progress">
-              <div className="td-videos-bar">
-                <div className="td-videos-bar-fill" style={{ width: `${videoProgress}%` }} />
-              </div>
-              <span className="td-videos-pct">
-                <strong>{completedVideos.toString().padStart(2, '0')}</strong>/<strong>{videos.length.toString().padStart(2, '0')}</strong>
-              </span>
+            <div
+              className="relative h-[4px] w-24 overflow-hidden"
+              style={{ backgroundColor: RULE, borderRadius: '1px' }}
+            >
+              <div
+                className="absolute left-0 top-0 h-full"
+                style={{ width: `${videoProgress}%`, backgroundColor: OLIVE }}
+              />
             </div>
           </header>
 
-          <ul className="td-videos-list">
-            {videos.map((v, i) => {
+          <ul
+            className="mt-5"
+            style={{
+              backgroundColor: '#ffffff',
+              borderTop: `1px solid ${RULE}`,
+              borderRight: `1px solid ${RULE}`,
+              borderBottom: `1px solid ${RULE}`,
+              borderLeft: `6px solid ${OLIVE}`,
+              borderRadius: '4px',
+            }}
+          >
+            {videos.map((v, i, arr) => {
               const isNext = !v.completed && i === completedVideos;
               const isLocked = !v.completed && !isNext;
               return (
                 <li
                   key={i}
-                  className={`td-video ${v.completed ? 'td-video-done' : isNext ? 'td-video-next' : 'td-video-locked'}`}
+                  className="grid items-center gap-3 px-4 py-3"
+                  style={{
+                    gridTemplateColumns: '36px 1fr max-content',
+                    borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${RULE}`,
+                    backgroundColor: isNext ? 'rgba(201, 169, 97, 0.08)' : v.completed ? '#f7fcf8' : 'transparent',
+                    opacity: isLocked ? 0.55 : 1,
+                  }}
                 >
-                  <span className="td-video-num">
-                    {v.completed ? <CheckCircle2 className="h-4 w-4" /> : isLocked ? <Lock className="h-3.5 w-3.5" /> : String(i + 1).padStart(2, '0')}
+                  <span
+                    className="inline-flex items-center justify-center text-[11px] font-semibold tabular-nums"
+                    style={{
+                      width: 32, height: 32,
+                      backgroundColor: v.completed ? '#eaf6ef' : isNext ? INK : CREAM,
+                      color: v.completed ? '#0a7a47' : isNext ? CREAM : INK_SOFT,
+                      border: v.completed ? 'none' : `1px solid ${RULE}`,
+                      borderRadius: '2px',
+                      fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                    }}
+                  >
+                    {v.completed ? <CheckCircle2 className="h-4 w-4" /> : isLocked ? <Lock className="h-3.5 w-3.5" /> : (i + 1).toString().padStart(2, '0')}
                   </span>
-                  <div className="td-video-body">
-                    <h4>{v.title}</h4>
-                    <p><Clock className="h-3 w-3" /> {v.duration}</p>
+                  <div className="min-w-0">
+                    <p
+                      className="truncate text-[13px] font-semibold tracking-[-0.01em]"
+                      style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+                    >
+                      {v.title}
+                    </p>
+                    <p
+                      className="mt-0.5 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.12em]"
+                      style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                    >
+                      <Clock className="h-2.5 w-2.5" />
+                      {v.duration}
+                    </p>
                   </div>
                   {v.completed ? (
-                    <span className="td-video-chip">Tamamlandı</span>
+                    <span
+                      className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.12em] leading-none"
+                      style={{
+                        color: '#0a7a47', backgroundColor: '#eaf6ef',
+                        fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                      }}
+                    >
+                      TAMAMLANDI
+                    </span>
                   ) : isNext ? (
-                    <Link href={`/exam/${examId}/videos`} className="td-video-cta">
-                      <Play className="h-3.5 w-3.5" fill="currentColor" />
-                      <span>İzle</span>
+                    <Link
+                      href={`/exam/${examId}/videos`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                      style={{
+                        color: CREAM, backgroundColor: INK, borderRadius: '2px',
+                        fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                      }}
+                    >
+                      <Play className="h-3 w-3" fill="currentColor" style={{ color: GOLD }} />
+                      İzle
                     </Link>
                   ) : null}
                 </li>
@@ -273,694 +510,473 @@ export default function TrainingDetailPage() {
           </ul>
 
           {training.videosCompleted && !training.postExamCompleted && (
-            <div className="td-videos-done">
-              <Award className="h-5 w-5" />
-              <div>
-                <h4>Tüm videolar tamamlandı</h4>
-                <p>Son sınava geçebilirsin.</p>
+            <div
+              className="mt-4 grid items-center gap-4 p-4"
+              style={{
+                gridTemplateColumns: '4px 44px 1fr max-content',
+                backgroundColor: '#ffffff',
+                border: `1px solid ${RULE}`,
+                borderRadius: '4px',
+              }}
+            >
+              <span style={{ backgroundColor: OLIVE, alignSelf: 'stretch', borderRadius: '2px' }} />
+              <div
+                className="flex items-center justify-center"
+                style={{ width: 44, height: 44, backgroundColor: '#eaf6ef', borderRadius: '2px' }}
+              >
+                <Award className="h-5 w-5" style={{ color: OLIVE }} />
               </div>
-              <Link href={`/exam/${examId}/post-exam`} className="td-btn td-btn-primary">
-                <Award className="h-4 w-4" />
-                <span>Son Sınav</span>
-                <ChevronRight className="h-4 w-4" />
+              <div>
+                <p
+                  className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                  style={{ color: OLIVE, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                >
+                  Hazır
+                </p>
+                <p
+                  className="mt-0.5 text-[14px] font-semibold tracking-[-0.01em]"
+                  style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+                >
+                  Tüm videolar tamamlandı — son sınava geç
+                </p>
+              </div>
+              <Link
+                href={`/exam/${examId}/post-exam`}
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                style={{
+                  color: CREAM, backgroundColor: OLIVE, borderRadius: '2px',
+                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                }}
+              >
+                <Award className="h-3.5 w-3.5" style={{ color: GOLD }} />
+                Son Sınav
+                <ChevronRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           )}
         </section>
       )}
 
-      {/* ═══════ Primary CTA ═══════ */}
+      {/* ───── Main CTA ───── */}
       {!allDone && !training.isExpired && (
-        <Link href={ctaHref} className="td-main-cta">
-          <CtaIcon className="h-5 w-5" />
-          <span>{ctaLabel}</span>
-          <ChevronRight className="h-4 w-4 td-main-cta-chev" />
+        <Link
+          href={ctaHref}
+          className="mt-10 group flex items-center justify-between gap-4 px-6 py-5"
+          style={{
+            backgroundColor: INK,
+            color: CREAM,
+            borderRadius: '4px',
+            border: `1px solid ${INK}`,
+            transition: 'background-color 200ms ease, transform 220ms ease',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = OLIVE; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = INK; }}
+        >
+          <div className="flex items-center gap-3">
+            <span
+              className="flex items-center justify-center"
+              style={{ width: 40, height: 40, backgroundColor: 'rgba(201, 169, 97, 0.15)', borderRadius: '2px' }}
+            >
+              <CtaIcon className="h-5 w-5" style={{ color: GOLD }} />
+            </span>
+            <div>
+              <p
+                className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+                style={{ color: GOLD, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+              >
+                Sonraki adım
+              </p>
+              <p
+                className="mt-0.5 text-[20px] font-semibold tracking-[-0.01em]"
+                style={{ color: CREAM, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+              >
+                {ctaLabel}
+              </p>
+            </div>
+          </div>
+          <ChevronRight
+            className="h-6 w-6 transition-transform group-hover:translate-x-1"
+            style={{ color: GOLD }}
+          />
         </Link>
       )}
 
-      {/* ═══════ Passed state ═══════ */}
+      {/* ───── Passed state ───── */}
       {training.status === 'passed' && (
-        <div className="td-passed">
-          <div className="td-passed-hero">
-            <div className="td-passed-icon">
-              <CheckCircle2 className="h-6 w-6" />
+        <section className="mt-10">
+          <div
+            className="grid items-start gap-4 p-6"
+            style={{
+              gridTemplateColumns: '6px 52px 1fr',
+              backgroundColor: '#f7fcf8',
+              borderTop: `1px solid #bfe0cb`,
+              borderRight: `1px solid #bfe0cb`,
+              borderBottom: `1px solid #bfe0cb`,
+              borderRadius: '4px',
+            }}
+          >
+            <span style={{ backgroundColor: OLIVE, alignSelf: 'stretch', borderRadius: '2px' }} />
+            <div
+              className="flex items-center justify-center"
+              style={{ width: 52, height: 52, backgroundColor: '#eaf6ef', borderRadius: '2px' }}
+            >
+              <CheckCircle2 className="h-6 w-6" style={{ color: OLIVE }} />
             </div>
             <div>
-              <span className="td-card-eyebrow">Tamamlandı</span>
-              <h2 className="td-passed-title">Eğitim başarıyla tamamlandı</h2>
+              <p
+                className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+                style={{ color: OLIVE, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+              >
+                Tamamlandı
+              </p>
+              <h2
+                className="mt-1 text-[22px] font-semibold tracking-[-0.01em]"
+                style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+              >
+                Eğitim başarıyla tamamlandı
+              </h2>
               {training.lastAttemptScore !== undefined && (
-                <p className="td-passed-meta">
-                  Son sınav puanı <strong>%{training.lastAttemptScore}</strong>
+                <p className="mt-1 text-[13px]" style={{ color: INK_SOFT }}>
+                  Son sınav puanı <span style={{ color: INK, fontWeight: 600 }}>%{training.lastAttemptScore}</span>
                 </p>
               )}
             </div>
           </div>
 
-          <div className="td-passed-actions">
+          <div
+            className="mt-4"
+            style={{ backgroundColor: '#ffffff', border: `1px solid ${RULE}`, borderRadius: '4px' }}
+          >
             {videos.length > 0 && (
-              <Link href={`/exam/${examId}/videos?mode=review`} className="td-action">
-                <span className="td-action-icon td-action-icon-ink">
-                  <Play className="h-4 w-4" fill="currentColor" />
+              <Link
+                href={`/exam/${examId}/videos?mode=review`}
+                className="grid items-center gap-3 px-5 py-4 group"
+                style={{
+                  gridTemplateColumns: '36px 1fr max-content',
+                  borderBottom: `1px solid ${RULE}`,
+                }}
+              >
+                <span
+                  className="flex items-center justify-center"
+                  style={{ width: 36, height: 36, backgroundColor: INK, borderRadius: '2px' }}
+                >
+                  <Play className="h-4 w-4" fill="currentColor" style={{ color: GOLD }} />
                 </span>
-                <div className="td-action-body">
-                  <h4>Eğitim İçeriğini Tekrar İzle</h4>
-                  <p>{videos.length} video · istediğin zaman tekrar izle</p>
+                <div>
+                  <h4
+                    className="text-[14px] font-semibold tracking-[-0.01em]"
+                    style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+                  >
+                    Eğitim içeriğini tekrar izle
+                  </h4>
+                  <p
+                    className="mt-0.5 text-[10px] uppercase tracking-[0.14em]"
+                    style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                  >
+                    {videos.length} video · istediğin zaman
+                  </p>
                 </div>
-                <ChevronRight className="h-4 w-4 td-action-chev" />
+                <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" style={{ color: GOLD }} />
               </Link>
             )}
 
-            <Link href="/staff/certificates" className="td-action">
-              <span className="td-action-icon td-action-icon-ok">
-                <Award className="h-4 w-4" />
+            <Link
+              href="/staff/certificates"
+              className="grid items-center gap-3 px-5 py-4 group"
+              style={{ gridTemplateColumns: '36px 1fr max-content' }}
+            >
+              <span
+                className="flex items-center justify-center"
+                style={{ width: 36, height: 36, backgroundColor: '#eaf6ef', borderRadius: '2px' }}
+              >
+                <Award className="h-4 w-4" style={{ color: OLIVE }} />
               </span>
-              <div className="td-action-body">
-                <h4>Sertifikalarıma Git</h4>
-                <p>Başarı sertifikana ulaş</p>
+              <div>
+                <h4
+                  className="text-[14px] font-semibold tracking-[-0.01em]"
+                  style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+                >
+                  Sertifikalarıma git
+                </h4>
+                <p
+                  className="mt-0.5 text-[10px] uppercase tracking-[0.14em]"
+                  style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                >
+                  Başarı sertifikana ulaş
+                </p>
               </div>
-              <ChevronRight className="h-4 w-4 td-action-chev" />
+              <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" style={{ color: GOLD }} />
             </Link>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* ═══════ Failed state ═══════ */}
+      {/* ───── Failed state ───── */}
       {allDone && training.status === 'failed' && (
-        <div className="td-failed">
-          <div className="td-failed-icon"><Lock className="h-6 w-6" /></div>
-          <h3>Tüm deneme hakları tükendi</h3>
-          <p>{training.maxAttempts} deneme hakkının tamamını kullandın. Ek deneme için eğitim yöneticine başvur.</p>
-          <Link href="/staff/my-trainings" className="td-failed-link">← Eğitimlerime Dön</Link>
-        </div>
+        <section
+          className="mt-10 grid items-start gap-4 p-6"
+          style={{
+            gridTemplateColumns: '6px 52px 1fr',
+            backgroundColor: '#fdf5f2',
+            borderTop: `1px solid #e9c9c0`,
+            borderRight: `1px solid #e9c9c0`,
+            borderBottom: `1px solid #e9c9c0`,
+            borderRadius: '4px',
+          }}
+        >
+          <span style={{ backgroundColor: '#b3261e', alignSelf: 'stretch', borderRadius: '2px' }} />
+          <div
+            className="flex items-center justify-center"
+            style={{ width: 52, height: 52, backgroundColor: '#b3261e', borderRadius: '2px' }}
+          >
+            <Lock className="h-6 w-6" style={{ color: CREAM }} />
+          </div>
+          <div>
+            <p
+              className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+              style={{ color: '#b3261e', fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+            >
+              Haklar tükendi
+            </p>
+            <h2
+              className="mt-1 text-[20px] font-semibold tracking-[-0.01em]"
+              style={{ color: '#7a1d14', fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+            >
+              Tüm deneme hakları kullanıldı
+            </h2>
+            <p className="mt-1 text-[13px]" style={{ color: '#7a1d14' }}>
+              {training.maxAttempts} deneme hakkının tamamını kullandın. Ek deneme için eğitim yöneticine başvur.
+            </p>
+            <Link
+              href="/staff/my-trainings"
+              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+              style={{
+                color: '#7a1d14', border: `1px solid #7a1d14`, borderRadius: '2px',
+                fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+              }}
+            >
+              <ArrowLeft className="h-3 w-3" />
+              Eğitimlerime Dön
+            </Link>
+          </div>
+        </section>
       )}
+    </>,
+  );
+}
 
-      <style jsx>{`
-        .td-page {
-          max-width: 820px;
-          margin: 0 auto;
-          display: flex;
-          flex-direction: column;
-          gap: 22px;
-          padding-bottom: 60px;
-        }
+/* ─────────────────────────────────────────────────────
+   Atoms
+   ───────────────────────────────────────────────────── */
 
-        /* ── Hero ── */
-        .td-hero {
-          padding: 28px 32px 32px;
-          background: linear-gradient(135deg, #faf8f2 0%, #f4efdf 100%);
-          border: 1px solid #ebe7df;
-          border-radius: 20px;
-          position: relative;
-          overflow: hidden;
-        }
-        .td-hero::before {
-          content: '';
-          position: absolute;
-          top: -40%;
-          right: -15%;
-          width: 480px;
-          height: 480px;
-          background: radial-gradient(circle, rgba(10, 122, 71, 0.08) 0%, transparent 65%);
-          pointer-events: none;
-        }
-        .td-hero::after {
-          content: '';
-          position: absolute;
-          left: 0; top: 0; bottom: 0;
-          width: 3px;
-          background: #0a7a47;
-        }
-        .td-back {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          height: 36px;
-          padding: 0 12px 0 10px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.6);
-          color: #6b6a63;
-          border: none;
-          cursor: pointer;
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          font-weight: 500;
-          margin-bottom: 18px;
-          position: relative;
-          z-index: 1;
-          transition: background 160ms ease, color 160ms ease;
-        }
-        .td-back:hover { background: #0a0a0a; color: #fafaf7; }
+function MetaChip({
+  icon: Icon, label, value, tone,
+}: {
+  icon: LucideIcon; label: string; value: string;
+  tone: { ink: string; bg: string; soft: string };
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-2 px-3 py-2"
+      style={{
+        backgroundColor: '#ffffff',
+        border: `1px solid ${RULE}`,
+        borderLeft: `3px solid ${tone.soft}`,
+        borderRadius: '2px',
+      }}
+    >
+      <span
+        className="flex items-center justify-center shrink-0"
+        style={{
+          width: 22, height: 22,
+          backgroundColor: tone.bg,
+          borderRadius: '2px',
+        }}
+      >
+        <Icon className="h-3 w-3" style={{ color: tone.soft }} />
+      </span>
+      <span
+        className="text-[9px] font-semibold uppercase tracking-[0.16em]"
+        style={{ color: tone.soft, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+      >
+        {label}
+      </span>
+      <span
+        className="text-[13px] font-semibold tabular-nums"
+        style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+      >
+        {value}
+      </span>
+    </span>
+  );
+}
 
-        .td-hero-meta {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 10px;
-          position: relative;
-          z-index: 1;
-        }
-        .td-eyebrow {
-          display: inline-block;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: #8a8578;
-        }
-        .td-attempt {
-          font-family: var(--font-display, system-ui);
-          font-size: 11px;
-          color: #8a8578;
-          font-variant-numeric: tabular-nums;
-        }
-        .td-attempt strong {
-          font-family: var(--font-editorial, serif);
-          font-weight: 500;
-          color: #0a0a0a;
-        }
-        .td-title {
-          font-family: var(--font-editorial, serif);
-          font-size: clamp(26px, 4vw, 40px);
-          font-weight: 500;
-          font-variation-settings: 'opsz' 72, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.025em;
-          line-height: 1.1;
-          margin: 0 0 10px;
-          position: relative;
-          z-index: 1;
-        }
-        .td-desc {
-          font-size: 14px;
-          color: #6b6a63;
-          line-height: 1.6;
-          margin: 0 0 18px;
-          position: relative;
-          z-index: 1;
-          max-width: 560px;
-        }
-        .td-chips {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          margin-bottom: 20px;
-          position: relative;
-          z-index: 1;
-        }
-        .td-progress {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          position: relative;
-          z-index: 1;
-        }
-        .td-progress-bar {
-          flex: 1;
-          height: 4px;
-          background: rgba(10, 10, 10, 0.08);
-          border-radius: 2px;
-          overflow: hidden;
-        }
-        .td-progress-fill {
-          height: 100%;
-          background: #0a7a47;
-          transition: width 800ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .td-progress-text {
-          font-family: var(--font-display, system-ui);
-          font-size: 11px;
-          color: #6b6a63;
-          font-variant-numeric: tabular-nums;
-        }
-        .td-progress-text strong {
-          color: #0a0a0a;
-          font-weight: 600;
-          font-family: var(--font-editorial, serif);
-        }
+function EditorialBanner({
+  tone, icon: Icon, title, description,
+}: {
+  tone: 'error' | 'warning' | 'success';
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}) {
+  const toneMap = {
+    error:   { ink: '#7a1d14', soft: '#b3261e', bg: '#fdf5f2', border: '#e9c9c0' },
+    warning: { ink: '#6a4e11', soft: '#b4820b', bg: '#fef6e7', border: '#e8d6a8' },
+    success: { ink: '#0d2010', soft: OLIVE,     bg: '#eaf6ef', border: '#bfe0cb' },
+  }[tone];
 
-        /* ── Steps timeline ── */
-        .td-steps {
-          display: flex;
-          flex-direction: column;
-          gap: 0;
-          padding: 8px 0;
-        }
-        .td-step {
-          display: grid;
-          grid-template-columns: auto 1fr;
-          gap: 16px;
-          padding: 16px 0;
-          position: relative;
-        }
-        .td-step-connector {
-          position: absolute;
-          left: 21px;
-          top: 62px;
-          bottom: -8px;
-          width: 2px;
-          background: #ebe7df;
-          border-radius: 1px;
-        }
-        .td-step-done .td-step-connector { background: #0a7a47; }
-        .td-step-num {
-          flex-shrink: 0;
-          width: 44px;
-          height: 44px;
-          border-radius: 12px;
-          background: #faf8f2;
-          color: #6b6a63;
-          border: 1px solid #ebe7df;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-          z-index: 1;
-        }
-        .td-step-done .td-step-num {
-          background: #0a7a47;
-          color: #fafaf7;
-          border-color: #0a7a47;
-        }
-        .td-step-current .td-step-num {
-          background: #0a0a0a;
-          color: #fafaf7;
-          border-color: #0a0a0a;
-          box-shadow: 0 0 0 4px rgba(10, 10, 10, 0.06);
-        }
-        .td-step-locked { opacity: 0.55; }
-        .td-step-body { padding-top: 4px; min-width: 0; }
-        .td-step-eyebrow {
-          display: block;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: #8a8578;
-          margin-bottom: 2px;
-        }
-        .td-step-body h3 {
-          font-family: var(--font-editorial, serif);
-          font-size: 17px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 30, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.01em;
-          margin: 0 0 4px;
-        }
-        .td-step-body p {
-          font-size: 12px;
-          color: #6b6a63;
-          margin: 0;
-        }
-        .td-step-score {
-          display: inline-block;
-          margin-top: 6px;
-          padding: 3px 9px;
-          border-radius: 999px;
-          background: #eaf6ef;
-          color: #0a7a47;
-          font-family: var(--font-display, system-ui);
-          font-size: 11px;
-          font-weight: 600;
-          font-variant-numeric: tabular-nums;
-        }
-
-        /* ── Videos card ── */
-        .td-videos {
-          padding: 24px;
-          background: #ffffff;
-          border: 1px solid #ebe7df;
-          border-radius: 16px;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
-        }
-        .td-videos-head {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 16px;
-          margin-bottom: 16px;
-          padding-bottom: 16px;
-          border-bottom: 1px dashed #ebe7df;
-        }
-        .td-card-eyebrow {
-          display: block;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: #8a8578;
-          margin-bottom: 2px;
-        }
-        .td-card-title {
-          font-family: var(--font-editorial, serif);
-          font-size: 18px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 32, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.01em;
-          margin: 0;
-        }
-        .td-videos-progress { display: flex; align-items: center; gap: 10px; }
-        .td-videos-bar {
-          width: 80px;
-          height: 4px;
-          background: #ebe7df;
-          border-radius: 2px;
-          overflow: hidden;
-        }
-        .td-videos-bar-fill {
-          height: 100%;
-          background: #0a7a47;
-          transition: width 600ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .td-videos-pct {
-          font-family: var(--font-display, system-ui);
-          font-size: 11px;
-          color: #6b6a63;
-          font-variant-numeric: tabular-nums;
-        }
-        .td-videos-pct strong {
-          color: #0a0a0a;
-          font-family: var(--font-editorial, serif);
-          font-weight: 500;
-        }
-        .td-videos-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .td-video {
-          display: grid;
-          grid-template-columns: auto 1fr auto;
-          gap: 14px;
-          align-items: center;
-          padding: 12px 14px;
-          border-radius: 10px;
-          border: 1px solid #ebe7df;
-          background: #ffffff;
-          transition: border-color 180ms ease, background 180ms ease;
-        }
-        .td-video-done { background: #f7fcf8; border-color: #c8e6d5; }
-        .td-video-next { background: #faf8f2; border-color: #0a0a0a; }
-        .td-video-locked { opacity: 0.55; }
-        .td-video-num {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          background: #faf8f2;
-          color: #6b6a63;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-family: var(--font-mono, monospace);
-          font-size: 11px;
-          font-weight: 700;
-          font-variant-numeric: tabular-nums;
-        }
-        .td-video-done .td-video-num { background: #0a7a47; color: #fafaf7; }
-        .td-video-next .td-video-num { background: #0a0a0a; color: #fafaf7; }
-        .td-video-body { min-width: 0; }
-        .td-video-body h4 {
-          font-family: var(--font-editorial, serif);
-          font-size: 14px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 24;
-          color: #0a0a0a;
-          margin: 0 0 2px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .td-video-body p {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 11px;
-          color: #6b6a63;
-          margin: 0;
-          font-variant-numeric: tabular-nums;
-        }
-        .td-video-chip {
-          display: inline-flex;
-          align-items: center;
-          padding: 3px 10px;
-          border-radius: 999px;
-          background: #eaf6ef;
-          color: #0a7a47;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.04em;
-        }
-        .td-video-cta {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          height: 36px;
-          padding: 0 14px;
-          border-radius: 999px;
-          background: #0a0a0a;
-          color: #fafaf7;
-          text-decoration: none;
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          font-weight: 600;
-          transition: background 160ms ease;
-        }
-        .td-video-cta:hover { background: #1a1a1a; }
-
-        .td-videos-done {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          margin-top: 16px;
-          padding: 14px 16px;
-          background: #fef6e7;
-          border: 1px solid #e9c977;
-          border-radius: 12px;
-        }
-        .td-videos-done :global(svg) { color: #b4820b; flex-shrink: 0; }
-        .td-videos-done > div { flex: 1; min-width: 0; }
-        .td-videos-done h4 {
-          font-family: var(--font-editorial, serif);
-          font-size: 14px;
-          font-weight: 500;
-          color: #6a4e11;
-          margin: 0 0 2px;
-        }
-        .td-videos-done p { font-size: 11px; color: #8a5a11; margin: 0; }
-
-        /* ── Primary CTA ── */
-        .td-main-cta {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          height: 56px;
-          padding: 0 24px;
-          border-radius: 999px;
-          background: #0a0a0a;
-          color: #fafaf7;
-          font-family: var(--font-display, system-ui);
-          font-size: 15px;
-          font-weight: 600;
-          letter-spacing: -0.005em;
-          text-decoration: none;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 6px 20px rgba(10, 10, 10, 0.15);
-          transition: background 160ms ease, transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .td-main-cta:hover { background: #1a1a1a; }
-        .td-main-cta:active { transform: scale(0.98); }
-        .td-main-cta-chev { transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1); }
-        .td-main-cta:hover .td-main-cta-chev { transform: translateX(3px); }
-
-        /* ── Buttons ── */
-        .td-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          height: 40px;
-          padding: 0 16px;
-          border-radius: 999px;
-          font-family: var(--font-display, system-ui);
-          font-size: 13px;
-          font-weight: 600;
-          text-decoration: none;
-          cursor: pointer;
-          border: 1px solid transparent;
-          transition: background 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .td-btn:active { transform: scale(0.97); }
-        .td-btn-primary {
-          background: #b4820b;
-          color: #fafaf7;
-        }
-        .td-btn-primary:hover { background: #8f6709; }
-
-        /* ── Passed state ── */
-        .td-passed { display: flex; flex-direction: column; gap: 18px; }
-        .td-passed-hero {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          padding: 22px 24px;
-          background: linear-gradient(135deg, #f7fcf8 0%, #eaf6ef 100%);
-          border: 1px solid #c8e6d5;
-          border-radius: 16px;
-          position: relative;
-          overflow: hidden;
-        }
-        .td-passed-hero::before {
-          content: '';
-          position: absolute;
-          left: 0; top: 0; bottom: 0;
-          width: 3px;
-          background: #0a7a47;
-        }
-        .td-passed-icon {
-          width: 48px;
-          height: 48px;
-          border-radius: 999px;
-          background: #0a7a47;
-          color: #fafaf7;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-        .td-passed-title {
-          font-family: var(--font-editorial, serif);
-          font-size: 22px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 36, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.015em;
-          margin: 0;
-        }
-        .td-passed-meta {
-          font-size: 13px;
-          color: #6b6a63;
-          margin: 4px 0 0;
-        }
-        .td-passed-meta strong {
-          font-family: var(--font-editorial, serif);
-          font-weight: 500;
-          color: #0a7a47;
-          font-variant-numeric: tabular-nums;
-        }
-        .td-passed-actions { display: flex; flex-direction: column; gap: 10px; }
-
-        /* Action cards */
-        .td-action {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          padding: 16px 18px;
-          background: #ffffff;
-          border: 1px solid #ebe7df;
-          border-radius: 14px;
-          text-decoration: none;
-          transition: border-color 200ms ease, transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .td-action:hover {
-          border-color: #0a0a0a;
-          transform: translateY(-1px);
-        }
-        .td-action-icon {
-          flex-shrink: 0;
-          width: 40px;
-          height: 40px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .td-action-icon-ink { background: #0a0a0a; color: #fafaf7; }
-        .td-action-icon-ok { background: #eaf6ef; color: #0a7a47; }
-        .td-action-body { flex: 1; min-width: 0; }
-        .td-action-body h4 {
-          font-family: var(--font-editorial, serif);
-          font-size: 15px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 24;
-          color: #0a0a0a;
-          margin: 0 0 2px;
-        }
-        .td-action-body p {
-          font-size: 12px;
-          color: #6b6a63;
-          margin: 0;
-        }
-        .td-action-chev {
-          color: #8a8578;
-          transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .td-action:hover .td-action-chev { transform: translateX(3px); color: #0a0a0a; }
-
-        /* ── Failed state ── */
-        .td-failed {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          padding: 40px 20px;
-          gap: 12px;
-        }
-        .td-failed-icon {
-          width: 56px;
-          height: 56px;
-          border-radius: 999px;
-          background: #fdf5f2;
-          color: #b3261e;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .td-failed h3 {
-          font-family: var(--font-editorial, serif);
-          font-size: 20px;
-          font-weight: 500;
-          color: #b3261e;
-          margin: 0;
-        }
-        .td-failed p {
-          font-size: 13px;
-          color: #6b6a63;
-          max-width: 400px;
-          line-height: 1.55;
-          margin: 0;
-        }
-        .td-failed-link {
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          font-weight: 600;
-          color: #0a0a0a;
-          text-decoration: none;
-          margin-top: 6px;
-        }
-
-        /* ── Responsive ── */
-        @media (max-width: 640px) {
-          .td-hero { padding: 22px 22px 24px; }
-          .td-videos { padding: 20px; }
-          .td-videos-head { flex-direction: column; align-items: flex-start; gap: 10px; padding-bottom: 14px; }
-          .td-video { gap: 12px; padding: 10px 12px; }
-          .td-video-body h4 { font-size: 13px; }
-          .td-videos-done { flex-wrap: wrap; }
-          .td-videos-done .td-btn { width: 100%; justify-content: center; }
-          .td-passed-hero { padding: 20px 22px; }
-          .td-passed-title { font-size: 18px; }
-          .td-main-cta { height: 52px; padding: 0 20px; font-size: 14px; }
-        }
-      `}</style>
+  return (
+    <div
+      className="mt-6 grid items-start gap-4 p-4"
+      style={{
+        gridTemplateColumns: '6px 44px 1fr',
+        backgroundColor: toneMap.bg,
+        borderTop: `1px solid ${toneMap.border}`,
+        borderRight: `1px solid ${toneMap.border}`,
+        borderBottom: `1px solid ${toneMap.border}`,
+        borderRadius: '4px',
+      }}
+    >
+      <span style={{ backgroundColor: toneMap.soft, alignSelf: 'stretch', borderRadius: '2px' }} />
+      <div
+        className="flex items-center justify-center"
+        style={{ width: 44, height: 44, backgroundColor: toneMap.soft, borderRadius: '2px' }}
+      >
+        <Icon className="h-5 w-5" style={{ color: CREAM }} />
+      </div>
+      <div>
+        <p
+          className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+          style={{ color: toneMap.soft, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+        >
+          {title}
+        </p>
+        <p className="mt-1 text-[12px] leading-snug" style={{ color: toneMap.ink }}>
+          {description}
+        </p>
+      </div>
     </div>
   );
 }
 
+function StepRow({
+  step, idx, isCurrent, isLocked,
+}: {
+  step: { label: string; desc: string; icon: LucideIcon; done: boolean; score?: number };
+  idx: number;
+  isCurrent: boolean;
+  isLocked: boolean;
+}) {
+  const StepIcon = step.icon;
+  const bgColor = step.done
+    ? OLIVE
+    : isCurrent
+      ? INK
+      : CREAM;
+  const fgColor = step.done || isCurrent ? CREAM : INK_SOFT;
+  const ringColor = isCurrent ? 'rgba(201, 169, 97, 0.3)' : 'transparent';
+
+  return (
+    <li
+      className="relative grid items-start gap-4"
+      style={{
+        gridTemplateColumns: '44px 1fr',
+        opacity: isLocked ? 0.5 : 1,
+      }}
+    >
+      <div
+        className="relative flex items-center justify-center shrink-0 z-10"
+        style={{
+          width: 44, height: 44,
+          backgroundColor: bgColor,
+          color: fgColor,
+          border: `1px solid ${step.done ? OLIVE : isCurrent ? INK : RULE}`,
+          borderRadius: '2px',
+          boxShadow: isCurrent ? `0 0 0 4px ${ringColor}` : 'none',
+        }}
+      >
+        {step.done ? <CheckCircle2 className="h-5 w-5" /> : isLocked ? <Lock className="h-4 w-4" /> : <StepIcon className="h-5 w-5" />}
+      </div>
+      <div
+        className="p-4"
+        style={{
+          backgroundColor: step.done ? '#f7fcf8' : isCurrent ? 'rgba(201, 169, 97, 0.06)' : '#ffffff',
+          borderTop: `1px solid ${RULE}`,
+          borderRight: `1px solid ${RULE}`,
+          borderBottom: `1px solid ${RULE}`,
+          borderLeft: step.done ? `6px solid ${OLIVE}` : isCurrent ? `6px solid ${GOLD}` : `2px solid ${RULE}`,
+          borderRadius: '4px',
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+            style={{
+              color: step.done ? OLIVE : isCurrent ? GOLD : INK_SOFT,
+              fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+            }}
+          >
+            Aşama {(idx + 1).toString().padStart(2, '0')}
+          </span>
+          {step.done && (
+            <span
+              className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.12em] leading-none"
+              style={{
+                color: OLIVE, backgroundColor: '#eaf6ef',
+                fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+              }}
+            >
+              TAMAM
+            </span>
+          )}
+          {isCurrent && (
+            <span
+              className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.12em] leading-none"
+              style={{
+                color: GOLD, backgroundColor: 'rgba(201, 169, 97, 0.12)',
+                fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+              }}
+            >
+              AKTİF
+            </span>
+          )}
+        </div>
+        <h3
+          className="mt-1 text-[16px] font-semibold tracking-[-0.01em]"
+          style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+        >
+          {step.label}
+        </h3>
+        <p className="mt-0.5 text-[12px]" style={{ color: INK_SOFT }}>
+          {step.desc}
+        </p>
+        {step.score !== undefined && step.done && (
+          <p
+            className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums"
+            style={{
+              color: OLIVE,
+              fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+            }}
+          >
+            PUAN · %{step.score}
+          </p>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="mt-6 space-y-6">
+      <div className="h-3 w-40" style={{ backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: '2px' }} />
+      <div className="h-12 w-3/4" style={{ backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: '2px' }} />
+      <div className="h-4 w-1/2" style={{ backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: '2px' }} />
+      <div className="space-y-3 mt-6">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-24" style={{ backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: '4px' }} />
+        ))}
+      </div>
+    </div>
+  );
+}
