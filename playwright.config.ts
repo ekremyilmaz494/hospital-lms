@@ -1,4 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
+import { config as dotenvConfig } from 'dotenv'
+
+// Playwright bağımsız Node process — Next.js'in .env.local auto-load'unu görmez.
+// E2E_* credentials buradan yüklenmezse global-setup ve helpers env yok diye skip eder.
+dotenvConfig({ path: '.env.local' })
+dotenvConfig({ path: '.env' })
 
 export default defineConfig({
   testDir: './e2e',
@@ -14,7 +20,9 @@ export default defineConfig({
     trace: 'on-first-retry',
     // Her test action için max bekleme süresi
     actionTimeout: 15000,
-    navigationTimeout: 30000,
+    // Dev'de Turbopack lazy compile sub-resource'ları yavaşlatıyor → 60s
+    // Prod'da gereksiz, ama test:e2e dev server'a karşı koşuyor (webServer.command: pnpm dev)
+    navigationTimeout: 60000,
   },
   // Her test için max süre
   timeout: 60000,

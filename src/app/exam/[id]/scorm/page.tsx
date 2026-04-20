@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useFetch } from '@/hooks/use-fetch'
 import { PageLoading } from '@/components/shared/page-loading'
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { AlertTriangle, CheckCircle2, LogOut, Play, ArrowLeft } from 'lucide-react'
 
 interface TrainingInfo {
   id: string
@@ -24,7 +25,6 @@ interface ScormAttempt {
   successStatus: string | null
 }
 
-// Declare the SCORM API on window
 declare global {
   interface Window {
     API?: ScormAPI
@@ -56,12 +56,10 @@ export default function ScormPlayerPage() {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialized = useRef(false)
 
-  // Sync ref with state
   useEffect(() => {
     attemptRef.current = attempt
   }, [attempt])
 
-  /** PATCH the attempt data */
   const patchAttempt = useCallback(async (data: Record<string, unknown>) => {
     try {
       const res = await fetch(`/api/exam/${id}/scorm/tracking`, {
@@ -75,20 +73,16 @@ export default function ScormPlayerPage() {
         return updated
       }
     } catch {
-      // Silent fail for tracking updates
+      /* Silent fail */
     }
     return null
   }, [id])
 
-  /** Debounced patch */
   const debouncedPatch = useCallback((data: Record<string, unknown>) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
-    debounceTimer.current = setTimeout(() => {
-      patchAttempt(data)
-    }, 2000)
+    debounceTimer.current = setTimeout(() => { patchAttempt(data) }, 2000)
   }, [patchAttempt])
 
-  /** Initialize SCORM attempt */
   useEffect(() => {
     if (!training || initialized.current) return
     initialized.current = true
@@ -96,11 +90,10 @@ export default function ScormPlayerPage() {
     async function initAttempt() {
       if (!training!.scormEntryPoint) {
         setStatus('error')
-        setErrorMsg('Bu egitim icin SCORM icerik bulunamadi')
+        setErrorMsg('Bu eğitim için SCORM içerik bulunamadı')
         return
       }
       try {
-        // Try to get existing attempt
         const getRes = await fetch(`/api/exam/${id}/scorm/tracking`)
         if (getRes.ok) {
           const existing = await getRes.json()
@@ -111,7 +104,6 @@ export default function ScormPlayerPage() {
           }
         }
 
-        // Create new attempt
         const postRes = await fetch(`/api/exam/${id}/scorm/tracking`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -122,11 +114,11 @@ export default function ScormPlayerPage() {
           setStatus('ready')
         } else {
           const err = await postRes.json().catch(() => ({}))
-          setErrorMsg(err.error || 'SCORM oturumu baslatilamadi')
+          setErrorMsg(err.error || 'SCORM oturumu başlatılamadı')
           setStatus('error')
         }
       } catch {
-        setErrorMsg('SCORM oturumu baslatilamadi')
+        setErrorMsg('SCORM oturumu başlatılamadı')
         setStatus('error')
       }
     }
@@ -134,11 +126,9 @@ export default function ScormPlayerPage() {
     initAttempt()
   }, [training, id])
 
-  /** Set up SCORM API bridge on window */
   useEffect(() => {
     if (status !== 'ready') return
 
-    // SCORM 1.2 data store
     const cmiData: Record<string, string> = {
       'cmi.core.student_id': '',
       'cmi.core.student_name': '',
@@ -157,42 +147,23 @@ export default function ScormPlayerPage() {
 
     const api: ScormAPI = {
       LMSInitialize: () => 'true',
-      LMSGetValue: (key: string) => {
-        return cmiData[key] ?? ''
-      },
+      LMSGetValue: (key: string) => cmiData[key] ?? '',
       LMSSetValue: (key: string, value: string) => {
         cmiData[key] = value
-
-        // Map SCORM keys to our tracking data
         const patchData: Record<string, unknown> = {}
-
-        if (key === 'cmi.core.lesson_status') {
-          patchData.lessonStatus = value
-        } else if (key === 'cmi.core.score.raw') {
-          patchData.score = parseFloat(value) || 0
-        } else if (key === 'cmi.core.total_time' || key === 'cmi.core.session_time') {
-          patchData.totalTime = value
-        } else if (key === 'cmi.suspend_data') {
-          patchData.suspendData = value
-        } else if (key === 'cmi.completion_status') {
-          patchData.completionStatus = value
-        } else if (key === 'cmi.success_status') {
-          patchData.successStatus = value
-        }
-
-        if (Object.keys(patchData).length > 0) {
-          debouncedPatch(patchData)
-        }
-
-        // Check for completion
+        if (key === 'cmi.core.lesson_status') patchData.lessonStatus = value
+        else if (key === 'cmi.core.score.raw') patchData.score = parseFloat(value) || 0
+        else if (key === 'cmi.core.total_time' || key === 'cmi.core.session_time') patchData.totalTime = value
+        else if (key === 'cmi.suspend_data') patchData.suspendData = value
+        else if (key === 'cmi.completion_status') patchData.completionStatus = value
+        else if (key === 'cmi.success_status') patchData.successStatus = value
+        if (Object.keys(patchData).length > 0) debouncedPatch(patchData)
         if (key === 'cmi.core.lesson_status' && (value === 'passed' || value === 'completed')) {
           setStatus('completed')
         }
-
         return 'true'
       },
       LMSCommit: () => {
-        // Immediate save
         if (debounceTimer.current) clearTimeout(debounceTimer.current)
         const data: Record<string, unknown> = {}
         if (cmiData['cmi.core.lesson_status']) data.lessonStatus = cmiData['cmi.core.lesson_status']
@@ -205,7 +176,6 @@ export default function ScormPlayerPage() {
         return 'true'
       },
       LMSFinish: () => {
-        // Final save
         if (debounceTimer.current) clearTimeout(debounceTimer.current)
         const data: Record<string, unknown> = {}
         if (cmiData['cmi.core.lesson_status']) data.lessonStatus = cmiData['cmi.core.lesson_status']
@@ -232,217 +202,312 @@ export default function ScormPlayerPage() {
 
   if (isLoading) return <PageLoading />
 
-  // Error state
+  // ── Error state ──
   if (status === 'error') {
     return (
-      <div
-        className="flex min-h-screen flex-col items-center justify-center p-6"
-        style={{ background: 'var(--color-bg)' }}
-      >
-        <div
-          className="w-full max-w-md rounded-2xl border p-8 text-center"
-          style={{
-            background: 'var(--color-surface)',
-            borderColor: 'var(--color-border)',
-            boxShadow: 'var(--shadow-lg)',
-          }}
-        >
-          <svg
-            className="mx-auto mb-4 h-12 w-12"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            style={{ color: 'var(--color-error)' }}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-            />
-          </svg>
-          <p
-            className="text-sm font-semibold mb-2"
-            style={{ color: 'var(--color-error)' }}
-          >
-            {errorMsg || 'Bir hata olustu'}
-          </p>
-          <button
-            onClick={() => router.back()}
-            className="mt-4 rounded-xl px-6 py-2.5 text-sm font-semibold"
-            style={{
-              background: 'var(--color-bg)',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text)',
-            }}
-          >
-            Geri Don
+      <div className="sc-center">
+        <div className="sc-card">
+          <div className="sc-card-icon sc-card-icon-err"><AlertTriangle className="h-6 w-6" /></div>
+          <span className="sc-eyebrow">Hata</span>
+          <h2>{errorMsg || 'Bir hata oluştu'}</h2>
+          <p>SCORM içerik başlatılamadı. Lütfen tekrar dene veya yöneticine başvur.</p>
+          <button onClick={() => router.back()} className="sc-btn sc-btn-ghost">
+            <ArrowLeft className="h-4 w-4" />
+            <span>Geri Dön</span>
           </button>
         </div>
+        {sharedStyles()}
       </div>
     )
   }
 
-  // Completion state
+  // ── Completed state ──
   if (status === 'completed') {
     return (
-      <div
-        className="flex min-h-screen flex-col items-center justify-center p-6"
-        style={{ background: 'var(--color-bg)' }}
-      >
-        <div
-          className="w-full max-w-md rounded-2xl border p-8 text-center"
-          style={{
-            background: 'var(--color-surface)',
-            borderColor: 'var(--color-border)',
-            boxShadow: 'var(--shadow-lg)',
-          }}
-        >
-          <svg
-            className="mx-auto mb-4 h-14 w-14"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            style={{ color: 'var(--color-primary)' }}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <h2
-            className="text-lg font-bold mb-2"
-            style={{ color: 'var(--color-text)', fontFamily: 'var(--font-display)' }}
-          >
-            Egitim Tamamlandi
-          </h2>
-          <p
-            className="text-sm mb-6"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            {training?.title} egitimini basariyla tamamladiniz.
-          </p>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="rounded-xl px-6 py-2.5 text-sm font-semibold text-white"
-            style={{
-              background: 'var(--color-primary)',
-            }}
-          >
-            Panele Don
+      <div className="sc-center">
+        <div className="sc-card">
+          <div className="sc-card-icon sc-card-icon-ok"><CheckCircle2 className="h-7 w-7" /></div>
+          <span className="sc-eyebrow">Tamamlandı</span>
+          <h2>Eğitim başarıyla tamamlandı</h2>
+          <p><em>{training?.title}</em> eğitimini başarıyla bitirdin.</p>
+          <button onClick={() => router.push('/staff/my-trainings')} className="sc-btn sc-btn-primary">
+            <span>Eğitimlerime Dön</span>
           </button>
         </div>
+        {sharedStyles()}
       </div>
     )
   }
 
-  // Loading attempt
   if (status === 'loading') return <PageLoading />
 
-  // SCORM player
+  // ── SCORM player ──
   const scormSrc = `/api/exam/${id}/scorm/content/${training?.scormEntryPoint || 'index.html'}`
-
   const lessonStatus = attempt?.lessonStatus || 'not attempted'
 
+  const statusLabel =
+    lessonStatus === 'passed'     ? 'Başarılı'     :
+    lessonStatus === 'completed'  ? 'Tamamlandı'   :
+    lessonStatus === 'incomplete' ? 'Devam Ediyor' :
+    lessonStatus === 'failed'     ? 'Başarısız'    :
+    'Başlanmadı'
+
+  const statusChipClass =
+    lessonStatus === 'passed' || lessonStatus === 'completed' ? 'sc-chip-ok' :
+    lessonStatus === 'incomplete' ? 'sc-chip-amber' :
+    lessonStatus === 'failed' ? 'sc-chip-err' :
+    'sc-chip-neutral'
+
   return (
-    <div
-      className="flex min-h-screen flex-col"
-      style={{ background: 'var(--color-bg)' }}
-    >
-      {/* Top bar */}
-      <div
-        className="flex items-center justify-between px-4 py-3 border-b shrink-0"
-        style={{
-          background: 'var(--color-surface)',
-          borderColor: 'var(--color-border)',
-        }}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-            style={{
-              background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-            }}
-          >
-            <svg
-              className="h-4 w-4 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+    <div className="sc-player">
+      <header className="sc-header">
+        <div className="sc-header-left">
+          <div className="sc-header-icon"><Play className="h-4 w-4" fill="currentColor" /></div>
+          <div className="sc-header-title">
+            <span className="sc-header-eyebrow">SCORM İçerik</span>
+            <h1>{training?.title || 'Eğitim'}</h1>
           </div>
-          <h1
-            className="text-sm font-semibold truncate"
-            style={{ color: 'var(--color-text)', fontFamily: 'var(--font-display)' }}
-          >
-            {training?.title || 'SCORM Egitim'}
-          </h1>
         </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Status badge */}
-          <span
-            className="rounded-full px-3 py-1 text-xs font-medium"
-            style={{
-              background: lessonStatus === 'passed' || lessonStatus === 'completed'
-                ? 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)'
-                : 'rgba(148, 163, 184, 0.15)',
-              color: lessonStatus === 'passed' || lessonStatus === 'completed'
-                ? 'var(--color-primary)'
-                : 'var(--color-text-muted)',
-            }}
-          >
-            {lessonStatus === 'passed' ? 'Basarili' :
-             lessonStatus === 'completed' ? 'Tamamlandi' :
-             lessonStatus === 'incomplete' ? 'Devam Ediyor' :
-             lessonStatus === 'failed' ? 'Basarisiz' :
-             'Baslanmadi'}
+        <div className="sc-header-right">
+          <span className={`sc-chip ${statusChipClass}`}>
+            <span className="sc-chip-dot" />
+            {statusLabel}
           </span>
-
-          {/* Exit button */}
           <button
             onClick={() => {
-              // Trigger LMSFinish before navigating
-              if (window.API) {
-                window.API.LMSFinish('')
-              }
+              if (window.API) window.API.LMSFinish('')
               router.back()
             }}
-            className="rounded-xl px-4 py-2 text-xs font-semibold"
-            style={{
-              background: 'var(--color-bg)',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text)',
-            }}
+            className="sc-exit-btn"
           >
-            Cikis
+            <LogOut className="h-3.5 w-3.5" />
+            <span>Çıkış</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* SCORM iframe */}
-      <div className="flex-1 relative">
+      <div className="sc-iframe-wrap">
         <iframe
           src={scormSrc}
-          className="absolute inset-0 h-full w-full border-0"
-          title="SCORM Icerik"
+          className="sc-iframe"
+          title="SCORM İçerik"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
         />
       </div>
+
+      <style jsx>{`
+        .sc-player {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          background: #f7f4ea;
+        }
+
+        .sc-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 14px 24px;
+          background: rgba(255, 255, 255, 0.92);
+          backdrop-filter: blur(12px);
+          border-bottom: 1px solid #ebe7df;
+          flex-shrink: 0;
+        }
+        .sc-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .sc-header-icon {
+          flex-shrink: 0;
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: #0a0a0a;
+          color: #fafaf7;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .sc-header-title { min-width: 0; }
+        .sc-header-eyebrow {
+          display: block;
+          font-family: var(--font-display, system-ui);
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #8a8578;
+        }
+        .sc-header-title h1 {
+          font-family: var(--font-editorial, serif);
+          font-size: 15px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 24;
+          color: #0a0a0a;
+          margin: 2px 0 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 420px;
+          letter-spacing: -0.01em;
+        }
+
+        .sc-header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+        .sc-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 12px;
+          border-radius: 999px;
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          font-weight: 600;
+          border: 1px solid transparent;
+        }
+        .sc-chip-dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: currentColor;
+        }
+        .sc-chip-ok { background: #eaf6ef; color: #0a7a47; border-color: #c8e6d5; }
+        .sc-chip-amber { background: #fef6e7; color: #6a4e11; border-color: #e9c977; }
+        .sc-chip-err { background: #fdf5f2; color: #b3261e; border-color: #e9c9c0; }
+        .sc-chip-neutral { background: #faf8f2; color: #6b6a63; border-color: #ebe7df; }
+
+        .sc-exit-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          height: 36px;
+          padding: 0 14px;
+          border-radius: 999px;
+          background: transparent;
+          color: #6b6a63;
+          border: 1px solid #ebe7df;
+          font-family: var(--font-display, system-ui);
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+        }
+        .sc-exit-btn:hover { background: #fdf5f2; color: #b3261e; border-color: #e9c9c0; }
+
+        .sc-iframe-wrap {
+          flex: 1;
+          position: relative;
+          padding: 20px 24px 24px;
+        }
+        .sc-iframe {
+          position: absolute;
+          top: 20px;
+          left: 24px;
+          right: 24px;
+          bottom: 24px;
+          width: calc(100% - 48px);
+          height: calc(100% - 44px);
+          border: 1px solid #ebe7df;
+          border-radius: 14px;
+          background: #ffffff;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 20px rgba(10, 10, 10, 0.04);
+        }
+
+        @media (max-width: 640px) {
+          .sc-header { padding: 12px 16px; }
+          .sc-header-title h1 { max-width: 200px; font-size: 13px; }
+          .sc-exit-btn span { display: none; }
+          .sc-exit-btn { width: 36px; padding: 0; justify-content: center; }
+          .sc-iframe-wrap { padding: 12px; }
+          .sc-iframe { top: 12px; left: 12px; right: 12px; bottom: 12px; width: calc(100% - 24px); height: calc(100% - 24px); }
+        }
+      `}</style>
     </div>
+  )
+}
+
+function sharedStyles() {
+  return (
+    <style jsx>{`
+      .sc-center {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 20px;
+        background: #f7f4ea;
+      }
+      .sc-card {
+        width: 100%;
+        max-width: 440px;
+        padding: 36px 32px;
+        background: #ffffff;
+        border: 1px solid #ebe7df;
+        border-radius: 20px;
+        text-align: center;
+        box-shadow: 0 12px 40px rgba(10, 10, 10, 0.06);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .sc-card-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+        color: #fafaf7;
+      }
+      .sc-card-icon-ok { background: #0a7a47; }
+      .sc-card-icon-err { background: #b3261e; }
+      .sc-eyebrow {
+        display: inline-block;
+        font-family: var(--font-display, system-ui);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #8a8578;
+        margin-bottom: 6px;
+      }
+      .sc-card h2 {
+        font-family: var(--font-editorial, serif);
+        font-size: 24px;
+        font-weight: 500;
+        font-variation-settings: 'opsz' 42, 'SOFT' 50;
+        color: #0a0a0a;
+        letter-spacing: -0.02em;
+        margin: 0 0 8px;
+      }
+      .sc-card p {
+        font-size: 13px;
+        color: #6b6a63;
+        line-height: 1.55;
+        margin: 0 0 20px;
+        max-width: 320px;
+      }
+      .sc-card p em { font-style: italic; color: #0a0a0a; font-family: var(--font-editorial, serif); }
+
+      .sc-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        height: 48px;
+        padding: 0 24px;
+        border-radius: 999px;
+        font-family: var(--font-display, system-ui);
+        font-size: 14px;
+        font-weight: 600;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: background 160ms ease, border-color 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .sc-btn:active { transform: scale(0.97); }
+      .sc-btn-ghost { background: transparent; color: #6b6a63; border-color: #ebe7df; }
+      .sc-btn-ghost:hover { border-color: #0a0a0a; color: #0a0a0a; }
+      .sc-btn-primary { background: #0a0a0a; color: #fafaf7; box-shadow: inset 0 1px 0 rgba(255,255,255,0.1); }
+      .sc-btn-primary:hover { background: #1a1a1a; }
+    `}</style>
   )
 }

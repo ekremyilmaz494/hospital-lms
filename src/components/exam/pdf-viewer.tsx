@@ -3,8 +3,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
-import 'react-pdf/dist/Page/AnnotationLayer.css'
-import 'react-pdf/dist/Page/TextLayer.css'
 
 // PDF.js worker — public/ altındaki dosya react-pdf'in bundle ettiği sürümle eşleşmeli
 // (public/pdf.worker.min.mjs → node_modules/.pnpm/pdfjs-dist@X.Y.Z/.../build/pdf.worker.min.mjs)

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Clock, ChevronRight, AlertTriangle, Lock, LogOut } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
@@ -41,13 +40,13 @@ export default function PostExamPage() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [phaseChecked, setPhaseChecked] = useState(false);
   const [isExamOnly, setIsExamOnly] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Kaydedilmis cevaplari yukle
   useEffect(() => {
     if (examData?.questions) {
       const restored: Record<number, string> = {};
@@ -61,14 +60,12 @@ export default function PostExamPage() {
     }
   }, [examData]);
 
-  // Phase guard — redirect if attempt is not in post_exam status
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/exam/${id}/start`, { method: 'POST' })
       .then(async (res) => {
         const attempt = await res.json();
         if (cancelled) return;
-        // Start API hata kontrolu
         if (!res.ok) {
           setStartError(attempt?.error || 'Sınav başlatılamadı');
           setPhaseChecked(true);
@@ -94,7 +91,6 @@ export default function PostExamPage() {
     return () => { cancelled = true; };
   }, [id, router]);
 
-  // Server-synced timer — fetch remaining seconds from Redis-backed endpoint
   useEffect(() => {
     if (!attemptId) return;
     let cancelled = false;
@@ -111,9 +107,8 @@ export default function PostExamPage() {
       })
       .catch(() => { if (!cancelled) setTimeLeft(examData?.totalTime ?? 1800); });
     return () => { cancelled = true; };
-  }, [attemptId]);
+  }, [attemptId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sayfa kapatilirken son cevabi kaydet (beforeunload)
   useEffect(() => {
     const saveOnExit = () => {
       const qs = examData?.questions ?? [];
@@ -132,44 +127,35 @@ export default function PostExamPage() {
     return () => window.removeEventListener('beforeunload', saveOnExit);
   }, [id, examData, currentQ, answers]);
 
-  // Countdown interval
   useEffect(() => {
     if (timeLeft === null) return;
     timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev === null || prev <= 0) return 0;
-        return prev - 1;
-      });
+      setTimeLeft(prev => (prev === null || prev <= 0 ? 0 : prev - 1));
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [timeLeft !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Anti-cheat: Tab visibility detection (tüm sınavlarda aktif)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setTabSwitchCount((prev) => prev + 1);
-      }
+      if (document.hidden) setTabSwitchCount((prev) => prev + 1);
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // Tab switch count değişince uyarı toast'ı göster (kayıt admin raporlarında görünür)
   useEffect(() => {
     if (tabSwitchCount === 0) return;
     toast(`Sekme değiştirme tespit edildi (${tabSwitchCount}). Bu davranış kayıt altına alınıyor.`, 'warning');
   }, [tabSwitchCount, toast]);
 
-  // Anti-cheat: Fullscreen zorunluluğu (examOnly sınavlarda)
   useEffect(() => {
     if (!isExamOnly) return;
     document.documentElement.requestFullscreen?.().catch(() => {
-      toast('Tam ekran moduna gecin', 'warning');
+      toast('Tam ekran moduna geçin', 'warning');
     });
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement) {
-        toast('Tam ekran modundan cikmayiniz', 'warning');
+        toast('Tam ekran modundan çıkmayınız', 'warning');
         document.documentElement.requestFullscreen?.().catch(() => {});
       }
     };
@@ -177,13 +163,11 @@ export default function PostExamPage() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [isExamOnly, toast]);
 
-  // Auto-submit when timer hits zero
   const handleFinishRef = useRef<() => void>(undefined);
   useEffect(() => {
     if (timeLeft === 0 && handleFinishRef.current) handleFinishRef.current();
   }, [timeLeft]);
 
-  // One-way navigation helpers
   const goNext = useCallback(() => {
     setCurrentQ(prev => {
       const next = prev + 1;
@@ -194,6 +178,7 @@ export default function PostExamPage() {
 
   const handleFinish = useCallback(async () => {
     setSubmitting(true);
+    setSubmitError(null);
     if (timerRef.current) clearInterval(timerRef.current);
     try {
       const qs = examData?.questions ?? [];
@@ -214,7 +199,6 @@ export default function PostExamPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // Retry once on failure (timer auto-submit may race)
         const retry = await fetch(`/api/exam/${id}/submit`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -228,35 +212,48 @@ export default function PostExamPage() {
           router.replace(`/exam/${id}/transition?from=post-exam&score=${retryData.score ?? 0}&passed=${retryData.isPassed ?? false}&passingScore=${retryData.passingScore ?? 70}&attemptsRemaining=${retryData.attemptsRemaining ?? 0}&attemptId=${attemptId}`);
           return;
         }
-        toast(`Sınav gönderilemedi: ${data.error || retryData.error || 'Bilinmeyen hata'}. Cevaplarınız kaydedilmemiş olabilir.`, 'error');
-        router.push('/staff/my-trainings');
+        setSubmitError(`Sınav gönderilemedi: ${data.error || retryData.error || 'Bilinmeyen hata'}. Cevaplarınız kaydedilmedi — tekrar deneyin.`);
         return;
       }
       if (data.results && data.isPassed) {
         try { sessionStorage.setItem(`exam-results-${id}`, JSON.stringify(data.results)); } catch { /* ignore */ }
       }
       router.replace(`/exam/${id}/transition?from=post-exam&score=${data.score ?? 0}&passed=${data.isPassed ?? false}&passingScore=${data.passingScore ?? 70}&attemptsRemaining=${data.attemptsRemaining ?? 0}&attemptId=${attemptId}`);
-    } catch (err) {
-      toast('Sınav gönderilemedi — internet bağlantınızı kontrol edin. Sayfayı yenileyip tekrar deneyin.', 'error');
-      router.push('/staff/my-trainings');
+    } catch {
+      setSubmitError('Sınav gönderilemedi — internet bağlantınızı kontrol edip tekrar deneyin. Cevaplarınız kaydedilmedi.');
     } finally {
       setSubmitting(false);
     }
-  }, [id, answers, examData, router]);
+  }, [id, answers, examData, router, attemptId, tabSwitchCount]);
 
-  // Keep ref in sync for auto-submit on timer expiry
   handleFinishRef.current = handleFinish;
 
-  if (isLoading || !phaseChecked) {
-    return <PageLoading />;
-  }
+  if (isLoading || !phaseChecked) return <PageLoading />;
 
   if (startError || error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{startError || error}</div></div>;
+    return (
+      <div className="pe-err">
+        <div className="pe-err-icon"><AlertTriangle className="h-6 w-6" /></div>
+        <h2>Sınav başlatılamadı</h2>
+        <p>{startError || error}</p>
+        <button onClick={() => router.push('/staff/my-trainings')} className="pe-err-link">← Eğitimlerime Dön</button>
+        <style>{`
+          .pe-err { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; gap: 10px; max-width: 420px; margin: 0 auto; }
+          .pe-err-icon { width: 56px; height: 56px; border-radius: 999px; background: #fdf5f2; color: #b3261e; display: flex; align-items: center; justify-content: center; }
+          .pe-err h2 { font-family: var(--font-editorial, serif); font-size: 22px; color: #0a0a0a; margin: 0; }
+          .pe-err p { font-size: 13px; color: #6b6a63; margin: 0; }
+          .pe-err-link { margin-top: 10px; background: none; border: none; color: #0a0a0a; font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; cursor: pointer; }
+        `}</style>
+      </div>
+    );
   }
 
   if (!examData || (examData.questions ?? []).length === 0) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: '#6b6a63', fontFamily: 'var(--font-editorial, serif)', fontSize: 16 }}>
+        Henüz veri yok
+      </div>
+    );
   }
 
   const questions = examData.questions ?? [];
@@ -266,113 +263,614 @@ export default function PostExamPage() {
   const progress = ((currentQ + 1) / questions.length) * 100;
   const q = questions[currentQ];
   const answeredCount = Object.keys(answers).length;
+  const isTimerCritical = displayTime > 0 && displayTime < 300;
 
   return (
     <div
-      className="min-h-screen"
-      style={{ background: 'var(--color-bg)' }}
+      className="pe-root"
       onContextMenu={(e) => e.preventDefault()}
       onCopy={(e) => e.preventDefault()}
       onCut={(e) => e.preventDefault()}
     >
-      {/* Tab switch warning banner */}
       {isExamOnly && tabSwitchCount > 0 && (
-        <div
-          className="sticky top-0 z-60 flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white"
-          style={{ background: 'var(--color-warning)' }}
-        >
-          Sekme değiştirme tespit edildi ({tabSwitchCount}) — davranışınız kayıt altına alınıyor
+        <div className="pe-warn-banner">
+          Sekme değiştirme tespit edildi ({tabSwitchCount}) — davranışın kayıt altına alınıyor
         </div>
       )}
-      <div className="sticky top-0 z-50 border-b px-6 py-3" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h3 className="text-sm font-bold">{examData.trainingTitle ?? ''}</h3>
-            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--color-accent-light)', color: 'var(--color-accent)' }}>{isExamOnly ? 'Sınav' : (examData.examType ?? 'Son Sınav')}</span>
-            <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Soru {currentQ + 1}/{questions.length}</span>
+
+      {/* ═══════ Header ═══════ */}
+      <header className="pe-header">
+        <div className="pe-header-row">
+          <div className="pe-header-left">
+            <span className="pe-phase-chip pe-phase-chip-ok">{isExamOnly ? 'Sınav' : 'Son Sınav'}</span>
+            <h1 className="pe-training">{examData.trainingTitle}</h1>
+            <span className="pe-counter">
+              Soru <strong>{(currentQ + 1).toString().padStart(2, '0')}</strong>/<strong>{questions.length.toString().padStart(2, '0')}</strong>
+            </span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: displayTime < 300 ? 'var(--color-error-bg)' : 'var(--color-surface-hover)' }}>
-              <Clock className="h-4 w-4" style={{ color: displayTime < 300 ? 'var(--color-error)' : 'var(--color-text-muted)' }} />
-              <span className="text-base font-bold" style={{ fontFamily: 'var(--font-mono)', color: displayTime < 300 ? 'var(--color-error)' : 'var(--color-text-primary)' }}>{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}</span>
+          <div className="pe-header-right">
+            <div className={`pe-timer ${isTimerCritical ? 'pe-timer-crit' : ''}`}>
+              <Clock className="h-3.5 w-3.5" />
+              <span>{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}</span>
             </div>
             <button
-              onClick={() => { if (confirm('Sınavdan çıkmak istediğinize emin misiniz? Cevaplarınız kaydedilmiştir.')) router.push('/staff/my-trainings'); }}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150 hover:opacity-80"
-              style={{ color: 'var(--color-text-muted)' }}
+              onClick={() => { if (confirm('Sınavdan çıkmak istediğine emin misin? Cevapların kaydedilmiştir.')) router.push('/staff/my-trainings'); }}
+              className="pe-exit"
             >
-              <LogOut className="h-3.5 w-3.5" /> Çık
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Çık</span>
             </button>
           </div>
         </div>
-        <div className="mt-2 h-1 w-full rounded-full" style={{ background: 'var(--color-border)' }}>
-          <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'var(--color-accent)', transition: 'width var(--transition-base)' }} />
+        <div className="pe-progress">
+          <div className="pe-progress-fill" style={{ width: `${progress}%` }} />
         </div>
-      </div>
+      </header>
 
-      <div className="mx-auto max-w-5xl p-6">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-          <div className="lg:col-span-3 rounded-xl border p-6" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <p className="mb-6 text-lg font-semibold leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>
-              <span className="mr-2 text-sm font-bold" style={{ color: 'var(--color-accent)' }}>S{q?.id ?? currentQ + 1}.</span>{q?.text ?? ''}
-            </p>
-            <div className="space-y-3">
-              {(q?.options ?? []).map((opt) => {
-                const isSelected = answers[q?.id ?? 0] === opt.id;
-                return (
-                  <button key={opt.id} onClick={() => {
-                    setAnswers({ ...answers, [q?.id ?? 0]: opt.id });
-                    // Auto-save cevabi
-                    const questionId = q?.questionId ?? '';
-                    if (questionId && opt.optionId) {
-                      fetch(`/api/exam/${id}/save-answer`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ questionId, selectedOptionId: opt.optionId, examPhase: 'post' }),
-                      }).catch(() => {});
-                    }
-                  }} className="flex w-full items-center gap-3 rounded-lg border p-4 text-left" style={{ borderColor: isSelected ? 'var(--color-accent)' : 'var(--color-border)', background: isSelected ? 'var(--color-accent-light)' : 'var(--color-surface)', transition: 'border-color var(--transition-fast), background var(--transition-fast)' }}>
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ background: isSelected ? 'var(--color-accent)' : 'var(--color-border)', color: isSelected ? 'white' : 'var(--color-text-muted)' }}>{opt.id.toUpperCase()}</div>
-                    <span className="text-sm" style={{ color: 'var(--color-text-primary)', fontWeight: isSelected ? 600 : 400 }}>{opt.text}</span>
+      {/* ═══════ Body ═══════ */}
+      <div className="pe-body">
+        <main className="pe-question-card">
+          <div className="pe-q-head">
+            <span className="pe-q-num">S{String(q?.id ?? currentQ + 1).padStart(2, '0')}</span>
+            <p className="pe-q-text">{q?.text ?? ''}</p>
+          </div>
+
+          <ul className="pe-options">
+            {(q?.options ?? []).map((opt) => {
+              const isSelected = answers[q?.id ?? 0] === opt.id;
+              return (
+                <li key={opt.id}>
+                  <button
+                    onClick={() => {
+                      setAnswers({ ...answers, [q?.id ?? 0]: opt.id });
+                      const questionId = q?.questionId ?? '';
+                      if (questionId && opt.optionId) {
+                        fetch(`/api/exam/${id}/save-answer`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ questionId, selectedOptionId: opt.optionId, examPhase: 'post' }),
+                        }).catch(() => {});
+                      }
+                    }}
+                    className={`pe-option ${isSelected ? 'pe-option-on' : ''}`}
+                    aria-pressed={isSelected}
+                  >
+                    <span className={`pe-option-letter ${isSelected ? 'pe-option-letter-on' : ''}`}>
+                      {opt.id.toUpperCase()}
+                    </span>
+                    <span className="pe-option-text">{opt.text}</span>
                   </button>
-                );
-              })}
-            </div>
-            <div className="mt-6 flex items-center justify-end">
-              {currentQ < questions.length - 1 ? (
-                <Button onClick={goNext} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-accent)', transition: 'background var(--transition-fast)' }}>Sonraki <ChevronRight className="h-4 w-4" /></Button>
-              ) : (
-                <div className="flex flex-col items-end gap-1">
-                  {answeredCount < questions.length && (
-                    <p className="text-[11px] font-medium" style={{ color: 'var(--color-warning)' }}>
-                      {questions.length - answeredCount} soru cevaplanmadı (yanlış sayılacak)
-                    </p>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="pe-actions">
+            {currentQ < questions.length - 1 ? (
+              <button onClick={goNext} className="pe-next">
+                <span>Sonraki Soru</span>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <div className="pe-finish-wrap">
+                {answeredCount < questions.length && (
+                  <p className="pe-finish-warn">
+                    <AlertTriangle className="h-3 w-3" />
+                    {questions.length - answeredCount} soru cevaplanmadı · yanlış sayılacak
+                  </p>
+                )}
+                <button onClick={handleFinish} disabled={submitting} className="pe-finish pe-finish-ok">
+                  {submitting ? (
+                    <>
+                      <span className="pe-spin" />
+                      <span>Gönderiliyor…</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>Sınavı Bitir ({answeredCount}/{questions.length})</span>
+                    </>
                   )}
-                  <Button onClick={handleFinish} disabled={submitting} className="gap-2 font-semibold text-white" style={{ background: 'var(--color-success)', transition: 'background var(--transition-fast)' }}><AlertTriangle className="h-4 w-4" /> {submitting ? 'Gönderiliyor...' : `Sınavı Bitir (${answeredCount}/${questions.length})`}</Button>
-                </div>
-              )}
-            </div>
+                </button>
+                {submitError && (
+                  <div className="pe-submit-err">
+                    <p>{submitError}</p>
+                    <button onClick={() => { setSubmitError(null); handleFinish(); }}>Tekrar Dene</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+
+        <aside className="pe-navigator">
+          <h2 className="pe-nav-title">Soru Haritası</h2>
+
+          <div className="pe-nav-grid">
+            {questions.map((qn, i) => {
+              const qId = qn?.id;
+              const isAnswered = qId !== undefined ? answers[qId] !== undefined : false;
+              const isCurrent = i === currentQ;
+              const isLocked = i < currentQ;
+              const isFuture = i > maxReachedQ;
+              const isDisabled = isLocked || isFuture;
+
+              let cls = 'pe-nav-cell';
+              if (isCurrent) cls += ' pe-nav-current';
+              else if (isLocked) cls += ' pe-nav-locked';
+              else if (isAnswered) cls += ' pe-nav-answered';
+              else if (isFuture) cls += ' pe-nav-future';
+
+              return (
+                <button
+                  key={i}
+                  onClick={() => !isDisabled && setCurrentQ(i)}
+                  disabled={isDisabled}
+                  className={cls}
+                  aria-label={`Soru ${i + 1}`}
+                >
+                  {isLocked ? <Lock className="h-3 w-3" /> : String(i + 1).padStart(2, '0')}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="rounded-xl border p-4" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <h4 className="mb-3 text-sm font-bold">Soru Navigasyonu</h4>
-            <div className="grid grid-cols-5 gap-2">
-              {questions.map((_, i) => {
-                const isAnswered = answers[questions[i]?.id ?? 0] !== undefined;
-                const isCurrent = i === currentQ;
-                const isLocked = i < currentQ;
-                const isFuture = i > maxReachedQ;
-                const isDisabled = isLocked || isFuture;
-                return (
-                  <button key={i} onClick={() => { if (!isDisabled) setCurrentQ(i); }} disabled={isDisabled} className="relative flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold" style={{ background: isCurrent ? 'var(--color-accent)' : isLocked ? 'var(--color-surface-hover)' : isAnswered ? 'var(--color-success-bg)' : 'var(--color-surface-hover)', color: isCurrent ? 'white' : isLocked ? 'var(--color-text-muted)' : isAnswered ? 'var(--color-success)' : 'var(--color-text-muted)', border: `1.5px solid ${isCurrent ? 'var(--color-accent)' : isLocked ? 'var(--color-border)' : isAnswered ? 'var(--color-success)' : 'var(--color-border)'}`, opacity: isDisabled && !isCurrent ? 0.5 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer', transition: 'background var(--transition-fast), border-color var(--transition-fast)' }}>
-                    {isLocked ? <Lock className="h-3 w-3" /> : i + 1}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+          <ul className="pe-nav-legend">
+            <li><span className="pe-nav-swatch pe-nav-swatch-ink" /> Aktif</li>
+            <li><span className="pe-nav-swatch pe-nav-swatch-ok" /> Cevaplandı · <strong>{answeredCount}</strong></li>
+            <li><span className="pe-nav-swatch pe-nav-swatch-locked" /> Kilitli · geçildi</li>
+            <li><span className="pe-nav-swatch pe-nav-swatch-future" /> Cevaplanmadı · <strong>{questions.length - answeredCount}</strong></li>
+          </ul>
+        </aside>
       </div>
+
+      <style jsx>{`
+        .pe-root { min-height: 100vh; background: #f7f4ea; padding-bottom: 40px; }
+
+        .pe-warn-banner {
+          position: sticky;
+          top: 0;
+          z-index: 60;
+          padding: 8px 16px;
+          background: #b3261e;
+          color: #fafaf7;
+          font-family: var(--font-display, system-ui);
+          font-size: 12px;
+          font-weight: 600;
+          text-align: center;
+        }
+
+        .pe-header {
+          position: sticky;
+          top: 0;
+          z-index: 50;
+          padding: 14px 24px 0;
+          background: rgba(255, 255, 255, 0.88);
+          backdrop-filter: blur(12px);
+          border-bottom: 1px solid #ebe7df;
+        }
+        .pe-header-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding-bottom: 10px;
+        }
+        .pe-header-left {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          min-width: 0;
+        }
+        .pe-phase-chip {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 10px;
+          border-radius: 999px;
+          background: #0a0a0a;
+          color: #fafaf7;
+          font-family: var(--font-display, system-ui);
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          flex-shrink: 0;
+        }
+        .pe-phase-chip-ok { background: #0a7a47; }
+        .pe-training {
+          font-family: var(--font-editorial, serif);
+          font-size: 15px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 24;
+          color: #0a0a0a;
+          margin: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 320px;
+        }
+        .pe-counter {
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          color: #6b6a63;
+          font-variant-numeric: tabular-nums;
+          flex-shrink: 0;
+        }
+        .pe-counter strong {
+          color: #0a0a0a;
+          font-family: var(--font-editorial, serif);
+          font-weight: 500;
+        }
+
+        .pe-header-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+        .pe-timer {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          height: 36px;
+          padding: 0 12px;
+          border-radius: 999px;
+          background: #ffffff;
+          border: 1px solid #ebe7df;
+          font-family: var(--font-editorial, serif);
+          font-size: 16px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 28, 'SOFT' 50;
+          color: #0a0a0a;
+          font-variant-numeric: tabular-nums;
+          letter-spacing: -0.02em;
+          transition: background 220ms ease, color 220ms ease, border-color 220ms ease;
+        }
+        .pe-timer :global(svg) { color: #6b6a63; }
+        .pe-timer-crit {
+          background: #fdf5f2;
+          border-color: #e9c9c0;
+          color: #b3261e;
+          animation: pe-pulse 1.4s ease-in-out infinite;
+        }
+        .pe-timer-crit :global(svg) { color: #b3261e; }
+        @keyframes pe-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(179, 38, 30, 0.3); }
+          50% { box-shadow: 0 0 0 4px rgba(179, 38, 30, 0); }
+        }
+
+        .pe-exit {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          height: 36px;
+          padding: 0 12px;
+          border-radius: 999px;
+          background: transparent;
+          color: #8a8578;
+          border: 1px solid transparent;
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+        }
+        .pe-exit:hover { background: #fdf5f2; color: #b3261e; border-color: #e9c9c0; }
+
+        .pe-progress {
+          height: 3px;
+          background: transparent;
+          margin: 0 -24px;
+          border-top: 1px solid #ebe7df;
+        }
+        .pe-progress-fill {
+          height: 100%;
+          background: #0a7a47;
+          transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .pe-body {
+          max-width: 1180px;
+          margin: 0 auto;
+          padding: 28px 24px 0;
+          display: grid;
+          grid-template-columns: 1fr 280px;
+          gap: 20px;
+          align-items: start;
+        }
+
+        .pe-question-card {
+          padding: 32px;
+          background: #ffffff;
+          border: 1px solid #ebe7df;
+          border-radius: 18px;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(10, 10, 10, 0.02);
+        }
+        .pe-q-head {
+          display: flex;
+          align-items: flex-start;
+          gap: 14px;
+          margin-bottom: 28px;
+          padding-bottom: 20px;
+          border-bottom: 1px dashed #ebe7df;
+        }
+        .pe-q-num {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          width: 48px;
+          height: 48px;
+          border-radius: 14px;
+          background: #0a7a47;
+          color: #fafaf7;
+          font-family: var(--font-editorial, serif);
+          font-size: 16px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 28, 'SOFT' 50;
+          letter-spacing: -0.01em;
+          font-variant-numeric: tabular-nums;
+        }
+        .pe-q-text {
+          font-family: var(--font-editorial, serif);
+          font-size: 20px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 42, 'SOFT' 50;
+          color: #0a0a0a;
+          letter-spacing: -0.015em;
+          line-height: 1.4;
+          margin: 0;
+          flex: 1;
+        }
+
+        .pe-options {
+          list-style: none;
+          padding: 0;
+          margin: 0 0 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .pe-option {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          width: 100%;
+          padding: 14px 18px;
+          background: #ffffff;
+          border: 1px solid #ebe7df;
+          border-radius: 12px;
+          text-align: left;
+          cursor: pointer;
+          font-family: inherit;
+          transition: border-color 160ms ease, background 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .pe-option:hover { border-color: #d9d4c4; background: #faf8f2; }
+        .pe-option-on {
+          background: #0a7a47;
+          border-color: #0a7a47;
+        }
+        .pe-option-on:hover { background: #0a7a47; border-color: #0a7a47; }
+        .pe-option:focus-visible { outline: 2px solid #0a7a47; outline-offset: 2px; }
+
+        .pe-option-letter {
+          flex-shrink: 0;
+          width: 32px;
+          height: 32px;
+          border-radius: 999px;
+          background: #faf8f2;
+          border: 1px solid #ebe7df;
+          color: #6b6a63;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-family: var(--font-editorial, serif);
+          font-size: 13px;
+          font-weight: 500;
+        }
+        .pe-option-letter-on {
+          background: #fafaf7;
+          color: #0a7a47;
+          border-color: #fafaf7;
+        }
+        .pe-option-text {
+          flex: 1;
+          font-size: 14px;
+          line-height: 1.5;
+          color: #0a0a0a;
+        }
+        .pe-option-on .pe-option-text { color: #fafaf7; }
+
+        .pe-actions {
+          display: flex;
+          justify-content: flex-end;
+          padding-top: 8px;
+        }
+        .pe-next, .pe-finish {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          height: 48px;
+          padding: 0 22px;
+          border-radius: 999px;
+          font-family: var(--font-display, system-ui);
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          border: 1px solid transparent;
+          transition: background 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .pe-next:active, .pe-finish:active { transform: scale(0.97); }
+        .pe-next {
+          background: #0a0a0a;
+          color: #fafaf7;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        .pe-next:hover { background: #1a1a1a; }
+
+        .pe-finish-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+        .pe-finish-ok {
+          background: #0a7a47;
+          color: #fafaf7;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        .pe-finish-ok:hover:not(:disabled) { background: #086338; }
+        .pe-finish:disabled { opacity: 0.6; cursor: not-allowed; }
+        .pe-finish-warn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          color: #b4820b;
+          margin: 0;
+        }
+        .pe-submit-err {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .pe-submit-err p {
+          font-size: 12px;
+          color: #b3261e;
+          margin: 0;
+        }
+        .pe-submit-err button {
+          background: none;
+          border: none;
+          color: #0a0a0a;
+          font-family: var(--font-display, system-ui);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          text-decoration: underline;
+        }
+
+        .pe-spin {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top-color: #ffffff;
+          animation: pe-rot 700ms linear infinite;
+        }
+        @keyframes pe-rot { to { transform: rotate(360deg); } }
+
+        .pe-navigator {
+          padding: 22px 20px;
+          background: #ffffff;
+          border: 1px solid #ebe7df;
+          border-radius: 18px;
+          position: sticky;
+          top: 90px;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        }
+        .pe-nav-title {
+          font-family: var(--font-editorial, serif);
+          font-size: 14px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 24;
+          color: #0a0a0a;
+          margin: 0 0 14px;
+          padding-bottom: 10px;
+          border-bottom: 1px dashed #ebe7df;
+        }
+
+        .pe-nav-grid {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 6px;
+          margin-bottom: 18px;
+        }
+        .pe-nav-cell {
+          aspect-ratio: 1;
+          border-radius: 8px;
+          background: #faf8f2;
+          border: 1px solid #ebe7df;
+          color: #8a8578;
+          font-family: var(--font-mono, monospace);
+          font-size: 11px;
+          font-weight: 600;
+          font-variant-numeric: tabular-nums;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+        }
+        .pe-nav-cell:disabled { cursor: not-allowed; }
+        .pe-nav-answered { background: #eaf6ef; border-color: #c8e6d5; color: #0a7a47; }
+        .pe-nav-current {
+          background: #0a7a47;
+          border-color: #0a7a47;
+          color: #fafaf7;
+          font-weight: 700;
+          box-shadow: 0 0 0 3px rgba(10, 122, 71, 0.12);
+        }
+        .pe-nav-locked { background: #f4efdf; border-color: #ebe7df; color: #8a8578; }
+        .pe-nav-future { background: transparent; border-color: #ebe7df; color: #c8c2b0; opacity: 0.7; }
+
+        .pe-nav-legend {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .pe-nav-legend li {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          color: #6b6a63;
+          font-variant-numeric: tabular-nums;
+        }
+        .pe-nav-legend strong { color: #0a0a0a; font-weight: 600; font-family: var(--font-editorial, serif); }
+        .pe-nav-swatch {
+          width: 12px;
+          height: 12px;
+          border-radius: 4px;
+          border: 1px solid #ebe7df;
+          flex-shrink: 0;
+        }
+        .pe-nav-swatch-ink { background: #0a7a47; border-color: #0a7a47; }
+        .pe-nav-swatch-ok { background: #eaf6ef; border-color: #c8e6d5; }
+        .pe-nav-swatch-locked { background: #f4efdf; }
+        .pe-nav-swatch-future { background: transparent; }
+
+        @media (max-width: 960px) {
+          .pe-body { grid-template-columns: 1fr; padding: 20px 16px 0; }
+          .pe-navigator { position: static; order: -1; }
+          .pe-nav-grid { grid-template-columns: repeat(8, 1fr); }
+        }
+
+        @media (max-width: 640px) {
+          .pe-header { padding: 12px 16px 0; }
+          .pe-header-left { gap: 10px; }
+          .pe-training { font-size: 13px; max-width: 160px; }
+          .pe-counter { font-size: 10px; }
+          .pe-question-card { padding: 22px 18px; }
+          .pe-q-text { font-size: 17px; }
+          .pe-q-num { width: 40px; height: 40px; font-size: 14px; border-radius: 10px; }
+          .pe-option { padding: 12px 14px; gap: 10px; }
+          .pe-option-text { font-size: 13px; }
+          .pe-option-letter { width: 28px; height: 28px; font-size: 12px; }
+          .pe-next, .pe-finish { width: 100%; }
+          .pe-finish-wrap { width: 100%; }
+          .pe-nav-grid { grid-template-columns: repeat(6, 1fr); }
+        }
+
+        @media (max-width: 480px) {
+          .pe-exit span { display: none; }
+          .pe-exit { width: 36px; padding: 0; justify-content: center; }
+          .pe-header-left { flex-wrap: wrap; }
+          .pe-training { max-width: 100%; }
+        }
+      `}</style>
     </div>
   );
 }
