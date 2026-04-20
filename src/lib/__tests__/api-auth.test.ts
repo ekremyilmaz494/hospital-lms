@@ -24,6 +24,8 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn(async () => ({
     getAll: mockCookiesGetAll,
     get: vi.fn(),
+    set: vi.fn(),
+    delete: vi.fn(),
   })),
 }))
 
@@ -41,6 +43,15 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('@/lib/email', () => ({
   sendEmail: vi.fn(async () => {}),
+}))
+
+vi.mock('@/lib/activity-logger', () => ({
+  logActivity: vi.fn(async () => {}),
+}))
+
+vi.mock('@/lib/auth/trusted-device', () => ({
+  isDeviceTrusted: vi.fn(async () => false),
+  markDeviceTrusted: vi.fn(async () => {}),
 }))
 
 vi.mock('@/lib/prisma', () => ({
