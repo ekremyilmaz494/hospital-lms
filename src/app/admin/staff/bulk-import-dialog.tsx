@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, Download, FileSpreadsheet, CheckCircle2, AlertCircle, X, Loader2, FileText, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { Upload, Download, CheckCircle2, AlertCircle, Loader2, FileText, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/shared/toast';
+import { PremiumModal, PremiumModalFooter, PremiumButton, type PremiumModalStep } from '@/components/shared/premium-modal';
 
 type Stage = 'idle' | 'uploading' | 'preview' | 'importing' | 'done';
 
@@ -62,7 +62,6 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
   const [skipErrors, setSkipErrors] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Departmanları dialog açılınca yükle
   useEffect(() => {
     if (!open) return;
     fetch('/api/admin/departments')
@@ -172,7 +171,6 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
     setEditedRows(rows => {
       const next = [...rows];
       next[idx] = { ...next[idx], ...patch };
-      // Departman değiştirildiyse match tipini güncelle
       if ('deptId' in patch) {
         const dept = departments.find(d => d.id === patch.deptId);
         next[idx].deptName = dept?.name || '';
@@ -201,7 +199,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
     ];
     const headerRow = sheet.getRow(1);
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D9668' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A0A0A' } };
     headerRow.height = 30;
     headerRow.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
 
@@ -242,326 +240,647 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
     URL.revokeObjectURL(url);
   };
 
-  if (!open) return null;
-
-  // rowIndex → error lookup for quick access
-  const errorByRowIndex = new Map(preview?.rows.filter(r => r.status === 'error').map(r => [r.rowIndex, r.reason]) ?? []);
+  const errorByRowIndex = useMemo(
+    () => new Map(preview?.rows.filter(r => r.status === 'error').map(r => [r.rowIndex, r.reason]) ?? []),
+    [preview]
+  );
   const errorCount = preview?.errors ?? 0;
   const validCount = preview?.valid ?? 0;
-  const canImport = preview && validCount > 0 && (skipErrors || errorCount === 0);
+  const canImport = !!preview && validCount > 0 && (skipErrors || errorCount === 0);
+
+  // Step rail — 3-step wizard, visual progress
+  const activeStepId: 'upload' | 'review' | 'done' =
+    stage === 'idle' || stage === 'uploading' ? 'upload' :
+    stage === 'preview' || stage === 'importing' ? 'review' : 'done';
+
+  const steps: PremiumModalStep[] = [
+    { id: 'upload', label: 'Dosya', caption: 'Excel yükle', complete: activeStepId !== 'upload' },
+    { id: 'review', label: 'İnceleme', caption: 'Doğrula ve düzenle', complete: activeStepId === 'done' },
+    { id: 'done', label: 'Sonuç', caption: 'Özet', complete: false },
+  ];
+
+  const subtitle = (() => {
+    if (stage === 'idle') return 'Excel şablonu ile toplu personel yükle.';
+    if (stage === 'uploading') return 'Dosya doğrulanıyor…';
+    if (stage === 'preview') return `${preview?.total ?? 0} satır okundu — düzenleyip onayla.`;
+    if (stage === 'importing') return 'Kayıtlar oluşturuluyor…';
+    return 'Yükleme tamamlandı.';
+  })();
+
+  const footer = (() => {
+    if (stage === 'preview') {
+      return (
+        <PremiumModalFooter
+          summary={
+            <span>
+              <strong style={{ color: '#0a7a47' }}>{validCount.toString().padStart(2, '0')}</strong> geçerli
+              {errorCount > 0 && <> · <strong style={{ color: '#b3261e' }}>{errorCount.toString().padStart(2, '0')}</strong> hatalı</>}
+            </span>
+          }
+          actions={
+            <>
+              <PremiumButton variant="ghost" onClick={revalidate} icon={<RefreshCw className="h-4 w-4" />}>
+                Tekrar Doğrula
+              </PremiumButton>
+              <PremiumButton variant="outline" onClick={reset}>Farklı Dosya</PremiumButton>
+              <PremiumButton
+                onClick={handleConfirmImport}
+                disabled={!canImport}
+                icon={<CheckCircle2 className="h-4 w-4" />}
+              >
+                {validCount > 0 ? `${validCount} Personeli Ekle` : 'Yüklenecek Satır Yok'}
+              </PremiumButton>
+            </>
+          }
+        />
+      );
+    }
+    if (stage === 'done') {
+      return (
+        <PremiumModalFooter
+          actions={
+            <>
+              <PremiumButton variant="ghost" onClick={reset}>Yeni Dosya Yükle</PremiumButton>
+              <PremiumButton onClick={handleClose}>Kapat</PremiumButton>
+            </>
+          }
+        />
+      );
+    }
+    if (stage === 'idle') {
+      return (
+        <PremiumModalFooter
+          actions={<PremiumButton variant="ghost" onClick={handleClose}>İptal</PremiumButton>}
+        />
+      );
+    }
+    return null;
+  })();
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0, 0, 0, 0.5)' }}
-      onClick={handleClose}
+    <PremiumModal
+      isOpen={open}
+      onClose={handleClose}
+      eyebrow="Toplu İşlem"
+      title="Personel Yüklemesi"
+      subtitle={subtitle}
+      size="xl"
+      steps={steps}
+      activeStep={activeStepId}
+      disableEscape={stage === 'uploading' || stage === 'importing'}
+      footer={footer}
     >
-      <div
-        className="w-full max-w-6xl rounded-2xl shadow-xl max-h-[92vh] flex flex-col"
-        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-              <FileSpreadsheet className="h-5 w-5" />
+      {stage === 'idle' && (
+        <div className="bid-idle">
+          <div
+            className="bid-drop"
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const f = e.dataTransfer.files?.[0];
+              if (f) handleFileSelect(f);
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
+          >
+            <div className="bid-drop-icon">
+              <Upload className="h-7 w-7" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>Toplu Personel Yükle</h2>
-              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                {stage === 'idle' && 'Excel dosyası yükleyin'}
-                {stage === 'uploading' && 'Dosya doğrulanıyor…'}
-                {stage === 'preview' && `${preview?.total ?? 0} satır — düzenleyip onaylayın`}
-                {stage === 'importing' && 'Kayıtlar oluşturuluyor…'}
-                {stage === 'done' && 'Tamamlandı'}
-              </p>
+            <h4>Excel dosyası bırak</h4>
+            <p>Tıkla ve seç ya da dosyayı buraya sürükle. .xlsx veya .xls — maksimum 10 MB.</p>
+            <input
+              ref={fileInputRef} type="file" accept=".xlsx,.xls" className="bid-file"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFileSelect(f);
+                e.target.value = '';
+              }}
+            />
+          </div>
+
+          <aside className="bid-template">
+            <div className="bid-template-icon">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="bid-template-body">
+              <h5>Şablon ile başla</h5>
+              <p>Başlıklar esnek: <em>Ad/İsim</em>, <em>Soyad</em>, <em>E-posta/Email/Mail</em>, <em>Departman/Bölüm</em> — hepsi tanınır.</p>
+              <button type="button" onClick={downloadTemplate} className="bid-template-btn">
+                <Download className="h-3.5 w-3.5" />
+                Şablonu indir (.xlsx)
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {stage === 'uploading' && (
+        <div className="bid-status">
+          <Loader2 className="bid-spin" />
+          <h4>Dosya doğrulanıyor…</h4>
+          <p>Excel satırları okunuyor ve departmanlarla eşleştiriliyor.</p>
+        </div>
+      )}
+
+      {stage === 'preview' && preview && (
+        <div className="bid-review">
+          <div className="bid-stats">
+            <StatTile label="Toplam" value={preview.total} tone="neutral" />
+            <StatTile label="Geçerli" value={validCount} tone="ok" icon={<CheckCircle2 className="h-3.5 w-3.5" />} />
+            <StatTile label="Hatalı" value={errorCount} tone="err" icon={<AlertCircle className="h-3.5 w-3.5" />} />
+          </div>
+
+          {preview.unknownHeaders && preview.unknownHeaders.length > 0 && (
+            <div className="bid-warn">
+              <AlertCircle className="h-4 w-4" />
+              <div>
+                <strong>Tanınmayan sütunlar:</strong> {preview.unknownHeaders.join(', ')} — atlandı.
+              </div>
+            </div>
+          )}
+
+          <div className="bid-table-wrap">
+            <div className="bid-table-scroll">
+              <table className="bid-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 44 }}>#</th>
+                    <th>Ad *</th>
+                    <th>Soyad *</th>
+                    <th>E-posta *</th>
+                    <th>Telefon</th>
+                    <th>Departman</th>
+                    <th>Unvan</th>
+                    <th>Durum</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {editedRows.map((row, idx) => {
+                    const err = errorByRowIndex.get(row.rowIndex);
+                    const isError = !!err;
+                    return (
+                      <tr key={idx} className={isError ? 'bid-row-err' : ''}>
+                        <td className="bid-rowidx">{row.rowIndex}</td>
+                        <td><CellInput value={row.firstName} onChange={(v) => updateRow(idx, { firstName: v })} /></td>
+                        <td><CellInput value={row.lastName} onChange={(v) => updateRow(idx, { lastName: v })} /></td>
+                        <td><CellInput value={row.email} onChange={(v) => updateRow(idx, { email: v.toLowerCase() })} /></td>
+                        <td><CellInput value={row.phone} onChange={(v) => updateRow(idx, { phone: v })} /></td>
+                        <td>
+                          <select
+                            value={row.deptId || ''}
+                            onChange={(e) => updateRow(idx, { deptId: e.target.value || undefined })}
+                            className={`bid-sel ${row.deptMatch === 'ambiguous' || row.deptMatch === 'none' ? 'bid-sel-err' : ''}`}
+                          >
+                            <option value="">— {row.deptName || 'Seçin'}</option>
+                            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                          </select>
+                        </td>
+                        <td><CellInput value={row.title} onChange={(v) => updateRow(idx, { title: v })} /></td>
+                        <td>
+                          {isError ? (
+                            <span className="bid-status-err" title={err}>
+                              <AlertCircle className="h-3 w-3" />
+                              <span>{err}</span>
+                            </span>
+                          ) : (
+                            <span className="bid-status-ok">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Geçerli
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
-          <button
-            onClick={handleClose}
-            disabled={stage === 'uploading' || stage === 'importing'}
-            className="rounded-lg p-2 hover:bg-(--color-surface-hover) disabled:opacity-50"
-            aria-label="Kapat"
-          >
-            <X className="h-5 w-5" style={{ color: 'var(--color-text-muted)' }} />
-          </button>
-        </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {stage === 'idle' && (
-            <div className="space-y-4">
-              <div
-                className="rounded-xl border-2 border-dashed p-10 text-center cursor-pointer transition-colors hover:bg-(--color-surface-hover)"
-                style={{ borderColor: 'var(--color-border)' }}
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const f = e.dataTransfer.files?.[0];
-                  if (f) handleFileSelect(f);
-                }}
-              >
-                <Upload className="mx-auto h-10 w-10 mb-3" style={{ color: 'var(--color-text-muted)' }} />
-                <p className="font-medium mb-1" style={{ color: 'var(--color-text)' }}>Excel dosyası seçin veya buraya sürükleyin</p>
-                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>.xlsx veya .xls (maksimum 10MB)</p>
-                <input
-                  ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFileSelect(f);
-                    e.target.value = '';
-                  }}
-                />
-              </div>
-              <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: 'var(--color-surface-muted)', border: '1px solid var(--color-border)' }}>
-                <FileText className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
-                <div className="flex-1">
-                  <p className="font-medium text-sm mb-1" style={{ color: 'var(--color-text)' }}>Şablon dosyasını indirin</p>
-                  <p className="text-sm mb-3" style={{ color: 'var(--color-text-muted)' }}>Başlıklar farklı yazılabilir: "Ad"/"İsim", "Soyad", "E-posta"/"Email"/"Mail", "Departman"/"Bölüm" — hepsi tanınır.</p>
-                  <Button variant="outline" size="sm" onClick={downloadTemplate}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Şablon İndir (.xlsx)
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {stage === 'uploading' && (
-            <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="h-10 w-10 animate-spin mb-3" style={{ color: 'var(--color-primary)' }} />
-              <p style={{ color: 'var(--color-text-muted)' }}>Dosya doğrulanıyor…</p>
-            </div>
-          )}
-
-          {stage === 'preview' && preview && (
-            <div className="space-y-4">
-              {/* Summary */}
-              <div className="grid grid-cols-3 gap-3">
-                <SummaryCard label="Toplam" value={preview.total} color="var(--color-text)" />
-                <SummaryCard label="Geçerli" value={validCount} color="var(--color-success)" icon={<CheckCircle2 className="h-4 w-4" />} />
-                <SummaryCard label="Hatalı" value={errorCount} color="var(--color-error)" icon={<AlertCircle className="h-4 w-4" />} />
-              </div>
-
-              {preview.unknownHeaders && preview.unknownHeaders.length > 0 && (
-                <div className="rounded-xl p-3 flex items-start gap-2 text-sm" style={{ background: 'var(--color-warning-bg, #fffbeb)', border: '1px solid #f59e0b' }}>
-                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#f59e0b' }} />
-                  <div>
-                    <span className="font-medium" style={{ color: '#92400e' }}>Tanınmayan sütunlar:</span>{' '}
-                    <span style={{ color: '#92400e' }}>{preview.unknownHeaders.join(', ')}</span>
-                    <span style={{ color: '#92400e' }}> — bu sütunlar atlandı.</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Editable table */}
-              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0" style={{ background: 'var(--color-surface-muted)' }}>
-                      <tr>
-                        <th className="px-2 py-2 text-left font-medium w-10" style={{ color: 'var(--color-text-muted)' }}>#</th>
-                        <th className="px-2 py-2 text-left font-medium" style={{ color: 'var(--color-text-muted)' }}>Ad *</th>
-                        <th className="px-2 py-2 text-left font-medium" style={{ color: 'var(--color-text-muted)' }}>Soyad *</th>
-                        <th className="px-2 py-2 text-left font-medium" style={{ color: 'var(--color-text-muted)' }}>E-posta *</th>
-                        <th className="px-2 py-2 text-left font-medium" style={{ color: 'var(--color-text-muted)' }}>Telefon</th>
-                        <th className="px-2 py-2 text-left font-medium" style={{ color: 'var(--color-text-muted)' }}>Departman</th>
-                        <th className="px-2 py-2 text-left font-medium" style={{ color: 'var(--color-text-muted)' }}>Unvan</th>
-                        <th className="px-2 py-2 text-left font-medium" style={{ color: 'var(--color-text-muted)' }}>Durum</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {editedRows.map((row, idx) => {
-                        const err = errorByRowIndex.get(row.rowIndex);
-                        const isError = !!err;
-                        return (
-                          <tr
-                            key={idx}
-                            style={{
-                              borderTop: '1px solid var(--color-border)',
-                              background: isError ? 'var(--color-error-bg)' : undefined,
-                            }}
-                          >
-                            <td className="px-2 py-1 font-mono text-xs" style={{ color: 'var(--color-text-muted)' }}>{row.rowIndex}</td>
-                            <td className="px-2 py-1">
-                              <CellInput value={row.firstName} onChange={(v) => updateRow(idx, { firstName: v })} />
-                            </td>
-                            <td className="px-2 py-1">
-                              <CellInput value={row.lastName} onChange={(v) => updateRow(idx, { lastName: v })} />
-                            </td>
-                            <td className="px-2 py-1">
-                              <CellInput value={row.email} onChange={(v) => updateRow(idx, { email: v.toLowerCase() })} />
-                            </td>
-                            <td className="px-2 py-1">
-                              <CellInput value={row.phone} onChange={(v) => updateRow(idx, { phone: v })} />
-                            </td>
-                            <td className="px-2 py-1">
-                              <select
-                                value={row.deptId || ''}
-                                onChange={(e) => updateRow(idx, { deptId: e.target.value || undefined })}
-                                className="w-full h-8 text-xs rounded-md border px-1.5"
-                                style={{
-                                  background: 'var(--color-bg)',
-                                  borderColor: row.deptMatch === 'ambiguous' || row.deptMatch === 'none'
-                                    ? 'var(--color-error)'
-                                    : 'var(--color-border)',
-                                  color: 'var(--color-text)',
-                                }}
-                              >
-                                <option value="">— {row.deptName || 'Seçin'}</option>
-                                {departments.map(d => (
-                                  <option key={d.id} value={d.id}>{d.name}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="px-2 py-1">
-                              <CellInput value={row.title} onChange={(v) => updateRow(idx, { title: v })} />
-                            </td>
-                            <td className="px-2 py-1">
-                              {isError ? (
-                                <span className="inline-flex items-center gap-1 text-xs" style={{ color: 'var(--color-error)' }} title={err}>
-                                  <AlertCircle className="h-3 w-3" />
-                                  <span className="truncate max-w-[150px]">{err}</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-xs" style={{ color: 'var(--color-success)' }}>
-                                  <CheckCircle2 className="h-3 w-3" />
-                                  Geçerli
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {errorCount > 0 && (
-                <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--color-text)' }}>
-                  <input
-                    type="checkbox" checked={skipErrors}
-                    onChange={(e) => setSkipErrors(e.target.checked)}
-                    className="h-4 w-4"
-                  />
-                  Hatalı satırları atlayarak {validCount} geçerli satırı yükle
-                </label>
-              )}
-            </div>
-          )}
-
-          {stage === 'importing' && (
-            <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="h-10 w-10 animate-spin mb-3" style={{ color: 'var(--color-primary)' }} />
-              <p style={{ color: 'var(--color-text-muted)' }}>Personeller oluşturuluyor…</p>
-              <p className="text-xs mt-2" style={{ color: 'var(--color-text-muted)' }}>Bu işlem birkaç saniye sürebilir</p>
-            </div>
-          )}
-
-          {stage === 'done' && importResult && (
-            <div className="space-y-4">
-              <div className="text-center py-6">
-                <div className="inline-flex h-16 w-16 items-center justify-center rounded-full mb-3" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-                  <CheckCircle2 className="h-8 w-8" />
-                </div>
-                <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>Yükleme tamamlandı</h3>
-                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  {importResult.created} başarılı{importResult.failed > 0 ? `, ${importResult.failed} başarısız` : ''}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <SummaryCard label="Başarılı" value={importResult.created} color="var(--color-success)" icon={<CheckCircle2 className="h-4 w-4" />} />
-                <SummaryCard label="Başarısız" value={importResult.failed} color="var(--color-error)" icon={<AlertCircle className="h-4 w-4" />} />
-              </div>
-
-              {importResult.failed > 0 && (
-                <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: 'var(--color-error-bg)' }}>
-                  <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-error)' }} />
-                  <div className="flex-1">
-                    <p className="font-medium text-sm mb-1" style={{ color: 'var(--color-error)' }}>
-                      {importResult.failed} satır yüklenemedi
-                    </p>
-                    <p className="text-sm mb-3" style={{ color: 'var(--color-text-muted)' }}>Detaylı Excel raporunu indirin:</p>
-                    <Button variant="outline" size="sm" onClick={downloadErrorReport}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Hata Raporu İndir (Excel)
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
+          {errorCount > 0 && (
+            <label className="bid-skip">
+              <input
+                type="checkbox" checked={skipErrors}
+                onChange={(e) => setSkipErrors(e.target.checked)}
+              />
+              <span>Hatalı satırları atla, <strong>{validCount}</strong> geçerli satırı yükle</span>
+            </label>
           )}
         </div>
+      )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-3 p-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
-          {stage === 'preview' ? (
-            <>
-              <Button variant="outline" onClick={revalidate}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Tekrar Doğrula
-              </Button>
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={reset}>Farklı Dosya</Button>
-                <button
-                  onClick={handleConfirmImport}
-                  disabled={!canImport}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg px-4 h-10 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: '#0d9668' }}
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  {validCount > 0 ? `${validCount} Personeli Ekle` : 'Yüklenecek Satır Yok'}
+      {stage === 'importing' && (
+        <div className="bid-status">
+          <Loader2 className="bid-spin" />
+          <h4>Personeller oluşturuluyor…</h4>
+          <p>Her satır için kullanıcı hesabı, departman ataması ve hoşgeldin e-postası hazırlanıyor. Birkaç saniye sürebilir.</p>
+        </div>
+      )}
+
+      {stage === 'done' && importResult && (
+        <div className="bid-done">
+          <div className="bid-done-hero">
+            <div className="bid-done-icon">
+              <CheckCircle2 className="h-7 w-7" />
+            </div>
+            <h3>
+              <em>{importResult.created}</em> personel eklendi
+              {importResult.failed > 0 && <span className="bid-done-failed"> · {importResult.failed} başarısız</span>}
+            </h3>
+            <p>Yeni kullanıcılar giriş bilgilerini e-posta ile aldı.</p>
+          </div>
+
+          <div className="bid-stats">
+            <StatTile label="Başarılı" value={importResult.created} tone="ok" icon={<CheckCircle2 className="h-3.5 w-3.5" />} />
+            <StatTile label="Başarısız" value={importResult.failed} tone="err" icon={<AlertCircle className="h-3.5 w-3.5" />} />
+          </div>
+
+          {importResult.failed > 0 && (
+            <div className="bid-err-card">
+              <AlertCircle className="h-5 w-5" />
+              <div>
+                <h5>{importResult.failed} satır yüklenemedi</h5>
+                <p>Hatanın sebebini ve düzeltme önerilerini içeren Excel raporunu indir:</p>
+                <button type="button" onClick={downloadErrorReport} className="bid-err-btn">
+                  <Download className="h-3.5 w-3.5" />
+                  Hata Raporu İndir (Excel)
                 </button>
               </div>
-            </>
-          ) : stage === 'done' ? (
-            <>
-              <Button variant="outline" onClick={reset}>Yeni Dosya Yükle</Button>
-              <button
-                onClick={handleClose}
-                className="inline-flex items-center justify-center rounded-lg px-4 h-10 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                style={{ background: '#0d9668' }}
-              >
-                Kapat
-              </button>
-            </>
-          ) : stage === 'idle' ? (
-            <>
-              <div />
-              <Button variant="outline" onClick={handleClose}>İptal</Button>
-            </>
-          ) : (
-            <div />
+            </div>
           )}
         </div>
-      </div>
-    </div>
+      )}
+
+      <style jsx>{`
+        /* ── Idle: dropzone + template ── */
+        .bid-idle {
+          display: grid;
+          grid-template-columns: 1.6fr 1fr;
+          gap: 18px;
+        }
+        @media (max-width: 768px) { .bid-idle { grid-template-columns: 1fr; } }
+
+        .bid-drop {
+          border: 1.5px dashed #d9d4c4;
+          border-radius: 14px;
+          padding: 40px 28px;
+          background: #ffffff;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          gap: 10px;
+          transition: border-color 180ms ease, background 180ms ease, transform 220ms cubic-bezier(0.16,1,0.3,1);
+        }
+        .bid-drop:hover { border-color: #0a0a0a; background: #faf8f2; transform: translateY(-1px); }
+        .bid-drop-icon {
+          width: 56px;
+          height: 56px;
+          border-radius: 999px;
+          background: #0a0a0a;
+          color: #fafaf7;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 6px;
+        }
+        .bid-drop h4 {
+          font-family: var(--font-editorial, serif);
+          font-size: 22px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 42;
+          color: #0a0a0a;
+          letter-spacing: -0.01em;
+          margin: 0;
+        }
+        .bid-drop p {
+          font-size: 13px;
+          color: #6b6a63;
+          max-width: 360px;
+          line-height: 1.55;
+          margin: 0;
+        }
+        .bid-file { display: none; }
+
+        .bid-template {
+          display: flex;
+          gap: 14px;
+          padding: 22px;
+          border-radius: 14px;
+          background: #faf8f2;
+          border: 1px solid #ebe7df;
+        }
+        .bid-template-icon {
+          flex-shrink: 0;
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          background: #ffffff;
+          color: #0a0a0a;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #ebe7df;
+        }
+        .bid-template-body { flex: 1; }
+        .bid-template h5 {
+          font-family: var(--font-editorial, serif);
+          font-size: 16px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 32;
+          color: #0a0a0a;
+          margin: 0 0 6px;
+        }
+        .bid-template p { font-size: 12px; color: #6b6a63; line-height: 1.55; margin: 0 0 12px; }
+        .bid-template em { font-style: italic; color: #0a0a0a; font-family: var(--font-editorial, serif); }
+        .bid-template-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 12px;
+          border-radius: 999px;
+          border: 1px solid #d9d4c4;
+          background: #ffffff;
+          font-size: 12px;
+          font-weight: 600;
+          color: #0a0a0a;
+          cursor: pointer;
+          font-family: var(--font-display, system-ui);
+          transition: border-color 160ms ease, background 160ms ease;
+        }
+        .bid-template-btn:hover { border-color: #0a0a0a; background: #faf8f2; }
+
+        /* ── Status panels (uploading / importing) ── */
+        .bid-status {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          padding: 60px 30px;
+          gap: 14px;
+        }
+        :global(.bid-spin) {
+          width: 36px;
+          height: 36px;
+          color: #0a0a0a;
+          animation: bid-rot 900ms linear infinite;
+        }
+        @keyframes bid-rot { to { transform: rotate(360deg); } }
+        .bid-status h4 {
+          font-family: var(--font-editorial, serif);
+          font-size: 22px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 42;
+          color: #0a0a0a;
+          margin: 0;
+        }
+        .bid-status p {
+          font-size: 13px;
+          color: #6b6a63;
+          max-width: 420px;
+          line-height: 1.55;
+          margin: 0;
+        }
+
+        /* ── Review stage ── */
+        .bid-review { display: flex; flex-direction: column; gap: 14px; }
+
+        .bid-stats {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+        }
+        .bid-done .bid-stats { grid-template-columns: repeat(2, 1fr); }
+
+        .bid-warn {
+          display: flex;
+          gap: 10px;
+          padding: 12px 14px;
+          border-radius: 10px;
+          background: #fef6e7;
+          border: 1px solid #e9c977;
+          color: #6a4e11;
+          font-size: 12px;
+          line-height: 1.5;
+        }
+        .bid-warn :global(svg) { flex-shrink: 0; margin-top: 2px; color: #b4820b; }
+        .bid-warn strong { color: #4a3608; }
+
+        .bid-table-wrap {
+          border: 1px solid #ebe7df;
+          border-radius: 12px;
+          overflow: hidden;
+          background: #ffffff;
+        }
+        .bid-table-scroll {
+          overflow: auto;
+          max-height: 380px;
+        }
+        .bid-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .bid-table thead th {
+          position: sticky;
+          top: 0;
+          background: #faf8f2;
+          padding: 10px 10px;
+          text-align: left;
+          font-family: var(--font-display, system-ui);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #6b6a63;
+          border-bottom: 1px solid #ebe7df;
+          white-space: nowrap;
+        }
+        .bid-table tbody tr { border-top: 1px solid #f1ede3; }
+        .bid-table tbody tr.bid-row-err { background: #fdf5f2; }
+        .bid-table td { padding: 4px 6px; vertical-align: middle; }
+        .bid-rowidx {
+          font-family: var(--font-mono, monospace);
+          font-size: 10px;
+          color: #8a8578;
+          padding-left: 10px;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .bid-sel {
+          width: 100%;
+          height: 32px;
+          border-radius: 6px;
+          border: 1px solid #ebe7df;
+          background: #ffffff;
+          padding: 0 6px;
+          font-size: 12px;
+          color: #0a0a0a;
+          font-family: inherit;
+        }
+        .bid-sel:focus { outline: 2px solid #0a0a0a; outline-offset: 1px; border-color: #0a0a0a; }
+        .bid-sel-err { border-color: #b3261e; background: #fdf5f2; }
+
+        .bid-status-ok, .bid-status-err {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 11px;
+          font-weight: 600;
+          white-space: nowrap;
+          max-width: 180px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .bid-status-ok { color: #0a7a47; }
+        .bid-status-err { color: #b3261e; }
+        .bid-status-ok :global(svg), .bid-status-err :global(svg) { flex-shrink: 0; }
+
+        .bid-skip {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 14px;
+          border-radius: 10px;
+          background: #faf8f2;
+          border: 1px solid #ebe7df;
+          font-size: 13px;
+          color: #0a0a0a;
+          cursor: pointer;
+        }
+        .bid-skip input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          accent-color: #0a0a0a;
+        }
+
+        /* ── Done stage ── */
+        .bid-done { display: flex; flex-direction: column; gap: 18px; }
+        .bid-done-hero {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          padding: 20px 20px 0;
+          gap: 10px;
+        }
+        .bid-done-icon {
+          width: 60px;
+          height: 60px;
+          border-radius: 999px;
+          background: #0a7a47;
+          color: #fafaf7;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .bid-done h3 {
+          font-family: var(--font-editorial, serif);
+          font-size: 26px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 48, 'SOFT' 50;
+          color: #0a0a0a;
+          margin: 0;
+          letter-spacing: -0.015em;
+        }
+        .bid-done h3 em {
+          font-style: italic;
+          color: #0a7a47;
+          font-variant-numeric: tabular-nums;
+        }
+        .bid-done-failed { font-style: normal; color: #b3261e; font-size: 18px; font-weight: 400; }
+        .bid-done p { font-size: 13px; color: #6b6a63; margin: 0; }
+
+        .bid-err-card {
+          display: flex;
+          gap: 14px;
+          padding: 18px;
+          border-radius: 12px;
+          background: #fdf5f2;
+          border: 1px solid #e9c9c0;
+        }
+        .bid-err-card :global(svg) { flex-shrink: 0; color: #b3261e; margin-top: 2px; }
+        .bid-err-card h5 {
+          font-family: var(--font-editorial, serif);
+          font-size: 16px;
+          font-weight: 500;
+          color: #7a1d14;
+          margin: 0 0 4px;
+        }
+        .bid-err-card p { font-size: 12px; color: #6b6a63; margin: 0 0 10px; line-height: 1.5; }
+        .bid-err-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 12px;
+          border-radius: 999px;
+          background: #b3261e;
+          color: #fff;
+          border: none;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: var(--font-display, system-ui);
+          transition: background 160ms ease;
+        }
+        .bid-err-btn:hover { background: #8f1e17; }
+      `}</style>
+    </PremiumModal>
   );
 }
 
-/** Tablo hücresi için kompakt input */
 function CellInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <Input
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="h-8 text-xs px-2"
+      style={{ background: '#ffffff', borderColor: '#ebe7df' }}
     />
   );
 }
 
-function SummaryCard({ label, value, color, icon }: { label: string; value: number; color: string; icon?: React.ReactNode }) {
+function StatTile({ label, value, tone, icon }: { label: string; value: number; tone: 'neutral' | 'ok' | 'err'; icon?: React.ReactNode }) {
+  const color = tone === 'ok' ? '#0a7a47' : tone === 'err' ? '#b3261e' : '#0a0a0a';
+  const bg = tone === 'ok' ? '#eaf6ef' : tone === 'err' ? '#fdf5f2' : '#faf8f2';
   return (
-    <div className="rounded-xl p-4" style={{ background: 'var(--color-surface-muted)', border: '1px solid var(--color-border)' }}>
-      <div className="flex items-center gap-2 text-xs font-medium mb-1" style={{ color: 'var(--color-text-muted)' }}>
+    <div className="st-tile">
+      <div className="st-head">
         {icon}
-        {label}
+        <span>{label}</span>
       </div>
-      <div className="text-2xl font-bold" style={{ color }}>{value}</div>
+      <div className="st-value">{value.toString().padStart(2, '0')}</div>
+      <style jsx>{`
+        .st-tile {
+          padding: 14px 16px;
+          border-radius: 12px;
+          background: ${bg};
+          border: 1px solid #ebe7df;
+        }
+        .st-head {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-family: var(--font-display, system-ui);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #6b6a63;
+          margin-bottom: 6px;
+        }
+        .st-head :global(svg) { color: ${color}; }
+        .st-value {
+          font-family: var(--font-editorial, serif);
+          font-size: 28px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 48, 'SOFT' 50;
+          color: ${color};
+          line-height: 1;
+          letter-spacing: -0.02em;
+          font-variant-numeric: tabular-nums;
+        }
+      `}</style>
     </div>
   );
 }
+

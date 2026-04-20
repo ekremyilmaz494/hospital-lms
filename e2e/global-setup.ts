@@ -50,25 +50,37 @@ async function loginAndSave(
   const context = await browser.newContext()
   const page = await context.newPage()
 
+  // Cookie consent banner submit'i intercept ediyor (z-[9999] fixed bottom).
+  // Pre-dismiss: localStorage key'leri set et — banner mount'ta kendini gizler.
+  await page.addInitScript(() => {
+    localStorage.setItem('lms_cookie_consent', 'true')
+    localStorage.setItem('lms_cookie_prefs', JSON.stringify({ essential: true, functional: true, analytics: true }))
+  })
+
   try {
-    await page.goto(`${baseURL}/auth/login`)
-    await page.waitForSelector('[type="email"]', { timeout: 20000 })
+    await page.goto(`${baseURL}/auth/login`, { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('[type="email"]', { timeout: 30000 })
 
     await page.fill('[type="email"]', email)
     await page.fill('[type="password"]', password)
 
-    // Shadcn Checkbox: '#kvkk' is a hidden <input aria-hidden="true">.
-    // The actual clickable element is <button data-slot="checkbox">.
-    // CI'da sayfa render geç tamamlanabilir — 10s bekle, bulamazsan devam et.
-    const kvkk = page.locator('button[data-slot="checkbox"]')
-    try {
-      await kvkk.waitFor({ state: 'visible', timeout: 10000 })
-      await kvkk.click()
-    } catch {
-      // Checkbox yoksa (ya da render gecikmesi) skip et
-    }
+    // KVKK checkbox login form'undan kaldırıldı (Nisan 2026). Submit zımni kabul.
 
-    await page.click('button[type="submit"]')
+    // ShimmerButton dynamic import → text-based selector (placeholder text'siz)
+    const submitBtn = page.getByRole('button', { name: /Giriş Yap/i })
+    await submitBtn.waitFor({ state: 'visible', timeout: 15000 })
+    await submitBtn.click()
+
+    // KVKK Notice Modal: önce checkbox (accepted=true), sonra "Kabul Ediyorum" butonu enable
+    try {
+      const kvkkCheck = page.locator('button[role="checkbox"][aria-checked]')
+      await kvkkCheck.waitFor({ state: 'visible', timeout: 8000 })
+      await kvkkCheck.click()
+      const acceptBtn = page.getByRole('button', { name: /Kabul Ediyorum/i })
+      await acceptBtn.waitFor({ state: 'visible', timeout: 3000 })
+      await acceptBtn.click()
+    } catch { /* modal yok */ }
+
     await page.waitForURL(`**${dashboard}`, { timeout: 30000 })
 
     // Session'ı kaydet

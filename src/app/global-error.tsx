@@ -1,5 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
+
 /**
  * Global error boundary — tum uygulamada yakalanmayan hatalari yakalar.
  * Root layout dahil hatalari handle eder.
@@ -11,18 +14,9 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  // Sentry'ye hata gonder (paket yuklendiginde aktif olacak)
-  if (typeof window !== 'undefined') {
-    // Dinamik import — @sentry/nextjs paketi yuklenmemisse sessizce gecer
-    const sentryModule = '@sentry/nextjs'
-    import(/* webpackIgnore: true */ sentryModule)
-      .then((Sentry: { captureException: (e: Error) => void }) => {
-        Sentry.captureException(error)
-      })
-      .catch(() => {
-        // @sentry/nextjs paketi henuz yuklenmemis
-      })
-  }
+  useEffect(() => {
+    Sentry.captureException(error)
+  }, [error])
 
   return (
     <html lang="tr">

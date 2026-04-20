@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next.nosync/
 /out/
 
 # next-pwa / Serwist build artifacts (her build'de hash değişir)

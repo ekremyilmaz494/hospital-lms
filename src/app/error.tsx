@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react'
@@ -18,16 +19,7 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    // Sentry'ye hata gonder (paket yuklendiginde aktif olacak)
-    // Dinamik import — @sentry/nextjs paketi yuklenmemisse sessizce gecer
-    const sentryModule = '@sentry/nextjs'
-    import(/* webpackIgnore: true */ sentryModule)
-      .then((Sentry: { captureException: (e: Error) => void }) => {
-        Sentry.captureException(error)
-      })
-      .catch(() => {
-        // @sentry/nextjs paketi henuz yuklenmemis
-      })
+    Sentry.captureException(error)
   }, [error])
 
   return (

@@ -67,42 +67,49 @@ export async function login(page: Page, role: UserRole = 'admin') {
   // Normal login akışı
   const { email, password } = CREDENTIALS[role]
 
-  await page.goto('/auth/login')
-  await page.waitForSelector('[type="email"]', { timeout: 15000 })
+  // 'load' yerine 'domcontentloaded' — Turbopack dev'de chunk'lar lazy compile,
+  // 'load' tüm dynamic import'ların bitmesini bekleyip 30s timeout veriyor.
+  // Email selector zaten waitForSelector ile beklenecek, asset yüklenmesini beklemeye gerek yok.
+  await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('[type="email"]', { timeout: 30000 })
 
   await page.fill('[type="email"]', email)
   await page.fill('[type="password"]', password)
 
-  // Shadcn Checkbox: '#kvkk' is a hidden <input aria-hidden="true">.
-  // The actual clickable element is <button data-slot="checkbox">.
-  // CI'da sayfa render geç tamamlanabilir — 10s bekle, bulamazsan devam et.
-  const kvkkCheckbox = page.locator('button[data-slot="checkbox"]')
+  // NOT: Login formundan KVKK checkbox kaldırıldı (Nisan 2026 UI revizyonu).
+  // KVKK metni bilgilendirme paragrafı, submit ile zımni kabul ediliyor.
+  // Acknowledgement'ı kullanıcı login sonrası KvkkNoticeModal'da yapıyor.
+  // Tek checkbox kaldı: rememberMe (Bu cihazda oturumumu açık tut).
+
+  // ShimmerButton dynamic import — placeholder mount olana kadar gerçek button beklenmeli.
+  // Placeholder'da text yok; submit butonu "Giriş Yap" text'i içeriyor.
+  const submitBtn = page.getByRole('button', { name: /Giriş Yap/i })
+  await submitBtn.waitFor({ state: 'visible', timeout: 15000 })
+  await submitBtn.click()
+
+  // Login sonrası KVKK Notice Modal açılır (E2E user'ların acknowledged metadata'sı yok).
+  // Modal yapısı: önce role=checkbox tıklanır (accepted=true), sonra "Kabul Ediyorum" butonu enable olur.
   try {
-    await kvkkCheckbox.waitFor({ state: 'visible', timeout: 10000 })
-    await kvkkCheckbox.click()
+    const kvkkCheck = page.locator('button[role="checkbox"][aria-checked]')
+    await kvkkCheck.waitFor({ state: 'visible', timeout: 8000 })
+    await kvkkCheck.click()
+    const acceptBtn = page.getByRole('button', { name: /Kabul Ediyorum/i })
+    await acceptBtn.waitFor({ state: 'visible', timeout: 3000 })
+    await acceptBtn.click()
   } catch {
-    // Checkbox yoksa skip et
+    // Modal yoksa zaten dashboard'a yönlendi — devam
   }
 
-  await page.click('button[type="submit"]')
-  await page.waitForURL(`**${dashboard}`, { timeout: 20000 })
+  await page.waitForURL(`**${dashboard}`, { timeout: 30000 })
 }
 
 /**
- * Logout helper — clicks the logout button in sidebar and verifies redirect to login.
+ * Logout helper — API-based to avoid Next.js dev overlay (`<nextjs-portal>`)
+ * intercepting clicks on sidebar/avatar buttons.
  */
 export async function logout(page: Page) {
-  // Try sidebar logout first, then topbar dropdown
-  const sidebarLogout = page.getByText('Çıkış Yap').first()
-  if (await sidebarLogout.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await sidebarLogout.click()
-  } else {
-    // Topbar avatar dropdown
-    const avatarBtn = page.locator('[class*="avatar"]').first()
-    await avatarBtn.click()
-    await page.getByText('Çıkış Yap').click()
-  }
-
+  await page.request.post('/api/auth/logout')
+  await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
   await page.waitForURL('**/auth/login', { timeout: 10000 })
 }
 

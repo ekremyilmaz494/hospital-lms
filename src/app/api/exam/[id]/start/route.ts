@@ -87,8 +87,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (existing) {
     let resumed = existing
-    // Retry attempt'i pre_exam'da takılı kalmışsa watching_videos'a yükselt
-    if (existing.attemptNumber > 1 && existing.status === 'pre_exam') {
+    // Pre_exam'da takılı kalmış attempt'i watching_videos'a yükselt:
+    //   - Retry attempt (attemptNumber > 1) → ön sınav atlanır
+    //   - Ön sınavı gerçekten tamamlamış attempt (preExamCompletedAt dolu) → status senkron değil, düzelt
+    const shouldPromote =
+      existing.status === 'pre_exam' &&
+      (existing.attemptNumber > 1 || existing.preExamCompletedAt !== null)
+    if (shouldPromote) {
       resumed = await prisma.examAttempt.update({
         where: { id: existing.id },
         data: {
@@ -135,7 +140,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
 
     if (existingInTx) {
-      if (existingInTx.attemptNumber > 1 && existingInTx.status === 'pre_exam') {
+      const shouldPromoteInTx =
+        existingInTx.status === 'pre_exam' &&
+        (existingInTx.attemptNumber > 1 || existingInTx.preExamCompletedAt !== null)
+      if (shouldPromoteInTx) {
         return await tx.examAttempt.update({
           where: { id: existingInTx.id },
           data: {

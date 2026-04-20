@@ -2,7 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Play, Pause, Volume2, VolumeX, CheckCircle } from 'lucide-react'
-import { PdfViewer } from '@/components/exam/pdf-viewer'
+import dynamic from 'next/dynamic'
+
+const PdfViewer = dynamic(
+  () => import('@/components/exam/pdf-viewer').then(m => ({ default: m.PdfViewer })),
+  { ssr: false }
+)
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)

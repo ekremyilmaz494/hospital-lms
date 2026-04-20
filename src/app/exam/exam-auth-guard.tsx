@@ -15,7 +15,20 @@ export function ExamAuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, router]);
 
-  if (isLoading || !user) return null;
+  if (isLoading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: 'var(--color-bg)' }}
+      >
+        <div
+          className="h-8 w-8 rounded-full border-2 animate-spin"
+          style={{ borderColor: '#0a7a47', borderTopColor: 'transparent' }}
+        />
+      </div>
+    );
+  }
+  if (!user) return null;
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>

@@ -15,13 +15,14 @@ function createPrismaClient() {
       '.env.local dosyasına DATABASE_URL=postgresql://... satırını ekleyin.'
     )
   }
+  const isDev = process.env.NODE_ENV === 'development'
   const pool = new Pool({
     connectionString,
     max: 25,
-    min: 5,
-    idleTimeoutMillis: 60000,
+    min: isDev ? 0 : 5,
+    idleTimeoutMillis: isDev ? 30000 : 60000,
     connectionTimeoutMillis: 15000,
-    allowExitOnIdle: false,
+    allowExitOnIdle: isDev,
   })
   // Warm pool: establish initial connections immediately
   pool.connect().then(c => c.release()).catch(() => {})

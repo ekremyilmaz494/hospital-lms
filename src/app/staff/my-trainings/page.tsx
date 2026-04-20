@@ -9,7 +9,6 @@ import {
   FlaskConical, Syringe, Scale, Award, BookOpenText, TrendingUp, Hash,
   CalendarDays, ChevronRight, Target, Flame,
 } from 'lucide-react';
-import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { MandatoryFeedbackBanner } from '@/components/shared/mandatory-feedback-banner';
 
@@ -30,31 +29,7 @@ interface Training {
   passingScore?: number;
 }
 
-/* ─────────────────────────────────────────────────────────────
-   KLİNİK PALET — proje CSS değişkenlerine bağlı tema tokenları.
-   Dekoratif değil; her renk bir klinik anlam taşır (triyaj kodu).
-   ───────────────────────────────────────────────────────────── */
-const C = {
-  surface:    'var(--color-surface)',
-  bg:         'var(--color-bg)',
-  border:     'var(--color-border)',
-  text:       'var(--color-text)',
-  textMuted:  'var(--color-text-muted)',
-  // Triyaj renkleri (sol kenar şeritleri için)
-  primary:    'var(--color-primary)',
-  primaryLt:  'var(--color-primary-light)',
-  primaryDk:  'var(--brand-800)',
-  success:    'var(--color-success)',
-  successBg:  'var(--color-success-bg)',
-  warning:    'var(--color-warning)',
-  warningBg:  'var(--color-warning-bg)',
-  error:      'var(--color-error)',
-  errorBg:    'var(--color-error-bg)',
-  accent:     'var(--color-accent)',
-  accentLt:   'var(--color-accent-light)',
-} as const;
-
-/* Kategori → klinik ikon eşlemesi (Türkçe anahtarlar) */
+/* Kategori → klinik ikon eşlemesi */
 const categoryIcon = (category: string): LucideIcon => {
   const k = (category || '').toLowerCase();
   if (k.includes('enfeksiyon')) return Microscope;
@@ -78,6 +53,25 @@ const statusLabel: Record<StatusKey, string> = {
   locked: 'Kilitli',
 };
 
+// Editorial Clinical status chips
+const statusChip: Record<StatusKey, { bg: string; text: string; dot: string }> = {
+  assigned:    { bg: '#eef2fb', text: '#1f3a7a', dot: '#2c55b8' },
+  in_progress: { bg: '#fef6e7', text: '#6a4e11', dot: '#b4820b' },
+  passed:      { bg: '#eaf6ef', text: '#0a7a47', dot: '#0a7a47' },
+  failed:      { bg: '#fdf5f2', text: '#b3261e', dot: '#b3261e' },
+  locked:      { bg: '#f4efdf', text: '#8a5a11', dot: '#b4820b' },
+};
+
+const monthShort = ['', 'OCA', 'ŞUB', 'MAR', 'NİS', 'MAY', 'HAZ', 'TEM', 'AĞU', 'EYL', 'EKİ', 'KAS', 'ARA'];
+
+function splitDate(deadline?: string): { day: string; month: string } {
+  if (!deadline) return { day: '—', month: '---' };
+  const parts = deadline.split('.');
+  const day = parts[0] ?? '—';
+  const mIdx = parseInt(parts[1] ?? '0', 10);
+  return { day, month: monthShort[mIdx] ?? '---' };
+}
+
 export default function MyTrainingsPage() {
   const { data: rawData, isLoading, error } =
     useFetch<{ data: Training[] } | Training[]>('/api/staff/my-trainings');
@@ -94,8 +88,7 @@ export default function MyTrainingsPage() {
     totalCount, activeCount, completedCount, averageScore, urgentCount,
   } = useMemo(() => {
     const list = allItems.filter((t) => (activeTab === 'exams' ? t.examOnly : !t.examOnly));
-    const isExhaustedFailed = (t: Training) =>
-      t.status === 'failed' && t.attempt >= t.maxAttempts;
+    const isExhaustedFailed = (t: Training) => t.status === 'failed' && t.attempt >= t.maxAttempts;
     const active = list.filter(
       (t) =>
         (t.status === 'assigned' || t.status === 'in_progress' || t.status === 'failed') &&
@@ -107,8 +100,8 @@ export default function MyTrainingsPage() {
     const passed = completed.length;
     const scores = list.filter((t) => t.score).map((t) => t.score!);
     const avg = scores.length
-      ? `%${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)}`
-      : '—';
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : null;
     const urgent = active.filter((t) => t.daysLeft !== undefined && t.daysLeft <= 3).length;
 
     return {
@@ -128,104 +121,64 @@ export default function MyTrainingsPage() {
   }, [allItems, activeTab]);
 
   if (isLoading) return <TrainingsSkeleton />;
+
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh] px-4">
-        <div className="text-center max-w-sm">
-          <div
-            className="inline-flex h-14 w-14 items-center justify-center rounded-2xl mb-4"
-            style={{ background: C.errorBg }}
-          >
-            <AlertOctagon className="h-6 w-6" style={{ color: C.error }} />
-          </div>
-          <p className="text-[14px] font-bold mb-1" style={{ color: C.error }}>
-            Eğitimler yüklenemedi
-          </p>
-          <p className="text-[12px]" style={{ color: C.textMuted }}>{error}</p>
-        </div>
+      <div className="mt-empty">
+        <div className="mt-empty-icon"><AlertOctagon className="h-6 w-6" /></div>
+        <h2>Eğitimler yüklenemedi</h2>
+        <p>{error}</p>
+        <style>{`
+          .mt-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 60px 20px; gap: 10px; }
+          .mt-empty-icon { width: 56px; height: 56px; border-radius: 999px; background: #fdf5f2; color: #b3261e; display: flex; align-items: center; justify-content: center; }
+          h2 { font-family: var(--font-editorial, serif); font-size: 20px; color: #b3261e; margin: 0; }
+          p { font-size: 13px; color: #6b6a63; margin: 0; }
+        `}</style>
       </div>
     );
   }
 
   return (
-    <div
-      className="pb-24 sm:pb-8"
-      style={{
-        fontFamily: 'var(--font-display), system-ui, sans-serif',
-        fontVariantNumeric: 'tabular-nums',
-      }}
-    >
+    <div className="mt-page">
       <MandatoryFeedbackBanner />
 
-      {/* ═══════ HEADER — editorial, az dekoratif ═══════ */}
-      <BlurFade delay={0}>
-        <header className="mb-5 sm:mb-7">
-          <div className="flex items-end justify-between gap-3 mb-1">
-            <span
-              className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-[0.18em] uppercase"
-              style={{ color: C.textMuted }}
-            >
-              <span
-                className="inline-block w-2 h-2 rounded-full"
-                style={{ background: C.success }}
-                aria-hidden
-              />
-              EĞİTİM PORTALI
+      {/* ═══════ Editorial Header ═══════ */}
+      <header className="mt-header">
+        <div className="mt-header-meta">
+          <span className="mt-eyebrow">
+            <span className="mt-eyebrow-dot" />
+            Eğitim Portalı
+          </span>
+          {urgentCount > 0 && (
+            <span className="mt-urgent-pill">
+              <Flame className="h-3 w-3" />
+              {urgentCount} acil
             </span>
-            {urgentCount > 0 && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
-                style={{ background: C.warningBg, color: C.warning }}
-              >
-                <Flame className="h-3 w-3" />
-                {urgentCount} acil
-              </span>
-            )}
-          </div>
-          <h1
-            className="text-[28px] sm:text-[36px] font-black tracking-[-0.025em] leading-[1.05]"
-            style={{ color: C.text, fontFamily: 'var(--font-display)' }}
-          >
-            Eğitimlerim
-          </h1>
-          <p
-            className="text-[12.5px] sm:text-[13.5px] mt-1.5 max-w-xl leading-relaxed"
-            style={{ color: C.textMuted }}
-          >
-            Atanan eğitimleri tamamla, sınavlardan geç, sertifikalarını topla.
-          </p>
-        </header>
-      </BlurFade>
+          )}
+        </div>
+        <h1 className="mt-title">
+          <em>Eğitimlerim</em>
+        </h1>
+        <p className="mt-subtitle">Atanan eğitimleri tamamla, sınavlardan geç, sertifikalarını topla.</p>
+      </header>
 
-      {/* ═══════ KPI ŞERİTİ — clinical metric strip ═══════ */}
-      <BlurFade delay={0.04}>
-        <section
-          className="mb-5 sm:mb-7 rounded-2xl overflow-hidden"
-          style={{
-            background: C.surface,
-            border: `1px solid ${C.border}`,
-            boxShadow: '0 1px 0 rgba(2,36,31,0.02)',
-          }}
-        >
-          <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0"
-            style={{ borderColor: C.border }}
-          >
-            <Kpi icon={BookOpen}     label="Toplam Eğitim" value={totalCount.toString()} accent={C.primary} />
-            <Kpi icon={Clock}        label="Devam Eden"    value={activeCount.toString()} accent={C.accent} />
-            <Kpi icon={CheckCircle2} label="Tamamlanan"    value={completedCount.toString()} accent={C.success} />
-            <Kpi icon={TrendingUp}   label="Ortalama Puan" value={averageScore} accent={C.primaryDk} highlight />
-          </div>
-        </section>
-      </BlurFade>
+      {/* ═══════ KPI strip ═══════ */}
+      <section className="mt-kpis" aria-label="Eğitim özeti">
+        <KpiTile label="Toplam" value={totalCount} tone="ink" icon={<BookOpen className="h-4 w-4" />} />
+        <KpiTile label="Devam Eden" value={activeCount} tone="amber" icon={<Clock className="h-4 w-4" />} />
+        <KpiTile label="Tamamlanan" value={completedCount} tone="ok" icon={<CheckCircle2 className="h-4 w-4" />} />
+        <KpiTile
+          label="Ortalama"
+          value={averageScore ?? '—'}
+          suffix={averageScore !== null ? '%' : undefined}
+          tone="emerald"
+          icon={<TrendingUp className="h-4 w-4" />}
+        />
+      </section>
 
-      {/* ═══════ TAB SWITCHER — underline editorial, ARIA tablist ═══════ */}
-      <BlurFade delay={0.06}>
-        <div
-          role="tablist"
-          aria-label="Eğitim tipi filtresi"
-          className="flex items-center gap-1 mb-5 sm:mb-7 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto"
-          style={{ borderBottom: `1px solid ${C.border}` }}
-        >
+      {/* ═══════ Tab switcher ═══════ */}
+      <div className="mt-tabs-wrap">
+        <div role="tablist" aria-label="Eğitim tipi filtresi" className="mt-tabs">
           {([
             { id: 'trainings' as const, label: 'Eğitimler', count: trainingCount, Icon: BookOpen },
             { id: 'exams' as const, label: 'Sınavlar', count: examCount, Icon: ClipboardCheck },
@@ -240,620 +193,1157 @@ export default function MyTrainingsPage() {
                 aria-controls={`panel-${tab.id}`}
                 tabIndex={isActive ? 0 : -1}
                 onClick={() => setActiveTab(tab.id)}
-                className="relative inline-flex items-center gap-2 px-3 sm:px-4 min-h-11 text-[13px] font-bold whitespace-nowrap transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 rounded-t-md"
-                style={{
-                  color: isActive ? C.primary : C.textMuted,
-                  ['--tw-ring-color' as string]: C.primary,
-                }}
+                className={`mt-tab ${isActive ? 'mt-tab-on' : ''}`}
               >
-                <tab.Icon className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-                {tab.label}
-                <span
-                  className="rounded-full px-1.5 py-0.5 text-[10px] font-mono font-bold leading-none"
-                  style={{
-                    background: isActive ? C.primaryLt : C.bg,
-                    color: isActive ? C.primary : C.textMuted,
-                  }}
-                  aria-label={`${tab.count} adet`}
-                >
-                  {tab.count}
-                </span>
-                {isActive && (
-                  <span
-                    aria-hidden
-                    className="absolute left-0 right-0 -bottom-px h-[2px]"
-                    style={{ background: C.primary }}
-                  />
-                )}
+                <tab.Icon className="h-3.5 w-3.5" />
+                <span>{tab.label}</span>
+                <span className="mt-tab-count">{tab.count}</span>
               </button>
             );
           })}
         </div>
-      </BlurFade>
+      </div>
 
-      {/* ═══════ AKTİF EĞİTİMLER — clinical chart card ═══════ */}
+      {/* ═══════ Aktif Eğitimler ═══════ */}
       {activeTrainings.length > 0 && (
-        <Section title="Aktif Eğitimler" count={activeTrainings.length} accent={C.primary} delay={0.08}>
-          <div className="space-y-2.5">
+        <Section title="Aktif" count={activeTrainings.length} accent="#0a0a0a">
+          <div className="mt-active-list">
             {activeTrainings.map((t, i) => (
-              <BlurFade key={t.id} delay={0.1 + i * 0.03}>
-                <ActiveCard training={t} />
-              </BlurFade>
+              <ActiveCard key={t.id} training={t} delay={i * 35} />
             ))}
           </div>
         </Section>
       )}
 
-      {/* ═══════ TAMAMLANAN — bento (asimetrik) ═══════ */}
+      {/* ═══════ Tamamlanan ═══════ */}
       {completedTrainings.length > 0 && (
-        <Section
-          title="Tamamlanan Eğitimler"
-          count={completedTrainings.length}
-          accent={C.success}
-          delay={0.12}
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+        <Section title="Tamamlanan" count={completedTrainings.length} accent="#0a7a47">
+          <div className="mt-completed-grid">
             {completedTrainings.map((t, i) => (
-              <BlurFade key={t.id} delay={0.14 + i * 0.025}>
-                <CompletedCard training={t} />
-              </BlurFade>
+              <CompletedCard key={t.id} training={t} delay={i * 30} />
             ))}
           </div>
         </Section>
       )}
 
-      {/* ═══════ BAŞARISIZ — kırmızı sol şeritli arşiv ═══════ */}
+      {/* ═══════ Başarısız (hakkı tükenen) ═══════ */}
       {exhaustedTrainings.length > 0 && (
-        <Section
-          title="Başarısız Eğitimler"
-          count={exhaustedTrainings.length}
-          accent={C.error}
-          delay={0.16}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+        <Section title="Haklar Tükendi" count={exhaustedTrainings.length} accent="#b3261e">
+          <div className="mt-archive-grid">
             {exhaustedTrainings.map((t, i) => (
-              <BlurFade key={t.id} delay={0.18 + i * 0.025}>
-                <ArchiveCard training={t} variant="failed" />
-              </BlurFade>
+              <ArchiveCard key={t.id} training={t} variant="failed" delay={i * 30} />
             ))}
           </div>
         </Section>
       )}
 
-      {/* ═══════ KİLİTLİ — amber sol şeritli arşiv ═══════ */}
+      {/* ═══════ Kilitli ═══════ */}
       {lockedTrainings.length > 0 && (
-        <Section
-          title="Kilitlenmiş Eğitimler"
-          count={lockedTrainings.length}
-          accent={C.accent}
-          delay={0.2}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+        <Section title="Kilitli" count={lockedTrainings.length} accent="#b4820b">
+          <div className="mt-archive-grid">
             {lockedTrainings.map((t, i) => (
-              <BlurFade key={t.id} delay={0.22 + i * 0.025}>
-                <ArchiveCard training={t} variant="locked" />
-              </BlurFade>
+              <ArchiveCard key={t.id} training={t} variant="locked" delay={i * 30} />
             ))}
           </div>
         </Section>
       )}
 
-      {/* ═══════ EMPTY ═══════ */}
+      {/* ═══════ Empty ═══════ */}
       {trainingList.length === 0 && (
-        <BlurFade delay={0.1}>
-          <div
-            className="text-center py-16 sm:py-24 rounded-2xl"
-            style={{ background: C.surface, border: `1px dashed ${C.border}` }}
-          >
-            <div
-              className="inline-flex h-14 w-14 items-center justify-center rounded-2xl mb-4"
-              style={{ background: C.primaryLt }}
-            >
-              <BookOpen className="h-6 w-6" style={{ color: C.primary }} strokeWidth={1.75} />
-            </div>
-            <p className="text-[15px] font-bold mb-1" style={{ color: C.text }}>
-              Henüz {activeTab === 'exams' ? 'sınav' : 'eğitim'} atanmadı
-            </p>
-            <p className="text-[12px] max-w-xs mx-auto" style={{ color: C.textMuted }}>
-              Yöneticiniz size {activeTab === 'exams' ? 'bir sınav' : 'bir eğitim'} atadığında
-              burada görünecek.
-            </p>
-          </div>
-        </BlurFade>
+        <div className="mt-empty-page">
+          <div className="mt-empty-page-icon"><BookOpen className="h-6 w-6" /></div>
+          <h2>Henüz {activeTab === 'exams' ? 'sınav' : 'eğitim'} atanmadı</h2>
+          <p>
+            Yöneticiniz size {activeTab === 'exams' ? 'bir sınav' : 'bir eğitim'} atadığında
+            burada görünecek.
+          </p>
+        </div>
       )}
+
+      <style jsx>{`
+        .mt-page {
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+          padding-bottom: 40px;
+        }
+
+        /* ── Header ── */
+        .mt-header { padding-bottom: 20px; border-bottom: 1px solid #ebe7df; }
+        .mt-header-meta {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 10px;
+          flex-wrap: wrap;
+        }
+        .mt-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-family: var(--font-display, system-ui);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: #8a8578;
+        }
+        .mt-eyebrow-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 999px;
+          background: #0a7a47;
+          display: inline-block;
+          box-shadow: 0 0 0 3px rgba(10, 122, 71, 0.12);
+        }
+        .mt-urgent-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          background: #fef6e7;
+          color: #6a4e11;
+          font-family: var(--font-display, system-ui);
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+        .mt-title {
+          font-family: var(--font-editorial, serif);
+          font-size: clamp(30px, 5vw, 48px);
+          font-weight: 500;
+          font-variation-settings: 'opsz' 72, 'SOFT' 50;
+          color: #0a0a0a;
+          letter-spacing: -0.03em;
+          line-height: 1;
+          margin: 0;
+        }
+        .mt-title em {
+          font-style: italic;
+          font-variation-settings: 'opsz' 72, 'SOFT' 100;
+        }
+        .mt-subtitle {
+          font-size: 13px;
+          color: #6b6a63;
+          margin: 8px 0 0;
+          max-width: 520px;
+          line-height: 1.55;
+        }
+
+        /* ── KPI strip ── */
+        .mt-kpis {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+        }
+
+        /* ── Tabs ── */
+        .mt-tabs-wrap { display: flex; }
+        .mt-tabs {
+          display: inline-flex;
+          padding: 4px;
+          border-radius: 999px;
+          background: #faf8f2;
+          border: 1px solid #ebe7df;
+          gap: 2px;
+        }
+        .mt-tab {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          height: 40px;
+          padding: 0 16px;
+          border-radius: 999px;
+          font-family: var(--font-display, system-ui);
+          font-size: 13px;
+          font-weight: 500;
+          color: #6b6a63;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          transition: background 180ms ease, color 180ms ease;
+        }
+        .mt-tab:hover { color: #0a0a0a; }
+        .mt-tab-on {
+          background: #0a0a0a;
+          color: #fafaf7;
+          font-weight: 600;
+        }
+        .mt-tab-on:hover { color: #fafaf7; }
+        .mt-tab-count {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2px 7px;
+          border-radius: 999px;
+          background: rgba(10, 10, 10, 0.08);
+          color: inherit;
+          font-size: 10px;
+          font-weight: 700;
+          font-variant-numeric: tabular-nums;
+          line-height: 1;
+        }
+        .mt-tab-on .mt-tab-count {
+          background: rgba(255, 255, 255, 0.14);
+          color: #fafaf7;
+        }
+
+        /* ── Empty ── */
+        .mt-empty-page {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          padding: 80px 20px;
+          gap: 10px;
+          background: #ffffff;
+          border: 1px dashed #ebe7df;
+          border-radius: 16px;
+        }
+        .mt-empty-page-icon {
+          width: 56px;
+          height: 56px;
+          border-radius: 999px;
+          background: #faf8f2;
+          color: #0a0a0a;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .mt-empty-page h2 {
+          font-family: var(--font-editorial, serif);
+          font-size: 20px;
+          color: #0a0a0a;
+          margin: 0;
+        }
+        .mt-empty-page p {
+          font-size: 13px;
+          color: #6b6a63;
+          margin: 0;
+          max-width: 320px;
+        }
+
+        .mt-active-list { display: flex; flex-direction: column; gap: 10px; }
+        .mt-completed-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 12px;
+        }
+        .mt-archive-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+          gap: 12px;
+        }
+
+        @media (max-width: 700px) {
+          .mt-kpis { grid-template-columns: repeat(2, 1fr); }
+          .mt-tabs { width: 100%; }
+          .mt-tab { flex: 1; justify-content: center; padding: 0 12px; }
+        }
+
+        @media (max-width: 420px) {
+          .mt-kpis { grid-template-columns: 1fr; }
+        }
+      `}</style>
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   SUB-COMPONENTS
-   ═══════════════════════════════════════════════════════════════ */
-
-function Kpi({
-  icon: Icon, label, value, accent, highlight = false,
-}: {
-  icon: LucideIcon;
+// ── KPI Tile ──
+function KpiTile({ label, value, suffix, tone, icon }: {
   label: string;
-  value: string;
-  accent: string;
-  highlight?: boolean;
+  value: number | string;
+  suffix?: string;
+  tone: 'ink' | 'ok' | 'amber' | 'emerald';
+  icon: React.ReactNode;
 }) {
+  const accent = { ink: '#0a0a0a', ok: '#0a7a47', amber: '#b4820b', emerald: '#0a7a47' }[tone];
   return (
-    <div
-      className="px-4 py-4 sm:px-5 sm:py-5 relative"
-      style={{
-        borderColor: C.border,
-        background: highlight ? `linear-gradient(180deg, ${accent}06 0%, transparent 100%)` : 'transparent',
-      }}
-    >
-      <div className="flex items-center justify-between mb-2 sm:mb-3">
-        <span
-          className="text-[9.5px] font-bold uppercase tracking-[0.16em]"
-          style={{ color: C.textMuted }}
-        >
-          {label}
-        </span>
-        <Icon className="h-3.5 w-3.5" style={{ color: accent }} strokeWidth={2.25} />
+    <div className="k-tile">
+      <div className="k-rail" />
+      <div className="k-head">
+        <span className="k-icon">{icon}</span>
+        <span className="k-label">{label}</span>
       </div>
-      <div
-        className="text-[24px] sm:text-[28px] font-black leading-none tracking-tight"
-        style={{ color: C.text, fontFamily: 'var(--font-display)' }}
-      >
-        {value}
+      <div className="k-value">
+        <span className="k-number">{typeof value === 'number' ? value.toLocaleString('tr-TR') : value}</span>
+        {suffix && <span className="k-suffix">{suffix}</span>}
       </div>
+      <style jsx>{`
+        .k-tile {
+          position: relative;
+          padding: 16px 18px 16px 22px;
+          background: #ffffff;
+          border-radius: 12px;
+          border: 1px solid #ebe7df;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        }
+        .k-rail {
+          position: absolute;
+          left: 0;
+          top: 12px;
+          bottom: 12px;
+          width: 3px;
+          background: ${accent};
+          border-radius: 0 2px 2px 0;
+        }
+        .k-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+        .k-icon { display: inline-flex; color: ${accent}; opacity: 0.7; }
+        .k-label {
+          font-family: var(--font-display, system-ui);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #6b6a63;
+        }
+        .k-value { display: flex; align-items: baseline; gap: 3px; }
+        .k-number {
+          font-family: var(--font-editorial, serif);
+          font-size: 28px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 48, 'SOFT' 50;
+          color: #0a0a0a;
+          line-height: 1;
+          font-variant-numeric: tabular-nums;
+          letter-spacing: -0.02em;
+        }
+        .k-suffix {
+          font-family: var(--font-display, system-ui);
+          font-size: 12px;
+          color: #8a8578;
+        }
+      `}</style>
     </div>
   );
 }
 
-function Section({
-  title, count, accent, delay = 0, children,
-}: {
+// ── Section wrapper ──
+function Section({ title, count, accent, children }: {
   title: string;
   count: number;
   accent: string;
-  delay?: number;
   children: React.ReactNode;
 }) {
   return (
-    <section className="mb-7 sm:mb-9">
-      <BlurFade delay={delay}>
-        <div className="flex items-baseline gap-3 mb-3 sm:mb-4">
-          <span
-            aria-hidden
-            className="block w-1 h-5 rounded-full"
-            style={{ background: accent }}
-          />
-          <h2
-            className="text-[15px] sm:text-[17px] font-black tracking-tight"
-            style={{ color: C.text }}
-          >
-            {title}
-          </h2>
-          <span
-            className="text-[11px] font-mono font-bold rounded-full px-2 py-0.5"
-            style={{ background: C.bg, color: C.textMuted, border: `1px solid ${C.border}` }}
-          >
-            {count}
-          </span>
-        </div>
-      </BlurFade>
+    <section className="s-root">
+      <div className="s-head">
+        <span className="s-rail" style={{ background: accent }} />
+        <h2 className="s-title">{title}</h2>
+        <span className="s-count">{count.toString().padStart(2, '0')}</span>
+      </div>
       {children}
+      <style jsx>{`
+        .s-root { display: flex; flex-direction: column; gap: 12px; }
+        .s-head { display: flex; align-items: center; gap: 10px; }
+        .s-rail { width: 3px; height: 18px; border-radius: 2px; }
+        .s-title {
+          font-family: var(--font-editorial, serif);
+          font-size: 18px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 32, 'SOFT' 50;
+          color: #0a0a0a;
+          letter-spacing: -0.015em;
+          margin: 0;
+        }
+        .s-count {
+          font-family: var(--font-display, system-ui);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          color: #8a8578;
+          font-variant-numeric: tabular-nums;
+        }
+      `}</style>
     </section>
   );
 }
 
-function ActiveCard({ training: t }: { training: Training }) {
+// ── Active Card ──
+function ActiveCard({ training: t, delay = 0 }: { training: Training; delay?: number }) {
   const Icon = categoryIcon(t.category);
   const isUrgent = t.daysLeft !== undefined && t.daysLeft <= 3;
   const isStarted = t.status === 'in_progress' || t.progress > 0;
   const isFailedRetry = t.status === 'failed';
-  const accent = isFailedRetry ? C.warning : isUrgent ? C.error : isStarted ? C.accent : C.primary;
+  const accent = isFailedRetry ? '#b4820b' : isUrgent ? '#b3261e' : isStarted ? '#2c55b8' : '#0a0a0a';
   const status = statusLabel[t.status as StatusKey] ?? t.status;
+  const chip = statusChip[t.status as StatusKey] ?? statusChip.assigned;
+  const { day, month } = splitDate(t.deadline);
 
   return (
     <Link
       href={`/staff/my-trainings/${t.id}`}
-      className="block group rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-      style={{ ['--tw-ring-color' as string]: accent }}
-      aria-label={`${t.title} eğitimi · Durum: ${status} · Kategori: ${t.category || 'Genel'}${isUrgent ? ` · Son ${t.daysLeft} gün` : ''}`}
+      className="ac-link"
+      aria-label={`${t.title} · ${status}${isUrgent ? ` · Son ${t.daysLeft} gün` : ''}`}
+      style={{ animationDelay: `${delay}ms` }}
     >
-      <article
-        className="relative overflow-hidden rounded-xl transition-[transform,box-shadow] duration-300 group-hover:-translate-y-0.5 group-active:translate-y-0"
-        style={{
-          background: C.surface,
-          border: `1px solid ${C.border}`,
-          boxShadow: '0 1px 2px rgba(2,36,31,0.04)',
-        }}
-      >
-        {/* Sol triyaj şeridi — status'a göre renk */}
-        <span
-          aria-hidden
-          className="absolute left-0 top-0 bottom-0 w-1"
-          style={{ background: accent }}
-        />
+      <article className="ac-card" style={{ ['--ac-accent' as string]: accent }}>
+        <span className="ac-rail" />
 
-        {/* İçerik — mobile vertical, sm+ horizontal */}
-        <div className="pl-4 pr-4 py-4 sm:pl-5 sm:pr-5 sm:py-5">
-          {/* Top meta row */}
-          <div className="flex items-center gap-2 mb-2.5 flex-wrap">
-            <span
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em]"
-              style={{ background: `${accent}15`, color: accent }}
-            >
-              <span
-                className="w-1 h-1 rounded-full"
-                style={{ background: accent }}
-                aria-hidden
-              />
+        <div className="ac-date" aria-hidden>
+          <span className="ac-date-month">{month}</span>
+          <span className="ac-date-day">{day}</span>
+        </div>
+
+        <div className="ac-body">
+          <div className="ac-meta">
+            <span className="ac-chip" style={{ background: chip.bg, color: chip.text }}>
+              <span className="ac-chip-dot" style={{ background: chip.dot }} />
               {status}
             </span>
-            <span className="text-[10.5px] font-bold uppercase tracking-[0.12em]" style={{ color: C.textMuted }}>
-              {t.category || 'Genel'}
-            </span>
+            <span className="ac-category">{t.category || 'Genel'}</span>
             {isUrgent && (
-              <span
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold"
-                style={{ background: C.errorBg, color: C.error }}
-              >
+              <span className="ac-urgent">
                 <Flame className="h-2.5 w-2.5" />
                 Son {t.daysLeft} gün
               </span>
             )}
           </div>
 
-          {/* Title row — icon + title side by side */}
-          <div className="flex items-start gap-3 mb-3">
-            <div
-              className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-lg"
-              style={{
-                background: `${accent}10`,
-                border: `1px solid ${accent}25`,
-              }}
-            >
-              <Icon className="h-5 w-5" style={{ color: accent }} strokeWidth={1.75} />
-            </div>
-            <div className="min-w-0 flex-1 pt-0.5">
-              <h3
-                className="text-[14px] sm:text-[15px] font-black leading-[1.25] tracking-tight"
-                style={{ color: C.text }}
-              >
-                {t.title}
-              </h3>
-              <p className="text-[11px] mt-0.5 font-mono" style={{ color: C.textMuted }}>
-                <CalendarDays className="inline h-3 w-3 -mt-0.5 mr-1" />
-                Bitiş: <span style={{ color: isUrgent ? C.error : C.text, fontWeight: 700 }}>{t.deadline || '—'}</span>
-              </p>
-            </div>
+          <div className="ac-title-row">
+            <span className="ac-icon">
+              <Icon className="h-4 w-4" />
+            </span>
+            <h3 className="ac-title">{t.title}</h3>
           </div>
 
-          {/* Progress bar — sadece progress > 0 ise */}
           {isStarted && (
-            <div className="mb-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: C.textMuted }}>
-                  İlerleme
-                </span>
-                <span className="text-[11px] font-mono font-bold" style={{ color: accent }}>
-                  %{t.progress}
-                </span>
+            <div className="ac-progress">
+              <div className="ac-progress-bar">
+                <div className="ac-progress-fill" style={{ width: `${t.progress}%` }} />
               </div>
-              <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: C.border }}>
-                <div
-                  className="h-full rounded-full transition-[width] duration-700"
-                  style={{ width: `${t.progress}%`, background: accent }}
-                />
-              </div>
+              <span className="ac-progress-num">{t.progress}%</span>
             </div>
           )}
 
-          {/* Stats grid + CTA — bottom (mobile: wrap CTA below if cramped) */}
-          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
-            <dl className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-x-4 text-[11px] font-mono" style={{ color: C.textMuted }}>
-              <div className="flex items-center gap-1">
-                <Hash className="h-3 w-3" />
-                <span style={{ color: C.text, fontWeight: 700 }}>{Math.max(t.attempt, 1)}</span>/{t.maxAttempts}
+          <dl className="ac-stats">
+            <div>
+              <dt><Hash className="h-3 w-3" /></dt>
+              <dd><strong>{Math.max(t.attempt, 1)}</strong>/{t.maxAttempts}</dd>
+            </div>
+            {t.examOnly ? (
+              <div>
+                <dt><Clock className="h-3 w-3" /></dt>
+                <dd><strong>{t.examDurationMinutes ?? '—'}</strong>dk</dd>
               </div>
-              {t.examOnly ? (
-                <div className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  <span style={{ color: C.text, fontWeight: 700 }}>{t.examDurationMinutes ?? '—'}</span>dk
-                </div>
-              ) : t.daysLeft !== undefined ? (
-                <div className="flex items-center gap-1">
-                  <Target className="h-3 w-3" />
-                  <span style={{ color: isUrgent ? C.error : C.text, fontWeight: 700 }}>{t.daysLeft}</span>g kaldı
-                </div>
-              ) : t.questionCount ? (
-                <div className="flex items-center gap-1">
-                  <ClipboardCheck className="h-3 w-3" />
-                  <span style={{ color: C.text, fontWeight: 700 }}>{t.questionCount}</span> soru
-                </div>
-              ) : null}
-            </dl>
-            <span
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg px-4 min-h-11 min-w-11 text-[12.5px] font-bold transition-colors"
-              style={{
-                background: accent,
-                color: '#ffffff',
-                boxShadow: `0 1px 0 ${accent}40`,
-              }}
-              aria-hidden
-            >
-              <Play className="h-3.5 w-3.5" fill="currentColor" />
-              <span>{isStarted || isFailedRetry ? 'Devam' : 'Başla'}</span>
-              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
-            </span>
-          </div>
+            ) : t.daysLeft !== undefined ? (
+              <div>
+                <dt><Target className="h-3 w-3" /></dt>
+                <dd><strong style={{ color: isUrgent ? '#b3261e' : undefined }}>{t.daysLeft}</strong>g kaldı</dd>
+              </div>
+            ) : t.questionCount ? (
+              <div>
+                <dt><ClipboardCheck className="h-3 w-3" /></dt>
+                <dd><strong>{t.questionCount}</strong> soru</dd>
+              </div>
+            ) : null}
+            <div className="ac-deadline-meta">
+              <dt><CalendarDays className="h-3 w-3" /></dt>
+              <dd><strong>{t.deadline || '—'}</strong></dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="ac-cta">
+          <Play className="h-3.5 w-3.5" fill="currentColor" />
+          <span>{isStarted || isFailedRetry ? 'Devam' : 'Başla'}</span>
+          <ArrowRight className="h-3.5 w-3.5 ac-cta-arrow" />
         </div>
       </article>
+
+      <style jsx>{`
+        .ac-link {
+          display: block;
+          text-decoration: none;
+          opacity: 0;
+          animation: ac-in 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes ac-in {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .ac-card {
+          position: relative;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          align-items: center;
+          gap: 18px;
+          padding: 16px 20px 16px 24px;
+          background: #ffffff;
+          border: 1px solid #ebe7df;
+          border-radius: 14px;
+          overflow: hidden;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(10, 10, 10, 0.02);
+          transition: border-color 200ms ease, transform 260ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms ease;
+        }
+        .ac-card:hover {
+          border-color: var(--ac-accent);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(10, 10, 10, 0.05);
+        }
+        .ac-rail {
+          position: absolute;
+          left: 0; top: 0; bottom: 0;
+          width: 3px;
+          background: var(--ac-accent);
+        }
+
+        .ac-date {
+          width: 48px;
+          height: 52px;
+          border-radius: 10px;
+          background: #faf8f2;
+          border: 1px solid #ebe7df;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          flex-shrink: 0;
+        }
+        .ac-date-month {
+          font-family: var(--font-display, system-ui);
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          color: #8a8578;
+        }
+        .ac-date-day {
+          font-family: var(--font-editorial, serif);
+          font-size: 20px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 32, 'SOFT' 50;
+          color: #0a0a0a;
+          line-height: 1;
+          font-variant-numeric: tabular-nums;
+          letter-spacing: -0.02em;
+        }
+
+        .ac-body { min-width: 0; }
+
+        .ac-meta {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+          flex-wrap: wrap;
+        }
+        .ac-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 3px 9px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+        .ac-chip-dot { width: 5px; height: 5px; border-radius: 50%; }
+        .ac-category {
+          font-family: var(--font-display, system-ui);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #8a8578;
+        }
+        .ac-urgent {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 7px;
+          border-radius: 999px;
+          background: #fdf5f2;
+          color: #b3261e;
+          font-size: 10px;
+          font-weight: 700;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .ac-title-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+        .ac-icon {
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
+          background: #faf8f2;
+          color: var(--ac-accent);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .ac-title {
+          font-family: var(--font-editorial, serif);
+          font-size: 16px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 28, 'SOFT' 50;
+          color: #0a0a0a;
+          letter-spacing: -0.01em;
+          line-height: 1.25;
+          margin: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+        }
+
+        .ac-progress { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .ac-progress-bar {
+          flex: 1;
+          max-width: 200px;
+          height: 4px;
+          background: #ebe7df;
+          border-radius: 2px;
+          overflow: hidden;
+        }
+        .ac-progress-fill {
+          height: 100%;
+          background: var(--ac-accent);
+          transition: width 800ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .ac-progress-num {
+          font-family: var(--font-mono, monospace);
+          font-size: 11px;
+          color: #6b6a63;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .ac-stats {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          margin: 0;
+          flex-wrap: wrap;
+        }
+        .ac-stats > div {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 11px;
+          color: #6b6a63;
+          margin: 0;
+        }
+        .ac-stats dt { display: inline-flex; align-items: center; color: #8a8578; margin: 0; }
+        .ac-stats dd { display: inline; margin: 0; font-variant-numeric: tabular-nums; }
+        .ac-stats strong {
+          font-family: var(--font-editorial, serif);
+          font-weight: 500;
+          color: #0a0a0a;
+          font-size: 12px;
+        }
+
+        .ac-cta {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          height: 40px;
+          padding: 0 16px;
+          border-radius: 999px;
+          background: var(--ac-accent);
+          color: #fafaf7;
+          font-family: var(--font-display, system-ui);
+          font-size: 12px;
+          font-weight: 600;
+          flex-shrink: 0;
+          transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .ac-cta-arrow { transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1); }
+        .ac-card:hover .ac-cta-arrow { transform: translateX(2px); }
+
+        @media (max-width: 640px) {
+          .ac-card {
+            grid-template-columns: auto 1fr;
+            grid-template-rows: auto auto;
+            padding: 14px 16px 14px 20px;
+            gap: 12px 14px;
+          }
+          .ac-cta {
+            grid-column: 1 / -1;
+            justify-content: center;
+            width: 100%;
+          }
+          .ac-deadline-meta { display: none; }
+        }
+
+        @media (max-width: 420px) {
+          .ac-title { font-size: 15px; }
+          .ac-progress-bar { max-width: 100%; }
+        }
+      `}</style>
     </Link>
   );
 }
 
-function CompletedCard({ training: t }: { training: Training }) {
+// ── Completed Card ──
+function CompletedCard({ training: t, delay = 0 }: { training: Training; delay?: number }) {
   const Icon = categoryIcon(t.category);
   const score = t.score ?? 0;
-  const scoreColor = score >= 85 ? C.success : score >= 70 ? C.primary : score >= 60 ? C.accent : C.error;
-  const scoreTier = score >= 95 ? 'Mükemmel' : score >= 85 ? 'Yüksek' : score >= 70 ? 'İyi' : score >= 60 ? 'Orta' : 'Düşük';
   const isTop = score >= 95;
+  const scoreTier = score >= 95 ? 'Mükemmel' : score >= 85 ? 'Yüksek' : score >= 70 ? 'İyi' : score >= 60 ? 'Orta' : 'Düşük';
 
   return (
     <Link
       href={`/staff/my-trainings/${t.id}`}
-      className="block group rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-      style={{ ['--tw-ring-color' as string]: C.primary }}
-      aria-label={`${t.title} eğitimi · Tamamlandı · Skor: %${score} (${scoreTier})`}
+      className="cc-link"
+      aria-label={`${t.title} · Tamamlandı · %${score} (${scoreTier})`}
+      style={{ animationDelay: `${delay}ms` }}
     >
-      <article
-        className="rounded-xl p-4 sm:p-5 h-full flex flex-col transition-[transform,box-shadow,border-color] duration-300 group-hover:-translate-y-0.5"
-        style={{
-          background: C.surface,
-          border: `1px solid ${isTop ? `${C.success}40` : C.border}`,
-          boxShadow: isTop
-            ? `0 4px 14px -8px ${C.success}50, 0 1px 0 rgba(0,0,0,0.02)`
-            : '0 1px 2px rgba(2,36,31,0.04)',
-        }}
-      >
-        {/* Header row */}
-        <div className="flex items-start justify-between gap-2 mb-4">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
-            style={{ background: C.successBg }}
-          >
-            <Icon className="h-4 w-4" style={{ color: C.success }} strokeWidth={2} />
+      <article className={`cc-card ${isTop ? 'cc-card-top' : ''}`}>
+        <div className="cc-top">
+          <div className="cc-icon">
+            <Icon className="h-4 w-4" />
           </div>
-          <div className="text-right">
-            <div className="flex items-center justify-end gap-1.5">
-              {isTop && <Award className="h-3.5 w-3.5" style={{ color: C.accent }} aria-hidden />}
-              <span
-                className="text-[22px] font-black leading-none font-mono"
-                style={{ color: scoreColor }}
-                aria-hidden
-              >
-                %{score}
-              </span>
+          <div className="cc-score">
+            <div className="cc-score-value">
+              {isTop && <Award className="h-3.5 w-3.5" aria-hidden />}
+              <span>{score}</span>
+              <span className="cc-score-pct">%</span>
             </div>
-            <span
-              className="text-[9px] font-bold uppercase tracking-[0.16em] mt-0.5 block"
-              style={{ color: scoreColor }}
-              aria-hidden
-            >
-              {scoreTier}
-            </span>
+            <span className="cc-score-tier">{scoreTier}</span>
           </div>
         </div>
 
-        {/* Title */}
-        <h4
-          className="text-[13.5px] font-black leading-[1.3] tracking-tight mb-2 line-clamp-2 flex-1"
-          style={{ color: C.text }}
-        >
-          {t.title}
-        </h4>
+        <h4 className="cc-title">{t.title}</h4>
 
-        {/* Meta */}
-        <div className="flex items-center gap-2 text-[10.5px] font-mono mb-3" style={{ color: C.textMuted }}>
-          <span className="font-bold uppercase tracking-[0.12em]">{t.category || 'Genel'}</span>
-          {t.deadline && (
-            <>
-              <span aria-hidden>·</span>
-              <span>{t.deadline}</span>
-            </>
-          )}
+        <div className="cc-meta">
+          <span className="cc-category">{t.category || 'Genel'}</span>
+          {t.deadline && <span className="cc-dot">·</span>}
+          {t.deadline && <span className="cc-date">{t.deadline}</span>}
         </div>
 
-        {/* Skor barı */}
-        <div className="w-full h-[3px] rounded-full overflow-hidden mb-3" style={{ background: C.border }}>
-          <div
-            className="h-full rounded-full transition-[width] duration-1000"
-            style={{ width: `${score}%`, background: scoreColor }}
-          />
+        <div className="cc-bar">
+          <div className="cc-bar-fill" style={{ width: `${score}%` }} />
         </div>
 
-        {/* CTA */}
-        <div
-          className="flex items-center justify-between text-[11.5px] font-bold pt-2"
-          style={{ borderTop: `1px solid ${C.border}`, color: C.textMuted }}
-        >
-          <span>Detayları Görüntüle</span>
-          <ChevronRight
-            className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
-            style={{ color: C.primary }}
-          />
+        <div className="cc-foot">
+          <span>Detayları Gör</span>
+          <ChevronRight className="h-3.5 w-3.5" />
         </div>
       </article>
+
+      <style jsx>{`
+        .cc-link {
+          display: block;
+          text-decoration: none;
+          opacity: 0;
+          animation: cc-in 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes cc-in {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .cc-card {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          padding: 18px 20px;
+          background: #ffffff;
+          border: 1px solid #ebe7df;
+          border-radius: 14px;
+          transition: border-color 200ms ease, transform 260ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms ease;
+          height: 100%;
+        }
+        .cc-card:hover {
+          border-color: #0a7a47;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(10, 122, 71, 0.08);
+        }
+        .cc-card-top {
+          border-color: #c8e6d5;
+          background: linear-gradient(180deg, #f7fcf8 0%, #ffffff 100%);
+        }
+
+        .cc-top {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        .cc-icon {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          background: #eaf6ef;
+          color: #0a7a47;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .cc-score { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .cc-score-value {
+          display: flex;
+          align-items: baseline;
+          gap: 2px;
+          font-family: var(--font-editorial, serif);
+          font-size: 26px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 48, 'SOFT' 50;
+          color: #0a7a47;
+          line-height: 1;
+          font-variant-numeric: tabular-nums;
+          letter-spacing: -0.02em;
+        }
+        .cc-score-value :global(svg) { color: #b4820b; align-self: center; margin-right: 2px; }
+        .cc-score-pct {
+          font-family: var(--font-display, system-ui);
+          font-size: 13px;
+          color: #6b6a63;
+        }
+        .cc-score-tier {
+          font-family: var(--font-display, system-ui);
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #0a7a47;
+        }
+
+        .cc-title {
+          font-family: var(--font-editorial, serif);
+          font-size: 15px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 28, 'SOFT' 50;
+          color: #0a0a0a;
+          letter-spacing: -0.005em;
+          line-height: 1.3;
+          margin: 0;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          flex: 1;
+        }
+
+        .cc-meta {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          color: #6b6a63;
+          font-variant-numeric: tabular-nums;
+        }
+        .cc-category {
+          font-family: var(--font-display, system-ui);
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          font-size: 10px;
+          color: #8a8578;
+        }
+        .cc-dot { color: #c8c2b0; }
+
+        .cc-bar {
+          height: 3px;
+          background: #ebe7df;
+          border-radius: 2px;
+          overflow: hidden;
+        }
+        .cc-bar-fill {
+          height: 100%;
+          background: #0a7a47;
+          transition: width 1000ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .cc-foot {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-top: 10px;
+          border-top: 1px dashed #ebe7df;
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          font-weight: 500;
+          color: #6b6a63;
+        }
+        .cc-foot :global(svg) {
+          color: #0a7a47;
+          transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .cc-card:hover .cc-foot :global(svg) { transform: translateX(2px); }
+      `}</style>
     </Link>
   );
 }
 
-function ArchiveCard({
-  training: t,
-  variant,
-}: {
+// ── Archive Card (failed/locked) ──
+function ArchiveCard({ training: t, variant, delay = 0 }: {
   training: Training;
   variant: 'failed' | 'locked';
+  delay?: number;
 }) {
+  const Icon = categoryIcon(t.category);
   const isLocked = variant === 'locked';
-  const accent = isLocked ? C.accent : C.error;
-  const accentBg = isLocked ? C.accentLt : C.errorBg;
+  const accent = isLocked ? '#b4820b' : '#b3261e';
+  const accentBg = isLocked ? '#fef6e7' : '#fdf5f2';
   const StateIcon = isLocked ? Lock : AlertOctagon;
   const stateLabel = isLocked ? 'Eğitim Kilitlendi' : 'Haklar Tükendi';
   const description = isLocked
-    ? 'Bu eğitim yönetici tarafından kilitlenmiştir. Detaylar için akademik birim yöneticinize başvurunuz.'
-    : `Bu eğitim için tanımlanan ${t.maxAttempts} deneme hakkının tamamı kullanılmıştır. Ek deneme hakkı için akademik birim yöneticinize başvurunuz.`;
+    ? 'Yönetici tarafından kilitlenmiştir. Akademik birime başvurunuz.'
+    : `${t.maxAttempts} deneme hakkının tamamı kullanıldı. Ek hak için yöneticinize başvurunuz.`;
 
   return (
     <Link
       href={`/staff/my-trainings/${t.id}`}
-      className="block group rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-      style={{ ['--tw-ring-color' as string]: accent }}
-      aria-label={`${t.title} eğitimi · ${stateLabel}`}
+      className="av-link"
+      style={{ animationDelay: `${delay}ms`, ['--av-accent' as string]: accent, ['--av-bg' as string]: accentBg }}
     >
-      <article
-        className="relative overflow-hidden rounded-xl p-4 sm:p-5 h-full transition-[transform,box-shadow] duration-300 group-hover:-translate-y-0.5"
-        style={{
-          background: C.surface,
-          border: `1px solid ${C.border}`,
-          boxShadow: '0 1px 2px rgba(2,36,31,0.04)',
-        }}
-      >
-        {/* Sol triyaj şeridi */}
-        <span
-          aria-hidden
-          className="absolute left-0 top-0 bottom-0 w-1"
-          style={{ background: accent }}
-        />
-
-        <div className="pl-3 sm:pl-4">
-          <div className="flex items-start gap-3 mb-3">
-            <div
-              className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center"
-              style={{ background: accentBg }}
-            >
-              <StateIcon className="h-4.5 w-4.5" style={{ color: accent }} strokeWidth={2} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h4
-                className="text-[14px] font-black leading-[1.25] tracking-tight mb-0.5 line-clamp-2"
-                style={{ color: C.text }}
-              >
-                {t.title}
-              </h4>
-              <span
-                className="text-[10px] font-bold uppercase tracking-[0.16em]"
-                style={{ color: accent }}
-              >
-                {stateLabel}
-              </span>
-            </div>
-            {!isLocked && t.score !== undefined && (
-              <div className="text-right shrink-0 hidden sm:block">
-                <div
-                  className="text-[18px] font-black font-mono leading-none"
-                  style={{ color: C.error }}
-                >
-                  %{t.score ?? 0}
-                </div>
-                <div className="text-[8.5px] font-bold uppercase tracking-[0.14em] mt-0.5" style={{ color: C.textMuted }}>
-                  Son skor
-                </div>
-              </div>
-            )}
+      <article className="av-card">
+        <span className="av-rail" />
+        <div className="av-head">
+          <div className="av-icon">
+            <StateIcon className="h-4 w-4" />
           </div>
-
-          <p className="text-[12px] leading-relaxed mb-3" style={{ color: C.textMuted }}>
-            {description}
-          </p>
-
-          <div
-            className="flex items-center justify-between text-[11px] font-mono pt-3"
-            style={{ borderTop: `1px solid ${C.border}` }}
-          >
-            <span style={{ color: C.textMuted }}>
-              {isLocked ? (t.category || 'Genel') : `Son tarih: ${t.deadline || '—'}`}
-            </span>
-            <span
-              className="inline-flex items-center gap-1 font-bold transition-transform duration-200 group-hover:translate-x-0.5"
-              style={{ color: accent }}
-              aria-hidden
-            >
-              Yöneticiye Başvur
-              <ArrowRight className="h-3 w-3" />
-            </span>
+          <div className="av-head-body">
+            <h4 className="av-title">{t.title}</h4>
+            <span className="av-state">{stateLabel}</span>
           </div>
+          {!isLocked && t.score !== undefined && (
+            <div className="av-score">
+              <span className="av-score-value">{t.score ?? 0}%</span>
+              <span className="av-score-label">Son skor</span>
+            </div>
+          )}
+        </div>
+
+        <p className="av-desc">
+          <span className="av-desc-icon"><Icon className="h-3 w-3" /></span>
+          {description}
+        </p>
+
+        <div className="av-foot">
+          <span className="av-foot-meta">
+            {isLocked ? (t.category || 'Genel') : `Son tarih: ${t.deadline || '—'}`}
+          </span>
+          <span className="av-foot-cta">
+            Yöneticiye Başvur
+            <ArrowRight className="h-3 w-3" />
+          </span>
         </div>
       </article>
+
+      <style jsx>{`
+        .av-link {
+          display: block;
+          text-decoration: none;
+          opacity: 0;
+          animation: av-in 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes av-in {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .av-card {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          padding: 18px 20px 16px 24px;
+          background: #ffffff;
+          border: 1px solid #ebe7df;
+          border-radius: 14px;
+          overflow: hidden;
+          transition: border-color 200ms ease, transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .av-card:hover {
+          border-color: var(--av-accent);
+          transform: translateY(-1px);
+        }
+        .av-rail {
+          position: absolute;
+          left: 0; top: 0; bottom: 0;
+          width: 3px;
+          background: var(--av-accent);
+        }
+
+        .av-head {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+        }
+        .av-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: var(--av-bg);
+          color: var(--av-accent);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .av-head-body { flex: 1; min-width: 0; }
+        .av-title {
+          font-family: var(--font-editorial, serif);
+          font-size: 15px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 28;
+          color: #0a0a0a;
+          letter-spacing: -0.005em;
+          line-height: 1.3;
+          margin: 0 0 3px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        .av-state {
+          font-family: var(--font-display, system-ui);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--av-accent);
+        }
+        .av-score { text-align: right; flex-shrink: 0; }
+        .av-score-value {
+          display: block;
+          font-family: var(--font-editorial, serif);
+          font-size: 18px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 32, 'SOFT' 50;
+          color: var(--av-accent);
+          line-height: 1;
+          font-variant-numeric: tabular-nums;
+        }
+        .av-score-label {
+          font-family: var(--font-display, system-ui);
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #8a8578;
+          margin-top: 3px;
+        }
+
+        .av-desc {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          font-size: 12px;
+          color: #6b6a63;
+          line-height: 1.55;
+          margin: 0;
+        }
+        .av-desc-icon {
+          flex-shrink: 0;
+          margin-top: 2px;
+          color: #8a8578;
+        }
+
+        .av-foot {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-top: 10px;
+          border-top: 1px dashed #ebe7df;
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          font-variant-numeric: tabular-nums;
+        }
+        .av-foot-meta { color: #8a8578; }
+        .av-foot-cta {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          color: var(--av-accent);
+          font-weight: 600;
+          transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .av-card:hover .av-foot-cta { transform: translateX(2px); }
+
+        @media (max-width: 520px) {
+          .av-score { display: none; }
+        }
+      `}</style>
     </Link>
   );
 }
 
-/* ─────────────────────────────────────────────────────────────
-   SKELETON — sayfa-spesifik shimmer placeholder.
-   PageLoading global spinner yerine layout'u koruyarak yükle.
-   ───────────────────────────────────────────────────────────── */
+// ── Skeleton ──
 function TrainingsSkeleton() {
   return (
-    <div
-      role="status"
-      aria-busy="true"
-      aria-label="Eğitimler yükleniyor"
-      className="pb-24 sm:pb-8 motion-safe:animate-pulse"
-      style={{ fontFamily: 'var(--font-display), system-ui, sans-serif' }}
-    >
-      {/* Header */}
-      <div className="mb-5 sm:mb-7">
-        <div className="h-3 w-32 rounded mb-3" style={{ background: C.border }} />
-        <div className="h-9 w-56 rounded mb-2" style={{ background: C.border }} />
-        <div className="h-3 w-72 max-w-full rounded" style={{ background: C.border }} />
+    <div role="status" aria-busy="true" aria-label="Eğitimler yükleniyor" className="skel-page">
+      <div className="skel-header">
+        <div className="skel skel-bar-sm" style={{ width: 110 }} />
+        <div className="skel skel-title" />
+        <div className="skel skel-sub" />
       </div>
 
-      {/* KPI strip */}
-      <div
-        className="mb-5 sm:mb-7 rounded-2xl overflow-hidden grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0"
-        style={{ background: C.surface, border: `1px solid ${C.border}`, borderColor: C.border }}
-      >
+      <div className="skel-kpis">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="px-4 py-4 sm:px-5 sm:py-5">
-            <div className="h-2.5 w-20 rounded mb-3" style={{ background: C.border }} />
-            <div className="h-7 w-16 rounded" style={{ background: C.border }} />
+          <div key={i} className="skel-kpi">
+            <div className="skel skel-bar-sm" style={{ width: '60%' }} />
+            <div className="skel skel-bar-lg" />
           </div>
         ))}
       </div>
 
-      {/* Tab strip */}
-      <div className="flex gap-3 mb-5 sm:mb-7" style={{ borderBottom: `1px solid ${C.border}` }}>
-        <div className="h-11 w-28 rounded-t" style={{ background: C.border }} />
-        <div className="h-11 w-24 rounded-t" style={{ background: C.bg }} />
-      </div>
+      <div className="skel skel-tabs" />
 
-      {/* Active card skeletons */}
-      <div className="mb-7">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-1 h-5 rounded-full" style={{ background: C.border }} />
-          <div className="h-4 w-32 rounded" style={{ background: C.border }} />
-        </div>
-        <div className="space-y-2.5">
+      <div className="skel-section">
+        <div className="skel skel-bar-sm" style={{ width: 80 }} />
+        <div className="skel-cards">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="rounded-xl p-4 sm:p-5"
-              style={{ background: C.surface, border: `1px solid ${C.border}` }}
-            >
-              <div className="flex gap-3 mb-3">
-                <div className="h-10 w-10 rounded-lg shrink-0" style={{ background: C.border }} />
-                <div className="flex-1">
-                  <div className="h-3 w-2/3 rounded mb-2" style={{ background: C.border }} />
-                  <div className="h-2.5 w-1/3 rounded" style={{ background: C.border }} />
-                </div>
-                <div className="h-11 w-24 rounded-lg shrink-0" style={{ background: C.border }} />
-              </div>
-              <div className="h-1 w-full rounded-full" style={{ background: C.border }} />
-            </div>
+            <div key={i} className="skel-card" />
           ))}
         </div>
       </div>
 
       <span className="sr-only">Eğitimler yükleniyor, lütfen bekleyin.</span>
+
+      <style jsx>{`
+        .skel-page {
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+          animation: skel-pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes skel-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.55; }
+        }
+        .skel { background: #ebe7df; border-radius: 6px; }
+        .skel-bar-sm { height: 10px; }
+        .skel-bar-lg { height: 28px; width: 60%; border-radius: 4px; }
+        .skel-title { height: 44px; width: 220px; margin: 10px 0; }
+        .skel-sub { height: 12px; width: 320px; max-width: 90%; }
+        .skel-header { padding-bottom: 20px; border-bottom: 1px solid #ebe7df; }
+        .skel-kpis {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+        }
+        .skel-kpi {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          padding: 18px;
+          border: 1px solid #ebe7df;
+          border-radius: 12px;
+          background: #ffffff;
+        }
+        .skel-tabs { height: 48px; width: 260px; border-radius: 999px; }
+        .skel-section { display: flex; flex-direction: column; gap: 12px; }
+        .skel-cards { display: flex; flex-direction: column; gap: 10px; }
+        .skel-card {
+          height: 120px;
+          border-radius: 14px;
+          background: #ffffff;
+          border: 1px solid #ebe7df;
+        }
+        @media (max-width: 700px) {
+          .skel-kpis { grid-template-columns: repeat(2, 1fr); }
+        }
+      `}</style>
     </div>
   );
 }

@@ -73,11 +73,14 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   serverExternalPackages: ["remotion", "@remotion/cli"],
-  // macOS: Desktop iCloud-synced; build output iCloud sync tetiklemesin.
-  // Vercel (CI): .next'te kalır (Vercel build environment). Local: /tmp'e yaz.
-  // Next 16.2+ Turbopack distDir'in project içinde olmasını zorunlu kılıyor (projectPath dışına çıkılamıyor).
-  // macOS iCloud sync sorunu için predev script'i provenance temizliyor.
-  distDir: '.next',
+  // macOS iCloud Drive, .nosync suffix'li klasörleri senkronize etmez (Apple dokümante).
+  // Dev+darwin'de distDir'i .next.nosync yapıp iCloud eviction'ı engelliyoruz.
+  // Vercel (Linux + prod) ve CI koşulu geçer, klasik .next kullanılır.
+  // NEXT_DIST_DIR env override'ı isteğe bağlı (ör. RAM disk testi için).
+  distDir: process.env.NEXT_DIST_DIR ??
+    (process.env.NODE_ENV === 'development' && process.platform === 'darwin'
+      ? '.next.nosync'
+      : '.next'),
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.supabase.co' },
@@ -86,7 +89,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     proxyClientMaxBodySize: '512mb',
-    optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion', 'date-fns', '@tanstack/react-table', '@tiptap/react'],
+    optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion', 'date-fns', '@tanstack/react-table', '@tiptap/react', 'react-pdf'],
   },
   redirects: async () => [
     {
@@ -154,9 +157,23 @@ const nextConfig: NextConfig = {
   ],
 };
 
-export default withSentryConfig(withPWA(nextConfig), {
-  silent: true,
-  sourcemaps: {
-    deleteSourcemapsAfterUpload: true,
-  },
-});
+const finalConfig = withPWA(nextConfig);
+
+// Sentry webpack wrapper dev mode'da `reactComponentAnnotation` babel transform'u
+// uzerinden her React component'e source-location enjekte eder; buyuk client
+// component'lerde (1000+ satir) her compile'da ussel yavaslamaya yol acar.
+// Prod gozlemlenebilirlik icin hâlâ production build'de tam aktif.
+export default process.env.NODE_ENV === 'development'
+  ? finalConfig
+  : withSentryConfig(finalConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: !process.env.CI,
+      widenClientFileUpload: true,
+      tunnelRoute: '/monitoring',
+      reactComponentAnnotation: { enabled: true },
+      sourcemaps: { deleteSourcemapsAfterUpload: true },
+      automaticVercelMonitors: false,
+      disableLogger: true,
+    });

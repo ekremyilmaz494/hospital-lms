@@ -36,7 +36,9 @@
     "**/*.mts",
     "/tmp/hospital-lms-next/types/**/*.ts",
     "/tmp/hospital-lms-next/dev/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    ".next.nosync/types/**/*.ts",
+    ".next.nosync/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
