@@ -1,18 +1,19 @@
 'use client';
 
+/**
+ * Profilim — "Clinical Editorial" redesign.
+ * Notifications + Calendar + SMG ile aynı dil: cream + ink + gold + mono caps + serif display.
+ * Hero identity + numaralı bölüm mimarisi (I. Bilgiler · II. Güvenlik · III. 2FA · IV. Bildirimler).
+ */
+
 import { useState, useEffect, useRef } from 'react';
 import {
-  User, Mail, Phone, Building2, Shield, Camera, Save, Eye, EyeOff,
-  CheckCircle2, AlertTriangle, Calendar, Award, BookOpen, FileText,
-  Lock, Loader2, Briefcase, Bell, BellOff,
+  Mail, Phone, Building2, Shield, Camera, Eye, EyeOff,
+  CheckCircle2, AlertTriangle, Award, BookOpen, FileText,
+  Lock, Loader2, Bell, BellOff, Briefcase,
 } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
-import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
 interface ProfileData {
@@ -36,12 +37,69 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
 }
 
+/* ─── Editorial palette ─── */
+const INK = '#0a1628';
+const INK_SOFT = '#5b6478';
+const CREAM = '#faf7f2';
+const RULE = '#e5e0d5';
+const GOLD = '#c9a961';
+const OLIVE = '#1a3a28';
+
 export default function ProfilePage() {
   const { toast } = useToast();
   const { fullName, initials } = useAuth();
   const { data: profile, isLoading, error, refetch } = useFetch<ProfileData>('/api/staff/profile');
-
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+
+  /* Cream theme cascade */
+  useEffect(() => {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const el = main as HTMLElement;
+    const prevBg = el.style.backgroundColor;
+    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
+    el.style.backgroundColor = CREAM;
+    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
+    return () => {
+      el.style.backgroundColor = prevBg;
+      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
+      else el.style.removeProperty('--color-bg-rgb');
+    };
+  }, []);
+
+  useEffect(() => {
+    if (profile) {
+      setFirstName(profile.firstName ?? '');
+      setLastName(profile.lastName ?? '');
+      setPhone(profile.phone ?? '');
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    setPushSupported(true);
+    if (Notification.permission === 'granted') {
+      navigator.serviceWorker.ready
+        .then(reg => reg.pushManager.getSubscription())
+        .then(sub => { if (sub) setPushEnabled(true); })
+        .catch(() => {});
+    }
+  }, []);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -57,108 +115,12 @@ export default function ProfilePage() {
     try {
       const formData = new FormData();
       formData.append('avatar', file);
-      const res = await fetch('/api/staff/profile', {
-        method: 'PATCH',
-        body: formData,
-      });
+      const res = await fetch('/api/staff/profile', { method: 'PATCH', body: formData });
       if (!res.ok) throw new Error('Yükleme başarısız');
       toast('Fotoğraf güncellendi', 'success');
       refetch();
     } catch {
       toast('Fotoğraf yüklenemedi', 'error');
-    }
-  };
-
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
-
-  // ── Push Bildirimleri ──
-  const [pushSupported, setPushSupported] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
-
-  // Initialize form when profile data arrives
-  useEffect(() => {
-    if (profile) {
-      setFirstName(profile.firstName ?? '');
-      setLastName(profile.lastName ?? '');
-      setPhone(profile.phone ?? '');
-    }
-  }, [profile]);
-
-  // Push bildirim desteğini ve mevcut aboneliği kontrol et
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    setPushSupported(true);
-    // Zaten izin verildi mi ve aktif abonelik var mı?
-    if (Notification.permission === 'granted') {
-      navigator.serviceWorker.ready
-        .then(reg => reg.pushManager.getSubscription())
-        .then(sub => { if (sub) setPushEnabled(true); })
-        .catch(() => {});
-    }
-  }, []);
-
-  const handleTogglePush = async () => {
-    if (!pushSupported) return;
-    setPushLoading(true);
-    try {
-      const reg = await navigator.serviceWorker.ready;
-
-      if (pushEnabled) {
-        // Aboneliği iptal et
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-          await fetch('/api/staff/push/unsubscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ endpoint: sub.endpoint }),
-          });
-          await sub.unsubscribe();
-        }
-        setPushEnabled(false);
-        toast('Anlık bildirimler devre dışı bırakıldı', 'success');
-      } else {
-        // İzin iste
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          toast('Bildirim izni verilmedi. Tarayıcı ayarlarından izin verebilirsiniz.', 'error');
-          return;
-        }
-        // Abone ol
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
-        if (!vapidKey) { toast('Push bildirimleri yapılandırılmamış', 'error'); return; }
-
-        const sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
-        });
-        const json = sub.toJSON();
-        await fetch('/api/staff/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            endpoint: json.endpoint,
-            p256dh: json.keys?.p256dh,
-            auth: json.keys?.auth,
-          }),
-        });
-        setPushEnabled(true);
-        toast('Anlık bildirimler aktif edildi', 'success');
-      }
-    } catch {
-      toast('Bildirim ayarı değiştirilemedi', 'error');
-    } finally {
-      setPushLoading(false);
     }
   };
 
@@ -188,18 +150,12 @@ export default function ProfilePage() {
   };
 
   const handleChangePassword = async () => {
-    if (!currentPassword) {
-      toast('Mevcut şifrenizi girin', 'error');
-      return;
-    }
+    if (!currentPassword) { toast('Mevcut şifrenizi girin', 'error'); return; }
     if (!newPassword || newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
       toast('Şifre en az 8 karakter, bir büyük harf ve bir rakam içermelidir', 'error');
       return;
     }
-    if (newPassword !== confirmPassword) {
-      toast('Yeni şifreler eşleşmiyor', 'error');
-      return;
-    }
+    if (newPassword !== confirmPassword) { toast('Yeni şifreler eşleşmiyor', 'error'); return; }
     setSavingPassword(true);
     try {
       const res = await fetch('/api/staff/profile', {
@@ -212,9 +168,7 @@ export default function ProfilePage() {
         throw new Error(data.error || 'Şifre değiştirilemedi');
       }
       toast('Şifreniz başarıyla güncellendi', 'success');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
     } finally {
@@ -222,81 +176,165 @@ export default function ProfilePage() {
     }
   };
 
-  if (isLoading) return <PageLoading />;
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</div>
-      </div>
-    );
-  }
+  const handleTogglePush = async () => {
+    if (!pushSupported) return;
+    setPushLoading(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (pushEnabled) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch('/api/staff/push/unsubscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+        setPushEnabled(false);
+        toast('Anlık bildirimler devre dışı bırakıldı', 'success');
+      } else {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          toast('Bildirim izni verilmedi. Tarayıcı ayarlarından izin verebilirsiniz.', 'error');
+          return;
+        }
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
+        if (!vapidKey) { toast('Push bildirimleri yapılandırılmamış', 'error'); return; }
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
+        });
+        const json = sub.toJSON();
+        await fetch('/api/staff/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            endpoint: json.endpoint,
+            p256dh: json.keys?.p256dh,
+            auth: json.keys?.auth,
+          }),
+        });
+        setPushEnabled(true);
+        toast('Anlık bildirimler aktif edildi', 'success');
+      }
+    } catch {
+      toast('Bildirim ayarı değiştirilemedi', 'error');
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   const displayName = profile ? `${profile.firstName} ${profile.lastName}` : fullName;
-  const displayInitials = profile ? `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase() : initials;
+  const displayInitials = profile
+    ? `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase()
+    : initials;
   const memberSince = profile?.createdAt
     ? new Date(profile.createdAt).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
     : '';
 
-  const inputClass = 'h-11 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--color-primary)]/20';
-  const inputStyle = { background: 'var(--color-bg)', borderColor: 'var(--color-border)' };
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <BlurFade delay={0}>
-        <div className="flex items-center gap-4">
-          <div
-            className="flex h-12 w-12 items-center justify-center rounded-2xl"
-            style={{
-              background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-              boxShadow: '0 4px 14px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
-            }}
-          >
-            <User className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-              Profilim
-            </h1>
-            <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              Kişisel bilgilerinizi görüntüleyin ve düzenleyin
-            </p>
-          </div>
-        </div>
-      </BlurFade>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px_1fr]">
-        {/* ─── Left: Profile Card ─── */}
-        <div className="space-y-4">
-          <BlurFade delay={0.03}>
-            <div
-              className="rounded-2xl border overflow-hidden"
-              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
+    <div
+      className="relative -mx-4 -my-4 md:-mx-8 md:-my-8 min-h-full"
+      style={{
+        backgroundColor: CREAM,
+        color: INK,
+        fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
+        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(10, 22, 40, 0.035) 1px, transparent 0)',
+        backgroundSize: '24px 24px',
+      }}
+    >
+      <div className="relative px-6 sm:px-10 lg:px-16 pt-8 pb-16 max-w-6xl">
+        {/* ───── Masthead ───── */}
+        <header
+          className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b pb-5"
+          style={{ borderColor: INK }}
+        >
+          <div className="flex items-end gap-4">
+            <p
+              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
             >
-              {/* Banner */}
-              <div
-                className="relative h-24"
-                style={{
-                  background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--brand-800) 60%, #0a3d2e 100%)',
-                }}
-              >
-                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 70% 30%, rgba(255,255,255,0.4) 0%, transparent 50%)' }} />
-              </div>
+              № 04 · Profil
+            </p>
+            <h1
+              className="text-[36px] sm:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
+              style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+            >
+              hesap bilgileri<span style={{ color: GOLD }}>.</span>
+            </h1>
+          </div>
 
-              {/* Avatar + Name */}
-              <div className="relative px-6 pb-6">
-                <div className="relative -mt-12 mb-4">
-                  <Avatar
-                    className="h-24 w-24 ring-4"
-                    style={{ '--tw-ring-color': 'var(--color-surface)' } as React.CSSProperties}
+          {memberSince && (
+            <span
+              className="text-[10px] font-semibold uppercase tracking-[0.14em]"
+              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+            >
+              ÜYE SİCİLİ · {memberSince.toUpperCase()}
+            </span>
+          )}
+        </header>
+
+        <p
+          className="mt-3 text-[12px] uppercase tracking-[0.16em]"
+          style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+        >
+          Kişisel bilgiler · güvenlik · tercihler
+        </p>
+
+        {isLoading ? (
+          <ProfileSkeleton />
+        ) : error ? (
+          <p className="mt-10 text-[13px]" style={{ color: '#b3261e' }}>{error}</p>
+        ) : (
+          <>
+            {/* ───── HERO: Identity ───── */}
+            <section className="mt-10">
+              <div
+                className="grid gap-6 md:gap-8 md:items-center"
+                style={{ gridTemplateColumns: 'max-content minmax(0, 1fr)' }}
+              >
+                {/* Avatar */}
+                <div className="relative inline-block">
+                  <div
+                    className="relative flex items-center justify-center"
+                    style={{
+                      width: 128, height: 128,
+                      backgroundColor: OLIVE,
+                      border: `2px solid ${INK}`,
+                      borderRadius: '4px',
+                    }}
                   >
-                    <AvatarFallback
-                      className="text-2xl font-bold text-white"
-                      style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' }}
-                    >
-                      {displayInitials}
-                    </AvatarFallback>
-                  </Avatar>
+                    {profile?.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={profile.avatarUrl}
+                        alt={displayName}
+                        className="h-full w-full object-cover"
+                        style={{ borderRadius: '2px' }}
+                      />
+                    ) : (
+                      <span
+                        className="text-[44px] font-semibold tracking-[-0.02em]"
+                        style={{
+                          color: CREAM,
+                          fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                        }}
+                      >
+                        {displayInitials}
+                      </span>
+                    )}
+                    {/* Gold corner mark */}
+                    <span
+                      aria-hidden
+                      className="absolute -top-[2px] -right-[2px]"
+                      style={{
+                        width: 14, height: 14,
+                        backgroundColor: GOLD,
+                        border: `2px solid ${INK}`,
+                      }}
+                    />
+                  </div>
                   <input
                     ref={avatarInputRef}
                     type="file"
@@ -305,406 +343,542 @@ export default function ProfilePage() {
                     onChange={handleAvatarUpload}
                   />
                   <button
-                    className="absolute bottom-0 left-16 flex h-11 w-11 sm:h-8 sm:w-8 items-center justify-center rounded-full border-2 shadow-md transition-transform duration-200 hover:scale-110 active:scale-95"
-                    style={{ background: 'var(--color-primary)', borderColor: 'var(--color-surface)', color: 'white' }}
                     onClick={() => avatarInputRef.current?.click()}
-                    aria-label="Profil foto\u011fraf\u0131 y\u00fckle"
+                    aria-label="Profil fotoğrafı yükle"
+                    className="absolute -bottom-1 -right-1 flex items-center justify-center transition-colors"
+                    style={{
+                      width: 32, height: 32,
+                      backgroundColor: CREAM,
+                      color: INK,
+                      border: `1px solid ${INK}`,
+                      borderRadius: '2px',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = INK; e.currentTarget.style.color = CREAM; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = CREAM; e.currentTarget.style.color = INK; }}
                   >
-                    <Camera className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                    <Camera className="h-4 w-4" />
                   </button>
                 </div>
 
-                <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-                  {displayName}
-                </h3>
-                {profile?.title && (
-                  <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
-                    {profile.title}
-                  </p>
-                )}
-                <div className="flex items-center gap-2 mt-2">
-                  {profile?.department && (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                      style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--color-primary)' }} />
-                      {profile.department}
-                    </span>
-                  )}
-                  {memberSince && (
-                    <span className="text-[10px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
-                      {memberSince}&apos;den beri
-                    </span>
-                  )}
-                </div>
-
-                {/* Info rows */}
-                <div className="mt-5 space-y-1">
-                  {[
-                    { icon: Mail, label: 'E-posta', value: profile?.email ?? '' },
-                    { icon: Phone, label: 'Telefon', value: profile?.phone || '—' },
-                    { icon: Building2, label: 'Hastane', value: profile?.hospital ?? '' },
-                  ].map(item => (
-                    <div
-                      key={item.label}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2.5"
-                    >
-                      <div
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                        style={{ background: 'var(--color-bg)' }}
-                      >
-                        <item.icon className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                          {item.label}
-                        </p>
-                        <p className={`text-[13px] font-medium truncate ${'mono' in item && item.mono ? 'font-mono' : ''}`} style={{ color: 'var(--color-text-primary)' }}>
-                          {item.value}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </BlurFade>
-
-          {/* Stats */}
-          <BlurFade delay={0.06}>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Eğitim', value: profile?.stats?.assignments ?? 0, icon: BookOpen, color: 'var(--color-info)' },
-                { label: 'Sınav', value: profile?.stats?.exams ?? 0, icon: FileText, color: 'var(--color-warning)' },
-                { label: 'Sertifika', value: profile?.stats?.certificates ?? 0, icon: Award, color: 'var(--color-success)' },
-              ].map(s => (
-                <div
-                  key={s.label}
-                  className="flex flex-col items-center rounded-xl p-3"
-                  style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
-                >
-                  <div
-                    className="flex h-8 w-8 items-center justify-center rounded-lg mb-1.5"
-                    style={{ background: `${s.color}12` }}
+                {/* Name + title + meta */}
+                <div className="min-w-0">
+                  <p
+                    className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+                    style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
                   >
-                    <s.icon className="h-4 w-4" style={{ color: s.color }} />
-                  </div>
-                  <p className="text-lg font-bold font-mono">{s.value}</p>
-                  <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </BlurFade>
-        </div>
-
-        {/* ─── Right: Edit Forms ─── */}
-        <div className="space-y-5">
-          {/* Personal Info */}
-          <BlurFade delay={0.06}>
-            <div
-              className="rounded-2xl border overflow-hidden"
-              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
-            >
-              <div
-                className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between px-6 py-4"
-                style={{ borderBottom: '1px solid var(--color-border)' }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
-                    <Briefcase className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
-                  </div>
-                  <div>
-                    <h3 className="text-[14px] font-bold">Kişisel Bilgiler</h3>
-                    <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Ad, soyad ve iletişim bilgileriniz</p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleSaveProfile}
-                  disabled={savingProfile}
-                  className="hidden sm:flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-                    boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)',
-                  }}
-                >
-                  {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {savingProfile ? 'Kaydediliyor...' : 'Kaydet'}
-                </button>
-              </div>
-
-              <div className="p-6 space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                      <User className="h-3 w-3" /> Ad
-                    </Label>
-                    <Input
-                      value={firstName}
-                      onChange={e => setFirstName(e.target.value)}
-                      className={inputClass}
-                      style={inputStyle}
-                      placeholder="Adınız"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                      <User className="h-3 w-3" /> Soyad
-                    </Label>
-                    <Input
-                      value={lastName}
-                      onChange={e => setLastName(e.target.value)}
-                      className={inputClass}
-                      style={inputStyle}
-                      placeholder="Soyadınız"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                    <Mail className="h-3 w-3" /> E-posta
-                  </Label>
-                  <Input
-                    value={profile?.email ?? ''}
-                    disabled
-                    className={`${inputClass} cursor-not-allowed`}
-                    style={{ ...inputStyle, background: 'var(--color-surface-hover)', opacity: 0.7 }}
-                  />
-                  <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                    E-posta adresi yönetici tarafından belirlenir
+                    Kayıtlı personel
                   </p>
+                  <h2
+                    className="mt-1 text-[34px] sm:text-[40px] leading-[0.95] font-semibold tracking-[-0.025em]"
+                    style={{
+                      color: INK,
+                      fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                    }}
+                  >
+                    {displayName}
+                  </h2>
+                  {profile?.title && (
+                    <p className="mt-1 text-[14px]" style={{ color: INK_SOFT }}>
+                      {profile.title}
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {profile?.department && (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-semibold tracking-[0.14em] uppercase"
+                        style={{
+                          color: OLIVE,
+                          backgroundColor: '#e8efe9',
+                          fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                        }}
+                      >
+                        <Briefcase className="h-3 w-3" />
+                        {profile.department}
+                      </span>
+                    )}
+                    {profile?.hospital && (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-semibold tracking-[0.14em] uppercase"
+                        style={{
+                          color: INK_SOFT,
+                          backgroundColor: 'rgba(0,0,0,0.03)',
+                          fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                        }}
+                      >
+                        <Building2 className="h-3 w-3" />
+                        {profile.hospital}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                    <Phone className="h-3 w-3" /> Telefon
-                  </Label>
-                  <Input
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    className={inputClass}
-                    style={inputStyle}
-                    placeholder="+90 (___) ___ __ __"
+
+              </div>
+
+              {/* Stats strip — hero altında yatay satır */}
+              <div
+                className="mt-6 grid grid-cols-3"
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${RULE}`,
+                  borderRadius: '4px',
+                }}
+              >
+                <StatPill icon={BookOpen} label="Eğitim" value={profile?.stats?.assignments ?? 0} orientation="horizontal" />
+                <StatPill icon={FileText} label="Sınav" value={profile?.stats?.exams ?? 0} orientation="horizontal" />
+                <StatPill icon={Award} label="Sertifika" value={profile?.stats?.certificates ?? 0} orientation="horizontal" last />
+              </div>
+            </section>
+
+            {/* ───── I. Kişisel bilgiler ───── */}
+            <Section number="I." title="Kişisel bilgiler" subtitle="Ad, soyad ve iletişim bilgilerin">
+              <div
+                className="p-5 sm:p-6"
+                style={{ backgroundColor: '#ffffff', border: `1px solid ${RULE}`, borderRadius: '4px' }}
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <EditorialField label="Ad">
+                    <EditorialInput value={firstName} onChange={setFirstName} placeholder="Adınız" />
+                  </EditorialField>
+                  <EditorialField label="Soyad">
+                    <EditorialInput value={lastName} onChange={setLastName} placeholder="Soyadınız" />
+                  </EditorialField>
+                </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <EditorialField label="E-posta" icon={Mail} locked>
+                    <EditorialInput value={profile?.email ?? ''} onChange={() => {}} disabled />
+                    <p
+                      className="mt-1 text-[10px] uppercase tracking-[0.14em]"
+                      style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                    >
+                      Yönetici tarafından atanır
+                    </p>
+                  </EditorialField>
+                  <EditorialField label="Telefon" icon={Phone}>
+                    <EditorialInput
+                      value={phone}
+                      onChange={setPhone}
+                      placeholder="+90 (___) ___ __ __"
+                    />
+                  </EditorialField>
+                </div>
+                <div
+                  className="mt-6 flex items-center justify-end gap-3 pt-4 border-t"
+                  style={{ borderColor: RULE }}
+                >
+                  <EditorialButton
+                    onClick={handleSaveProfile}
+                    loading={savingProfile}
+                    label={savingProfile ? 'Kaydediliyor' : 'Kaydet'}
                   />
                 </div>
-                {/* Mobile save button — at bottom of form */}
-                <button
-                  onClick={handleSaveProfile}
-                  disabled={savingProfile}
-                  className="flex sm:hidden w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[14px] font-semibold text-white transition-all duration-200 active:scale-[0.98] disabled:opacity-60"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-                    boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)',
-                  }}
-                >
-                  {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {savingProfile ? 'Kaydediliyor...' : 'Kaydet'}
-                </button>
               </div>
-            </div>
-          </BlurFade>
+            </Section>
 
-          {/* Password Change */}
-          <BlurFade delay={0.1}>
-            <div
-              className="rounded-2xl border overflow-hidden"
-              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
-            >
+            {/* ───── II. Şifre değiştir ───── */}
+            <Section number="II." title="Şifre güncelle" subtitle="Hesap güvenliğin için düzenli değiştir">
               <div
-                className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-4"
-                style={{ borderBottom: '1px solid var(--color-border)' }}
+                className="p-5 sm:p-6"
+                style={{ backgroundColor: '#ffffff', border: `1px solid ${RULE}`, borderRadius: '4px' }}
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-warning-bg)' }}>
-                    <Lock className="h-4 w-4" style={{ color: 'var(--color-warning)' }} />
-                  </div>
-                  <div>
-                    <h3 className="text-[14px] font-bold">Şifre Değiştir</h3>
-                    <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Hesap güvenliğiniz için şifrenizi güncelleyin</p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleChangePassword}
-                  disabled={savingPassword || (!currentPassword && !newPassword)}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{
-                    background: (currentPassword && newPassword) ? 'var(--color-warning-bg)' : 'var(--color-bg)',
-                    color: (currentPassword && newPassword) ? 'var(--color-warning)' : 'var(--color-text-muted)',
-                    border: `1px solid ${(currentPassword && newPassword) ? 'var(--color-warning)' : 'var(--color-border)'}`,
-                  }}
-                >
-                  {savingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                  {savingPassword ? 'Güncelleniyor...' : 'Şifreyi Güncelle'}
-                </button>
-              </div>
-
-              <div className="p-6 space-y-5">
-                <div>
-                  <Label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                    <Lock className="h-3 w-3" /> Mevcut Şifre
-                  </Label>
+                <EditorialField label="Mevcut şifre" icon={Lock}>
                   <div className="relative">
-                    <Input
+                    <EditorialInput
                       type={showCurrent ? 'text' : 'password'}
                       value={currentPassword}
-                      onChange={e => setCurrentPassword(e.target.value)}
-                      autoComplete="current-password"
+                      onChange={setCurrentPassword}
                       placeholder="Mevcut şifreniz"
-                      className={`${inputClass} pr-11`}
-                      style={inputStyle}
+                      autoComplete="current-password"
                     />
                     <button
                       type="button"
-                      onClick={() => setShowCurrent(!showCurrent)}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 flex h-11 w-11 sm:h-8 sm:w-8 items-center justify-center rounded-md"
-                      style={{ color: 'var(--color-text-muted)' }}
+                      onClick={() => setShowCurrent(v => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
+                      style={{ color: INK_SOFT }}
                     >
                       {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                      <Lock className="h-3 w-3" /> Yeni Şifre
-                    </Label>
+                </EditorialField>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <EditorialField label="Yeni şifre" icon={Lock}>
                     <div className="relative">
-                      <Input
+                      <EditorialInput
                         type={showNew ? 'text' : 'password'}
                         value={newPassword}
-                        onChange={e => setNewPassword(e.target.value)}
+                        onChange={setNewPassword}
+                        placeholder="En az 8 karakter"
                         autoComplete="new-password"
-                        placeholder="En az 6 karakter"
-                        className={`${inputClass} pr-11`}
-                        style={inputStyle}
                       />
                       <button
                         type="button"
-                        onClick={() => setShowNew(!showNew)}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 flex h-11 w-11 sm:h-8 sm:w-8 items-center justify-center rounded-md"
-                        style={{ color: 'var(--color-text-muted)' }}
+                        onClick={() => setShowNew(v => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
+                        style={{ color: INK_SOFT }}
                       >
                         {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                  </div>
-                  <div>
-                    <Label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                      <Lock className="h-3 w-3" /> Tekrar
-                    </Label>
-                    <Input
+                    <PasswordStrength password={newPassword} />
+                  </EditorialField>
+                  <EditorialField label="Tekrar" icon={Lock}>
+                    <EditorialInput
                       type="password"
                       value={confirmPassword}
-                      onChange={e => setConfirmPassword(e.target.value)}
+                      onChange={setConfirmPassword}
+                      placeholder="Yeni şifreyi tekrar gir"
                       autoComplete="new-password"
-                      placeholder="Yeni şifreyi tekrar girin"
-                      className={inputClass}
-                      style={inputStyle}
                     />
                     {confirmPassword && newPassword && confirmPassword !== newPassword && (
-                      <p className="flex items-center gap-1 text-[10px] mt-1" style={{ color: 'var(--color-error)' }}>
-                        <AlertTriangle className="h-3 w-3" /> Şifreler eşleşmiyor
+                      <p className="mt-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.12em]"
+                        style={{ color: '#b3261e', fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}>
+                        <AlertTriangle className="h-3 w-3" />
+                        Şifreler eşleşmiyor
                       </p>
                     )}
                     {confirmPassword && newPassword && confirmPassword === newPassword && (
-                      <p className="flex items-center gap-1 text-[10px] mt-1" style={{ color: 'var(--color-success)' }}>
-                        <CheckCircle2 className="h-3 w-3" /> Şifreler eşleşiyor
+                      <p className="mt-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.12em]"
+                        style={{ color: '#0a7a47', fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}>
+                        <CheckCircle2 className="h-3 w-3" />
+                        Eşleşiyor
                       </p>
                     )}
-                  </div>
+                  </EditorialField>
+                </div>
+                <div
+                  className="mt-6 flex items-center justify-end gap-3 pt-4 border-t"
+                  style={{ borderColor: RULE }}
+                >
+                  <EditorialButton
+                    onClick={handleChangePassword}
+                    loading={savingPassword}
+                    label={savingPassword ? 'Güncelleniyor' : 'Şifreyi Güncelle'}
+                    disabled={!currentPassword || !newPassword}
+                  />
                 </div>
               </div>
-            </div>
-          </BlurFade>
+            </Section>
 
-          {/* ─── MFA / 2FA ─── */}
-          <BlurFade delay={0.5}>
-            <div className="rounded-2xl border p-7" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-              <div className="mb-5 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--color-info-bg)' }}>
-                  <Shield className="h-5 w-5" style={{ color: 'var(--color-info)' }} />
+            {/* ───── III. 2FA ───── */}
+            <Section number="III." title="İki faktörlü doğrulama" subtitle="Hesabını ek katmanla koru">
+              <div
+                className="grid items-center gap-4 p-5 sm:p-6"
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${RULE}`,
+                  borderRadius: '4px',
+                  gridTemplateColumns: '44px 1fr max-content',
+                }}
+              >
+                <div
+                  className="flex items-center justify-center"
+                  style={{ width: 44, height: 44, backgroundColor: '#eef2fb', borderRadius: '2px' }}
+                >
+                  <Shield className="h-5 w-5" style={{ color: '#2c55b8' }} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>İki Faktörlü Doğrulama (2FA)</h3>
-                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Hesabınızı ek güvenlik katmanıyla koruyun</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between rounded-xl border p-4" style={{ borderColor: 'var(--color-border)' }}>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Authenticator Uygulaması</p>
-                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Google Authenticator veya benzeri uygulama ile 6 haneli kod</p>
+                  <p
+                    className="text-[14px] font-semibold tracking-[-0.01em]"
+                    style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+                  >
+                    Authenticator Uygulaması
+                  </p>
+                  <p className="mt-0.5 text-[12px]" style={{ color: INK_SOFT }}>
+                    Google Authenticator veya benzeri uygulama ile 6 haneli kod.
+                  </p>
                 </div>
                 <a
                   href="/auth/mfa-setup"
-                  className="rounded-lg px-4 py-2 text-sm font-semibold"
-                  style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                  style={{
+                    color: CREAM,
+                    backgroundColor: INK,
+                    borderRadius: '2px',
+                    fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                  }}
                 >
                   Ayarla
+                  <span style={{ color: GOLD }}>→</span>
                 </a>
               </div>
-            </div>
-          </BlurFade>
+            </Section>
 
-          {/* ─── Anlık Bildirimler ─── */}
-          {pushSupported && (
-            <BlurFade delay={0.6}>
-              <div className="rounded-2xl border p-7" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl"
-                    style={{ background: pushEnabled ? 'var(--color-primary-light)' : 'var(--color-surface-hover)' }}>
+            {/* ───── IV. Push ───── */}
+            {pushSupported && (
+              <Section number="IV." title="Anlık bildirimler" subtitle="Yeni atamaları tarayıcından al">
+                <div
+                  className="grid items-center gap-4 p-5 sm:p-6"
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: `1px solid ${RULE}`,
+                    borderRadius: '4px',
+                    gridTemplateColumns: '44px 1fr max-content',
+                  }}
+                >
+                  <div
+                    className="flex items-center justify-center"
+                    style={{
+                      width: 44, height: 44,
+                      backgroundColor: pushEnabled ? '#eaf6ef' : 'rgba(0,0,0,0.04)',
+                      borderRadius: '2px',
+                    }}
+                  >
                     {pushEnabled
-                      ? <Bell className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
-                      : <BellOff className="h-5 w-5" style={{ color: 'var(--color-text-muted)' }} />
-                    }
+                      ? <Bell className="h-5 w-5" style={{ color: '#0a7a47' }} />
+                      : <BellOff className="h-5 w-5" style={{ color: INK_SOFT }} />}
                   </div>
                   <div>
-                    <h3 className="text-base font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>
-                      Anlık Bildirimler
-                    </h3>
-                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      Yeni eğitim ve sınav atamalarında anında haberdar olun
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-xl border p-4"
-                  style={{ borderColor: 'var(--color-border)' }}>
-                  <div>
-                    <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                    <p
+                      className="text-[14px] font-semibold tracking-[-0.01em]"
+                      style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+                    >
                       {pushEnabled ? 'Bildirimler Açık' : 'Bildirimler Kapalı'}
                     </p>
-                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    <p className="mt-0.5 text-[12px]" style={{ color: INK_SOFT }}>
                       {pushEnabled
-                        ? 'Bu cihazda anlık bildirim alıyorsunuz'
-                        : 'Eğitim ve sınav bildirimlerini alın'}
+                        ? 'Bu cihazda anlık bildirim alıyorsun.'
+                        : 'Eğitim ve sınav bildirimlerini aç.'}
                     </p>
                   </div>
-
-                  {/* Toggle switch */}
                   <button
                     onClick={handleTogglePush}
                     disabled={pushLoading}
-                    className="relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors disabled:opacity-50"
-                    style={{ background: pushEnabled ? 'var(--color-primary)' : 'var(--color-border)' }}
+                    className="relative inline-flex items-center shrink-0 transition-colors"
+                    style={{
+                      width: 48, height: 28,
+                      backgroundColor: pushEnabled ? OLIVE : RULE,
+                      borderRadius: '14px',
+                      opacity: pushLoading ? 0.6 : 1,
+                    }}
                     aria-label={pushEnabled ? 'Bildirimleri kapat' : 'Bildirimleri aç'}
                   >
                     <span
-                      className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform"
-                      style={{ transform: pushEnabled ? 'translateX(20px)' : 'translateX(2px)' }}
+                      className="inline-block transition-transform"
+                      style={{
+                        width: 22, height: 22,
+                        backgroundColor: CREAM,
+                        borderRadius: '50%',
+                        transform: pushEnabled ? 'translateX(23px)' : 'translateX(3px)',
+                      }}
                     />
                   </button>
                 </div>
-
-                {Notification.permission === 'denied' && (
-                  <p className="mt-3 flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-warning)' }}>
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                    Tarayıcıda bildirim izni reddedilmiş. Adres çubuğundaki kilit simgesinden izin verebilirsiniz.
+                {typeof window !== 'undefined' && Notification.permission === 'denied' && (
+                  <p
+                    className="mt-2 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em]"
+                    style={{ color: '#b3261e', fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    Tarayıcıda izin reddedilmiş. Adres çubuğundaki kilit simgesinden izin ver.
                   </p>
                 )}
-              </div>
-            </BlurFade>
-          )}
-        </div>
+              </Section>
+            )}
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   Atoms
+   ───────────────────────────────────────────────────── */
+
+function Section({
+  number, title, subtitle, children,
+}: { number: string; title: string; subtitle: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-12">
+      <header
+        className="grid items-end gap-4 pb-3 border-b"
+        style={{ gridTemplateColumns: '40px 1fr', borderColor: RULE }}
+      >
+        <span
+          className="text-[11px] font-semibold tracking-[0.2em]"
+          style={{ color: GOLD, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+        >
+          {number}
+        </span>
+        <div>
+          <h3
+            className="text-[20px] leading-tight font-semibold tracking-[-0.02em]"
+            style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+          >
+            {title}
+          </h3>
+          <p
+            className="mt-0.5 text-[10px] uppercase tracking-[0.16em]"
+            style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+          >
+            {subtitle}
+          </p>
+        </div>
+      </header>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+function StatPill({
+  icon: Icon, label, value, last, orientation = 'vertical',
+}: {
+  icon: typeof BookOpen; label: string; value: number; last?: boolean;
+  orientation?: 'vertical' | 'horizontal';
+}) {
+  const divider = orientation === 'horizontal'
+    ? { borderRight: last ? 'none' : `1px solid ${RULE}` }
+    : { borderBottom: last ? 'none' : `1px solid ${RULE}` };
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3"
+      style={divider}
+    >
+      <div
+        className="flex items-center justify-center shrink-0"
+        style={{ width: 28, height: 28, backgroundColor: CREAM, borderRadius: '2px' }}
+      >
+        <Icon className="h-3.5 w-3.5" style={{ color: INK_SOFT }} />
+      </div>
+      <div className="flex-1 flex items-baseline justify-between gap-2">
+        <span
+          className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+          style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+        >
+          {label}
+        </span>
+        <span
+          className="text-[20px] font-semibold tabular-nums tracking-[-0.02em]"
+          style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+        >
+          {value.toString().padStart(2, '0')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function EditorialField({
+  label, icon: Icon, children, locked,
+}: { label: string; icon?: typeof Mail; children: React.ReactNode; locked?: boolean }) {
+  return (
+    <div>
+      <label
+        className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] mb-1.5"
+        style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+      >
+        {Icon && <Icon className="h-3 w-3" />}
+        {label}
+        {locked && <Lock className="h-2.5 w-2.5 ml-1" />}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function EditorialInput({
+  value, onChange, placeholder, type = 'text', disabled, autoComplete,
+}: {
+  value: string; onChange: (v: string) => void;
+  placeholder?: string; type?: string; disabled?: boolean; autoComplete?: string;
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      disabled={disabled}
+      autoComplete={autoComplete}
+      className="w-full text-[13px] px-3 py-2.5 focus:outline-none focus:ring-0"
+      style={{
+        backgroundColor: disabled ? 'rgba(0,0,0,0.03)' : CREAM,
+        color: disabled ? INK_SOFT : INK,
+        border: `1px solid ${RULE}`,
+        borderRadius: '2px',
+        fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
+        opacity: disabled ? 0.7 : 1,
+        cursor: disabled ? 'not-allowed' : 'text',
+      }}
+    />
+  );
+}
+
+function EditorialButton({
+  onClick, loading, label, disabled,
+}: { onClick: () => void; loading: boolean; label: string; disabled?: boolean }) {
+  const isDisabled = loading || disabled;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={isDisabled}
+      className="inline-flex items-center gap-2 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors"
+      style={{
+        color: CREAM,
+        backgroundColor: isDisabled ? '#6b7280' : INK,
+        borderRadius: '2px',
+        fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+        opacity: isDisabled ? 0.6 : 1,
+        cursor: isDisabled ? 'not-allowed' : 'pointer',
+      }}
+      onMouseEnter={e => { if (!isDisabled) e.currentTarget.style.backgroundColor = OLIVE; }}
+      onMouseLeave={e => { if (!isDisabled) e.currentTarget.style.backgroundColor = INK; }}
+    >
+      {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+      {label}
+      {!loading && <span style={{ color: GOLD }}>→</span>}
+    </button>
+  );
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  if (!password) return null;
+  const checks = {
+    length: password.length >= 8,
+    upper: /[A-Z]/.test(password),
+    digit: /\d/.test(password),
+  };
+  const score = Object.values(checks).filter(Boolean).length;
+  const label = score < 2 ? 'ZAYIF' : score === 2 ? 'ORTA' : 'GÜÇLÜ';
+  const color = score < 2 ? '#b3261e' : score === 2 ? '#b4820b' : '#0a7a47';
+  return (
+    <div className="mt-2">
+      <div
+        className="relative h-[3px] w-full overflow-hidden"
+        style={{ backgroundColor: RULE, borderRadius: '1px' }}
+      >
+        <div
+          className="absolute left-0 top-0 h-full transition-all"
+          style={{
+            width: `${(score / 3) * 100}%`,
+            backgroundColor: color,
+          }}
+        />
+      </div>
+      <p
+        className="mt-1 text-[10px] uppercase tracking-[0.14em] font-semibold"
+        style={{ color, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+      >
+        Güç: {label}
+      </p>
+    </div>
+  );
+}
+
+function ProfileSkeleton() {
+  return (
+    <div className="mt-10 space-y-10">
+      <div className="grid gap-8 md:grid-cols-[auto_1fr_auto] md:items-center">
+        <div style={{ width: 128, height: 128, backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: '4px' }} />
+        <div>
+          <div className="h-3 w-40" style={{ backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: '2px' }} />
+          <div className="mt-3 h-10 w-3/4" style={{ backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: '2px' }} />
+        </div>
+        <div className="h-[160px] w-[180px]" style={{ backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: '4px' }} />
+      </div>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="h-48 w-full" style={{ backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: '4px' }} />
+      ))}
     </div>
   );
 }

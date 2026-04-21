@@ -279,7 +279,7 @@ function TransitionContent() {
           .tr-result {
             min-height: 100vh;
             padding: 32px 20px 60px;
-            background: #f7f4ea;
+            background: #faf7f2;
             position: relative;
             overflow: hidden;
           }
@@ -309,7 +309,7 @@ function TransitionContent() {
           /* ── Score card ── */
           .tr-score-card {
             background: #ffffff;
-            border: 1px solid #ebe7df;
+            border: 1px solid #e5e0d5;
             border-radius: 20px;
             overflow: hidden;
             box-shadow: 0 12px 40px rgba(10, 10, 10, 0.08);
@@ -317,8 +317,8 @@ function TransitionContent() {
           .tr-score-hero {
             padding: 36px 32px 28px;
             text-align: center;
-            background: linear-gradient(135deg, #faf8f2 0%, #f4efdf 100%);
-            border-bottom: 1px solid #ebe7df;
+            background: linear-gradient(135deg, #faf7f2 0%, #f4efdf 100%);
+            border-bottom: 1px solid #e5e0d5;
             position: relative;
             overflow: hidden;
           }
@@ -334,7 +334,7 @@ function TransitionContent() {
             height: 60px;
             border-radius: 999px;
             background: ${isPassed ? '#0a7a47' : '#b3261e'};
-            color: #fafaf7;
+            color: #faf7f2;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -347,15 +347,15 @@ function TransitionContent() {
             font-weight: 600;
             letter-spacing: 0.14em;
             text-transform: uppercase;
-            color: #8a8578;
+            color: #5b6478;
             margin-bottom: 8px;
           }
           .tr-score-title {
-            font-family: var(--font-editorial, serif);
+            font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
             font-size: clamp(26px, 4.5vw, 36px);
             font-weight: 500;
             font-variation-settings: 'opsz' 72, 'SOFT' 50;
-            color: #0a0a0a;
+            color: #0a1628;
             letter-spacing: -0.025em;
             line-height: 1.05;
             margin: 0 0 8px;
@@ -367,7 +367,7 @@ function TransitionContent() {
           }
           .tr-score-subtitle {
             font-size: 13px;
-            color: #6b6a63;
+            color: #5b6478;
             margin: 0;
           }
 
@@ -384,8 +384,8 @@ function TransitionContent() {
           }
           .tr-score-slot {
             padding: 18px 20px;
-            background: #faf8f2;
-            border: 1px solid #ebe7df;
+            background: #faf7f2;
+            border: 1px solid #e5e0d5;
             border-radius: 12px;
             text-align: center;
           }
@@ -396,7 +396,7 @@ function TransitionContent() {
             font-weight: 600;
             letter-spacing: 0.1em;
             text-transform: uppercase;
-            color: #8a8578;
+            color: #5b6478;
             margin-bottom: 8px;
           }
           .tr-slot-value {
@@ -404,11 +404,11 @@ function TransitionContent() {
             align-items: baseline;
             justify-content: center;
             gap: 2px;
-            font-family: var(--font-editorial, serif);
+            font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
             font-size: 38px;
             font-weight: 500;
             font-variation-settings: 'opsz' 72, 'SOFT' 50;
-            color: #0a0a0a;
+            color: #0a1628;
             line-height: 1;
             font-variant-numeric: tabular-nums;
             letter-spacing: -0.03em;
@@ -419,7 +419,7 @@ function TransitionContent() {
           .tr-slot-pct {
             font-family: var(--font-display, system-ui);
             font-size: 14px;
-            color: #8a8578;
+            color: #5b6478;
             font-weight: 500;
             letter-spacing: 0;
           }
@@ -427,7 +427,7 @@ function TransitionContent() {
           .tr-score-bar {
             position: relative;
             height: 8px;
-            background: #ebe7df;
+            background: #e5e0d5;
             border-radius: 4px;
             overflow: visible;
           }
@@ -444,7 +444,7 @@ function TransitionContent() {
             top: -4px;
             bottom: -4px;
             width: 2px;
-            background: #0a0a0a;
+            background: #0a1628;
             border-radius: 1px;
           }
           .tr-score-bar-threshold::after {
@@ -458,7 +458,7 @@ function TransitionContent() {
             font-weight: 600;
             letter-spacing: 0.06em;
             text-transform: uppercase;
-            color: #6b6a63;
+            color: #5b6478;
             white-space: nowrap;
           }
 
@@ -476,10 +476,10 @@ function TransitionContent() {
           }
           .tr-tally-ok { background: #eaf6ef; border-color: #c8e6d5; }
           .tr-tally-err { background: #fdf5f2; border-color: #e9c9c0; }
-          .tr-tally-skip { background: #faf8f2; border-color: #ebe7df; }
+          .tr-tally-skip { background: #faf7f2; border-color: #e5e0d5; }
           .tr-tally-num {
             display: block;
-            font-family: var(--font-editorial, serif);
+            font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
             font-size: 24px;
             font-weight: 500;
             font-variation-settings: 'opsz' 42, 'SOFT' 50;
@@ -489,7 +489,7 @@ function TransitionContent() {
           }
           .tr-tally-ok .tr-tally-num { color: #0a7a47; }
           .tr-tally-err .tr-tally-num { color: #b3261e; }
-          .tr-tally-skip .tr-tally-num { color: #6b6a63; }
+          .tr-tally-skip .tr-tally-num { color: #5b6478; }
           .tr-tally-label {
             display: block;
             margin-top: 4px;
@@ -498,7 +498,7 @@ function TransitionContent() {
             font-weight: 600;
             letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: #8a8578;
+            color: #5b6478;
           }
 
           .tr-notice {
@@ -519,7 +519,7 @@ function TransitionContent() {
           .tr-notice-err { background: #fdf5f2; border-color: #e9c9c0; }
           .tr-notice-err::before { background: #b3261e; }
           .tr-notice h4 {
-            font-family: var(--font-editorial, serif);
+            font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
             font-size: 15px;
             font-weight: 500;
             font-variation-settings: 'opsz' 28;
@@ -551,27 +551,27 @@ function TransitionContent() {
             font-weight: 600;
             border: none;
             cursor: pointer;
-            color: #fafaf7;
+            color: #faf7f2;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 6px 20px rgba(10, 10, 10, 0.12);
             transition: background 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
           }
           .tr-cta-ok { background: #0a7a47; }
           .tr-cta-ok:hover { background: #086338; }
-          .tr-cta-ink { background: #0a0a0a; }
+          .tr-cta-ink { background: #0a1628; }
           .tr-cta-ink:hover { background: #1a1a1a; }
           .tr-cta:active { transform: scale(0.98); }
 
           /* ── Analysis ── */
           .tr-analysis {
             background: #ffffff;
-            border: 1px solid #ebe7df;
+            border: 1px solid #e5e0d5;
             border-radius: 20px;
             overflow: hidden;
           }
           .tr-analysis header {
             padding: 22px 28px;
-            border-bottom: 1px solid #ebe7df;
-            background: #faf8f2;
+            border-bottom: 1px solid #e5e0d5;
+            background: #faf7f2;
           }
           .tr-analysis-eyebrow {
             display: block;
@@ -580,15 +580,15 @@ function TransitionContent() {
             font-weight: 600;
             letter-spacing: 0.14em;
             text-transform: uppercase;
-            color: #8a8578;
+            color: #5b6478;
             margin-bottom: 4px;
           }
           .tr-analysis header h2 {
-            font-family: var(--font-editorial, serif);
+            font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
             font-size: 20px;
             font-weight: 500;
             font-variation-settings: 'opsz' 36, 'SOFT' 50;
-            color: #0a0a0a;
+            color: #0a1628;
             letter-spacing: -0.015em;
             margin: 0;
           }
@@ -601,7 +601,7 @@ function TransitionContent() {
 
           .tr-qa {
             padding: 20px 28px;
-            border-bottom: 1px dashed #ebe7df;
+            border-bottom: 1px dashed #e5e0d5;
           }
           .tr-qa:last-child { border-bottom: none; }
 
@@ -619,21 +619,21 @@ function TransitionContent() {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-family: var(--font-editorial, serif);
+            font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
             font-size: 13px;
-            color: #fafaf7;
+            color: #faf7f2;
             margin-top: 2px;
           }
           .tr-qa-ok .tr-qa-mark { background: #0a7a47; }
           .tr-qa-err .tr-qa-mark { background: #b3261e; }
-          .tr-qa-skip .tr-qa-mark { background: #8a8578; }
+          .tr-qa-skip .tr-qa-mark { background: #5b6478; }
 
           .tr-qa-text {
-            font-family: var(--font-editorial, serif);
+            font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
             font-size: 15px;
             font-weight: 500;
             font-variation-settings: 'opsz' 28;
-            color: #0a0a0a;
+            color: #0a1628;
             line-height: 1.45;
             margin: 0;
             flex: 1;
@@ -644,7 +644,7 @@ function TransitionContent() {
             font-size: 10px;
             font-weight: 700;
             letter-spacing: 0.08em;
-            color: #8a8578;
+            color: #5b6478;
             margin-right: 8px;
             font-variant-numeric: tabular-nums;
           }
@@ -665,7 +665,7 @@ function TransitionContent() {
           }
           .tr-qa-row-ok { background: #eaf6ef; border: 1px solid #c8e6d5; }
           .tr-qa-row-err { background: #fdf5f2; border: 1px solid #e9c9c0; }
-          .tr-qa-row-skip { background: #faf8f2; border: 1px dashed #ebe7df; }
+          .tr-qa-row-skip { background: #faf7f2; border: 1px dashed #e5e0d5; }
 
           .tr-qa-row-label {
             font-family: var(--font-display, system-ui);
@@ -677,15 +677,15 @@ function TransitionContent() {
           }
           .tr-qa-row-ok .tr-qa-row-label { color: #0a7a47; }
           .tr-qa-row-err .tr-qa-row-label { color: #b3261e; }
-          .tr-qa-row-label-skip { color: #8a8578; }
+          .tr-qa-row-label-skip { color: #5b6478; }
           .tr-qa-row-text {
             font-size: 13px;
-            color: #0a0a0a;
+            color: #0a1628;
             line-height: 1.45;
           }
           .tr-qa-row-text-skip {
             font-size: 12px;
-            color: #8a8578;
+            color: #5b6478;
             font-style: italic;
           }
 
@@ -736,10 +736,10 @@ function TransitionContent() {
 
         <div className="tr-count-ring-wrap">
           <svg viewBox="0 0 128 128" className="tr-count-ring">
-            <circle cx="64" cy="64" r="54" fill="none" strokeWidth="5" stroke="#ebe7df" />
+            <circle cx="64" cy="64" r="54" fill="none" strokeWidth="5" stroke="#e5e0d5" />
             <circle
               cx="64" cy="64" r="54" fill="none" strokeWidth="5"
-              stroke="#0a0a0a" strokeLinecap="round"
+              stroke="#0a1628" strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={circumference - progress}
               transform="rotate(-90 64 64)"
@@ -771,7 +771,7 @@ function TransitionContent() {
           align-items: center;
           justify-content: center;
           padding: 24px 20px;
-          background: #f7f4ea;
+          background: #faf7f2;
           position: relative;
           overflow: hidden;
         }
@@ -791,7 +791,7 @@ function TransitionContent() {
           max-width: 480px;
           text-align: center;
           background: #ffffff;
-          border: 1px solid #ebe7df;
+          border: 1px solid #e5e0d5;
           border-radius: 20px;
           padding: 36px 32px;
           box-shadow: 0 12px 40px rgba(10, 10, 10, 0.06);
@@ -805,7 +805,7 @@ function TransitionContent() {
           height: 56px;
           border-radius: 999px;
           background: #0a7a47;
-          color: #fafaf7;
+          color: #faf7f2;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -818,22 +818,22 @@ function TransitionContent() {
           font-weight: 600;
           letter-spacing: 0.14em;
           text-transform: uppercase;
-          color: #8a8578;
+          color: #5b6478;
           margin-bottom: 8px;
         }
         .tr-count-title {
-          font-family: var(--font-editorial, serif);
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-size: 28px;
           font-weight: 500;
           font-variation-settings: 'opsz' 56, 'SOFT' 50;
-          color: #0a0a0a;
+          color: #0a1628;
           letter-spacing: -0.02em;
           line-height: 1.1;
           margin: 0 0 6px;
         }
         .tr-count-subtitle {
           font-size: 13px;
-          color: #6b6a63;
+          color: #5b6478;
           margin: 0 0 16px;
         }
 
@@ -843,18 +843,18 @@ function TransitionContent() {
           gap: 6px;
           padding: 6px 14px;
           border-radius: 999px;
-          background: #faf8f2;
-          border: 1px solid #ebe7df;
+          background: #faf7f2;
+          border: 1px solid #e5e0d5;
           font-family: var(--font-display, system-ui);
           font-size: 11px;
-          color: #6b6a63;
+          color: #5b6478;
           margin-bottom: 24px;
         }
         .tr-count-score strong {
-          font-family: var(--font-editorial, serif);
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-size: 14px;
           font-weight: 500;
-          color: #0a0a0a;
+          color: #0a1628;
           font-variant-numeric: tabular-nums;
         }
 
@@ -875,11 +875,11 @@ function TransitionContent() {
           gap: 3px;
         }
         .tr-count-digit > span:first-child {
-          font-family: var(--font-editorial, serif);
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-size: 42px;
           font-weight: 500;
           font-variation-settings: 'opsz' 72, 'SOFT' 50;
-          color: #0a0a0a;
+          color: #0a1628;
           font-variant-numeric: tabular-nums;
           letter-spacing: -0.03em;
           line-height: 1;
@@ -888,7 +888,7 @@ function TransitionContent() {
         .tr-count-unit {
           font-family: var(--font-display, system-ui);
           font-size: 12px;
-          color: #8a8578;
+          color: #5b6478;
           margin-bottom: 6px;
         }
 
@@ -899,7 +899,7 @@ function TransitionContent() {
           gap: 6px;
           font-family: var(--font-display, system-ui);
           font-size: 11px;
-          color: #8a8578;
+          color: #5b6478;
           margin: 0 0 24px;
           font-variant-numeric: tabular-nums;
         }
@@ -912,8 +912,8 @@ function TransitionContent() {
           height: 52px;
           padding: 0 28px;
           border-radius: 999px;
-          background: #0a0a0a;
-          color: #fafaf7;
+          background: #0a1628;
+          color: #faf7f2;
           font-family: var(--font-display, system-ui);
           font-size: 14px;
           font-weight: 600;
@@ -938,7 +938,7 @@ function TransitionContent() {
 export default function TransitionPage() {
   return (
     <Suspense fallback={
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f7f4ea', color: '#6b6a63', fontFamily: 'var(--font-editorial, serif)', fontSize: 16 }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#faf7f2', color: '#5b6478', fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif', fontSize: 16 }}>
         Yükleniyor…
       </div>
     }>

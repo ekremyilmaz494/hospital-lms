@@ -1,11 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+/**
+ * Sertifikalarım — "Clinical Editorial" redesign.
+ * Artifact (navy+gold belge) korundu — page shell editorial dile taşındı.
+ * cream + ink + gold + serif display + mono caps + navy/gold premium artifact.
+ */
+
+import { useEffect, useState } from 'react';
 import {
   Award, Download, CheckCircle2, AlertTriangle, Copy, Eye, X, Archive,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
-import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
 interface Certificate {
@@ -20,7 +25,19 @@ interface Certificate {
   user?: { firstName?: string; lastName?: string; organization?: { name?: string } };
 }
 
-/** Gold medal seal — certificate artifact element */
+/* ─── Editorial palette ─── */
+const INK = '#0a1628';
+const INK_SOFT = '#5b6478';
+const CREAM = '#faf7f2';
+const RULE = '#e5e0d5';
+const GOLD = '#c9a961';
+const NAVY = '#0b1e3f';
+const OLIVE = '#1a3a28';
+
+/* ════════════════════════════════════════════════════════
+   PRESERVED: Gold seal + Certificate artifact (belgenin kendisi)
+   ════════════════════════════════════════════════════════ */
+
 function GoldSeal() {
   const points = 16;
   const outerR = 26;
@@ -49,7 +66,6 @@ function GoldSeal() {
   );
 }
 
-/** Certificate artifact (preserved — this is the printable document) */
 function CertificatePreview({ cert }: { cert: Certificate }) {
   const fullName = cert.user ? `${cert.user.firstName ?? ''} ${cert.user.lastName ?? ''}`.trim() : '';
   const orgLogo = (cert.user?.organization as { logoUrl?: string | null } | undefined)?.logoUrl ?? '/logos/devakent.png';
@@ -58,53 +74,53 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
     ? `${new Date(cert.expiresAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}${cert.isExpired ? ' (Süresi Dolmuş)' : ''}`
     : 'Süresiz';
 
-  const NAVY = '#0b1e3f';
-  const NAVY_DARK = '#06142d';
-  const NAVY_MID = '#16305a';
-  const GOLD = '#c9a961';
-  const GOLD_DARK = '#a5823c';
-  const GOLD_LIGHT = '#e6c88a';
-  const CREAM = '#faf6eb';
+  const ART_NAVY = '#0b1e3f';
+  const ART_NAVY_DARK = '#06142d';
+  const ART_NAVY_MID = '#16305a';
+  const ART_GOLD = '#c9a961';
+  const ART_GOLD_DARK = '#a5823c';
+  const ART_GOLD_LIGHT = '#e6c88a';
+  const ART_CREAM = '#faf6eb';
 
   return (
     <div
       className="relative w-full overflow-hidden select-none"
       style={{
-        background: CREAM,
+        background: ART_CREAM,
         borderRadius: '4px',
         aspectRatio: '1.414 / 1',
         minHeight: '300px',
-        border: `1px solid ${GOLD}`,
+        border: `1px solid ${ART_GOLD}`,
       }}
     >
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-0" style={{ width: '30%', height: '40%' }}>
-          <div className="absolute inset-0" style={{ background: NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
-          <div className="absolute inset-0" style={{ background: NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
-          <div className="absolute inset-0" style={{ background: GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
-          <div className="absolute inset-0" style={{ background: NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
-          <div className="absolute inset-0" style={{ background: GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
         </div>
         <div className="absolute top-0 right-0" style={{ width: '30%', height: '40%', transform: 'scaleX(-1)' }}>
-          <div className="absolute inset-0" style={{ background: NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
-          <div className="absolute inset-0" style={{ background: NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
-          <div className="absolute inset-0" style={{ background: GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
-          <div className="absolute inset-0" style={{ background: NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
-          <div className="absolute inset-0" style={{ background: GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
         </div>
         <div className="absolute bottom-0 left-0" style={{ width: '30%', height: '40%', transform: 'scaleY(-1)' }}>
-          <div className="absolute inset-0" style={{ background: NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
-          <div className="absolute inset-0" style={{ background: NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
-          <div className="absolute inset-0" style={{ background: GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
-          <div className="absolute inset-0" style={{ background: NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
-          <div className="absolute inset-0" style={{ background: GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
         </div>
         <div className="absolute bottom-0 right-0" style={{ width: '30%', height: '40%', transform: 'scale(-1, -1)' }}>
-          <div className="absolute inset-0" style={{ background: NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
-          <div className="absolute inset-0" style={{ background: NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
-          <div className="absolute inset-0" style={{ background: GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
-          <div className="absolute inset-0" style={{ background: NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
-          <div className="absolute inset-0" style={{ background: GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY_DARK, clipPath: 'polygon(0 0, 72% 0, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_GOLD, clipPath: 'polygon(72% 0, 82% 0, 0 82%, 0 75%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_NAVY_MID, clipPath: 'polygon(82% 0, 100% 0, 0 100%, 0 82%)' }} />
+          <div className="absolute inset-0" style={{ background: ART_GOLD_LIGHT, clipPath: 'polygon(40% 0, 42% 0, 0 42%, 0 40%)' }} />
         </div>
       </div>
 
@@ -112,24 +128,24 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
         <div className="flex flex-col items-center gap-1 w-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={orgLogo} alt="Hastane Logosu" className="h-10 sm:h-12 object-contain" style={{ maxWidth: '55%' }} />
-          <h1 className="text-[22px] sm:text-[30px] font-bold tracking-[0.05em] mt-1" style={{ color: GOLD_DARK, letterSpacing: '0.08em' }}>
+          <h1 className="text-[22px] sm:text-[30px] font-bold tracking-[0.05em] mt-1" style={{ color: ART_GOLD_DARK, letterSpacing: '0.08em' }}>
             BAŞARI SERTİFİKASI
           </h1>
           <div className="flex items-center gap-2 w-full max-w-[60%] mt-0.5">
-            <div className="flex-1 h-px" style={{ background: GOLD }} />
-            <div className="w-1.5 h-1.5 rotate-45" style={{ background: GOLD }} />
-            <div className="flex-1 h-px" style={{ background: GOLD }} />
+            <div className="flex-1 h-px" style={{ background: ART_GOLD }} />
+            <div className="w-1.5 h-1.5 rotate-45" style={{ background: ART_GOLD }} />
+            <div className="flex-1 h-px" style={{ background: ART_GOLD }} />
           </div>
         </div>
 
         <div className="flex flex-col items-center gap-1 text-center">
           <p className="text-[10px] sm:text-[11px] italic" style={{ color: '#6e737d' }}>Bu sertifika,</p>
           {fullName && (
-            <p className="text-[18px] sm:text-[24px] font-bold tracking-wide uppercase" style={{ color: NAVY, fontFamily: 'system-ui, sans-serif' }}>
+            <p className="text-[18px] sm:text-[24px] font-bold tracking-wide uppercase" style={{ color: ART_NAVY, fontFamily: 'system-ui, sans-serif' }}>
               {fullName}
             </p>
           )}
-          <p className="text-[11px] sm:text-[13px] font-semibold max-w-[70%] leading-tight" style={{ color: NAVY_MID }}>
+          <p className="text-[11px] sm:text-[13px] font-semibold max-w-[70%] leading-tight" style={{ color: ART_NAVY_MID }}>
             {cert.training.title}
           </p>
           <p className="text-[9px] sm:text-[10px]" style={{ color: '#232837' }}>
@@ -141,23 +157,23 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
               Geçerlilik Tarihi: <span className="font-semibold">{expiryLabel}</span>
             </div>
             {cert.score != null && (
-              <div style={{ color: GOLD_DARK }} className="font-bold mt-0.5">Sınav Puanı: %{cert.score}</div>
+              <div style={{ color: ART_GOLD_DARK }} className="font-bold mt-0.5">Sınav Puanı: %{cert.score}</div>
             )}
           </div>
         </div>
 
         <div className="w-full flex items-end justify-between px-2" style={{ fontFamily: 'system-ui, sans-serif' }}>
           <div className="flex flex-col items-center gap-0.5" style={{ width: '28%' }}>
-            <div className="h-px w-full" style={{ background: NAVY }} />
-            <span className="text-[9px] font-bold" style={{ color: NAVY }}>Yetkili İmza</span>
+            <div className="h-px w-full" style={{ background: ART_NAVY }} />
+            <span className="text-[9px] font-bold" style={{ color: ART_NAVY }}>Yetkili İmza</span>
             <span className="text-[7px]" style={{ color: '#6e737d' }}>Official</span>
           </div>
           <div className="flex flex-col items-center -mb-1">
             <GoldSeal />
           </div>
           <div className="flex flex-col items-center gap-0.5" style={{ width: '28%' }}>
-            <div className="h-px w-full" style={{ background: NAVY }} />
-            <span className="text-[9px] font-bold" style={{ color: NAVY }}>Eğitmen İmza</span>
+            <div className="h-px w-full" style={{ background: ART_NAVY }} />
+            <span className="text-[9px] font-bold" style={{ color: ART_NAVY }}>Eğitmen İmza</span>
             <span className="text-[7px]" style={{ color: '#6e737d' }}>Mühür</span>
           </div>
         </div>
@@ -169,12 +185,32 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
   );
 }
 
+/* ════════════════════════════════════════════════════════
+   Page
+   ════════════════════════════════════════════════════════ */
+
 export default function StaffCertificatesPage() {
   const { toast } = useToast();
   const { data: rawData, isLoading, error } = useFetch<{ certificates: Certificate[]; total: number }>('/api/staff/certificates');
   const data = rawData?.certificates ?? null;
   const [selected, setSelected] = useState<Certificate | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+
+  /* Cream theme cascade */
+  useEffect(() => {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const el = main as HTMLElement;
+    const prevBg = el.style.backgroundColor;
+    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
+    el.style.backgroundColor = CREAM;
+    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
+    return () => {
+      el.style.backgroundColor = prevBg;
+      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
+      else el.style.removeProperty('--color-bg-rgb');
+    };
+  }, []);
 
   const handleDownloadPDF = async (cert: Certificate) => {
     setPdfLoading(true);
@@ -198,202 +234,296 @@ export default function StaffCertificatesPage() {
     }
   };
 
-  if (isLoading) return <PageLoading />;
-
-  if (error) {
-    return (
-      <div className="cp-err">
-        <div className="cp-err-icon"><AlertTriangle className="h-6 w-6" /></div>
-        <h2>Sertifikalar yüklenemedi</h2>
-        <p>{error}</p>
-        <style>{`
-          .cp-err { min-height: 50vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; gap: 10px; max-width: 420px; margin: 0 auto; }
-          .cp-err-icon { width: 56px; height: 56px; border-radius: 999px; background: #fdf5f2; color: #b3261e; display: flex; align-items: center; justify-content: center; }
-          .cp-err h2 { font-family: var(--font-editorial, serif); font-size: 20px; color: #0a0a0a; margin: 0; }
-          .cp-err p { font-size: 13px; color: #6b6a63; margin: 0; }
-        `}</style>
-      </div>
-    );
-  }
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code).then(() => toast('Sertifika kodu kopyalandı', 'success'));
+  };
 
   const certificates = data ?? [];
   const active = certificates.filter(c => !c.isExpired).length;
   const expired = certificates.length - active;
 
-  const copyCode = (code: string) => {
-    navigator.clipboard.writeText(code).then(() => toast('Sertifika kodu kopyalandı', 'success'));
-  };
-
   return (
-    <div className="cp-page">
-      {/* ═══════ Editorial Header ═══════ */}
-      <header className="cp-header">
-        <span className="cp-eyebrow">Başarı Arşivi</span>
-        <h1 className="cp-title">
-          <em>Sertifikalarım</em>
-        </h1>
-        <div className="cp-summary">
-          <span><strong>{certificates.length.toString().padStart(2, '0')}</strong> toplam</span>
-          <span className="cp-summary-sep">·</span>
-          <span><strong className="cp-summary-ok">{active.toString().padStart(2, '0')}</strong> aktif</span>
-          {expired > 0 && (
-            <>
-              <span className="cp-summary-sep">·</span>
-              <span><strong className="cp-summary-err">{expired.toString().padStart(2, '0')}</strong> süresi dolmuş</span>
-            </>
-          )}
-        </div>
-      </header>
-
-      {/* ═══════ Certificates Grid ═══════ */}
-      {certificates.length > 0 ? (
-        <div className="cp-grid">
-          {certificates.map((cert, i) => {
-            const issued = new Date(cert.issuedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
-            return (
-              <article
-                key={cert.id}
-                className={`cp-card ${cert.isExpired ? 'cp-card-expired' : ''}`}
-                style={{ animationDelay: `${i * 35}ms` }}
-              >
-                <span className="cp-card-rail" />
-
-                <header className="cp-card-head">
-                  <div className="cp-seal-wrap">
-                    <div className="cp-seal">
-                      <Award className="h-5 w-5" />
-                    </div>
-                  </div>
-                  {cert.isExpired ? (
-                    <span className="cp-chip cp-chip-err">
-                      <AlertTriangle className="h-3 w-3" />
-                      Süresi Dolmuş
-                    </span>
-                  ) : (
-                    <span className="cp-chip cp-chip-ok">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Aktif
-                    </span>
-                  )}
-                </header>
-
-                <h2 className="cp-card-title">{cert.training.title}</h2>
-
-                <div className="cp-card-tags">
-                  {cert.training.category && (
-                    <span className="cp-tag">{cert.training.category}</span>
-                  )}
-                  {cert.training.isArchived && (
-                    <span className="cp-tag cp-tag-archived" title="Bu eğitim artık aktif değil — sertifikanız geçerliliğini korur">
-                      <Archive className="h-2.5 w-2.5" />
-                      Arşivlendi
-                    </span>
-                  )}
-                </div>
-
-                <dl className="cp-metrics">
-                  <div>
-                    <dt>Puan</dt>
-                    <dd>
-                      <strong>{cert.score}</strong>
-                      <span>%</span>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Tarih</dt>
-                    <dd className="cp-metric-date">
-                      <strong>{issued}</strong>
-                    </dd>
-                  </div>
-                </dl>
-
-                <div className="cp-code-row">
-                  <span className="cp-code-label">Kod</span>
-                  <code className="cp-code">{cert.certificateCode}</code>
-                  <button
-                    onClick={() => copyCode(cert.certificateCode)}
-                    aria-label="Kopyala"
-                    className="cp-copy-btn"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                <div className="cp-card-actions">
-                  <button
-                    onClick={() => setSelected(cert)}
-                    className="cp-act cp-act-ghost"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    <span>Önizle</span>
-                  </button>
-                  <button
-                    disabled={pdfLoading}
-                    onClick={() => handleDownloadPDF(cert)}
-                    className="cp-act cp-act-primary"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    <span>{pdfLoading ? 'İndiriliyor…' : 'İndir'}</span>
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="cp-empty">
-          <div className="cp-empty-icon">
-            <Award className="h-7 w-7" />
+    <div
+      className="relative -mx-4 -my-4 md:-mx-8 md:-my-8 min-h-full"
+      style={{
+        backgroundColor: CREAM,
+        color: INK,
+        fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
+        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(10, 22, 40, 0.035) 1px, transparent 0)',
+        backgroundSize: '24px 24px',
+      }}
+    >
+      <div className="relative px-6 sm:px-10 lg:px-16 pt-5 pb-16">
+        {/* ───── Masthead ───── */}
+        <header
+          className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 pb-5"
+          style={{ borderBottom: `3px solid ${INK}` }}
+        >
+          <div className="flex items-end gap-4">
+            <p
+              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+            >
+              № 03 · Sertifikalar
+            </p>
+            <h1
+              className="text-[36px] sm:text-[48px] leading-[0.95] font-semibold tracking-[-0.025em]"
+              style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+            >
+              başarı arşivi<span style={{ color: GOLD }}>.</span>
+            </h1>
           </div>
-          <span className="cp-eyebrow">Boş</span>
-          <h2>Henüz sertifikan yok</h2>
-          <p>Eğitimleri başarıyla tamamladığında sertifikaların burada arşivlenecek.</p>
-        </div>
-      )}
+
+          <div className="flex items-center gap-4 sm:gap-6">
+            <SummaryStat label="Toplam" value={certificates.length} tone={INK} />
+            <span className="h-8 w-px" style={{ backgroundColor: RULE }} />
+            <SummaryStat label="Aktif" value={active} tone={OLIVE} />
+            {expired > 0 && (
+              <>
+                <span className="h-8 w-px" style={{ backgroundColor: RULE }} />
+                <SummaryStat label="Süresi dolmuş" value={expired} tone="#b3261e" />
+              </>
+            )}
+          </div>
+        </header>
+
+        <p
+          className="mt-3 text-[12px] uppercase tracking-[0.16em]"
+          style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+        >
+          Tamamladığın eğitimlerin resmi belgeleri · PDF olarak indirilebilir
+        </p>
+
+        {isLoading ? (
+          <CertificatesSkeleton />
+        ) : error ? (
+          <div
+            className="mt-10 grid items-start gap-4 p-5"
+            style={{
+              gridTemplateColumns: '6px 44px 1fr',
+              backgroundColor: '#fdf5f2',
+              borderTop: `1px solid #e9c9c0`,
+              borderRight: `1px solid #e9c9c0`,
+              borderBottom: `1px solid #e9c9c0`,
+              borderRadius: '4px',
+            }}
+          >
+            <span style={{ backgroundColor: '#b3261e', alignSelf: 'stretch', borderRadius: '2px' }} />
+            <div
+              className="flex items-center justify-center"
+              style={{ width: 44, height: 44, backgroundColor: '#b3261e', borderRadius: '2px' }}
+            >
+              <AlertTriangle className="h-5 w-5" style={{ color: CREAM }} />
+            </div>
+            <div>
+              <p
+                className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: '#b3261e', fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+              >
+                Yükleme hatası
+              </p>
+              <p className="mt-1 text-[14px]" style={{ color: '#7a1d14' }}>{error}</p>
+            </div>
+          </div>
+        ) : certificates.length === 0 ? (
+          <div
+            className="mt-10 flex flex-col items-center justify-center text-center px-6 py-20"
+            style={{
+              border: `1px dashed ${GOLD}`,
+              borderRadius: '4px',
+              backgroundColor: 'rgba(201, 169, 97, 0.04)',
+            }}
+          >
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: 56, height: 56,
+                backgroundColor: NAVY,
+                border: `2px solid ${GOLD}`,
+                borderRadius: '2px',
+              }}
+            >
+              <Award style={{ width: 24, height: 24, color: GOLD }} />
+            </div>
+            <p
+              className="mt-4 text-[11px] font-semibold uppercase tracking-[0.2em]"
+              style={{ color: GOLD, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+            >
+              Boş arşiv
+            </p>
+            <p
+              className="mt-2 text-[20px] font-semibold tracking-[-0.01em]"
+              style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+            >
+              Henüz sertifikan yok
+            </p>
+            <p className="mt-1 max-w-md text-[13px]" style={{ color: INK_SOFT }}>
+              Eğitimleri başarıyla tamamladığında sertifikaların bu arşivde görünecek.
+            </p>
+          </div>
+        ) : (
+          <section className="mt-10">
+            <header
+              className="grid items-end gap-4 pb-3"
+              style={{ gridTemplateColumns: '40px 1fr max-content', borderBottom: `3px solid ${GOLD}` }}
+            >
+              <span
+                className="text-[13px] font-semibold tracking-[0.2em]"
+                style={{ color: GOLD, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+              >
+                §
+              </span>
+              <div>
+                <h2
+                  className="text-[22px] leading-tight font-semibold tracking-[-0.02em]"
+                  style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+                >
+                  Belge arşivi
+                </h2>
+                <p
+                  className="mt-0.5 text-[10px] uppercase tracking-[0.16em]"
+                  style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                >
+                  Kronolojik sıra — en yeni üstte
+                </p>
+              </div>
+              <span
+                className="text-[11px] font-semibold tabular-nums"
+                style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+              >
+                [{certificates.length.toString().padStart(2, '0')}]
+              </span>
+            </header>
+
+            <div
+              className="mt-5 grid gap-4"
+              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+            >
+              {certificates.map((cert, i) => (
+                <CertificateCard
+                  key={cert.id}
+                  cert={cert}
+                  index={i + 1}
+                  pdfLoading={pdfLoading}
+                  onPreview={() => setSelected(cert)}
+                  onDownload={() => handleDownloadPDF(cert)}
+                  onCopy={() => copyCode(cert.certificateCode)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
 
       {/* ═══════ Preview Modal ═══════ */}
       {selected && (
-        <div className="cp-modal" onClick={() => setSelected(null)}>
-          <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
-            <header className="cp-modal-head">
-              <div className="cp-modal-head-title">
-                <Award className="h-4 w-4" />
-                <span>Sertifika Önizlemesi</span>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(6, 16, 33, 0.72)', backdropFilter: 'blur(6px)' }}
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="relative w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: CREAM,
+              border: `1px solid ${INK}`,
+              borderRadius: '4px',
+              boxShadow: '0 20px 60px rgba(6, 16, 33, 0.4)',
+            }}
+          >
+            <header
+              className="flex items-center justify-between px-5 py-3"
+              style={{ borderBottom: `2px solid ${INK}` }}
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className="flex items-center justify-center"
+                  style={{
+                    width: 32, height: 32,
+                    backgroundColor: NAVY,
+                    border: `1px solid ${GOLD}`,
+                    borderRadius: '2px',
+                  }}
+                >
+                  <Award className="h-4 w-4" style={{ color: GOLD }} />
+                </span>
+                <div>
+                  <p
+                    className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+                    style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                  >
+                    № {selected.certificateCode.slice(-6).toUpperCase()}
+                  </p>
+                  <h3
+                    className="text-[16px] font-semibold tracking-[-0.01em]"
+                    style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+                  >
+                    Sertifika önizlemesi
+                  </h3>
+                </div>
               </div>
               <button
                 onClick={() => setSelected(null)}
                 aria-label="Kapat"
-                className="cp-modal-close"
+                className="flex items-center justify-center"
+                style={{
+                  width: 32, height: 32,
+                  color: INK_SOFT,
+                  border: `1px solid ${RULE}`,
+                  borderRadius: '2px',
+                }}
               >
                 <X className="h-4 w-4" />
               </button>
             </header>
 
-            <div className="cp-modal-body">
+            <div className="flex-1 overflow-auto p-5 sm:p-8" style={{ backgroundColor: CREAM }}>
               <CertificatePreview cert={selected} />
             </div>
 
-            <footer className="cp-modal-foot">
+            <footer
+              className="flex items-center justify-end gap-2 px-5 py-3"
+              style={{ borderTop: `1px solid ${RULE}`, backgroundColor: 'rgba(10, 22, 40, 0.02)' }}
+            >
               <button
                 onClick={() => setSelected(null)}
-                className="cp-act cp-act-ghost"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                style={{
+                  color: INK,
+                  border: `1px solid ${INK}`,
+                  borderRadius: '2px',
+                  backgroundColor: 'transparent',
+                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                }}
               >
                 Kapat
               </button>
               <button
                 disabled={pdfLoading}
                 onClick={() => selected && handleDownloadPDF(selected)}
-                className="cp-act cp-act-primary"
+                className="inline-flex items-center gap-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                style={{
+                  color: CREAM,
+                  backgroundColor: NAVY,
+                  border: `1px solid ${GOLD}`,
+                  borderRadius: '2px',
+                  opacity: pdfLoading ? 0.7 : 1,
+                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                }}
               >
                 {pdfLoading ? (
                   <>
-                    <span className="cp-spin" />
-                    <span>Oluşturuluyor…</span>
+                    <span
+                      className="inline-block h-3 w-3 animate-spin rounded-full"
+                      style={{ border: `2px solid ${GOLD}`, borderTopColor: 'transparent' }}
+                    />
+                    Oluşturuluyor
                   </>
                 ) : (
                   <>
-                    <Download className="h-4 w-4" />
-                    <span>PDF İndir</span>
+                    <Download className="h-3.5 w-3.5" style={{ color: GOLD }} />
+                    PDF İndir
                   </>
                 )}
               </button>
@@ -401,437 +531,301 @@ export default function StaffCertificatesPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      <style jsx>{`
-        .cp-page { display: flex; flex-direction: column; gap: 24px; padding-bottom: 40px; }
+/* ─────────────────────────────────────────────────────
+   Atoms
+   ───────────────────────────────────────────────────── */
 
-        /* ── Header ── */
-        .cp-header {
-          padding-bottom: 20px;
-          border-bottom: 1px solid #ebe7df;
-        }
-        .cp-eyebrow {
-          display: inline-block;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: #8a8578;
-          margin-bottom: 10px;
-        }
-        .cp-title {
-          font-family: var(--font-editorial, serif);
-          font-size: clamp(30px, 5vw, 48px);
-          font-weight: 500;
-          font-variation-settings: 'opsz' 72, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.03em;
-          line-height: 1;
-          margin: 0;
-        }
-        .cp-title em {
-          font-style: italic;
-          font-variation-settings: 'opsz' 72, 'SOFT' 100;
-        }
-        .cp-summary {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-top: 10px;
-          flex-wrap: wrap;
-          font-family: var(--font-display, system-ui);
-          font-size: 13px;
-          color: #6b6a63;
-          font-variant-numeric: tabular-nums;
-        }
-        .cp-summary strong {
-          color: #0a0a0a;
-          font-family: var(--font-editorial, serif);
-          font-weight: 500;
-          margin-right: 4px;
-        }
-        .cp-summary-ok { color: #0a7a47 !important; }
-        .cp-summary-err { color: #b3261e !important; }
-        .cp-summary-sep { color: #c8c2b0; }
+function SummaryStat({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className="flex flex-col items-start">
+      <span
+        className="text-[9px] font-semibold uppercase tracking-[0.2em] leading-none"
+        style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+      >
+        {label}
+      </span>
+      <span
+        className="mt-1 text-[22px] font-semibold leading-none tracking-[-0.02em]"
+        style={{ color: tone, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+      >
+        {value.toString().padStart(2, '0')}
+      </span>
+    </div>
+  );
+}
 
-        /* ── Grid ── */
-        .cp-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 14px;
-        }
+function CertificateCard({
+  cert, index, pdfLoading, onPreview, onDownload, onCopy,
+}: {
+  cert: Certificate; index: number; pdfLoading: boolean;
+  onPreview: () => void; onDownload: () => void; onCopy: () => void;
+}) {
+  const isExpired = cert.isExpired;
+  const railColor = isExpired ? '#b3261e' : GOLD;
+  const issued = new Date(cert.issuedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
 
-        /* ── Card ── */
-        .cp-card {
-          position: relative;
-          padding: 22px 22px 20px 26px;
-          background: #ffffff;
-          border: 1px solid #ebe7df;
-          border-radius: 16px;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(10, 10, 10, 0.02);
-          overflow: hidden;
-          opacity: 0;
-          animation: cp-in 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          transition: border-color 200ms ease, transform 260ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms ease;
-        }
-        @keyframes cp-in {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .cp-card:hover {
-          border-color: #0a7a47;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 18px rgba(10, 122, 71, 0.08);
-        }
-        .cp-card-rail {
-          position: absolute;
-          left: 0; top: 0; bottom: 0;
-          width: 3px;
-          background: #0a7a47;
-        }
-        .cp-card-expired .cp-card-rail { background: #b3261e; }
-        .cp-card-expired:hover { border-color: #b3261e; box-shadow: 0 4px 18px rgba(179, 38, 30, 0.08); }
+  return (
+    <article
+      className="group relative overflow-hidden flex flex-col"
+      style={{
+        backgroundColor: '#ffffff',
+        borderTop: `1px solid ${RULE}`,
+        borderRight: `1px solid ${RULE}`,
+        borderBottom: `1px solid ${RULE}`,
+        borderLeft: `6px solid ${railColor}`,
+        borderRadius: '4px',
+        transition: 'box-shadow 200ms ease, transform 220ms ease',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 18px rgba(10, 22, 40, 0.08)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'translateY(0)'; }}
+    >
+      {/* Top navy band with medal */}
+      <div
+        className="relative flex items-center justify-between px-4 py-3"
+        style={{
+          backgroundColor: isExpired ? '#2a0f0c' : NAVY,
+          borderBottom: `2px solid ${GOLD}`,
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="flex items-center justify-center"
+            style={{
+              width: 32, height: 32,
+              backgroundColor: 'rgba(201, 169, 97, 0.15)',
+              border: `1px solid ${GOLD}`,
+              borderRadius: '2px',
+            }}
+          >
+            <Award className="h-4 w-4" style={{ color: GOLD }} />
+          </span>
+          <div>
+            <p
+              className="text-[9px] font-semibold uppercase tracking-[0.2em]"
+              style={{ color: GOLD, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+            >
+              № {index.toString().padStart(3, '0')}
+            </p>
+            <p
+              className="text-[10px] uppercase tracking-[0.14em]"
+              style={{ color: 'rgba(250, 247, 242, 0.55)', fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+            >
+              Başarı Sertifikası
+            </p>
+          </div>
+        </div>
+        {isExpired ? (
+          <span
+            className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.12em] leading-none"
+            style={{
+              color: '#fef6e7', backgroundColor: '#b3261e',
+              fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+            }}
+          >
+            <AlertTriangle className="h-3 w-3" />
+            DOLDU
+          </span>
+        ) : (
+          <span
+            className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.12em] leading-none"
+            style={{
+              color: NAVY, backgroundColor: GOLD,
+              fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+            }}
+          >
+            <CheckCircle2 className="h-3 w-3" />
+            AKTİF
+          </span>
+        )}
+      </div>
 
-        .cp-card-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 18px;
-        }
-        .cp-seal-wrap {
-          position: relative;
-          width: 48px;
-          height: 48px;
-        }
-        .cp-seal {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: linear-gradient(135deg, #d4b36e 0%, #a5823c 100%);
-          color: #faf8f2;
-          border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(165, 130, 60, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-        }
-        .cp-card-expired .cp-seal {
-          background: linear-gradient(135deg, #e9c9c0 0%, #b3261e 100%);
-        }
+      {/* Body */}
+      <div className="flex-1 flex flex-col p-4">
+        <h3
+          className="text-[16px] font-semibold tracking-[-0.01em] leading-snug"
+          style={{
+            color: INK,
+            fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {cert.training.title}
+        </h3>
 
-        .cp-chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 4px 10px;
-          border-radius: 999px;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-        }
-        .cp-chip-ok { background: #eaf6ef; color: #0a7a47; border: 1px solid #c8e6d5; }
-        .cp-chip-err { background: #fdf5f2; color: #b3261e; border: 1px solid #e9c9c0; }
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {cert.training.category && (
+            <span
+              className="inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.12em] leading-none"
+              style={{
+                color: INK_SOFT, backgroundColor: 'rgba(0,0,0,0.04)',
+                fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+              }}
+            >
+              {cert.training.category.toUpperCase()}
+            </span>
+          )}
+          {cert.training.isArchived && (
+            <span
+              className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.12em] leading-none"
+              style={{
+                color: '#8a5a11', backgroundColor: '#f4efdf',
+                fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+              }}
+              title="Eğitim arşivlendi — sertifika geçerliliğini korur"
+            >
+              <Archive className="h-2.5 w-2.5" />
+              ARŞİV
+            </span>
+          )}
+        </div>
 
-        .cp-card-title {
-          font-family: var(--font-editorial, serif);
-          font-size: 17px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 30, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.015em;
-          line-height: 1.25;
-          margin: 0 0 8px;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
+        {/* Metrics */}
+        <div
+          className="mt-3 grid"
+          style={{
+            gridTemplateColumns: '1fr 1fr',
+            border: `1px solid ${RULE}`,
+            borderRadius: '2px',
+          }}
+        >
+          <div className="px-3 py-2" style={{ borderRight: `1px solid ${RULE}` }}>
+            <p
+              className="text-[9px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+            >
+              Puan
+            </p>
+            <p className="mt-0.5 flex items-baseline gap-0.5">
+              <span
+                className="text-[24px] font-semibold tabular-nums leading-none tracking-[-0.025em]"
+                style={{ color: OLIVE, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+              >
+                {cert.score}
+              </span>
+              <span
+                className="text-[11px] font-semibold"
+                style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+              >
+                %
+              </span>
+            </p>
+          </div>
+          <div className="px-3 py-2">
+            <p
+              className="text-[9px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+            >
+              Tarih
+            </p>
+            <p
+              className="mt-0.5 text-[14px] font-semibold tracking-[-0.01em]"
+              style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+            >
+              {issued}
+            </p>
+          </div>
+        </div>
 
-        .cp-card-tags {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-          margin-bottom: 14px;
-        }
-        .cp-tag {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 3px 9px;
-          border-radius: 999px;
-          background: #faf8f2;
-          border: 1px solid #ebe7df;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 500;
-          letter-spacing: 0.02em;
-          color: #6b6a63;
-        }
-        .cp-tag-archived { color: #8a5a11; background: #fef6e7; border-color: #e9c977; }
+        {/* Code row */}
+        <div
+          className="mt-3 flex items-center gap-2 px-2.5 py-1.5"
+          style={{
+            backgroundColor: 'rgba(10, 22, 40, 0.03)',
+            border: `1px solid ${RULE}`,
+            borderRadius: '2px',
+          }}
+        >
+          <span
+            className="text-[9px] font-semibold uppercase tracking-[0.18em]"
+            style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+          >
+            KOD
+          </span>
+          <code
+            className="flex-1 text-[11px] truncate tabular-nums"
+            style={{
+              color: INK,
+              fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {cert.certificateCode}
+          </code>
+          <button
+            onClick={onCopy}
+            aria-label="Kodu kopyala"
+            className="flex items-center justify-center shrink-0"
+            style={{
+              width: 22, height: 22,
+              color: INK_SOFT,
+              border: `1px solid ${RULE}`,
+              borderRadius: '2px',
+              backgroundColor: '#ffffff',
+              transition: 'color 160ms ease, border-color 160ms ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = GOLD; e.currentTarget.style.borderColor = GOLD; }}
+            onMouseLeave={e => { e.currentTarget.style.color = INK_SOFT; e.currentTarget.style.borderColor = RULE; }}
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+        </div>
 
-        .cp-metrics {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 8px;
-          margin: 0 0 14px;
-        }
-        .cp-metrics > div {
-          padding: 10px 12px;
-          background: #faf8f2;
-          border: 1px solid #ebe7df;
-          border-radius: 10px;
-        }
-        .cp-metrics dt {
-          font-family: var(--font-display, system-ui);
-          font-size: 9px;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: #8a8578;
-          margin-bottom: 4px;
-        }
-        .cp-metrics dd {
-          display: flex;
-          align-items: baseline;
-          gap: 2px;
-          font-family: var(--font-editorial, serif);
-          font-size: 20px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 32, 'SOFT' 50;
-          color: #0a0a0a;
-          line-height: 1;
-          font-variant-numeric: tabular-nums;
-          letter-spacing: -0.02em;
-          margin: 0;
-        }
-        .cp-metrics dd span {
-          font-family: var(--font-display, system-ui);
-          font-size: 11px;
-          color: #8a8578;
-          font-weight: 500;
-        }
-        .cp-metric-date strong {
-          font-size: 15px;
-          font-weight: 500;
-        }
+        {/* Actions */}
+        <div className="mt-3 flex gap-2 mt-auto pt-3">
+          <button
+            onClick={onPreview}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{
+              color: INK,
+              border: `1px solid ${INK}`,
+              borderRadius: '2px',
+              backgroundColor: 'transparent',
+              fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+            }}
+          >
+            <Eye className="h-3 w-3" style={{ color: GOLD }} />
+            Önizle
+          </button>
+          <button
+            disabled={pdfLoading}
+            onClick={onDownload}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{
+              color: CREAM,
+              backgroundColor: NAVY,
+              border: `1px solid ${GOLD}`,
+              borderRadius: '2px',
+              opacity: pdfLoading ? 0.7 : 1,
+              fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+            }}
+          >
+            <Download className="h-3 w-3" style={{ color: GOLD }} />
+            {pdfLoading ? '…' : 'İndir'}
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
 
-        .cp-code-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 12px;
-          background: #faf8f2;
-          border: 1px dashed #ebe7df;
-          border-radius: 10px;
-          margin-bottom: 14px;
-        }
-        .cp-code-label {
-          font-family: var(--font-display, system-ui);
-          font-size: 9px;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: #8a8578;
-          flex-shrink: 0;
-        }
-        .cp-code {
-          flex: 1;
-          font-family: var(--font-mono, monospace);
-          font-size: 11px;
-          font-weight: 600;
-          color: #0a0a0a;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .cp-copy-btn {
-          flex-shrink: 0;
-          width: 28px;
-          height: 28px;
-          border-radius: 8px;
-          background: #ffffff;
-          border: 1px solid #ebe7df;
-          color: #6b6a63;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
-        }
-        .cp-copy-btn:hover { background: #0a0a0a; color: #fafaf7; border-color: #0a0a0a; }
-
-        .cp-card-actions {
-          display: flex;
-          gap: 8px;
-        }
-
-        /* ── Buttons ── */
-        .cp-act {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          flex: 1;
-          height: 40px;
-          padding: 0 14px;
-          border-radius: 999px;
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          font-weight: 600;
-          border: 1px solid transparent;
-          cursor: pointer;
-          text-decoration: none;
-          transition: background 160ms ease, border-color 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .cp-act:active:not(:disabled) { transform: scale(0.97); }
-        .cp-act:disabled { opacity: 0.6; cursor: not-allowed; }
-        .cp-act-ghost {
-          background: transparent;
-          color: #6b6a63;
-          border-color: #ebe7df;
-        }
-        .cp-act-ghost:hover { border-color: #0a0a0a; color: #0a0a0a; background: #faf8f2; }
-        .cp-act-primary {
-          background: #0a0a0a;
-          color: #fafaf7;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
-        }
-        .cp-act-primary:hover:not(:disabled) { background: #1a1a1a; }
-
-        .cp-spin {
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-          border: 2px solid rgba(255, 255, 255, 0.3);
-          border-top-color: #ffffff;
-          animation: cp-rot 700ms linear infinite;
-        }
-        @keyframes cp-rot { to { transform: rotate(360deg); } }
-
-        /* ── Empty ── */
-        .cp-empty {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          padding: 80px 20px;
-          gap: 12px;
-          background: #ffffff;
-          border: 1px dashed #ebe7df;
-          border-radius: 16px;
-        }
-        .cp-empty-icon {
-          width: 64px;
-          height: 64px;
-          border-radius: 999px;
-          background: linear-gradient(135deg, #d4b36e 0%, #a5823c 100%);
-          color: #faf8f2;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 4px 12px rgba(165, 130, 60, 0.2);
-          margin-bottom: 6px;
-        }
-        .cp-empty h2 {
-          font-family: var(--font-editorial, serif);
-          font-size: 24px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 48, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.015em;
-          margin: 0;
-        }
-        .cp-empty p {
-          font-size: 13px;
-          color: #6b6a63;
-          line-height: 1.55;
-          max-width: 360px;
-          margin: 0;
-        }
-
-        /* ── Modal ── */
-        .cp-modal {
-          position: fixed;
-          inset: 0;
-          z-index: 100;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px;
-          background: rgba(10, 10, 10, 0.6);
-          backdrop-filter: blur(8px);
-        }
-        .cp-modal-card {
-          width: 100%;
-          max-width: 720px;
-          background: #ffffff;
-          border-radius: 20px;
-          overflow: hidden;
-          box-shadow: 0 32px 80px rgba(10, 10, 10, 0.35);
-          display: flex;
-          flex-direction: column;
-          max-height: calc(100vh - 40px);
-        }
-        .cp-modal-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 16px 20px;
-          border-bottom: 1px solid #ebe7df;
-          background: #faf8f2;
-          flex-shrink: 0;
-        }
-        .cp-modal-head-title {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          font-family: var(--font-editorial, serif);
-          font-size: 15px;
-          font-weight: 500;
-          color: #0a0a0a;
-        }
-        .cp-modal-head-title :global(svg) { color: #a5823c; }
-        .cp-modal-close {
-          width: 36px;
-          height: 36px;
-          border-radius: 999px;
-          background: transparent;
-          border: 1px solid #ebe7df;
-          color: #6b6a63;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
-        }
-        .cp-modal-close:hover { background: #0a0a0a; color: #fafaf7; border-color: #0a0a0a; }
-
-        .cp-modal-body {
-          padding: 24px;
-          flex: 1;
-          overflow-y: auto;
-        }
-        .cp-modal-foot {
-          display: flex;
-          gap: 10px;
-          padding: 14px 20px;
-          border-top: 1px solid #ebe7df;
-          background: #faf8f2;
-          flex-shrink: 0;
-        }
-        .cp-modal-foot .cp-act { flex: 1; }
-
-        /* ── Responsive ── */
-        @media (max-width: 640px) {
-          .cp-grid { grid-template-columns: 1fr; }
-          .cp-card { padding: 18px 18px 16px 22px; }
-          .cp-modal-body { padding: 16px; }
-          .cp-modal-foot { flex-direction: column; }
-        }
-      `}</style>
+function CertificatesSkeleton() {
+  return (
+    <div className="mt-10">
+      <div
+        className="grid gap-4"
+        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+      >
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-72" style={{ backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: '4px' }} />
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,15 +1,30 @@
 import { Redis } from '@upstash/redis'
+import { logger } from '@/lib/logger'
 
 // ── Lazy Redis client — null if not configured or unreachable ──
 let _redis: Redis | null = null
+let _constructorWarned = false
 export function getRedis(): Redis | null {
   if (_redis) return _redis
   const url = process.env.REDIS_URL
   const token = process.env.REDIS_TOKEN
   // Placeholder veya boş değerler varsa Redis'i atla
   if (!url || !token || url.includes('your-redis') || token.includes('your-redis')) return null
-  _redis = new Redis({ url, token, keepAlive: true })
-  return _redis
+  // Constructor invalid URL/token formatında senkron throw atar.
+  // Throw yutulmazsa rate-limit/timer çağrılarını tetikleyen route'lar (örn. /api/auth/login)
+  // 500 verir ve memory fallback hiç devreye girmez. Yakala, sessizce memory'ye düş — ama loud log at.
+  try {
+    _redis = new Redis({ url, token, keepAlive: true })
+    return _redis
+  } catch (err) {
+    if (!_constructorWarned) {
+      _constructorWarned = true
+      logger.error('Redis', 'Constructor başarısız — memory fallback devrede. Env vars kontrol et.', {
+        message: (err as Error)?.message,
+      })
+    }
+    return null
+  }
 }
 
 // Resets the cached client so next call to getRedis() retries the connection.

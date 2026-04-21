@@ -1,28 +1,37 @@
 'use client';
 
+/**
+ * AppTopbar — "Clinical Editorial" redesign.
+ * Cream masthead row + ink monospace meta + gold accents.
+ * Arama · tema seçici · bildirim · kullanıcı menüsü (davranış aynı).
+ */
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { Menu, Moon, Palette, Search, Sun, X } from 'lucide-react';
+import { Menu, Moon, Search, Sun, X, User, Bell, LogOut } from 'lucide-react';
 import { useColorTheme, COLOR_THEMES } from '@/hooks/use-color-theme';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { NotificationBell } from '@/components/shared/notification-bell';
-import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuGroup,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
+/* ─── Editorial palette ─── */
+const INK = '#0a1628';
+const INK_SOFT = '#5b6478';
+const CREAM = '#faf7f2';
+const RULE = '#e5e0d5';
+const GOLD = '#c9a961';
+const OLIVE = '#1a3a28';
 
 interface AppTopbarProps {
   title: string;
@@ -38,7 +47,6 @@ interface AppTopbarProps {
 
 export function AppTopbar({
   title,
-  subtitle,
   orgName,
   onToggleSidebar,
   userName = 'Kullanıcı',
@@ -60,55 +68,67 @@ export function AppTopbar({
     router.push('/auth/login');
   };
 
-  const profilePath = user?.role === 'admin' ? '/admin/settings' : user?.role === 'super_admin' ? '/super-admin/settings' : '/staff/profile';
+  const profilePath = user?.role === 'admin'
+    ? '/admin/settings'
+    : user?.role === 'super_admin'
+      ? '/super-admin/settings'
+      : '/staff/profile';
   const notificationsPath = user?.role === 'staff' ? '/staff/notifications' : '/admin/notifications';
 
   return (
     <header
-      className="sticky top-0 z-40 flex h-16 items-center justify-between gap-4 border-b px-6"
+      className="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 px-4 sm:px-6"
       style={{
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        background: 'rgba(var(--color-bg-rgb), 0.85)',
-        borderColor: 'var(--color-border)',
+        backgroundColor: 'rgba(250, 247, 242, 0.85)',
+        borderBottom: `1px solid ${INK}`,
+        color: INK,
       }}
     >
-      {/* Left side: Menu toggle */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
+      {/* ── Left: mobile menu + masthead meta ── */}
+      <div className="flex items-center gap-3 min-w-0">
+        <button
           onClick={onToggleSidebar}
-          className="lg:hidden"
-          style={{ color: 'var(--color-text-secondary)' }}
+          className="inline-flex h-9 w-9 items-center justify-center lg:hidden"
+          style={{
+            color: INK,
+            border: `1px solid ${RULE}`,
+            borderRadius: '2px',
+            backgroundColor: 'transparent',
+          }}
+          aria-label="Menüyü aç"
         >
-          <Menu className="h-5 w-5" />
-        </Button>
+          <Menu className="h-4 w-4" />
+        </button>
 
         {(orgName || title) && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {orgName && (
-              <>
-                <p
-                  className="text-sm font-semibold hidden sm:block"
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    color: 'var(--brand-primary, var(--color-text-primary))',
-                  }}
-                >
-                  {orgName}
-                </p>
-                {title && (
-                  <span className="hidden sm:block text-xs" style={{ color: 'var(--color-text-muted)' }}>/</span>
-                )}
-              </>
+              <p
+                className="text-[11px] font-semibold uppercase tracking-[0.16em] truncate hidden sm:block"
+                style={{
+                  color: INK,
+                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                }}
+              >
+                {orgName}
+              </p>
+            )}
+            {orgName && title && (
+              <span
+                className="hidden sm:inline-block text-[12px]"
+                style={{ color: GOLD }}
+              >
+                /
+              </span>
             )}
             {title && (
               <p
-                className="text-xs font-medium"
+                className="text-[11px] font-semibold uppercase tracking-[0.14em] truncate"
                 style={{
-                  fontFamily: 'var(--font-body)',
-                  color: 'var(--color-text-muted)',
+                  color: INK_SOFT,
+                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
                 }}
               >
                 {title}
@@ -118,161 +138,376 @@ export function AppTopbar({
         )}
       </div>
 
-      {/* Right side: Search + Actions */}
-      <div className="flex items-center gap-2">
+      {/* ── Right: actions ── */}
+      <div className="flex items-center gap-1.5">
         {/* Search */}
-        <div className={cn('relative', searchOpen ? 'w-64' : 'w-auto')}>
+        <div className={searchOpen ? 'relative w-56 sm:w-64' : 'relative'}>
           {searchOpen ? (
             <div className="flex items-center">
               <Search
-                className="absolute left-3 h-4 w-4"
-                style={{ color: 'var(--color-text-muted)' }}
+                className="absolute left-2.5 h-3.5 w-3.5"
+                style={{ color: INK_SOFT }}
               />
-              <Input
+              <input
                 placeholder="Ara..."
-                className="pl-9 pr-8 h-9 text-sm"
                 autoFocus
                 onBlur={() => setSearchOpen(false)}
+                className="w-full pl-8 pr-8 h-9 text-[13px] focus:outline-none"
                 style={{
-                  background: 'var(--color-surface)',
-                  borderColor: 'var(--color-border)',
-                  fontFamily: 'var(--font-body)',
+                  backgroundColor: '#ffffff',
+                  color: INK,
+                  border: `1px solid ${INK}`,
+                  borderRadius: '2px',
+                  fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
                 }}
               />
               <button
                 className="absolute right-2"
                 onClick={() => setSearchOpen(false)}
+                aria-label="Aramayı kapat"
               >
-                <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+                <X className="h-3.5 w-3.5" style={{ color: INK_SOFT }} />
               </button>
             </div>
           ) : (
-            <Tooltip >
+            <Tooltip>
               <TooltipTrigger
-                render={<Button variant="ghost" size="icon" className="h-9 w-9" />}
                 onClick={() => setSearchOpen(true)}
-                style={{ color: 'var(--color-text-secondary)' }}
+                className="inline-flex h-9 w-9 items-center justify-center"
+                style={{
+                  color: INK_SOFT,
+                  borderRadius: '2px',
+                  backgroundColor: 'transparent',
+                  transition: 'color 160ms ease, background-color 160ms ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = INK; e.currentTarget.style.backgroundColor = 'rgba(10, 22, 40, 0.05)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = INK_SOFT; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                aria-label="Ara"
               >
-                <Search className="h-4.5 w-4.5" />
+                <Search className="h-4 w-4" />
               </TooltipTrigger>
               <TooltipContent>Ara (⌘K)</TooltipContent>
             </Tooltip>
           )}
         </div>
 
-        {/* Theme Dropdown */}
+        {/* Theme dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="relative inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-[var(--color-surface-hover)]"
-            style={{ color: 'var(--color-text-secondary)' }}
+            className="relative inline-flex h-9 w-9 items-center justify-center"
+            style={{
+              color: INK_SOFT,
+              borderRadius: '2px',
+              backgroundColor: 'transparent',
+              transition: 'color 160ms ease, background-color 160ms ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = INK; e.currentTarget.style.backgroundColor = 'rgba(10, 22, 40, 0.05)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = INK_SOFT; e.currentTarget.style.backgroundColor = 'transparent'; }}
             aria-label="Tema ayarları"
           >
-            <Sun className="h-4.5 w-4.5 rotate-0 scale-100 dark:-rotate-90 dark:scale-0" style={{ transition: 'transform var(--transition-base)' }} />
-            <Moon className="absolute h-4.5 w-4.5 rotate-90 scale-0 dark:rotate-0 dark:scale-100" style={{ transition: 'transform var(--transition-base)' }} />
+            <Sun className="h-4 w-4 rotate-0 scale-100 dark:-rotate-90 dark:scale-0" style={{ transition: 'transform 300ms ease' }} />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 dark:rotate-0 dark:scale-100" style={{ transition: 'transform 300ms ease' }} />
             {colorTheme !== 'emerald' && (
               <span
-                className="absolute bottom-1 right-1 h-2 w-2 rounded-full ring-1 ring-white dark:ring-zinc-900"
-                style={{ background: COLOR_THEMES.find(t => t.id === colorTheme)?.light }}
+                className="absolute bottom-1 right-1 h-1.5 w-1.5"
+                style={{
+                  backgroundColor: COLOR_THEMES.find(t => t.id === colorTheme)?.light,
+                  borderRadius: '50%',
+                  border: `1px solid ${CREAM}`,
+                }}
               />
             )}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-                Görünüm
-              </DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => setTheme('light')}
-                className="flex items-center gap-2.5 cursor-pointer"
+          <DropdownMenuContent
+            align="end"
+            className="w-60 p-0 overflow-hidden border-0"
+            style={{
+              backgroundColor: CREAM,
+              border: `1px solid ${INK}`,
+              borderRadius: '4px',
+              boxShadow: '0 8px 24px rgba(6, 16, 33, 0.12)',
+            }}
+          >
+            <div className="px-3 pt-3 pb-2" style={{ borderBottom: `1px solid ${RULE}` }}>
+              <p
+                className="text-[9px] font-semibold uppercase tracking-[0.2em]"
+                style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
               >
-                <Sun className="h-4 w-4 shrink-0" />
-                <span>Aydınlık</span>
-                {theme === 'light' && <span className="ml-auto text-xs" style={{ color: 'var(--color-primary)' }}>✓</span>}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setTheme('dark')}
-                className="flex items-center gap-2.5 cursor-pointer"
-              >
-                <Moon className="h-4 w-4 shrink-0" />
-                <span>Karanlık</span>
-                {theme === 'dark' && <span className="ml-auto text-xs" style={{ color: 'var(--color-primary)' }}>✓</span>}
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-                Renk
-              </DropdownMenuLabel>
-            <div className="flex items-center gap-2 px-2 pb-2 pt-1">
-              {COLOR_THEMES.map((ct) => (
-                <button
-                  key={ct.id}
-                  onClick={() => setColorTheme(ct.id)}
-                  title={ct.label}
-                  aria-label={ct.label}
-                  className="relative h-6 w-6 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2"
-                  style={{
-                    background: theme === 'dark' ? ct.dark : ct.light,
-                    boxShadow: colorTheme === ct.id ? `0 0 0 2px var(--color-surface), 0 0 0 4px ${theme === 'dark' ? ct.dark : ct.light}` : undefined,
-                  }}
-                >
-                  {colorTheme === ct.id && (
-                    <span className="absolute inset-0 flex items-center justify-center text-white text-[10px] font-bold">✓</span>
-                  )}
-                </button>
-              ))}
+                № Tema
+              </p>
             </div>
+
+            <DropdownMenuGroup>
+              <EditorialMenuItem
+                icon={Sun}
+                label="Aydınlık"
+                active={theme === 'light'}
+                onClick={() => setTheme('light')}
+              />
+              <EditorialMenuItem
+                icon={Moon}
+                label="Karanlık"
+                active={theme === 'dark'}
+                onClick={() => setTheme('dark')}
+              />
             </DropdownMenuGroup>
+
+            <div className="px-3 pt-2 pb-2" style={{ borderTop: `1px solid ${RULE}` }}>
+              <p
+                className="text-[9px] font-semibold uppercase tracking-[0.2em] mb-2"
+                style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+              >
+                Renk paleti
+              </p>
+              <div className="flex items-center gap-1.5">
+                {COLOR_THEMES.map((ct) => {
+                  const isActive = colorTheme === ct.id;
+                  return (
+                    <button
+                      key={ct.id}
+                      onClick={() => setColorTheme(ct.id)}
+                      title={ct.label}
+                      aria-label={ct.label}
+                      className="relative h-6 w-6 focus:outline-none transition-transform"
+                      style={{
+                        backgroundColor: theme === 'dark' ? ct.dark : ct.light,
+                        borderRadius: '2px',
+                        border: isActive ? `2px solid ${INK}` : `1px solid ${RULE}`,
+                        transform: isActive ? 'scale(1.1)' : 'scale(1)',
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 
         {/* Notifications */}
         <NotificationBell unreadCount={unreadNotifications} />
 
-        {/* User Avatar Dropdown */}
+        {/* User dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="flex items-center gap-2.5 rounded-lg px-2 py-1.5"
-            style={{ transition: 'background var(--transition-fast)' }}
+            className="flex items-center gap-2.5 px-2 py-1"
+            style={{
+              borderRadius: '2px',
+              transition: 'background-color 160ms ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(10, 22, 40, 0.05)'; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
-              <Avatar className="h-8 w-8">
+            <Avatar className="h-8 w-8" style={{ border: `1.5px solid ${GOLD}` }}>
+              <AvatarImage src={userAvatar} />
+              <AvatarFallback
+                className="text-[11px] font-semibold"
+                style={{
+                  backgroundColor: OLIVE,
+                  color: CREAM,
+                  fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                }}
+              >
+                {userInitials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="hidden text-left md:block">
+              <p
+                className="text-[12px] font-semibold tracking-[-0.01em] leading-tight"
+                style={{
+                  color: INK,
+                  fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                }}
+              >
+                {userName}
+              </p>
+              <p
+                className="text-[9px] uppercase tracking-[0.18em] mt-0.5"
+                style={{
+                  color: GOLD,
+                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                }}
+              >
+                {userRole}
+              </p>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="w-64 p-0 overflow-hidden border-0"
+            style={{
+              backgroundColor: CREAM,
+              border: `1px solid ${INK}`,
+              borderRadius: '4px',
+              boxShadow: '0 8px 24px rgba(6, 16, 33, 0.12)',
+            }}
+          >
+            {/* Header card */}
+            <div
+              className="px-4 pt-4 pb-4 flex items-center gap-3"
+              style={{
+                background: `linear-gradient(180deg, rgba(10, 22, 40, 0.03) 0%, transparent 100%)`,
+                borderBottom: `1px solid ${RULE}`,
+              }}
+            >
+              <Avatar className="h-12 w-12 shrink-0" style={{ border: `2px solid ${GOLD}` }}>
                 <AvatarImage src={userAvatar} />
                 <AvatarFallback
-                  className="text-xs font-semibold text-white"
-                  style={{ background: 'var(--color-primary)' }}
+                  className="text-[15px] font-semibold"
+                  style={{
+                    backgroundColor: OLIVE,
+                    color: CREAM,
+                    fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                  }}
                 >
                   {userInitials}
                 </AvatarFallback>
               </Avatar>
-              <div className="hidden text-left md:block">
+              <div className="min-w-0 flex-1">
                 <p
-                  className="text-sm font-semibold leading-tight"
-                  style={{ color: 'var(--color-text-primary)' }}
+                  className="text-[9px] font-semibold uppercase tracking-[0.2em]"
+                  style={{
+                    color: INK_SOFT,
+                    fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                  }}
+                >
+                  Oturum
+                </p>
+                <p
+                  className="text-[15px] font-semibold tracking-[-0.01em] truncate"
+                  style={{
+                    color: INK,
+                    fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                  }}
                 >
                   {userName}
                 </p>
-                <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                <p
+                  className="text-[9px] uppercase tracking-[0.18em] mt-0.5"
+                  style={{
+                    color: GOLD,
+                    fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                  }}
+                >
                   {userRole}
                 </p>
               </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>
-                <p className="text-sm font-semibold">{userName}</p>
-                <p className="text-xs font-normal" style={{ color: 'var(--color-text-muted)' }}>
-                  {userRole}
-                </p>
-              </DropdownMenuLabel>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push(profilePath)}>Profilim</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push(notificationsPath)}>Bildirimler</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-500" onClick={handleLogout}>Çıkış Yap</DropdownMenuItem>
+            </div>
+
+            {/* Items */}
+            <div className="py-1">
+              <EditorialMenuItem
+                icon={User}
+                label="Profilim"
+                onClick={() => router.push(profilePath)}
+              />
+              <EditorialMenuItem
+                icon={Bell}
+                label="Bildirimler"
+                onClick={() => router.push(notificationsPath)}
+                badge={unreadNotifications > 0 ? unreadNotifications : undefined}
+              />
+            </div>
+
+            <DropdownMenuSeparator style={{ backgroundColor: RULE }} />
+
+            <div className="py-1">
+              <DropdownMenuItem
+                onClick={handleLogout}
+                onSelect={e => e.preventDefault()}
+                className="cursor-pointer relative group"
+                style={{
+                  borderRadius: 0,
+                  color: '#b3261e',
+                  padding: '10px 12px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
+                  transition: 'background-color 160ms ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#fdf5f2'; }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                <LogOut className="h-3.5 w-3.5 mr-2" />
+                <span>Çıkış Yap</span>
+                <span
+                  className="ml-auto text-[9px] uppercase tracking-[0.14em]"
+                  style={{
+                    color: '#b3261e',
+                    opacity: 0.6,
+                    fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                  }}
+                >
+                  →
+                </span>
+              </DropdownMenuItem>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
     </header>
+  );
+}
+
+function EditorialMenuItem({
+  icon: Icon, label, active, onClick, badge,
+}: {
+  icon: typeof Sun;
+  label: string;
+  active?: boolean;
+  onClick?: () => void;
+  badge?: number;
+}) {
+  return (
+    <DropdownMenuItem
+      onClick={onClick}
+      onSelect={e => e.preventDefault()}
+      className="cursor-pointer relative"
+      style={{
+        borderRadius: 0,
+        padding: '10px 12px',
+        fontSize: '13px',
+        fontWeight: active ? 600 : 500,
+        color: active ? INK : INK_SOFT,
+        fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
+        backgroundColor: active ? 'rgba(201, 169, 97, 0.08)' : 'transparent',
+        transition: 'background-color 160ms ease, color 160ms ease',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.color = INK; e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.06)'; }}
+      onMouseLeave={e => {
+        e.currentTarget.style.color = active ? INK : INK_SOFT;
+        e.currentTarget.style.backgroundColor = active ? 'rgba(201, 169, 97, 0.08)' : 'transparent';
+      }}
+    >
+      {active && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1/2 -translate-y-1/2"
+          style={{ width: 3, height: 16, backgroundColor: GOLD, borderRadius: '1px' }}
+        />
+      )}
+      <Icon className="h-3.5 w-3.5 mr-2" style={{ color: active ? GOLD : INK_SOFT }} />
+      <span>{label}</span>
+      {badge != null && badge > 0 && (
+        <span
+          className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold tabular-nums leading-none"
+          style={{
+            color: INK,
+            backgroundColor: GOLD,
+            borderRadius: '2px',
+            fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+          }}
+        >
+          {badge}
+        </span>
+      )}
+      {active && !badge && (
+        <span
+          className="ml-auto text-[11px] font-semibold"
+          style={{ color: GOLD, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+        >
+          ●
+        </span>
+      )}
+    </DropdownMenuItem>
   );
 }

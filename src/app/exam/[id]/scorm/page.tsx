@@ -300,7 +300,7 @@ export default function ScormPlayerPage() {
           min-height: 100vh;
           display: flex;
           flex-direction: column;
-          background: #f7f4ea;
+          background: #faf7f2;
         }
 
         .sc-header {
@@ -311,7 +311,7 @@ export default function ScormPlayerPage() {
           padding: 14px 24px;
           background: rgba(255, 255, 255, 0.92);
           backdrop-filter: blur(12px);
-          border-bottom: 1px solid #ebe7df;
+          border-bottom: 1px solid #e5e0d5;
           flex-shrink: 0;
         }
         .sc-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -320,8 +320,8 @@ export default function ScormPlayerPage() {
           width: 36px;
           height: 36px;
           border-radius: 10px;
-          background: #0a0a0a;
-          color: #fafaf7;
+          background: #0a1628;
+          color: #faf7f2;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -334,14 +334,14 @@ export default function ScormPlayerPage() {
           font-weight: 600;
           letter-spacing: 0.12em;
           text-transform: uppercase;
-          color: #8a8578;
+          color: #5b6478;
         }
         .sc-header-title h1 {
-          font-family: var(--font-editorial, serif);
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-size: 15px;
           font-weight: 500;
           font-variation-settings: 'opsz' 24;
-          color: #0a0a0a;
+          color: #0a1628;
           margin: 2px 0 0;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -372,7 +372,7 @@ export default function ScormPlayerPage() {
         .sc-chip-ok { background: #eaf6ef; color: #0a7a47; border-color: #c8e6d5; }
         .sc-chip-amber { background: #fef6e7; color: #6a4e11; border-color: #e9c977; }
         .sc-chip-err { background: #fdf5f2; color: #b3261e; border-color: #e9c9c0; }
-        .sc-chip-neutral { background: #faf8f2; color: #6b6a63; border-color: #ebe7df; }
+        .sc-chip-neutral { background: #faf7f2; color: #5b6478; border-color: #e5e0d5; }
 
         .sc-exit-btn {
           display: inline-flex;
@@ -382,8 +382,8 @@ export default function ScormPlayerPage() {
           padding: 0 14px;
           border-radius: 999px;
           background: transparent;
-          color: #6b6a63;
-          border: 1px solid #ebe7df;
+          color: #5b6478;
+          border: 1px solid #e5e0d5;
           font-family: var(--font-display, system-ui);
           font-size: 12px;
           font-weight: 500;
@@ -405,7 +405,7 @@ export default function ScormPlayerPage() {
           bottom: 24px;
           width: calc(100% - 48px);
           height: calc(100% - 44px);
-          border: 1px solid #ebe7df;
+          border: 1px solid #e5e0d5;
           border-radius: 14px;
           background: #ffffff;
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 20px rgba(10, 10, 10, 0.04);
@@ -433,14 +433,14 @@ function sharedStyles() {
         align-items: center;
         justify-content: center;
         padding: 24px 20px;
-        background: #f7f4ea;
+        background: #faf7f2;
       }
       .sc-card {
         width: 100%;
         max-width: 440px;
         padding: 36px 32px;
         background: #ffffff;
-        border: 1px solid #ebe7df;
+        border: 1px solid #e5e0d5;
         border-radius: 20px;
         text-align: center;
         box-shadow: 0 12px 40px rgba(10, 10, 10, 0.06);
@@ -456,7 +456,7 @@ function sharedStyles() {
         align-items: center;
         justify-content: center;
         margin-bottom: 16px;
-        color: #fafaf7;
+        color: #faf7f2;
       }
       .sc-card-icon-ok { background: #0a7a47; }
       .sc-card-icon-err { background: #b3261e; }
@@ -467,26 +467,26 @@ function sharedStyles() {
         font-weight: 600;
         letter-spacing: 0.14em;
         text-transform: uppercase;
-        color: #8a8578;
+        color: #5b6478;
         margin-bottom: 6px;
       }
       .sc-card h2 {
-        font-family: var(--font-editorial, serif);
+        font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
         font-size: 24px;
         font-weight: 500;
         font-variation-settings: 'opsz' 42, 'SOFT' 50;
-        color: #0a0a0a;
+        color: #0a1628;
         letter-spacing: -0.02em;
         margin: 0 0 8px;
       }
       .sc-card p {
         font-size: 13px;
-        color: #6b6a63;
+        color: #5b6478;
         line-height: 1.55;
         margin: 0 0 20px;
         max-width: 320px;
       }
-      .sc-card p em { font-style: italic; color: #0a0a0a; font-family: var(--font-editorial, serif); }
+      .sc-card p em { font-style: italic; color: #0a1628; font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; }
 
       .sc-btn {
         display: inline-flex;
@@ -504,9 +504,10 @@ function sharedStyles() {
         transition: background 160ms ease, border-color 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
       }
       .sc-btn:active { transform: scale(0.97); }
-      .sc-btn-ghost { background: transparent; color: #6b6a63; border-color: #ebe7df; }
-      .sc-btn-ghost:hover { border-color: #0a0a0a; color: #0a0a0a; }
-      .sc-btn-primary { background: #0a0a0a; color: #fafaf7; box-shadow: inset 0 1px 0 rgba(255,255,255,0.1); }
+      .sc-btn-ghost { background: transparent; color: #5b6478; border-color: #e5e0d5; }
+      .sc-btn-ghost:hover { border-color: #0a1628; color: #0a1628; }
+      .sc-btn-primary { background: #0a1628; color: #faf7f2; border-color: #c9a961; box-shadow: inset 0 1px 0 rgba(201, 169, 97, 0.15); }
+      .sc-btn-primary :global(svg) { color: #c9a961; }
       .sc-btn-primary:hover { background: #1a1a1a; }
     `}</style>
   )
