@@ -1,6 +1,8 @@
 import { getAuthUser, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
+import { createClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 
 /**
  * POST /api/auth/kvkk-acknowledge
@@ -28,6 +30,20 @@ export async function POST() {
     where: { id: dbUser!.id },
     data: { kvkkNoticeAcknowledgedAt: acknowledgedAt },
   })
+
+  // JWT user_metadata'yı da güncelle — middleware bu alanı JWT'den okuyarak
+  // KVKK guard'ı enforce eder. DB-only yazarsak kullanıcı her refresh'te
+  // tekrar modal görür ve middleware refresh sonrası kontrol yapamaz.
+  // updateUser() shallow merge yapar ve yeni JWT'yi cookie'ye yazar.
+  try {
+    const supabase = await createClient()
+    await supabase.auth.updateUser({
+      data: { kvkk_notice_acknowledged_at: acknowledgedAt.toISOString() },
+    })
+  } catch (err) {
+    logger.warn('auth:kvkk', 'user_metadata senkronizasyonu basarisiz', err)
+    // DB yazıldı → akış devam etsin; sonraki login'de metadata zaten yenilenir
+  }
 
   await createAuditLog({
     userId: dbUser!.id,

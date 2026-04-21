@@ -134,9 +134,31 @@ export async function updateSession(request: NextRequest) {
   if (isPublicRoute(pathname)) {
     try {
       const sessionResult = await withTimeout(supabase.auth.getSession(), 2500)
-      if (sessionResult?.data?.session?.user && (pathname === '/auth/login' || pathname === '/')) {
-        const role = sanitizeRole(sessionResult.data.session.user.app_metadata?.role ?? sessionResult.data.session.user.user_metadata?.role)
-        return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+      const sessionUser = sessionResult?.data?.session?.user
+      if (sessionUser) {
+        const role = sanitizeRole(sessionUser.app_metadata?.role ?? sessionUser.user_metadata?.role)
+        const kvkkAck = sessionUser.user_metadata?.kvkk_notice_acknowledged_at ?? null
+
+        // KVKK onaylanmamış authenticated kullanıcı — /auth/login'de kalması gerek ki modal açılsın.
+        // Landing (/) gibi public sayfalardan login'e yönlendir, modal zorunlu.
+        if (!kvkkAck) {
+          if (pathname === '/auth/login') {
+            return supabaseResponse
+          }
+          if (pathname === '/') {
+            const url = request.nextUrl.clone()
+            url.pathname = '/auth/login'
+            url.searchParams.set('reason', 'kvkk-required')
+            return NextResponse.redirect(url)
+          }
+          // Diğer public sayfalar (/kvkk, /pricing, vb.): serbest — zaten login gerektirmeyen içerik
+          return supabaseResponse
+        }
+
+        // KVKK tamam: login/landing'de auth'luysa dashboard'a gönder (mevcut davranış)
+        if (pathname === '/auth/login' || pathname === '/') {
+          return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+        }
       }
     } catch {
       // Session parse başarısız — public sayfayı normal göster
@@ -171,6 +193,19 @@ export async function updateSession(request: NextRequest) {
     const smsPending = request.cookies.get('hlms-sms-pending')?.value === '1'
     if (smsPending && !pathname.startsWith('/auth/sms-verify') && !pathname.startsWith('/auth/phone-setup') && !pathname.startsWith('/auth/logout')) {
       return NextResponse.redirect(new URL('/auth/sms-verify', request.url))
+    }
+
+    // ── KVKK onay guard ──
+    // user_metadata'da kvkk_notice_acknowledged_at yoksa kullanıcı hiçbir
+    // protected route'a giremez. Login sayfasında ?reason=kvkk-required ile
+    // modal otomatik açılır. Client-side modal bypass (refresh) bu sayede
+    // kapatılır — enforcement middleware'de, JWT'den okunur (DB sorgusu yok).
+    const kvkkAck = user.user_metadata?.kvkk_notice_acknowledged_at ?? null
+    if (!kvkkAck) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      url.searchParams.set('reason', 'kvkk-required')
+      return NextResponse.redirect(url)
     }
 
     // Role-based access control — app_metadata tercih edilir (kullanıcı değiştiremez)

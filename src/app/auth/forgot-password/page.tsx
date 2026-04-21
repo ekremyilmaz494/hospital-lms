@@ -2,13 +2,26 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Mail, ArrowLeft, Loader2, CheckCircle, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 import dynamic from 'next/dynamic';
-const BlurFade = dynamic(() => import('@/components/ui/blur-fade').then(m => ({ default: m.BlurFade })), { ssr: false, loading: () => <div /> });
-const ShimmerButton = dynamic(() => import('@/components/ui/shimmer-button').then(m => ({ default: m.ShimmerButton })), { ssr: false, loading: () => <button className="w-full h-11 rounded-xl" style={{ background: 'var(--color-primary)' }} /> });
+
+const BlurFade = dynamic(
+  () => import('@/components/ui/blur-fade').then(m => ({ default: m.BlurFade })),
+  { ssr: false, loading: () => <div /> }
+);
+const MeshGradient = dynamic(
+  () => import('@paper-design/shaders-react').then(m => ({ default: m.MeshGradient })),
+  { ssr: false }
+);
+
+// Clinical Editorial palette
+const INK = '#0a1628';
+const CREAM = '#faf7f2';
+const RULE = '#e5e0d5';
+const GOLD = '#c9a961';
+const INK_SOFT = '#5b6478';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -56,155 +69,247 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6" style={{ background: 'var(--color-bg)' }}>
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <BlurFade delay={0.1}>
-          <div className="mb-10 flex items-center gap-3">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-6 sm:p-10" style={{ background: CREAM }}>
+      <style>{`
+        .ed-display { font-family: var(--font-plus-jakarta-sans), serif; }
+        .ed-mono { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; }
+        .ed-input {
+          width: 100%;
+          height: 50px;
+          padding: 0 16px;
+          background: ${CREAM};
+          border: 1.5px solid ${RULE};
+          border-radius: 0;
+          font-size: 15px;
+          color: ${INK};
+          transition: border-color 180ms ease, background-color 180ms ease;
+          outline: none;
+        }
+        .ed-input:focus { border-color: ${INK}; background: #fff; }
+        .ed-input::placeholder { color: ${INK_SOFT}; opacity: 0.6; }
+      `}</style>
+
+      {/* MeshGradient ambient backdrop */}
+      <div className="absolute inset-0 z-0">
+        <MeshGradient
+          style={{ width: '100%', height: '100%' }}
+          colors={['#faf7f2', '#f3dfa6', '#d4a437', '#c9a961', '#A9C4B3', '#e7c97a']}
+          distortion={1.1}
+          swirl={0.55}
+          speed={0.35}
+          offsetX={0.05}
+          grainMixer={0}
+          grainOverlay={0}
+        />
+        <div className="absolute inset-0" style={{ background: 'rgba(250, 247, 242, 0.12)' }} />
+        <div
+          className="absolute inset-0 opacity-[0.22]"
+          style={{
+            backgroundImage: `radial-gradient(circle, ${RULE} 1px, transparent 1px)`,
+            backgroundSize: '32px 32px',
+          }}
+        />
+      </div>
+
+      <div className="relative z-10 w-full max-w-[460px]">
+        {/* Masthead — logo */}
+        <BlurFade delay={0.05} duration={0.4}>
+          <div className="mb-6 flex items-center gap-3">
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white font-heading"
-              style={{ background: 'var(--color-primary)' }}
+              className="flex h-9 w-9 items-center justify-center ed-display text-base font-semibold"
+              style={{ background: INK, color: GOLD }}
             >
               H
             </div>
-            <span className="text-xl font-bold font-heading">Devakent Hastanesi</span>
+            <span className="ed-display text-lg font-semibold" style={{ color: INK }}>
+              Devakent Hastanesi
+            </span>
           </div>
         </BlurFade>
 
-        {sent ? (
-          /* Başarı durumu */
-          <BlurFade delay={0.1}>
-            <div
-              className="rounded-2xl border p-8 text-center"
-              style={{
-                background: 'var(--color-surface)',
-                borderColor: 'var(--color-border)',
-                boxShadow: 'var(--shadow-lg)',
-              }}
-            >
-              <div
-                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
-                style={{ background: 'var(--color-success-bg)' }}
-              >
-                <CheckCircle className="h-7 w-7" style={{ color: 'var(--color-success)' }} />
-              </div>
-              <h2 className="text-xl font-bold mb-2">E-posta Gönderildi</h2>
-              <p className="text-sm mb-6" style={{ color: 'var(--color-text-muted)' }}>
-                <strong>{email}</strong> adresine şifre sıfırlama bağlantısı gönderildi. Lütfen gelen kutunuzu kontrol edin.
-              </p>
-              <p className="text-xs mb-6" style={{ color: 'var(--color-text-muted)' }}>
-                E-posta birkaç dakika içinde ulaşmazsa spam/istenmeyen klasörünü kontrol edin.
-              </p>
-              <Link href="/auth/login">
-                <ShimmerButton
-                  className="w-full h-12 gap-2 text-[15px] font-semibold"
-                  shimmerColor="rgba(255,255,255,0.15)"
-                  shimmerSize="0.08em"
-                  borderRadius="12px"
-                  background="linear-gradient(135deg, var(--brand-600) 0%, var(--brand-800) 100%)"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                  Giriş Sayfasına Dön
-                </ShimmerButton>
-              </Link>
-            </div>
-          </BlurFade>
-        ) : (
-          /* Form */
-          <>
-            <BlurFade delay={0.1}>
-              <p
-                className="text-xs font-semibold uppercase tracking-[0.15em] mb-3"
-                style={{ color: 'var(--color-primary)' }}
-              >
-                Şifre Sıfırlama
-              </p>
-              <h2 className="text-3xl font-bold tracking-tight mb-2">Şifrenizi mi unuttunuz?</h2>
-              <p className="text-sm mb-8" style={{ color: 'var(--color-text-muted)' }}>
-                Kayıtlı e-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.
-              </p>
-            </BlurFade>
-
-            {error && (
-              <BlurFade delay={0}>
-                <div
-                  className="mb-5 flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium"
-                  style={{
-                    background: 'var(--color-error-bg)',
-                    color: 'var(--color-error)',
-                    border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)',
-                  }}
-                >
-                  <div
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
-                    style={{ background: 'var(--color-error)', color: 'white' }}
-                  >
-                    !
-                  </div>
-                  {error}
+        {/* Card with gold left rail */}
+        <div
+          className="relative bg-white"
+          style={{
+            border: `1.5px solid ${RULE}`,
+            borderLeft: `6px solid ${GOLD}`,
+            padding: '36px 38px',
+          }}
+        >
+          {sent ? (
+            /* ── SUCCESS STATE ── */
+            <>
+              <BlurFade delay={0.08} duration={0.4}>
+                <div className="ed-mono text-[10px] tracking-[0.32em]" style={{ color: GOLD }}>
+                  № 04 · GÖNDERİLDİ
                 </div>
               </BlurFade>
-            )}
 
-            <BlurFade delay={0.2}>
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <Label
-                    className="text-xs font-semibold mb-2 block"
-                    style={{ color: 'var(--color-text-secondary)' }}
-                  >
-                    E-posta Adresi
-                  </Label>
-                  <Input
-                    type="email"
-                    placeholder="ornek@hastane.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    className="h-12 rounded-xl text-[15px]"
-                    style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-                    required
-                  />
+              <BlurFade delay={0.12} duration={0.4}>
+                <h2
+                  className="ed-display mt-3 leading-[1.05] tracking-tight"
+                  style={{ color: INK, fontSize: '2rem', fontWeight: 600 }}
+                >
+                  E-posta <span style={{ fontStyle: 'italic', color: GOLD }}>yola çıktı.</span>
+                </h2>
+              </BlurFade>
+
+              <BlurFade delay={0.16} duration={0.4}>
+                <div className="my-6 h-px" style={{ background: RULE }} />
+              </BlurFade>
+
+              <BlurFade delay={0.18} duration={0.4}>
+                <div
+                  className="mb-6 flex items-start gap-4 px-4 py-4"
+                  style={{ background: '#f1f7f3', borderLeft: `3px solid #1a3a28` }}
+                >
+                  <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#1a3a28' }} />
+                  <div className="text-[13px] leading-relaxed" style={{ color: INK }}>
+                    <strong style={{ color: INK }}>{email}</strong> adresine şifre sıfırlama bağlantısı
+                    gönderildi. Lütfen gelen kutunuzu kontrol edin.
+                  </div>
                 </div>
+              </BlurFade>
 
-                <ShimmerButton
-                  type="submit"
-                  disabled={loading}
-                  className="w-full h-12 gap-2.5 text-[15px] font-semibold"
-                  shimmerColor="rgba(255,255,255,0.15)"
-                  shimmerSize="0.08em"
-                  borderRadius="12px"
-                  background="linear-gradient(135deg, var(--brand-600) 0%, var(--brand-800) 100%)"
-                >
-                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mail className="h-5 w-5" />}
-                  {loading ? 'Gönderiliyor...' : 'Sıfırlama Bağlantısı Gönder'}
-                  {!loading && <ChevronRight className="h-4 w-4 ml-1 opacity-60" />}
-                </ShimmerButton>
-              </form>
-            </BlurFade>
-
-            <BlurFade delay={0.3}>
-              <div className="mt-6 text-center">
-                <Link
-                  href="/auth/login"
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold transition-colors duration-150 hover:underline"
-                  style={{ color: 'var(--color-primary)' }}
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Giriş sayfasına dön
-                </Link>
-              </div>
-            </BlurFade>
-
-            <BlurFade delay={0.4}>
-              <div className="mt-10 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
-                <p className="text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  &copy; 2026 Devakent Hastanesi. Tüm hakları saklıdır.
+              <BlurFade delay={0.22} duration={0.4}>
+                <p className="text-[12.5px] leading-relaxed mb-7" style={{ color: INK_SOFT }}>
+                  E-posta birkaç dakika içinde ulaşmazsa <strong>spam/istenmeyen</strong> klasörünü kontrol
+                  edin. Bağlantı 1 saat süreyle geçerlidir.
                 </p>
-              </div>
-            </BlurFade>
-          </>
-        )}
+              </BlurFade>
+
+              <BlurFade delay={0.26} duration={0.4}>
+                <Link href="/auth/login">
+                  <button
+                    type="button"
+                    className="group relative w-full flex items-center justify-center gap-3 transition-colors duration-200"
+                    style={{
+                      height: 52,
+                      background: INK,
+                      color: '#f8f4ea',
+                      border: `1.5px solid ${INK}`,
+                      boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px ${GOLD}55`,
+                    }}
+                  >
+                    <ArrowLeft
+                      className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-1"
+                      style={{ color: GOLD }}
+                    />
+                    <span className="ed-mono text-[12px] tracking-[0.28em]">GİRİŞE DÖN</span>
+                  </button>
+                </Link>
+              </BlurFade>
+            </>
+          ) : (
+            /* ── FORM STATE ── */
+            <>
+              <BlurFade delay={0.08} duration={0.4}>
+                <div className="ed-mono text-[10px] tracking-[0.32em]" style={{ color: GOLD }}>
+                  № 03 · ŞİFRE SIFIRLAMA
+                </div>
+              </BlurFade>
+
+              <BlurFade delay={0.12} duration={0.4}>
+                <h2
+                  className="ed-display mt-3 leading-[1.05] tracking-tight"
+                  style={{ color: INK, fontSize: '2rem', fontWeight: 600 }}
+                >
+                  Şifrenizi mi <span style={{ fontStyle: 'italic', color: GOLD }}>unuttunuz?</span>
+                </h2>
+              </BlurFade>
+
+              <BlurFade delay={0.16} duration={0.4}>
+                <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: INK_SOFT }}>
+                  Kayıtlı e-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.
+                </p>
+              </BlurFade>
+
+              <BlurFade delay={0.18} duration={0.4}>
+                <div className="my-6 h-px" style={{ background: RULE }} />
+              </BlurFade>
+
+              {error && (
+                <BlurFade delay={0}>
+                  <div
+                    className="mb-5 flex items-start gap-3 px-4 py-3 text-[13px]"
+                    style={{ background: '#fdf2ee', color: '#992f1d', borderLeft: '3px solid #b3261e' }}
+                  >
+                    <span className="ed-mono text-[11px] mt-0.5" style={{ color: '#b3261e' }}>!</span>
+                    <span>{error}</span>
+                  </div>
+                </BlurFade>
+              )}
+
+              <BlurFade delay={0.22} duration={0.4}>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="ed-mono text-[10px] tracking-[0.28em] mb-2 block" style={{ color: INK }}>
+                      E-POSTA
+                    </label>
+                    <Input
+                      type="email"
+                      placeholder="ornek@hastane.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                      className="ed-input"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="group relative w-full mt-2 flex items-center justify-center gap-3 transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{
+                      height: 52,
+                      background: INK,
+                      color: '#f8f4ea',
+                      border: `1.5px solid ${INK}`,
+                      boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px ${GOLD}55`,
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" style={{ color: GOLD }} />
+                        <span className="ed-mono text-[12px] tracking-[0.28em]">GÖNDERİLİYOR…</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="ed-mono text-[12px] tracking-[0.28em]">BAĞLANTI GÖNDER</span>
+                        <ArrowRight
+                          className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
+                          style={{ color: GOLD }}
+                        />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </BlurFade>
+
+              <BlurFade delay={0.28} duration={0.4}>
+                <div className="mt-6 text-center">
+                  <Link
+                    href="/auth/login"
+                    className="ed-mono inline-flex items-center gap-2 text-[10px] tracking-[0.28em] transition-colors hover:underline"
+                    style={{ color: INK }}
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" style={{ color: GOLD }} />
+                    GİRİŞ SAYFASINA DÖN
+                  </Link>
+                </div>
+              </BlurFade>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <BlurFade delay={0.32} duration={0.4}>
+          <div className="mt-6 flex items-center justify-between ed-mono text-[10px] tracking-[0.25em]" style={{ color: INK_SOFT }}>
+            <span>© 2026 · DEVAKENT HASTANESI</span>
+            <span style={{ color: GOLD }}>HOSPITAL LMS</span>
+          </div>
+        </BlurFade>
       </div>
     </div>
   );
