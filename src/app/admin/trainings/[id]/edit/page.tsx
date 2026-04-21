@@ -23,10 +23,17 @@ interface TrainingEditData {
   smgPoints: number;
   startDate: string;
   endDate: string;
+  questionCount?: number;
 }
 
 import { TRAINING_CATEGORIES } from '@/lib/training-categories';
 const categories = TRAINING_CATEGORIES;
+
+/** Baraj puanı için en az kaç doğru cevap gerektiğini hesaplar. */
+const minCorrectForPassing = (passingScore: number, totalQuestions: number): number => {
+  if (totalQuestions <= 0 || passingScore <= 0) return 0;
+  return Math.ceil((passingScore / 100) * totalQuestions);
+};
 
 export default function EditTrainingPage() {
   const router = useRouter();
@@ -51,6 +58,7 @@ export default function EditTrainingPage() {
         smgPoints: typeof data.smgPoints === 'number' ? data.smgPoints : 10,
         startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
         endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
+        questionCount: data.questionCount ?? 0,
       });
     }
   }, [data]);
@@ -178,11 +186,36 @@ export default function EditTrainingPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-5 lg:grid-cols-5">
-            <div>
+            <div className="col-span-2 lg:col-span-5">
               <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
                 <Target className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} /> Baraj Puanı
               </Label>
-              <Input type="number" value={formData.passingScore} onChange={(e) => setFormData({ ...formData, passingScore: Number(e.target.value) })} className="h-10 rounded-xl font-mono" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[140px_1fr] sm:items-center">
+                <Input type="number" min={0} max={100} value={formData.passingScore} onChange={(e) => setFormData({ ...formData, passingScore: Number(e.target.value) })} className="h-10 rounded-xl font-mono" style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }} />
+                <div
+                  className="rounded-lg px-3 py-2 text-xs"
+                  style={{
+                    background: 'var(--color-primary-light)',
+                    color: 'var(--color-primary-dark)',
+                    border: '1px dashed var(--color-primary)',
+                  }}
+                >
+                  {(formData.questionCount ?? 0) > 0 && formData.passingScore > 0 ? (
+                    <>
+                      Personel barajı geçmek için{' '}
+                      <strong style={{ color: 'var(--color-primary)' }}>{formData.questionCount}</strong> sorudan en az{' '}
+                      <strong style={{ color: 'var(--color-primary)' }}>
+                        {minCorrectForPassing(formData.passingScore, formData.questionCount ?? 0)}
+                      </strong>{' '}
+                      tanesini doğru cevaplamalı.
+                    </>
+                  ) : (
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      Bu eğitimde henüz soru yok — baraj etkisi için önce soru eklemelisin.
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
             <div>
               <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
