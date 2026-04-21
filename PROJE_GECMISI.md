@@ -5775,3 +5775,149 @@ Supabase cloud DB'ye manuel SQL Editor ile uygulandı (migration dosyası fresh 
 ---
 
 *Son güncelleme: 19 Nisan 2026 — Oturum 51 (SMS MFA)*
+
+---
+
+## OTURUM 52 — 20 NİSAN 2026: STAFF REDESIGN + macOS iCloud DEV FIX + CI STABILIZASYONU
+
+### Motivasyon
+Dün eşzamanlı birkaç Claude agent çalışmıştı ve personel paneli (eğitimlerim → pre-exam → videos → post-exam → feedback) akışında çakışma yaşanmış olabileceği şüphesi vardı. Kullanıcı ilk olarak "video İzle butonu çalışmıyor, URL değişmiyor" şikayetini bildirdi. Araştırma derinleştikçe iki ayrı kök sorun ortaya çıktı: (1) videos sayfası Turbopack'te stuck compile, (2) `.next/dev/` klasöründe manifest dosyaları ENOENT kaskadıyla yok oluyor → HTTP 500.
+
+### Teşhis — İki Ayrı Semptom, İki Ayrı Kök
+
+**1. Videos sayfası stuck compile (1288 satır + 500 satır `<style jsx>`)**
+- `src/app/exam/[id]/videos/page.tsx` içinde 496 satırlık tek bir `<style jsx>` bloğu vardı
+- style-jsx Babel transform büyük template literal'larda O(n²) yavaşlıyordu
+- Hem Turbopack hem webpack `Compiling /exam/[id]/videos...` noktasında 100% CPU takılıyordu
+- Kullanıcı "İzle" butonuna tıkladığında 2-4 dakika bekliyor, compile hiç bitmiyordu
+
+**2. macOS Desktop iCloud Drive `.next/` eviction'ı**
+- Proje `~/Desktop/deva-project/hospital-lms/` konumunda (iCloud-synced)
+- iCloud Drive `.next/dev/` altındaki tmp rename operasyonlarıyla race ediyordu
+- Kanıt: `.next` 0 byte + yanında `.next 2` iCloud conflict copy oluşuyordu
+- Loglarda: `ENOENT: pages-manifest.json`, `next-font-manifest.json`, `vendor-chunks/*.js`
+- `predev.js`'teki `xattr -d com.apple.provenance` cleanup yetersiz kaldı — iCloud sadece xattr'dan değil dir adından da evict kararı alıyor
+
+### Geçmişte Denenen ve Başarısız Olan Çözümler
+Bu session öncesi memory'de dokümante edilmişti:
+- `distDir: '/tmp/hospital-lms-next'` → Next 16.2 project path dışını reddediyor
+- `.next → /tmp` symlink → Turbopack postcss child worker CWD'de node_modules walk-up yapamıyor (`@tailwindcss/postcss` Cannot find module)
+- `predev.js` provenance xattr temizliği → hala eviction oluyor
+
+### Kalıcı Çözüm: `.nosync` Suffix (Apple dokümante özellik)
+
+macOS iCloud Drive, `.nosync` uzantılı dosya/klasörleri senkronize etmez. `distDir`'i dev+darwin'de `.next.nosync` yapınca:
+- Proje içinde kalır → Next.js validation geçer (`public` ve empty string dışında her ad kabul)
+- iCloud dokunmaz → manifest intact kalır
+- Vercel/CI Linux'ta koşul false → klasik `.next` → production sıfır etki
+
+### Uygulanan Değişiklikler
+
+**next.config.ts (conditional distDir):**
+```ts
+distDir: process.env.NEXT_DIST_DIR ??
+  (process.env.NODE_ENV === 'development' && process.platform === 'darwin'
+    ? '.next.nosync'
+    : '.next'),
+```
+
+**scripts/predev.js (her iki dir + conflict cleanup):**
+- `.next`, `.next.nosync` provenance xattr temizliği
+- `.next 2`, `.next.nosync 2` iCloud conflict copy'leri `fs.rmSync` ile siliyor
+
+**.gitignore:** `/.next.nosync/` eklendi
+
+**package.json:** `dev:clean` script güncellendi — `rm -rf .next .next.nosync '.next 2' '.next.nosync 2'`
+
+**videos/page.tsx + videos.css:**
+- 496 satırlık ana `<style jsx>` bloğu + 73 satırlık renderItem style'ı `videos.css`'e taşındı
+- `'use client'` hemen altına `import './videos.css'` eklendi
+- Sınıf isimleri aynı (`vd-*`, `vi-*`) — görsel regresyon yok
+- Dosya 1288 → 746 satır
+
+**Bug fix'ler (aynı session):**
+- `exam/[id]/scorm/page.tsx` — tamamlanma sonrası `/staff/dashboard` yerine `/staff/my-trainings`'e yönlendirme (diğer akışlarla tutarlılık)
+- `exam/[id]/post-exam/page.tsx` — retry-fail race condition → inline error banner + "Tekrar Dene" butonu
+- `exam/[id]/pre-exam/page.tsx` — cevaplanmayan soru uyarısı (matching post-exam pattern)
+- `exam/[id]/videos/page.tsx` — dead code removal (showPostExamPrompt modal hiç tetiklenmiyordu)
+
+### PR #21 Canlıya Alma — CI Kademeli Stabilizasyon
+
+**Branch:** `feat/staff-redesign-macos-fix` → main
+**İlk push:** 41 dosya, +11933 / -4273 satır (dünkü redesign WIP'i + bugünkü fixes)
+
+CI arka arkaya 4 farklı sebeple fail etti; her biri ayrı commit'te çözüldü:
+
+1. **perf-check hook — Cache-Control eksik** (pre-commit)
+   - `src/app/api/debug/sentry/route.ts` GET handler `Cache-Control` header'ı yoktu
+   - Fix: `NO_CACHE_HEADERS` constant ekleyip tüm response'lara `headers: NO_CACHE_HEADERS` geçildi
+
+2. **Migration drift — accreditation_standards_code_key orphan index**
+   - CI `prisma migrate diff` raporu: fresh DB'de `code` kolonunda UNIQUE INDEX kalıyor ama schema composite istiyor
+   - Kök: `20260330_add_accreditation` UNIQUE INDEX olarak oluşturdu, sonraki `20260418_per_org` `DROP CONSTRAINT IF EXISTS` ile silmeye çalıştı — Postgres'te UNIQUE INDEX ≠ UNIQUE CONSTRAINT, DROP CONSTRAINT no-op
+   - Fix: Yeni migration `20260420160000_drop_legacy_code_unique_index` — `DROP INDEX IF EXISTS "accreditation_standards_code_key"`
+
+3. **Unit test fail — api-auth.test.ts eksik mocklar**
+   - Login route'a yeni eklenmiş bağımlılıklar (`logActivity`, `isDeviceTrusted`) test dosyasında mock'lanmamıştı
+   - `next/headers` `cookies()` mock'ı sadece `getAll, get` döndürüyordu, `set` yoktu → `cookieStore.set(REMEMBER_ME_COOKIE)` undefined crash
+   - Fix: `@/lib/activity-logger`, `@/lib/auth/trusted-device` mock'ları + `cookies()` mock'una `set, delete` eklendi
+   - Lokal: 365/365 test geçti
+
+4. **Production build fail — route collision (kritik bulgu)**
+   - Hata: `Invariant: The client reference manifest for route "/" does not exist. This is a bug in Next.js.`
+   - Aldatıcı mesaj — Next.js'in kendi bug'ı olarak görünüyor
+   - Gerçek sebep: `src/app/page.tsx` VE `src/app/(marketing)/page.tsx` aynı `/` URL'ine çözülüyor
+   - Route group parantezli ad (`(marketing)`) URL segmentinde görünmez — dev'de collision algılanmıyor, prod build'de invariant atıyor
+   - `(marketing)/page.tsx` sadece `export { MarketingHomeClient as default }` re-export'u yapan legacy dosyaydı, gerçek home `src/app/page.tsx`'te
+   - Fix: `(marketing)/page.tsx` silindi. Sub-route'lar (`contact/`, `pricing/`, `privacy/`, vs.) ve `layout.tsx` korundu
+   - Git log: Bu bug 5+ commit'tir main'de açıktı ama fark edilmemişti — CI build step pre-existing fail'di, PR'ım bunu expose etti
+
+### Sonuç — PR #21 Merge
+- Tüm CI check'leri yeşil: `ci` pass (6m5s), Vercel preview deploy pass
+- Squash-merge ile main'e birleşti — SHA `821d3e3`
+- Vercel otomatik prod deploy yaptı → `hospital-lms-uajo.vercel.app` güncel
+- main'e direkt push atılmadı, standart PR akışı izlendi
+
+### Dal Temizliği (post-merge)
+Remote'ta birikmiş 7 merge edilmiş branch + 2 lokal orphan branch silindi:
+- `feat/staff-redesign-macos-fix` (PR #21)
+- `fix/backup-crypto` (PR #20)
+- `ci/archived-training-filter`, `ci/gate-auto-merge`
+- `feat/feedback-premium-kvkk-gating`, `feat/feedback-snapshot-polish`
+- `fix/auto-merge-workflow-git-context`, `fix/competency-matrix-effectiveness`
+- Lokal: `backup/dev-2026-04-13`, `backup/main-2026-04-13`
+
+**Kalan:** `origin/main` + `origin/archive/old-main-2026-04-13` (2026-04-13 cleanup'tan kalan bilinçli yedek)
+
+### Öğrenilen Bilgi Kalemleri (memory'e kaydedildi)
+
+1. **`.nosync` suffix = macOS iCloud bypass** — `xattr -d com.apple.provenance` yetmiyor, dir adındaki suffix daha güçlü koruma
+2. **style-jsx büyük blok = Babel transform yavaşlaması** — 500+ satır CSS'i global `.css` dosyasına çıkart, HMR anlık hızlanır
+3. **Route group collision** — `app/page.tsx` + `app/(x)/page.tsx` prod build'de InvariantError, mesaj misleading ("bug in Next.js")
+4. **Postgres UNIQUE INDEX ≠ UNIQUE CONSTRAINT** — `DROP CONSTRAINT` index'i silmez. Prisma migration'larda `code_key` tipi silmek için `DROP INDEX IF EXISTS` gerekli
+5. **Next.js route group parantezli ad URL'de görünmez** — `(marketing)/page.tsx` → `/`, `marketing/page.tsx` → `/marketing`
+
+### Değiştirilen Dosyalar
+- `next.config.ts` — conditional distDir
+- `scripts/predev.js` — iCloud cleanup genişletildi
+- `.gitignore` — `.next.nosync/`
+- `package.json` — `dev:clean`
+- `src/app/exam/[id]/videos/page.tsx` — style-jsx extract
+- `src/app/exam/[id]/videos/videos.css` — YENİ (542 satır)
+- `src/app/exam/[id]/pre-exam/page.tsx` — cevapsız soru uyarısı
+- `src/app/exam/[id]/post-exam/page.tsx` — inline error + tekrar dene
+- `src/app/exam/[id]/scorm/page.tsx` — my-trainings yönlendirmesi
+- `src/app/api/debug/sentry/route.ts` — Cache-Control
+- `src/lib/__tests__/api-auth.test.ts` — eksik mocklar
+- `src/app/(marketing)/page.tsx` — SİLİNDİ (route collision)
+- `prisma/migrations/20260420160000_drop_legacy_code_unique_index/migration.sql` — YENİ (drift fix)
+
+### Önemli Not — Personel Etkisi
+`.nosync` suffix sadece benim Mac'imde + dev modda aktif. Production'da (Vercel Linux):
+- `NODE_ENV=production` → koşul false → klasik `.next` build'i
+- Personel Windows/Android cihazlarında `.next` veya `.next.nosync` klasörü yok — tarayıcı sadece Vercel CDN'den bundle indirir
+- Hiçbir müşteri etkisi yok
+
+---
+
+*Son güncelleme: 20 Nisan 2026 — Oturum 52 (Staff Redesign + macOS iCloud Fix + CI Stabilizasyonu)*
