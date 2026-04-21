@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createAssignmentSchema } from '@/lib/validations'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
+import { sendEmail, trainingAssignedEmail } from '@/lib/email'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -59,7 +61,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     select: {
       id: true,
       title: true,
+      description: true,
+      category: true,
+      endDate: true,
+      examDurationMinutes: true,
+      passingScore: true,
+      smgPoints: true,
+      isCompulsory: true,
       videos: { select: { contentType: true } },
+      organization: { select: { name: true } },
     },
   })
   if (!training) return errorResponse('Eğitim bulunamadı veya arşivlenmiş', 404)
@@ -120,7 +130,89 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
 
+  // Fire-and-forget: atanan personellere profesyonel e-posta gönder (tenant SMTP).
+  // Atama commit edildikten sonra arka planda çalışır; email hatası response'u etkilemez.
+  const orgId = dbUser!.organizationId!
+  const assignedByName = [dbUser!.firstName, dbUser!.lastName].filter(Boolean).join(' ') || null
+  void sendAssignmentEmails({
+    organizationId: orgId,
+    userIds: newUserIds,
+    training: {
+      title: training.title,
+      description: training.description,
+      category: training.category,
+      endDate: training.endDate,
+      examDurationMinutes: training.examDurationMinutes,
+      passingScore: training.passingScore,
+      smgPoints: training.smgPoints,
+      isCompulsory: training.isCompulsory,
+    },
+    hospitalName: training.organization.name,
+    maxAttempts: parsed.data.maxAttempts,
+    assignedByName,
+  })
+
   return jsonResponse({ created: assignments.count, skipped: existingUserIds.size }, 201)
+}
+
+/** Atanan personellere eğitim bildirimi e-postası — arka planda çalışır, hata yutar. */
+async function sendAssignmentEmails(params: {
+  organizationId: string
+  userIds: string[]
+  training: {
+    title: string
+    description: string | null
+    category: string | null
+    endDate: Date
+    examDurationMinutes: number | null
+    passingScore: number | null
+    smgPoints: number | null
+    isCompulsory: boolean
+  }
+  hospitalName: string
+  maxAttempts: number
+  assignedByName: string | null
+}) {
+  try {
+    const recipients = await prisma.user.findMany({
+      where: { id: { in: params.userIds }, organizationId: params.organizationId },
+      select: { id: true, email: true, firstName: true, lastName: true },
+    })
+
+    const dueDate = params.training.endDate.toLocaleDateString('tr-TR', {
+      day: '2-digit', month: 'long', year: 'numeric',
+    })
+
+    await Promise.allSettled(
+      recipients
+        .filter(r => r.email)
+        .map(async (r) => {
+          const staffName = [r.firstName, r.lastName].filter(Boolean).join(' ') || r.email
+          const html = trainingAssignedEmail({
+            staffName,
+            hospitalName: params.hospitalName,
+            trainingTitle: params.training.title,
+            trainingDescription: params.training.description,
+            category: params.training.category,
+            endDate: dueDate,
+            examDurationMinutes: params.training.examDurationMinutes,
+            maxAttempts: params.maxAttempts,
+            passingScore: params.training.passingScore,
+            smgPoints: params.training.smgPoints,
+            isCompulsory: params.training.isCompulsory,
+            assignedByName: params.assignedByName,
+          })
+          await sendEmail({
+            organizationId: params.organizationId,
+            to: r.email,
+            subject: `${params.hospitalName} · Yeni eğitim atandı: ${params.training.title}`,
+            html,
+          })
+        }),
+    )
+  } catch (err) {
+    logger.error('Assignments', 'Atama e-postaları gönderilemedi', err)
+  }
 }
 
 /** PATCH — Yönetici: başarısız eğitimi yeniden aç + ek deneme hakkı ver */

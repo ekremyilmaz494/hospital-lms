@@ -1,5 +1,8 @@
-import nodemailer from 'nodemailer'
+import nodemailer, { type Transporter } from 'nodemailer'
 import { checkRateLimit } from '@/lib/redis'
+import { prisma } from '@/lib/prisma'
+import { decrypt } from '@/lib/crypto'
+import { logger } from '@/lib/logger'
 
 /**
  * Escapes HTML special characters to prevent HTML injection in email templates.
@@ -14,7 +17,8 @@ export function escapeHtml(unsafe: string): string {
     .replace(/'/g, '&#39;')
 }
 
-const transporter = nodemailer.createTransport({
+// ── Global (platform-owned) transporter — super admin, self-registration, invoice ──
+const globalTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT ?? '587'),
   secure: false,
@@ -30,10 +34,89 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 30000,
 })
 
+// ── Per-org transporter cache ──
+type OrgTransport = {
+  transporter: Transporter
+  from: string
+  replyTo: string
+  cachedAt: number
+}
+const orgTransporters = new Map<string, OrgTransport>()
+const ORG_CACHE_TTL_MS = 10 * 60 * 1000 // 10 dk — settings güncellenince invalidate ediyoruz, bu sadece safety
+
+/** Settings güncellenince çağır — eski transporter bağlantısını kapat ve cache'den düş. */
+export function invalidateOrgTransporter(organizationId: string) {
+  const entry = orgTransporters.get(organizationId)
+  if (entry) {
+    try { entry.transporter.close() } catch {}
+    orgTransporters.delete(organizationId)
+  }
+}
+
+/**
+ * Hastane (tenant) için SMTP transporter'ı döner.
+ * smtpEnabled=false veya host yoksa null döner → çağıran email'i atlar.
+ */
+async function getOrgTransporter(organizationId: string): Promise<OrgTransport | null> {
+  const cached = orgTransporters.get(organizationId)
+  if (cached && Date.now() - cached.cachedAt < ORG_CACHE_TTL_MS) {
+    return cached
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: {
+      name: true,
+      smtpEnabled: true,
+      smtpHost: true,
+      smtpPort: true,
+      smtpSecure: true,
+      smtpUser: true,
+      smtpPassEncrypted: true,
+      smtpFrom: true,
+      smtpReplyTo: true,
+    },
+  })
+
+  if (!org?.smtpEnabled || !org.smtpHost || !org.smtpUser || !org.smtpPassEncrypted) {
+    return null
+  }
+
+  let password: string
+  try {
+    password = decrypt(org.smtpPassEncrypted)
+  } catch (err) {
+    logger.error('email', `SMTP şifresi çözülemedi — org=${organizationId}`, err)
+    return null
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: org.smtpHost,
+    port: org.smtpPort ?? 587,
+    secure: org.smtpSecure,
+    auth: { user: org.smtpUser, pass: password },
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 50,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 30000,
+  })
+
+  const from = org.smtpFrom ?? `${org.name} <${org.smtpUser}>`
+  const replyTo = org.smtpReplyTo ?? org.smtpFrom ?? org.smtpUser
+
+  const entry: OrgTransport = { transporter, from, replyTo, cachedAt: Date.now() }
+  orgTransporters.set(organizationId, entry)
+  return entry
+}
+
 interface EmailOptions {
   to: string | string[]
   subject: string
   html: string
+  /** Belirtilirse hastanenin kendi SMTP'si kullanılır. Yoksa email atlanır (false döner). */
+  organizationId?: string
 }
 
 // Rate limits: max 200 emails/hour globally, max 20/hour per recipient
@@ -41,7 +124,15 @@ const EMAIL_GLOBAL_LIMIT = 200
 const EMAIL_PER_RECIPIENT_LIMIT = 20
 const EMAIL_WINDOW_SECONDS = 3600
 
-export async function sendEmail({ to, subject, html }: EmailOptions) {
+/**
+ * E-posta gönderir.
+ * - `organizationId` verildiyse hastanenin kendi SMTP'si kullanılır. Hastane SMTP
+ *   konfigüre etmediyse gönderim atlanır ve `false` döner (fırlatmaz).
+ * - `organizationId` verilmediyse global platform SMTP'si kullanılır
+ *   (super admin, self-registration, invoice gibi platform-owned akışlar).
+ * @returns gönderildi mi?
+ */
+export async function sendEmail({ to, subject, html, organizationId }: EmailOptions): Promise<boolean> {
   const recipientList = Array.isArray(to) ? to : [to]
 
   // Global hourly cap — prevents runaway cron/bulk sends
@@ -59,32 +150,161 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
     }
   }
 
+  let transporter: Transporter
+  let from: string
+  let replyTo: string
+
+  if (organizationId) {
+    const orgT = await getOrgTransporter(organizationId)
+    if (!orgT) {
+      // Hastane SMTP konfigüre etmemiş — sessizce atla (tenant izolasyonu)
+      return false
+    }
+    transporter = orgT.transporter
+    from = orgT.from
+    replyTo = orgT.replyTo
+  } else {
+    transporter = globalTransporter
+    from = process.env.SMTP_FROM ?? 'Devakent Hastanesi <noreply@hastanelms.com>'
+    replyTo = process.env.SMTP_REPLY_TO ?? process.env.SMTP_FROM ?? 'destek@hastanelms.com'
+  }
+
   await transporter.sendMail({
-    from: process.env.SMTP_FROM ?? 'Devakent Hastanesi <noreply@hastanelms.com>',
-    replyTo: process.env.SMTP_REPLY_TO ?? process.env.SMTP_FROM ?? 'destek@hastanelms.com',
+    from,
+    replyTo,
     to: recipientList.join(', '),
     subject,
     html,
   })
+  return true
 }
 
 // ── Email Templates ──
 
-export function trainingAssignedEmail(staffName: string, trainingTitle: string, dueDate: string) {
+interface TrainingAssignedEmailParams {
+  staffName: string
+  hospitalName: string
+  trainingTitle: string
+  trainingDescription?: string | null
+  category?: string | null
+  endDate: string
+  examDurationMinutes?: number | null
+  maxAttempts?: number | null
+  passingScore?: number | null
+  smgPoints?: number | null
+  isCompulsory?: boolean
+  assignedByName?: string | null
+}
+
+/**
+ * Profesyonel, tenant-aware "Yeni Eğitim Atandı" e-postası.
+ * Hastane adı dinamik — her kurum kendi markasıyla görünür.
+ */
+export function trainingAssignedEmail(params: TrainingAssignedEmailParams): string {
+  const {
+    staffName,
+    hospitalName,
+    trainingTitle,
+    trainingDescription,
+    category,
+    endDate,
+    examDurationMinutes,
+    maxAttempts,
+    passingScore,
+    smgPoints,
+    isCompulsory,
+    assignedByName,
+  } = params
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const ctaUrl = `${appUrl}/staff/my-trainings`
+
+  const detailRow = (label: string, value: string) => `
+    <tr>
+      <td style="padding: 10px 0; color: #64748b; font-size: 13px; width: 42%;">${escapeHtml(label)}</td>
+      <td style="padding: 10px 0; color: #0f172a; font-size: 13px; font-weight: 600;">${escapeHtml(value)}</td>
+    </tr>`
+
+  const rows: string[] = []
+  if (category) rows.push(detailRow('Kategori', category))
+  rows.push(detailRow('Son tamamlama tarihi', endDate))
+  if (examDurationMinutes != null) rows.push(detailRow('Sınav süresi', `${examDurationMinutes} dakika`))
+  if (passingScore != null) rows.push(detailRow('Geçme puanı', `${passingScore} / 100`))
+  if (maxAttempts != null) rows.push(detailRow('Sınav hakkı', `${maxAttempts} deneme`))
+  if (smgPoints != null && smgPoints > 0) rows.push(detailRow('SMG puanı', `${smgPoints} puan`))
+
+  const compulsoryBadge = isCompulsory
+    ? `<span style="display: inline-block; background: #fef2f2; color: #b91c1c; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; border: 1px solid #fecaca; margin-left: 8px;">Zorunlu</span>`
+    : ''
+
+  const descriptionBlock = trainingDescription
+    ? `
+      <p style="color: #475569; line-height: 1.65; font-size: 14px; margin: 8px 0 20px;">
+        ${escapeHtml(trainingDescription)}
+      </p>`
+    : ''
+
+  const assignedByLine = assignedByName
+    ? `<p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0;">Atayan: <strong style="color: #475569;">${escapeHtml(assignedByName)}</strong></p>`
+    : ''
+
   return `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+    <div style="font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 620px; margin: 0 auto; background: #f8fafc; padding: 32px 16px;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 36px 32px; border-radius: 16px 16px 0 0;">
+        <p style="margin: 0 0 6px; color: rgba(255,255,255,0.72); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600;">Personel Eğitim Bildirimi</p>
+        <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px;">${escapeHtml(hospitalName)}</h1>
       </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Yeni Eğitim Atandı</h2>
-        <p style="color: #64748b;">Merhaba ${escapeHtml(staffName)},</p>
-        <p style="color: #64748b;"><strong>"${escapeHtml(trainingTitle)}"</strong> eğitimi size atanmıştır.</p>
-        <p style="color: #64748b;">Son tarih: <strong>${escapeHtml(dueDate)}</strong></p>
-        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/staff/my-trainings"
-           style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Eğitime Başla
-        </a>
+
+      <!-- Body -->
+      <div style="background: white; padding: 36px 32px; border: 1px solid #e2e8f0; border-top: none;">
+        <h2 style="color: #0f172a; margin: 0 0 6px; font-size: 20px; font-weight: 700; letter-spacing: -0.2px;">
+          Yeni bir eğitim atandı${compulsoryBadge}
+        </h2>
+        <p style="color: #64748b; margin: 0 0 24px; font-size: 14px; line-height: 1.6;">
+          Sayın <strong style="color: #0f172a;">${escapeHtml(staffName)}</strong>, aşağıdaki eğitim kurumunuz tarafından size atanmıştır.
+          Süresi dolmadan tamamlamanız beklenmektedir.
+        </p>
+
+        <!-- Training card -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 24px; margin: 0 0 24px;">
+          <h3 style="margin: 0 0 4px; color: #0f172a; font-size: 17px; font-weight: 700; line-height: 1.35;">
+            ${escapeHtml(trainingTitle)}
+          </h3>
+          ${assignedByLine}
+          ${descriptionBlock}
+          <table style="width: 100%; border-collapse: collapse; margin-top: 8px; border-top: 1px dashed #e2e8f0;">
+            ${rows.join('')}
+          </table>
+        </div>
+
+        <!-- CTA -->
+        <div style="text-align: center; margin: 28px 0 8px;">
+          <a href="${escapeHtml(ctaUrl)}"
+             style="display: inline-block; background: linear-gradient(135deg, #0d9668, #0a7d56); color: white; padding: 14px 36px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.2px; box-shadow: 0 4px 14px rgba(13,150,104,0.35);">
+            Eğitime Başla
+          </a>
+        </div>
+        <p style="text-align: center; color: #94a3b8; font-size: 12px; margin: 0 0 8px;">
+          veya bu bağlantıyı tarayıcınıza yapıştırın:<br/>
+          <span style="color: #64748b; word-break: break-all;">${escapeHtml(ctaUrl)}</span>
+        </p>
+
+        <!-- Footer note -->
+        <div style="border-top: 1px solid #f1f5f9; margin-top: 28px; padding-top: 20px;">
+          <p style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin: 0;">
+            Bu e-posta <strong>${escapeHtml(hospitalName)}</strong> personel eğitim yönetim sistemi tarafından
+            otomatik olarak gönderilmiştir. Soru ve talepleriniz için kurumunuzun İnsan Kaynakları veya
+            Eğitim Koordinatörlüğü birimine başvurabilirsiniz.
+          </p>
+        </div>
+      </div>
+
+      <!-- Ribbon -->
+      <div style="background: #0f172a; padding: 14px 32px; border-radius: 0 0 16px 16px; text-align: center;">
+        <p style="margin: 0; color: rgba(255,255,255,0.55); font-size: 11px; letter-spacing: 0.3px;">
+          ${escapeHtml(hospitalName)} · Personel Eğitim Yönetim Sistemi
+        </p>
       </div>
     </div>
   `
@@ -392,7 +612,8 @@ export async function sendInvoiceEmail(params: {
     </div>
   `
 
-  await transporter.sendMail({
+  // Fatura platform-owned akış — global SMTP kullanılır.
+  await globalTransporter.sendMail({
     from: process.env.SMTP_FROM ?? 'Devakent Hastanesi <noreply@hastanelms.com>',
     to: recipientList.join(', '),
     subject: `Fatura - ${invoiceNumber}`,
