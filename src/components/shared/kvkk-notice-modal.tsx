@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Shield, ExternalLink, Database, Lock, UserCheck, Loader2, Check, X } from 'lucide-react'
+import { ExternalLink, Loader2, ArrowRight } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/store/auth-store'
+
+// Clinical Editorial palette (matches /auth/login)
+const INK = '#0a1628'
+const CREAM = '#faf7f2'
+const RULE = '#e5e0d5'
+const GOLD = '#c9a961'
+const INK_SOFT = '#5b6478'
 
 /**
  * KVKK Aydınlatma Metni Bildirimi Modalı
@@ -60,128 +67,89 @@ export function KvkkNoticeModal({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        // Backdrop / ESC ile kapanmaya izin verme — sadece açık button aksiyonu kapatabilir
         if (next) setOpen(true)
       }}
     >
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-xl p-0 overflow-hidden gap-0 border-0 max-h-[92dvh] flex flex-col"
+        className="sm:max-w-[560px] p-0 overflow-hidden gap-0 max-h-[92dvh] flex flex-col"
         style={{
-          background: 'var(--color-surface)',
-          boxShadow: '0 32px 64px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px var(--color-border)',
+          background: '#fff',
+          border: `1.5px solid ${RULE}`,
+          borderLeft: `6px solid ${GOLD}`,
+          borderRadius: 0,
+          boxShadow: '0 32px 64px -12px rgba(10, 22, 40, 0.32)',
         }}
       >
-        {/* Decorative gradient header */}
-        <div
-          className="relative px-5 md:px-7 pt-5 md:pt-7 pb-4 md:pb-5 overflow-hidden shrink-0"
-          style={{
-            background:
-              'linear-gradient(135deg, var(--brand-50) 0%, color-mix(in srgb, var(--brand-100) 60%, var(--color-surface)) 100%)',
-            borderBottom: '1px solid var(--color-border)',
-          }}
-        >
-          <div
-            aria-hidden
-            className="absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl opacity-30 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, var(--brand-400), transparent 70%)' }}
-          />
+        <style>{`
+          .kvkk-display { font-family: var(--font-plus-jakarta-sans), serif; }
+          .kvkk-mono { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; }
+        `}</style>
 
-          <DialogHeader className="relative">
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-2xl shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, var(--brand-600), var(--brand-800))',
-                  boxShadow: '0 8px 20px color-mix(in srgb, var(--brand-600) 30%, transparent)',
-                }}
-              >
-                <Shield className="h-5 w-5 text-white" strokeWidth={2.2} />
-              </div>
-              <div className="min-w-0">
-                <p
-                  className="text-[10px] font-bold uppercase tracking-[0.2em] mb-0.5"
-                  style={{ color: 'var(--color-primary)' }}
-                >
-                  Yasal Bilgilendirme
-                </p>
-                <DialogTitle
-                  className="text-lg md:text-xl font-bold leading-tight"
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    color: 'var(--color-text-primary)',
-                  }}
-                >
-                  KVKK Aydınlatma Metni
-                </DialogTitle>
-              </div>
-            </div>
+        {/* Header */}
+        <DialogHeader className="px-7 pt-7 pb-5 shrink-0">
+          <div className="kvkk-mono text-[10px] tracking-[0.32em]" style={{ color: GOLD }}>
+            № 05 · YASAL BİLGİLENDİRME
+          </div>
+          <DialogTitle
+            className="kvkk-display mt-3 leading-[1.05] tracking-tight"
+            style={{ color: INK, fontSize: '1.7rem', fontWeight: 600 }}
+          >
+            KVKK <span style={{ fontStyle: 'italic', color: GOLD }}>Aydınlatma Metni.</span>
+          </DialogTitle>
+          <p className="mt-3 text-[13px] leading-relaxed" style={{ color: INK_SOFT }}>
+            6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında, sisteme giriş yapmadan önce
+            kişisel verilerinizin nasıl işlendiği hakkında bilgilendirilmeniz gerekmektedir.
+          </p>
+        </DialogHeader>
 
-            <p
-              className="text-[13px] leading-relaxed"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında, sisteme giriş yapmadan önce kişisel
-              verilerinizin nasıl işlendiği hakkında bilgilendirilmeniz gerekmektedir.
-            </p>
-          </DialogHeader>
-        </div>
-
-        {/* Body — three key points */}
-        <div className="px-5 md:px-7 py-5 md:py-6 space-y-3.5 md:space-y-4 overflow-y-auto flex-1 min-h-0">
+        {/* Body */}
+        <div className="px-7 py-5 overflow-y-auto flex-1 min-h-0" style={{ borderTop: `1px solid ${RULE}` }}>
           <InfoRow
-            icon={<Database className="w-4 h-4" />}
-            title="İşleme Amacı"
+            no="I"
+            label="İŞLEME AMACI"
             description={
               <>
                 Ad-soyad, e-posta, departman, eğitim ve sınav kayıtlarınız yalnızca{' '}
-                <strong style={{ color: 'var(--color-text-primary)' }}>
-                  personel eğitim süreçlerinin yönetimi
-                </strong>{' '}
-                amacıyla işlenir.
+                <strong style={{ color: INK }}>personel eğitim süreçlerinin yönetimi</strong> amacıyla işlenir.
               </>
             }
           />
           <InfoRow
-            icon={<Lock className="w-4 h-4" />}
-            title="Saklama ve Güvenlik"
+            no="II"
+            label="SAKLAMA & GÜVENLİK"
             description={
               <>
-                Verileriniz Supabase, AWS ve Vercel&apos;in{' '}
-                <strong style={{ color: 'var(--color-text-primary)' }}>AB sunucularında</strong>, KVKK m.9
-                uyarınca şifrelenerek saklanır.
+                Verileriniz Supabase, AWS ve Vercel&apos;in <strong style={{ color: INK }}>AB sunucularında</strong>,
+                KVKK m.9 uyarınca şifrelenerek saklanır.
               </>
             }
           />
           <InfoRow
-            icon={<UserCheck className="w-4 h-4" />}
-            title="Haklarınız"
+            no="III"
+            label="HAKLARINIZ"
+            last
             description={
               <>
-                KVKK m.11 kapsamında verilerinize{' '}
-                <strong style={{ color: 'var(--color-text-primary)' }}>
-                  erişim, düzeltme ve silme
-                </strong>{' '}
+                KVKK m.11 kapsamında verilerinize <strong style={{ color: INK }}>erişim, düzeltme ve silme</strong>{' '}
                 haklarına sahipsiniz.
               </>
             }
           />
 
+          {/* External link callout */}
           <div
-            className="rounded-xl p-3 flex items-start gap-2.5 mt-4"
-            style={{
-              background: 'var(--color-surface-hover)',
-              border: '1px solid var(--color-border)',
-            }}
+            className="mt-5 flex items-start gap-3 px-4 py-3"
+            style={{ background: CREAM, borderLeft: `3px solid ${GOLD}` }}
           >
-            <ExternalLink className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: 'var(--color-text-muted)' }} />
-            <p className="text-[12px] leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+            <ExternalLink className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: GOLD }} />
+            <p className="text-[12.5px] leading-relaxed" style={{ color: INK_SOFT }}>
               Ayrıntılı bilgi için{' '}
               <Link
                 href="/kvkk"
                 target="_blank"
-                className="font-semibold underline underline-offset-2 transition-colors duration-150 hover:opacity-80"
-                style={{ color: 'var(--brand-700)' }}
+                className="font-semibold underline underline-offset-2 transition-colors hover:opacity-80"
+                style={{ color: INK }}
               >
                 KVKK Aydınlatma Metni&apos;nin tamamını
               </Link>{' '}
@@ -191,73 +159,73 @@ export function KvkkNoticeModal({
 
           {/* Consent checkbox */}
           <label
-            className="flex items-start gap-3 cursor-pointer rounded-2xl p-4 transition-[background,border-color] duration-200"
+            className="mt-5 flex items-start gap-3 cursor-pointer p-4 transition-colors duration-200"
             style={{
-              background: accepted
-                ? 'color-mix(in srgb, var(--brand-50) 80%, var(--color-surface))'
-                : 'var(--color-surface-hover)',
-              border: accepted
-                ? '1px solid var(--brand-300)'
-                : '1px solid var(--color-border)',
+              background: accepted ? CREAM : '#fafafa',
+              border: accepted ? `1.5px solid ${GOLD}` : `1.5px solid ${RULE}`,
             }}
+            onClick={() => setAccepted((v) => !v)}
           >
             <button
               type="button"
               role="checkbox"
               aria-checked={accepted}
-              onClick={() => setAccepted((v) => !v)}
-              className="w-5 h-5 rounded-md shrink-0 mt-0.5 flex items-center justify-center transition-[background,border-color] duration-200"
+              onClick={(e) => {
+                e.stopPropagation()
+                setAccepted((v) => !v)
+              }}
+              className="w-[18px] h-[18px] shrink-0 mt-0.5 flex items-center justify-center transition-colors duration-200"
               style={{
-                background: accepted ? 'var(--color-primary)' : 'var(--color-surface)',
-                border: accepted ? '1px solid var(--color-primary)' : '1.5px solid var(--color-border-hover)',
-                boxShadow: accepted
-                  ? '0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent)'
-                  : 'none',
+                background: accepted ? INK : CREAM,
+                border: accepted ? `1.5px solid ${INK}` : `1.5px solid ${RULE}`,
               }}
             >
-              {accepted && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+              {accepted && (
+                <span
+                  style={{
+                    width: 5,
+                    height: 9,
+                    borderStyle: 'solid',
+                    borderColor: GOLD,
+                    borderWidth: '0 2px 2px 0',
+                    transform: 'rotate(45deg) translate(-1px, -1px)',
+                    display: 'block',
+                  }}
+                />
+              )}
             </button>
-            <span
-              className="text-[13px] leading-relaxed select-none"
-              style={{ color: 'var(--color-text-primary)' }}
-              onClick={() => setAccepted((v) => !v)}
-            >
+            <span className="text-[13px] leading-relaxed select-none" style={{ color: INK }}>
               KVKK Aydınlatma Metni&apos;ni{' '}
-              <strong style={{ color: 'var(--color-text-primary)' }}>okudum ve anladım</strong>; kişisel
-              verilerimin belirtilen amaç doğrultusunda işlenmesine onay veriyorum.
+              <strong style={{ color: INK }}>okudum ve anladım</strong>; kişisel verilerimin belirtilen amaç
+              doğrultusunda işlenmesine onay veriyorum.
             </span>
           </label>
         </div>
 
-        {/* Footer — sticky on mobile */}
+        {/* Footer */}
         <div
-          className="px-5 md:px-7 py-4 md:py-5 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 shrink-0"
-          style={{
-            background: 'var(--color-surface-hover)',
-            borderTop: '1px solid var(--color-border)',
-          }}
+          className="px-7 py-5 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0"
+          style={{ background: CREAM, borderTop: `1px solid ${RULE}` }}
         >
           <button
             type="button"
             onClick={handleReject}
             disabled={loading || rejecting}
-            className="inline-flex items-center justify-center gap-2 rounded-xl h-11 px-5 text-[13px] font-semibold transition-[background,border-color,opacity] disabled:opacity-60 disabled:cursor-not-allowed hover:enabled:bg-[var(--color-surface)]"
+            className="kvkk-mono inline-flex items-center justify-center gap-2 px-5 text-[11px] tracking-[0.24em] transition-colors disabled:opacity-60 disabled:cursor-not-allowed hover:enabled:bg-white"
             style={{
+              height: 48,
               background: 'transparent',
-              color: 'var(--color-text-secondary)',
-              border: '1px solid var(--color-border)',
+              color: INK,
+              border: `1.5px solid ${RULE}`,
             }}
           >
             {rejecting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Çıkış yapılıyor...
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ÇIKIŞ YAPILIYOR…
               </>
             ) : (
-              <>
-                <X className="w-4 h-4" />
-                Reddet ve Çıkış Yap
-              </>
+              <>REDDET & ÇIKIŞ</>
             )}
           </button>
 
@@ -265,24 +233,30 @@ export function KvkkNoticeModal({
             type="button"
             onClick={handleAcknowledge}
             disabled={!accepted || loading || rejecting}
-            className="inline-flex items-center justify-center gap-2 rounded-xl h-11 px-6 text-[13px] font-semibold text-white transition-[transform,box-shadow,opacity] disabled:opacity-50 disabled:cursor-not-allowed hover:enabled:-translate-y-0.5"
+            className="group kvkk-mono relative inline-flex items-center justify-center gap-3 px-7 text-[12px] tracking-[0.28em] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              background: 'linear-gradient(135deg, var(--brand-600), var(--brand-800))',
-              boxShadow: accepted && !loading
-                ? '0 10px 24px color-mix(in srgb, var(--brand-600) 35%, transparent)'
-                : 'none',
-              border: 'none',
+              height: 48,
+              background: INK,
+              color: '#f8f4ea',
+              border: `1.5px solid ${INK}`,
+              boxShadow:
+                accepted && !loading && !rejecting
+                  ? `0 0 0 1px ${GOLD}, 0 0 0 3px ${CREAM}, 0 0 0 4px ${GOLD}55`
+                  : 'none',
             }}
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Kaydediliyor...
+                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: GOLD }} />
+                <span>KAYDEDİLİYOR…</span>
               </>
             ) : (
               <>
-                <Check className="w-4 h-4" strokeWidth={2.5} />
-                Kabul Ediyorum
+                <span>KABUL EDİYORUM</span>
+                <ArrowRight
+                  className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1"
+                  style={{ color: GOLD }}
+                />
               </>
             )}
           </button>
@@ -293,34 +267,32 @@ export function KvkkNoticeModal({
 }
 
 function InfoRow({
-  icon,
-  title,
+  no,
+  label,
   description,
+  last = false,
 }: {
-  icon: React.ReactNode
-  title: string
+  no: string
+  label: string
   description: React.ReactNode
+  last?: boolean
 }) {
   return (
-    <div className="flex items-start gap-3">
+    <div
+      className="grid grid-cols-[36px_1fr] gap-4 items-start py-3.5"
+      style={!last ? { borderBottom: `1px solid ${RULE}` } : undefined}
+    >
       <div
-        className="w-8 h-8 md:w-9 md:h-9 shrink-0 rounded-xl flex items-center justify-center"
-        style={{
-          background: 'var(--brand-50)',
-          color: 'var(--brand-700)',
-          border: '1px solid var(--brand-100)',
-        }}
+        className="kvkk-display text-xl pt-0.5"
+        style={{ color: GOLD, fontStyle: 'italic', fontWeight: 500, lineHeight: 1 }}
       >
-        {icon}
+        {no}
       </div>
-      <div className="flex-1 min-w-0 pt-0.5">
-        <p
-          className="text-[13px] font-bold mb-0.5"
-          style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-display)' }}
-        >
-          {title}
-        </p>
-        <p className="text-[12px] leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+      <div>
+        <div className="kvkk-mono text-[10px] tracking-[0.28em] mb-1.5" style={{ color: INK }}>
+          {label}
+        </div>
+        <p className="text-[13px] leading-relaxed" style={{ color: INK_SOFT }}>
           {description}
         </p>
       </div>
