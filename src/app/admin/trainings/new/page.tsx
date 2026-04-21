@@ -36,6 +36,23 @@ import { ContentLibraryModal, type SelectedContent } from './content-library-mod
 interface DeptStaff { id: string; name: string; title: string; initials: string; }
 interface Dept { id: string; name: string; count: number; color: string; staff: DeptStaff[]; }
 
+/**
+ * N soruyu 100 puana eşit dağıtır. Yuvarlama artığı son soruya eklenir,
+ * böylece toplam her zaman tam 100 olur (örn. 3 soru → 33+33+34).
+ */
+const distributePoints = (n: number): number[] => {
+  if (n <= 0) return [];
+  const base = Math.floor(100 / n);
+  const remainder = 100 - base * n;
+  return Array.from({ length: n }, (_, i) => (i === n - 1 ? base + remainder : base));
+};
+
+/** Baraj puanı için en az kaç doğru cevap gerektiğini hesaplar. */
+const minCorrectForPassing = (passingScore: number, totalQuestions: number): number => {
+  if (totalQuestions <= 0 || passingScore <= 0) return 0;
+  return Math.ceil((passingScore / 100) * totalQuestions);
+};
+
 export default function NewTrainingPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -213,8 +230,6 @@ export default function NewTrainingPage() {
       if (!selectedCategory) return 'Kategori seçilmelidir.';
       if (!startDate || !endDate) return 'Başlangıç ve bitiş tarihleri zorunludur.';
       if (new Date(startDate) > new Date(endDate)) return 'Bitiş tarihi başlangıç tarihinden önce olamaz.';
-      const ps = Number(passingScore);
-      if (!Number.isFinite(ps) || ps < 0 || ps > 100) return 'Baraj puanı 0 ile 100 arasında olmalıdır.';
       const ma = Number(maxAttempts);
       if (!Number.isFinite(ma) || ma < 1 || ma > 10) return 'Deneme hakkı 1 ile 10 arasında olmalıdır.';
       const ed = Number(examDurationMinutes);
@@ -241,9 +256,10 @@ export default function NewTrainingPage() {
       }
     }
     if (step === 3) {
+      const ps = Number(passingScore);
+      if (!Number.isFinite(ps) || ps < 0 || ps > 100) return 'Baraj puanı 0 ile 100 arasında olmalıdır.';
       for (const q of questions) {
         if (!q.text.trim()) return 'Tüm soruların metni doldurulmalıdır.';
-        if (!Number.isFinite(q.points) || q.points < 1) return 'Soru puanı en az 1 olmalıdır.';
         const emptyOption = q.options.findIndex(o => !o.trim());
         if (emptyOption !== -1) return 'Tüm seçenekler doldurulmalıdır (boş seçenek bırakmayın).';
         if (q.correct < 0 || q.correct > 3) return 'Her soru için doğru cevap seçilmelidir.';
@@ -495,15 +511,9 @@ export default function NewTrainingPage() {
                   className="rounded-xl p-5"
                   style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
                 >
-                  <p className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>Sınav Ayarları</p>
-                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Target className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
-                        <Label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Baraj Puanı</Label>
-                      </div>
-                      <Input type="number" value={passingScore} onChange={(e) => setPassingScore(Number(e.target.value))} className="h-10" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }} />
-                    </div>
+                  <p className="text-sm font-semibold mb-1" style={{ color: 'var(--color-text-primary)' }}>Sınav Ayarları</p>
+                  <p className="text-[11px] mb-4" style={{ color: 'var(--color-text-muted)' }}>Baraj puanı &quot;Sınav Soruları&quot; adımında belirlenir — soru sayısına göre otomatik hesaplama yapılır.</p>
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
                         <Award className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
@@ -1122,7 +1132,7 @@ export default function NewTrainingPage() {
                   <div>
                     <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>Sınav Soruları</h3>
                     <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      {questions.length} soru • Toplam {questions.reduce((s, q) => s + q.points, 0)} puan
+                      {questions.length} soru • Her soru eşit puan değerinde (otomatik dağıtılır — toplam 100)
                     </p>
                   </div>
                 </div>
@@ -1134,6 +1144,52 @@ export default function NewTrainingPage() {
                   >
                     <Plus className="h-4 w-4" /> Soru Ekle
                   </Button>
+                </div>
+              </div>
+
+              {/* Baraj Puanı — soru sayısına göre canlı hesaplama */}
+              <div
+                className="rounded-xl p-5"
+                style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+              >
+                <div className="flex items-center gap-1.5 mb-3">
+                  <Target className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+                  <Label className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Baraj Puanı</Label>
+                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>(100 üzerinden)</span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr] sm:items-center">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={passingScore}
+                    onChange={(e) => setPassingScore(Number(e.target.value))}
+                    className="h-11 text-center text-base font-bold"
+                    style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }}
+                  />
+                  <div
+                    className="rounded-lg px-4 py-3 text-sm"
+                    style={{
+                      background: 'var(--color-primary-light)',
+                      color: 'var(--color-primary-dark)',
+                      border: '1px dashed var(--color-primary)',
+                    }}
+                  >
+                    {questions.length > 0 && passingScore > 0 ? (
+                      <>
+                        Personel barajı geçmek için{' '}
+                        <strong style={{ color: 'var(--color-primary)' }}>{questions.length}</strong> sorudan en az{' '}
+                        <strong style={{ color: 'var(--color-primary)', fontSize: '1.05em' }}>
+                          {minCorrectForPassing(passingScore, questions.length)}
+                        </strong>{' '}
+                        tanesini doğru cevaplamalı.
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--color-text-muted)' }}>
+                        Soru ekledikçe ve baraj puanı girdikçe burada kaç doğru gerektiği gösterilecek.
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1163,14 +1219,17 @@ export default function NewTrainingPage() {
                         style={{ color: 'var(--color-text-primary)' }}
                       />
                       <div className="flex items-center gap-2 shrink-0">
-                        <Input
-                          type="number"
-                          value={q.points}
-                          onChange={(e) => setQuestions(prev => prev.map(pq => pq.id === q.id ? { ...pq, points: Number(e.target.value) } : pq))}
-                          className="w-16 h-8 text-center text-xs"
-                          style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)', borderRadius: 'var(--radius-lg)' }}
-                        />
-                        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>puan</span>
+                        <span
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold"
+                          style={{
+                            background: 'var(--color-accent-light)',
+                            color: 'var(--color-accent)',
+                            fontFamily: 'var(--font-mono)',
+                          }}
+                          title="Puan otomatik hesaplanır — 100 / soru sayısı"
+                        >
+                          {distributePoints(questions.length)[qIdx] ?? 0} puan
+                        </span>
                         <button
                           onClick={() => removeQuestion(q.id)}
                           className="rounded-lg p-1.5"
@@ -1495,7 +1554,11 @@ export default function NewTrainingPage() {
                       regulatoryBody: isCompulsory && regulatoryBody ? regulatoryBody : null,
                       renewalPeriodMonths: renewalPeriodMonths !== '' ? Number(renewalPeriodMonths) : null,
                       videos: videos.filter(v => v.url).map(v => ({ title: v.title || v.file?.name || (v.contentType === 'audio' ? 'Ses' : v.contentType === 'pdf' ? 'Doküman' : 'Video'), url: v.url, contentType: v.contentType, pageCount: v.pageCount, durationSeconds: v.durationSeconds, documentKey: v.documentKey })),
-                      questions,
+                      // Puanlar otomatik dağıtılır: her soru 100/N, son soru yuvarlama artığını alır → toplam her zaman 100
+                      questions: (() => {
+                        const dist = distributePoints(questions.length);
+                        return questions.map((q, i) => ({ ...q, points: dist[i] }));
+                      })(),
                       selectedDepts,
                       excludedStaff,
                     }),
