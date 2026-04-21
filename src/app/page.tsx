@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
-import { HeroSection } from "./(landing)/hero-section";
+import { HeroSection } from "@/components/landing/hero-section";
 import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
@@ -21,7 +21,7 @@ const ScrollStorySection = dynamic(() =>
 );
 
 const StatsSection = dynamic(() =>
-  import("./(landing)/stats-section").then((m) => ({ default: m.StatsSection }))
+  import("@/components/landing/stats-section").then((m) => ({ default: m.StatsSection }))
 );
 
 const FeaturedTrainingsSection = dynamic(() =>
@@ -31,7 +31,7 @@ const FeaturedTrainingsSection = dynamic(() =>
 );
 
 const FeaturesSection = dynamic(() =>
-  import("./(landing)/features-section").then((m) => ({ default: m.FeaturesSection }))
+  import("@/components/landing/features-section").then((m) => ({ default: m.FeaturesSection }))
 );
 
 const TrainingCatalogSection = dynamic(() =>
@@ -41,7 +41,7 @@ const TrainingCatalogSection = dynamic(() =>
 );
 
 const CtaSection = dynamic(() =>
-  import("./(landing)/cta-section").then((m) => ({ default: m.CtaSection }))
+  import("@/components/landing/cta-section").then((m) => ({ default: m.CtaSection }))
 );
 
 const FaqSection = dynamic(() =>
@@ -49,7 +49,7 @@ const FaqSection = dynamic(() =>
 );
 
 const TestimonialsSection = dynamic(() =>
-  import("./(landing)/testimonials-section").then((m) => ({ default: m.TestimonialsSection }))
+  import("@/components/landing/testimonials-section").then((m) => ({ default: m.TestimonialsSection }))
 );
 
 export default function LandingPage() {
