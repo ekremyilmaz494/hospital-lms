@@ -72,7 +72,7 @@ export function KvkkNoticeModal({
     >
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-[560px] p-0 overflow-hidden gap-0 max-h-[92dvh] flex flex-col"
+        className="sm:max-w-[480px] p-0 overflow-hidden gap-0 max-h-[min(720px,85dvh)] flex flex-col"
         style={{
           background: '#fff',
           border: `1.5px solid ${RULE}`,
@@ -87,24 +87,24 @@ export function KvkkNoticeModal({
         `}</style>
 
         {/* Header */}
-        <DialogHeader className="px-7 pt-7 pb-5 shrink-0">
+        <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <div className="kvkk-mono text-[10px] tracking-[0.32em]" style={{ color: GOLD }}>
             № 05 · YASAL BİLGİLENDİRME
           </div>
           <DialogTitle
-            className="kvkk-display mt-3 leading-[1.05] tracking-tight"
-            style={{ color: INK, fontSize: '1.7rem', fontWeight: 600 }}
+            className="kvkk-display mt-2 leading-[1.05] tracking-tight"
+            style={{ color: INK, fontSize: '1.45rem', fontWeight: 600 }}
           >
             KVKK <span style={{ fontStyle: 'italic', color: GOLD }}>Aydınlatma Metni.</span>
           </DialogTitle>
-          <p className="mt-3 text-[13px] leading-relaxed" style={{ color: INK_SOFT }}>
+          <p className="mt-2 text-[12.5px] leading-relaxed" style={{ color: INK_SOFT }}>
             6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında, sisteme giriş yapmadan önce
             kişisel verilerinizin nasıl işlendiği hakkında bilgilendirilmeniz gerekmektedir.
           </p>
         </DialogHeader>
 
         {/* Body */}
-        <div className="px-7 py-5 overflow-y-auto flex-1 min-h-0" style={{ borderTop: `1px solid ${RULE}` }}>
+        <div className="px-6 py-4 overflow-y-auto flex-1 min-h-0" style={{ borderTop: `1px solid ${RULE}` }}>
           <InfoRow
             no="I"
             label="İŞLEME AMACI"
@@ -139,7 +139,7 @@ export function KvkkNoticeModal({
 
           {/* External link callout */}
           <div
-            className="mt-5 flex items-start gap-3 px-4 py-3"
+            className="mt-4 flex items-start gap-3 px-4 py-2.5"
             style={{ background: CREAM, borderLeft: `3px solid ${GOLD}` }}
           >
             <ExternalLink className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: GOLD }} />
@@ -159,7 +159,7 @@ export function KvkkNoticeModal({
 
           {/* Consent checkbox */}
           <label
-            className="mt-5 flex items-start gap-3 cursor-pointer p-4 transition-colors duration-200"
+            className="mt-4 flex items-start gap-3 cursor-pointer px-4 py-3 transition-colors duration-200"
             style={{
               background: accepted ? CREAM : '#fafafa',
               border: accepted ? `1.5px solid ${GOLD}` : `1.5px solid ${RULE}`,
@@ -204,7 +204,7 @@ export function KvkkNoticeModal({
 
         {/* Footer */}
         <div
-          className="px-7 py-5 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0"
+          className="px-6 py-4 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0"
           style={{ background: CREAM, borderTop: `1px solid ${RULE}` }}
         >
           <button
@@ -213,7 +213,7 @@ export function KvkkNoticeModal({
             disabled={loading || rejecting}
             className="kvkk-mono inline-flex items-center justify-center gap-2 px-5 text-[11px] tracking-[0.24em] transition-colors disabled:opacity-60 disabled:cursor-not-allowed hover:enabled:bg-white"
             style={{
-              height: 48,
+              height: 42,
               background: 'transparent',
               color: INK,
               border: `1.5px solid ${RULE}`,
@@ -235,7 +235,7 @@ export function KvkkNoticeModal({
             disabled={!accepted || loading || rejecting}
             className="group kvkk-mono relative inline-flex items-center justify-center gap-3 px-7 text-[12px] tracking-[0.28em] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              height: 48,
+              height: 42,
               background: INK,
               color: '#f8f4ea',
               border: `1.5px solid ${INK}`,
@@ -279,7 +279,7 @@ function InfoRow({
 }) {
   return (
     <div
-      className="grid grid-cols-[36px_1fr] gap-4 items-start py-3.5"
+      className="grid grid-cols-[32px_1fr] gap-3 items-start py-2.5"
       style={!last ? { borderBottom: `1px solid ${RULE}` } : undefined}
     >
       <div
