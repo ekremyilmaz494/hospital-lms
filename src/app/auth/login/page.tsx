@@ -4,17 +4,20 @@ import { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, LogIn, Loader2, Shield, BookOpen, BarChart3, ChevronRight, Clock } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Clock, ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import dynamic from 'next/dynamic';
 import { BlurFade } from '@/components/ui/blur-fade';
-import { ShimmerButton } from '@/components/ui/shimmer-button';
+import { KlinovaMark } from '@/components/ui/klinova-mark';
 import { KvkkNoticeModal } from '@/components/shared/kvkk-notice-modal';
 
 const Particles = dynamic(() => import('@/components/ui/particles').then(m => ({ default: m.Particles })), { ssr: false });
-const Ripple = dynamic(() => import('@/components/ui/ripple').then(m => ({ default: m.Ripple })), { ssr: false });
+// MeshGradient is WebGL — must be client-only
+const MeshGradient = dynamic(
+  () => import('@paper-design/shaders-react').then(m => ({ default: m.MeshGradient })),
+  { ssr: false }
+);
+
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { useOrgBranding } from '@/hooks/use-org-branding';
@@ -25,11 +28,14 @@ const ROLE_ROUTES: Record<string, string> = {
   staff: '/staff/dashboard',
 };
 
-const features = [
-  { icon: BookOpen, title: 'Eğitim Yönetimi', desc: 'Video tabanlı eğitimler ve otomatik sınav sistemi' },
-  { icon: BarChart3, title: 'Detaylı Raporlama', desc: 'Departman ve personel bazlı performans analizi' },
-  { icon: Shield, title: 'Güvenli Altyapı', desc: 'Rol tabanlı erişim ve denetim kayıtları' },
-];
+// Clinical Editorial palette
+const INK = '#0a1628';
+const CREAM = '#faf7f2';
+const RULE = '#e5e0d5';
+const GOLD = '#c9a961';
+const AMBER = '#f59e0b';
+const INK_SOFT = '#5b6478';
+const CREAM_SOFT = 'rgba(245, 241, 232, 0.62)';
 
 function LoginForm() {
   const router = useRouter();
@@ -43,27 +49,21 @@ function LoginForm() {
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
 
   const rawRedirect = searchParams.get('redirectTo');
-  // Prevent open redirect — only allow relative paths starting with /
   const redirectTo = rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : null;
   const isTimeout = searchParams.get('reason') === 'timeout';
   const urlReason = searchParams.get('reason');
   const urlMsg = searchParams.get('msg');
 
-  // KVKK reddi sonrası mesajı göster (URL'den gelen)
   useEffect(() => {
-    if (urlReason === 'kvkk-rejected' && urlMsg) {
-      setError(urlMsg);
-    }
+    if (urlReason === 'kvkk-rejected' && urlMsg) setError(urlMsg);
   }, [urlReason, urlMsg]);
 
-  // White-label branding: ?org=slug parametresiyle hastane markasi yuklenir
   const orgSlug = searchParams.get('org');
   const { branding } = useOrgBranding(orgSlug);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
     setLoading(true);
 
     try {
@@ -86,32 +86,26 @@ function LoginForm() {
         return;
       }
 
-      // MFA gerekiyorsa doğrulama sayfasına yönlendir (kullanıcı bilgisi MFA öncesi döndürülmez)
       if (data.mfaRequired) {
         router.push(`/auth/mfa-verify?factorId=${encodeURIComponent(data.factorId)}`);
         return;
       }
 
-      // SMS MFA gerekiyorsa: telefon yoksa phone-setup'a, varsa direkt sms-verify'a
       if (data.smsMfaRequired) {
         router.push(data.phoneMissing ? '/auth/phone-setup' : '/auth/sms-verify');
         return;
       }
 
-      // İlk girişte şifre değiştirme zorunluluğu
       if (data.mustChangePassword) {
         router.push('/auth/change-password?reason=first-login');
         return;
       }
 
       const role = data.user?.role as string;
-      // redirectTo varsa role ile uyumlu mu kontrol et — admin kullanıcıyı /staff'a yönlendirme
       const rolePrefix = role === 'super_admin' ? '/super-admin' : role === 'admin' ? '/admin' : '/staff';
       const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
       const target = isRedirectCompatible ? redirectTo : ROLE_ROUTES[role] || '/staff/dashboard';
 
-      // Store'u session'dan doldur — layout mount olduğunda user mevcut olmalı.
-      // AWAIT ile bekliyoruz, yoksa layout guard store boş bulup login'e geri atar.
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
@@ -135,7 +129,6 @@ function LoginForm() {
         });
       }
 
-      // KVKK onaylanmamışsa önce login sayfasında modal göster, sonra yönlendir
       const kvkkAcknowledged = session?.user?.user_metadata?.kvkk_notice_acknowledged_at ?? null;
       if (!kvkkAcknowledged) {
         setPendingRedirect(target);
@@ -143,7 +136,6 @@ function LoginForm() {
         return;
       }
 
-      // Full reload — middleware fresh JWT ile çalışır, SPA race condition olmaz
       window.location.href = target;
     } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
@@ -151,31 +143,17 @@ function LoginForm() {
     }
   };
 
-  // Font kombinasyonu: A=space-grotesk+dm-sans | B=outfit | C=bricolage+dm-sans | D=syne+dm-sans
-  const loginFont = '--font-syne';
-
   if (pendingRedirect) {
     return (
       <KvkkNoticeModal
-        onAcknowledge={() => {
-          window.location.href = pendingRedirect;
-        }}
+        onAcknowledge={() => { window.location.href = pendingRedirect; }}
         onReject={async () => {
-          // httpOnly cookie'leri server üzerinden temizle — client signOut tek başına yetmez.
-          try {
-            await fetch('/api/auth/logout', { method: 'POST' });
-          } catch {
-            // Yok say — yine de local state'i temizleyip sayfayı yenileyeceğiz
-          }
+          try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
           try {
             const supabase = createClient();
             await supabase.auth.signOut();
-          } catch {
-            // Yok say
-          }
+          } catch {}
           useAuthStore.getState().logout();
-          // Full reload — middleware fresh cookie state ile tekrar değerlendirsin,
-          // kullanıcı login'e reddet mesajıyla dönsün
           const msg = encodeURIComponent('Sisteme giriş için KVKK Aydınlatma Metni\'ni onaylamanız gerekmektedir.');
           window.location.href = `/auth/login?reason=kvkk-rejected&msg=${msg}`;
         }}
@@ -183,269 +161,380 @@ function LoginForm() {
     );
   }
 
+  const tenantName = branding?.name || 'Devakent Hastanesi';
+
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden" style={{ background: CREAM }}>
       <style>{`
-        .login-card,.login-card *{font-family:var(${loginFont}),sans-serif!important}
-        .login-left,.login-left h1,.login-left p{font-family:var(${loginFont}),sans-serif!important}
-        .login-gradient-text{background:linear-gradient(135deg,var(--brand-400) 0%,var(--brand-300) 50%,var(--brand-200) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-        .login-heading-gradient{background:linear-gradient(135deg,#ffffff 0%,#e2e8f0 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-        .login-card-heading-gradient{background:linear-gradient(135deg,var(--brand-900) 0%,var(--brand-600) 60%,var(--brand-400) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .ed-display { font-family: var(--font-plus-jakarta-sans), serif; }
+        .ed-mono { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; }
+        .ed-input {
+          width: 100%;
+          height: 50px;
+          padding: 0 16px;
+          background: ${CREAM};
+          border: 1.5px solid ${RULE};
+          border-radius: 0;
+          font-size: 15px;
+          color: ${INK};
+          transition: border-color 180ms ease, background-color 180ms ease;
+          outline: none;
+        }
+        .ed-input:focus { border-color: ${INK}; background: #fff; }
+        .ed-input::placeholder { color: ${INK_SOFT}; opacity: 0.6; }
+        .ed-checkbox {
+          appearance: none;
+          width: 18px; height: 18px;
+          border: 1.5px solid ${RULE};
+          background: ${CREAM};
+          cursor: pointer;
+          position: relative;
+          flex-shrink: 0;
+        }
+        .ed-checkbox:checked { background: ${INK}; border-color: ${INK}; }
+        .ed-checkbox:checked::after {
+          content: ""; position: absolute;
+          top: 2px; left: 5px;
+          width: 5px; height: 9px;
+          border: solid ${GOLD};
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
+        }
+        @keyframes ed-glow {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 0.8; }
+        }
+        .ed-pulse { animation: ed-glow 6s ease-in-out infinite; }
       `}</style>
-      {/* ── Left Panel: Branding ── */}
-      <div
-        className="login-left relative hidden lg:flex lg:w-[55%] flex-col justify-between overflow-hidden"
-        style={{
-          background: branding?.loginBannerUrl
-            ? undefined
-            : branding?.brandColor
-              ? `linear-gradient(160deg, ${branding.brandColor} 0%, ${branding.brandColor}dd 35%, ${branding.brandColor}99 100%)`
-              : 'linear-gradient(160deg, var(--brand-900) 0%, #0a3d2e 35%, #051c14 100%)',
-        }}
+
+      {/* ── LEFT — Dark Editorial Brand Panel ── */}
+      <aside
+        className="relative hidden lg:flex lg:w-1/2 flex-col overflow-hidden"
+        style={{ background: INK }}
       >
-        {/* Login banner (varsa tam ekran arka plan) */}
+        {/* Backdrop layers */}
         {branding?.loginBannerUrl && (
           <div className="absolute inset-0 z-0">
             <Image src={branding.loginBannerUrl} alt="" fill className="object-cover" unoptimized />
-            <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.5)' }} />
+            <div className="absolute inset-0" style={{ background: 'rgba(10, 22, 40, 0.85)' }} />
           </div>
         )}
+        <div
+          className="absolute inset-0 z-0 ed-pulse"
+          style={{ background: `radial-gradient(ellipse 65% 55% at 50% 50%, ${GOLD}1f 0%, transparent 60%)` }}
+        />
+        <div
+          className="absolute inset-0 z-0 opacity-[0.16]"
+          style={{
+            backgroundImage: `radial-gradient(circle, ${GOLD} 1px, transparent 1px)`,
+            backgroundSize: '26px 26px',
+          }}
+        />
+        <Particles className="absolute inset-0 z-0" quantity={50} staticity={50} color={GOLD} size={0.4} />
 
-        {/* Particles */}
-        <Particles className="absolute inset-0 z-0" quantity={80} staticity={20} color={branding?.secondaryColor || 'var(--brand-400)'} size={0.3} />
+        {/* CONTENT — symmetric padding, vertical 3-zone layout */}
+        <div className="relative z-10 flex h-full flex-col p-12 xl:p-16">
 
-        {/* Ripple center accent */}
-        <div className="absolute inset-0 z-0 flex items-center justify-center opacity-20">
-          <Ripple mainCircleSize={300} mainCircleOpacity={0.1} numCircles={5} />
-        </div>
-
-        {/* Gradient overlays */}
-        <div className="absolute inset-0 z-0" style={{ background: 'radial-gradient(ellipse at 20% 50%, color-mix(in srgb, var(--brand-600) calc(0.15 * 100%), transparent) 0%, transparent 60%)' }} />
-        <div className="absolute bottom-0 left-0 right-0 h-1/3 z-0" style={{ background: 'linear-gradient(to top, rgba(5, 28, 20, 0.8), transparent)' }} />
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between h-full p-12 xl:p-16">
-          {/* Logo */}
-          <BlurFade delay={0.05} duration={0.3}>
-            <div className="flex items-center gap-3">
-              {branding?.logoUrl ? (
-                <Image src={branding.logoUrl} alt={branding.name} width={44} height={44} className="rounded-2xl object-contain" style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(12px)' }} unoptimized />
-              ) : (
-                <div
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl text-lg font-bold font-heading"
-                  style={{ background: 'color-mix(in srgb, var(--brand-400) calc(0.15 * 100%), transparent)', backdropFilter: 'blur(12px)', border: '1px solid color-mix(in srgb, var(--brand-400) calc(0.2 * 100%), transparent)', color: 'var(--brand-400)' }}
-                >
-                  H
-                </div>
-              )}
-              <span className="text-xl font-bold text-white/90 font-heading tracking-tight">
-                {branding?.name || 'Devakent Hastanesi'}
+          {/* TOP — tenant masthead */}
+          <BlurFade delay={0.05} duration={0.4}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {branding?.logoUrl ? (
+                  <Image
+                    src={branding.logoUrl}
+                    alt={tenantName}
+                    width={38}
+                    height={38}
+                    className="object-contain"
+                    unoptimized
+                  />
+                ) : (
+                  <div
+                    className="flex h-10 w-10 items-center justify-center ed-display text-lg font-semibold"
+                    style={{ color: GOLD, border: `1.5px solid ${GOLD}` }}
+                  >
+                    H
+                  </div>
+                )}
+                <span className="ed-display text-lg font-semibold tracking-tight" style={{ color: '#f5f1e8' }}>
+                  {tenantName}
+                </span>
+              </div>
+              <span className="ed-mono text-[10px] tracking-[0.28em]" style={{ color: GOLD }}>
+                EST · 2026
               </span>
             </div>
           </BlurFade>
 
-          {/* Hero text */}
-          <div className="max-w-lg">
-            <BlurFade delay={0.08} duration={0.3}>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] mb-6" style={{ color: 'var(--brand-400)' }}>
-                Personel Eğitim Platformu
-              </p>
+          {/* CENTER — brand mark + hero — auto-centered via flex-1 */}
+          <div className="flex flex-1 flex-col justify-center py-10">
+            <BlurFade delay={0.1} duration={0.4}>
+              <div className="mb-2">
+                <KlinovaMark
+                  width={420}
+                  height={92}
+                  strokeWidth={6}
+                  animationDuration={2.8}
+                  baseColor={GOLD}
+                  gradientColors={[`${GOLD}00`, AMBER, `${GOLD}00`]}
+                  labelColor={GOLD}
+                />
+              </div>
             </BlurFade>
-            <BlurFade delay={0.1} duration={0.3}>
-              <h1 className="text-[2.75rem] xl:text-5xl font-bold leading-[1.1] tracking-tight mb-6">
-                <span className="login-heading-gradient">Eğitimi Yönet,</span><br />
-                <span className="login-gradient-text">Başarıyı Ölç.</span>
+
+            <BlurFade delay={0.18} duration={0.4}>
+              <div className="ed-mono text-[11px] tracking-[0.32em]" style={{ color: GOLD }}>
+                № 01 · KLİNİK EĞİTİM MECRASI
+              </div>
+            </BlurFade>
+
+            <BlurFade delay={0.22} duration={0.4}>
+              <h1
+                className="ed-display mt-6 leading-[0.98] tracking-tight"
+                style={{ color: '#f8f4ea', fontSize: 'clamp(2.4rem, 4vw, 3.6rem)', fontWeight: 600 }}
+              >
+                Eğitimi yönet,
+                <br />
+                <span style={{ fontStyle: 'italic', color: GOLD }}>başarıyı ölç.</span>
               </h1>
             </BlurFade>
-            <BlurFade delay={0.12} duration={0.3}>
-              <p className="text-base text-white/50 leading-relaxed max-w-md">
-                Hastane personellerinize video tabanlı eğitimler atayın, sınav yapın ve performansı gerçek zamanlı takip edin.
+
+            <BlurFade delay={0.26} duration={0.4}>
+              <p className="mt-5 max-w-md text-[14.5px] leading-[1.65]" style={{ color: CREAM_SOFT }}>
+                Hastane personellerinize video tabanlı eğitimler atayın, sınav yapın ve performansı
+                gerçek zamanlı takip edin.
+              </p>
+            </BlurFade>
+          </div>
+
+          {/* BOTTOM — footer */}
+          <BlurFade delay={0.35} duration={0.4}>
+            <div className="h-px w-full" style={{ background: `${GOLD}33` }} />
+            <div className="mt-4 flex items-center justify-between ed-mono text-[10px] tracking-[0.25em]" style={{ color: 'rgba(245,241,232,0.4)' }}>
+              <span>© 2026 · {tenantName.toUpperCase()}</span>
+              <span style={{ color: GOLD }}>HOSPITAL LMS</span>
+            </div>
+          </BlurFade>
+        </div>
+      </aside>
+
+      {/* ── RIGHT — Cream Form Panel ── */}
+      <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6 sm:p-10" style={{ background: CREAM }}>
+        {/* MeshGradient shader — animated cream/gold/sage ambient backdrop */}
+        <div className="absolute inset-0 z-0">
+          <MeshGradient
+            style={{ width: '100%', height: '100%' }}
+            colors={['#faf7f2', '#f3dfa6', '#d4a437', '#c9a961', '#A9C4B3', '#e7c97a']}
+            distortion={1.1}
+            swirl={0.55}
+            speed={0.35}
+            offsetX={0.05}
+            grainMixer={0}
+            grainOverlay={0}
+          />
+          {/* Very light cream veil — softens edges only, keeps gradient visible */}
+          <div className="absolute inset-0" style={{ background: 'rgba(250, 247, 242, 0.12)' }} />
+          {/* Cream dot texture overlay */}
+          <div
+            className="absolute inset-0 opacity-[0.22]"
+            style={{
+              backgroundImage: `radial-gradient(circle, ${RULE} 1px, transparent 1px)`,
+              backgroundSize: '32px 32px',
+            }}
+          />
+        </div>
+
+        <div className="relative z-10 w-full max-w-[440px]">
+          {/* Mobile masthead */}
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            {branding?.logoUrl ? (
+              <Image src={branding.logoUrl} alt={tenantName} width={36} height={36} className="object-contain" unoptimized />
+            ) : (
+              <div
+                className="flex h-9 w-9 items-center justify-center ed-display text-base font-semibold"
+                style={{ background: INK, color: GOLD }}
+              >
+                H
+              </div>
+            )}
+            <span className="ed-display text-lg font-semibold" style={{ color: INK }}>
+              {tenantName}
+            </span>
+          </div>
+
+          {/* Form card with gold left rail */}
+          <div
+            className="relative bg-white"
+            style={{
+              border: `1.5px solid ${RULE}`,
+              borderLeft: `6px solid ${GOLD}`,
+              padding: '36px 38px',
+            }}
+          >
+            <BlurFade delay={0.08} duration={0.4}>
+              <div className="ed-mono text-[10px] tracking-[0.32em]" style={{ color: GOLD }}>
+                № 02 · OTURUM AÇ
+              </div>
+            </BlurFade>
+
+            <BlurFade delay={0.12} duration={0.4}>
+              <h2
+                className="ed-display mt-3 leading-[1.05] tracking-tight"
+                style={{ color: INK, fontSize: '2rem', fontWeight: 600 }}
+              >
+                Hoş <span style={{ fontStyle: 'italic', color: GOLD }}>geldiniz.</span>
+              </h2>
+            </BlurFade>
+
+            <BlurFade delay={0.16} duration={0.4}>
+              <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: INK_SOFT }}>
+                Devam etmek için kurum hesabınızla giriş yapın.
               </p>
             </BlurFade>
 
-            {/* Feature pills */}
-            <div className="mt-10 space-y-3">
-              {features.map((f, i) => (
-                <BlurFade key={f.title} delay={0.15 + i * 0.05} duration={0.3}>
-                  <div className="flex items-center gap-4 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'color-mix(in srgb, var(--brand-400) calc(0.1 * 100%), transparent)' }}>
-                      <f.icon className="h-5 w-5" style={{ color: 'var(--brand-400)' }} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white/90">{f.title}</p>
-                      <p className="text-xs text-white/40">{f.desc}</p>
-                    </div>
-                  </div>
-                </BlurFade>
-              ))}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <BlurFade delay={0.2} duration={0.3}>
-            <p className="text-xs text-white/30">&copy; 2026 {branding?.name || 'Devakent Hastanesi Platformu'}</p>
-          </BlurFade>
-        </div>
-      </div>
-
-      {/* ── Right Panel: Login Form ── */}
-      <div
-        className="relative flex flex-1 items-center justify-center p-6 sm:p-8 overflow-hidden"
-        style={{
-          backgroundColor: 'var(--color-bg)',
-          backgroundImage: branding?.loginBannerUrl
-            ? undefined
-            : `url('/login/gradient.jpg')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
-      >
-
-        <div
-          className="login-card relative z-10 w-full max-w-105 rounded-3xl p-8 sm:p-10"
-          style={{
-            background: 'rgba(255, 255, 255, 0.78)',
-            backdropFilter: 'blur(24px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-            border: '1px solid rgba(255, 255, 255, 0.5)',
-            boxShadow: '0 20px 60px -15px rgba(6, 78, 59, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
-          }}
-        >
-          {/* Mobile logo */}
-          <div className="mb-10 flex items-center gap-3 lg:hidden">
-            {branding?.logoUrl ? (
-              <Image src={branding.logoUrl} alt={branding.name} width={40} height={40} className="rounded-xl object-contain" unoptimized />
-            ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white font-heading" style={{ background: 'var(--color-primary)' }}>H</div>
-            )}
-            <span className="text-xl font-bold font-heading">{branding?.name || 'Devakent Hastanesi'}</span>
-          </div>
-
-          <BlurFade delay={0.05} duration={0.3}>
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-3" style={{ color: 'var(--color-primary)' }}>
-              Giriş Yap
-            </p>
-            <h2 className="text-3xl font-bold tracking-tight mb-2">
-              <span className="login-card-heading-gradient">Hoş Geldiniz</span>
-            </h2>
-            <p className="text-sm mb-8" style={{ color: 'var(--color-text-muted)' }}>
-              Devam etmek için hesabınıza giriş yapın
-            </p>
-          </BlurFade>
-
-          {isTimeout && !error && (
-            <BlurFade delay={0}>
-              <div
-                className="mb-5 flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium"
-                style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)', border: '1px solid color-mix(in srgb, var(--color-warning) 20%, transparent)' }}
-              >
-                <Clock className="h-5 w-5 shrink-0" />
-                Uzun süre işlem yapmadığınız için oturumunuz sonlandırıldı.
-              </div>
+            <BlurFade delay={0.18} duration={0.4}>
+              <div className="my-6 h-px" style={{ background: RULE }} />
             </BlurFade>
-          )}
 
-          {error && (
-            <BlurFade delay={0}>
-              <div
-                className="mb-5 flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium"
-                style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)', border: '1px solid color-mix(in srgb, var(--color-error) 20%, transparent)' }}
-              >
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--color-error)', color: 'white' }}>!</div>
-                {error}
-              </div>
-            </BlurFade>
-          )}
-
-          <BlurFade delay={0.08} duration={0.3}>
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div>
-                <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>E-posta Adresi</Label>
-                <Input
-                  type="email"
-                  placeholder="ornek@hastane.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  className="h-12 rounded-xl text-[15px]"
-                  style={{ background: 'rgba(255, 255, 255, 0.6)', borderColor: 'rgba(6, 78, 59, 0.12)' }}
-                  required
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Şifre</Label>
-                  <Link href="/auth/forgot-password" className="text-xs font-semibold transition-colors duration-150 hover:underline" style={{ color: 'var(--color-primary)' }}>Şifremi Unuttum</Link>
+            {isTimeout && !error && (
+              <BlurFade delay={0}>
+                <div
+                  className="mb-5 flex items-start gap-3 px-4 py-3 text-[13px]"
+                  style={{ background: '#fdf6e3', color: '#7a5511', borderLeft: `3px solid ${GOLD}` }}
+                >
+                  <Clock className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>Uzun süre işlem yapmadığınız için oturumunuz sonlandırıldı.</span>
                 </div>
-                <div className="relative">
+              </BlurFade>
+            )}
+
+            {error && (
+              <BlurFade delay={0}>
+                <div
+                  className="mb-5 flex items-start gap-3 px-4 py-3 text-[13px]"
+                  style={{ background: '#fdf2ee', color: '#992f1d', borderLeft: '3px solid #b3261e' }}
+                >
+                  <span className="ed-mono text-[11px] mt-0.5" style={{ color: '#b3261e' }}>!</span>
+                  <span>{error}</span>
+                </div>
+              </BlurFade>
+            )}
+
+            <BlurFade delay={0.22} duration={0.4}>
+              <form onSubmit={handleLogin} className="space-y-4">
+                {/* Email */}
+                <div>
+                  <label className="ed-mono text-[10px] tracking-[0.28em] mb-2 block" style={{ color: INK }}>
+                    E-POSTA
+                  </label>
                   <Input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                    className="h-12 rounded-xl pr-11 text-[15px]"
-                    style={{ background: 'rgba(255, 255, 255, 0.6)', borderColor: 'rgba(6, 78, 59, 0.12)' }}
+                    type="email"
+                    placeholder="ornek@hastane.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
+                    className="ed-input"
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors duration-150"
-                    style={{ color: 'var(--color-text-muted)' }}
-                  >
-                    {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
-                  </button>
                 </div>
-              </div>
 
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-                Giriş yaparak{' '}
-                <Link href="/kvkk" target="_blank" className="font-semibold underline transition-colors duration-150" style={{ color: 'var(--color-primary)' }}>
-                  KVKK Aydınlatma Metni
-                </Link>
-                &apos;ni okumuş ve bilgilendirilmiş kabul edersiniz.
-              </p>
+                {/* Password */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="ed-mono text-[10px] tracking-[0.28em]" style={{ color: INK }}>
+                      ŞİFRE
+                    </label>
+                    <Link
+                      href="/auth/forgot-password"
+                      className="ed-mono text-[10px] tracking-[0.2em] transition-colors hover:underline"
+                      style={{ color: GOLD }}
+                    >
+                      UNUTTUM ↗
+                    </Link>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
+                      className="ed-input"
+                      style={{ paddingRight: 48 }}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 transition-colors"
+                      style={{ color: INK_SOFT }}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
 
-              <div className="flex items-center gap-2.5">
-                <Checkbox
-                  id="rememberMe"
-                  checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked === true)}
-                />
-                <label htmlFor="rememberMe" className="text-xs font-medium cursor-pointer select-none" style={{ color: 'var(--color-text-secondary)' }}>
-                  Bu cihazda oturumumu açık tut (7 gün)
+                {/* Remember me */}
+                <label className="flex items-center gap-3 cursor-pointer select-none pt-1">
+                  <input
+                    type="checkbox"
+                    className="ed-checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <span className="text-[13px]" style={{ color: INK_SOFT }}>
+                    Bu cihazda oturumumu açık tut <span style={{ opacity: 0.7 }}>(7 gün)</span>
+                  </span>
                 </label>
-              </div>
 
-              <ShimmerButton
-                type="submit"
-                disabled={loading}
-                className="w-full h-12 gap-2.5 text-[15px] font-semibold"
-                shimmerColor="rgba(255,255,255,0.15)"
-                shimmerSize="0.08em"
-                borderRadius="12px"
-                background={branding?.brandColor ? `linear-gradient(135deg, ${branding.brandColor} 0%, ${branding.brandColor}cc 100%)` : 'linear-gradient(135deg, var(--brand-600) 0%, var(--brand-800) 100%)'}
-              >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
-                {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
-                {!loading && <ChevronRight className="h-4 w-4 ml-1 opacity-60" />}
-              </ShimmerButton>
-            </form>
-          </BlurFade>
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="group relative w-full mt-2 flex items-center justify-center gap-3 transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{
+                    height: 52,
+                    background: INK,
+                    color: '#f8f4ea',
+                    border: `1.5px solid ${INK}`,
+                    boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px ${GOLD}55`,
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" style={{ color: GOLD }} />
+                      <span className="ed-mono text-[12px] tracking-[0.28em]">GİRİŞ YAPILIYOR…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="ed-mono text-[12px] tracking-[0.28em]">OTURUM AÇ</span>
+                      <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" style={{ color: GOLD }} />
+                    </>
+                  )}
+                </button>
 
-          <BlurFade delay={0.12} duration={0.3}>
-            <div className="mt-10 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
-              <p className="text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                &copy; 2026 Devakent Hastanesi. Tüm hakları saklıdır.
-              </p>
+                {/* KVKK */}
+                <p className="text-[11.5px] leading-snug pt-1" style={{ color: INK_SOFT }}>
+                  Giriş yaparak{' '}
+                  <Link href="/kvkk" target="_blank" className="underline underline-offset-2" style={{ color: INK }}>
+                    KVKK Aydınlatma Metni
+                  </Link>
+                  &apos;ni okumuş ve bilgilendirilmiş kabul edersiniz.
+                </p>
+              </form>
+            </BlurFade>
+          </div>
+
+          {/* Mobile footer */}
+          <BlurFade delay={0.3} duration={0.4}>
+            <div className="mt-6 flex items-center justify-between ed-mono text-[10px] tracking-[0.25em] lg:hidden" style={{ color: INK_SOFT }}>
+              <span>© 2026 · {tenantName.toUpperCase()}</span>
+              <span style={{ color: GOLD }}>HOSPITAL LMS</span>
             </div>
           </BlurFade>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
