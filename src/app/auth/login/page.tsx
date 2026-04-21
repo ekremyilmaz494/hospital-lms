@@ -58,6 +58,34 @@ function LoginForm() {
     if (urlReason === 'kvkk-rejected' && urlMsg) setError(urlMsg);
   }, [urlReason, urlMsg]);
 
+  // KVKK onayı zorunlu: middleware authenticated ama onaysız kullanıcıyı
+  // buraya yönlendirdiğinde modalı otomatik aç. Refresh bypass'ının client ayağı.
+  useEffect(() => {
+    if (urlReason !== 'kvkk-required') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled || !session?.user) return;
+
+        const r = (session.user.app_metadata?.role ?? session.user.user_metadata?.role) as string | undefined;
+        const target = ROLE_ROUTES[r ?? 'staff'] ?? '/staff/dashboard';
+
+        // Başka sekmede onaylandıysa direkt dashboard'a çık
+        if (session.user.user_metadata?.kvkk_notice_acknowledged_at) {
+          window.location.href = target;
+          return;
+        }
+
+        setPendingRedirect(target);
+      } catch {
+        // Session okunamadı — form olduğu gibi kalır
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [urlReason]);
+
   const orgSlug = searchParams.get('org');
   const { branding } = useOrgBranding(orgSlug);
 
