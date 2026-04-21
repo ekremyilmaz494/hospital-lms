@@ -78,6 +78,16 @@ model Organization {
   smsMfaEnabled       Boolean   @default(false) @map("sms_mfa_enabled")
   smsMfaEnforcedAt    DateTime? @map("sms_mfa_enforced_at") @db.Timestamptz
 
+  // Per-tenant SMTP (hastane kendi mail sunucusundan gönderir)
+  smtpHost            String?  @map("smtp_host") @db.VarChar(255)
+  smtpPort            Int?     @default(587) @map("smtp_port")
+  smtpSecure          Boolean  @default(false) @map("smtp_secure")
+  smtpUser            String?  @map("smtp_user") @db.VarChar(255)
+  smtpPassEncrypted   String?  @map("smtp_pass_encrypted") @db.Text
+  smtpFrom            String?  @map("smtp_from") @db.VarChar(320)
+  smtpReplyTo         String?  @map("smtp_reply_to") @db.VarChar(320)
+  smtpEnabled         Boolean  @default(false) @map("smtp_enabled")
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz

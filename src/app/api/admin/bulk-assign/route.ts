@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { z } from 'zod/v4'
 import { logger } from '@/lib/logger'
+import { sendEmail, trainingAssignedEmail } from '@/lib/email'
 
 const bulkAssignSchema = z.object({
   trainingIds: z.array(z.string().uuid()).min(1, 'En az 1 eğitim seçilmeli'),
@@ -40,7 +41,17 @@ export async function POST(request: Request) {
         isActive: true,
         publishStatus: { not: 'archived' },
       },
-      select: { id: true, title: true },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        category: true,
+        endDate: true,
+        examDurationMinutes: true,
+        passingScore: true,
+        smgPoints: true,
+        isCompulsory: true,
+      },
     })
     if (trainings.length !== trainingIds.length) {
       return errorResponse('Bazı eğitimler kurumunuza ait değil veya arşivlenmiş', 403)
@@ -108,6 +119,16 @@ export async function POST(request: Request) {
       request,
     })
 
+    // Fire-and-forget: atanan her (kullanıcı × eğitim) kombinasyonu için e-posta
+    const assignedByName = [dbUser!.firstName, dbUser!.lastName].filter(Boolean).join(' ') || null
+    void sendBulkAssignmentEmails({
+      organizationId: orgId,
+      trainings,
+      newAssignments,
+      maxAttempts,
+      assignedByName,
+    })
+
     return jsonResponse({
       created: newAssignments.length,
       skipped: existing.length,
@@ -116,5 +137,79 @@ export async function POST(request: Request) {
   } catch (err) {
     logger.error('BulkAssign', 'Toplu atama başarısız', err)
     return errorResponse('Toplu atama yapılamadı', 500)
+  }
+}
+
+type BulkTraining = {
+  id: string
+  title: string
+  description: string | null
+  category: string | null
+  endDate: Date
+  examDurationMinutes: number | null
+  passingScore: number | null
+  smgPoints: number | null
+  isCompulsory: boolean
+}
+
+/** Toplu atama sonrası e-postalar — arka planda çalışır, hata yutar. */
+async function sendBulkAssignmentEmails(params: {
+  organizationId: string
+  trainings: BulkTraining[]
+  newAssignments: { trainingId: string; userId: string }[]
+  maxAttempts: number
+  assignedByName: string | null
+}) {
+  try {
+    const org = await prisma.organization.findUnique({
+      where: { id: params.organizationId },
+      select: { name: true },
+    })
+    if (!org) return
+
+    const userIds = Array.from(new Set(params.newAssignments.map(a => a.userId)))
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds }, organizationId: params.organizationId },
+      select: { id: true, email: true, firstName: true, lastName: true },
+    })
+    const usersById = new Map(users.map(u => [u.id, u]))
+    const trainingsById = new Map(params.trainings.map(t => [t.id, t]))
+
+    await Promise.allSettled(
+      params.newAssignments.map(async (a) => {
+        const user = usersById.get(a.userId)
+        const training = trainingsById.get(a.trainingId)
+        if (!user?.email || !training) return
+
+        const staffName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email
+        const dueDate = training.endDate.toLocaleDateString('tr-TR', {
+          day: '2-digit', month: 'long', year: 'numeric',
+        })
+
+        const html = trainingAssignedEmail({
+          staffName,
+          hospitalName: org.name,
+          trainingTitle: training.title,
+          trainingDescription: training.description,
+          category: training.category,
+          endDate: dueDate,
+          examDurationMinutes: training.examDurationMinutes,
+          maxAttempts: params.maxAttempts,
+          passingScore: training.passingScore,
+          smgPoints: training.smgPoints,
+          isCompulsory: training.isCompulsory,
+          assignedByName: params.assignedByName,
+        })
+
+        await sendEmail({
+          organizationId: params.organizationId,
+          to: user.email,
+          subject: `${org.name} · Yeni eğitim atandı: ${training.title}`,
+          html,
+        })
+      }),
+    )
+  } catch (err) {
+    logger.error('BulkAssign', 'Toplu atama e-postaları gönderilemedi', err)
   }
 }

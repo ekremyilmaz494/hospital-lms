@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Settings, Save, Building2,
-  Bell, Palette,
+  Bell, Palette, Mail,
   ChevronRight, CheckCircle2,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
@@ -16,6 +16,7 @@ const tabLoading = () => <div className="h-64 animate-pulse rounded-lg m-8" styl
 const HospitalTab = dynamic(() => import('./hospital-tab'), { ssr: false, loading: tabLoading });
 const NotificationTab = dynamic(() => import('./notification-tab'), { ssr: false, loading: tabLoading });
 const BrandingTab = dynamic(() => import('./branding-tab'), { ssr: false, loading: tabLoading });
+const EmailTab = dynamic(() => import('./email-tab'), { ssr: false, loading: tabLoading });
 
 interface SettingsData {
   defaultPassingScore: number;
@@ -61,6 +62,7 @@ const tabs = [
   { id: 'hospital', label: 'Kurum', icon: Building2 },
   { id: 'branding', label: 'Marka', icon: Palette },
   { id: 'notifications', label: 'Bildirimler', icon: Bell },
+  { id: 'email', label: 'E-posta', icon: Mail },
 ] as const;
 
 type TabId = (typeof tabs)[number]['id'];
@@ -223,6 +225,7 @@ export default function AdminSettingsPage() {
             {activeTab === 'hospital' && <HospitalTab {...tabProps} />}
             {activeTab === 'branding' && <BrandingTab {...tabProps} />}
             {activeTab === 'notifications' && <NotificationTab {...tabProps} />}
+            {activeTab === 'email' && <EmailTab />}
           </div>
         </BlurFade>
       </div>
