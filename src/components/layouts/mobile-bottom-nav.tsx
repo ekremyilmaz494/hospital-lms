@@ -21,8 +21,8 @@ const DEFAULT_STAFF_ITEMS: readonly MobileBottomNavItem[] = [
 /* ─── Editorial palette ─── */
 const INK = '#0a1628'
 const INK_SOFT = '#5b6478'
-const CREAM = '#faf7f2'
-const RULE = '#e5e0d5'
+const CREAM = '#f4ead5'
+const RULE = '#e0d7c0'
 const GOLD = '#c9a961'
 
 interface MobileBottomNavProps {

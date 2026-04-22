@@ -189,21 +189,21 @@ export function KvkkNoticeModal({
                 e.stopPropagation()
                 setAccepted((v) => !v)
               }}
-              className="w-[18px] h-[18px] shrink-0 mt-0.5 flex items-center justify-center transition-colors duration-200"
+              className="w-3 h-3 shrink-0 mt-1 flex items-center justify-center transition-colors duration-200"
               style={{
                 background: accepted ? INK : CREAM,
-                border: accepted ? `1.5px solid ${INK}` : `1.5px solid ${RULE}`,
+                border: accepted ? `1px solid ${INK}` : `1px solid ${RULE}`,
               }}
             >
               {accepted && (
                 <span
                   style={{
-                    width: 5,
-                    height: 9,
+                    width: 3,
+                    height: 6,
                     borderStyle: 'solid',
                     borderColor: GOLD,
-                    borderWidth: '0 2px 2px 0',
-                    transform: 'rotate(45deg) translate(-1px, -1px)',
+                    borderWidth: '0 1.5px 1.5px 0',
+                    transform: 'translateY(-1px) rotate(45deg)',
                     display: 'block',
                   }}
                 />

@@ -7,7 +7,7 @@
  * Filtreleme/segmentasyon mantığı PR #21'den korundu, görsel dil hizalandı.
  */
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -18,6 +18,10 @@ import {
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { MandatoryFeedbackBanner } from '@/components/shared/mandatory-feedback-banner';
+import {
+  INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE, CARD_BG,
+  STATUS_TOKENS,
+} from '@/lib/editorial-palette';
 
 interface Training {
   id: string;
@@ -35,14 +39,6 @@ interface Training {
   examDurationMinutes?: number;
   passingScore?: number;
 }
-
-/* ─── Editorial palette ─── */
-const INK = 'var(--ed-ink, #0a1628)';
-const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
-const CREAM = 'var(--ed-cream, #faf7f2)';
-const RULE = 'var(--ed-rule, #e5e0d5)';
-const GOLD = 'var(--ed-gold, #c9a961)';
-const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 /* ─── Domain mappings ─── */
 
@@ -62,10 +58,11 @@ const categoryIcon = (category: string): LucideIcon => {
 
 type StatusKey = 'assigned' | 'in_progress' | 'passed' | 'failed' | 'locked';
 const STATUS: Record<StatusKey, { label: string; ink: string; bg: string; dot: string }> = {
-  assigned:    { label: 'ATANDI',  ink: '#1f3a7a', bg: '#eef2fb', dot: '#2c55b8' },
-  in_progress: { label: 'DEVAM',   ink: '#6a4e11', bg: '#fef6e7', dot: '#b4820b' },
-  passed:      { label: 'GEÇTİ',   ink: '#0a7a47', bg: '#eaf6ef', dot: '#0a7a47' },
-  failed:      { label: 'KALDI',   ink: '#b3261e', bg: '#fdf5f2', dot: '#b3261e' },
+  assigned:    { label: 'ATANDI',  ...STATUS_TOKENS.assigned },
+  in_progress: { label: 'DEVAM',   ...STATUS_TOKENS.in_progress },
+  passed:      { label: 'GEÇTİ',   ...STATUS_TOKENS.completed },
+  failed:      { label: 'KALDI',   ...STATUS_TOKENS.failed },
+  // locked: STATUS_TOKENS'te karşılığı yok — locked'a özgü amber/kahverengi kombo.
   locked:      { label: 'KİLİTLİ', ink: '#8a5a11', bg: '#f4efdf', dot: '#b4820b' },
 };
 
@@ -85,22 +82,6 @@ export default function MyTrainingsPage() {
   const { data: rawData, isLoading, error } =
     useFetch<{ data: Training[] } | Training[]>('/api/staff/my-trainings');
   const [activeTab, setActiveTab] = useState<'trainings' | 'exams'>('trainings');
-
-  /* Cream theme cascade */
-  useEffect(() => {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const el = main as HTMLElement;
-    const prevBg = el.style.backgroundColor;
-    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
-    el.style.backgroundColor = CREAM;
-    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
-    return () => {
-      el.style.backgroundColor = prevBg;
-      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
-      else el.style.removeProperty('--color-bg-rgb');
-    };
-  }, []);
 
   const allItems: Training[] = useMemo(
     () => (Array.isArray(rawData) ? rawData : (rawData as { data: Training[] })?.data ?? []),
@@ -141,8 +122,6 @@ export default function MyTrainingsPage() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ed-ink) 3.5%, transparent) 1px, transparent 0)',
-        backgroundSize: '24px 24px',
       }}
     >
       <div className="relative px-4 sm:px-10 lg:px-16 pt-5 pb-16">
@@ -154,12 +133,6 @@ export default function MyTrainingsPage() {
           style={{ borderColor: INK }}
         >
           <div className="flex items-end gap-4">
-            <p
-              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-            >
-              № 02 · Eğitimler
-            </p>
             <h1
               className="text-[36px] sm:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
               style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
@@ -226,7 +199,7 @@ export default function MyTrainingsPage() {
               <div
                 className="grid grid-cols-2 md:grid-cols-4"
                 style={{
-                  backgroundColor: '#ffffff',
+                  backgroundColor: CARD_BG,
                   border: `1px solid ${RULE}`,
                   borderRadius: '4px',
                 }}
@@ -468,7 +441,7 @@ function ActiveRow({ t, index }: { t: Training; index: number }) {
         href={`/staff/my-trainings/${t.id}`}
         className="group grid items-stretch overflow-hidden focus:outline-none grid-cols-[56px_minmax(0,1fr)] sm:grid-cols-[40px_56px_minmax(0,1fr)_max-content]"
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: CARD_BG,
           borderTopWidth: '1px',
           borderRightWidth: '1px',
           borderBottomWidth: '1px',
@@ -625,7 +598,7 @@ function CompletedRow({ t, index }: { t: Training; index: number }) {
         href={`/staff/my-trainings/${t.id}`}
         className="grid items-center overflow-hidden focus:outline-none grid-cols-[minmax(0,1fr)_120px] sm:grid-cols-[40px_minmax(0,1fr)_120px_48px]"
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: CARD_BG,
           borderTopWidth: '1px',
           borderRightWidth: '1px',
           borderBottomWidth: '1px',
@@ -722,7 +695,7 @@ function ArchiveRow({
         className="grid items-stretch overflow-hidden focus:outline-none"
         style={{
           gridTemplateColumns: '40px 1fr max-content',
-          backgroundColor: '#ffffff',
+          backgroundColor: CARD_BG,
           borderTopWidth: '1px',
           borderRightWidth: '1px',
           borderBottomWidth: '1px',

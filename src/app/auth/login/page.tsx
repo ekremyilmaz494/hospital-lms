@@ -212,8 +212,8 @@ function LoginForm() {
         .ed-input::placeholder { color: ${INK_SOFT}; opacity: 0.6; }
         .ed-checkbox {
           appearance: none;
-          width: 18px; height: 18px;
-          border: 1.5px solid ${RULE};
+          width: 12px; height: 12px;
+          border: 1px solid ${RULE};
           background: ${CREAM};
           cursor: pointer;
           position: relative;
@@ -222,11 +222,11 @@ function LoginForm() {
         .ed-checkbox:checked { background: ${INK}; border-color: ${INK}; }
         .ed-checkbox:checked::after {
           content: ""; position: absolute;
-          top: 2px; left: 5px;
-          width: 5px; height: 9px;
+          top: 50%; left: 50%;
+          width: 3px; height: 6px;
           border: solid ${GOLD};
-          border-width: 0 2px 2px 0;
-          transform: rotate(45deg);
+          border-width: 0 1.5px 1.5px 0;
+          transform: translate(-50%, -60%) rotate(45deg);
         }
         @keyframes ed-glow {
           0%, 100% { opacity: 0.5; }

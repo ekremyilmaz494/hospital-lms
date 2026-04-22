@@ -5921,3 +5921,112 @@ Remote'ta birikmiş 7 merge edilmiş branch + 2 lokal orphan branch silindi:
 ---
 
 *Son güncelleme: 20 Nisan 2026 — Oturum 52 (Staff Redesign + macOS iCloud Fix + CI Stabilizasyonu)*
+
+---
+
+## Oturum 53 — Editorial Dark Mode + Mobile Polish (22 Nisan 2026)
+
+**Kapsam:** Staff paneli mobile uyumluluğu + KVKK modal loop fix + editorial dark mode. Üç PR merge edildi: #32, #33, #34.
+
+### PR #32 — Staff Mobile Responsive Pass (merged, SHA `70b97cd`)
+
+**Sorun:** Staff paneli `~80%` mobile-ready ama bazı sayfalarda yatay scroll riski, sıkışık layout, eski bottom nav.
+
+**Yapılanlar:**
+- Stats grid `grid-cols-2 md:grid-cols-4` (mobile 2x2, tablet+ 4 kolon) — dashboard + my-trainings
+- `StatTile` index-based borders (`data-mb` / `data-mr` attribute + `data-[mb='0']:border-b-0` Tailwind selectors)
+- Classic hamburger (sol üst) — önceki edge-pull tab / bookmark ribbon / üst tab denemeleri reddedildi
+- Mobile drawer → editorial redesign (cream + ink + gold rail + mono caps labels)
+- Cookie consent modalı editorial redesign (cream bg, gold left-rail 6px, `№ 06 · YASAL BİLGİLENDİRME` monoscaps)
+- Color palette chooser kaldırıldı — sadece Aydınlık/Karanlık toggle
+- Calendar default view = Ay (mobile ve desktop aynı)
+
+**Reddedilen tasarımlar (iteration kaydı):**
+1. Bookmark ribbon edge tab (45° kesim) — "çok hoş durmadı"
+2. Ortada edge tab — "ortada olmasın"
+3. Minimal drawer handle (üstte) — "sevmedim"
+4. Nihai: "klasik kullanıcı dostu" → hamburger
+
+### PR #33 — KVKK Modal Kabul Loop Fix (merged, SHA `28aab12`)
+
+**Sorun:** KVKK onay → sayfa yenileniyor → modal tekrar çıkıyor (sonsuz döngü). Rate limit lockout da eklenince çıkılamıyor.
+
+**Kök sebepler:**
+1. `supabase.auth.updateUser()` metadata güncelledi ama JWT cookie'yi refresh etmedi → middleware eski token'ı okudu → `kvkkAccepted=false` → geri yönlendirdi
+2. Rate limit idempotency kontrolünden ÖNCE çalışıyordu → zaten kabul etmiş user tekrar denediğinde 429 aldı
+3. Dev mode rate limit bypass yoktu
+
+**Çözüm:**
+- `api/auth/kvkk-acknowledge/route.ts` — `await supabase.auth.refreshSession()` updateUser'dan sonra
+- Idempotency check (zaten kabul edilmişse 200) rate limit'TEN ÖNCE
+- `NODE_ENV=development` → rate limit skip
+- `kvkk-notice-modal.tsx` — `apiError` state eklendi, 429 durumunda açık mesaj, hata varsa navigation yok
+
+### PR #34 — Editorial Dark Mode + Polish (merged, SHA `2d68b80`)
+
+**Hedef:** Staff paneline dark mode + mobile polish pas 2.
+
+**Strateji — "CSS var indirection":**
+`var(--ed-cream)` pattern'i ile JS constant'ları değiştirerek 18 dosyada yüzlerce `style={{ color: INK }}` kullanımına dokunmadan tüm panel dark mode kapsamına girdi. React inline style string kabul eder → browser `.dark` class'ına göre var'ı resolve eder.
+
+**İlk yaklaşım (başarısız):** Tüm chrome + content CSS var → drawer "yarı saydam", topbar gri (dark page üstünde `rgba(cream, 0.85) + blur`), theme dropdown saydam (shadcn default `backdropFilter: blur(8px)`).
+
+**Nihai karar (PR #34):**
+- **Content** (9 staff page): `var(--ed-*, #hex)` + fallback → dark mode flip
+- **Chrome** (topbar, sidebar, drawer, bottom-nav, cookie, kvkk): hex sabit → tema'dan etkilenmez
+- Topbar solid `#faf7f2`, backdrop-blur kaldırıldı (scroll saydamlık fix)
+- DropdownMenuContent `backdropFilter: 'none'` + `WebkitBackdropFilter: 'none'` explicit (shadcn override)
+- CompletedRow puan kolonu `grid-cols-[minmax(0,1fr)_120px]` sabit → "100%" + Award ikon + "73%" hepsi aynı x'te
+
+**Dark palette (midnight newsprint):**
+```css
+.dark {
+  --ed-cream: #0d1524;   /* page paper → deep ink navy */
+  --ed-ink:   #f0ebe0;   /* body text → warm parchment */
+  --ed-gold:  #d4b876;   /* slightly warmer */
+  --ed-rule:  #1e2a42;
+  --ed-olive: #5c8a6b;
+}
+```
+
+### Öğrenilen Bilgi Kalemleri (memory'e kaydedildi)
+
+1. **CSS var indirection for theming** — Yüzlerce inline style'a dokunmadan tema eklemek için constant'ları `'#hex'` → `'var(--foo)'` yap. React inline style her CSS string'i kabul eder, browser runtime'da resolve eder.
+2. **Chrome vs Content ayrımı** — Navigation/modal/topbar design kararı olarak tema'dan bağımsız bırakılabilir. Tam flip denemelerinde saydamlık ve kontrast sorunları çıkıyor.
+3. **Turbopack CSS HMR race** — `globals.css` güncellendiğinde yeni var tanımları sayfa CSS'inden önce yüklenmeyebilir → `var(--foo)` invalid → transparent fallback. Çözüm: `var(--foo, #hex)` fallback her constant'ta.
+4. **Shadcn DropdownMenuContent default blur** — `backdropFilter: blur(8px)` default. Opaque bg istemek için inline style'a `backdropFilter: 'none'` + `WebkitBackdropFilter: 'none'` + explicit `background` yazmak gerekli.
+5. **Hex alpha concat `${GOLD}55`** — CSS var reference'a çevirildiğinde (`var(--ed-gold)55` = invalid) kırılır. Ya alpha variant CSS var tanımla (`--ed-gold-a33`), ya `color-mix(in srgb, var(--ed-gold) 33%, transparent)` kullan, ya hex kalan yerlerde `#c9a96155` doğrudan yaz.
+6. **DropdownMenuContent user style spread order** — Shadcn'in `{...props}` spread'i internal `style={{ background: var(--color-surface) }}` ÜSTÜNE yazar, ancak prop'tan gelen style tam object replace eder, merge DEĞİL. Explicit her gerekli field'ı user style'a yaz.
+
+### Değiştirilen Dosyalar (PR #34)
+
+**Content (CSS var + fallback):**
+- `src/app/globals.css` — `:root` ve `.dark` altında `--ed-*` palette + alpha variants
+- `src/app/staff/dashboard/page.tsx`
+- `src/app/staff/my-trainings/page.tsx` + `[id]/page.tsx`
+- `src/app/staff/calendar/page.tsx`
+- `src/app/staff/certificates/page.tsx`
+- `src/app/staff/notifications/page.tsx`
+- `src/app/staff/profile/page.tsx`
+- `src/app/staff/smg/page.tsx`
+- `src/app/help/page.tsx`
+
+**Chrome (hex sabit revert):**
+- `src/app/staff/layout.tsx` (edge-tab kaldırma önceki değişiklik)
+- `src/components/layouts/topbar/app-topbar.tsx`
+- `src/components/layouts/sidebar/app-sidebar.tsx`
+- `src/components/layouts/mobile-sidebar-drawer.tsx`
+- `src/components/layouts/mobile-bottom-nav.tsx` (kullanımda olmayan ama temiz tutuldu)
+- `src/components/shared/cookie-consent.tsx`
+- `src/components/shared/kvkk-notice-modal.tsx`
+
+**Özet:** 17 dosya, +592 / -350 satır.
+
+### Bilinen Kalem / Takip
+
+- DevTools mobile emülasyon modu sayfa sürekli yenileniyor — Chrome DevTools + Next.js 16 Turbopack quirk, gerçek mobil cihazda (iPhone/Android) sorun yok. Çözülemedi, kabul edildi.
+- Staff chrome (topbar/sidebar/drawer) dark mode'da flip etmiyor — design kararı olarak sabit. Kullanıcı dark mode'da cream chrome + dark content kombinasyonunu kabul etti.
+
+---
+
+*Son güncelleme: 22 Nisan 2026 — Oturum 53 (Editorial Dark Mode + Mobile Polish + KVKK Modal Fix)*

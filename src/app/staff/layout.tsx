@@ -14,6 +14,7 @@ import { MobileSidebarDrawer } from '@/components/layouts/mobile-sidebar-drawer'
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
+import { CREAM } from '@/lib/editorial-palette';
 
 export default function StaffLayout({
   children,
@@ -62,7 +63,15 @@ export default function StaffLayout({
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
+      <div
+        className="min-h-screen"
+        style={{
+          background: CREAM,
+          // Topbar `rgba(var(--color-bg-rgb), 0.85)` kullanıyor — cream RGB'si
+          // ile override et ki chrome da editorial cream'e uyum sağlasın.
+          ['--color-bg-rgb' as string]: '244, 234, 213',
+        }}
+      >
         {/* Sidebar: sadece md ve üzerinde göster */}
         <div className="hidden md:block">
           <AppSidebar
@@ -99,6 +108,7 @@ export default function StaffLayout({
           style={{
             marginLeft: isMobile ? 0 : 72,
             paddingBottom: isMobile ? 'env(safe-area-inset-bottom)' : undefined,
+            background: CREAM,
           }}
         >
           <ImpersonationBanner />

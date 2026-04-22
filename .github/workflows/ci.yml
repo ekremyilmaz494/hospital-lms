@@ -62,6 +62,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Editorial palette guard
+        run: bash scripts/editorial-palette-guard.sh
+
       - name: Unit tests
         run: pnpm test
 

@@ -6,12 +6,13 @@
  * cream + ink + gold + serif display + mono caps + navy/gold premium artifact.
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Award, Download, CheckCircle2, AlertTriangle, Copy, Eye, X, Archive,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
+import { INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE, CARD_BG } from '@/lib/editorial-palette';
 
 interface Certificate {
   id: string;
@@ -25,14 +26,8 @@ interface Certificate {
   user?: { firstName?: string; lastName?: string; organization?: { name?: string } };
 }
 
-/* ─── Editorial palette ─── */
-const INK = 'var(--ed-ink, #0a1628)';
-const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
-const CREAM = 'var(--ed-cream, #faf7f2)';
-const RULE = 'var(--ed-rule, #e5e0d5)';
-const GOLD = 'var(--ed-gold, #c9a961)';
+/* Certificates-özel navy (premium artifact chrome) — editorial palette'te yok. */
 const NAVY = '#0b1e3f';
-const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 /* ════════════════════════════════════════════════════════
    PRESERVED: Gold seal + Certificate artifact (belgenin kendisi)
@@ -196,22 +191,6 @@ export default function StaffCertificatesPage() {
   const [selected, setSelected] = useState<Certificate | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
-  /* Cream theme cascade */
-  useEffect(() => {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const el = main as HTMLElement;
-    const prevBg = el.style.backgroundColor;
-    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
-    el.style.backgroundColor = CREAM;
-    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
-    return () => {
-      el.style.backgroundColor = prevBg;
-      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
-      else el.style.removeProperty('--color-bg-rgb');
-    };
-  }, []);
-
   const handleDownloadPDF = async (cert: Certificate) => {
     setPdfLoading(true);
     try {
@@ -249,8 +228,6 @@ export default function StaffCertificatesPage() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ed-ink) 3.5%, transparent) 1px, transparent 0)',
-        backgroundSize: '24px 24px',
       }}
     >
       <div className="relative px-4 sm:px-10 lg:px-16 pt-5 pb-16">
@@ -260,12 +237,6 @@ export default function StaffCertificatesPage() {
           style={{ borderBottom: `3px solid ${INK}` }}
         >
           <div className="flex items-end gap-4">
-            <p
-              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-            >
-              № 03 · Sertifikalar
-            </p>
             <h1
               className="text-[36px] sm:text-[48px] leading-[0.95] font-semibold tracking-[-0.025em]"
               style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
@@ -572,7 +543,7 @@ function CertificateCard({
     <article
       className="group relative overflow-hidden flex flex-col"
       style={{
-        backgroundColor: '#ffffff',
+        backgroundColor: CARD_BG,
         borderTop: `1px solid ${RULE}`,
         borderRight: `1px solid ${RULE}`,
         borderBottom: `1px solid ${RULE}`,
@@ -767,7 +738,7 @@ function CertificateCard({
               color: INK_SOFT,
               border: `1px solid ${RULE}`,
               borderRadius: '2px',
-              backgroundColor: '#ffffff',
+              backgroundColor: CARD_BG,
               transition: 'color 160ms ease, border-color 160ms ease',
             }}
             onMouseEnter={e => { e.currentTarget.style.color = GOLD; e.currentTarget.style.borderColor = GOLD; }}

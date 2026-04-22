@@ -16,6 +16,10 @@ import {
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
 import { MandatoryFeedbackBanner } from '@/components/shared/mandatory-feedback-banner';
+import {
+  INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE, CARD_BG,
+  STATUS_TOKENS,
+} from '@/lib/editorial-palette';
 
 interface Training {
   id: string;
@@ -47,17 +51,9 @@ interface DashboardData {
   urgentTraining?: { id: string; title: string; daysLeft: number } | null;
 }
 
-/* ─── Editorial palette ─── */
-const INK = 'var(--ed-ink, #0a1628)';
-const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
-const CREAM = 'var(--ed-cream, #faf7f2)';
-const RULE = 'var(--ed-rule, #e5e0d5)';
-const GOLD = 'var(--ed-gold, #c9a961)';
-const OLIVE = 'var(--ed-olive, #1a3a28)';
-
 const STATUS: Record<string, { label: string; ink: string; bg: string; dot: string }> = {
-  in_progress: { label: 'DEVAM',  ink: '#6a4e11', bg: '#fef6e7', dot: '#b4820b' },
-  assigned:    { label: 'ATANDI', ink: '#1f3a7a', bg: '#eef2fb', dot: '#2c55b8' },
+  in_progress: { label: 'DEVAM',  ...STATUS_TOKENS.in_progress },
+  assigned:    { label: 'ATANDI', ...STATUS_TOKENS.assigned },
 };
 
 const ACTIVITY_TONE: Record<string, string> = {
@@ -98,22 +94,6 @@ export default function StaffDashboard() {
   const { user } = useAuth();
   const { data, isLoading, error } = useFetch<DashboardData>('/api/staff/dashboard');
 
-  /* Cream theme cascade */
-  useEffect(() => {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const el = main as HTMLElement;
-    const prevBg = el.style.backgroundColor;
-    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
-    el.style.backgroundColor = CREAM;
-    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
-    return () => {
-      el.style.backgroundColor = prevBg;
-      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
-      else el.style.removeProperty('--color-bg-rgb');
-    };
-  }, []);
-
   const stats = [
     { label: 'Atanan',      value: data?.stats?.assigned   ?? 0, icon: BookOpen,    tone: INK,       num: '01' },
     { label: 'Devam Eden',  value: data?.stats?.inProgress ?? 0, icon: Clock,       tone: '#b4820b', num: '02' },
@@ -143,8 +123,6 @@ export default function StaffDashboard() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ed-ink) 3.5%, transparent) 1px, transparent 0)',
-        backgroundSize: '24px 24px',
       }}
     >
       <div className="relative px-4 sm:px-10 lg:px-16 pt-5 pb-16">
@@ -156,12 +134,6 @@ export default function StaffDashboard() {
           style={{ borderColor: INK }}
         >
           <div className="flex items-end gap-4">
-            <p
-              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-            >
-              № 01 · Panel
-            </p>
             <h1
               className="text-[36px] sm:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
               style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
@@ -320,7 +292,7 @@ export default function StaffDashboard() {
               <div
                 className="mt-5 grid grid-cols-2 md:grid-cols-4"
                 style={{
-                  backgroundColor: '#ffffff',
+                  backgroundColor: CARD_BG,
                   border: `1px solid ${RULE}`,
                   borderRadius: '4px',
                 }}
@@ -436,7 +408,7 @@ export default function StaffDashboard() {
                     <ul
                       className="mt-4"
                       style={{
-                        backgroundColor: '#ffffff',
+                        backgroundColor: CARD_BG,
                         border: `1px solid ${RULE}`,
                         borderRadius: '4px',
                       }}
@@ -520,7 +492,7 @@ export default function StaffDashboard() {
                     <ul
                       className="mt-4"
                       style={{
-                        backgroundColor: '#ffffff',
+                        backgroundColor: CARD_BG,
                         border: `1px solid ${RULE}`,
                         borderRadius: '4px',
                       }}
@@ -638,7 +610,7 @@ function TrainingRow({ t, index }: { t: Training; index: number }) {
         className="group grid items-center overflow-hidden focus:outline-none"
         style={{
           gridTemplateColumns: '40px 56px 1fr max-content',
-          backgroundColor: '#ffffff',
+          backgroundColor: CARD_BG,
           borderTopWidth: '1px',
           borderRightWidth: '1px',
           borderBottomWidth: '1px',
@@ -761,7 +733,7 @@ function CountdownPanel({ training }: { training: Training }) {
       className="grid items-center gap-4 p-4 sm:p-5"
       style={{
         gridTemplateColumns: '4px 36px 1fr max-content',
-        backgroundColor: '#ffffff',
+        backgroundColor: CARD_BG,
         border: `1px solid ${RULE}`,
         borderRadius: '4px',
       }}

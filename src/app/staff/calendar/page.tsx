@@ -6,13 +6,17 @@
  * Calendar grid editorial bar-chart feel ile, day cells borderless hairline ruled.
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2,
   BookOpen, AlertTriangle, X, ArrowRight, Lock, ClipboardList,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
+import {
+  INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE, CARD_BG,
+  FONT_DISPLAY, FONT_BODY, FONT_MONO,
+} from '@/lib/editorial-palette';
 
 type ViewMode = 'month' | 'week' | 'agenda';
 
@@ -80,14 +84,6 @@ function formatDateRange(start: string, end: string) {
   }
   return `${s.toLocaleDateString('tr-TR', opts)} – ${e.toLocaleDateString('tr-TR', opts)}`;
 }
-
-/* ─── Editorial palette ─── */
-const INK = 'var(--ed-ink, #0a1628)';
-const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
-const CREAM = 'var(--ed-cream, #faf7f2)';
-const RULE = 'var(--ed-rule, #e5e0d5)';
-const GOLD = 'var(--ed-gold, #c9a961)';
-const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 /* ─────────────────────────────────────────────────────
    Page
@@ -210,22 +206,6 @@ export default function CalendarPage() {
     };
   }, [events, month, year]);
 
-  /* Cream theme bleed (same trick as notifications) */
-  useEffect(() => {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const el = main as HTMLElement;
-    const prevBg = el.style.backgroundColor;
-    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
-    el.style.backgroundColor = CREAM;
-    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
-    return () => {
-      el.style.backgroundColor = prevBg;
-      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
-      else el.style.removeProperty('--color-bg-rgb');
-    };
-  }, []);
-
   if (isLoading) return <CalendarSkeleton />;
   if (error) return <CalendarError message={error} />;
 
@@ -246,16 +226,10 @@ export default function CalendarPage() {
           style={{ borderColor: INK }}
         >
           <div className="flex min-w-0 items-end gap-3 sm:gap-4">
-            <p
-              className="pb-1 hidden sm:block text-[10px] uppercase tracking-[0.26em]"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
-            >
-              № 02 · Takvim
-            </p>
             <h1
               className="leading-none tracking-[-0.02em]"
               style={{
-                fontFamily: 'var(--font-display)',
+                fontFamily: FONT_DISPLAY,
                 fontSize: 'clamp(1.5rem, 2.6vw, 2.25rem)',
                 color: INK,
                 fontWeight: 800,
@@ -265,7 +239,7 @@ export default function CalendarPage() {
               <span style={{ color: GOLD }}>.</span>
               <span
                 className="ml-2 text-[0.55em] align-top"
-                style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', fontWeight: 700 }}
+                style={{ color: INK_SOFT, fontFamily: FONT_MONO, letterSpacing: '0.1em', fontWeight: 700 }}
               >
                 {year}
               </span>
@@ -274,7 +248,7 @@ export default function CalendarPage() {
 
           {/* Inline nav + stats + today button — wrap-safe on mobile */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-6">
-            <div className="flex items-center gap-3 sm:gap-4 text-[11px] tracking-[0.18em]" style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}>
+            <div className="flex items-center gap-3 sm:gap-4 text-[11px] tracking-[0.18em]" style={{ color: INK_SOFT, fontFamily: FONT_MONO }}>
               <span>
                 <span style={{ color: INK, fontWeight: 700 }}>{monthStats.total.toString().padStart(2, '0')}</span> TOPLAM
               </span>
@@ -301,7 +275,7 @@ export default function CalendarPage() {
                 style={{
                   backgroundColor: INK,
                   color: CREAM,
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: FONT_MONO,
                   fontWeight: 700,
                 }}
               >
@@ -399,7 +373,7 @@ function ViewSwitcher({ value, onChange }: { value: ViewMode; onChange: (v: View
             style={{
               backgroundColor: active ? INK : 'transparent',
               color: active ? CREAM : INK,
-              fontFamily: 'var(--font-mono)',
+              fontFamily: FONT_MONO,
               fontWeight: 700,
               borderLeft: i === 0 ? 'none' : `1px solid ${INK}`,
               minHeight: 40, // touch-friendly
@@ -433,7 +407,7 @@ function MonthView({
           <div
             key={d}
             className="text-center text-[10px] tracking-[0.22em]"
-            style={{ color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+            style={{ color: INK, fontFamily: FONT_MONO, fontWeight: 700 }}
           >
             {d}
           </div>
@@ -472,7 +446,7 @@ function MonthView({
 
       <div
         className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-2 text-[10px] tracking-[0.18em]"
-        style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+        style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
       >
         <LegendItem color="#2c55b8" label="EĞİTİM" />
         <LegendItem color="#1a3a28" label="SINAV" />
@@ -493,7 +467,7 @@ function StatBlock({ value, label, accent }: { value: number; label: string; acc
       <div
         className="leading-none tabular-nums"
         style={{
-          fontFamily: 'var(--font-display)',
+          fontFamily: FONT_DISPLAY,
           fontSize: 'clamp(2.25rem, 4vw, 3rem)',
           fontWeight: 800,
           color: accent ? INK : INK_SOFT,
@@ -506,7 +480,7 @@ function StatBlock({ value, label, accent }: { value: number; label: string; acc
         className="mt-1 text-[10px] tracking-[0.3em]"
         style={{
           color: accent ? GOLD : INK_SOFT,
-          fontFamily: 'var(--font-mono)',
+          fontFamily: FONT_MONO,
           fontWeight: 700,
         }}
       >
@@ -599,7 +573,7 @@ function CalendarCell({
         <span
           className="leading-none tabular-nums"
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: FONT_DISPLAY,
             fontSize: 'clamp(0.95rem, 1.4vw, 1.125rem)',
             fontWeight: isToday ? 800 : 600,
             color: isToday ? INK : isSelected ? INK : INK_SOFT,
@@ -629,7 +603,7 @@ function CalendarCell({
               <span className="h-1.5 w-1.5" style={{ backgroundColor: '#2c55b8' }} />
               <span
                 className="text-[9px] tabular-nums leading-none"
-                style={{ color: '#2c55b8', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                style={{ color: '#2c55b8', fontFamily: FONT_MONO, fontWeight: 700 }}
               >
                 {trainingCount}
               </span>
@@ -640,7 +614,7 @@ function CalendarCell({
               <span className="h-1.5 w-1.5" style={{ backgroundColor: OLIVE }} />
               <span
                 className="text-[9px] tabular-nums leading-none"
-                style={{ color: OLIVE, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                style={{ color: OLIVE, fontFamily: FONT_MONO, fontWeight: 700 }}
               >
                 {examCount}
               </span>
@@ -696,7 +670,7 @@ function WeekView({
     <div className="space-y-3">
       <p
         className="text-[10px] tracking-[0.22em]"
-        style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+        style={{ color: INK_SOFT, fontFamily: FONT_MONO, fontWeight: 700 }}
       >
         {weekDays[0].getDate().toString().padStart(2, '0')}
         {' – '}
@@ -733,14 +707,14 @@ function WeekView({
                 <div className="w-14 shrink-0">
                   <div
                     className="text-[10px] tracking-[0.2em]"
-                    style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                    style={{ color: INK_SOFT, fontFamily: FONT_MONO, fontWeight: 700 }}
                   >
                     {DAYS_TR[(d.getDay() + 6) % 7]}
                   </div>
                   <div
                     className="tabular-nums leading-none"
                     style={{
-                      fontFamily: 'var(--font-display)',
+                      fontFamily: FONT_DISPLAY,
                       fontSize: '1.5rem',
                       fontWeight: 800,
                       color: isInMonth ? INK : INK_SOFT,
@@ -755,7 +729,7 @@ function WeekView({
                   {evts.length === 0 ? (
                     <p
                       className="text-[11px] tracking-[0.18em]"
-                      style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                      style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
                     >
                       —
                     </p>
@@ -769,7 +743,7 @@ function WeekView({
                           />
                           <span
                             className="truncate text-[13px] leading-snug"
-                            style={{ color: INK, fontFamily: 'var(--font-display)', fontWeight: 600 }}
+                            style={{ color: INK, fontFamily: FONT_DISPLAY, fontWeight: 600 }}
                           >
                             {e.title}
                           </span>
@@ -778,7 +752,7 @@ function WeekView({
                       {evts.length > 3 && (
                         <li
                           className="text-[10px] tracking-[0.18em]"
-                          style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                          style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
                         >
                           +{evts.length - 3} DAHA
                         </li>
@@ -877,7 +851,7 @@ function AgendaView({
         <CalendarIcon className="h-8 w-8" style={{ color: INK_SOFT }} strokeWidth={1.25} />
         <p
           className="mt-4 text-[11px] tracking-[0.22em]"
-          style={{ color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+          style={{ color: INK, fontFamily: FONT_MONO, fontWeight: 700 }}
         >
           YAKLAŞAN KAYIT YOK
         </p>
@@ -897,7 +871,7 @@ function AgendaView({
         <section key={bucket.key}>
           <header
             className="flex items-center gap-3 border-y py-2 text-[10px] tracking-[0.22em]"
-            style={{ borderColor: INK, color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+            style={{ borderColor: INK, color: INK, fontFamily: FONT_MONO, fontWeight: 700 }}
           >
             <span>{bucket.label}</span>
             <span className="h-px flex-1" style={{ backgroundColor: RULE }} />
@@ -941,14 +915,14 @@ function AgendaEventCard({ evt }: { evt: CalendarEvent }) {
         <div className="flex items-center gap-2">
           <span
             className="text-[10px] tracking-[0.22em]"
-            style={{ color: cfg.ink, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+            style={{ color: cfg.ink, fontFamily: FONT_MONO, fontWeight: 700 }}
           >
             {evt.eventType === 'exam' ? 'SINAV' : 'EĞİTİM'} · {cfg.label}
           </span>
           {urgent && (
             <span
               className="text-[10px] tracking-[0.14em]"
-              style={{ color: '#b3261e', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+              style={{ color: '#b3261e', fontFamily: FONT_MONO, fontWeight: 700 }}
             >
               · {days} GÜN
             </span>
@@ -957,7 +931,7 @@ function AgendaEventCard({ evt }: { evt: CalendarEvent }) {
         <h4
           className="mt-1 leading-snug tracking-tight"
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: FONT_DISPLAY,
             color: INK,
             fontWeight: 700,
             fontSize: '0.9375rem',
@@ -967,7 +941,7 @@ function AgendaEventCard({ evt }: { evt: CalendarEvent }) {
         </h4>
         <p
           className="mt-1 text-[11px] tabular-nums"
-          style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+          style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
         >
           {formatDateRange(evt.start, evt.end)}
         </p>
@@ -993,7 +967,7 @@ function SelectedDayPanel({
     <section>
       <header
         className="flex items-center gap-3 border-y py-2 text-[10px] tracking-[0.22em]"
-        style={{ borderColor: INK, color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+        style={{ borderColor: INK, color: INK, fontFamily: FONT_MONO, fontWeight: 700 }}
       >
         <span>SEÇİLİ GÜN</span>
         <span className="h-px flex-1" style={{ backgroundColor: RULE }} />
@@ -1012,7 +986,7 @@ function SelectedDayPanel({
         <span
           className="leading-none tabular-nums"
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: FONT_DISPLAY,
             fontSize: '3rem',
             fontWeight: 800,
             color: INK,
@@ -1023,7 +997,7 @@ function SelectedDayPanel({
         </span>
         <span
           className="text-[12px] tracking-[0.2em]"
-          style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+          style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
         >
           {MONTHS_TR[month]} {year}
         </span>
@@ -1038,7 +1012,7 @@ function SelectedDayPanel({
             <CalendarIcon className="h-6 w-6" style={{ color: INK_SOFT }} strokeWidth={1.5} />
             <p
               className="mt-3 text-[11px] tracking-[0.22em]"
-              style={{ color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+              style={{ color: INK, fontFamily: FONT_MONO, fontWeight: 700 }}
             >
               KAYIT YOK
             </p>
@@ -1064,7 +1038,7 @@ function SelectedDayPanel({
                   <Icon className="h-3 w-3" style={{ color: cfg.ink }} strokeWidth={2.5} />
                   <span
                     className="text-[10px] tracking-[0.22em]"
-                    style={{ color: cfg.ink, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                    style={{ color: cfg.ink, fontFamily: FONT_MONO, fontWeight: 700 }}
                   >
                     {evt.eventType === 'exam' ? 'SINAV' : 'EĞİTİM'} · {cfg.label}
                   </span>
@@ -1073,7 +1047,7 @@ function SelectedDayPanel({
                 <h4
                   className="mt-2 leading-snug tracking-tight"
                   style={{
-                    fontFamily: 'var(--font-display)',
+                    fontFamily: FONT_DISPLAY,
                     color: INK,
                     fontWeight: 700,
                     fontSize: '0.9375rem',
@@ -1085,7 +1059,7 @@ function SelectedDayPanel({
                 <div className="mt-2 flex items-center justify-between">
                   <p
                     className="text-[11px] tabular-nums"
-                    style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                    style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
                   >
                     {formatDateRange(evt.start, evt.end)}
                   </p>
@@ -1094,7 +1068,7 @@ function SelectedDayPanel({
                       className="text-[10px] tracking-[0.14em]"
                       style={{
                         color: days <= 3 ? '#b3261e' : '#b4820b',
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: FONT_MONO,
                         fontWeight: 700,
                       }}
                     >
@@ -1116,7 +1090,7 @@ function DeadlinesPanel({ events }: { events: CalendarEvent[] }) {
     <section>
       <header
         className="flex items-center gap-3 border-y py-2 text-[10px] tracking-[0.22em]"
-        style={{ borderColor: INK, color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+        style={{ borderColor: INK, color: INK, fontFamily: FONT_MONO, fontWeight: 700 }}
       >
         <span>YAKLAŞAN SON TARİHLER</span>
         <span className="h-px flex-1" style={{ backgroundColor: RULE }} />
@@ -1132,7 +1106,7 @@ function DeadlinesPanel({ events }: { events: CalendarEvent[] }) {
             <CheckCircle2 className="h-6 w-6" style={{ color: '#0a7a47' }} strokeWidth={1.5} />
             <p
               className="mt-3 text-[11px] tracking-[0.22em]"
-              style={{ color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+              style={{ color: INK, fontFamily: FONT_MONO, fontWeight: 700 }}
             >
               YAKLAŞAN SON TARİH YOK
             </p>
@@ -1151,7 +1125,7 @@ function DeadlinesPanel({ events }: { events: CalendarEvent[] }) {
                 >
                   <span
                     className="pt-2 text-[10px] tabular-nums tracking-[0.14em]"
-                    style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                    style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
                   >
                     {(i + 1).toString().padStart(2, '0')}
                   </span>
@@ -1172,13 +1146,13 @@ function DeadlinesPanel({ events }: { events: CalendarEvent[] }) {
                     >
                       <span
                         className="text-[14px] tabular-nums leading-none"
-                        style={{ fontFamily: 'var(--font-display)', fontWeight: 800 }}
+                        style={{ fontFamily: FONT_DISPLAY, fontWeight: 800 }}
                       >
                         {days}
                       </span>
                       <span
                         className="mt-0.5 text-[8px] tracking-[0.2em]"
-                        style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                        style={{ fontFamily: FONT_MONO, fontWeight: 700 }}
                       >
                         GÜN
                       </span>
@@ -1186,7 +1160,7 @@ function DeadlinesPanel({ events }: { events: CalendarEvent[] }) {
                     <div className="min-w-0 flex-1">
                       <p
                         className="truncate text-[13px] leading-tight tracking-tight"
-                        style={{ color: INK, fontFamily: 'var(--font-display)', fontWeight: 700 }}
+                        style={{ color: INK, fontFamily: FONT_DISPLAY, fontWeight: 700 }}
                       >
                         {evt.title}
                       </p>
@@ -1194,7 +1168,7 @@ function DeadlinesPanel({ events }: { events: CalendarEvent[] }) {
                         <span className="h-1.5 w-1.5" style={{ backgroundColor: cfg.ink }} />
                         <span
                           className="text-[10px] tracking-[0.18em]"
-                          style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                          style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
                         >
                           {cfg.label}
                         </span>
@@ -1244,7 +1218,7 @@ function CalendarError({ message }: { message: string }) {
       <div className="px-6 pt-10 pb-24 sm:px-10 lg:px-16">
         <div
           className="flex items-center gap-4 text-[10px] tracking-[0.22em]"
-          style={{ color: '#b3261e', fontFamily: 'var(--font-mono)' }}
+          style={{ color: '#b3261e', fontFamily: FONT_MONO }}
         >
           <span>—</span>
           <span style={{ fontWeight: 700 }}>HATA</span>
@@ -1253,7 +1227,7 @@ function CalendarError({ message }: { message: string }) {
         <h1
           className="mt-6 leading-tight tracking-tight"
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: FONT_DISPLAY,
             color: INK,
             fontSize: 'clamp(2rem, 4vw, 2.75rem)',
             fontWeight: 800,

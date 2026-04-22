@@ -6,11 +6,15 @@
  * Büyük tipografik hero skor + segmented progress + editorial aktivite log'u.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Star, Plus, Loader2, ChevronDown, CheckCircle2, Clock, XCircle, AlertTriangle } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/components/shared/toast';
+import {
+  INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE, CARD_BG,
+  STATUS_TOKENS,
+} from '@/lib/editorial-palette';
 
 /* ─── Domain ─── */
 
@@ -57,18 +61,10 @@ const activityTypeLabels: Record<string, string> = {
 };
 
 const STATUS: Record<string, { label: string; ink: string; bg: string; icon: typeof CheckCircle2 }> = {
-  APPROVED: { label: 'ONAYLANDI',  ink: '#0a7a47', bg: '#eaf6ef', icon: CheckCircle2 },
-  PENDING:  { label: 'BEKLİYOR',   ink: '#6a4e11', bg: '#fef6e7', icon: Clock },
-  REJECTED: { label: 'REDDEDİLDİ', ink: '#b3261e', bg: '#fdf5f2', icon: XCircle },
+  APPROVED: { label: 'ONAYLANDI',  ink: STATUS_TOKENS.completed.ink,   bg: STATUS_TOKENS.completed.bg,   icon: CheckCircle2 },
+  PENDING:  { label: 'BEKLİYOR',   ink: STATUS_TOKENS.in_progress.ink, bg: STATUS_TOKENS.in_progress.bg, icon: Clock },
+  REJECTED: { label: 'REDDEDİLDİ', ink: STATUS_TOKENS.failed.ink,      bg: STATUS_TOKENS.failed.bg,      icon: XCircle },
 };
-
-/* ─── Editorial palette ─── */
-const INK = 'var(--ed-ink, #0a1628)';
-const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
-const CREAM = 'var(--ed-cream, #faf7f2)';
-const RULE = 'var(--ed-rule, #e5e0d5)';
-const GOLD = 'var(--ed-gold, #c9a961)';
-const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 /* ─── Page ─── */
 
@@ -92,22 +88,6 @@ export default function StaffSmgPage() {
   const { data: categoriesData } = useFetch<CategoriesResponse>('/api/admin/smg/categories');
   const categories = categoriesData?.categories ?? [];
   const selectedCategory = categories.find(c => c.id === form.categoryId);
-
-  /* Cream theme cascade */
-  useEffect(() => {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const el = main as HTMLElement;
-    const prevBg = el.style.backgroundColor;
-    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
-    el.style.backgroundColor = CREAM;
-    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
-    return () => {
-      el.style.backgroundColor = prevBg;
-      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
-      else el.style.removeProperty('--color-bg-rgb');
-    };
-  }, []);
 
   const handleSubmit = async () => {
     if (!form.title || !form.completionDate || !form.smgPoints) {
@@ -174,8 +154,6 @@ export default function StaffSmgPage() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ed-ink) 3.5%, transparent) 1px, transparent 0)',
-        backgroundSize: '24px 24px',
       }}
     >
       <div className="relative px-4 sm:px-10 lg:px-16 pt-8 pb-16">
@@ -185,12 +163,6 @@ export default function StaffSmgPage() {
           style={{ borderColor: INK }}
         >
           <div className="flex items-end gap-4">
-            <p
-              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-            >
-              № 03 · SMG
-            </p>
             <h1
               className="text-[36px] sm:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
               style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
@@ -322,7 +294,7 @@ export default function StaffSmgPage() {
               {/* Right: breakdown table */}
               <div
                 className="grid gap-0 border"
-                style={{ borderColor: RULE, backgroundColor: '#ffffff', borderRadius: '4px' }}
+                style={{ borderColor: RULE, backgroundColor: CARD_BG, borderRadius: '4px' }}
               >
                 <BreakdownRow
                   swatch={OLIVE}
@@ -445,14 +417,6 @@ export default function StaffSmgPage() {
           style={{ backgroundColor: CREAM, borderRadius: '4px', color: INK }}
         >
           <DialogHeader className="px-6 pt-6 pb-3 border-b" style={{ borderColor: INK }}>
-            <div className="flex items-center justify-between">
-              <p
-                className="text-[10px] font-semibold uppercase tracking-[0.2em]"
-                style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-              >
-                № 03.01 · YENİ KAYIT
-              </p>
-            </div>
             <DialogTitle
               className="text-[22px] font-semibold tracking-[-0.02em]"
               style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif', color: INK }}
@@ -637,7 +601,7 @@ function ActivityRow({ a, index }: { a: SmgActivity; index: number }) {
   return (
     <li
       style={{
-        backgroundColor: '#ffffff',
+        backgroundColor: CARD_BG,
         border: `1px solid ${RULE}`,
         borderRadius: '4px',
         overflow: 'hidden',
@@ -754,7 +718,7 @@ function EditorialInput({
       placeholder={placeholder}
       className="w-full text-[13px] px-3 py-2 focus:outline-none focus:ring-0"
       style={{
-        backgroundColor: '#ffffff',
+        backgroundColor: CARD_BG,
         color: INK,
         border: `1px solid ${RULE}`,
         borderRadius: '2px',
@@ -774,7 +738,7 @@ function EditorialSelect({
         onChange={e => onChange(e.target.value)}
         className="w-full appearance-none cursor-pointer text-[13px] px-3 py-2 pr-8 focus:outline-none"
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: CARD_BG,
           color: INK,
           border: `1px solid ${RULE}`,
           borderRadius: '2px',

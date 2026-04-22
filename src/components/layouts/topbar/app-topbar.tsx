@@ -28,8 +28,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 /* Topbar is chrome — fixed hex, not themed. Stays solid cream always. */
 const INK = '#0a1628';
 const INK_SOFT = '#5b6478';
-const CREAM = '#faf7f2';
-const RULE = '#e5e0d5';
+const CREAM = '#f4ead5';
+const RULE = '#e0d7c0';
 const GOLD = '#c9a961';
 const OLIVE = '#1a3a28';
 
@@ -78,7 +78,7 @@ export function AppTopbar({
     <header
       className="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 px-4 sm:px-6"
       style={{
-        backgroundColor: '#faf7f2',
+        backgroundColor: '#f4ead5',
         borderBottom: '1px solid #0a1628',
         color: '#0a1628',
       }}

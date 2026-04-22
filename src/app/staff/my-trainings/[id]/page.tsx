@@ -6,7 +6,6 @@
  * Dil: cream + ink + gold + serif display + mono caps + radial dot bg.
  */
 
-import { useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
@@ -15,14 +14,7 @@ import {
   Calendar, Award, ChevronRight, Lock, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
-
-/* ─── Editorial palette ─── */
-const INK = 'var(--ed-ink, #0a1628)';
-const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
-const CREAM = 'var(--ed-cream, #faf7f2)';
-const RULE = 'var(--ed-rule, #e5e0d5)';
-const GOLD = 'var(--ed-gold, #c9a961)';
-const OLIVE = 'var(--ed-olive, #1a3a28)';
+import { INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE, CARD_BG } from '@/lib/editorial-palette';
 
 interface TrainingVideo {
   title: string;
@@ -61,22 +53,6 @@ export default function TrainingDetailPage() {
 
   const { data: training, isLoading, error, refetch } = useFetch<TrainingDetail>(apiUrl);
 
-  /* Cream theme cascade */
-  useEffect(() => {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const el = main as HTMLElement;
-    const prevBg = el.style.backgroundColor;
-    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
-    el.style.backgroundColor = CREAM;
-    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
-    return () => {
-      el.style.backgroundColor = prevBg;
-      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
-      else el.style.removeProperty('--color-bg-rgb');
-    };
-  }, []);
-
   const pageShell = (children: React.ReactNode) => (
     <div
       className="relative -mx-4 -my-4 md:-mx-8 md:-my-8 min-h-full"
@@ -84,8 +60,6 @@ export default function TrainingDetailPage() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ed-ink) 3.5%, transparent) 1px, transparent 0)',
-        backgroundSize: '24px 24px',
       }}
     >
       <div className="relative px-4 sm:px-10 lg:px-16 pt-5 pb-16 max-w-5xl mx-auto">
@@ -237,14 +211,7 @@ export default function TrainingDetailPage() {
         className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 pb-5"
         style={{ borderBottom: `3px solid ${INK}` }}
       >
-        <div className="flex items-end gap-4 min-w-0">
-          <p
-            className="text-[10px] font-semibold uppercase tracking-[0.18em] shrink-0"
-            style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-          >
-            № Eğitim · {(training.category || 'GENEL').toUpperCase()}
-          </p>
-        </div>
+        <div className="flex items-end gap-4 min-w-0" />
 
         <span
           className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
@@ -285,7 +252,7 @@ export default function TrainingDetailPage() {
       <div
         className="mt-6 p-4"
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: CARD_BG,
           border: `1px solid ${RULE}`,
           borderLeft: `4px solid ${OLIVE}`,
           borderRadius: '4px',
@@ -431,7 +398,7 @@ export default function TrainingDetailPage() {
           <ul
             className="mt-5"
             style={{
-              backgroundColor: '#ffffff',
+              backgroundColor: CARD_BG,
               borderTop: `1px solid ${RULE}`,
               borderRight: `1px solid ${RULE}`,
               borderBottom: `1px solid ${RULE}`,
@@ -513,7 +480,7 @@ export default function TrainingDetailPage() {
             <div
               className="mt-4 flex flex-col gap-4 p-4 sm:grid sm:items-center"
               style={{
-                backgroundColor: '#ffffff',
+                backgroundColor: CARD_BG,
                 border: `1px solid ${RULE}`,
                 borderRadius: '4px',
                 gridTemplateColumns: '4px 44px 1fr max-content',
@@ -650,7 +617,7 @@ export default function TrainingDetailPage() {
 
           <div
             className="mt-4"
-            style={{ backgroundColor: '#ffffff', border: `1px solid ${RULE}`, borderRadius: '4px' }}
+            style={{ backgroundColor: CARD_BG, border: `1px solid ${RULE}`, borderRadius: '4px' }}
           >
             {videos.length > 0 && (
               <Link
@@ -784,7 +751,7 @@ function MetaChip({
     <span
       className="inline-flex items-center gap-2 px-3 py-2"
       style={{
-        backgroundColor: '#ffffff',
+        backgroundColor: CARD_BG,
         border: `1px solid ${RULE}`,
         borderLeft: `3px solid ${tone.soft}`,
         borderRadius: '2px',

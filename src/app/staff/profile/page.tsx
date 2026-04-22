@@ -15,6 +15,7 @@ import {
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/components/shared/toast';
+import { INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE, CARD_BG } from '@/lib/editorial-palette';
 
 interface ProfileData {
   firstName: string;
@@ -37,14 +38,6 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
 }
 
-/* ─── Editorial palette ─── */
-const INK = 'var(--ed-ink, #0a1628)';
-const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
-const CREAM = 'var(--ed-cream, #faf7f2)';
-const RULE = 'var(--ed-rule, #e5e0d5)';
-const GOLD = 'var(--ed-gold, #c9a961)';
-const OLIVE = 'var(--ed-olive, #1a3a28)';
-
 export default function ProfilePage() {
   const { toast } = useToast();
   const { fullName, initials } = useAuth();
@@ -64,22 +57,6 @@ export default function ProfilePage() {
   const [pushSupported, setPushSupported] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
-
-  /* Cream theme cascade */
-  useEffect(() => {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const el = main as HTMLElement;
-    const prevBg = el.style.backgroundColor;
-    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
-    el.style.backgroundColor = CREAM;
-    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
-    return () => {
-      el.style.backgroundColor = prevBg;
-      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
-      else el.style.removeProperty('--color-bg-rgb');
-    };
-  }, []);
 
   useEffect(() => {
     if (profile) {
@@ -240,8 +217,6 @@ export default function ProfilePage() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ed-ink) 3.5%, transparent) 1px, transparent 0)',
-        backgroundSize: '24px 24px',
       }}
     >
       <div className="relative px-4 sm:px-10 lg:px-16 pt-8 pb-16 max-w-6xl">
@@ -251,12 +226,6 @@ export default function ProfilePage() {
           style={{ borderColor: INK }}
         >
           <div className="flex items-end gap-4">
-            <p
-              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-            >
-              № 04 · Profil
-            </p>
             <h1
               className="text-[28px] sm:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
               style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
@@ -418,7 +387,7 @@ export default function ProfilePage() {
               <div
                 className="mt-6 grid grid-cols-3"
                 style={{
-                  backgroundColor: '#ffffff',
+                  backgroundColor: CARD_BG,
                   border: `1px solid ${RULE}`,
                   borderRadius: '4px',
                 }}
@@ -433,7 +402,7 @@ export default function ProfilePage() {
             <Section number="I." title="Kişisel bilgiler" subtitle="Ad, soyad ve iletişim bilgilerin">
               <div
                 className="p-5 sm:p-6"
-                style={{ backgroundColor: '#ffffff', border: `1px solid ${RULE}`, borderRadius: '4px' }}
+                style={{ backgroundColor: CARD_BG, border: `1px solid ${RULE}`, borderRadius: '4px' }}
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <EditorialField label="Ad">
@@ -478,7 +447,7 @@ export default function ProfilePage() {
             <Section number="II." title="Şifre güncelle" subtitle="Hesap güvenliğin için düzenli değiştir">
               <div
                 className="p-5 sm:p-6"
-                style={{ backgroundColor: '#ffffff', border: `1px solid ${RULE}`, borderRadius: '4px' }}
+                style={{ backgroundColor: CARD_BG, border: `1px solid ${RULE}`, borderRadius: '4px' }}
               >
                 <EditorialField label="Mevcut şifre" icon={Lock}>
                   <div className="relative">
@@ -563,7 +532,7 @@ export default function ProfilePage() {
               <div
                 className="grid items-center gap-4 p-5 sm:p-6"
                 style={{
-                  backgroundColor: '#ffffff',
+                  backgroundColor: CARD_BG,
                   border: `1px solid ${RULE}`,
                   borderRadius: '4px',
                   gridTemplateColumns: '44px 1fr max-content',
@@ -608,7 +577,7 @@ export default function ProfilePage() {
                 <div
                   className="grid items-center gap-4 p-5 sm:p-6"
                   style={{
-                    backgroundColor: '#ffffff',
+                    backgroundColor: CARD_BG,
                     border: `1px solid ${RULE}`,
                     borderRadius: '4px',
                     gridTemplateColumns: '44px 1fr max-content',

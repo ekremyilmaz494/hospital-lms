@@ -1,13 +1,23 @@
 'use client';
 
+/**
+ * Değerlendirme Wizard — "Clinical Editorial" redesign.
+ * 360° değerlendirme form sayfası. Functionality korundu — sadece görsel
+ * tabaka editorial dile taşındı. Star rating GOLD dolgu + RULE outline,
+ * textarea sharp border, progress bar editorial palette.
+ */
+
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Loader2, CheckCircle, Star } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import {
+  INK, INK_SOFT, CREAM, GOLD, RULE, OLIVE, CARD_BG,
+  FONT_DISPLAY, FONT_BODY, FONT_MONO, TONE_TOKENS,
+} from '@/lib/editorial-palette';
 
 interface EvalItem { id: string; text: string; description: string | null; order: number }
 interface EvalCategory { id: string; name: string; weight: number; order: number; items: EvalItem[] }
@@ -29,25 +39,31 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
   const [hovered, setHovered] = useState(0);
   return (
     <div className="flex flex-wrap items-center gap-1">
-      {[1, 2, 3, 4, 5].map(n => (
-        <button
-          key={n}
-          type="button"
-          onClick={() => onChange(n)}
-          onMouseEnter={() => setHovered(n)}
-          onMouseLeave={() => setHovered(0)}
-          aria-label={`${n} yıldız`}
-          className="flex h-11 w-11 items-center justify-center transition-transform hover:scale-110 sm:h-10 sm:w-10"
-        >
-          <Star
-            className="h-7 w-7 sm:h-8 sm:w-8"
-            fill={(hovered || value) >= n ? 'var(--color-warning)' : 'none'}
-            style={{ color: (hovered || value) >= n ? 'var(--color-warning)' : 'var(--color-border)' }}
-          />
-        </button>
-      ))}
+      {[1, 2, 3, 4, 5].map(n => {
+        const active = (hovered || value) >= n;
+        return (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            onMouseEnter={() => setHovered(n)}
+            onMouseLeave={() => setHovered(0)}
+            aria-label={`${n} yıldız`}
+            className="flex h-11 w-11 items-center justify-center transition-transform hover:scale-110 sm:h-10 sm:w-10"
+          >
+            <Star
+              className="h-7 w-7 sm:h-8 sm:w-8"
+              fill={active ? GOLD : 'none'}
+              style={{ color: active ? GOLD : RULE }}
+            />
+          </button>
+        );
+      })}
       {value > 0 && (
-        <span className="ml-2 text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+        <span
+          className="ml-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
+          style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
+        >
           {['', 'Çok Zayıf', 'Zayıf', 'Orta', 'İyi', 'Mükemmel'][value]}
         </span>
       )}
@@ -81,7 +97,21 @@ export default function EvaluationWizardPage() {
   }, [data]);
 
   if (isLoading && !data) return <PageLoading />;
-  if (!data) return <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Değerlendirme bulunamadı.</div>;
+  if (!data) {
+    return (
+      <div
+        className="relative -mx-4 -my-4 md:-mx-8 md:-my-8 min-h-full"
+        style={{ backgroundColor: CREAM, color: INK, fontFamily: FONT_BODY }}
+      >
+        <div
+          className="p-10 text-center text-[12px] uppercase tracking-[0.16em]"
+          style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
+        >
+          Değerlendirme bulunamadı.
+        </div>
+      </div>
+    );
+  }
 
   const { evaluation, totalItems } = data;
   const categories = evaluation.form.categories;
@@ -130,147 +160,285 @@ export default function EvaluationWizardPage() {
 
   if (completed) {
     return (
-      <BlurFade delay={0}>
-        <div className="max-w-lg mx-auto mt-16 text-center space-y-4">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: 'var(--color-success-bg)' }}>
-            <CheckCircle className="h-8 w-8" style={{ color: 'var(--color-success)' }} />
-          </div>
-          <h2 className="text-xl font-black" style={{ color: 'var(--color-text)' }}>Değerlendirme Tamamlandı!</h2>
-          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            {evaluation.subject.firstName} {evaluation.subject.lastName} için değerlendirmeniz kaydedildi.
-          </p>
-          <Button onClick={() => router.push('/staff/evaluations')} className="rounded-xl">
-            Değerlendirmelerime Dön
-          </Button>
+      <div
+        className="relative -mx-4 -my-4 md:-mx-8 md:-my-8 min-h-full"
+        style={{ backgroundColor: CREAM, color: INK, fontFamily: FONT_BODY }}
+      >
+        <div className="relative px-4 sm:px-10 lg:px-16 pt-5 pb-16">
+          <BlurFade delay={0}>
+            <div
+              className="max-w-lg mx-auto mt-16 p-10 text-center"
+              style={{ backgroundColor: CARD_BG, border: `1px solid ${RULE}` }}
+            >
+              <div
+                className="w-16 h-16 flex items-center justify-center mx-auto mb-6"
+                style={{
+                  backgroundColor: TONE_TOKENS.success.bg,
+                  border: `1px solid ${TONE_TOKENS.success.border}`,
+                }}
+              >
+                <CheckCircle className="h-8 w-8" style={{ color: TONE_TOKENS.success.ink }} />
+              </div>
+              <h2
+                className="text-[28px] leading-[1.05] font-semibold tracking-[-0.02em]"
+                style={{ color: INK, fontFamily: FONT_DISPLAY }}
+              >
+                Değerlendirme <span style={{ fontStyle: 'italic', color: OLIVE }}>tamamlandı</span>
+                <span style={{ color: GOLD }}>.</span>
+              </h2>
+              <p className="text-[13px] mt-3" style={{ color: INK_SOFT }}>
+                {evaluation.subject.firstName} {evaluation.subject.lastName} için değerlendirmeniz kaydedildi.
+              </p>
+              <button
+                onClick={() => router.push('/staff/evaluations')}
+                className="mt-6 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] px-5 py-2.5"
+                style={{
+                  backgroundColor: OLIVE,
+                  color: CREAM,
+                  fontFamily: FONT_MONO,
+                }}
+              >
+                Değerlendirmelerime Dön
+              </button>
+            </div>
+          </BlurFade>
         </div>
-      </BlurFade>
+      </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 px-4 sm:px-0">
-      <BlurFade delay={0}>
-        {/* Header */}
-        <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                {EVALUATOR_LABELS[evaluation.evaluatorType] ?? evaluation.evaluatorType}
+    <div
+      className="relative -mx-4 -my-4 md:-mx-8 md:-my-8 min-h-full"
+      style={{ backgroundColor: CREAM, color: INK, fontFamily: FONT_BODY }}
+    >
+      <div className="relative px-4 sm:px-10 lg:px-16 pt-5 pb-16">
+        {/* ───── Masthead ───── */}
+        <BlurFade delay={0}>
+          <header
+            className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5"
+            style={{ borderColor: INK }}
+          >
+            <div className="flex items-end gap-4">
+              <h1
+                className="text-[32px] sm:text-[40px] leading-[0.95] font-semibold tracking-[-0.025em]"
+                style={{ fontFamily: FONT_DISPLAY }}
+              >
+                <span style={{ fontStyle: 'italic', color: OLIVE }}>{evaluation.subject.firstName}</span>{' '}
+                {evaluation.subject.lastName}
+                <span style={{ color: GOLD }}>.</span>
+              </h1>
+            </div>
+            <div className="text-right">
+              <p
+                className="text-[36px] sm:text-[44px] leading-none font-semibold tabular-nums tracking-[-0.025em]"
+                style={{ color: INK, fontFamily: FONT_DISPLAY }}
+              >
+                {progressPct}
+                <span
+                  className="text-[13px] ml-0.5 align-top"
+                  style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
+                >
+                  %
+                </span>
               </p>
-              <h1 className="text-base font-black" style={{ color: 'var(--color-text)' }}>{evaluation.form.title}</h1>
-              <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-                Değerlendirilen: <strong>{evaluation.subject.firstName} {evaluation.subject.lastName}</strong>
-                {evaluation.subject.departmentRel && ` · ${evaluation.subject.departmentRel.name}`}
+              <p
+                className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] tabular-nums"
+                style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
+              >
+                {answeredCount}/{totalItems} Madde
               </p>
             </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-2xl font-black" style={{ color: 'var(--color-primary)' }}>%{progressPct}</p>
-              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{answeredCount}/{totalItems} madde</p>
-            </div>
-          </div>
+          </header>
+          <p
+            className="mt-3 text-[12px] uppercase tracking-[0.16em]"
+            style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
+          >
+            {evaluation.form.title}
+            {evaluation.subject.departmentRel && ` · ${evaluation.subject.departmentRel.name}`}
+          </p>
 
           {/* Progress bar */}
-          <div className="mt-3 rounded-full h-2 overflow-hidden" style={{ background: 'var(--color-border)' }}>
-            <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%`, background: 'var(--color-primary)' }} />
+          <div
+            className="mt-4 h-[3px] overflow-hidden"
+            style={{ backgroundColor: RULE }}
+          >
+            <div
+              className="h-full"
+              style={{
+                width: `${progressPct}%`,
+                backgroundColor: OLIVE,
+                transition: 'width 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            />
           </div>
 
           {/* Category steps */}
-          <div className="flex items-center gap-1 mt-3 flex-wrap">
+          <div className="flex items-center gap-2 mt-4 flex-wrap">
             {categories.map((cat, i) => {
               const catComplete = cat.items.every(item => (answers[item.id]?.score ?? 0) > 0);
+              const isCurrent = i === currentCatIdx;
               return (
                 <button
                   key={cat.id}
                   onClick={() => setCurrentCatIdx(i)}
-                  className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-full font-medium transition-all"
+                  className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] px-2.5 py-1.5"
                   style={{
-                    background: i === currentCatIdx ? 'var(--color-primary)' : catComplete ? 'var(--color-success-bg)' : 'var(--color-surface-2)',
-                    color: i === currentCatIdx ? 'white' : catComplete ? 'var(--color-success)' : 'var(--color-text-secondary)',
+                    backgroundColor: isCurrent ? OLIVE : catComplete ? TONE_TOKENS.success.bg : CARD_BG,
+                    color: isCurrent ? CREAM : catComplete ? TONE_TOKENS.success.ink : INK_SOFT,
+                    border: `1px solid ${isCurrent ? OLIVE : catComplete ? TONE_TOKENS.success.border : RULE}`,
+                    fontFamily: FONT_MONO,
                   }}
                 >
-                  {catComplete && i !== currentCatIdx && <CheckCircle className="h-3 w-3" />}
-                  {cat.name}
+                  <span className="tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+                  {catComplete && !isCurrent && <CheckCircle className="h-3 w-3" />}
+                  <span className="normal-case" style={{ letterSpacing: 0, fontFamily: FONT_DISPLAY }}>
+                    {cat.name}
+                  </span>
                 </button>
               );
             })}
           </div>
-        </div>
-      </BlurFade>
+        </BlurFade>
 
-      {/* Current Category Items */}
-      <BlurFade delay={0.05} key={currentCatIdx}>
-        <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-          <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-2)' }}>
-            <h2 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>{currentCat.name}</h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              Ağırlık: %{currentCat.weight} · {currentCat.items.length} madde
-            </p>
-          </div>
+        {/* ───── Current Category Items ───── */}
+        <BlurFade delay={0.05} key={currentCatIdx}>
+          <section
+            className="mt-8"
+            style={{ backgroundColor: CARD_BG, border: `1px solid ${RULE}` }}
+          >
+            <div
+              className="px-5 py-4 border-b"
+              style={{ borderColor: RULE, backgroundColor: CREAM }}
+            >
+              <h2
+                className="text-[18px] font-semibold tracking-[-0.01em]"
+                style={{ color: INK, fontFamily: FONT_DISPLAY }}
+              >
+                {currentCat.name}
+              </h2>
+              <p
+                className="text-[10px] mt-1 font-semibold uppercase tracking-[0.16em] tabular-nums"
+                style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
+              >
+                Ağırlık %{currentCat.weight} · {currentCat.items.length} Madde
+              </p>
+            </div>
 
-          <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
-            {currentCat.items.map((item, itemIdx) => {
-              const ans = answers[item.id];
-              return (
-                <div key={item.id} className="px-5 py-4">
-                  <div className="flex items-start gap-3 mb-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mt-0.5"
-                      style={{ background: ans?.score ? 'var(--color-success-bg)' : 'var(--color-surface-2)', color: ans?.score ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
-                      {itemIdx + 1}
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>{item.text}</p>
-                      {item.description && <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{item.description}</p>}
+            <div className="divide-y" style={{ borderColor: RULE }}>
+              {currentCat.items.map((item, itemIdx) => {
+                const ans = answers[item.id];
+                const answered = (ans?.score ?? 0) > 0;
+                return (
+                  <div key={item.id} className="px-5 py-5" style={{ borderColor: RULE }}>
+                    <div className="flex items-start gap-4 mb-4">
+                      <span
+                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center text-[11px] font-semibold tabular-nums mt-0.5"
+                        style={{
+                          backgroundColor: answered ? TONE_TOKENS.success.bg : CREAM,
+                          color: answered ? TONE_TOKENS.success.ink : INK_SOFT,
+                          border: `1px solid ${answered ? TONE_TOKENS.success.border : RULE}`,
+                          fontFamily: FONT_MONO,
+                        }}
+                      >
+                        {String(itemIdx + 1).padStart(2, '0')}
+                      </span>
+                      <div className="min-w-0">
+                        <p
+                          className="text-[14px] font-medium leading-snug"
+                          style={{ color: INK }}
+                        >
+                          {item.text}
+                        </p>
+                        {item.description && (
+                          <p
+                            className="text-[12px] mt-1 leading-relaxed"
+                            style={{ color: INK_SOFT }}
+                          >
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="ml-12 space-y-3">
+                      <StarRating value={ans?.score ?? 0} onChange={score => setItemScore(item.id, score)} />
+                      <textarea
+                        value={ans?.comment ?? ''}
+                        onChange={e => setItemComment(item.id, e.target.value)}
+                        placeholder="Opsiyonel yorum..."
+                        rows={2}
+                        className="w-full text-[13px] px-3 py-2 resize-none outline-none focus:outline-none"
+                        style={{
+                          border: `1px solid ${RULE}`,
+                          backgroundColor: CREAM,
+                          color: INK,
+                          fontFamily: FONT_BODY,
+                        }}
+                      />
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          </section>
+        </BlurFade>
 
-                  <div className="ml-9 space-y-2">
-                    <StarRating value={ans?.score ?? 0} onChange={score => setItemScore(item.id, score)} />
-                    <textarea
-                      value={ans?.comment ?? ''}
-                      onChange={e => setItemComment(item.id, e.target.value)}
-                      placeholder="Opsiyonel yorum..."
-                      rows={2}
-                      className="w-full text-base sm:text-sm rounded-xl px-3 py-2 border resize-none outline-none"
-                      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text)' }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+        {/* ───── Navigation ───── */}
+        <BlurFade delay={0.1}>
+          <div className="flex items-center justify-between gap-2 mt-6">
+            <button
+              type="button"
+              onClick={() => setCurrentCatIdx(i => i - 1)}
+              disabled={currentCatIdx === 0}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] px-4 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: CARD_BG,
+                color: INK,
+                border: `1px solid ${RULE}`,
+                fontFamily: FONT_MONO,
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Önceki</span>
+            </button>
+
+            {!isLastCat ? (
+              <button
+                type="button"
+                onClick={handleNext}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] px-4 py-2.5"
+                style={{
+                  backgroundColor: OLIVE,
+                  color: CREAM,
+                  fontFamily: FONT_MONO,
+                }}
+              >
+                <span className="sm:hidden">Devam</span>
+                <span className="hidden sm:inline">Kaydet ve Devam</span>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] px-4 py-2.5 disabled:opacity-60"
+                style={{
+                  backgroundColor: TONE_TOKENS.success.border,
+                  color: '#ffffff',
+                  fontFamily: FONT_MONO,
+                }}
+              >
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                <CheckCircle className="h-4 w-4" />
+                <span className="sm:hidden">Tamamla</span>
+                <span className="hidden sm:inline">Değerlendirmeyi Tamamla</span>
+              </button>
+            )}
           </div>
-        </div>
-      </BlurFade>
-
-      {/* Navigation */}
-      <BlurFade delay={0.1}>
-        <div className="flex items-center justify-between gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentCatIdx(i => i - 1)}
-            disabled={currentCatIdx === 0}
-            className="gap-1.5 rounded-xl"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Önceki</span>
-          </Button>
-
-          {!isLastCat ? (
-            <Button onClick={handleNext} className="gap-1.5 rounded-xl">
-              <span className="sm:hidden">Devam</span>
-              <span className="hidden sm:inline">Kaydet ve Devam</span>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button onClick={handleSubmit} disabled={submitting} className="gap-1.5 rounded-xl"
-              style={{ background: 'var(--color-success)' }}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              <CheckCircle className="h-4 w-4" />
-              <span className="sm:hidden">Tamamla</span>
-              <span className="hidden sm:inline">Değerlendirmeyi Tamamla</span>
-            </Button>
-          )}
-        </div>
-      </BlurFade>
+        </BlurFade>
+      </div>
     </div>
   );
 }

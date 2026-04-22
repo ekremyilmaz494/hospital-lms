@@ -23,10 +23,10 @@ import type { NavGroup } from './sidebar-config';
  * not themed by light/dark toggle. These stay hex, unlike the rest of staff panel. */
 const INK = '#0a1628';
 const INK_DEEP = '#061021';
-const CREAM = '#faf7f2';
+const CREAM = '#f4ead5';
 const GOLD = '#c9a961';
 const OLIVE = '#1a3a28';
-const HAIRLINE = 'rgba(250, 247, 242, 0.08)';
+const HAIRLINE = 'rgba(244, 234, 213, 0.08)';
 const TEXT_DIM = 'rgba(250, 247, 242, 0.58)';
 const TEXT_BASE = 'rgba(250, 247, 242, 0.82)';
 const HOVER_BG = 'rgba(250, 247, 242, 0.04)';

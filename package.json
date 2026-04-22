@@ -59,6 +59,9 @@
     ],
     "src/app/**/page.{ts,tsx}": [
       "node scripts/perf-check.js"
+    ],
+    "src/app/{staff,admin,super-admin,help}/**/*.{ts,tsx}": [
+      "bash scripts/editorial-palette-guard.sh"
     ]
   },
   "dependencies": {

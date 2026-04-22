@@ -8,6 +8,7 @@ import { ToastProvider } from "@/components/shared/toast";
 import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
+import { DevSWCleaner } from "@/components/dev-sw-cleaner";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { CrispWidget } from "@/components/providers/crisp-widget";
 import "./globals.css";
@@ -133,6 +134,7 @@ export default async function RootLayout({
               <ToastProvider>
                 <ErrorBoundary>
                   {children}
+                  {process.env.NODE_ENV === 'development' && <DevSWCleaner />}
                   <PWAInstallPrompt />
                   <CookieConsent />
                   <CrispWidget />

@@ -6,20 +6,12 @@
  * Eğitim akışı (4 adım) + kurallar + iletişim.
  */
 
-import { useEffect } from 'react';
 import {
   ArrowLeft, BookOpen, Mail, Phone, Video, FileText, Award, Shield,
   GraduationCap, Play, ClipboardCheck, Headphones,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-
-/* ─── Editorial palette ─── */
-const INK = 'var(--ed-ink, #0a1628)';
-const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
-const CREAM = 'var(--ed-cream, #faf7f2)';
-const RULE = 'var(--ed-rule, #e5e0d5)';
-const GOLD = 'var(--ed-gold, #c9a961)';
-const OLIVE = 'var(--ed-olive, #1a3a28)';
+import { INK, INK_SOFT, CREAM, RULE, GOLD, CARD_BG } from '@/lib/editorial-palette';
 
 const trainingSteps: {
   step: string; title: string; desc: string; icon: LucideIcon;
@@ -88,22 +80,6 @@ const contacts: {
 ];
 
 export default function HelpPage() {
-  /* Cream theme cascade (main layout varsa) */
-  useEffect(() => {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const el = main as HTMLElement;
-    const prevBg = el.style.backgroundColor;
-    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
-    el.style.backgroundColor = CREAM;
-    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
-    return () => {
-      el.style.backgroundColor = prevBg;
-      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
-      else el.style.removeProperty('--color-bg-rgb');
-    };
-  }, []);
-
   return (
     <div
       className="relative min-h-screen"
@@ -111,8 +87,6 @@ export default function HelpPage() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(10, 22, 40, 0.035) 1px, transparent 0)',
-        backgroundSize: '24px 24px',
       }}
     >
       <div className="relative px-6 sm:px-10 lg:px-16 pt-6 pb-16 max-w-6xl mx-auto">
@@ -141,12 +115,6 @@ export default function HelpPage() {
           style={{ borderBottom: `3px solid ${INK}` }}
         >
           <div className="flex items-end gap-4">
-            <p
-              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-            >
-              № 00 · Yardım
-            </p>
             <h1
               className="text-[36px] sm:text-[48px] leading-[0.95] font-semibold tracking-[-0.025em]"
               style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
@@ -214,7 +182,7 @@ export default function HelpPage() {
           <div
             className="mt-5 grid gap-0"
             style={{
-              backgroundColor: '#ffffff',
+              backgroundColor: CARD_BG,
               border: `1px solid ${RULE}`,
               borderRadius: '4px',
               gridTemplateColumns: 'repeat(1, minmax(0, 1fr))',
@@ -345,7 +313,7 @@ export default function HelpPage() {
                 <ul
                   className="mt-5"
                   style={{
-                    backgroundColor: '#ffffff',
+                    backgroundColor: CARD_BG,
                     borderTop: `1px solid ${RULE}`,
                     borderRight: `1px solid ${RULE}`,
                     borderBottom: `1px solid ${RULE}`,
@@ -425,7 +393,7 @@ export default function HelpPage() {
           <div
             className="mt-5 grid sm:grid-cols-3"
             style={{
-              backgroundColor: '#ffffff',
+              backgroundColor: CARD_BG,
               border: `1px solid ${RULE}`,
               borderRadius: '4px',
             }}

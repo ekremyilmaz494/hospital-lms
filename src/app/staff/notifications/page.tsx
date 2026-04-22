@@ -16,6 +16,10 @@ import {
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE,
+  FONT_DISPLAY, FONT_BODY, FONT_MONO,
+} from '@/lib/editorial-palette';
 
 /* ─────────────────────────────────────────────────────
    Domain
@@ -110,15 +114,6 @@ function formatExactTime(dateStr: string): string {
 function formatLongDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
-
-/* ─── Design tokens (editorial palette) ─── */
-
-const INK = 'var(--ed-ink, #0a1628)';
-const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
-const CREAM = 'var(--ed-cream, #faf7f2)';
-const RULE = 'var(--ed-rule, #e5e0d5)';
-const GOLD = 'var(--ed-gold, #c9a961)';
-const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 /* ─────────────────────────────────────────────────────
    Page
@@ -276,35 +271,11 @@ export default function StaffNotificationsPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [selected.size, clearSelection, typeMenuOpen]);
 
-  /*
-   * Cream theme bleeds into layout: override <main>'s bg and --color-bg-rgb
-   * so the topbar (which uses rgba(var(--color-bg-rgb), 0.85)) also inherits cream.
-   * Restored on unmount — other pages get their default bg back.
-   */
-  useEffect(() => {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const el = main as HTMLElement;
-    const prevBg = el.style.backgroundColor;
-    const prevVar = el.style.getPropertyValue('--color-bg-rgb');
-    el.style.backgroundColor = CREAM;
-    el.style.setProperty('--color-bg-rgb', '250, 247, 242');
-    return () => {
-      el.style.backgroundColor = prevBg;
-      if (prevVar) el.style.setProperty('--color-bg-rgb', prevVar);
-      else el.style.removeProperty('--color-bg-rgb');
-    };
-  }, []);
-
   if (isLoading) return <EditorialSkeleton />;
   if (error) return <EditorialError message={error} onRetry={refetch} />;
 
   const hasAnyFilter = search.length > 0 || activeTypes.size > 0 || viewFilter !== 'all';
   const totalAfterFilter = filtered.length;
-
-  const todayStr = new Date().toLocaleDateString('tr-TR', {
-    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-  }).toUpperCase();
 
   return (
     <div
@@ -313,56 +284,24 @@ export default function StaffNotificationsPage() {
     >
       <div className="px-6 pt-6 pb-24 sm:px-10 lg:px-16">
         {/* ═══════════════ MASTHEAD ═══════════════ */}
-        <header>
-          {/* Top meta rail */}
-          <div
-            className="flex items-center justify-between border-y py-2 text-[10px] tracking-[0.22em]"
-            style={{
-              borderColor: INK,
-              color: INK,
-              fontFamily: 'var(--font-mono)',
-            }}
-          >
-            <span>№ 01 — HASTANE LMS</span>
-            <span>{todayStr}</span>
+        <header
+          className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5"
+          style={{ borderColor: INK }}
+        >
+          <div className="flex items-end gap-4">
+            <h1
+              className="text-[36px] sm:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
+              style={{ fontFamily: FONT_DISPLAY }}
+            >
+              bildirim <span style={{ fontStyle: 'italic', color: OLIVE }}>merkezi</span>
+              <span style={{ color: GOLD }}>.</span>
+            </h1>
           </div>
 
-          {/* Title zone — asymmetric split */}
-          <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-[1fr_auto] md:items-end">
-            <div>
-              <p
-                className="mb-3 text-[11px] uppercase tracking-[0.3em]"
-                style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
-              >
-                Bildirim Merkezi
-              </p>
-              <h1
-                className="font-bold leading-[0.95] tracking-[-0.02em]"
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 'clamp(2.5rem, 5vw, 3.75rem)',
-                  color: INK,
-                  fontWeight: 800,
-                }}
-              >
-                Bildirimler<span style={{ color: GOLD }}>.</span>
-              </h1>
-              <p
-                className="mt-3 max-w-lg text-[14px] leading-relaxed"
-                style={{ color: INK_SOFT }}
-              >
-                Eğitim atamaları, sınav hatırlatmaları ve resmi duyurular — tek bir akışta, tarih sırasına göre.
-              </p>
-            </div>
-
-            {/* Unread counter — editorial stat */}
-            <div className="flex items-end gap-6 md:flex-col md:items-end md:gap-1">
-              <StatBlock value={unreadCount} label="OKUNMAMIŞ" accent={unreadCount > 0} />
-            </div>
+          {/* Unread counter — editorial stat */}
+          <div className="flex items-end gap-6">
+            <StatBlock value={unreadCount} label="OKUNMAMIŞ" accent={unreadCount > 0} />
           </div>
-
-          {/* Thick rule */}
-          <div className="mt-10 h-[3px]" style={{ backgroundColor: INK }} />
         </header>
 
         {/* ═══════════════ CONTROL STRIP ═══════════════ */}
@@ -386,7 +325,7 @@ export default function StaffNotificationsPage() {
                 style={{
                   color: INK,
                   borderBottom: `1px solid ${search ? INK : RULE}`,
-                  fontFamily: 'var(--font-body)',
+                  fontFamily: FONT_BODY,
                 }}
               />
               {search && (
@@ -405,7 +344,7 @@ export default function StaffNotificationsPage() {
             <nav
               aria-label="Görünüm filtresi"
               className="flex items-center gap-3 text-[11px] tracking-[0.14em]"
-              style={{ fontFamily: 'var(--font-mono)' }}
+              style={{ fontFamily: FONT_MONO }}
             >
               {(['all', 'unread', 'today', 'week'] as ViewFilter[]).map((v, i) => (
                 <span key={v} className="inline-flex items-center gap-3">
@@ -438,7 +377,7 @@ export default function StaffNotificationsPage() {
                   borderColor: activeTypes.size > 0 ? INK : RULE,
                   color: INK,
                   backgroundColor: activeTypes.size > 0 ? CREAM : 'transparent',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: FONT_MONO,
                   fontWeight: 600,
                 }}
                 aria-expanded={typeMenuOpen}
@@ -462,7 +401,7 @@ export default function StaffNotificationsPage() {
                 >
                   <div
                     className="border-b px-4 py-2 text-[10px] tracking-[0.2em]"
-                    style={{ borderColor: RULE, color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                    style={{ borderColor: RULE, color: INK_SOFT, fontFamily: FONT_MONO }}
                   >
                     TİPE GÖRE FİLTRELE
                   </div>
@@ -480,7 +419,7 @@ export default function StaffNotificationsPage() {
                             style={{
                               ['--hover-bg' as string]: CREAM,
                               color: INK,
-                              fontFamily: 'var(--font-body)',
+                              fontFamily: FONT_BODY,
                             }}
                           >
                             <span className="inline-flex items-center gap-2">
@@ -493,7 +432,7 @@ export default function StaffNotificationsPage() {
                             </span>
                             <span
                               className="text-[10px] tabular-nums"
-                              style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                              style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
                             >
                               {c}
                             </span>
@@ -515,7 +454,7 @@ export default function StaffNotificationsPage() {
               style={{
                 backgroundColor: unreadCount > 0 ? INK : 'transparent',
                 color: unreadCount > 0 ? CREAM : INK_SOFT,
-                fontFamily: 'var(--font-mono)',
+                fontFamily: FONT_MONO,
                 fontWeight: 700,
                 border: unreadCount > 0 ? 'none' : `1px solid ${RULE}`,
               }}
@@ -529,7 +468,7 @@ export default function StaffNotificationsPage() {
           {hasAnyFilter && (
             <div
               className="mt-2 flex items-center gap-3 text-[10px] tracking-[0.18em]"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+              style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
             >
               <span>{totalAfterFilter} / {allNotifications.length} GÖSTERİLİYOR</span>
               <button
@@ -550,14 +489,14 @@ export default function StaffNotificationsPage() {
               <Checkbox checked={allVisibleSelected} onCheckedChange={selectAllVisible} />
               <span
                 className="text-[10px] tracking-[0.2em]"
-                style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
               >
                 {selected.size > 0 ? `${selected.size} SEÇİLDİ` : 'TÜMÜNÜ SEÇ'}
               </span>
             </label>
             <span
               className="text-[10px] tabular-nums tracking-[0.14em]"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+              style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
             >
               TOPLAM {allNotifications.length.toString().padStart(3, '0')}
             </span>
@@ -600,14 +539,14 @@ export default function StaffNotificationsPage() {
                     </div>
                     <h2
                       className="text-[11px] tracking-[0.3em] whitespace-nowrap"
-                      style={{ color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                      style={{ color: INK, fontFamily: FONT_MONO, fontWeight: 700 }}
                     >
                       {BUCKET_LABEL[bucket]}
                     </h2>
                     <span className="block h-px w-full" style={{ backgroundColor: RULE }} />
                     <span
                       className="text-[10px] tabular-nums tracking-[0.14em] whitespace-nowrap"
-                      style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                      style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
                     >
                       {items.length.toString().padStart(2, '0')}
                     </span>
@@ -651,11 +590,11 @@ export default function StaffNotificationsPage() {
               <div className="flex items-center gap-3">
                 <span
                   className="px-2 py-0.5 text-[11px] font-bold tracking-[0.14em]"
-                  style={{ backgroundColor: GOLD, color: INK, fontFamily: 'var(--font-mono)' }}
+                  style={{ backgroundColor: GOLD, color: INK, fontFamily: FONT_MONO }}
                 >
                   {selected.size}
                 </span>
-                <span className="text-[12px] tracking-[0.14em]" style={{ fontFamily: 'var(--font-mono)' }}>
+                <span className="text-[12px] tracking-[0.14em]" style={{ fontFamily: FONT_MONO }}>
                   BİLDİRİM SEÇİLDİ
                 </span>
               </div>
@@ -663,7 +602,7 @@ export default function StaffNotificationsPage() {
                 <button
                   onClick={handleMarkSelectedRead}
                   className="inline-flex items-center gap-1.5 border px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] transition-colors duration-150 hover:bg-white/10"
-                  style={{ borderColor: CREAM, color: CREAM, fontFamily: 'var(--font-mono)' }}
+                  style={{ borderColor: CREAM, color: CREAM, fontFamily: FONT_MONO }}
                 >
                   <Check className="h-3 w-3" />
                   Okundu
@@ -695,7 +634,7 @@ function StatBlock({ value, label, accent }: { value: number; label: string; acc
       <div
         className="leading-none tabular-nums"
         style={{
-          fontFamily: 'var(--font-display)',
+          fontFamily: FONT_DISPLAY,
           fontSize: 'clamp(3rem, 6vw, 4.5rem)',
           fontWeight: 800,
           color: accent ? INK : INK_SOFT,
@@ -708,7 +647,7 @@ function StatBlock({ value, label, accent }: { value: number; label: string; acc
         className="mt-1 text-[10px] tracking-[0.3em]"
         style={{
           color: accent ? GOLD : INK_SOFT,
-          fontFamily: 'var(--font-mono)',
+          fontFamily: FONT_MONO,
           fontWeight: 700,
         }}
       >
@@ -782,14 +721,14 @@ function NotificationEntry({
                 <Icon className="h-3 w-3" style={{ color: m.ink }} strokeWidth={2.5} />
                 <span
                   className="text-[10px] tracking-[0.22em]"
-                  style={{ color: m.ink, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                  style={{ color: m.ink, fontFamily: FONT_MONO, fontWeight: 700 }}
                 >
                   {m.label}
                 </span>
                 <span className="text-[10px]" style={{ color: RULE }}>|</span>
                 <span
                   className="text-[10px] tracking-[0.14em] tabular-nums"
-                  style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                  style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
                 >
                   {index.toString().padStart(2, '0')}
                 </span>
@@ -799,7 +738,7 @@ function NotificationEntry({
                 className="text-[10px] tabular-nums"
                 dateTime={n.createdAt}
                 title={`${formatLongDate(n.createdAt)} · ${formatExactTime(n.createdAt)}`}
-                style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
               >
                 {formatRelativeTime(n.createdAt)}
                 <span className="opacity-60"> · {formatExactTime(n.createdAt)}</span>
@@ -810,7 +749,7 @@ function NotificationEntry({
             <h3
               className="mt-2 leading-snug tracking-tight"
               style={{
-                fontFamily: 'var(--font-display)',
+                fontFamily: FONT_DISPLAY,
                 color: INK,
                 fontWeight: 700,
                 fontSize: '1.0625rem',
@@ -829,7 +768,7 @@ function NotificationEntry({
             {/* Message */}
             <p
               className="mt-1.5 text-[13.5px] leading-relaxed"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-body)' }}
+              style={{ color: INK_SOFT, fontFamily: FONT_BODY }}
             >
               {n.message}
             </p>
@@ -842,7 +781,7 @@ function NotificationEntry({
                   className="group/link inline-flex items-center gap-1.5 text-[11px] tracking-[0.12em] uppercase transition-colors duration-150"
                   style={{
                     color: OLIVE,
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: FONT_MONO,
                     fontWeight: 700,
                     borderBottom: `1px solid ${OLIVE}`,
                     paddingBottom: '2px',
@@ -909,7 +848,7 @@ function EditorialEmptyState({
       {/* "— KAYIT YOK —" style typographic mark */}
       <div
         className="mb-6 flex items-center gap-4"
-        style={{ fontFamily: 'var(--font-mono)' }}
+        style={{ fontFamily: FONT_MONO }}
       >
         <span style={{ color: INK_SOFT }}>—</span>
         <span
@@ -924,7 +863,7 @@ function EditorialEmptyState({
       <h3
         className="max-w-md leading-tight tracking-tight"
         style={{
-          fontFamily: 'var(--font-display)',
+          fontFamily: FONT_DISPLAY,
           color: INK,
           fontSize: '1.5rem',
           fontWeight: 700,
@@ -949,7 +888,7 @@ function EditorialEmptyState({
           style={{
             backgroundColor: INK,
             color: CREAM,
-            fontFamily: 'var(--font-mono)',
+            fontFamily: FONT_MONO,
             fontWeight: 700,
           }}
         >
@@ -970,7 +909,7 @@ function EditorialError({ message, onRetry }: { message: string; onRetry: () => 
       <div className="px-6 pt-10 pb-24 sm:px-10 lg:px-16">
         <div
           className="flex items-center gap-4 text-[10px] tracking-[0.22em]"
-          style={{ color: '#b3261e', fontFamily: 'var(--font-mono)' }}
+          style={{ color: '#b3261e', fontFamily: FONT_MONO }}
         >
           <span>—</span>
           <span style={{ fontWeight: 700 }}>HATA</span>
@@ -979,7 +918,7 @@ function EditorialError({ message, onRetry }: { message: string; onRetry: () => 
         <h1
           className="mt-6 leading-tight tracking-tight"
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: FONT_DISPLAY,
             color: INK,
             fontSize: 'clamp(2rem, 4vw, 2.75rem)',
             fontWeight: 800,
@@ -996,7 +935,7 @@ function EditorialError({ message, onRetry }: { message: string; onRetry: () => 
           style={{
             backgroundColor: INK,
             color: CREAM,
-            fontFamily: 'var(--font-mono)',
+            fontFamily: FONT_MONO,
             fontWeight: 700,
           }}
         >
