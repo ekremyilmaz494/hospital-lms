@@ -10,7 +10,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useLayoutBranding } from '@/hooks/use-layout-branding';
 import { useMobile } from '@/hooks/use-mobile';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
-import { MobileBottomNav } from '@/components/layouts/mobile-bottom-nav';
 import { MobileSidebarDrawer } from '@/components/layouts/mobile-sidebar-drawer';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 import { createClient } from '@/lib/supabase/client';
@@ -92,12 +91,14 @@ export default function StaffLayout({
           onLogout={handleLogout}
         />
 
-        {/* Ana içerik: masaüstünde sidebar durumuna göre kayar, mobilde sabit */}
+        {/* Ana içerik: masaüstünde sidebar durumuna göre kayar, mobilde sabit.
+            Mobile bottom padding kaldırıldı — edge tab artık 64px fixed bar yerine
+            sol kenardaki küçük bookmark ribbon, alt alan serbest. */}
         <main
           className="min-h-screen md:pb-0"
           style={{
             marginLeft: isMobile ? 0 : 72,
-            paddingBottom: isMobile ? 'calc(64px + env(safe-area-inset-bottom) + 1rem)' : undefined,
+            paddingBottom: isMobile ? 'env(safe-area-inset-bottom)' : undefined,
           }}
         >
           <ImpersonationBanner />
@@ -112,8 +113,6 @@ export default function StaffLayout({
           <div className="p-4 md:p-8">{children}</div>
         </main>
 
-        {/* Mobil alt navigasyon */}
-        <MobileBottomNav onMorePress={() => setMobileDrawerOpen(true)} />
       </div>
     </TooltipProvider>
   );

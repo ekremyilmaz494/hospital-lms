@@ -176,6 +176,19 @@
   --sidebar-accent-foreground: var(--color-primary);
   --sidebar-border: var(--color-border);
   --sidebar-ring: var(--color-primary);
+
+  /* ══ EDITORIAL PALETTE (staff panel — Clinical Editorial) ══
+     Light mode: cream paper, ink text, gold accent */
+  --ed-cream: #faf7f2;
+  --ed-ink: #0a1628;
+  --ed-ink-soft: #5b6478;
+  --ed-gold: #c9a961;
+  --ed-rule: #e5e0d5;
+  --ed-olive: #1a3a28;
+  /* Alpha variants for concatenation patterns (shadow glows, gradients) */
+  --ed-gold-a10: #c9a9611a;
+  --ed-gold-a20: #c9a96133;
+  --ed-gold-a33: #c9a96155;
 }
 
 .dark {
@@ -225,6 +238,18 @@
   --sidebar-accent: var(--color-primary-light);
   --sidebar-accent-foreground: var(--color-primary);
   --sidebar-border: var(--color-border);
+
+  /* ══ EDITORIAL PALETTE — dark variant (midnight newsprint) ══
+     Flip cream↔ink, keep gold, soften rules */
+  --ed-cream: #0d1524;           /* page paper → deep ink navy */
+  --ed-ink: #f0ebe0;             /* body text → warm parchment */
+  --ed-ink-soft: #9aa3b8;        /* secondary text → muted steel */
+  --ed-gold: #d4b876;             /* accent → slightly warmer gold */
+  --ed-rule: #1e2a42;             /* borders → subtle navy */
+  --ed-olive: #5c8a6b;            /* secondary accent → lighter olive */
+  --ed-gold-a10: #d4b8761a;
+  --ed-gold-a20: #d4b87633;
+  --ed-gold-a33: #d4b87655;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -566,6 +591,16 @@ select:focus-visible {
 .dark select {
   color-scheme: dark;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   EDITORIAL STAFF PANEL — ALWAYS LIGHT
+   Staff panel uses "Clinical Editorial" design (cream + ink + gold) via
+   hardcoded JS hex constants. Dark mode refactor requires replacing
+   those with CSS variables (separate PR).
+   Until then, we force staff/* pages to stay in editorial light theme
+   regardless of user's theme preference. Auth + landing pages still
+   respect dark/light toggle.
+   ═══════════════════════════════════════════════════════════════════ */
 
 /* Dark mode scrollbar */
 .dark ::-webkit-scrollbar-thumb {

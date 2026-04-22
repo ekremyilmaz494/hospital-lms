@@ -26,13 +26,13 @@ interface Certificate {
 }
 
 /* ─── Editorial palette ─── */
-const INK = '#0a1628';
-const INK_SOFT = '#5b6478';
-const CREAM = '#faf7f2';
-const RULE = '#e5e0d5';
-const GOLD = '#c9a961';
+const INK = 'var(--ed-ink, #0a1628)';
+const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
+const CREAM = 'var(--ed-cream, #faf7f2)';
+const RULE = 'var(--ed-rule, #e5e0d5)';
+const GOLD = 'var(--ed-gold, #c9a961)';
 const NAVY = '#0b1e3f';
-const OLIVE = '#1a3a28';
+const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 /* ════════════════════════════════════════════════════════
    PRESERVED: Gold seal + Certificate artifact (belgenin kendisi)
@@ -249,7 +249,7 @@ export default function StaffCertificatesPage() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(10, 22, 40, 0.035) 1px, transparent 0)',
+        backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ed-ink) 3.5%, transparent) 1px, transparent 0)',
         backgroundSize: '24px 24px',
       }}
     >

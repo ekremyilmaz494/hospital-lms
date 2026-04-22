@@ -10,7 +10,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { Menu, Moon, Search, Sun, X, User, Bell, LogOut } from 'lucide-react';
-import { useColorTheme, COLOR_THEMES } from '@/hooks/use-color-theme';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { NotificationBell } from '@/components/shared/notification-bell';
@@ -26,6 +25,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 /* ─── Editorial palette ─── */
+/* Topbar is chrome — fixed hex, not themed. Stays solid cream always. */
 const INK = '#0a1628';
 const INK_SOFT = '#5b6478';
 const CREAM = '#faf7f2';
@@ -57,7 +57,6 @@ export function AppTopbar({
 }: AppTopbarProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { colorTheme, setColorTheme } = useColorTheme();
   const [searchOpen, setSearchOpen] = useState(false);
   const { user } = useAuthStore();
 
@@ -79,27 +78,25 @@ export function AppTopbar({
     <header
       className="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 px-4 sm:px-6"
       style={{
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        backgroundColor: 'rgba(250, 247, 242, 0.85)',
-        borderBottom: `1px solid ${INK}`,
-        color: INK,
+        backgroundColor: '#faf7f2',
+        borderBottom: '1px solid #0a1628',
+        color: '#0a1628',
       }}
     >
-      {/* ── Left: mobile menu + masthead meta ── */}
+      {/* ── Left: hamburger (mobile) + masthead meta ──
+          Klasik Material/iOS navigation drawer pattern: top-left hamburger → drawer açılır.
+          Mobile primary navigation kaynağı (md:hidden), desktop'ta sidebar vardır. */}
       <div className="flex items-center gap-3 min-w-0">
         <button
+          type="button"
           onClick={onToggleSidebar}
-          className="inline-flex h-9 w-9 items-center justify-center md:hidden"
-          style={{
-            color: INK,
-            border: `1px solid ${RULE}`,
-            borderRadius: '2px',
-            backgroundColor: 'transparent',
-          }}
           aria-label="Menüyü aç"
+          className="inline-flex h-10 w-10 items-center justify-center md:hidden transition-colors"
+          style={{ color: INK, background: 'transparent', borderRadius: '4px' }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(10, 22, 40, 0.06)'; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
         >
-          <Menu className="h-4 w-4" />
+          <Menu className="h-5 w-5" strokeWidth={2} />
         </button>
 
         {(orgName || title) && (
@@ -207,22 +204,15 @@ export function AppTopbar({
           >
             <Sun className="h-4 w-4 rotate-0 scale-100 dark:-rotate-90 dark:scale-0" style={{ transition: 'transform 300ms ease' }} />
             <Moon className="absolute h-4 w-4 rotate-90 scale-0 dark:rotate-0 dark:scale-100" style={{ transition: 'transform 300ms ease' }} />
-            {colorTheme !== 'emerald' && (
-              <span
-                className="absolute bottom-1 right-1 h-1.5 w-1.5"
-                style={{
-                  backgroundColor: COLOR_THEMES.find(t => t.id === colorTheme)?.light,
-                  borderRadius: '50%',
-                  border: `1px solid ${CREAM}`,
-                }}
-              />
-            )}
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
             className="w-60 p-0 overflow-hidden border-0"
             style={{
               backgroundColor: CREAM,
+              background: CREAM,
+              backdropFilter: 'none',
+              WebkitBackdropFilter: 'none',
               border: `1px solid ${INK}`,
               borderRadius: '4px',
               boxShadow: '0 8px 24px rgba(6, 16, 33, 0.12)',
@@ -251,35 +241,6 @@ export function AppTopbar({
                 onClick={() => setTheme('dark')}
               />
             </DropdownMenuGroup>
-
-            <div className="px-3 pt-2 pb-2" style={{ borderTop: `1px solid ${RULE}` }}>
-              <p
-                className="text-[9px] font-semibold uppercase tracking-[0.2em] mb-2"
-                style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-              >
-                Renk paleti
-              </p>
-              <div className="flex items-center gap-1.5">
-                {COLOR_THEMES.map((ct) => {
-                  const isActive = colorTheme === ct.id;
-                  return (
-                    <button
-                      key={ct.id}
-                      onClick={() => setColorTheme(ct.id)}
-                      title={ct.label}
-                      aria-label={ct.label}
-                      className="relative h-6 w-6 focus:outline-none transition-transform"
-                      style={{
-                        backgroundColor: theme === 'dark' ? ct.dark : ct.light,
-                        borderRadius: '2px',
-                        border: isActive ? `2px solid ${INK}` : `1px solid ${RULE}`,
-                        transform: isActive ? 'scale(1.1)' : 'scale(1)',
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -336,6 +297,9 @@ export function AppTopbar({
             className="w-64 p-0 overflow-hidden border-0"
             style={{
               backgroundColor: CREAM,
+              background: CREAM,
+              backdropFilter: 'none',
+              WebkitBackdropFilter: 'none',
               border: `1px solid ${INK}`,
               borderRadius: '4px',
               boxShadow: '0 8px 24px rgba(6, 16, 33, 0.12)',

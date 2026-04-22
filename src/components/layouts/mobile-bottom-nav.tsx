@@ -13,10 +13,17 @@ export interface MobileBottomNavItem {
 }
 
 const DEFAULT_STAFF_ITEMS: readonly MobileBottomNavItem[] = [
-  { href: '/staff/dashboard',    label: 'Ana Sayfa',   icon: LayoutDashboard, rootHref: '/staff/dashboard' },
-  { href: '/staff/my-trainings', label: 'Eğitimlerim', icon: BookOpen },
-  { href: '/staff/certificates', label: 'Sertifikalar', icon: Award },
+  { href: '/staff/dashboard',    label: 'Panel',       icon: LayoutDashboard, rootHref: '/staff/dashboard' },
+  { href: '/staff/my-trainings', label: 'Eğitimler',   icon: BookOpen },
+  { href: '/staff/certificates', label: 'Sertifika',   icon: Award },
 ] as const
+
+/* ─── Editorial palette ─── */
+const INK = '#0a1628'
+const INK_SOFT = '#5b6478'
+const CREAM = '#faf7f2'
+const RULE = '#e5e0d5'
+const GOLD = '#c9a961'
 
 interface MobileBottomNavProps {
   onMorePress?: () => void;
@@ -24,22 +31,23 @@ interface MobileBottomNavProps {
 }
 
 /**
- * Mobil görünümde sayfanın alt kısmında sabit duran navigasyon çubuğu.
- * md breakpoint üzerinde gizlenir.
- * 4. item "Daha Fazla" — sidebar drawer'ı açar (iOS tab bar convention).
+ * Mobile alt navigasyon — "Clinical Editorial" dili.
+ * Cream zemin, ink ikon/metin, gold active underline. Rounded-xl emerald
+ * tasarım kaldırıldı; diğer staff sayfalarındaki dil ile hizalandı.
+ * md breakpoint üzerinde gizlenir (desktop sidebar devreye girer).
  */
 export function MobileBottomNav({ onMorePress, items = DEFAULT_STAFF_ITEMS }: MobileBottomNavProps) {
   const pathname = usePathname()
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 flex items-center border-t md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 flex items-stretch md:hidden"
       style={{
-        background: 'var(--color-surface)',
-        borderColor: 'var(--color-border)',
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
+        background: CREAM,
+        borderTop: `1px solid ${INK}`,
         height: '64px',
         paddingBottom: 'env(safe-area-inset-bottom)',
+        fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
       }}
     >
       {items.map(({ href, label, icon: Icon, rootHref }) => {
@@ -49,23 +57,26 @@ export function MobileBottomNav({ onMorePress, items = DEFAULT_STAFF_ITEMS }: Mo
           <Link
             key={href}
             href={href}
-            className="flex flex-1 flex-col items-center justify-center gap-1 py-2"
-            style={{ minHeight: 60 }}
+            aria-current={isActive ? 'page' : undefined}
+            className="relative flex flex-1 flex-col items-center justify-center gap-1"
+            style={{ minHeight: 60, color: isActive ? INK : INK_SOFT }}
           >
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors"
-              style={{
-                background: isActive ? 'var(--color-primary-light)' : 'transparent',
-              }}
-            >
-              <Icon
-                className="h-5 w-5 transition-colors"
-                style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
+            {/* Gold active indicator — top underline, editorial rule */}
+            {isActive && (
+              <span
+                aria-hidden
+                className="absolute top-0 left-[25%] right-[25%]"
+                style={{ height: '2px', background: GOLD }}
               />
-            </div>
+            )}
+            <Icon
+              className="h-[18px] w-[18px]"
+              strokeWidth={isActive ? 2.2 : 1.75}
+              style={{ color: isActive ? INK : INK_SOFT }}
+            />
             <span
-              className="text-[10px] font-semibold leading-none"
-              style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
+              className="text-[9px] font-semibold tracking-[0.18em] uppercase leading-none"
+              style={{ color: isActive ? INK : INK_SOFT }}
             >
               {label}
             </span>
@@ -73,27 +84,27 @@ export function MobileBottomNav({ onMorePress, items = DEFAULT_STAFF_ITEMS }: Mo
         )
       })}
 
-      {/* "Daha Fazla" butonu — drawer açar */}
+      {/* Vertical divider before More — editorial hairline */}
+      <span aria-hidden className="self-stretch my-3" style={{ width: '1px', background: RULE }} />
+
+      {/* "Daha Fazla" — drawer açar */}
       <button
         type="button"
         onClick={onMorePress}
-        className="flex flex-1 flex-col items-center justify-center gap-1 py-2"
-        style={{ minHeight: 60 }}
+        aria-label="Daha fazla menü aç"
+        className="relative flex flex-1 flex-col items-center justify-center gap-1"
+        style={{ minHeight: 60, color: INK_SOFT, background: 'transparent' }}
       >
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors"
-          style={{ background: 'transparent' }}
-        >
-          <MoreHorizontal
-            className="h-5 w-5 transition-colors"
-            style={{ color: 'var(--color-text-muted)' }}
-          />
-        </div>
+        <MoreHorizontal
+          className="h-[18px] w-[18px]"
+          strokeWidth={1.75}
+          style={{ color: INK_SOFT }}
+        />
         <span
-          className="text-[10px] font-semibold leading-none"
-          style={{ color: 'var(--color-text-muted)' }}
+          className="text-[9px] font-semibold tracking-[0.18em] uppercase leading-none"
+          style={{ color: INK_SOFT }}
         >
-          Daha Fazla
+          Menü
         </span>
       </button>
     </nav>

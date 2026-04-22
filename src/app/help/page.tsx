@@ -14,12 +14,12 @@ import {
 import type { LucideIcon } from 'lucide-react';
 
 /* ─── Editorial palette ─── */
-const INK = '#0a1628';
-const INK_SOFT = '#5b6478';
-const CREAM = '#faf7f2';
-const RULE = '#e5e0d5';
-const GOLD = '#c9a961';
-const OLIVE = '#1a3a28';
+const INK = 'var(--ed-ink, #0a1628)';
+const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
+const CREAM = 'var(--ed-cream, #faf7f2)';
+const RULE = 'var(--ed-rule, #e5e0d5)';
+const GOLD = 'var(--ed-gold, #c9a961)';
+const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 const trainingSteps: {
   step: string; title: string; desc: string; icon: LucideIcon;

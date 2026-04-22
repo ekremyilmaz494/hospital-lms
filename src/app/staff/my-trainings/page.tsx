@@ -37,12 +37,12 @@ interface Training {
 }
 
 /* ─── Editorial palette ─── */
-const INK = '#0a1628';
-const INK_SOFT = '#5b6478';
-const CREAM = '#faf7f2';
-const RULE = '#e5e0d5';
-const GOLD = '#c9a961';
-const OLIVE = '#1a3a28';
+const INK = 'var(--ed-ink, #0a1628)';
+const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
+const CREAM = 'var(--ed-cream, #faf7f2)';
+const RULE = 'var(--ed-rule, #e5e0d5)';
+const GOLD = 'var(--ed-gold, #c9a961)';
+const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 /* ─── Domain mappings ─── */
 
@@ -141,7 +141,7 @@ export default function MyTrainingsPage() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(10, 22, 40, 0.035) 1px, transparent 0)',
+        backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ed-ink) 3.5%, transparent) 1px, transparent 0)',
         backgroundSize: '24px 24px',
       }}
     >
@@ -224,17 +224,16 @@ export default function MyTrainingsPage() {
             {/* ───── KPI strip ───── */}
             <section className="mt-8">
               <div
-                className="grid"
+                className="grid grid-cols-2 md:grid-cols-4"
                 style={{
                   backgroundColor: '#ffffff',
                   border: `1px solid ${RULE}`,
                   borderRadius: '4px',
-                  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
                 }}
               >
-                <KpiTile icon={BookOpen}    label="Toplam"     value={segmented.total}          tone={INK}       num="01" />
-                <KpiTile icon={Clock}       label="Devam Eden" value={segmented.activeCount}    tone="#b4820b" num="02" />
-                <KpiTile icon={CheckCircle2} label="Tamamlanan" value={segmented.completedCount} tone="#0a7a47" num="03" />
+                <KpiTile icon={BookOpen}    label="Toplam"     value={segmented.total}          tone={INK}       num="01" index={0} />
+                <KpiTile icon={Clock}       label="Devam Eden" value={segmented.activeCount}    tone="#b4820b" num="02" index={1} />
+                <KpiTile icon={CheckCircle2} label="Tamamlanan" value={segmented.completedCount} tone="#0a7a47" num="03" index={2} />
                 <KpiTile
                   icon={TrendingUp}
                   label="Ortalama"
@@ -242,7 +241,7 @@ export default function MyTrainingsPage() {
                   suffix={segmented.averageScore !== null ? '%' : undefined}
                   tone={GOLD}
                   num="04"
-                  last
+                  index={3}
                 />
               </div>
             </section>
@@ -353,31 +352,38 @@ export default function MyTrainingsPage() {
    ───────────────────────────────────────────────────── */
 
 function KpiTile({
-  icon: Icon, label, value, suffix, tone, num, last,
+  icon: Icon, label, value, suffix, tone, num, index,
 }: {
   icon: typeof BookOpen; label: string; value: number | string;
-  suffix?: string; tone: string; num: string; last?: boolean;
+  suffix?: string; tone: string; num: string; index: number;
 }) {
+  // 2x2 (mobile) ve 1x4 (sm+) için border logic:
+  // - Mobile: row 1 (idx 0,1) bottom border var; sol kolon (idx 0,2) right border var
+  // - sm+: tümü arasında right border, son hariç
+  const showMobileBottom = index < 2;
+  const showMobileRight = index % 2 === 0;
   return (
     <div
-      className="relative px-5 py-5"
-      style={{ borderRight: last ? 'none' : `1px solid ${RULE}` }}
+      className="relative pl-4 pr-3 py-4 md:px-5 md:py-5 border-b md:border-b-0 border-r md:border-r data-[mb='0']:border-b-0 data-[mr='0']:border-r-0 md:data-[mb='0']:border-b-0 md:[&:last-child]:border-r-0"
+      data-mb={showMobileBottom ? '1' : '0'}
+      data-mr={showMobileRight ? '1' : '0'}
+      style={{ borderColor: RULE }}
     >
       <span
         aria-hidden
         className="absolute left-0 top-0 bottom-0"
         style={{ width: '3px', backgroundColor: tone }}
       />
-      <div className="flex items-center gap-2 mb-3">
-        <Icon className="h-3.5 w-3.5" style={{ color: tone }} />
+      <div className="flex items-center gap-2 mb-2 md:mb-3">
+        <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: tone }} />
         <span
-          className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+          className="truncate text-[10px] font-semibold uppercase tracking-[0.14em]"
           style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           {label}
         </span>
         <span
-          className="ml-auto text-[9px] tabular-nums"
+          className="ml-auto hidden md:block text-[9px] tabular-nums"
           style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           {num}
@@ -385,7 +391,7 @@ function KpiTile({
       </div>
       <div className="flex items-baseline gap-1">
         <span
-          className="text-[36px] font-semibold tabular-nums leading-none tracking-[-0.025em]"
+          className="text-[28px] md:text-[36px] font-semibold tabular-nums leading-none tracking-[-0.025em]"
           style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
         >
           {typeof value === 'number' ? value.toLocaleString('tr-TR') : value}
@@ -617,7 +623,7 @@ function CompletedRow({ t, index }: { t: Training; index: number }) {
     <li>
       <Link
         href={`/staff/my-trainings/${t.id}`}
-        className="grid items-center overflow-hidden focus:outline-none grid-cols-[minmax(0,1fr)_max-content] sm:grid-cols-[40px_minmax(0,1fr)_max-content_max-content]"
+        className="grid items-center overflow-hidden focus:outline-none grid-cols-[minmax(0,1fr)_120px] sm:grid-cols-[40px_minmax(0,1fr)_120px_48px]"
         style={{
           backgroundColor: '#ffffff',
           borderTopWidth: '1px',

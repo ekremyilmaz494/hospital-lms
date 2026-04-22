@@ -13,7 +13,6 @@ import {
   BookOpen, AlertTriangle, X, ArrowRight, Lock, ClipboardList,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
-import { useMobile } from '@/hooks/use-mobile';
 
 type ViewMode = 'month' | 'week' | 'agenda';
 
@@ -83,12 +82,12 @@ function formatDateRange(start: string, end: string) {
 }
 
 /* ─── Editorial palette ─── */
-const INK = '#0a1628';
-const INK_SOFT = '#5b6478';
-const CREAM = '#faf7f2';
-const RULE = '#e5e0d5';
-const GOLD = '#c9a961';
-const OLIVE = '#1a3a28';
+const INK = 'var(--ed-ink, #0a1628)';
+const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
+const CREAM = 'var(--ed-cream, #faf7f2)';
+const RULE = 'var(--ed-rule, #e5e0d5)';
+const GOLD = 'var(--ed-gold, #c9a961)';
+const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 /* ─────────────────────────────────────────────────────
    Page
@@ -96,15 +95,13 @@ const OLIVE = '#1a3a28';
 
 export default function CalendarPage() {
   const today = useMemo(() => new Date(), []);
-  const isMobile = useMobile();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  // null = follow device default (mobile → agenda, desktop → month).
-  // Once the user picks explicitly, the override wins even if they rotate the device.
-  const [viewOverride, setViewOverride] = useState<ViewMode | null>(null);
-  const viewMode: ViewMode = viewOverride ?? (isMobile ? 'agenda' : 'month');
-  const handleViewChange = useCallback((v: ViewMode) => setViewOverride(v), []);
+  // Her cihazda default = 'month' (ay) — sayfa açıldığında kullanıcı ay takvimini
+  // görür, isterse segmented control'den Hafta / Ajanda'ya geçer.
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const handleViewChange = useCallback((v: ViewMode) => setViewMode(v), []);
 
   const { data, isLoading, error } = useFetch<{ events: CalendarEvent[]; total: number }>(
     '/api/staff/calendar',

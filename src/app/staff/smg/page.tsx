@@ -63,12 +63,12 @@ const STATUS: Record<string, { label: string; ink: string; bg: string; icon: typ
 };
 
 /* ─── Editorial palette ─── */
-const INK = '#0a1628';
-const INK_SOFT = '#5b6478';
-const CREAM = '#faf7f2';
-const RULE = '#e5e0d5';
-const GOLD = '#c9a961';
-const OLIVE = '#1a3a28';
+const INK = 'var(--ed-ink, #0a1628)';
+const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
+const CREAM = 'var(--ed-cream, #faf7f2)';
+const RULE = 'var(--ed-rule, #e5e0d5)';
+const GOLD = 'var(--ed-gold, #c9a961)';
+const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 /* ─── Page ─── */
 
@@ -174,7 +174,7 @@ export default function StaffSmgPage() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(10, 22, 40, 0.035) 1px, transparent 0)',
+        backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ed-ink) 3.5%, transparent) 1px, transparent 0)',
         backgroundSize: '24px 24px',
       }}
     >
