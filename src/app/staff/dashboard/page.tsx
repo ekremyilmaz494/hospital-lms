@@ -48,12 +48,12 @@ interface DashboardData {
 }
 
 /* ─── Editorial palette ─── */
-const INK = '#0a1628';
-const INK_SOFT = '#5b6478';
-const CREAM = '#faf7f2';
-const RULE = '#e5e0d5';
-const GOLD = '#c9a961';
-const OLIVE = '#1a3a28';
+const INK = 'var(--ed-ink, #0a1628)';
+const INK_SOFT = 'var(--ed-ink-soft, #5b6478)';
+const CREAM = 'var(--ed-cream, #faf7f2)';
+const RULE = 'var(--ed-rule, #e5e0d5)';
+const GOLD = 'var(--ed-gold, #c9a961)';
+const OLIVE = 'var(--ed-olive, #1a3a28)';
 
 const STATUS: Record<string, { label: string; ink: string; bg: string; dot: string }> = {
   in_progress: { label: 'DEVAM',  ink: '#6a4e11', bg: '#fef6e7', dot: '#b4820b' },
@@ -143,7 +143,7 @@ export default function StaffDashboard() {
         backgroundColor: CREAM,
         color: INK,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(10, 22, 40, 0.035) 1px, transparent 0)',
+        backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ed-ink) 3.5%, transparent) 1px, transparent 0)',
         backgroundSize: '24px 24px',
       }}
     >
@@ -318,16 +318,15 @@ export default function StaffDashboard() {
               </header>
 
               <div
-                className="mt-5 grid"
+                className="mt-5 grid grid-cols-2 md:grid-cols-4"
                 style={{
                   backgroundColor: '#ffffff',
                   border: `1px solid ${RULE}`,
                   borderRadius: '4px',
-                  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
                 }}
               >
                 {stats.map((s, i) => (
-                  <StatTile key={s.label} {...s} last={i === stats.length - 1} />
+                  <StatTile key={s.label} {...s} index={i} />
                 ))}
               </div>
             </section>
@@ -577,38 +576,44 @@ export default function StaffDashboard() {
    ───────────────────────────────────────────────────── */
 
 function StatTile({
-  label, value, icon: Icon, tone, num, last,
+  label, value, icon: Icon, tone, num, index,
 }: {
   label: string; value: number; icon: typeof BookOpen;
-  tone: string; num: string; last: boolean;
+  tone: string; num: string; index: number;
 }) {
+  // 2x2 mobile, 1x4 sm+ border logic: bottom bar sadece mobile row 1, right bar
+  // mobile sol kolon ve sm+'da son hariç tümü.
+  const showMobileBottom = index < 2;
+  const showMobileRight = index % 2 === 0;
   return (
     <div
-      className="relative px-5 py-5"
-      style={{ borderRight: last ? 'none' : `1px solid ${RULE}` }}
+      className="relative pl-4 pr-3 py-4 md:px-5 md:py-5 border-b md:border-b-0 border-r md:border-r data-[mb='0']:border-b-0 data-[mr='0']:border-r-0 md:data-[mb='0']:border-b-0 md:[&:last-child]:border-r-0"
+      data-mb={showMobileBottom ? '1' : '0'}
+      data-mr={showMobileRight ? '1' : '0'}
+      style={{ borderColor: RULE }}
     >
       <span
         aria-hidden
         className="absolute left-0 top-0 bottom-0"
         style={{ width: '3px', backgroundColor: tone }}
       />
-      <div className="flex items-center gap-2 mb-3">
-        <Icon className="h-3.5 w-3.5" style={{ color: tone }} />
+      <div className="flex items-center gap-2 mb-2 md:mb-3">
+        <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: tone }} />
         <span
-          className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+          className="truncate text-[10px] font-semibold uppercase tracking-[0.14em]"
           style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           {label}
         </span>
         <span
-          className="ml-auto text-[9px] tabular-nums"
+          className="ml-auto hidden md:block text-[9px] tabular-nums"
           style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           {num}
         </span>
       </div>
       <div
-        className="text-[36px] font-semibold tabular-nums leading-none tracking-[-0.025em]"
+        className="text-[28px] md:text-[36px] font-semibold tabular-nums leading-none tracking-[-0.025em]"
         style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
       >
         {value.toLocaleString('tr-TR')}

@@ -18,9 +18,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useAiGenerationStore, selectUnviewedCount, selectActiveCount } from '@/store/ai-generation-store';
 import type { NavGroup } from './sidebar-config';
 
-/* ─── Editorial palette ─── */
+/* ─── Editorial palette ───
+ * Desktop sidebar is intentionally a fixed dark "masthead" (gazete mast başlığı),
+ * not themed by light/dark toggle. These stay hex, unlike the rest of staff panel. */
 const INK = '#0a1628';
-const INK_DEEP = '#061021';        // slightly darker for gradient base
+const INK_DEEP = '#061021';
 const CREAM = '#faf7f2';
 const GOLD = '#c9a961';
 const OLIVE = '#1a3a28';

@@ -10,8 +10,17 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import type { NavGroup } from '@/components/layouts/sidebar/sidebar-config';
+
+/* ─── Editorial palette ───
+ * Drawer is a fixed design element (mobile equivalent of desktop dark masthead).
+ * Stays in editorial-light always, not themed by dark mode toggle. */
+const INK = '#0a1628';
+const INK_SOFT = '#5b6478';
+const CREAM = '#faf7f2';
+const RULE = '#e5e0d5';
+const GOLD = '#c9a961';
+const OLIVE = '#1a3a28';
 
 interface MobileSidebarDrawerProps {
   open: boolean;
@@ -26,9 +35,9 @@ interface MobileSidebarDrawerProps {
 }
 
 /**
- * Slide-in drawer that shows the full staff navigation on mobile.
- * Uses the existing Sheet (base-ui Dialog) component — zero new dependencies.
- * Automatically closes when a nav link is tapped.
+ * Mobile drawer — "Clinical Editorial" dili.
+ * Cream zemin, ink ikon, gold accent indicator, mono caps label, serif org name.
+ * Sheet base-ui Dialog wrapper'ını kullanıyor (dependency değişmedi).
  */
 export function MobileSidebarDrawer({
   open,
@@ -48,31 +57,70 @@ export function MobileSidebarDrawer({
       <SheetContent
         side="left"
         showCloseButton
-        className="flex flex-col p-0"
-        style={{ maxWidth: '280px', width: '80vw' }}
+        className="flex flex-col p-0 border-0"
+        style={{
+          maxWidth: '300px',
+          width: '82vw',
+          background: CREAM,
+          borderRight: `1px solid ${INK}`,
+          fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
+        }}
       >
-        {/* Header — org branding */}
-        <SheetHeader className="border-b px-5 py-4" style={{ borderColor: 'var(--color-border)' }}>
+        {/* Header — editorial masthead */}
+        <SheetHeader
+          className="px-5 pt-5 pb-4 gap-0"
+          style={{ borderBottom: `1px solid ${INK}` }}
+        >
+          <p
+            className="text-[9px] font-semibold uppercase tracking-[0.28em] mb-2"
+            style={{
+              color: GOLD,
+              fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+            }}
+          >
+            № 00 · Menü
+          </p>
           <div className="flex items-center gap-3">
             {orgLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={orgLogoUrl}
                 alt={orgName}
-                className="h-9 w-9 rounded-lg object-cover"
+                className="h-10 w-10 object-cover"
+                style={{ border: `1px solid ${INK}`, borderRadius: '2px' }}
               />
             ) : (
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold text-white"
-                style={{ background: 'var(--color-primary)' }}
+                className="flex h-10 w-10 items-center justify-center text-[13px] font-semibold"
+                style={{
+                  background: INK,
+                  color: GOLD,
+                  borderRadius: '2px',
+                  fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                }}
               >
                 {orgName.charAt(0)}
               </div>
             )}
-            <div className="min-w-0">
-              <SheetTitle className="truncate text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            <div className="min-w-0 flex-1 text-left">
+              <SheetTitle
+                className="truncate leading-tight tracking-tight"
+                style={{
+                  color: INK,
+                  fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                }}
+              >
                 {orgName}
               </SheetTitle>
-              <SheetDescription className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              <SheetDescription
+                className="mt-0.5 text-[10px] tracking-[0.18em] uppercase"
+                style={{
+                  color: INK_SOFT,
+                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                }}
+              >
                 Personel Paneli
               </SheetDescription>
             </div>
@@ -80,19 +128,22 @@ export function MobileSidebarDrawer({
         </SheetHeader>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-3">
+        <nav className="flex-1 overflow-y-auto py-2">
           {navGroups.map((group, gi) => (
-            <div key={gi} className={gi > 0 ? 'mt-4' : ''}>
+            <div key={gi} className={gi > 0 ? 'mt-3 pt-3' : ''} style={gi > 0 ? { borderTop: `1px solid ${RULE}` } : undefined}>
               {group.label && (
                 <p
-                  className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.1em]"
-                  style={{ color: 'var(--color-text-muted)' }}
+                  className="px-5 mb-1.5 text-[9px] font-semibold uppercase tracking-[0.28em]"
+                  style={{
+                    color: INK_SOFT,
+                    fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                  }}
                 >
                   {group.label}
                 </p>
               )}
-              <ul className="flex flex-col gap-0.5">
-                {group.items.map((item) => {
+              <ul className="list-none p-0 m-0">
+                {group.items.map((item, idx) => {
                   const Icon = item.icon;
                   const isActive =
                     pathname === item.href ||
@@ -103,26 +154,39 @@ export function MobileSidebarDrawer({
                       <Link
                         href={item.href}
                         onClick={onClose}
-                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
+                        aria-current={isActive ? 'page' : undefined}
+                        className="relative flex items-center gap-3 px-5 py-3 transition-colors"
                         style={{
-                          background: isActive ? 'var(--color-primary-light)' : 'transparent',
-                          color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                          minHeight: '44px',
+                          color: isActive ? INK : INK_SOFT,
+                          background: isActive ? 'rgba(201, 169, 97, 0.08)' : 'transparent',
+                          minHeight: '48px',
+                          fontSize: '14px',
+                          fontWeight: isActive ? 600 : 500,
+                          paddingLeft: idx > 0 || group.label ? undefined : '20px',
                         }}
                       >
+                        {/* Gold active indicator — left rail */}
+                        {isActive && (
+                          <span
+                            aria-hidden
+                            className="absolute left-0 top-2 bottom-2"
+                            style={{ width: '3px', background: GOLD }}
+                          />
+                        )}
                         <Icon
-                          className="h-5 w-5 shrink-0"
-                          style={{
-                            color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                          }}
+                          className="h-[18px] w-[18px] shrink-0"
+                          strokeWidth={isActive ? 2.2 : 1.75}
+                          style={{ color: isActive ? INK : INK_SOFT }}
                         />
-                        <span className="truncate">{item.title}</span>
+                        <span className="truncate tracking-tight">{item.title}</span>
                         {item.badge && (
                           <span
-                            className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold"
+                            className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold tabular-nums leading-none"
                             style={{
-                              background: 'var(--color-accent-light)',
-                              color: 'var(--color-accent)',
+                              color: INK,
+                              background: GOLD,
+                              borderRadius: '2px',
+                              fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
                             }}
                           >
                             {item.badge}
@@ -137,28 +201,46 @@ export function MobileSidebarDrawer({
           ))}
         </nav>
 
-        {/* Footer — user info + logout */}
+        {/* Footer — user + logout */}
         <div
-          className="border-t px-4 py-3"
-          style={{ borderColor: 'var(--color-border)' }}
+          className="px-5 py-4"
+          style={{ borderTop: `1px solid ${INK}`, background: 'rgba(10, 22, 40, 0.02)' }}
         >
           <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9 shrink-0">
-              <AvatarFallback
-                className="text-xs font-semibold text-white"
-                style={{ background: 'var(--color-primary)' }}
-              >
-                {userInitials}
-              </AvatarFallback>
-            </Avatar>
+            <div
+              className="flex h-10 w-10 items-center justify-center shrink-0"
+              style={{
+                background: OLIVE,
+                color: CREAM,
+                borderRadius: '2px',
+                border: `1.5px solid ${GOLD}`,
+                fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                fontSize: '13px',
+                fontWeight: 600,
+              }}
+            >
+              {userInitials}
+            </div>
             <div className="min-w-0 flex-1">
               <p
-                className="truncate text-sm font-semibold"
-                style={{ color: 'var(--color-text-primary)' }}
+                className="truncate leading-tight"
+                style={{
+                  color: INK,
+                  fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                }}
               >
                 {userName}
               </p>
-              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              <p
+                className="mt-0.5 text-[10px] uppercase tracking-[0.22em]"
+                style={{
+                  color: GOLD,
+                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                  fontWeight: 700,
+                }}
+              >
                 {userRole}
               </p>
             </div>
@@ -167,11 +249,18 @@ export function MobileSidebarDrawer({
                 onClose();
                 onLogout();
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors"
-              style={{ color: 'var(--color-text-muted)', minWidth: '44px', minHeight: '44px' }}
+              className="flex items-center justify-center transition-colors"
+              style={{
+                width: 44,
+                height: 44,
+                color: '#b3261e',
+                background: 'transparent',
+                border: `1px solid ${RULE}`,
+                borderRadius: '2px',
+              }}
               aria-label="Çıkış Yap"
             >
-              <LogOut className="h-4.5 w-4.5" />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>

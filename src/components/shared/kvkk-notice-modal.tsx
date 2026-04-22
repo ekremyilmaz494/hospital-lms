@@ -266,7 +266,7 @@ export function KvkkNoticeModal({
               border: `1.5px solid ${INK}`,
               boxShadow:
                 accepted && !loading && !rejecting
-                  ? `0 0 0 1px ${GOLD}, 0 0 0 3px ${CREAM}, 0 0 0 4px ${GOLD}55`
+                  ? `0 0 0 1px ${GOLD}, 0 0 0 3px ${CREAM}, 0 0 0 4px #c9a96155`
                   : 'none',
             }}
           >
