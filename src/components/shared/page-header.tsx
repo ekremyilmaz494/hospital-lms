@@ -60,7 +60,7 @@ export function PageHeader({ title, subtitle, badge, action, secondaryAction }: 
       </div>
       {(action || secondaryAction) && (
         <BlurFade delay={0.15}>
-          <div className="mt-4 flex items-center gap-3 sm:mt-0">
+          <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-0 sm:gap-3">
             {secondaryAction && (
               <Button
                 variant="outline"

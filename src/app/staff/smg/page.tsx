@@ -178,7 +178,7 @@ export default function StaffSmgPage() {
         backgroundSize: '24px 24px',
       }}
     >
-      <div className="relative px-6 sm:px-10 lg:px-16 pt-8 pb-16">
+      <div className="relative px-4 sm:px-10 lg:px-16 pt-8 pb-16">
         {/* ───── Masthead ───── */}
         <header
           className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5"
@@ -643,12 +643,9 @@ function ActivityRow({ a, index }: { a: SmgActivity; index: number }) {
         overflow: 'hidden',
       }}
     >
-      <div
-        className="grid items-center gap-4 px-5 py-4"
-        style={{ gridTemplateColumns: '36px 1fr max-content max-content' }}
-      >
+      <div className="grid items-center gap-x-4 gap-y-2 px-4 py-4 sm:px-5 grid-cols-[minmax(0,1fr)_max-content] sm:grid-cols-[36px_minmax(0,1fr)_max-content_max-content]">
         <span
-          className="text-[11px] font-semibold tabular-nums"
+          className="hidden sm:block text-[11px] font-semibold tabular-nums"
           style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           {index.toString().padStart(2, '0')}
@@ -671,7 +668,7 @@ function ActivityRow({ a, index }: { a: SmgActivity; index: number }) {
           </p>
         </div>
 
-        <span className="flex items-baseline gap-1">
+        <span className="flex items-baseline gap-1 justify-self-end">
           <span
             className="text-[22px] font-semibold tabular-nums tracking-[-0.02em]"
             style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
@@ -687,7 +684,7 @@ function ActivityRow({ a, index }: { a: SmgActivity; index: number }) {
         </span>
 
         <span
-          className="inline-flex items-center gap-1 rounded-sm px-2 py-1 text-[10px] font-semibold tracking-[0.12em] leading-none"
+          className="inline-flex items-center gap-1 rounded-sm px-2 py-1 text-[10px] font-semibold tracking-[0.12em] leading-none col-span-2 sm:col-span-1 justify-self-start sm:justify-self-end"
           style={{
             color: status.ink,
             backgroundColor: status.bg,

@@ -14,30 +14,28 @@ interface ChartCardProps {
 export function ChartCard({ title, icon, action, children, className }: ChartCardProps) {
   return (
     <div
-      className={`rounded-2xl border p-6 ${className || ''}`}
+      className={`rounded-2xl border p-4 sm:p-6 ${className || ''}`}
       style={{
         background: 'var(--color-surface)',
         borderColor: 'var(--color-border)',
         boxShadow: 'var(--shadow-sm)',
       }}
     >
-      <div className="mb-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           {icon && (
             <div
-              className="flex h-9 w-9 items-center justify-center rounded-xl"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
               style={{ background: 'var(--color-primary-light)' }}
             >
               {icon}
             </div>
           )}
-          <h3
-            className="text-[15px] font-bold tracking-tight"
-          >
+          <h3 className="truncate text-[15px] font-bold tracking-tight">
             {title}
           </h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {action}
           <button
             className="rounded-lg p-2 hover:bg-[var(--color-surface-hover)]"

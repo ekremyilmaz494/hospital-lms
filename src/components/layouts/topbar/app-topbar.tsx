@@ -90,7 +90,7 @@ export function AppTopbar({
       <div className="flex items-center gap-3 min-w-0">
         <button
           onClick={onToggleSidebar}
-          className="inline-flex h-9 w-9 items-center justify-center lg:hidden"
+          className="inline-flex h-9 w-9 items-center justify-center md:hidden"
           style={{
             color: INK,
             border: `1px solid ${RULE}`,

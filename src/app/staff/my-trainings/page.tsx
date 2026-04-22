@@ -145,7 +145,7 @@ export default function MyTrainingsPage() {
         backgroundSize: '24px 24px',
       }}
     >
-      <div className="relative px-6 sm:px-10 lg:px-16 pt-5 pb-16">
+      <div className="relative px-4 sm:px-10 lg:px-16 pt-5 pb-16">
         <MandatoryFeedbackBanner />
 
         {/* ───── Masthead ───── */}
@@ -460,9 +460,8 @@ function ActiveRow({ t, index }: { t: Training; index: number }) {
     <li>
       <Link
         href={`/staff/my-trainings/${t.id}`}
-        className="group grid items-stretch overflow-hidden focus:outline-none"
+        className="group grid items-stretch overflow-hidden focus:outline-none grid-cols-[56px_minmax(0,1fr)] sm:grid-cols-[40px_56px_minmax(0,1fr)_max-content]"
         style={{
-          gridTemplateColumns: '40px 56px 1fr max-content',
           backgroundColor: '#ffffff',
           borderTopWidth: '1px',
           borderRightWidth: '1px',
@@ -479,8 +478,8 @@ function ActiveRow({ t, index }: { t: Training; index: number }) {
         onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 0 0 ' + INK; e.currentTarget.style.transform = 'translateY(-1px)'; }}
         onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'translateY(0)'; }}
       >
-        {/* Index */}
-        <div className="flex items-center justify-center border-r" style={{ borderColor: RULE }}>
+        {/* Index — hidden on mobile to give body more room */}
+        <div className="hidden sm:flex items-center justify-center border-r" style={{ borderColor: RULE }}>
           <span
             className="text-[11px] font-semibold tabular-nums"
             style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
@@ -589,8 +588,8 @@ function ActiveRow({ t, index }: { t: Training; index: number }) {
           </div>
         </div>
 
-        {/* CTA */}
-        <div className="flex items-center border-l px-5" style={{ borderColor: RULE }}>
+        {/* CTA — hidden on mobile (tap the whole card navigates); visible from sm: */}
+        <div className="hidden sm:flex items-center border-l px-5" style={{ borderColor: RULE }}>
           <span
             className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em]"
             style={{ color: INK, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
@@ -618,9 +617,8 @@ function CompletedRow({ t, index }: { t: Training; index: number }) {
     <li>
       <Link
         href={`/staff/my-trainings/${t.id}`}
-        className="grid items-center overflow-hidden focus:outline-none"
+        className="grid items-center overflow-hidden focus:outline-none grid-cols-[minmax(0,1fr)_max-content] sm:grid-cols-[40px_minmax(0,1fr)_max-content_max-content]"
         style={{
-          gridTemplateColumns: '40px 1fr max-content max-content',
           backgroundColor: '#ffffff',
           borderTopWidth: '1px',
           borderRightWidth: '1px',
@@ -634,7 +632,7 @@ function CompletedRow({ t, index }: { t: Training; index: number }) {
           borderRadius: '4px',
         }}
       >
-        <div className="flex items-center justify-center py-4 border-r" style={{ borderColor: RULE }}>
+        <div className="hidden sm:flex items-center justify-center py-4 border-r" style={{ borderColor: RULE }}>
           <span
             className="text-[11px] font-semibold tabular-nums"
             style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
@@ -690,7 +688,7 @@ function CompletedRow({ t, index }: { t: Training; index: number }) {
           </p>
         </div>
 
-        <div className="flex items-center px-4 border-l" style={{ borderColor: RULE }}>
+        <div className="hidden sm:flex items-center px-4 border-l" style={{ borderColor: RULE }}>
           <ArrowRight className="h-4 w-4" style={{ color: GOLD }} />
         </div>
       </Link>

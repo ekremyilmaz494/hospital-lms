@@ -28,7 +28,7 @@ const EVALUATOR_LABELS: Record<string, string> = {
 function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [hovered, setHovered] = useState(0);
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       {[1, 2, 3, 4, 5].map(n => (
         <button
           key={n}
@@ -36,10 +36,11 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
           onClick={() => onChange(n)}
           onMouseEnter={() => setHovered(n)}
           onMouseLeave={() => setHovered(0)}
-          className="transition-transform hover:scale-110"
+          aria-label={`${n} yıldız`}
+          className="flex h-11 w-11 items-center justify-center transition-transform hover:scale-110 sm:h-10 sm:w-10"
         >
           <Star
-            className="h-8 w-8"
+            className="h-7 w-7 sm:h-8 sm:w-8"
             fill={(hovered || value) >= n ? 'var(--color-warning)' : 'none'}
             style={{ color: (hovered || value) >= n ? 'var(--color-warning)' : 'var(--color-border)' }}
           />
@@ -147,7 +148,7 @@ export default function EvaluationWizardPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 px-4 sm:px-0">
       <BlurFade delay={0}>
         {/* Header */}
         <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
@@ -181,7 +182,7 @@ export default function EvaluationWizardPage() {
                 <button
                   key={cat.id}
                   onClick={() => setCurrentCatIdx(i)}
-                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium transition-all"
+                  className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-full font-medium transition-all"
                   style={{
                     background: i === currentCatIdx ? 'var(--color-primary)' : catComplete ? 'var(--color-success-bg)' : 'var(--color-surface-2)',
                     color: i === currentCatIdx ? 'white' : catComplete ? 'var(--color-success)' : 'var(--color-text-secondary)',
@@ -229,7 +230,7 @@ export default function EvaluationWizardPage() {
                       onChange={e => setItemComment(item.id, e.target.value)}
                       placeholder="Opsiyonel yorum..."
                       rows={2}
-                      className="w-full text-sm rounded-xl px-3 py-2 border resize-none outline-none"
+                      className="w-full text-base sm:text-sm rounded-xl px-3 py-2 border resize-none outline-none"
                       style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text)' }}
                     />
                   </div>
@@ -242,25 +243,30 @@ export default function EvaluationWizardPage() {
 
       {/* Navigation */}
       <BlurFade delay={0.1}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <Button
             variant="outline"
             onClick={() => setCurrentCatIdx(i => i - 1)}
             disabled={currentCatIdx === 0}
             className="gap-1.5 rounded-xl"
           >
-            <ChevronLeft className="h-4 w-4" /> Önceki
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Önceki</span>
           </Button>
 
           {!isLastCat ? (
             <Button onClick={handleNext} className="gap-1.5 rounded-xl">
-              Kaydet ve Devam <ChevronRight className="h-4 w-4" />
+              <span className="sm:hidden">Devam</span>
+              <span className="hidden sm:inline">Kaydet ve Devam</span>
+              <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
             <Button onClick={handleSubmit} disabled={submitting} className="gap-1.5 rounded-xl"
               style={{ background: 'var(--color-success)' }}>
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              <CheckCircle className="h-4 w-4" /> Değerlendirmeyi Tamamla
+              <CheckCircle className="h-4 w-4" />
+              <span className="sm:hidden">Tamamla</span>
+              <span className="hidden sm:inline">Değerlendirmeyi Tamamla</span>
             </Button>
           )}
         </div>
