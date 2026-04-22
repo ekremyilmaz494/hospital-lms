@@ -37,20 +37,35 @@ export function KvkkNoticeModal({
   const [loading, setLoading] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [accepted, setAccepted] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
   const { setUserIfChanged } = useAuthStore()
 
   async function handleAcknowledge() {
     if (!accepted || loading || rejecting) return
     setLoading(true)
+    setApiError(null)
     try {
-      await fetch('/api/auth/kvkk-acknowledge', { method: 'POST' })
+      const res = await fetch('/api/auth/kvkk-acknowledge', { method: 'POST' })
+      if (!res.ok) {
+        // 429 veya diğer hata: modal açık kalsın, mesaj göster → kullanıcı tekrar
+        // denesin. Önceden sessizce onAcknowledge() çağırıyorduk, navigasyon oluyor
+        // ama JWT güncel olmadığı için middleware tekrar modala gönderiyor = loop.
+        const body = await res.json().catch(() => ({}))
+        const msg = res.status === 429
+          ? 'Çok fazla deneme. 1 saat içinde tekrar deneyebilirsiniz veya sayfayı yenileyin.'
+          : (body.error ?? 'Kayıt başarısız oldu, lütfen tekrar deneyin.')
+        setApiError(msg)
+        setLoading(false)
+        return
+      }
       setUserIfChanged({ kvkkNoticeAcknowledgedAt: new Date().toISOString() })
     } catch {
-      // Devam — kayıt başarısız olsa da kullanıcı onay verdiği için akış sürer
-    } finally {
-      setOpen(false)
-      onAcknowledge?.()
+      setApiError('Sunucuya bağlanılamadı, lütfen tekrar deneyin.')
+      setLoading(false)
+      return
     }
+    setOpen(false)
+    onAcknowledge?.()
   }
 
   async function handleReject() {
@@ -201,6 +216,16 @@ export function KvkkNoticeModal({
             </span>
           </label>
         </div>
+
+        {/* API error banner */}
+        {apiError && (
+          <div
+            className="px-6 py-2 text-[12.5px] shrink-0"
+            style={{ background: '#fdf2ee', color: '#992f1d', borderTop: `1px solid ${RULE}`, borderLeft: '3px solid #b3261e' }}
+          >
+            {apiError}
+          </div>
+        )}
 
         {/* Footer */}
         <div
