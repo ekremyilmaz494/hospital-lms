@@ -88,7 +88,7 @@ export default function TrainingDetailPage() {
         backgroundSize: '24px 24px',
       }}
     >
-      <div className="relative px-6 sm:px-10 lg:px-16 pt-5 pb-16 max-w-5xl mx-auto">
+      <div className="relative px-4 sm:px-10 lg:px-16 pt-5 pb-16 max-w-5xl mx-auto">
         {children}
       </div>
     </div>
@@ -511,38 +511,43 @@ export default function TrainingDetailPage() {
 
           {training.videosCompleted && !training.postExamCompleted && (
             <div
-              className="mt-4 grid items-center gap-4 p-4"
+              className="mt-4 flex flex-col gap-4 p-4 sm:grid sm:items-center"
               style={{
-                gridTemplateColumns: '4px 44px 1fr max-content',
                 backgroundColor: '#ffffff',
                 border: `1px solid ${RULE}`,
                 borderRadius: '4px',
+                gridTemplateColumns: '4px 44px 1fr max-content',
               }}
             >
-              <span style={{ backgroundColor: OLIVE, alignSelf: 'stretch', borderRadius: '2px' }} />
-              <div
-                className="flex items-center justify-center"
-                style={{ width: 44, height: 44, backgroundColor: '#eaf6ef', borderRadius: '2px' }}
-              >
-                <Award className="h-5 w-5" style={{ color: OLIVE }} />
-              </div>
-              <div>
-                <p
-                  className="text-[10px] font-semibold uppercase tracking-[0.16em]"
-                  style={{ color: OLIVE, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+              <span
+                className="hidden sm:block"
+                style={{ backgroundColor: OLIVE, alignSelf: 'stretch', borderRadius: '2px' }}
+              />
+              <div className="flex items-center gap-3 sm:contents">
+                <div
+                  className="flex items-center justify-center shrink-0"
+                  style={{ width: 44, height: 44, backgroundColor: '#eaf6ef', borderRadius: '2px' }}
                 >
-                  Hazır
-                </p>
-                <p
-                  className="mt-0.5 text-[14px] font-semibold tracking-[-0.01em]"
-                  style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
-                >
-                  Tüm videolar tamamlandı — son sınava geç
-                </p>
+                  <Award className="h-5 w-5" style={{ color: OLIVE }} />
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                    style={{ color: OLIVE, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                  >
+                    Hazır
+                  </p>
+                  <p
+                    className="mt-0.5 text-[14px] font-semibold tracking-[-0.01em]"
+                    style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
+                  >
+                    Tüm videolar tamamlandı — son sınava geç
+                  </p>
+                </div>
               </div>
               <Link
                 href={`/exam/${examId}/post-exam`}
-                className="inline-flex items-center gap-2 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
                 style={{
                   color: CREAM, backgroundColor: OLIVE, borderRadius: '2px',
                   fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
@@ -561,7 +566,7 @@ export default function TrainingDetailPage() {
       {!allDone && !training.isExpired && (
         <Link
           href={ctaHref}
-          className="mt-10 group flex items-center justify-between gap-4 px-6 py-5"
+          className="mt-10 group flex items-center justify-between gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5"
           style={{
             backgroundColor: INK,
             color: CREAM,
@@ -572,14 +577,14 @@ export default function TrainingDetailPage() {
           onMouseEnter={e => { e.currentTarget.style.backgroundColor = OLIVE; }}
           onMouseLeave={e => { e.currentTarget.style.backgroundColor = INK; }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <span
-              className="flex items-center justify-center"
+              className="flex shrink-0 items-center justify-center"
               style={{ width: 40, height: 40, backgroundColor: 'rgba(201, 169, 97, 0.15)', borderRadius: '2px' }}
             >
               <CtaIcon className="h-5 w-5" style={{ color: GOLD }} />
             </span>
-            <div>
+            <div className="min-w-0">
               <p
                 className="text-[10px] font-semibold uppercase tracking-[0.18em]"
                 style={{ color: GOLD, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
@@ -587,7 +592,7 @@ export default function TrainingDetailPage() {
                 Sonraki adım
               </p>
               <p
-                className="mt-0.5 text-[20px] font-semibold tracking-[-0.01em]"
+                className="mt-0.5 truncate text-[17px] sm:text-[20px] font-semibold tracking-[-0.01em]"
                 style={{ color: CREAM, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
               >
                 {ctaLabel}
@@ -595,7 +600,7 @@ export default function TrainingDetailPage() {
             </div>
           </div>
           <ChevronRight
-            className="h-6 w-6 transition-transform group-hover:translate-x-1"
+            className="h-6 w-6 shrink-0 transition-transform group-hover:translate-x-1"
             style={{ color: GOLD }}
           />
         </Link>

@@ -253,7 +253,7 @@ export default function StaffCertificatesPage() {
         backgroundSize: '24px 24px',
       }}
     >
-      <div className="relative px-6 sm:px-10 lg:px-16 pt-5 pb-16">
+      <div className="relative px-4 sm:px-10 lg:px-16 pt-5 pb-16">
         {/* ───── Masthead ───── */}
         <header
           className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 pb-5"

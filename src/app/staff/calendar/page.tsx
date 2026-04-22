@@ -13,6 +13,9 @@ import {
   BookOpen, AlertTriangle, X, ArrowRight, Lock, ClipboardList,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
+import { useMobile } from '@/hooks/use-mobile';
+
+type ViewMode = 'month' | 'week' | 'agenda';
 
 /* ─────────────────────────────────────────────────────
    Domain
@@ -93,9 +96,15 @@ const OLIVE = '#1a3a28';
 
 export default function CalendarPage() {
   const today = useMemo(() => new Date(), []);
+  const isMobile = useMobile();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  // null = follow device default (mobile → agenda, desktop → month).
+  // Once the user picks explicitly, the override wins even if they rotate the device.
+  const [viewOverride, setViewOverride] = useState<ViewMode | null>(null);
+  const viewMode: ViewMode = viewOverride ?? (isMobile ? 'agenda' : 'month');
+  const handleViewChange = useCallback((v: ViewMode) => setViewOverride(v), []);
 
   const { data, isLoading, error } = useFetch<{ events: CalendarEvent[]; total: number }>(
     '/api/staff/calendar',
@@ -233,15 +242,15 @@ export default function CalendarPage() {
       className="-mx-4 -my-4 md:-mx-8 md:-my-8"
       style={{ backgroundColor: CREAM, minHeight: 'calc(100vh - 64px)' }}
     >
-      <div className="px-6 pt-4 pb-24 sm:px-10 lg:px-16">
+      <div className="px-4 pt-4 pb-24 sm:px-10 lg:px-16">
         {/* ═══════════════ COMPACT MASTHEAD — single row ═══════════════ */}
         <header
-          className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b pb-4"
+          className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b pb-4"
           style={{ borderColor: INK }}
         >
-          <div className="flex items-end gap-4">
+          <div className="flex min-w-0 items-end gap-3 sm:gap-4">
             <p
-              className="pb-1 text-[10px] uppercase tracking-[0.26em]"
+              className="pb-1 hidden sm:block text-[10px] uppercase tracking-[0.26em]"
               style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
             >
               № 02 · Takvim
@@ -250,7 +259,7 @@ export default function CalendarPage() {
               className="leading-none tracking-[-0.02em]"
               style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(1.75rem, 2.6vw, 2.25rem)',
+                fontSize: 'clamp(1.5rem, 2.6vw, 2.25rem)',
                 color: INK,
                 fontWeight: 800,
               }}
@@ -266,9 +275,9 @@ export default function CalendarPage() {
             </h1>
           </div>
 
-          {/* Inline nav + stats + today button */}
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-4 text-[11px] tracking-[0.18em]" style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}>
+          {/* Inline nav + stats + today button — wrap-safe on mobile */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-6">
+            <div className="flex items-center gap-3 sm:gap-4 text-[11px] tracking-[0.18em]" style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}>
               <span>
                 <span style={{ color: INK, fontWeight: 700 }}>{monthStats.total.toString().padStart(2, '0')}</span> TOPLAM
               </span>
@@ -306,84 +315,172 @@ export default function CalendarPage() {
           </div>
         </header>
 
-        {/* ═══════════════ MAIN GRID: CALENDAR + SIDEBAR ═══════════════ */}
+        {/* ═══════════════ VIEW SWITCHER — Ay / Hafta / Ajanda ═══════════════ */}
+        <ViewSwitcher value={viewMode} onChange={handleViewChange} />
+
+        {/* ═══════════════ MAIN GRID: VIEW + SIDEBAR ═══════════════ */}
         <div className="mt-5 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_340px]">
-          {/* Calendar */}
-          <div>
-            {/* Day headers */}
-            <div
-              className="grid grid-cols-7 border-b pb-3"
-              style={{ borderColor: INK }}
-            >
-              {DAYS_TR.map(d => (
-                <div
-                  key={d}
-                  className="text-center text-[10px] tracking-[0.22em]"
-                  style={{ color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
-                >
-                  {d}
-                </div>
-              ))}
-            </div>
-
-            {/* Calendar cells */}
-            <div className="grid grid-cols-7" style={{ borderTop: 'none' }}>
-              {calendarDays.map((cell, i) => {
-                const isToday = cell.isCurrentMonth && isSameDay(cell.date, today);
-                const isSelected = cell.isCurrentMonth && cell.day === selectedDay;
-                const dayEvents = eventsByDate.get(cell.date.toDateString()) ?? [];
-                const hasDeadline = dayEvents.some(e =>
-                  isSameDay(new Date(e.end), cell.date)
-                  && (e.status === 'assigned' || e.status === 'in_progress'),
-                );
-                const isPast = cell.date < today && !isToday;
-                const weekIndex = Math.floor(i / 7);
-                const colIndex = i % 7;
-
-                return (
-                  <CalendarCell
-                    key={i}
-                    cell={cell}
-                    isToday={isToday}
-                    isSelected={isSelected}
-                    isPast={isPast}
-                    hasDeadline={hasDeadline}
-                    dayEvents={dayEvents}
-                    weekIndex={weekIndex}
-                    colIndex={colIndex}
-                    onClick={() => cell.isCurrentMonth && setSelectedDay(cell.day === selectedDay ? null : cell.day)}
-                  />
-                );
-              })}
-            </div>
-
-            {/* Legend */}
-            <div
-              className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-2 text-[10px] tracking-[0.18em]"
-              style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
-            >
-              <LegendItem color="#2c55b8" label="EĞİTİM" />
-              <LegendItem color="#1a3a28" label="SINAV" />
-              <LegendItem color="#b3261e" label="SON TARİH" isDot />
-              <LegendItem color={GOLD} label="BUGÜN" isRing />
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <aside className="space-y-8">
-            {selectedDay !== null && (
-              <SelectedDayPanel
-                day={selectedDay}
-                month={month}
-                year={year}
-                events={selectedDayEvents}
-                onClose={() => setSelectedDay(null)}
+          <div className="min-w-0">
+            {viewMode === 'month' && (
+              <MonthView
+                calendarDays={calendarDays}
+                today={today}
+                selectedDay={selectedDay}
+                eventsByDate={eventsByDate}
+                onSelectDay={day => setSelectedDay(day === selectedDay ? null : day)}
               />
             )}
+            {viewMode === 'week' && (
+              <WeekView
+                today={today}
+                year={year}
+                month={month}
+                selectedDay={selectedDay}
+                eventsByDate={eventsByDate}
+                onSelectDay={day => setSelectedDay(day === selectedDay ? null : day)}
+              />
+            )}
+            {viewMode === 'agenda' && (
+              <AgendaView
+                events={events ?? []}
+                today={today}
+                year={year}
+                month={month}
+              />
+            )}
+          </div>
 
-            <DeadlinesPanel events={upcomingDeadlines} />
-          </aside>
+          {/* Sidebar — only for month/week views; agenda already is a list */}
+          {viewMode !== 'agenda' && (
+            <aside className="space-y-8">
+              {selectedDay !== null && (
+                <SelectedDayPanel
+                  day={selectedDay}
+                  month={month}
+                  year={year}
+                  events={selectedDayEvents}
+                  onClose={() => setSelectedDay(null)}
+                />
+              )}
+
+              <DeadlinesPanel events={upcomingDeadlines} />
+            </aside>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   View Switcher — segmented control in the editorial dialect
+   ───────────────────────────────────────────────────── */
+
+function ViewSwitcher({ value, onChange }: { value: ViewMode; onChange: (v: ViewMode) => void }) {
+  const options: { id: ViewMode; label: string }[] = [
+    { id: 'month',  label: 'AY' },
+    { id: 'week',   label: 'HAFTA' },
+    { id: 'agenda', label: 'AJANDA' },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label="Takvim görünümü"
+      className="mt-4 inline-flex items-stretch"
+      style={{ border: `1px solid ${INK}` }}
+    >
+      {options.map((opt, i) => {
+        const active = value === opt.id;
+        return (
+          <button
+            key={opt.id}
+            role="tab"
+            type="button"
+            aria-selected={active}
+            onClick={() => onChange(opt.id)}
+            className="px-4 py-2 text-[11px] tracking-[0.22em] transition-colors duration-150"
+            style={{
+              backgroundColor: active ? INK : 'transparent',
+              color: active ? CREAM : INK,
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 700,
+              borderLeft: i === 0 ? 'none' : `1px solid ${INK}`,
+              minHeight: 40, // touch-friendly
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   Month View — the original 6×7 grid extracted
+   ───────────────────────────────────────────────────── */
+
+function MonthView({
+  calendarDays, today, selectedDay, eventsByDate, onSelectDay,
+}: {
+  calendarDays: { day: number; isCurrentMonth: boolean; date: Date }[];
+  today: Date;
+  selectedDay: number | null;
+  eventsByDate: Map<string, CalendarEvent[]>;
+  onSelectDay: (day: number) => void;
+}) {
+  return (
+    <div>
+      <div className="grid grid-cols-7 border-b pb-3" style={{ borderColor: INK }}>
+        {DAYS_TR.map(d => (
+          <div
+            key={d}
+            className="text-center text-[10px] tracking-[0.22em]"
+            style={{ color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7" style={{ borderTop: 'none' }}>
+        {calendarDays.map((cell, i) => {
+          const isToday = cell.isCurrentMonth && isSameDay(cell.date, today);
+          const isSelected = cell.isCurrentMonth && cell.day === selectedDay;
+          const dayEvents = eventsByDate.get(cell.date.toDateString()) ?? [];
+          const hasDeadline = dayEvents.some(e =>
+            isSameDay(new Date(e.end), cell.date)
+            && (e.status === 'assigned' || e.status === 'in_progress'),
+          );
+          const isPast = cell.date < today && !isToday;
+          const weekIndex = Math.floor(i / 7);
+          const colIndex = i % 7;
+
+          return (
+            <CalendarCell
+              key={i}
+              cell={cell}
+              isToday={isToday}
+              isSelected={isSelected}
+              isPast={isPast}
+              hasDeadline={hasDeadline}
+              dayEvents={dayEvents}
+              weekIndex={weekIndex}
+              colIndex={colIndex}
+              onClick={() => cell.isCurrentMonth && onSelectDay(cell.day)}
+            />
+          );
+        })}
+      </div>
+
+      <div
+        className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-2 text-[10px] tracking-[0.18em]"
+        style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+      >
+        <LegendItem color="#2c55b8" label="EĞİTİM" />
+        <LegendItem color="#1a3a28" label="SINAV" />
+        <LegendItem color="#b3261e" label="SON TARİH" isDot />
+        <LegendItem color={GOLD} label="BUGÜN" isRing />
       </div>
     </div>
   );
@@ -555,6 +652,334 @@ function CalendarCell({
         </div>
       )}
     </button>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   Week View — 7 day rows with inline events. Mobile-first:
+   vertical stack, horizontal on tablet+.
+   ───────────────────────────────────────────────────── */
+
+function getWeekStart(d: Date): Date {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day; // Monday-based week
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
+function WeekView({
+  today, year, month, selectedDay, eventsByDate, onSelectDay,
+}: {
+  today: Date;
+  year: number;
+  month: number;
+  selectedDay: number | null;
+  eventsByDate: Map<string, CalendarEvent[]>;
+  onSelectDay: (day: number) => void;
+}) {
+  // Anchor the week to: (a) selected day if in view month, otherwise (b) today if in view month, (c) first day of view month.
+  const anchor = useMemo(() => {
+    if (selectedDay !== null) return new Date(year, month, selectedDay);
+    if (today.getFullYear() === year && today.getMonth() === month) return today;
+    return new Date(year, month, 1);
+  }, [selectedDay, year, month, today]);
+
+  const weekDays = useMemo(() => {
+    const start = getWeekStart(anchor);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      return d;
+    });
+  }, [anchor]);
+
+  return (
+    <div className="space-y-3">
+      <p
+        className="text-[10px] tracking-[0.22em]"
+        style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+      >
+        {weekDays[0].getDate().toString().padStart(2, '0')}
+        {' – '}
+        {weekDays[6].getDate().toString().padStart(2, '0')}
+        {' '}
+        {MONTHS_TR[weekDays[6].getMonth()]}
+      </p>
+
+      <ol className="list-none space-y-2 p-0">
+        {weekDays.map(d => {
+          const evts = eventsByDate.get(d.toDateString()) ?? [];
+          const isToday = isSameDay(d, today);
+          const isInMonth = d.getMonth() === month && d.getFullYear() === year;
+          const daySelectable = isInMonth;
+          const isSelectedHere = daySelectable && selectedDay === d.getDate();
+
+          return (
+            <li
+              key={d.toISOString()}
+              className="border bg-white"
+              style={{
+                borderColor: isSelectedHere ? INK : RULE,
+                borderLeftWidth: '3px',
+                borderLeftColor: isToday ? GOLD : isSelectedHere ? INK : RULE,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => daySelectable && onSelectDay(d.getDate())}
+                disabled={!daySelectable}
+                className="flex w-full items-start gap-3 p-3 text-left"
+                style={{ minHeight: 56, cursor: daySelectable ? 'pointer' : 'default' }}
+              >
+                <div className="w-14 shrink-0">
+                  <div
+                    className="text-[10px] tracking-[0.2em]"
+                    style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                  >
+                    {DAYS_TR[(d.getDay() + 6) % 7]}
+                  </div>
+                  <div
+                    className="tabular-nums leading-none"
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '1.5rem',
+                      fontWeight: 800,
+                      color: isInMonth ? INK : INK_SOFT,
+                      opacity: isInMonth ? 1 : 0.4,
+                    }}
+                  >
+                    {d.getDate().toString().padStart(2, '0')}
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  {evts.length === 0 ? (
+                    <p
+                      className="text-[11px] tracking-[0.18em]"
+                      style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                    >
+                      —
+                    </p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {evts.slice(0, 3).map(e => (
+                        <li key={e.id} className="flex items-center gap-2">
+                          <span
+                            className="h-1.5 w-1.5 shrink-0"
+                            style={{ backgroundColor: e.eventType === 'exam' ? OLIVE : '#2c55b8' }}
+                          />
+                          <span
+                            className="truncate text-[13px] leading-snug"
+                            style={{ color: INK, fontFamily: 'var(--font-display)', fontWeight: 600 }}
+                          >
+                            {e.title}
+                          </span>
+                        </li>
+                      ))}
+                      {evts.length > 3 && (
+                        <li
+                          className="text-[10px] tracking-[0.18em]"
+                          style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+                        >
+                          +{evts.length - 3} DAHA
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   Agenda View — chronological bucketed list.
+   Mobile default; shows only actionable (future) events by default.
+   ───────────────────────────────────────────────────── */
+
+type AgendaBucket = { key: string; label: string; events: CalendarEvent[] };
+
+/**
+ * Group events into human-friendly time buckets for agenda view.
+ * Buckets: Bugün / Yarın / Bu Hafta / Sonraki Hafta / Daha Sonra.
+ * Shows only events starting or ending in the next 90 days.
+ */
+function groupAgendaEvents(events: CalendarEvent[], today: Date): AgendaBucket[] {
+  const start = new Date(today);
+  start.setHours(0, 0, 0, 0);
+  const todayKey = start.toDateString();
+
+  const tomorrow = new Date(start);
+  tomorrow.setDate(start.getDate() + 1);
+  const tomorrowKey = tomorrow.toDateString();
+
+  const endOfWeek = new Date(start);
+  const daysUntilSunday = (7 - start.getDay()) % 7 || 7;
+  endOfWeek.setDate(start.getDate() + daysUntilSunday);
+
+  const endOfNextWeek = new Date(endOfWeek);
+  endOfNextWeek.setDate(endOfWeek.getDate() + 7);
+
+  const cutoff = new Date(start);
+  cutoff.setDate(start.getDate() + 90);
+
+  const buckets: Record<string, AgendaBucket> = {
+    today:    { key: 'today',    label: 'BUGÜN',         events: [] },
+    tomorrow: { key: 'tomorrow', label: 'YARIN',         events: [] },
+    thisWeek: { key: 'thisWeek', label: 'BU HAFTA',      events: [] },
+    nextWeek: { key: 'nextWeek', label: 'SONRAKİ HAFTA', events: [] },
+    later:    { key: 'later',    label: 'DAHA SONRA',    events: [] },
+  };
+
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+  );
+
+  for (const evt of sorted) {
+    const evtStart = new Date(evt.start);
+    const evtEnd = new Date(evt.end);
+    // Use end for past-filtering (show until the deadline passes).
+    if (evtEnd < start) continue;
+    if (evtStart > cutoff) continue;
+
+    const refDate = evtStart < start ? start : evtStart;
+    const refKey = refDate.toDateString();
+
+    if (refKey === todayKey) buckets.today.events.push(evt);
+    else if (refKey === tomorrowKey) buckets.tomorrow.events.push(evt);
+    else if (refDate <= endOfWeek) buckets.thisWeek.events.push(evt);
+    else if (refDate <= endOfNextWeek) buckets.nextWeek.events.push(evt);
+    else buckets.later.events.push(evt);
+  }
+
+  return Object.values(buckets).filter(b => b.events.length > 0);
+}
+
+function AgendaView({
+  events, today,
+}: {
+  events: CalendarEvent[];
+  today: Date;
+  year: number;
+  month: number;
+}) {
+  const buckets = useMemo(() => groupAgendaEvents(events, today), [events, today]);
+
+  if (buckets.length === 0) {
+    return (
+      <div
+        className="flex flex-col items-center py-16 text-center"
+        style={{ border: `1.5px dashed ${RULE}` }}
+      >
+        <CalendarIcon className="h-8 w-8" style={{ color: INK_SOFT }} strokeWidth={1.25} />
+        <p
+          className="mt-4 text-[11px] tracking-[0.22em]"
+          style={{ color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+        >
+          YAKLAŞAN KAYIT YOK
+        </p>
+        <p
+          className="mt-2 text-[13px]"
+          style={{ color: INK_SOFT }}
+        >
+          Önümüzdeki 90 gün için planlı eğitim ya da sınav görünmüyor.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {buckets.map(bucket => (
+        <section key={bucket.key}>
+          <header
+            className="flex items-center gap-3 border-y py-2 text-[10px] tracking-[0.22em]"
+            style={{ borderColor: INK, color: INK, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+          >
+            <span>{bucket.label}</span>
+            <span className="h-px flex-1" style={{ backgroundColor: RULE }} />
+            <span style={{ color: INK_SOFT }}>
+              {bucket.events.length.toString().padStart(2, '0')}
+            </span>
+          </header>
+
+          <ul className="mt-3 list-none space-y-2 p-0">
+            {bucket.events.map(evt => (
+              <li key={evt.id}>
+                <AgendaEventCard evt={evt} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function AgendaEventCard({ evt }: { evt: CalendarEvent }) {
+  const cfg = STATUS[evt.status];
+  const Icon = evt.eventType === 'exam' ? ClipboardList : cfg.icon;
+  const days = daysUntil(evt.end);
+  const urgent = days >= 0 && days <= 3 && (evt.status === 'assigned' || evt.status === 'in_progress');
+  return (
+    <Link
+      href={`/staff/my-trainings/${evt.trainingId}`}
+      className="group flex items-start gap-3 border bg-white p-3 transition-[border-color] duration-150 hover:border-[var(--ink)]"
+      style={{
+        ['--ink' as string]: INK,
+        borderColor: RULE,
+        borderLeftWidth: '3px',
+        borderLeftColor: cfg.ink,
+        minHeight: 56,
+      }}
+    >
+      <Icon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: cfg.ink }} strokeWidth={2} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] tracking-[0.22em]"
+            style={{ color: cfg.ink, fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+          >
+            {evt.eventType === 'exam' ? 'SINAV' : 'EĞİTİM'} · {cfg.label}
+          </span>
+          {urgent && (
+            <span
+              className="text-[10px] tracking-[0.14em]"
+              style={{ color: '#b3261e', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+            >
+              · {days} GÜN
+            </span>
+          )}
+        </div>
+        <h4
+          className="mt-1 leading-snug tracking-tight"
+          style={{
+            fontFamily: 'var(--font-display)',
+            color: INK,
+            fontWeight: 700,
+            fontSize: '0.9375rem',
+          }}
+        >
+          {evt.title}
+        </h4>
+        <p
+          className="mt-1 text-[11px] tabular-nums"
+          style={{ color: INK_SOFT, fontFamily: 'var(--font-mono)' }}
+        >
+          {formatDateRange(evt.start, evt.end)}
+        </p>
+      </div>
+      <ArrowRight
+        className="mt-1 h-3 w-3 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5"
+        style={{ color: INK_SOFT }}
+      />
+    </Link>
   );
 }
 

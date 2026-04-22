@@ -244,7 +244,7 @@ export default function ProfilePage() {
         backgroundSize: '24px 24px',
       }}
     >
-      <div className="relative px-6 sm:px-10 lg:px-16 pt-8 pb-16 max-w-6xl">
+      <div className="relative px-4 sm:px-10 lg:px-16 pt-8 pb-16 max-w-6xl">
         {/* ───── Masthead ───── */}
         <header
           className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b pb-5"
@@ -258,7 +258,7 @@ export default function ProfilePage() {
               № 04 · Profil
             </p>
             <h1
-              className="text-[36px] sm:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
+              className="text-[28px] sm:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
               style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
             >
               hesap bilgileri<span style={{ color: GOLD }}>.</span>
@@ -291,7 +291,7 @@ export default function ProfilePage() {
             {/* ───── HERO: Identity ───── */}
             <section className="mt-10">
               <div
-                className="grid gap-6 md:gap-8 md:items-center"
+                className="flex flex-col gap-6 md:grid md:gap-8 md:items-center"
                 style={{ gridTemplateColumns: 'max-content minmax(0, 1fr)' }}
               >
                 {/* Avatar */}
@@ -369,7 +369,7 @@ export default function ProfilePage() {
                     Kayıtlı personel
                   </p>
                   <h2
-                    className="mt-1 text-[34px] sm:text-[40px] leading-[0.95] font-semibold tracking-[-0.025em]"
+                    className="mt-1 text-[26px] sm:text-[40px] leading-[0.95] font-semibold tracking-[-0.025em]"
                     style={{
                       color: INK,
                       fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',

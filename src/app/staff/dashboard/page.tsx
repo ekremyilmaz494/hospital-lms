@@ -147,7 +147,7 @@ export default function StaffDashboard() {
         backgroundSize: '24px 24px',
       }}
     >
-      <div className="relative px-6 sm:px-10 lg:px-16 pt-5 pb-16">
+      <div className="relative px-4 sm:px-10 lg:px-16 pt-5 pb-16">
         <MandatoryFeedbackBanner />
 
         {/* ───── Masthead ───── */}
@@ -348,7 +348,7 @@ export default function StaffDashboard() {
                   </span>
                   <div>
                     <h2
-                      className="text-[22px] leading-tight font-semibold tracking-[-0.02em]"
+                      className="text-[18px] sm:text-[22px] leading-tight font-semibold tracking-[-0.02em]"
                       style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
                     >
                       Yaklaşan eğitimlerim
