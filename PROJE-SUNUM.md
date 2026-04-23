@@ -135,8 +135,6 @@ Eğitim listesinde filtreleme (duruma göre, kategoriye göre), arama ve sayfala
 
 **İçerik Kütüphanesi** (`/admin/content-library`) — Platform genelinde paylaşılan eğitim şablonları. Super admin'in yayınladığı hazır eğitimleri tek tıkla kendi hastanesine kurabilir. Bu sayede her hastane sıfırdan eğitim oluşturmak zorunda kalmıyor.
 
-**AI İçerik Stüdyosu** (`/admin/ai-content-studio`) — Yapay zeka ile eğitim içeriği üretme. Bir belge (PDF, doküman) yükleyip "bunu eğitime çevir" diyebilirsin. AI otomatik olarak eğitim başlığı, açıklaması ve sınav soruları oluşturuyor. Yönetici inceleyip onaylıyor veya düzenliyor. (Beta aşamasında)
-
 **SMG Takibi** (`/admin/smg`) — Sağlık Bakanlığı'nın zorunlu kıldığı Sürekli Mesleki Gelişim (SMG) puanlarının takibi. Her eğitim belirli SMG puanı kazandırıyor. Personelin yıllık SMG puan durumu takip ediliyor.
 
 **Raporlar** (`/admin/reports`) — Detaylı analitik raporlar. Eğitim bazında, personel bazında, departman bazında filtrelenebilir. Excel ve PDF formatında export edilebilir. Bakanlık raporlama formatında da çıktı alınabiliyor.

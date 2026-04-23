@@ -42,7 +42,6 @@ const { __clearMemCache } = await import('@/lib/redis') as any
 const ORG_ID = 'org-feature-test'
 
 const FULL_PLAN = {
-  hasAiContentStudio: true,
   hasScormSupport: true,
   hasHisIntegration: true,
   hasAdvancedReports: true,
@@ -57,7 +56,6 @@ const FULL_PLAN = {
 }
 
 const BASIC_PLAN = {
-  hasAiContentStudio: false,
   hasScormSupport: false,
   hasHisIntegration: false,
   hasAdvancedReports: false,
@@ -83,7 +81,7 @@ describe('checkFeature — Ozellik kontrolu', () => {
     mockSubFindUnique.mockResolvedValue({ plan: FULL_PLAN })
 
     const { checkFeature } = await import('../feature-gate')
-    const result = await checkFeature(ORG_ID, 'aiContentStudio')
+    const result = await checkFeature(ORG_ID, 'scormSupport')
     expect(result).toBe(true)
   })
 
@@ -91,7 +89,7 @@ describe('checkFeature — Ozellik kontrolu', () => {
     mockSubFindUnique.mockResolvedValue({ plan: BASIC_PLAN })
 
     const { checkFeature } = await import('../feature-gate')
-    const result = await checkFeature(ORG_ID, 'aiContentStudio')
+    const result = await checkFeature(ORG_ID, 'scormSupport')
     expect(result).toBe(false)
   })
 
@@ -116,7 +114,7 @@ describe('checkFeature — Ozellik kontrolu', () => {
 
     const { checkFeature } = await import('../feature-gate')
     const features = [
-      'aiContentStudio', 'scormSupport', 'hisIntegration',
+      'scormSupport', 'hisIntegration',
       'advancedReports', 'ssoSupport', 'competencyModule',
       'accreditationModule', 'bulkImport', 'customCertificates',
     ] as const
@@ -199,7 +197,7 @@ describe('Cache davranisi', () => {
     const { checkFeature } = await import('../feature-gate')
 
     // Ilk cagri — DB sorgusu yapilmali
-    await checkFeature(ORG_ID, 'aiContentStudio')
+    await checkFeature(ORG_ID, 'scormSupport')
     expect(mockSubFindUnique).toHaveBeenCalledTimes(1)
 
     // Cache verisi Redis mock'a yazilmis olmali
@@ -211,7 +209,7 @@ describe('Cache davranisi', () => {
     await setCached(`feature-gate:plan:${ORG_ID}`, FULL_PLAN, 300)
 
     const { checkFeature } = await import('../feature-gate')
-    const result = await checkFeature(ORG_ID, 'aiContentStudio')
+    const result = await checkFeature(ORG_ID, 'scormSupport')
 
     expect(result).toBe(true)
     // DB sorgusu YAPILMAMALI (cache hit)

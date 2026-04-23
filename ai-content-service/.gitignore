@@ -1,6 +1,0 @@
-__pycache__/
-*.pyc
-venv/
-.env
-temp/
-auth_store/*.enc

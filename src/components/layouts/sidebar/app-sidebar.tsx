@@ -15,7 +15,6 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useAiGenerationStore, selectUnviewedCount, selectActiveCount } from '@/store/ai-generation-store';
 import type { NavGroup } from './sidebar-config';
 
 /* ─── Editorial palette ───
@@ -31,31 +30,6 @@ const TEXT_DIM = 'rgba(250, 247, 242, 0.58)';
 const TEXT_BASE = 'rgba(250, 247, 242, 0.82)';
 const HOVER_BG = 'rgba(250, 247, 242, 0.04)';
 const ACTIVE_BG = 'rgba(201, 169, 97, 0.08)';
-
-/** AI badge — kendi store subscription'ı ile izole */
-function AiBadgeCount() {
-  const aiActiveCount = useAiGenerationStore(selectActiveCount);
-  const aiUnviewedCount = useAiGenerationStore(selectUnviewedCount);
-  const count = aiActiveCount + aiUnviewedCount;
-  if (count === 0) return null;
-  return (
-    <span
-      className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
-      style={{
-        color: aiActiveCount > 0 ? CREAM : INK,
-        backgroundColor: aiActiveCount > 0 ? '#b4820b' : GOLD,
-        borderRadius: '2px',
-        fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
-        letterSpacing: '0.05em',
-      }}
-    >
-      {aiActiveCount > 0 && (
-        <span className="h-1 w-1 rounded-full" style={{ backgroundColor: INK, animation: 'pulse 2s infinite' }} />
-      )}
-      {count}
-    </span>
-  );
-}
 
 /** pathname izolasyonu — sadece bu wrapper re-render olur */
 function NavItemActive({ href, childHrefs, render }: {
@@ -463,9 +437,7 @@ export const AppSidebar = memo(function AppSidebar({
                               )}
                               <Icon className="h-[18px] w-[18px] shrink-0" style={{ color: active ? GOLD : 'inherit' }} />
                               <span className="flex-1 truncate">{item.title}</span>
-                              {item.href === '/admin/ai-content-studio' ? (
-                                <AiBadgeCount />
-                              ) : item.badge ? (
+                              {item.badge ? (
                                 <span
                                   className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
                                   style={{
