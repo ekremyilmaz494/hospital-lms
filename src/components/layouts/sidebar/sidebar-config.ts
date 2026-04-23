@@ -20,7 +20,6 @@ import {
   Star,
   ClipboardCheck,
   ClipboardList,
-  Sparkles,
   Activity,
   MessageSquare,
   type LucideIcon,
@@ -117,9 +116,6 @@ export const adminNav: NavGroup[] = [
         ],
       },
       { title: 'İçerik Kütüphanesi', href: '/admin/content-library', icon: Library },
-      ...(BETA_MODULES_ENABLED
-        ? [{ title: 'AI İçerik Stüdyosu', href: '/admin/ai-content-studio', icon: Sparkles, badge: 'Beta' } satisfies NavItem]
-        : []),
     ],
   },
   {

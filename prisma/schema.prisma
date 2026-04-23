@@ -21,7 +21,6 @@ model SubscriptionPlan {
   features               Json     @default("[]")
   isActive               Boolean  @default(true) @map("is_active")
   // Feature gates
-  hasAiContentStudio     Boolean  @default(false) @map("has_ai_content_studio")
   hasScormSupport        Boolean  @default(false) @map("has_scorm_support")
   hasHisIntegration      Boolean  @default(false) @map("has_his_integration")
   hasAdvancedReports     Boolean  @default(false) @map("has_advanced_reports")
@@ -112,10 +111,6 @@ model Organization {
   accreditationStandards AccreditationStandard[]     @relation("OrgAccreditationStandards")
   trainingCategories     TrainingCategory[]
   questionBank           QuestionBank[]
-  // AI İçerik Stüdyosu
-  aiNotebooks            AiNotebook[]
-  aiGenerations          AiGeneration[]
-  aiGoogleConnection     AiGoogleConnection?
   orgContentLibrary      ContentLibrary[]      @relation("OrgContentLibrary")
   examAttempts           ExamAttempt[]
   certificates           Certificate[]
@@ -274,10 +269,6 @@ model User {
   pushSubscriptions       PushSubscription[]
   accreditationReports    AccreditationReport[]
   createdAccreditationStandards AccreditationStandard[] @relation("AccreditationStandardCreator")
-  // AI İçerik Stüdyosu
-  aiGenerations           AiGeneration[]               @relation("UserAiGenerations")
-  aiEvaluations           AiGeneration[]               @relation("AiEvaluator")
-  aiGoogleConnections     AiGoogleConnection[]
   // EY.FR.40 Eğitim Geri Bildirim
   feedbackResponses       TrainingFeedbackResponse[]
   // SMS MFA — güvenilir cihazlar
@@ -810,8 +801,6 @@ model ContentLibrary {
   organization  Organization?                @relation("OrgContentLibrary", fields: [organizationId], references: [id], onDelete: SetNull)
   installs      OrganizationContentLibrary[]
   trainings     Training[]                   @relation("TrainingFromLibrary")
-  // AI İçerik Stüdyosu
-  aiGenerations AiGeneration[]               @relation("AiToLibrary")
 
   @@index([category], map: "idx_content_library_category")
   @@index([contentType], map: "idx_content_library_content_type")
@@ -1090,110 +1079,6 @@ model QuestionBankOption {
   question QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
 
   @@map("question_bank_options")
-}
-
-// ── AI İÇERİK STÜDYOSU v2 ──
-
-model AiNotebook {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  notebookLmId   String   @map("notebooklm_id") @db.VarChar(100)
-  title          String   @db.VarChar(500)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
-
-  organization Organization       @relation(fields: [organizationId], references: [id])
-  sources      AiNotebookSource[]
-  generations  AiGeneration[]
-
-  @@index([organizationId])
-  @@map("ai_notebooks")
-}
-
-model AiNotebookSource {
-  id         String   @id @default(uuid()) @db.Uuid
-  notebookId String   @map("notebook_id") @db.Uuid
-  sourceLmId String?  @map("source_lm_id") @db.VarChar(100)
-  fileName   String   @map("file_name") @db.VarChar(500)
-  fileType   String   @map("file_type") @db.VarChar(50)
-  fileSize   Int      @map("file_size")
-  s3Key      String?  @map("s3_key") @db.Text
-  sourceType String   @map("source_type") @db.VarChar(30)
-  sourceUrl  String?  @map("source_url") @db.Text
-  status     String   @default("uploading") @db.VarChar(30)
-  summary    String?  @db.Text
-  keyTopics  Json?    @map("key_topics")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
-
-  notebook AiNotebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
-
-  @@index([notebookId])
-  @@map("ai_notebook_sources")
-}
-
-model AiGeneration {
-  id               String    @id @default(uuid()) @db.Uuid
-  organizationId   String    @map("organization_id") @db.Uuid
-  userId           String    @map("user_id") @db.Uuid
-  notebookId       String    @map("notebook_id") @db.Uuid
-  title            String    @db.VarChar(500)
-  artifactType     String    @map("artifact_type") @db.VarChar(30)
-  artifactLmId     String?   @map("artifact_lm_id") @db.VarChar(100)
-  taskLmId         String?   @map("task_lm_id") @db.VarChar(100)
-  instructions     String?   @db.Text
-  settings         Json      @default("{}")
-  status           String    @default("pending") @db.VarChar(30)
-  progress         Int       @default(0)
-  outputS3Key      String?   @map("output_s3_key") @db.Text
-  outputFileType   String?   @map("output_file_type") @db.VarChar(20)
-  outputSize       Int?      @map("output_size")
-  transcript       String?   @db.Text
-  contentData      Json?     @map("content_data")
-  metadata         Json      @default("{}")
-  errorMessage     String?   @map("error_message") @db.Text
-  evaluation       String?   @db.VarChar(20)
-  evaluationNote   String?   @map("evaluation_note") @db.Text
-  evaluatedAt      DateTime? @map("evaluated_at") @db.Timestamptz
-  evaluatedById    String?   @map("evaluated_by_id") @db.Uuid
-  savedToLibrary   Boolean   @default(false) @map("saved_to_library")
-  contentLibraryId String?   @map("content_library_id") @db.Uuid
-  savedAt          DateTime? @map("saved_at") @db.Timestamptz
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-
-  organization   Organization    @relation(fields: [organizationId], references: [id])
-  user           User            @relation("UserAiGenerations", fields: [userId], references: [id])
-  notebook       AiNotebook      @relation(fields: [notebookId], references: [id])
-  evaluatedBy    User?           @relation("AiEvaluator", fields: [evaluatedById], references: [id])
-  contentLibrary ContentLibrary? @relation("AiToLibrary", fields: [contentLibraryId], references: [id])
-
-  @@index([organizationId])
-  @@index([userId])
-  @@index([status])
-  @@index([artifactType])
-  @@index([evaluation])
-  @@map("ai_generations")
-}
-
-model AiGoogleConnection {
-  id              String    @id @default(uuid()) @db.Uuid
-  organizationId  String    @unique @map("organization_id") @db.Uuid
-  userId          String    @map("user_id") @db.Uuid
-  email           String
-  status          String    @default("pending")
-  encryptedCookie String?   @map("encrypted_cookie") @db.Text
-  lastVerifiedAt  DateTime? @map("last_verified_at") @db.Timestamptz
-  lastUsedAt      DateTime? @map("last_used_at") @db.Timestamptz
-  expiresAt       DateTime? @map("expires_at") @db.Timestamptz
-  errorMessage    String?   @map("error_message")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-
-  organization Organization @relation(fields: [organizationId], references: [id])
-  user         User         @relation(fields: [userId], references: [id])
-
-  @@index([status])
-  @@map("ai_google_connections")
 }
 
 // ──────────────────────────────────────────────────────────────

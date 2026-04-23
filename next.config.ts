@@ -132,14 +132,6 @@ const nextConfig: NextConfig = {
       ],
     },
     {
-      // AI Content Studio result endpoint — iframe ile PDF/medya önizleme için
-      source: '/api/admin/ai-content-studio/result/:path*',
-      headers: [
-        { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-        { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
-      ],
-    },
-    {
       source: '/_next/static/(.*)',
       headers: [
         { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },

@@ -185,10 +185,6 @@ SENTRY_ORG=
 SENTRY_PROJECT=
 SENTRY_AUTH_TOKEN=
 NEXT_PUBLIC_SENTRY_DSN=
-
-# --- AI Content Studio (opsiyonel) ---
-AI_CONTENT_SERVICE_URL=http://localhost:8100
-AI_CONTENT_INTERNAL_KEY=min-32-karakter-rastgele-string
 ```
 
 ### Prisma Client Olusturma ve Veritabani Senkronizasyonu

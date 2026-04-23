@@ -13,7 +13,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useLayoutBranding } from '@/hooks/use-layout-branding';
 import { useMobile } from '@/hooks/use-mobile';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
-import { AiGenerationPoller } from '@/components/providers/ai-generation-poller';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
@@ -149,7 +148,6 @@ export default function AdminLayout({
           style={{ marginLeft: isMobile ? 0 : 72 }}
         >
           <ImpersonationBanner />
-          <AiGenerationPoller />
           <AppTopbar
             title=""
             orgName={branding?.orgName}
