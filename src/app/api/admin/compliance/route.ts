@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import type { UserRole } from '@/types/database'
 
 /**
  * GET /api/admin/compliance
@@ -54,7 +55,7 @@ export async function GET() {
     // Hiç zorunlu eğitim tanımlı değilse erken dön
     if (trainingIds.length === 0) {
       const allStaffCount = await prisma.user.count({
-        where: { organizationId: orgId, role: 'staff', isActive: true },
+        where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
       })
       return jsonResponse({
         summary: {
@@ -76,7 +77,7 @@ export async function GET() {
     // 2) Paralel: staff listesi (dept ile), status sayımı, non-compliant detayı
     const [staffList, statusAgg, nonCompliantRaw] = await Promise.all([
       prisma.user.findMany({
-        where: { organizationId: orgId, role: 'staff', isActive: true },
+        where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
         select: { id: true, departmentRel: { select: { name: true } } },
       }),
       prisma.trainingAssignment.groupBy({

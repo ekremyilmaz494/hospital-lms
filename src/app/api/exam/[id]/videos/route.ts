@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { getAttemptStatus } from '@/lib/exam-helpers'
 import { getStreamUrl } from '@/lib/s3'
+import type { AttemptStatus, AssignmentStatus } from '@/lib/exam-state-machine'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -52,7 +53,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           userId: dbUser!.id,
           trainingId: training.id,
           organizationId: dbUser!.organizationId!,
-          status: 'completed',
+          status: 'completed' satisfies AttemptStatus,
           isPassed: true,
         },
         select: { id: true },
@@ -62,7 +63,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         where: {
           userId: dbUser!.id,
           trainingId: training.id,
-          status: 'passed',
+          status: 'passed' satisfies AssignmentStatus,
         },
         select: { id: true },
       }),
@@ -180,11 +181,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Find attempt — try assignmentId first, then trainingId
   let attempt = await prisma.examAttempt.findFirst({
-    where: { assignmentId: id, userId: dbUser!.id, status: 'watching_videos' },
+    where: { assignmentId: id, userId: dbUser!.id, status: 'watching_videos' satisfies AttemptStatus },
   })
   if (!attempt) {
     attempt = await prisma.examAttempt.findFirst({
-      where: { trainingId: id, userId: dbUser!.id, status: 'watching_videos' },
+      where: { trainingId: id, userId: dbUser!.id, status: 'watching_videos' satisfies AttemptStatus },
     })
   }
   if (!attempt) return errorResponse('Aktif video izleme aşaması bulunamadı', 400)

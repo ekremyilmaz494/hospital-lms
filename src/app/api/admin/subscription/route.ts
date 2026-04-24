@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import type { UserRole } from '@/types/database'
 
 /**
  * GET /api/admin/subscription
@@ -34,7 +35,7 @@ export async function GET() {
       where: { id: orgId },
       select: { name: true },
     }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
+    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole } }),
     prisma.training.count({ where: { organizationId: orgId } }),
   ])
 

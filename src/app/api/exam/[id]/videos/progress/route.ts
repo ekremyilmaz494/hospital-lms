@@ -103,7 +103,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     // Atomic guard: sadece hala watching_videos iken update et (race protection)
     await prisma.examAttempt.updateMany({
-      where: { id: attemptId, status: 'watching_videos' },
+      where: { id: attemptId, status: 'watching_videos' satisfies AttemptStatus },
       data: { videosCompletedAt: new Date(), status: transition.next, postExamStartedAt: new Date() },
     })
   }

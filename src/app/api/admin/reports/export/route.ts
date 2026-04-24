@@ -11,6 +11,7 @@ import {
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
+import type { UserRole } from '@/types/database'
 
 // ── Sabitler ──
 // Vercel serverless RAM guard — 5000 eğitim + 5000 personel güvenli üst sınır.
@@ -357,9 +358,9 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
 
   const [org, staffCount, totalTrainings, totalStaff, trainings, staff, departments, avgScoreResult] = await Promise.all([
     prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
+    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
     prisma.training.count({ where: { organizationId: orgId } }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
+    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole } }),
     prisma.training.findMany({
       where: { organizationId: orgId },
       select: {
@@ -390,7 +391,7 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
       take: REPORT_TRAINING_CAP,
     }),
     prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff' },
+      where: { organizationId: orgId, role: 'staff' satisfies UserRole },
       select: {
         firstName: true,
         lastName: true,
@@ -416,7 +417,7 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
       select: {
         name: true,
         users: {
-          where: { role: 'staff', isActive: true },
+          where: { role: 'staff' satisfies UserRole, isActive: true },
           select: {
             assignments: {
               where: { ...assignmentDateFilter },

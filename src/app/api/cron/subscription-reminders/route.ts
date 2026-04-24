@@ -7,6 +7,7 @@ import {
   sendSubscriptionExpiredEmail,
 } from '@/lib/email'
 import { logger } from '@/lib/logger'
+import type { SubscriptionStatus } from '@/types/database'
 
 const REMINDER_DAYS = [7, 3, 1] as const
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     // Trial abonelikleri
     const trialSubscriptions = await prisma.organizationSubscription.findMany({
       where: {
-        status: 'trial',
+        status: 'trial' satisfies SubscriptionStatus,
         trialEndsAt: { not: null },
       },
       include: {
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
 
     // Aktif abonelikler (paid)
     const activeSubscriptions = await prisma.organizationSubscription.findMany({
-      where: { status: 'active', expiresAt: { not: null } },
+      where: { status: 'active' satisfies SubscriptionStatus, expiresAt: { not: null } },
       include: { organization: { select: { name: true, email: true } } },
     })
 

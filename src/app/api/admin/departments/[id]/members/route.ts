@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
+import type { UserRole } from '@/types/database'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       where: {
         id: { in: body.userIds },
         organizationId: dbUser!.organizationId!,
-        role: 'staff',
+        role: 'staff' satisfies UserRole,
       },
       data: {
         departmentId,

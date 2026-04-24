@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { checkRateLimit, getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import type { UserRole } from '@/types/database'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -57,9 +58,9 @@ export async function GET(request: Request) {
     const STAFF_CAP = 2000
 
     const [staffCount, trainingCount, totalStaffForCap, assignmentStatusGroups, avgScoreResult, trainings, staff, departments, availableDepartments] = await Promise.all([
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true, ...userDeptFilter } }),
+      prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true, ...userDeptFilter } }),
       prisma.training.count({ where: trainingScope }),
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff', ...userDeptFilter } }),
+      prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, ...userDeptFilter } }),
       prisma.trainingAssignment.groupBy({
         by: ['status'],
         where: { training: trainingScope, user: { ...userDeptFilter }, ...assignmentDateFilter },
@@ -93,7 +94,7 @@ export async function GET(request: Request) {
       }),
       // Staff-based report (max 2000 — DoS koruması)
       prisma.user.findMany({
-        where: { organizationId: orgId, role: 'staff', ...userDeptFilter },
+        where: { organizationId: orgId, role: 'staff' satisfies UserRole, ...userDeptFilter },
         select: {
           id: true,
           firstName: true,
@@ -119,7 +120,7 @@ export async function GET(request: Request) {
           name: true,
           color: true,
           users: {
-            where: { role: 'staff', isActive: true },
+            where: { role: 'staff' satisfies UserRole, isActive: true },
             select: {
               assignments: {
                 where: { ...assignmentDateFilter, training: { isActive: true, publishStatus: { not: 'archived' } } },

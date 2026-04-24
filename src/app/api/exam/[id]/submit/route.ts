@@ -188,7 +188,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
     }
     const updated = await prisma.examAttempt.updateMany({
-      where: { id: attempt.id, status: 'pre_exam' },
+      where: { id: attempt.id, status: 'pre_exam' satisfies AttemptStatus },
       data: { preExamScore: score, preExamCompletedAt: new Date(), status: preTransition.next },
     })
     if (updated.count === 0) {
@@ -208,7 +208,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const updated = await prisma.examAttempt.updateMany({
-    where: { id: attempt.id, status: 'post_exam' },
+    where: { id: attempt.id, status: 'post_exam' satisfies AttemptStatus },
     data: { postExamScore: score, postExamCompletedAt: new Date(), isPassed, status: postTransition.next },
   })
   if (updated.count === 0) {

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { resolveRequiredPointsBulk } from '@/lib/smg-helpers'
+import type { UserRole } from '@/types/database'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
   }
 
   if (!period) {
-    const staffCount = await prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } })
+    const staffCount = await prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } })
     return jsonResponse({
       period: null,
       report: [],
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
 
   const [staff, allActivities] = await Promise.all([
     prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff', isActive: true },
+      where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
       select: {
         id: true,
         firstName: true,

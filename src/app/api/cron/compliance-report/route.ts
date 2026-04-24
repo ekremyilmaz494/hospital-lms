@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, complianceReportEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
+import type { UserRole } from '@/types/database'
 
 /** Monthly compliance report cron — runs at 08:00 UTC on the 1st of every month (11:00 Istanbul) */
 export async function GET(request: Request) {
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
 
     if (complianceRate < 80) {
       const admins = await prisma.user.findMany({
-        where: { organizationId: org.id, role: 'admin', isActive: true },
+        where: { organizationId: org.id, role: 'admin' satisfies UserRole, isActive: true },
         select: { email: true },
       })
 
@@ -87,5 +88,5 @@ export async function GET(request: Request) {
     emailsFailed,
     orgResults,
     timestamp: new Date().toISOString(),
-  })
+  }, { headers: { 'Cache-Control': 'no-store' } })
 }

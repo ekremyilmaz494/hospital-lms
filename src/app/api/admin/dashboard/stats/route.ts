@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import type { UserRole } from '@/types/database'
 
 const CACHE_TTL = 120 // 2 dakika
 const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' }
@@ -32,8 +33,8 @@ export async function GET() {
       statusCounts,
       compulsoryTrainings,
     ] = await Promise.all([
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
+      prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole } }),
+      prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
       prisma.training.count({ where: { organizationId: orgId, publishStatus: { not: 'archived' } } }),
       prisma.training.count({ where: trainingScope }),
       prisma.trainingAssignment.groupBy({

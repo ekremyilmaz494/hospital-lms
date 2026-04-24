@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import type { AssignmentStatus } from '@/lib/exam-state-machine'
+import type { UserRole } from '@/types/database'
 
 const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' }
 
@@ -66,8 +68,8 @@ async function fetchStats(orgId: string) {
   const trainingScope = { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } }
 
   const [staffCount, activeStaffCount, publishedTrainingCount, activeTrainingCount, statusCounts, compulsoryTrainings, overdueCount] = await Promise.all([
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
+    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole } }),
+    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
     // "Toplam yayındaki" — draft hariç, archived hariç, active
     prisma.training.count({ where: { ...trainingScope, publishStatus: 'published' } }),
     prisma.training.count({ where: trainingScope }),
@@ -242,7 +244,7 @@ async function fetchActivity(orgId: string) {
 
   const [topPerformerData, recentLogs] = await Promise.all([
     prisma.trainingAssignment.findMany({
-      where: { status: 'passed', training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } } },
+      where: { status: 'passed' satisfies AssignmentStatus, training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } } },
       include: {
         user: { select: { id: true, firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
         examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, preExamScore: true } },

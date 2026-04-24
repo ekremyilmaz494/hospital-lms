@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { getCached, setCached } from '@/lib/redis'
+import type { AssignmentStatus } from '@/lib/exam-state-machine'
+import type { UserRole } from '@/types/database'
 
 const CACHE_KEY = 'super-admin:dashboard'
 const CACHE_TTL = 300
@@ -32,11 +34,11 @@ export async function GET() {
       prisma.organization.count(),
       prisma.organization.count({ where: { isActive: true, isSuspended: false } }),
       prisma.user.count(),
-      prisma.user.count({ where: { role: 'staff' } }),
+      prisma.user.count({ where: { role: 'staff' satisfies UserRole } }),
       // Platform sayımları: archived/inactive training'ler "aktif değil" — tutarlılık için hariç
       prisma.training.count({ where: { isActive: true, publishStatus: { not: 'archived' } } }),
       prisma.trainingAssignment.count({ where: { training: { isActive: true, publishStatus: { not: 'archived' } } } }),
-      prisma.trainingAssignment.count({ where: { status: 'passed', training: { isActive: true, publishStatus: { not: 'archived' } } } }),
+      prisma.trainingAssignment.count({ where: { status: 'passed' satisfies AssignmentStatus, training: { isActive: true, publishStatus: { not: 'archived' } } } }),
       prisma.organizationSubscription.findMany({
         include: { plan: { select: { name: true } }, organization: { select: { name: true, code: true, isActive: true } } },
         orderBy: { createdAt: 'desc' },

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { NextResponse } from 'next/server'
+import type { UserRole } from '@/types/database'
 
 /**
  * GET /api/admin/audit-report
@@ -26,7 +27,7 @@ export async function GET() {
         select: { name: true, code: true, address: true, phone: true, email: true },
       }),
       prisma.user.findMany({
-        where: { organizationId: orgId, role: 'staff', isActive: true },
+        where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
         include: {
           assignments: {
             include: {
