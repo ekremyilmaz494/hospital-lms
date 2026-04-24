@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { calculateTrainingProgress } from '@/lib/training-progress'
 import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
@@ -71,18 +72,14 @@ export async function GET(request: Request) {
       const t = a.training
       const latestAttempt = a.examAttempts[0]
 
-      // Calculate progress: 3 steps (pre-exam, videos, post-exam)
-      // Not: `!== null` KULLANMA — optional chaining latestAttempt yokken
-      // `undefined` döndürür ve `undefined !== null` = true, yani atanmış ama
-      // hiç başlamamış eğitimler %100 görünürdü. `!= null` ikisini de eler.
-      let completedSteps = 0
-      const preExamDone = latestAttempt?.preExamCompletedAt != null
-      const videosDone = latestAttempt?.videosCompletedAt != null
-      const postExamDone = latestAttempt?.postExamCompletedAt != null
-      if (preExamDone) completedSteps++
-      if (videosDone) completedSteps++
-      if (postExamDone) completedSteps++
-      const progress = Math.round((completedSteps / 3) * 100)
+      // Tek doğruluk kaynağı — examOnly + retry farkını içerir.
+      const { percent: progress } = calculateTrainingProgress({
+        examOnly: t.examOnly === true,
+        attemptNumber: latestAttempt?.attemptNumber ?? 0,
+        preExamCompleted: latestAttempt?.preExamCompletedAt != null,
+        videosCompleted: latestAttempt?.videosCompletedAt != null,
+        postExamCompleted: latestAttempt?.postExamCompletedAt != null,
+      })
 
       // Days left until deadline
       const deadline = t.endDate

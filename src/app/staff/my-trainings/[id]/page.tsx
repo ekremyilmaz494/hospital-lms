@@ -14,6 +14,7 @@ import {
   Calendar, Award, ChevronRight, Lock, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
+import { calculateTrainingProgress } from '@/lib/training-progress';
 import { INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE, CARD_BG } from '@/lib/editorial-palette';
 
 interface TrainingVideo {
@@ -142,18 +143,18 @@ export default function TrainingDetailPage() {
   const completedVideos = videos.filter(v => v.completed).length;
   const videoProgress = videos.length > 0 ? Math.round((completedVideos / videos.length) * 100) : 0;
 
-  const isExamOnly = training.examOnly === true;
-  const isRetry = !isExamOnly && ((training.currentAttempt ?? 0) > 1 || !!training.needsRetry);
-
-  const currentStep = isExamOnly
-    ? (!training.postExamCompleted ? 0 : 1)
-    : isRetry
-      ? (!training.videosCompleted ? 0 : !training.postExamCompleted ? 1 : 2)
-      : (!training.preExamCompleted ? 0 : !training.videosCompleted ? 1 : !training.postExamCompleted ? 2 : 3);
-  const totalSteps = isExamOnly ? 1 : isRetry ? 2 : 3;
-  const completedSteps = currentStep;
-  const overallProgress = Math.round((completedSteps / totalSteps) * 100);
-  const allDone = isExamOnly ? currentStep >= 1 : isRetry ? currentStep >= 2 : currentStep >= 3;
+  // Tek doğruluk kaynağı — list ekranlarıyla aynı helper.
+  const { completedSteps, totalSteps, percent: overallProgress, isRetry, isExamOnly } =
+    calculateTrainingProgress({
+      examOnly: training.examOnly === true,
+      attemptNumber: training.currentAttempt ?? 0,
+      needsRetry: training.needsRetry,
+      preExamCompleted: training.preExamCompleted,
+      videosCompleted: training.videosCompleted,
+      postExamCompleted: training.postExamCompleted,
+    });
+  const currentStep = completedSteps;
+  const allDone = completedSteps >= totalSteps;
 
   const examId = training.assignmentId || training.id;
   let ctaHref = `/exam/${examId}/post-exam`;

@@ -8,6 +8,7 @@ import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { logger } from '@/lib/logger'
 import { sendEmail, certificateIssuedEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity-logger'
+import { isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
 
 
 /** Submit pre-exam or post-exam answers */
@@ -328,17 +329,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try { await invalidateDashboardCache(attempt.training.organizationId) } catch {}
 
-  // EY.FR.40 geri bildirim gerekli mi? (Organizasyonun aktif formu var mı)
+  // EY.FR.40 geri bildirim gerekli mi? — feedback/status ile aynı kuralı uygular.
   // Fire-and-forget: hata olursa feedbackRequired=false, akış bozulmaz.
+  // (Transition page yine /api/feedback/status'u çağırıp doğrular; bu erken sinyaldir.)
   let feedbackRequired = false
-  try {
-    const activeForm = await prisma.trainingFeedbackForm.findFirst({ // perf-check-disable-line
-      where: { organizationId: attempt.training.organizationId, isActive: true },
-      select: { id: true },
-    })
-    feedbackRequired = !!activeForm
-  } catch (err) {
-    logger.warn('ExamSubmit', 'feedbackRequired check failed', { err: (err as Error).message })
+  if (phase === 'post') {
+    try {
+      const activeForm = await prisma.trainingFeedbackForm.findFirst({ // perf-check-disable-line
+        where: { organizationId: attempt.training.organizationId, isActive: true },
+        select: { id: true },
+      })
+      feedbackRequired =
+        !!activeForm &&
+        isAttemptFeedbackTriggered(
+          { status: 'completed', isPassed, attemptNumber: attempt.attemptNumber },
+          attempt.assignment.originalMaxAttempts,
+        )
+    } catch (err) {
+      logger.warn('ExamSubmit', 'feedbackRequired check failed', { err: (err as Error).message })
+    }
   }
 
   const attemptsRemaining = isPassed ? 0 : Math.max(0, effectiveMaxAttempts - attempt.attemptNumber)

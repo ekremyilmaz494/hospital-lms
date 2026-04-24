@@ -319,8 +319,12 @@ model Training {
 
   // Bağımsız Sınav
   examOnly            Boolean @default(false) @map("exam_only")
-  requirePreExamOnRetry Boolean @default(true) @map("require_pre_exam_on_retry")
-  randomizeQuestions  Boolean @default(false) @map("randomize_questions")
+  // Default false: mevcut davranışı korur (retry'da pre-exam atlanır).
+  // Admin true yaparsa retry'da da pre-exam yapılır.
+  requirePreExamOnRetry Boolean @default(false) @map("require_pre_exam_on_retry")
+  // Default true: mevcut davranışı korur (sorular her zaman karıştırılır).
+  // Admin false yaparsa sorular sortOrder'a göre sabit sırada gelir.
+  randomizeQuestions  Boolean @default(true) @map("randomize_questions")
   randomQuestionCount Int?    @map("random_question_count")
 
   // İçerik Kütüphanesi

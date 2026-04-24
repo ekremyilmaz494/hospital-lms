@@ -31,6 +31,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           startDate: true,
           endDate: true,
           examOnly: true,
+          requirePreExamOnRetry: true,
           title: true,
           isActive: true,
           publishStatus: true,
@@ -88,11 +89,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (existing) {
     let resumed = existing
     // Pre_exam'da takılı kalmış attempt'i watching_videos'a yükselt:
-    //   - Retry attempt (attemptNumber > 1) → ön sınav atlanır
+    //   - Retry attempt (attemptNumber > 1) AND requirePreExamOnRetry=false → ön sınav atlanır
     //   - Ön sınavı gerçekten tamamlamış attempt (preExamCompletedAt dolu) → status senkron değil, düzelt
+    const skipPreExamOnRetry = !assignment.training.requirePreExamOnRetry
     const shouldPromote =
       existing.status === 'pre_exam' &&
-      (existing.attemptNumber > 1 || existing.preExamCompletedAt !== null)
+      ((existing.attemptNumber > 1 && skipPreExamOnRetry) || existing.preExamCompletedAt !== null)
     if (shouldPromote) {
       resumed = await prisma.examAttempt.update({
         where: { id: existing.id },
@@ -140,9 +142,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
 
     if (existingInTx) {
+      const skipPreExamOnRetryInTx = !assignment.training.requirePreExamOnRetry
       const shouldPromoteInTx =
         existingInTx.status === 'pre_exam' &&
-        (existingInTx.attemptNumber > 1 || existingInTx.preExamCompletedAt !== null)
+        ((existingInTx.attemptNumber > 1 && skipPreExamOnRetryInTx) || existingInTx.preExamCompletedAt !== null)
       if (shouldPromoteInTx) {
         return await tx.examAttempt.update({
           where: { id: existingInTx.id },
@@ -190,9 +193,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return created
     }
 
-    // Retry'da pre-exam gerekli mi? (varsayılan: evet)
+    // Retry'da pre-exam gerekli mi? Training konfigürasyonundan oku.
+    // requirePreExamOnRetry=false (varsayılan, mevcut davranışı korur) → retry'da pre-exam atlanır.
+    // Admin true yaparsa retry'da da pre-exam yapılır.
     const isRetry = newAttemptNumber > 1
-    const skipPreExam = isRetry
+    const skipPreExam = isRetry && !assignment.training.requirePreExamOnRetry
     const initialStatus = skipPreExam ? 'watching_videos' : 'pre_exam'
 
     const created = await tx.examAttempt.create({
