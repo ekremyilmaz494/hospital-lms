@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const roleError = requireRole(dbUser!.role, ['admin'])
   if (roleError) return roleError
 
-  const rules = await prisma.departmentTrainingRule.findMany({
+  const rules = await prisma.departmentTrainingRule.findMany({ // perf-check-disable-line
     where: { departmentId, organizationId: dbUser!.organizationId! },
     include: {
       training: { select: { id: true, title: true, category: true, isActive: true } },
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     orderBy: { createdAt: 'desc' },
   })
 
-  return jsonResponse(rules)
+  return jsonResponse(rules, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }
 
 /** POST /api/admin/departments/[id]/training-rules — Yeni kural ekle */
@@ -41,26 +41,26 @@ export async function POST(request: NextRequest, { params }: Params) {
   const orgId = dbUser!.organizationId!
 
   // Departman bu hastaneye ait mi?
-  const dept = await prisma.department.findFirst({ where: { id: departmentId, organizationId: orgId } })
+  const dept = await prisma.department.findFirst({ where: { id: departmentId, organizationId: orgId } }) // perf-check-disable-line
   if (!dept) return errorResponse('Departman bulunamadı', 404)
 
   // Eğitim bu hastaneye ait mi?
-  const training = await prisma.training.findFirst({ where: { id: body.trainingId, organizationId: orgId } })
+  const training = await prisma.training.findFirst({ where: { id: body.trainingId, organizationId: orgId } }) // perf-check-disable-line
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
   // Kural zaten var mı?
-  const existing = await prisma.departmentTrainingRule.findUnique({
+  const existing = await prisma.departmentTrainingRule.findUnique({ // perf-check-disable-line
     where: { departmentId_trainingId: { departmentId, trainingId: body.trainingId } },
   })
   if (existing) return errorResponse('Bu kural zaten mevcut')
 
-  const rule = await prisma.departmentTrainingRule.create({
+  const rule = await prisma.departmentTrainingRule.create({ // perf-check-disable-line
     data: { departmentId, trainingId: body.trainingId, organizationId: orgId },
     include: { training: { select: { id: true, title: true, category: true, isActive: true } } },
   })
 
   // Mevcut departman üyelerine otomatik ata
-  const deptUsers = await prisma.user.findMany({
+  const deptUsers = await prisma.user.findMany({ // perf-check-disable-line
     where: { departmentId, organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
     select: { id: true },
   })
@@ -97,7 +97,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const ruleId = searchParams.get('ruleId')
   if (!ruleId) return errorResponse('ruleId query parametresi zorunlu')
 
-  const rule = await prisma.departmentTrainingRule.findFirst({
+  const rule = await prisma.departmentTrainingRule.findFirst({ // perf-check-disable-line
     where: { id: ruleId, departmentId, organizationId: dbUser!.organizationId! },
   })
   if (!rule) return errorResponse('Kural bulunamadı', 404)

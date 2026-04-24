@@ -188,5 +188,5 @@ export async function GET(
     departmentStats,
     questionStats: questionStatsResult,
     attempts: attemptsList,
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }

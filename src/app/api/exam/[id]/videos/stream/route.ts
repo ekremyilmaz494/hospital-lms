@@ -34,5 +34,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const streamUrl = await getStreamUrl(video.videoKey)
 
-  return jsonResponse({ streamUrl, video })
+  return jsonResponse({ streamUrl, video }, 200, { 'Cache-Control': 'private, no-store' })
 }

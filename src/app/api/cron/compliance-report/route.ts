@@ -88,5 +88,5 @@ export async function GET(request: Request) {
     emailsFailed,
     orgResults,
     timestamp: new Date().toISOString(),
-  })
+  }, { headers: { 'Cache-Control': 'no-store' } })
 }
