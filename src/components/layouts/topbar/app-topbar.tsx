@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { getRolePath } from '@/lib/route-helpers';
 
 /* ─── Editorial palette ─── */
 /* Topbar is chrome — fixed hex, not themed. Stays solid cream always. */
@@ -67,12 +68,8 @@ export function AppTopbar({
     router.push('/auth/login');
   };
 
-  const profilePath = user?.role === 'admin'
-    ? '/admin/settings'
-    : user?.role === 'super_admin'
-      ? '/super-admin/settings'
-      : '/staff/profile';
-  const notificationsPath = user?.role === 'staff' ? '/staff/notifications' : '/admin/notifications';
+  const profilePath = getRolePath(user?.role, 'settings');
+  const notificationsPath = getRolePath(user?.role, 'notifications');
 
   return (
     <header
