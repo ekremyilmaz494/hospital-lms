@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { inspectionReportQuerySchema } from '@/lib/validations'
 import { resolveRequiredPointsBulk } from '@/lib/smg-helpers'
+import type { UserRole } from '@/types/database'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -60,7 +61,7 @@ export async function GET(request: Request) {
     prisma.user.findMany({
       where: {
         organizationId: orgId,
-        role: 'staff',
+        role: 'staff' satisfies UserRole,
         isActive: true,
         ...(departmentId && { departmentId }),
       },

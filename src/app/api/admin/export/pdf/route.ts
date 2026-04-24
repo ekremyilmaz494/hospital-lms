@@ -6,6 +6,8 @@ import { jsPDF } from 'jspdf'
 import { drawCertificatePage as drawCertPageShared, type CertDrawData } from '@/lib/pdf/cert-design'
 import { applyTurkishFont } from '@/lib/pdf/helpers/font'
 import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
+import type { AttemptStatus } from '@/lib/exam-state-machine'
+import type { UserRole } from '@/types/database'
 
 const BRAND_RGB: [number, number, number] = [13, 150, 104]
 
@@ -61,8 +63,8 @@ export async function GET(request: Request) {
 
   if (type === 'staff-report') {
     const [staffCount, activeStaff, departments] = await Promise.all([
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff' } }),
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
+      prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole } }),
+      prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
       prisma.department.findMany({
         where: { organizationId: orgId },
         include: { _count: { select: { users: true } } },
@@ -128,7 +130,7 @@ export async function GET(request: Request) {
 
   if (type === 'exam-report') {
     const attempts = await prisma.examAttempt.findMany({
-      where: { training: { organizationId: orgId }, status: 'completed' },
+      where: { training: { organizationId: orgId }, status: 'completed' satisfies AttemptStatus },
       include: {
         user: { select: { firstName: true, lastName: true } },
         training: { select: { title: true, passingScore: true } },

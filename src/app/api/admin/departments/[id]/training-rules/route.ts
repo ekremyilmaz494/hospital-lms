@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
+import type { UserRole } from '@/types/database'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   // Mevcut departman üyelerine otomatik ata
   const deptUsers = await prisma.user.findMany({
-    where: { departmentId, organizationId: orgId, role: 'staff', isActive: true },
+    where: { departmentId, organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
     select: { id: true },
   })
 

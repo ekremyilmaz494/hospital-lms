@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import ExcelJS from 'exceljs'
+import type { UserRole } from '@/types/database'
 
 const XLSX_MAX_ROWS = 5000
 const CSV_BATCH_SIZE = 500
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
 
   if (type === 'staff') {
     const staff = await prisma.user.findMany({ // perf-check-disable-line — each branch runs only 1 query
-      where: { organizationId: orgId, role: 'staff' },
+      where: { organizationId: orgId, role: 'staff' satisfies UserRole },
       include: { _count: { select: { assignments: true } } },
       orderBy: { lastName: 'asc' },
     })

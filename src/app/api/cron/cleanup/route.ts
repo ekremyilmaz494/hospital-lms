@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, certificateExpiryReminderEmail, overdueTrainingReminderEmail } from '@/lib/email'
 import { deleteObject } from '@/lib/s3'
-import { ATTEMPT_TERMINAL_STATUSES, type AttemptStatus } from '@/lib/exam-state-machine'
+import { ATTEMPT_TERMINAL_STATUSES, type AttemptStatus, type AssignmentStatus } from '@/lib/exam-state-machine'
+import type { UserRole } from '@/types/database'
 
 // State machine ile uyumlu: EXPIRE event'inin toplu (updateMany) hali.
 // ATTEMPT_TERMINAL_STATUSES sabitinden türetilmiş non-terminal liste — tek tek attemptNextStatus
@@ -56,7 +57,7 @@ export async function GET(request: Request) {
       // ATTEMPT_RESET event semantiği: sadece 'in_progress' assignment'ı assigned'a döndür.
       // (terminal 'passed'/'failed'/'locked' reset edilmez — state machine bunu da reddeder)
       await prisma.trainingAssignment.updateMany({
-        where: { id: { in: assignmentIds }, status: 'in_progress' },
+        where: { id: { in: assignmentIds }, status: 'in_progress' satisfies AssignmentStatus },
         data: { status: 'assigned' },
       })
     }
@@ -150,7 +151,7 @@ export async function GET(request: Request) {
       organization: {
         select: {
           name: true,
-          users: { where: { role: 'admin', isActive: true }, select: { id: true, email: true, firstName: true, lastName: true }, take: 3 },
+          users: { where: { role: 'admin' satisfies UserRole, isActive: true }, select: { id: true, email: true, firstName: true, lastName: true }, take: 3 },
         },
       },
     },

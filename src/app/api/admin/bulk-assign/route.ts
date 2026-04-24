@@ -3,6 +3,7 @@ import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, creat
 import { z } from 'zod/v4'
 import { logger } from '@/lib/logger'
 import { sendEmail, trainingAssignedEmail } from '@/lib/email'
+import type { UserRole } from '@/types/database'
 
 const bulkAssignSchema = z.object({
   trainingIds: z.array(z.string().uuid()).min(1, 'En az 1 eğitim seçilmeli'),
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
 
     // Kullanıcılar bu organizasyona ait mi?
     const users = await prisma.user.findMany({
-      where: { id: { in: userIds }, organizationId: orgId, role: 'staff', isActive: true },
+      where: { id: { in: userIds }, organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
       select: { id: true },
     })
     if (users.length !== userIds.length) {

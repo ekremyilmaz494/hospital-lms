@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import type { AssignmentStatus } from '@/lib/exam-state-machine'
 
 const CACHE_TTL = 120 // 2 dakika
 const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=60' }
@@ -24,7 +25,7 @@ export async function GET() {
     const [topPerformerData, recentLogs] = await Promise.all([
       prisma.trainingAssignment.findMany({
         where: {
-          status: 'passed',
+          status: 'passed' satisfies AssignmentStatus,
           training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } },
         },
         include: {

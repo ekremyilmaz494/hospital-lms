@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse } from '@/lib/api-helpers'
+import type { UserRole } from '@/types/database'
 
 /**
  * Son toplu yükleme işlemlerini listeler.
@@ -29,7 +30,7 @@ export async function GET() {
     }),
     // Hangi admin yaptı — isim bilgisi için
     prisma.user.findMany({
-      where: { organizationId: orgId, role: 'admin' },
+      where: { organizationId: orgId, role: 'admin' satisfies UserRole },
       select: { id: true, firstName: true, lastName: true, email: true },
     }),
   ])

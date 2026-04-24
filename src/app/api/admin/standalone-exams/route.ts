@@ -14,6 +14,8 @@ import { createStandaloneExamSchema } from '@/lib/validations'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import { getCached, setCached, invalidateByPrefix } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
+import type { AttemptStatus } from '@/lib/exam-state-machine'
+import type { UserRole } from '@/types/database'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -75,17 +77,17 @@ export async function GET(request: Request) {
       ? await Promise.all([
           prisma.examAttempt.groupBy({
             by: ['trainingId'],
-            where: { trainingId: { in: examIds }, isPassed: true, status: 'completed' },
+            where: { trainingId: { in: examIds }, isPassed: true, status: 'completed' satisfies AttemptStatus },
             _count: true,
           }),
           prisma.examAttempt.groupBy({
             by: ['trainingId'],
-            where: { trainingId: { in: examIds }, status: 'completed', postExamScore: { not: null } },
+            where: { trainingId: { in: examIds }, status: 'completed' satisfies AttemptStatus, postExamScore: { not: null } },
             _avg: { postExamScore: true },
           }),
           prisma.examAttempt.groupBy({
             by: ['trainingId'],
-            where: { trainingId: { in: examIds }, status: 'completed' },
+            where: { trainingId: { in: examIds }, status: 'completed' satisfies AttemptStatus },
             _count: true,
           }),
         ])
@@ -223,7 +225,7 @@ export async function POST(request: Request) {
             where: {
               organizationId: dbUser!.organizationId!,
               isActive: true,
-              role: 'staff',
+              role: 'staff' satisfies UserRole,
               departmentId: { in: selectedDepts },
             },
           })

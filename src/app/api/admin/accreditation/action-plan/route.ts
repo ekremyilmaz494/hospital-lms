@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { z } from 'zod/v4'
+import type { UserRole } from '@/types/database'
 
 const actionPlanSchema = z.object({
   standardBody: z.enum(['JCI', 'ISO_9001', 'ISO_15189', 'TJC', 'OSHA']),
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
         select: { id: true, category: true },
       }),
       prisma.user.findMany({
-        where: { organizationId: orgId, role: 'staff', isActive: true },
+        where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
         select: { id: true },
       }),
     ])

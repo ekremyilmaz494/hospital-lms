@@ -8,6 +8,8 @@ import { logger } from '@/lib/logger'
 import { sendStaffWelcomeEmail } from '@/lib/email'
 import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
+import type { AssignmentStatus } from '@/lib/exam-state-machine'
+import type { UserRole } from '@/types/database'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -55,18 +57,18 @@ export async function GET(request: Request) {
       prisma.user.count({ where }),
       prisma.department.findMany({
         where: { organizationId: orgId },
-        include: { _count: { select: { users: { where: { role: 'staff', isActive: true } } } } },
+        include: { _count: { select: { users: { where: { role: 'staff' satisfies UserRole, isActive: true } } } } },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff', isActive: true } }),
+      prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
       prisma.trainingAssignment.groupBy({
         by: ['userId'],
-        where: { user: { organizationId: orgId, role: 'staff' }, status: 'passed' },
+        where: { user: { organizationId: orgId, role: 'staff' satisfies UserRole }, status: 'passed' satisfies AssignmentStatus },
         _count: true,
       }),
       prisma.examAttempt.groupBy({
         by: ['userId'],
-        where: { user: { organizationId: orgId, role: 'staff' }, isPassed: true },
+        where: { user: { organizationId: orgId, role: 'staff' satisfies UserRole }, isPassed: true },
         _avg: { postExamScore: true },
       }),
     ])

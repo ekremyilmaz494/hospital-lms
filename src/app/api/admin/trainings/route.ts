@@ -5,6 +5,7 @@ import { createTrainingBodySchema } from '@/lib/validations'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { withCache, invalidateOrgCache } from '@/lib/redis'
+import type { AssignmentStatus } from '@/lib/exam-state-machine'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
     const completedCounts = trainingIds.length > 0
       ? await prisma.trainingAssignment.groupBy({
           by: ['trainingId'],
-          where: { trainingId: { in: trainingIds }, status: 'passed' },
+          where: { trainingId: { in: trainingIds }, status: 'passed' satisfies AssignmentStatus },
           _count: true,
         })
       : []

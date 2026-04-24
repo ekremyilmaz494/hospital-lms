@@ -2,6 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
 import { createNotificationSchema } from '@/lib/validations'
+import type { UserRole } from '@/types/database'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -71,7 +72,7 @@ export async function PUT(request: Request) {
   if (body.message.length > 5000) return errorResponse('Mesaj en fazla 5000 karakter olabilir', 400)
 
   const staffUsers = await prisma.user.findMany({
-    where: { organizationId: dbUser!.organizationId!, role: 'staff', isActive: true },
+    where: { organizationId: dbUser!.organizationId!, role: 'staff' satisfies UserRole, isActive: true },
     select: { id: true },
   })
 

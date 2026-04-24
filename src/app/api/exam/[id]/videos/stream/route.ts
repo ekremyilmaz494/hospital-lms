@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { getStreamUrl } from '@/lib/s3'
+import type { AttemptStatus } from '@/lib/exam-state-machine'
 
 /** Get signed streaming URL for a video */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -16,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   // Verify attempt belongs to user and is in video phase
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser!.id, status: 'watching_videos' },
+    where: { id: attemptId, userId: dbUser!.id, status: 'watching_videos' satisfies AttemptStatus },
     include: { training: { select: { organizationId: true } } },
   })
   if (!attempt) return errorResponse('Invalid attempt or not in video phase', 403)

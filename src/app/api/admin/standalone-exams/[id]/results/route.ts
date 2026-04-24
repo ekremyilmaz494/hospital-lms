@@ -5,6 +5,7 @@ import {
   jsonResponse,
   errorResponse,
 } from '@/lib/api-helpers'
+import type { AttemptStatus } from '@/lib/exam-state-machine'
 
 export async function GET(
   request: Request,
@@ -29,7 +30,7 @@ export async function GET(
 
     // Tamamlanan denemeler (kullanıcı bilgileriyle)
     prisma.examAttempt.findMany({
-      where: { trainingId: id, status: 'completed' },
+      where: { trainingId: id, status: 'completed' satisfies AttemptStatus },
       include: {
         user: {
           select: {
