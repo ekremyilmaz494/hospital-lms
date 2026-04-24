@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getAppUrl } from '@/lib/api-helpers'
 import { createAuthUser, AuthUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
+import { safeDecrypt } from '@/lib/crypto'
 import {
   verifySsoState,
   verifySamlSignature,
@@ -117,6 +118,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/login?error=sso_config_error', request.url))
   }
 
+  // OIDC client secret at-rest şifreli saklanır — kullanmadan önce decrypt.
+  // Legacy plaintext satırlar safeDecrypt tarafından şeffaf geçirilir (backfill'e kadar).
+  const oidcClientSecretPlain = safeDecrypt(org.oidcClientSecret)
+  if (!oidcClientSecretPlain) {
+    return NextResponse.redirect(new URL('/auth/login?error=sso_config_error', request.url))
+  }
+
   // Exchange code for tokens
   try {
     const discoveryRes = await fetch(org.oidcDiscoveryUrl)
@@ -134,7 +142,7 @@ export async function GET(request: NextRequest) {
         code,
         redirect_uri: `${appUrl}/api/auth/sso/callback`,
         client_id: org.oidcClientId,
-        client_secret: org.oidcClientSecret,
+        client_secret: oidcClientSecretPlain,
       }),
     })
 

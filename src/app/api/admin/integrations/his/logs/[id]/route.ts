@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 
 /** GET /api/admin/integrations/his/logs/[id] — Sync log detayı (hata listesi dahil) */
 export async function GET(
@@ -8,10 +8,10 @@ export async function GET(
 ) {
   const { id } = await params
 
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const log = await prisma.syncLog.findFirst({

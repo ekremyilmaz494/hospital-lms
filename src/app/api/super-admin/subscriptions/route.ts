@@ -1,11 +1,11 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
 import { createPlanSchema, updatePlanSchema, createSubscriptionSchema } from '@/lib/validations'
 
 // ── Subscription Plans CRUD ──
 
 export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])

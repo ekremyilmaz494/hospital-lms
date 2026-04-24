@@ -1,11 +1,11 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { createUserSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
 
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])

@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser, requireRole, jsonResponse, errorResponse,
+  getAuthUserStrict, requireRole, jsonResponse, errorResponse,
   parseBody, createAuditLog,
 } from '@/lib/api-helpers'
 import { encrypt } from '@/lib/crypto'
@@ -10,10 +10,10 @@ import { hisIntegrationSchema } from '@/lib/validations'
 
 /** GET /api/admin/integrations/his — Entegrasyon ayarlarını döndür (credentials masked) */
 export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const integration = await prisma.hisIntegration.findFirst({
@@ -34,15 +34,20 @@ export async function GET(request: Request) {
     },
   })
 
-  return jsonResponse({ integration })
+  if (!integration) return jsonResponse({ integration: null })
+
+  const { webhookToken, ...rest } = integration
+  return jsonResponse({
+    integration: { ...rest, hasWebhookToken: Boolean(webhookToken) },
+  })
 }
 
 /** POST /api/admin/integrations/his — Entegrasyonu oluştur veya güncelle */
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const body = await parseBody(request)
@@ -102,9 +107,11 @@ export async function POST(request: Request) {
     request,
   })
 
-  // Dönen objeden credentials çıkar
+  // Dönen objeden credentials ve webhookToken'ı çıkar — ikisi de secret
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { credentials: _creds, ...safeIntegration } = integration
+  const { credentials: _creds, webhookToken: _token, ...safeIntegration } = integration
 
-  return jsonResponse({ integration: safeIntegration })
+  return jsonResponse({
+    integration: { ...safeIntegration, hasWebhookToken: Boolean(_token) },
+  })
 }

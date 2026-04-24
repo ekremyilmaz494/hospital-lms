@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser,
+  getAuthUserStrict,
   requireRole,
   jsonResponse,
   errorResponse,
@@ -14,7 +14,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])
@@ -50,7 +50,7 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { z } from 'zod/v4'
 import { encrypt } from '@/lib/crypto'
 import { invalidateOrgTransporter } from '@/lib/email'
@@ -18,10 +18,10 @@ const smtpSchema = z.object({
 
 /** GET — SMTP config (şifre DÖNDÜRÜLMEZ, sadece hasPassword) */
 export async function GET() {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId
@@ -59,10 +59,10 @@ export async function GET() {
  * - smtpEnabled=true ancak kritik alanlar (host/user/pass) eksikse 400 döner.
  */
 export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId

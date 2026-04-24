@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser,
+  getAuthUserStrict,
   assertRole,
   jsonResponse,
   errorResponse,
@@ -11,6 +11,9 @@ import {
 import { downloadBuffer } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { decryptBackup } from '@/lib/backup-crypto'
+
+// Vercel Pro max: 300s. Restore tx timeout 120s, buna ek olarak S3 download + parse süresi var.
+export const maxDuration = 300
 
 /**
  * Expected shape of a backup JSON file (mirrors backup cron output).
@@ -83,7 +86,7 @@ interface RestoreRequestBody {
 export async function POST(request: Request) {
   try {
     // ── Auth ──
-    const { dbUser, error } = await getAuthUser()
+    const { dbUser, error } = await getAuthUserStrict()
     if (error) return error
     assertRole(dbUser!.role, ['super_admin'])
 

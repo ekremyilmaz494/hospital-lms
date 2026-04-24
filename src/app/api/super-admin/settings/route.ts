@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 
 /**
@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger'
  * Ayarlar henüz ayrı bir tabloda tutulmadığı için env variable'lardan okunur.
  */
 export async function GET() {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])
@@ -39,7 +39,7 @@ export async function GET() {
  * Not: Gerçek env değişkenleri Vercel'den güncellenir, burada sadece DB'deki ayarlar.
  */
 export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])

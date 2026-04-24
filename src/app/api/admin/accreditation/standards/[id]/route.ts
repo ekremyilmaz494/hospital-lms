@@ -34,7 +34,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const { id } = await params
@@ -118,7 +118,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const { id } = await params

@@ -511,6 +511,7 @@ async function main() {
       const question = await prisma.question.create({
         data: {
           trainingId: training.id,
+          organizationId: org.id,
           questionText: q.questionText,
           questionType: 'multiple_choice',
           points: 10,

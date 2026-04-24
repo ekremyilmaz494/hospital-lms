@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, getAppUrl } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, getAppUrl } from '@/lib/api-helpers'
 import { createHospitalWithAdminSchema } from '@/lib/validations'
 import { sendHospitalWelcomeEmail } from '@/lib/email'
 import { TRAINING_CATEGORIES } from '@/lib/training-categories'
@@ -9,7 +9,7 @@ import { createAuthUser, updateAuthUserOrgId, AuthUserError, DbUserError } from 
 import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])

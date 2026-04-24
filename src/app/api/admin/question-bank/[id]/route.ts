@@ -17,7 +17,7 @@ export async function PATCH(
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const body = await parseBody(request)
@@ -86,7 +86,7 @@ export async function DELETE(
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const existing = await prisma.questionBank.findFirst({

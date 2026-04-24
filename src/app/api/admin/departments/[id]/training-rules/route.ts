@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const rules = await prisma.departmentTrainingRule.findMany({ // perf-check-disable-line
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const body = await parseBody<{ trainingId: string }>(request)
@@ -90,7 +90,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const { searchParams } = new URL(request.url)

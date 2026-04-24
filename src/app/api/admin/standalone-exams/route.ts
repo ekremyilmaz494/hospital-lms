@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const { searchParams } = new URL(request.url)
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const limitError = await checkSubscriptionLimit(
@@ -201,6 +201,7 @@ export async function POST(request: Request) {
           const question = await tx.question.create({
             data: {
               trainingId: t.id,
+              organizationId: dbUser!.organizationId!,
               questionText: q.text,
               points: q.points,
               sortOrder: idx,

@@ -1,13 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { testHisConnection } from '@/lib/his-integration'
 
 /** POST /api/admin/integrations/his/test — HIS bağlantısını test et */
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const integration = await prisma.hisIntegration.findFirst({

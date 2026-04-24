@@ -48,6 +48,31 @@ export function safeDecryptTcNo(value: string | null): string | null {
   try { return decrypt(value) } catch { return value }
 }
 
+/**
+ * Güvenli çözme — hem iv:tag:ciphertext formatlı encrypted hem de legacy plaintext
+ * değerleri kabul eder. OIDC client secret gibi kademeli şifrelemeye geçen alanlar
+ * için. Yeni yazılan değerler encrypt() ile yazılır; eski satırlar decrypt olmadan
+ * döner (backfill'e kadar uyumluluk).
+ */
+export function safeDecrypt(value: string | null): string | null {
+  if (!value) return null
+  // Şifreli format: 24 hex iv + ':' + 32 hex authTag + ':' + hex ciphertext
+  const parts = value.split(':')
+  const looksEncrypted =
+    parts.length === 3 &&
+    parts[0].length === 24 &&
+    parts[1].length === 32 &&
+    /^[0-9a-f]+$/i.test(parts[0]) &&
+    /^[0-9a-f]+$/i.test(parts[1]) &&
+    /^[0-9a-f]+$/i.test(parts[2])
+  if (!looksEncrypted) return value
+  try {
+    return decrypt(value)
+  } catch {
+    return value
+  }
+}
+
 export function decrypt(token: string): string {
   const key = getKey()
   const parts = token.split(':')

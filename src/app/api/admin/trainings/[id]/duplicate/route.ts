@@ -13,7 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId!
@@ -76,6 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           data: questionsWithIds.map(q => ({
             id: q.newId,
             trainingId: training.id,
+            organizationId: orgId,
             questionText: q.questionText,
             questionType: q.questionType,
             points: q.points,

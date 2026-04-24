@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const body = await parseBody<{ action: 'add' | 'remove'; userIds: string[] }>(request)

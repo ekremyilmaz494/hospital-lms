@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { createCheckoutForm } from '@/lib/iyzico'
 import { logger } from '@/lib/logger'
 
@@ -9,10 +9,10 @@ import { logger } from '@/lib/logger'
  * Body: { planId: string, billingCycle: 'monthly' | 'annual' }
  */
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const body = await parseBody<{ planId: string; billingCycle: 'monthly' | 'annual' }>(request)

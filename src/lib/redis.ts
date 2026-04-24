@@ -1,9 +1,26 @@
 import { Redis } from '@upstash/redis'
 import { logger } from '@/lib/logger'
 
-// ── Lazy Redis client — null if not configured or unreachable ──
+// ⚠️ Multi-instance uyarısı (Vercel serverless):
+// In-memory fallback (memoryTimers, memoryRateLimits, memoryCache) her serverless
+// instance'ta ayrı. Redis down ise rate limit ve exam timer instance'lar arası
+// divergence yapar. Production'da her fallback kullanımı logger.error ile alarma
+// düşer — Sentry'de yakalanmalı. Env validation (scripts/validate-env.js) prod'da
+// REDIS_URL+REDIS_TOKEN zorunlu kılar; boot-time null olması beklenmez, sadece
+// runtime network hatalarında geçici fallback olur.
+
 let _redis: Redis | null = null
 let _constructorWarned = false
+
+/** Production'da memory fallback kullanıldığında loud alarm — Sentry yakalar. */
+function warnFallback(scope: string, attemptId?: string) {
+  if (process.env.NODE_ENV !== 'production') return
+  logger.error('Redis', `Memory fallback in production — multi-instance inconsistent (${scope})`, {
+    scope,
+    attemptId,
+  })
+}
+
 export function getRedis(): Redis | null {
   if (_redis) return _redis
   const url = process.env.REDIS_URL
@@ -53,6 +70,7 @@ export async function startExamTimer(attemptId: string, durationMinutes: number)
       resetRedis()
     }
   }
+  warnFallback('startExamTimer', attemptId)
   memoryTimers.set(attemptId, expiresAt)
   return expiresAt
 }
@@ -82,9 +100,11 @@ export async function getExamTimeRemaining(attemptId: string): Promise<number | 
       expiresAt = await redis.get<number>(`${EXAM_TIMER_PREFIX}${attemptId}`)
     } catch {
       resetRedis()
+      warnFallback('getExamTimeRemaining', attemptId)
       expiresAt = memoryTimers.get(attemptId) ?? null
     }
   } else {
+    warnFallback('getExamTimeRemaining', attemptId)
     expiresAt = memoryTimers.get(attemptId) ?? null
   }
   if (!expiresAt) return null
@@ -294,6 +314,7 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
   }
 
   // In-memory fallback
+  warnFallback('checkRateLimit')
   const k = `ratelimit:${key}`
   const now = Date.now()
   const entry = memoryRateLimits.get(k)

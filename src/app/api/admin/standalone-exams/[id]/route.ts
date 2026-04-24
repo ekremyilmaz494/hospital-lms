@@ -21,7 +21,7 @@ export async function GET(
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const [exam, attemptCount] = await Promise.all([
@@ -131,7 +131,7 @@ export async function PATCH(
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const body = await parseBody(request)
@@ -201,6 +201,7 @@ export async function PATCH(
             const created = await tx.question.create({
               data: {
                 trainingId: id,
+                organizationId: dbUser!.organizationId!,
                 questionText: q.text,
                 points: q.points,
                 sortOrder: idx,
@@ -258,7 +259,7 @@ export async function DELETE(
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const existing = await prisma.training.findFirst({

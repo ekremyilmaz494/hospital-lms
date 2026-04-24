@@ -7,7 +7,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   // Verify training belongs to org
@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   // Verify training belongs to org
@@ -47,6 +47,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     data: {
       ...questionData,
       trainingId: id,
+      organizationId: dbUser!.organizationId!,
       options: { create: options },
     },
     include: { options: true },
@@ -70,7 +71,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   // Verify training belongs to org

@@ -1,4 +1,4 @@
-import { jsonResponse, errorResponse, getAuthUser, parseBody, requireRole, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, getAuthUserStrict, parseBody, requireRole, createAuditLog } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 
@@ -12,11 +12,11 @@ import { prisma } from '@/lib/prisma'
  */
 
 export async function GET() {
-  const { user, dbUser, error } = await getAuthUser()
+  const { user, dbUser, error } = await getAuthUserStrict()
   if (error) return error
   if (!user || !dbUser) return errorResponse('Oturum bulunamadı', 401)
 
-  const roleErr = requireRole(dbUser.role, ['admin'])
+  const roleErr = requireRole(dbUser.role, ['admin', 'super_admin'])
   if (roleErr) return roleErr
 
   if (!dbUser.organizationId) return errorResponse('Organizasyon bulunamadı', 404)
@@ -33,11 +33,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { user, dbUser, error } = await getAuthUser()
+  const { user, dbUser, error } = await getAuthUserStrict()
   if (error) return error
   if (!user || !dbUser) return errorResponse('Oturum bulunamadı', 401)
 
-  const roleErr = requireRole(dbUser.role, ['admin'])
+  const roleErr = requireRole(dbUser.role, ['admin', 'super_admin'])
   if (roleErr) return roleErr
 
   if (!dbUser.organizationId) return errorResponse('Organizasyon bulunamadı', 404)

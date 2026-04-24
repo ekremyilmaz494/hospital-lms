@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 
 vi.mock('@/lib/api-helpers', () => ({
   getAuthUser: vi.fn(),
+  getAuthUserStrict: vi.fn(),
   requireRole: vi.fn((role: string, allowed: string[]) => {
     if (!allowed.includes(role)) return Response.json({ error: 'Forbidden' }, { status: 403 })
     return null
@@ -47,17 +48,20 @@ vi.mock('@/lib/dashboard-cache', () => ({ invalidateDashboardCache: vi.fn() }))
 vi.mock('@/lib/crypto', () => ({ encrypt: vi.fn((v: string) => v), decrypt: vi.fn((v: string) => v), safeDecryptTcNo: vi.fn((v: string | null) => v) }))
 vi.mock('@/lib/email', () => ({ sendEmail: vi.fn() }))
 
-import { getAuthUser } from '@/lib/api-helpers'
+import { getAuthUser, getAuthUserStrict } from '@/lib/api-helpers'
 
 const mockGetAuthUser = vi.mocked(getAuthUser)
+const mockGetAuthUserStrict = vi.mocked(getAuthUserStrict)
 const results: { role: string; endpoint: string; expected: number; actual: number; passed: boolean }[] = []
 
 function mockAuth(role: 'staff' | 'admin' | 'super_admin') {
-  mockGetAuthUser.mockResolvedValue({
+  const payload = {
     user: { id: 'user-1' },
     dbUser: { id: 'user-1', role, organizationId: 'org-1', isActive: true, firstName: 'Test', lastName: 'User', email: 'test@test.com' },
     error: null,
-  } as never)
+  }
+  mockGetAuthUser.mockResolvedValue(payload as never)
+  mockGetAuthUserStrict.mockResolvedValue(payload as never)
 }
 
 function record(role: string, endpoint: string, expected: number, actual: number) {

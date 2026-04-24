@@ -1,7 +1,7 @@
 import { s3 } from '@/lib/s3'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, errorResponse } from '@/lib/api-helpers'
 import { decryptBackup } from '@/app/api/admin/backups/route'
 import { logger } from '@/lib/logger'
 
@@ -10,10 +10,10 @@ export async function GET( // perf-check-disable-line — dosya indirme, Cache-C
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const backup = await prisma.dbBackup.findFirst({

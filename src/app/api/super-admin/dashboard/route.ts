@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { getCached, setCached } from '@/lib/redis'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
@@ -9,7 +9,7 @@ const CACHE_KEY = 'super-admin:dashboard'
 const CACHE_TTL = 300
 
 export async function GET() {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])

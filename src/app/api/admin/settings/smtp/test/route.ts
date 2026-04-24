@@ -1,4 +1,4 @@
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/crypto'
 import { escapeHtml } from '@/lib/email'
@@ -24,10 +24,10 @@ const testSchema = z.object({
  * Save-öncesi test → yanlış config ile lock-out önlenir.
  */
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId
