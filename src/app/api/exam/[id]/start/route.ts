@@ -4,6 +4,12 @@ import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { logActivity } from '@/lib/activity-logger'
 import { getPendingMandatoryFeedback } from '@/lib/feedback-helpers'
+import {
+  attemptNextStatus,
+  assignmentNextStatus,
+  type AttemptStatus,
+  type AssignmentStatus,
+} from '@/lib/exam-state-machine'
 
 /** Start a new exam attempt or resume existing one */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -91,15 +97,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // Pre_exam'da takılı kalmış attempt'i watching_videos'a yükselt:
     //   - Retry attempt (attemptNumber > 1) AND requirePreExamOnRetry=false → ön sınav atlanır
     //   - Ön sınavı gerçekten tamamlamış attempt (preExamCompletedAt dolu) → status senkron değil, düzelt
+    // Promote kararı state machine dışında kalır (iş mantığı koşulu); state machine
+    // yalnızca hedef status'ü hesaplar — PRE_EXAM_SUBMITTED → watching_videos.
     const skipPreExamOnRetry = !assignment.training.requirePreExamOnRetry
     const shouldPromote =
       existing.status === 'pre_exam' &&
       ((existing.attemptNumber > 1 && skipPreExamOnRetry) || existing.preExamCompletedAt !== null)
     if (shouldPromote) {
+      const transition = attemptNextStatus(existing.status as AttemptStatus, { type: 'PRE_EXAM_SUBMITTED' })
+      if (!transition.ok) {
+        logger.error('Exam Start', 'Promote transition reddedildi', {
+          assignmentId,
+          userId: dbUser!.id,
+          currentStatus: existing.status,
+          reason: transition.reason,
+        })
+        return errorResponse('Sınav durumu güncellenemedi.', 500)
+      }
       resumed = await prisma.examAttempt.update({
         where: { id: existing.id },
         data: {
-          status: 'watching_videos',
+          status: transition.next,
           preExamCompletedAt: existing.preExamCompletedAt ?? new Date(),
           preExamScore: existing.preExamScore ?? 0,
         },
@@ -142,15 +160,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
 
     if (existingInTx) {
+      // Promote kararı state machine dışında kalır (iş mantığı koşulu).
       const skipPreExamOnRetryInTx = !assignment.training.requirePreExamOnRetry
       const shouldPromoteInTx =
         existingInTx.status === 'pre_exam' &&
         ((existingInTx.attemptNumber > 1 && skipPreExamOnRetryInTx) || existingInTx.preExamCompletedAt !== null)
       if (shouldPromoteInTx) {
+        const transitionInTx = attemptNextStatus(existingInTx.status as AttemptStatus, { type: 'PRE_EXAM_SUBMITTED' })
+        if (!transitionInTx.ok) {
+          throw new Error(`PROMOTE_TRANSITION_REJECTED: ${transitionInTx.reason}`)
+        }
         return await tx.examAttempt.update({
           where: { id: existingInTx.id },
           data: {
-            status: 'watching_videos',
+            status: transitionInTx.next,
             preExamCompletedAt: existingInTx.preExamCompletedAt ?? new Date(),
             preExamScore: existingInTx.preExamScore ?? 0,
           },
@@ -168,37 +191,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       throw new Error('MAX_ATTEMPTS_EXCEEDED')
     }
 
-    // examOnly sınavlarda ön sınav ve video atlanır → doğrudan post_exam
+    // Yeni attempt için initial status'ü state machine belirler:
+    //   - examOnly=true → post_exam (ön sınav + video atlanır)
+    //   - isRetry + !requirePreExamOnRetry → watching_videos (retry'da pre-exam atlanır)
+    //   - Aksi halde → pre_exam
+    // requirePreExamOnRetry gerçek davranışı training schema field'ından gelir.
     const isExamOnly = assignment.training.examOnly === true
-
-    if (isExamOnly) {
-      const created = await tx.examAttempt.create({
-        data: {
-          assignmentId,
-          userId: dbUser!.id,
-          trainingId: assignment.trainingId,
-          organizationId: dbUser!.organizationId!,
-          attemptNumber: newAttemptNumber,
-          status: 'post_exam',
-          postExamStartedAt: new Date(),
-        },
-        include: { videoProgress: true },
-      })
-
-      await tx.trainingAssignment.update({
-        where: { id: assignmentId },
-        data: { currentAttempt: newAttemptNumber, status: 'in_progress' },
-      })
-
-      return created
-    }
-
-    // Retry'da pre-exam gerekli mi? Training konfigürasyonundan oku.
-    // requirePreExamOnRetry=false (varsayılan, mevcut davranışı korur) → retry'da pre-exam atlanır.
-    // Admin true yaparsa retry'da da pre-exam yapılır.
     const isRetry = newAttemptNumber > 1
-    const skipPreExam = isRetry && !assignment.training.requirePreExamOnRetry
-    const initialStatus = skipPreExam ? 'watching_videos' : 'pre_exam'
+    const requirePreExamOnRetry = assignment.training.requirePreExamOnRetry === true
+
+    const startTransition = attemptNextStatus(null, {
+      type: 'START',
+      examOnly: isExamOnly,
+      isRetry,
+      requirePreExamOnRetry,
+    })
+    if (!startTransition.ok) {
+      throw new Error(`START_TRANSITION_REJECTED: ${startTransition.reason}`)
+    }
+    const initialStatus = startTransition.next
+
+    // Timestamp alanları initialStatus'e göre seçilir (state ↔ data tutarlılığı).
+    const timestampFields =
+      initialStatus === 'post_exam'
+        ? { postExamStartedAt: new Date() }
+        : initialStatus === 'watching_videos'
+          ? { preExamCompletedAt: new Date(), preExamScore: 0 }
+          : { preExamStartedAt: new Date() }
 
     const created = await tx.examAttempt.create({
       data: {
@@ -208,17 +227,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         organizationId: dbUser!.organizationId!,
         attemptNumber: newAttemptNumber,
         status: initialStatus,
-        ...(skipPreExam
-          ? { preExamCompletedAt: new Date(), preExamScore: 0 }
-          : { preExamStartedAt: new Date() }
-        ),
+        ...timestampFields,
       },
       include: { videoProgress: true },
     })
 
+    // Assignment status geçişi de state machine üzerinden gider.
+    const assignmentTransition = assignmentNextStatus(assignment.status as AssignmentStatus, { type: 'ATTEMPT_STARTED' })
+    if (!assignmentTransition.ok) {
+      throw new Error(`ASSIGNMENT_TRANSITION_REJECTED: ${assignmentTransition.reason}`)
+    }
+
     await tx.trainingAssignment.update({
       where: { id: assignmentId },
-      data: { currentAttempt: newAttemptNumber, status: 'in_progress' },
+      data: { currentAttempt: newAttemptNumber, status: assignmentTransition.next },
     })
 
     return created
