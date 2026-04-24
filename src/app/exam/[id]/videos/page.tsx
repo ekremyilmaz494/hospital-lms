@@ -17,6 +17,7 @@ const AudioPlayer = dynamic(
 );
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
+import { attemptPhaseRedirect, type AttemptStatus } from '@/lib/exam-state-machine';
 
 interface VideoItem {
   id: string;
@@ -300,9 +301,14 @@ export default function VideoPlayerPage() {
 
   useEffect(() => {
     if (isReview) return;
-    if (data?.attemptStatus === 'pre_exam') router.replace(`/exam/${id}/pre-exam`);
-    else if (data?.attemptStatus === 'post_exam') router.replace(`/exam/${id}/post-exam`);
-    else if (data?.attemptStatus === 'completed') router.replace('/staff/my-trainings');
+    if (!data?.attemptStatus) return;
+    const redirect = attemptPhaseRedirect(data.attemptStatus as AttemptStatus, 'videos');
+    if (redirect) {
+      const path = redirect === 'my-trainings'
+        ? '/staff/my-trainings'
+        : `/exam/${id}/${redirect}`;
+      router.replace(path);
+    }
   }, [data?.attemptStatus, id, router, isReview]);
 
   if ((!startReady && !startError) || isLoading) return <PageLoading />;

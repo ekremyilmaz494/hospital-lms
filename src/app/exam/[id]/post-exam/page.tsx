@@ -6,6 +6,7 @@ import { Clock, ChevronRight, AlertTriangle, Lock, LogOut } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import { attemptPhaseRedirect, type AttemptStatus } from '@/lib/exam-state-machine';
 
 interface Option {
   id: string;
@@ -71,10 +72,12 @@ export default function PostExamPage() {
           setPhaseChecked(true);
           return;
         }
-        if (attempt.status !== 'post_exam') {
-          if (attempt.status === 'pre_exam') router.replace(`/exam/${id}/pre-exam`);
-          else if (attempt.status === 'watching_videos') router.replace(`/exam/${id}/videos`);
-          else if (attempt.status === 'completed') router.replace('/staff/my-trainings');
+        const redirect = attemptPhaseRedirect(attempt.status as AttemptStatus, 'post-exam');
+        if (redirect) {
+          const path = redirect === 'my-trainings'
+            ? '/staff/my-trainings'
+            : `/exam/${id}/${redirect}`;
+          router.replace(path);
           return;
         }
         setAttemptId(attempt.id);

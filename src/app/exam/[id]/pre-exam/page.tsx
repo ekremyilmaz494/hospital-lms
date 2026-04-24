@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Clock, ChevronRight, AlertTriangle, LogOut, Shield, Timer, Ban, Lock, ArrowLeft } from 'lucide-react';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import { attemptPhaseRedirect, type AttemptStatus } from '@/lib/exam-state-machine';
 
 interface Option {
   id: string;
@@ -84,17 +85,21 @@ export default function PreExamPage() {
           return;
         }
 
-        if (attempt?.examOnly || attempt?.status === 'post_exam') {
+        // examOnly: API START(examOnly=true) sonrası status='post_exam' döner
+        // (bkz. exam-state-machine.ts). attemptPhaseRedirect status'e bakarak yönlendirir.
+        if (attempt?.examOnly && attempt?.status !== 'post_exam') {
           router.replace(`/exam/${id}/post-exam`);
           return;
         }
-        if (attempt?.status === 'watching_videos') {
-          router.replace(`/exam/${id}/videos`);
-          return;
-        }
-        if (attempt?.status === 'completed') {
-          router.replace('/staff/my-trainings');
-          return;
+        if (attempt?.status) {
+          const redirect = attemptPhaseRedirect(attempt.status as AttemptStatus, 'pre-exam');
+          if (redirect) {
+            const path = redirect === 'my-trainings'
+              ? '/staff/my-trainings'
+              : `/exam/${id}/${redirect}`;
+            router.replace(path);
+            return;
+          }
         }
 
         if (!cancelled) setAttemptId(attempt?.id ?? null);
