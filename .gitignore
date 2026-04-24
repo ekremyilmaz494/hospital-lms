@@ -83,3 +83,6 @@ hospital-lms-next/
 # Lock files — pnpm tek kaynak (CLAUDE.md). Vercel ve dev ortamının aynı lock'u kullanması için npm/yarn lock'ları commit edilmez.
 package-lock.json
 yarn.lock
+
+# generated PDF outputs
+/hospital-admin-rehberi.pdf
