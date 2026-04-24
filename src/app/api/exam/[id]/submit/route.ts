@@ -9,6 +9,13 @@ import { logger } from '@/lib/logger'
 import { sendEmail, certificateIssuedEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity-logger'
 import { isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
+import {
+  attemptNextStatus,
+  assignmentNextStatus,
+  isAttemptInPhase,
+  type AttemptStatus,
+  type AssignmentStatus,
+} from '@/lib/exam-state-machine'
 
 
 /** Submit pre-exam or post-exam answers */
@@ -57,11 +64,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (attempt.status === 'completed') return errorResponse('Bu deneme zaten tamamlanmış', 400)
 
   // Phase transition validation — ensure attempt status matches the submitted phase
-  const submittedPhase = parsed.data.phase ?? (attempt.status === 'pre_exam' ? 'pre' : 'post')
-  if (submittedPhase === 'pre' && attempt.status !== 'pre_exam') {
+  const attemptStatus = attempt.status as AttemptStatus
+  const submittedPhase = parsed.data.phase ?? (attemptStatus === 'pre_exam' ? 'pre' : 'post')
+  if (submittedPhase === 'pre' && !isAttemptInPhase(attemptStatus, ['pre_exam'])) {
     return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
   }
-  if (submittedPhase === 'post' && attempt.status !== 'post_exam') {
+  if (submittedPhase === 'post' && !isAttemptInPhase(attemptStatus, ['post_exam'])) {
     return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
   }
 
@@ -172,9 +180,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Update attempt based on phase — atomic status guard prevents double-submit race condition
   if (phase === 'pre') {
+    const preTransition = attemptNextStatus(attemptStatus, { type: 'PRE_EXAM_SUBMITTED' })
+    if (!preTransition.ok) {
+      return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
+    }
     const updated = await prisma.examAttempt.updateMany({
       where: { id: attempt.id, status: 'pre_exam' },
-      data: { preExamScore: score, preExamCompletedAt: new Date(), status: 'watching_videos' },
+      data: { preExamScore: score, preExamCompletedAt: new Date(), status: preTransition.next },
     })
     if (updated.count === 0) {
       // Concurrent request already processed this submission
@@ -187,9 +199,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // Post-exam
   const isPassed = score >= attempt.training.passingScore
 
+  const postTransition = attemptNextStatus(attemptStatus, { type: 'POST_EXAM_SUBMITTED' })
+  if (!postTransition.ok) {
+    return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
+  }
+
   const updated = await prisma.examAttempt.updateMany({
     where: { id: attempt.id, status: 'post_exam' },
-    data: { postExamScore: score, postExamCompletedAt: new Date(), isPassed, status: 'completed' },
+    data: { postExamScore: score, postExamCompletedAt: new Date(), isPassed, status: postTransition.next },
   })
   if (updated.count === 0) {
     // Concurrent request already completed this attempt
@@ -202,14 +219,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // Update assignment status
   // assignment.maxAttempts admin "Yeni Hak Ver" ile override edilmiş olabilir
   const effectiveMaxAttempts = attempt.assignment.maxAttempts ?? attempt.training.maxAttempts
-  const newStatus = isPassed ? 'passed' : (
-    attempt.attemptNumber >= effectiveMaxAttempts ? 'failed' : 'in_progress'
+  const assignmentEvent = isPassed
+    ? ({ type: 'POST_EXAM_PASSED' } as const)
+    : ({ type: 'POST_EXAM_FAILED', attemptsRemaining: Math.max(0, effectiveMaxAttempts - attempt.attemptNumber) } as const)
+  const assignmentTransition = assignmentNextStatus(
+    attempt.assignment.status as AssignmentStatus,
+    assignmentEvent,
   )
+  if (!assignmentTransition.ok) {
+    return errorResponse('Atama durumu güncellenemedi: geçersiz durum geçişi', 400)
+  }
 
   await prisma.trainingAssignment.update({
     where: { id: attempt.assignmentId },
     data: {
-      status: newStatus,
+      status: assignmentTransition.next,
       ...(isPassed && { completedAt: new Date() }),
     },
   })
