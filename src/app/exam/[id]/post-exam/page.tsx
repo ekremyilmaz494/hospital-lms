@@ -103,7 +103,10 @@ export default function PostExamPage() {
         if (cancelled) return;
         const remaining = data.remainingSeconds ?? examData?.totalTime ?? 1800;
         if (remaining <= 0) {
-          router.replace(`/exam/${id}?error=time_expired`);
+          // Süre dolmuş halde dönen kullanıcı: timer POST recovery attempt'i zaten
+          // completed+failed yaptı. /exam/[id] sayfası olmadığı için eskiden 404'e düşüyorduk;
+          // şimdi mevcut hata ekranını (pe-err) göster, kullanıcı "Eğitimlerime Dön" ile çıkar.
+          setStartError('Sınav süresi dolmuş. Bu deneme tamamlandı.');
           return;
         }
         setTimeLeft(remaining);
