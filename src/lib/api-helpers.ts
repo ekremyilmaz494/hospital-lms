@@ -198,11 +198,11 @@ export async function getAuthUserWithWriteGuard(request: Request) {
 }
 
 /**
- * @deprecated Dönüş değerinin kontrol edilmesi unutulabilir — yeni kodda `assertRole` kullanın.
- * Mevcut kullanımlar çalışmaya devam eder, ancak yeni route'lara eklemeyin.
+ * Standart auth role guard. Pattern: `const err = requireRole(role, [...]); if (err) return err;`
  *
- * Require specific roles — returns error response if not authorized.
- * IMPORTANT: Caller MUST check return value: `if (roleError) return roleError`
+ * Returns a 403 error response if the user's role is not in `allowed`, else null.
+ * Caller MUST check return value and early-return. De facto standart; yeni route'larda da kullanılabilir.
+ * Alternatif: `assertRole` (try/catch içinde throw eder).
  */
 export function requireRole(role: string, allowed: string[]) {
   if (!allowed.includes(role)) {
@@ -212,8 +212,9 @@ export function requireRole(role: string, allowed: string[]) {
 }
 
 /**
- * Role guard that throws instead of returning — use in new code.
- * No need to check return value.
+ * Throwing variant of `requireRole`. Throws `ApiError(403)` if role is not allowed.
+ * Kullanım: try/catch bloğu içinde, böylece dönüş değerini kontrol etmeye gerek kalmaz.
+ * `requireRole` ile eşdeğer ve her ikisi de geçerli — route'un hata akışına göre seçin.
  */
 export function assertRole(role: string, allowed: string[]): void {
   if (!allowed.includes(role)) {
