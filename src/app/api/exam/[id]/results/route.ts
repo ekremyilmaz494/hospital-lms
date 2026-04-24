@@ -42,6 +42,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       },
       select: {
         id: true,
+        trainingId: true,
         isPassed: true,
         status: true,
         postExamScore: true,
