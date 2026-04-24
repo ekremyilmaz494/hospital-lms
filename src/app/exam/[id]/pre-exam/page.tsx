@@ -85,12 +85,8 @@ export default function PreExamPage() {
           return;
         }
 
-        // examOnly: API START(examOnly=true) sonrası status='post_exam' döner
-        // (bkz. exam-state-machine.ts). attemptPhaseRedirect status'e bakarak yönlendirir.
-        if (attempt?.examOnly && attempt?.status !== 'post_exam') {
-          router.replace(`/exam/${id}/post-exam`);
-          return;
-        }
+        // examOnly attempt'ler START sonrası status='post_exam' ile döner;
+        // attemptPhaseRedirect tek doğruluk kaynağı (bkz. exam-state-machine.ts).
         if (attempt?.status) {
           const redirect = attemptPhaseRedirect(attempt.status as AttemptStatus, 'pre-exam');
           if (redirect) {
