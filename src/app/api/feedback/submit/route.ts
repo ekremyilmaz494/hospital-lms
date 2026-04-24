@@ -3,6 +3,7 @@ import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } f
 import { trainingFeedbackSubmitSchema } from '@/lib/validations'
 import { checkRateLimit } from '@/lib/redis'
 import { isValidAnswer, isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
+import { isTrainingAccessible } from '@/lib/training-helpers'
 import { logger } from '@/lib/logger'
 
 /**
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
   if (attempt.feedbackResponse) return errorResponse('Bu sınav için zaten geri bildirim gönderdiniz', 409)
   // Archived/pasif eğitime feedback yasak — eski attempt'ler için bile. Exam akışı
   // zaten engelliyor ama savunmacı kat: doğrudan POST edilirse yakalanır.
-  if (!attempt.training.isActive || attempt.training.publishStatus === 'archived') {
+  if (!isTrainingAccessible(attempt.training)) {
     return errorResponse('Bu eğitim artık aktif değil, geri bildirim kabul edilmiyor', 400)
   }
 

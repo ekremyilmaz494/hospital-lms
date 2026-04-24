@@ -4,6 +4,7 @@ import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { logActivity } from '@/lib/activity-logger'
 import { getPendingMandatoryFeedback } from '@/lib/feedback-helpers'
+import { isTrainingAccessible } from '@/lib/training-helpers'
 import {
   attemptNextStatus,
   assignmentNextStatus,
@@ -49,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!assignment) return errorResponse('Eğitim atanması bulunamadı', 404)
 
   // Arşivli eğitim: yeni sınav başlatılamaz (in-progress attempt'ler resume'a izin verilir)
-  if (!assignment.training.isActive || assignment.training.publishStatus === 'archived') {
+  if (!isTrainingAccessible(assignment.training)) {
     return errorResponse('Bu eğitim arşivlenmiş, yeni sınav başlatılamaz.', 403)
   }
 

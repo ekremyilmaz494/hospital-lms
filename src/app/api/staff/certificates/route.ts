@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { withCache } from '@/lib/redis'
+import { isTrainingAccessible } from '@/lib/training-helpers'
 
 export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
           training: {
             title: c.training.title,
             category: c.training.category ?? '',
-            isArchived: !c.training.isActive || c.training.publishStatus === 'archived',
+            isArchived: !isTrainingAccessible(c.training),
           },
           score: c.attempt.postExamScore ? Number(c.attempt.postExamScore) : 0,
           attemptNumber: c.attempt.attemptNumber,
