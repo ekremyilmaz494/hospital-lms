@@ -13,6 +13,7 @@ import {
   attemptNextStatus,
   assignmentNextStatus,
   isAttemptInPhase,
+  attemptStatusToExamPhase,
   type AttemptStatus,
   type AssignmentStatus,
 } from '@/lib/exam-state-machine'
@@ -65,7 +66,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Phase transition validation — ensure attempt status matches the submitted phase
   const attemptStatus = attempt.status as AttemptStatus
-  const submittedPhase = parsed.data.phase ?? (attemptStatus === 'pre_exam' ? 'pre' : 'post')
+  const phase = attemptStatusToExamPhase(attemptStatus)
+  if (!phase) {
+    return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
+  }
+  const submittedPhase = parsed.data.phase ?? phase
   if (submittedPhase === 'pre' && !isAttemptInPhase(attemptStatus, ['pre_exam'])) {
     return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
   }
@@ -74,7 +79,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   // B7.1/G7.1 — phaseStartedAt null ise sınav başlatılmamış demek; gönderimi reddet
-  const phaseStartedAt = attempt.status === 'pre_exam' ? attempt.preExamStartedAt : attempt.postExamStartedAt
+  const phaseStartedAt = phase === 'pre' ? attempt.preExamStartedAt : attempt.postExamStartedAt
   if (!phaseStartedAt) {
     logger.warn('Exam Submit', 'phaseStartedAt null — sınav başlatılmamış, gönderim reddedildi', { attemptId: attempt.id })
     return errorResponse('Sınav henüz başlatılmamış. Lütfen sınavı yeniden başlatın.', 400)
@@ -89,8 +94,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return errorResponse('Sınav süresi çoktan dolmuş. Bu gönderim kabul edilemez.', 403)
     }
   }
-
-  const phase = attempt.status === 'pre_exam' ? 'pre' : 'post'
 
   // Get correct answers
   const questions = await prisma.question.findMany({

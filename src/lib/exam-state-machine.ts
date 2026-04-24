@@ -1,9 +1,19 @@
 /**
- * Exam Attempt + Training Assignment için **state machine** — TEK doğruluk kaynağı.
+ * Exam Attempt + Training Assignment için **state machine**.
  *
- * Şu an entegrasyon YAPILMADI (strangler fig pattern). Bu modül paralel yaşar,
- * önce kapsamlı testlerle doğrulanır. Sonra route/page'ler tek tek bu modüle
- * geçirilir (her geçiş ayrı PR).
+ * Kapsam (TEK doğruluk kaynağı olduğu yer):
+ *   - Status TRANSITION'ları (hangi event hangi state'e götürür)
+ *   - Phase GUARD'ları (kullanıcı bu route'ta bulunabilir mi)
+ *   - Submit sonrası ROUTING (hangi sayfaya yönlensin)
+ *
+ * Kapsam DIŞI (route/handler'da kalır):
+ *   - DB `where` filter'lardaki status literal'ları (atomic guard amacı, transition değil)
+ *   - Status'ten DB kolon seçimi (örn. pre_exam → preExamStartedAt) — projeksiyon, transition değil
+ *   - Business policy (effectiveMaxAttempts, isPassed eşiği vb.)
+ *
+ * Strangler fig migration TAMAMLANDI: PR #38–42 ile exam/start, exam/submit,
+ * videos/progress, cron/cleanup, admin reset, frontend phase guard'lar bu modüle
+ * geçirildi. Yeni route eklerken transition logic'i burada tut.
  *
  * ──────────────────────────────────────────────────────────────────────
  * EXAM ATTEMPT (her sınav denemesi):
@@ -230,6 +240,22 @@ export function attemptPhaseRedirect(status: AttemptStatus, currentRoute: ExamRo
     post_exam: 'post-exam',
   } as const)[status]
   return currentRoute === expectedRoute ? null : expectedRoute
+}
+
+/**
+ * Attempt status → exam phase ('pre' | 'post' | null).
+ * Sınav cevap/skor/timer kayıtları phase ekseniyle saklanır
+ * (preExamScore, postExamCompletedAt, examPhase kolonu vb.). Bu helper status'ten
+ * o eksene projeksiyon yapar — transition değil.
+ *
+ * `null` döner: status sınav fazında değil (watching_videos / completed / expired).
+ */
+export type ExamPhase = 'pre' | 'post'
+
+export function attemptStatusToExamPhase(status: AttemptStatus): ExamPhase | null {
+  if (status === 'pre_exam') return 'pre'
+  if (status === 'post_exam') return 'post'
+  return null
 }
 
 // ── Re-routing helper (transition page için) ──────────────────────────

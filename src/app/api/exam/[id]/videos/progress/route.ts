@@ -21,8 +21,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = updateVideoProgressSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
+  // status filter atomic guard — pre_exam/post_exam fazındaki attempt'e video progress
+  // yazılması state corruption'a yol açar (bkz. exam-state-machine.ts kapsam notu:
+  // DB filter literal'ları transition değil guard amacıyla kullanılır).
   const attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
-    where: { id: attemptId, userId: dbUser!.id, status: 'watching_videos' },
+    where: { id: attemptId, userId: dbUser!.id, status: 'watching_videos' satisfies AttemptStatus },
     include: { training: { select: { organizationId: true } } },
   })
 
