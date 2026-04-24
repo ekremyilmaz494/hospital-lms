@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
 import { logger } from '@/lib/logger'
 
 /**
@@ -55,23 +56,14 @@ export async function GET(request: Request) {
       select: { id: true, submittedAt: true },
     })
 
-    // Trigger koşulu:
+    // Trigger koşulu — paylaşılan helper:
     //  1. Aktif form var
     //  2. Kullanıcı daha önce bu eğitim için feedback vermemiş
-    //  3. Sınav tamamlanmış (status === 'completed')
-    //  4. Attempt orijinal atama cycle'ı içinde (attemptNumber <= originalMaxAttempts)
-    //  5. Ya başarılı ya da orijinal cycle'ın son denemesi
-    const originalMax = attempt.assignment.originalMaxAttempts
-    const withinOriginalCycle = attempt.attemptNumber <= originalMax
-    const isFinalOriginalAttempt = attempt.attemptNumber === originalMax
-    const triggerCondition = attempt.isPassed || isFinalOriginalAttempt
-
+    //  3. Attempt completed + cycle içinde + (passed || final original)
     const feedbackRequired =
       !!activeForm &&
       !priorFeedback &&
-      attempt.status === 'completed' &&
-      withinOriginalCycle &&
-      triggerCondition
+      isAttemptFeedbackTriggered(attempt, attempt.assignment.originalMaxAttempts)
 
     return jsonResponse({
       attemptStatus: attempt.status,

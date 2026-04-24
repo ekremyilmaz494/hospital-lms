@@ -8,8 +8,46 @@ import {
   isValidAnswer,
   aggregateItemScores,
   calculateOverallScore,
+  isAttemptFeedbackTriggered,
   type FeedbackQuestionType,
 } from '../feedback-helpers'
+
+describe('isAttemptFeedbackTriggered', () => {
+  const base = { status: 'completed', isPassed: false, attemptNumber: 1 }
+
+  it('status completed değilse false', () => {
+    expect(isAttemptFeedbackTriggered({ ...base, status: 'in_progress' }, 3)).toBe(false)
+    expect(isAttemptFeedbackTriggered({ ...base, status: 'pre_exam' }, 3)).toBe(false)
+    expect(isAttemptFeedbackTriggered({ ...base, status: 'post_exam' }, 3)).toBe(false)
+  })
+
+  it('passed → true (attempt numarasından bağımsız, cycle içinde)', () => {
+    expect(isAttemptFeedbackTriggered({ ...base, isPassed: true, attemptNumber: 1 }, 3)).toBe(true)
+    expect(isAttemptFeedbackTriggered({ ...base, isPassed: true, attemptNumber: 2 }, 3)).toBe(true)
+    expect(isAttemptFeedbackTriggered({ ...base, isPassed: true, attemptNumber: 3 }, 3)).toBe(true)
+  })
+
+  it('passed + cycle dışı (admin yeni hak verdi) → false', () => {
+    expect(isAttemptFeedbackTriggered({ ...base, isPassed: true, attemptNumber: 4 }, 3)).toBe(false)
+  })
+
+  it('failed + cycle son denemesi → true (son şans, feedback zorunlu)', () => {
+    expect(isAttemptFeedbackTriggered({ ...base, attemptNumber: 3 }, 3)).toBe(true)
+  })
+
+  it('failed + cycle ara denemesi → false (kilit tetiklenmez, kullanıcı tekrar deneyecek)', () => {
+    expect(isAttemptFeedbackTriggered({ ...base, attemptNumber: 1 }, 3)).toBe(false)
+    expect(isAttemptFeedbackTriggered({ ...base, attemptNumber: 2 }, 3)).toBe(false)
+  })
+
+  it('failed + cycle dışı → false', () => {
+    expect(isAttemptFeedbackTriggered({ ...base, attemptNumber: 4 }, 3)).toBe(false)
+  })
+
+  it('originalMaxAttempts=1 + failed → tek deneme, hemen son → true', () => {
+    expect(isAttemptFeedbackTriggered({ ...base, attemptNumber: 1 }, 1)).toBe(true)
+  })
+})
 
 describe('isValidAnswer', () => {
   describe('likert_5', () => {

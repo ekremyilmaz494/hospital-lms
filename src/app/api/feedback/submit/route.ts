@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { trainingFeedbackSubmitSchema } from '@/lib/validations'
 import { checkRateLimit } from '@/lib/redis'
-import { isValidAnswer } from '@/lib/feedback-helpers'
+import { isValidAnswer, isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
 import { logger } from '@/lib/logger'
 
 /**
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
       id: true,
       status: true,
       isPassed: true,
+      attemptNumber: true,
       trainingId: true,
       training: {
         select: {
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
           publishStatus: true,
         },
       },
+      assignment: { select: { originalMaxAttempts: true } },
       feedbackResponse: { select: { id: true } },
     },
   })
@@ -66,6 +68,13 @@ export async function POST(request: Request) {
   // zaten engelliyor ama savunmacı kat: doğrudan POST edilirse yakalanır.
   if (!attempt.training.isActive || attempt.training.publishStatus === 'archived') {
     return errorResponse('Bu eğitim artık aktif değil, geri bildirim kabul edilmiyor', 400)
+  }
+
+  // Tetik koşulu doğrulaması — status route ile aynı kuralı uygular.
+  // Aksi halde kullanıcı erken bir failed attempt'ten sonra feedback gönderip
+  // (idempotency yüzünden) ileride zorunlu feedback kilidini atlatabilir.
+  if (!isAttemptFeedbackTriggered(attempt, attempt.assignment.originalMaxAttempts)) {
+    return errorResponse('Bu deneme için henüz geri bildirim verilemez', 400)
   }
 
   // Kullanıcı+training bazlı idempotency: aynı eğitim için ikinci feedback engellenir.

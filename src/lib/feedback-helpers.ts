@@ -8,6 +8,31 @@ import { prisma } from '@/lib/prisma'
 export type FeedbackQuestionType = 'likert_5' | 'yes_partial_no' | 'text'
 
 /**
+ * EY.FR.40 — Bir attempt'in "feedback için trigger" durumunu hesaplar.
+ *
+ * Trigger koşulları (TÜMÜ doğru olmalı):
+ *   1. attempt completed
+ *   2. attemptNumber orijinal cycle içinde (<= originalMaxAttempts)
+ *   3. ya passed ya da orijinal cycle'ın son denemesi (attemptNumber === originalMaxAttempts)
+ *
+ * `activeForm` ve `priorResponse` kontrolünü çağıran taraf yapar — bu fonksiyon
+ * yalnızca attempt'in tetikleme şartlarını sağlayıp sağlamadığını döner.
+ *
+ * Aynı kuralı feedback/status, feedback/submit, exam/submit ve
+ * getPendingMandatoryFeedback paylaşmalıdır — tek doğruluk kaynağı.
+ */
+export function isAttemptFeedbackTriggered(attempt: {
+  status: string
+  isPassed: boolean
+  attemptNumber: number
+}, originalMaxAttempts: number): boolean {
+  if (attempt.status !== 'completed') return false
+  if (attempt.attemptNumber > originalMaxAttempts) return false
+  const isFinalOriginal = attempt.attemptNumber === originalMaxAttempts
+  return attempt.isPassed || isFinalOriginal
+}
+
+/**
  * Kullanıcının bekleyen ZORUNLU geri bildirim'i varsa döner.
  * "Zorunlu" = training.feedbackMandatory === true
  * "Bekleyen" = trigger koşulunu sağlayan bir attempt'i var AMA kullanıcı henüz
@@ -34,6 +59,7 @@ export async function getPendingMandatoryFeedback(userId: string): Promise<{
     },
     select: {
       id: true,
+      status: true,
       isPassed: true,
       attemptNumber: true,
       trainingId: true,
@@ -55,15 +81,11 @@ export async function getPendingMandatoryFeedback(userId: string): Promise<{
 
   for (const a of attempts) {
     if (submittedTrainingIds.has(a.trainingId)) continue
-    const originalMax = a.assignment.originalMaxAttempts
-    if (a.attemptNumber > originalMax) continue
-    const isFinal = a.attemptNumber === originalMax
-    if (a.isPassed || isFinal) {
-      return {
-        trainingId: a.trainingId,
-        trainingTitle: a.training.title,
-        attemptId: a.id,
-      }
+    if (!isAttemptFeedbackTriggered(a, a.assignment.originalMaxAttempts)) continue
+    return {
+      trainingId: a.trainingId,
+      trainingTitle: a.training.title,
+      attemptId: a.id,
     }
   }
   return null

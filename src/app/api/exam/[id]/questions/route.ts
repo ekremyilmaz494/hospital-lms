@@ -97,8 +97,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // seçilmez ve cevaplanmış sorular tab kapandığında "kaybolmaz".
   const attemptSeed = attempt ? stringToSeed(`${attempt.id}:${phase}:q`) : 0
 
-  // Tüm eğitimlerde soru sırası karıştır (pre + post exam)
-  questions = shuffle(questions, attemptSeed)
+  // randomizeQuestions=true ise sırayı karıştır; aksi halde sortOrder ile bırak.
+  // examOnly + randomQuestionCount yapılandırılmışsa subset seçimi için shuffle zorunlu.
+  const examOnlyWithRandomSubset = !!training.examOnly && !!training.randomQuestionCount && training.randomQuestionCount > 0 && training.randomQuestionCount < questions.length
+  const needsShuffle = training.randomizeQuestions || examOnlyWithRandomSubset
+  if (needsShuffle) {
+    questions = shuffle(questions, attemptSeed)
+  }
 
   // examOnly sınavlarda rastgele soru sayısı limiti — shuffle deterministic olduğu
   // için slice sonucu da attempt boyunca sabit.

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { calculateTrainingProgress } from '@/lib/training-progress'
 import { logger } from '@/lib/logger'
 import { getCached, setCached } from '@/lib/redis'
 
@@ -31,11 +32,17 @@ export async function GET() {
     }
 
     // 1) Assignments + attempts + notifications + recent activity — tümü paralel
+    // Arşivlenmiş/pasif eğitimleri filtrele — my-trainings ile aynı görünürlük
+    // (memory: feedback_archived_training_filter konvansiyonu).
     const [assignments, notifications, recentAttempts] = await Promise.all([
       prisma.trainingAssignment.findMany({
         where: {
           userId,
-          training: { organizationId: dbUser!.organizationId! },
+          training: {
+            organizationId: dbUser!.organizationId!,
+            isActive: true,
+            publishStatus: { not: 'archived' },
+          },
         },
         include: {
           training: {
@@ -49,7 +56,8 @@ export async function GET() {
             take: 1,
             select: {
               postExamScore: true, preExamScore: true, isPassed: true,
-              status: true, preExamCompletedAt: true, videosCompletedAt: true,
+              status: true, attemptNumber: true,
+              preExamCompletedAt: true, videosCompletedAt: true,
               postExamCompletedAt: true,
             },
           },
@@ -92,13 +100,13 @@ export async function GET() {
           : 999
 
         const latestAttempt = a.examAttempts[0]
-        let progress = 0
-        if (latestAttempt) {
-          if (latestAttempt.postExamCompletedAt) progress = 100
-          else if (latestAttempt.videosCompletedAt) progress = 75
-          else if (latestAttempt.preExamCompletedAt) progress = 25
-          else progress = 10
-        }
+        const { percent: progress } = calculateTrainingProgress({
+          examOnly: a.training.examOnly === true,
+          attemptNumber: latestAttempt?.attemptNumber ?? 0,
+          preExamCompleted: latestAttempt?.preExamCompletedAt != null,
+          videosCompleted: latestAttempt?.videosCompletedAt != null,
+          postExamCompleted: latestAttempt?.postExamCompletedAt != null,
+        })
 
         return {
           id: a.id,
