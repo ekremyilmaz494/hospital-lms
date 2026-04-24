@@ -271,11 +271,23 @@ export default function VideoPlayerPage() {
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.hidden && videoRef.current && !videoRef.current.paused) videoRef.current.pause();
+      if (!document.hidden) return;
+      // Sekme gizlendi: önce video'yu durdur, sonra pozisyonu hemen flush et.
+      // Eskiden sadece pause vardı → mobilde app arka plana atılıp killed olursa
+      // 15 sn'lik heartbeat'e kadar olan ilerleme kayboluyordu.
+      if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
+      if (isReview || !currentVideo || currentTime <= 0) return;
+      const payload = JSON.stringify({
+        videoId: currentVideo.id,
+        watchedTime: currentTime,
+        position: currentTime,
+      });
+      const blob = new Blob([payload], { type: 'application/json' });
+      navigator.sendBeacon(`/api/exam/${id}/videos`, blob);
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
+  }, [currentVideo, currentTime, id, isReview]);
 
   useEffect(() => {
     const pos = currentVideo?.lastPosition ?? 0;
@@ -295,8 +307,13 @@ export default function VideoPlayerPage() {
         navigator.sendBeacon(`/api/exam/${id}/videos`, blob);
       }
     };
+    // iOS Safari'de beforeunload sıklıkla tetiklenmez; pagehide daha güvenilir.
+    window.addEventListener('pagehide', saveOnExit);
     window.addEventListener('beforeunload', saveOnExit);
-    return () => window.removeEventListener('beforeunload', saveOnExit);
+    return () => {
+      window.removeEventListener('pagehide', saveOnExit);
+      window.removeEventListener('beforeunload', saveOnExit);
+    };
   }, [currentVideo?.id, currentTime, id, isReview, currentVideo]);
 
   useEffect(() => {

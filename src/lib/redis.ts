@@ -57,6 +57,23 @@ export async function startExamTimer(attemptId: string, durationMinutes: number)
   return expiresAt
 }
 
+// Redis TTL süresi geçtiğinde veya Redis flush sonrası DB'deki phaseStartedAt'tan
+// hesaplanmış mutlak expiresAt ile sayacı yeniden doldurur. TTL, kalan süre + 60 sn grace.
+export async function resumeExamTimer(attemptId: string, expiresAt: number) {
+  const ttlSeconds = Math.max(60, Math.ceil((expiresAt - Date.now()) / 1000) + 60)
+  const redis = getRedis()
+  if (redis) {
+    try {
+      await redis.set(`${EXAM_TIMER_PREFIX}${attemptId}`, expiresAt, { ex: ttlSeconds })
+      return expiresAt
+    } catch {
+      resetRedis()
+    }
+  }
+  memoryTimers.set(attemptId, expiresAt)
+  return expiresAt
+}
+
 export async function getExamTimeRemaining(attemptId: string): Promise<number | null> {
   const redis = getRedis()
   let expiresAt: number | null = null

@@ -93,14 +93,29 @@ function TransitionContent() {
 
   useEffect(() => {
     if (!isPostResult) return;
+    // 1) Fast path: submit sonrası sessionStorage'da tazeyken oku
     try {
       const stored = sessionStorage.getItem(`exam-results-${id}`);
       if (stored) {
         setQuestionResults(JSON.parse(stored) as QuestionResult[]);
         sessionStorage.removeItem(`exam-results-${id}`);
+        return;
       }
     } catch { /* ignore */ }
-  }, [isPostResult, id]);
+
+    // 2) Fallback: sayfa yenilendi ya da telefon kapanıp açıldı → DB'den replay
+    //    Sadece geçen kullanıcı için endpoint detay döndürür (anti-cheating).
+    if (passed !== 'true' || !attemptIdParam) return;
+    let cancelled = false;
+    fetch(`/api/exam/${attemptIdParam}/results`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (cancelled || !d || !Array.isArray(d.results)) return;
+        setQuestionResults(d.results as QuestionResult[]);
+      })
+      .catch(() => { /* sessiz — ekranda skor kartı yeterli */ });
+    return () => { cancelled = true; };
+  }, [isPostResult, id, passed, attemptIdParam]);
 
   useEffect(() => {
     if (!isPostResult || !attemptIdParam) return;
