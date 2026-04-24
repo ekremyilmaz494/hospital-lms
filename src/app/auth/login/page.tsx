@@ -21,6 +21,7 @@ const MeshGradient = dynamic(
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { useOrgBranding } from '@/hooks/use-org-branding';
+import { getRolePath } from '@/lib/route-helpers';
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/super-admin/dashboard',
@@ -129,10 +130,10 @@ function LoginForm() {
         return;
       }
 
-      const role = data.user?.role as string;
-      const rolePrefix = role === 'super_admin' ? '/super-admin' : role === 'admin' ? '/admin' : '/staff';
+      const role = data.user?.role as string | undefined;
+      const rolePrefix = getRolePath(role, 'dashboard');
       const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
-      const target = isRedirectCompatible ? redirectTo : ROLE_ROUTES[role] || '/staff/dashboard';
+      const target = isRedirectCompatible ? redirectTo : (role && ROLE_ROUTES[role]) || '/staff/dashboard';
 
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
