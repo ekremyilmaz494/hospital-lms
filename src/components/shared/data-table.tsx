@@ -48,9 +48,6 @@ interface DataTableProps<TData, TValue> {
   onSearchChange?: (query: string) => void;
 }
 
-/** @deprecated Use useMobile() from @/hooks/use-mobile instead */
-const useMobileView = useMobile;
-
 export const DataTable = memo(function DataTable<TData, TValue>({
   columns,
   data,
@@ -66,7 +63,7 @@ export const DataTable = memo(function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
-  const isMobile = useMobileView();
+  const isMobile = useMobile();
 
   const isServerPagination = onPageChange !== undefined && currentPage !== undefined;
 
