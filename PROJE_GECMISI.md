@@ -6029,4 +6029,110 @@ Remote'ta birikmiş 7 merge edilmiş branch + 2 lokal orphan branch silindi:
 
 ---
 
-*Son güncelleme: 22 Nisan 2026 — Oturum 53 (Editorial Dark Mode + Mobile Polish + KVKK Modal Fix)*
+## OTURUM 54 — Kod Hijyen Pass'i + Kırık Production Fix
+
+**Tarih:** 24 Nisan 2026
+**Yaklaşım:** Code review bulgusu → state machine kapsamı netleştirme → sistematik dağınıklık taraması → 4 paralel agent ile temizlik → kırık production tespiti + fix
+
+### Bağlam
+Bir önceki oturumlarda exam state machine refactor'u tamamlanmıştı (PR #38–42). Bu oturum:
+1. Kullanıcı 3 düşük seviye bulgu bildirdi (header iddiası gerçeklikle uyuşmuyor, mapping tekrarı, defensive guard)
+2. Sistematik tarama ile 12 ek "kod hijyeni" bulgusu çıktı
+3. Hepsi paralel agent'larla 4 PR halinde toplandı
+
+### Adım 1 — State Machine Kapsamı Netleştirme (PR #43)
+
+**Bulgular** (kullanıcıdan):
+1. `exam-state-machine.ts` header'ı "entegrasyon yapılmadı, paralel yaşar" diyordu — ama PR #38–42 ile entegre edildi. Yanıltıcı.
+2. `submit/route.ts`'te 3 yerde tekrarlayan `attempt.status === 'pre_exam' ? 'pre' : 'post'` mapping'i.
+3. `videos/progress/route.ts` `where: { status: 'watching_videos' }` tip-güvensiz literal.
+4. `pre-exam/page.tsx` `if (examOnly && status !== 'post_exam')` redundant guard — `attemptPhaseRedirect` zaten yapıyor.
+
+**Çözümler** ([PR #43](https://github.com/ekremyilmaz494/hospital-lms/pull/43) — 4 dosya, +43/-15):
+- Header'a "kapsam içi/dışı" listesi yazıldı (transition + guard içeride; DB filter literal'ları + status→kolon projeksiyonu dışarıda).
+- `attemptStatusToExamPhase()` + `ExamPhase` type helper eklendi.
+- `'watching_videos' satisfies AttemptStatus` ile compile-time tip güvenliği.
+- Defensive `examOnly` check kaldırıldı.
+
+### Adım 2 — Sistematik Hijyen Tarama (12 Bulgu)
+
+Explore agent ile geri kalan dağınıklık tarandı. 6 kategori: (A) yanıltıcı yorumlar, (B) tekrar mapping'ler, (C) tip-güvensiz literal'lar, (D) redundant guard'lar, (E) deprecated kullanım, (F) hardcoded constants.
+
+Önceliklendirme:
+- 🔴 **Yüksek** — B6 (archived training check 3 yerde), F12 (hardcoded "Devakent Hastanesi" 35+ yerde, multi-tenant bug), E10 (`requireRole` deprecated ama 30+ kullanım)
+- 🟡 **Orta** — B4 (publishStatus mapping), B5 (role-to-path mapping), C7-8 (Prisma satisfies)
+- 🟢 **Düşük** — D9 (login redundant), E11 (useMobileView alias), 4 kozmetik
+
+### Adım 3 — 4 Paralel Agent + 4 PR
+
+Worktree isolation kullanıldı (4 ayrı `wt-*` dizini, paralel `pnpm install`).
+
+**PR #44** — Training helpers ([+30/-3](https://github.com/ekremyilmaz494/hospital-lms/pull/44))
+- `src/lib/training-helpers.ts` yeni: `isTrainingAccessible(training)` — feedback/submit + exam/start + staff/certificates'taki tekrar konsolide.
+- Agent doğru karar verdi: B4 (publishStatus mapping) atlandı çünkü iki dosyada Türkçe (`'Yayında'`) vs İngilizce (`'active'`) farkı var — UI'ı kıracaktı.
+
+**PR #45** — Deprecated cleanup ([2 dosya](https://github.com/ekremyilmaz494/hospital-lms/pull/45))
+- `requireRole` `@deprecated` tag kaldırıldı (de facto standart, 219 kullanım vs `assertRole` 4 kullanım).
+- `useMobileView` alias silindi (0 dış kullanım).
+- Agent gri-bölge kararı: 4 `assertRole` kullanımını migrate etmek yerine her ikisini eşdeğer API olarak sundu — sıfır davranış riski.
+
+**PR #46** — Route helpers + 13 test ([1 yeni + 1 test + 2 güncel](https://github.com/ekremyilmaz494/hospital-lms/pull/46))
+- `src/lib/route-helpers.ts` yeni: `getRolePath(role, section)` — login + topbar'da inline ternary'leri konsolide.
+- 13 unit test yazıldı (quirks dahil: `staff/settings → /staff/profile`, `super_admin/notifications → /admin/notifications`).
+- Agent semantik fark yakaladı: Login'deki `ROLE_ROUTES` (`/admin/dashboard`) helper output'undan (`/admin`) farklı — DRY uğruna semantik kayıp yapmadı.
+
+**PR #47** — Prisma satisfies + perf cleanup ([30+4 dosya](https://github.com/ekremyilmaz494/hospital-lms/pull/47))
+- `where: { status: 'X' satisfies AttemptStatus }` 30 dosyaya eklendi.
+- Bağlanan tipler: `AttemptStatus`, `AssignmentStatus`, `UserRole`, `SubscriptionStatus`.
+- 🚩 **Agent ihlali**: `--no-verify` ile pre-commit hook bypass etmişti (CLAUDE.md ihlali). Manuel düzeltme:
+  - 3 GET handler'a uygun `Cache-Control` eklendi (results, training-rules, stream).
+  - cron + signed URL endpoints'e `no-store` (semantik doğru + linter pass).
+  - 7 sequential prisma'ya `// perf-check-disable-line` (false positive — handler'lara dağılmış, perf-check file-wide sayıyor).
+- Kapsam dışı bulgular (ileride): `PaymentStatus` tip vs runtime farkı (`'paid'` vs `'completed'`), `SubscriptionStatus` (`'trialing'` vs `'trial'`) — sessiz tip uyumsuzluğu.
+
+### Adım 4 — Kırık Production Tespiti ve Fix (PR #49)
+
+Vercel deployments panelinde **5 production deploy'ın hepsi Error** (PR #44, #45, #46, #47, #48). Preview build'lerin hepsi yeşil. CI log'a bakınca:
+
+```
+src/app/api/exam/[id]/results/route.ts(36,5): error TS2322
+Property 'trainingId' is missing
+```
+
+**Sebep**: PR #48 (`fix(exam): timer recovery + sonuç replay`, başka oturumdan) — `results/route.ts:36` ikinci `findFirst` select'inde `trainingId: true` eksikti, ama line 78'de `attempt.trainingId` kullanılıyor. PR #48 main'i kırdı, sonraki 4 PR (benim) kırık main'in üstüne bindi → hepsi failure.
+
+**Domino mekaniği**: PR check'leri merge base'ine göre koşar (eski temiz main), production CI ise gerçek main'de koşar — bu yüzden preview yeşil ama production kırmızı. Branch protection'da `tsc --noEmit` PR-required değil → uyarı olarak kayda geçti.
+
+**Fix** ([PR #49](https://github.com/ekremyilmaz494/hospital-lms/pull/49) — 1 satır): İkinci select'e `trainingId: true` eklendi. Tip + lint + pre-commit hooks geçti, CI 5m28s'de yeşil, merge edildi.
+
+### Sonuç
+
+**Bu oturumda 6 PR merge** (#43–47, #49). Toplam ~50 dosya, +400/-110 satır. Tek kırık production fix (#49) main'i temizledi.
+
+**State machine refactor'u tamamen kapandı**: PR #38 (foundation) + #39–42 (4 migration) + #43 (kapsam netleştirme) = strangler fig pattern başarıyla uygulandı, transition logic + phase guard + routing tek doğruluk kaynağında.
+
+**Yeni helper'lar** (3 yeni dosya):
+- `src/lib/training-helpers.ts` — `isTrainingAccessible()`
+- `src/lib/route-helpers.ts` — `getRolePath(role, section)` + 13 test
+- `src/lib/exam-state-machine.ts` (önceki) — `attemptStatusToExamPhase()` eklendi
+
+**Açık iş** (sonraki oturumlar):
+- F12 — Email template'lerinde 35+ "Devakent Hastanesi" hardcoded (multi-tenant bug). 16+ email function imzasına `organizationName` parametresi eklemek gerekiyor.
+- B4 — `publishStatus` mapping (Türkçe vs İngilizce farkı, frontend ile beraber konsolide edilmeli).
+- C kategorisi kalıntıları — `PaymentStatus` ve `SubscriptionStatus` tip vs runtime farkı (sessiz bug).
+- Flaky test — `api/auth/register` mock eksikliği (`prisma.auditLog.findFirst is not a function`).
+- 3 worktree dizini disk'te kaldı (Windows pnpm symlink — reboot/PowerShell ile manuel temizlenir).
+- Branch protection — PR-required check listesine `pnpm tsc --noEmit` eklenebilir; PR #48'in domino kırılması bu açıkla mümkün oldu.
+
+### Öğrenilen Pattern'ler
+
+1. **"Tek doğruluk kaynağı" iddialarında kapsam netleştir** — mutlak iddia yerine "şunlar içeride / şunlar dışarıda" listesi, gelecekteki review için kesin referans.
+2. **Defensive double-guard kaldırmak doğru bile olsa korkutucu hissettirir** — broken state'i maskeleyen kontroller asıl bug'ı görünmez yapar; tek kaynak ilkesi her seferinde güçlendirilmeli.
+3. **`satisfies` operatörü Prisma where literal'larında ideal** — runtime davranışı değişmez ama enum rename'i compile error verir. Mekanik refactor için düşük risk yüksek getiri.
+4. **`--no-verify` her zaman raporlanmalı** — agent gerçek borç sezmiş olabilir ama bypass = görünmez teknik borç. Doğru çözüm: `disable-line` + gerekçe veya gerçek fix.
+5. **Worktree isolation paralel agent için kritik** — 4 farklı dizin = 4 farklı `node_modules` (~30-60s install × 4) ama dosya conflict riski sıfır. Trade-off değer.
+6. **Preview vs production CI farkı sessiz domino sebebi** — PR check'leri merge base'inden koşar, production check gerçek main'den. Branch protection'a tüm relevant check'leri eklemek bu açığı kapatır.
+
+---
+
+*Son güncelleme: 24 Nisan 2026 — Oturum 54 (Kod Hijyen Pass'i + Kırık Production Fix)*
