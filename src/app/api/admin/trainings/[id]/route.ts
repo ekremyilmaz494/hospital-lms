@@ -5,6 +5,24 @@ import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { updateTrainingSchema } from '@/lib/validations'
 import { getStreamUrl } from '@/lib/s3'
+import {
+  ATTEMPT_TERMINAL_STATUSES,
+  ASSIGNMENT_TERMINAL_STATUSES,
+  type AttemptStatus,
+  type AssignmentStatus,
+} from '@/lib/exam-state-machine'
+
+// State machine ile uyumlu: EXPIRE event'inin toplu (updateMany) hali.
+// Terminal olmayan attempt'ler force-delete sırasında expired'a çekilir.
+const ATTEMPT_NON_TERMINAL_STATUSES: AttemptStatus[] = (
+  ['pre_exam', 'watching_videos', 'post_exam', 'completed', 'expired'] as AttemptStatus[]
+).filter(s => !ATTEMPT_TERMINAL_STATUSES.includes(s))
+
+// State machine ile uyumlu: TRAINING_LOCKED event'inin toplu hali.
+// Terminal olmayan assignment'lar (assigned/in_progress) force-delete'te locked'a çekilir.
+const ASSIGNMENT_NON_TERMINAL_STATUSES: AssignmentStatus[] = (
+  ['assigned', 'in_progress', 'passed', 'failed', 'locked'] as AssignmentStatus[]
+).filter(s => !ASSIGNMENT_TERMINAL_STATUSES.includes(s))
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -206,7 +224,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const activeAttemptCount = await prisma.examAttempt.count({
     where: {
       assignment: { trainingId: id },
-      status: { in: ['pre_exam', 'watching_videos', 'post_exam'] },
+      status: { in: ATTEMPT_NON_TERMINAL_STATUSES },
     },
   })
 
@@ -225,18 +243,20 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   await prisma.$transaction([
     prisma.training.update({ where: { id, organizationId: dbUser!.organizationId! }, data: { isActive: false } }),
     // Devam eden sınav girişimlerini iptal et (force ile onaylandı)
+    // State machine ile uyumlu: EXPIRE event'inin toplu hali (non-terminal → expired)
     ...(activeAttemptCount > 0
       ? [prisma.examAttempt.updateMany({
           where: {
             assignment: { trainingId: id },
-            status: { in: ['pre_exam', 'watching_videos', 'post_exam'] },
+            status: { in: ATTEMPT_NON_TERMINAL_STATUSES },
           },
           data: { status: 'expired', isPassed: false, postExamCompletedAt: new Date() },
         })]
       : []),
     // Aktif atamaları kilitle (assigned/in_progress → locked)
+    // State machine ile uyumlu: TRAINING_LOCKED event'inin toplu hali (non-terminal → locked)
     prisma.trainingAssignment.updateMany({
-      where: { trainingId: id, status: { in: ['assigned', 'in_progress'] } },
+      where: { trainingId: id, status: { in: ASSIGNMENT_NON_TERMINAL_STATUSES } },
       data: { status: 'locked' },
     }),
   ])

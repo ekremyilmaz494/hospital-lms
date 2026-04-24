@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
+import { assignmentNextStatus, type AssignmentStatus } from '@/lib/exam-state-machine'
 
 export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
@@ -23,11 +24,17 @@ export async function POST(request: Request) {
 
     if (!assignment) return errorResponse('Atama bulunamadı', 404)
 
+    // State machine ile validate: ATTEMPT_RESET — passed/locked reddedilir (terminal)
+    const transition = assignmentNextStatus(assignment.status as AssignmentStatus, { type: 'ATTEMPT_RESET' })
+    if (!transition.ok) {
+      return errorResponse(transition.reason, 400)
+    }
+
     // Deneme hakkını sıfırla — status'u tekrar 'assigned' yap, currentAttempt'i sıfırla
     await prisma.trainingAssignment.update({
       where: { id: assignment.id },
       data: {
-        status: 'assigned',
+        status: transition.next,
         currentAttempt: 0,
         completedAt: null,
       },

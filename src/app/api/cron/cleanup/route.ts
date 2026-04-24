@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, certificateExpiryReminderEmail, overdueTrainingReminderEmail } from '@/lib/email'
 import { deleteObject } from '@/lib/s3'
+import { ATTEMPT_TERMINAL_STATUSES, type AttemptStatus } from '@/lib/exam-state-machine'
+
+// State machine ile uyumlu: EXPIRE event'inin toplu (updateMany) hali.
+// ATTEMPT_TERMINAL_STATUSES sabitinden türetilmiş non-terminal liste — tek tek attemptNextStatus
+// çağırmak yerine bulk update için status filtresi olarak kullanılır (perf + atomicity).
+const ATTEMPT_NON_TERMINAL_STATUSES: AttemptStatus[] = (
+  ['pre_exam', 'watching_videos', 'post_exam', 'completed', 'expired'] as AttemptStatus[]
+).filter(s => !ATTEMPT_TERMINAL_STATUSES.includes(s))
 
 /** Daily cleanup cron job (Vercel Cron) */
 export async function GET(request: Request) {
@@ -11,7 +19,7 @@ export async function GET(request: Request) {
   }
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } })
   }
 
   // 1. Delete old read notifications (older than 90 days)
@@ -23,9 +31,10 @@ export async function GET(request: Request) {
   })
 
   // 2. Clean up stale exam attempts (stuck in non-completed state for 24h+)
+  // State machine ile uyumlu: EXPIRE event'inin toplu hali (terminal olmayan tüm attempt'ler).
   const staleAttemptsList = await prisma.examAttempt.findMany({
     where: {
-      status: { in: ['pre_exam', 'watching_videos', 'post_exam'] },
+      status: { in: ATTEMPT_NON_TERMINAL_STATUSES },
       createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
     },
     select: { id: true, assignmentId: true },
@@ -39,10 +48,13 @@ export async function GET(request: Request) {
     })
 
     // Update related TrainingAssignment statuses — filter out null (standalone exam attempts have no assignment)
+    // State machine ile uyumlu: ATTEMPT_RESET event'inin toplu hali (terminal olmayan in_progress → assigned).
     const assignmentIds = [...new Set(
       staleAttemptsList.map(a => a.assignmentId).filter((id): id is string => id !== null)
     )]
     if (assignmentIds.length > 0) {
+      // ATTEMPT_RESET event semantiği: sadece 'in_progress' assignment'ı assigned'a döndür.
+      // (terminal 'passed'/'failed'/'locked' reset edilmez — state machine bunu da reddeder)
       await prisma.trainingAssignment.updateMany({
         where: { id: { in: assignmentIds }, status: 'in_progress' },
         data: { status: 'assigned' },
@@ -260,5 +272,5 @@ export async function GET(request: Request) {
     subscriptionWarningsSent,
     examRemindersSent,
     timestamp: new Date().toISOString(),
-  })
+  }, { headers: { 'Cache-Control': 'no-store' } })
 }

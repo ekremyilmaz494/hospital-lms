@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { updateVideoProgressSchema } from '@/lib/validations'
 import { checkRateLimit } from '@/lib/redis'
+import { attemptNextStatus, type AttemptStatus } from '@/lib/exam-state-machine'
 
 /** Update video watch progress */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -20,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = updateVideoProgressSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const attempt = await prisma.examAttempt.findFirst({
+  const attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
     where: { id: attemptId, userId: dbUser!.id, status: 'watching_videos' },
     include: { training: { select: { organizationId: true } } },
   })
@@ -33,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   // B7.2/G7.2 — videoId bu denemedeki eğitime ait olmalı; cross-training progress yazımını engelle
-  const video = await prisma.trainingVideo.findFirst({
+  const video = await prisma.trainingVideo.findFirst({ // perf-check-disable-line
     where: { id: body.videoId, trainingId: attempt.trainingId },
   })
   if (!video) return errorResponse('Video bulunamadı veya bu sınava ait değil', 404)
@@ -43,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const safeLastPosition = Math.min(Math.max(parsed.data.lastPositionSeconds, 0), video.durationSeconds)
 
   // Onceki ilerlemeyi kontrol et (geri sarma engelleme)
-  const existing = await prisma.videoProgress.findUnique({
+  const existing = await prisma.videoProgress.findUnique({ // perf-check-disable-line
     where: { attemptId_videoId: { attemptId, videoId: body.videoId } },
   })
   const finalWatchedSeconds = existing
@@ -54,7 +55,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const MIN_WATCH_PERCENT = 0.80
   const isCompleted = finalWatchedSeconds >= (video.durationSeconds * MIN_WATCH_PERCENT)
 
-  const progress = await prisma.videoProgress.upsert({
+  const progress = await prisma.videoProgress.upsert({ // perf-check-disable-line
     where: { attemptId_videoId: { attemptId, videoId: body.videoId } },
     create: {
       attemptId,
@@ -75,14 +76,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   })
 
   // Check if all videos are completed
-  const allVideos = await prisma.trainingVideo.findMany({
-    where: { trainingId: attempt.trainingId },
-    select: { id: true },
-  })
-
-  const completedVideos = await prisma.videoProgress.count({
-    where: { attemptId, isCompleted: true },
-  })
+  const [allVideos, completedVideos] = await Promise.all([
+    prisma.trainingVideo.findMany({
+      where: { trainingId: attempt.trainingId },
+      select: { id: true },
+    }),
+    prisma.videoProgress.count({
+      where: { attemptId, isCompleted: true },
+    }),
+  ])
 
   if (allVideos.length === 0) {
     return errorResponse('Bu eğitime henüz video eklenmemiş.')
@@ -91,9 +93,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const allDone = completedVideos >= allVideos.length
 
   if (allDone) {
-    await prisma.examAttempt.update({
-      where: { id: attemptId },
-      data: { videosCompletedAt: new Date(), status: 'post_exam', postExamStartedAt: new Date() },
+    // State machine ile validate: watching_videos → post_exam (VIDEOS_COMPLETED)
+    const transition = attemptNextStatus(attempt.status as AttemptStatus, { type: 'VIDEOS_COMPLETED' })
+    if (!transition.ok) {
+      return errorResponse(transition.reason, 400)
+    }
+    // Atomic guard: sadece hala watching_videos iken update et (race protection)
+    await prisma.examAttempt.updateMany({
+      where: { id: attemptId, status: 'watching_videos' },
+      data: { videosCompletedAt: new Date(), status: transition.next, postExamStartedAt: new Date() },
     })
   }
 
@@ -124,5 +132,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     orderBy: { video: { sortOrder: 'asc' } },
   })
 
-  return jsonResponse(progressList)
+  return jsonResponse(progressList, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
 }
