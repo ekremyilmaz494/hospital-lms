@@ -13,12 +13,12 @@ type CookiePreferences = {
 const COOKIE_CONSENT_KEY = 'lms_cookie_consent'
 const COOKIE_PREFS_KEY = 'lms_cookie_prefs'
 
-/* ─── Klinova palette ─── */
-const INK = '#063a26'        // deep emerald-ink
-const INK_SOFT = '#475569'   // slate
-const CREAM = '#f0fdf4'      // emerald cream
-const RULE = '#a7f3d0'       // light emerald border
-const GOLD = '#10b981'       // emerald primary (semantic name preserved for diff minimalism)
+/* ─── Klinova palette (admin chrome tokens) ─── */
+const INK = '#1c1917'        // --k-text-primary (warm dark)
+const INK_SOFT = '#78716c'   // --k-text-muted (warm gray)
+const CREAM = '#fafaf9'      // --k-bg (warm gray bg)
+const RULE = '#e7e5e4'       // --k-border (warm gray border)
+const GOLD = '#0d9668'       // --k-primary (emerald-600) — semantic name preserved for diff minimalism
 
 function getStoredConsent(): boolean {
   if (typeof window === 'undefined') return false
@@ -218,7 +218,7 @@ export function CookieConsent() {
                 color: CREAM,
                 background: INK,
                 border: `1px solid ${INK}`,
-                boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px #10b98155`,
+                boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px #0d966855`,
               }}
             >
               <Check className="h-3.5 w-3.5" style={{ color: GOLD }} />
@@ -250,7 +250,7 @@ export function CookieConsent() {
                   color: CREAM,
                   background: INK,
                   border: `1px solid ${INK}`,
-                  boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px #10b98155`,
+                  boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px #0d966855`,
                 }}
               >
                 <span>TÜMÜNÜ KABUL ET</span>
@@ -303,7 +303,7 @@ function PrefRow({
           className="ck-mono text-[9px] tracking-[0.22em] px-2 py-1"
           style={{
             color: GOLD,
-            background: 'rgba(16, 185, 129, 0.1)',
+            background: 'rgba(13, 150, 104, 0.1)',
             border: `1px solid ${GOLD}`,
             borderRadius: '2px',
             fontWeight: 700,

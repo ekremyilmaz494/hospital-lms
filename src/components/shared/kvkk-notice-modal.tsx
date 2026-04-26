@@ -11,12 +11,12 @@ import {
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/store/auth-store'
 
-// Klinova palette (matches /auth/login)
-const INK = '#063a26'        // deep emerald-ink
-const CREAM = '#f0fdf4'      // emerald cream
-const RULE = '#a7f3d0'       // light emerald border
-const GOLD = '#10b981'       // emerald primary
-const INK_SOFT = '#475569'   // slate
+// Klinova palette (admin chrome tokens)
+const INK = '#1c1917'        // --k-text-primary (warm dark)
+const CREAM = '#fafaf9'      // --k-bg (warm gray bg)
+const RULE = '#e7e5e4'       // --k-border (warm gray border)
+const GOLD = '#0d9668'       // --k-primary (emerald-600)
+const INK_SOFT = '#78716c'   // --k-text-muted (warm gray)
 
 /**
  * KVKK Aydınlatma Metni Bildirimi Modalı
@@ -93,7 +93,7 @@ export function KvkkNoticeModal({
           border: `1.5px solid ${RULE}`,
           borderLeft: `6px solid ${GOLD}`,
           borderRadius: 0,
-          boxShadow: '0 32px 64px -12px rgba(6, 58, 38, 0.32)',
+          boxShadow: '0 32px 64px -12px rgba(28, 25, 23, 0.32)',
         }}
       >
         <style>{`
@@ -262,11 +262,11 @@ export function KvkkNoticeModal({
             style={{
               height: 42,
               background: INK,
-              color: '#ecfdf5',
+              color: '#fafaf9',
               border: `1.5px solid ${INK}`,
               boxShadow:
                 accepted && !loading && !rejecting
-                  ? `0 0 0 1px ${GOLD}, 0 0 0 3px ${CREAM}, 0 0 0 4px #10b98155`
+                  ? `0 0 0 1px ${GOLD}, 0 0 0 3px ${CREAM}, 0 0 0 4px #0d966855`
                   : 'none',
             }}
           >
