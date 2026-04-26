@@ -37,8 +37,8 @@ interface Props {
 const PRIMARY_PRESETS = ['#0F172A', 'var(--brand-600)', '#1e40af', '#7c3aed', '#dc2626', '#0891b2', '#4f46e5', '#15803d'];
 const SECONDARY_PRESETS = ['#3B82F6', '#f59e0b', 'var(--brand-500)', '#8b5cf6', '#ef4444', '#06b6d4', '#f97316', '#ec4899'];
 const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
-const inputClass = 'h-12 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--color-primary)]/20';
-const inputStyle = { background: 'var(--color-bg)', borderColor: 'var(--color-border)' };
+const inputClass = 'h-12 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--k-primary)]/20';
+const inputStyle = { background: 'var(--k-surface-hover)', borderColor: 'var(--k-border)' };
 
 /* ─── Field Wrapper ─── */
 function Field({ label, hint, icon: Icon, children }: {
@@ -50,15 +50,15 @@ function Field({ label, hint, icon: Icon, children }: {
   return (
     <div className="group">
       <Label
-        className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide"
-        style={{ color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}
+        className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: 'var(--k-text-muted)' }}
       >
-        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
+        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--k-primary)' }} />
         {label}
       </Label>
       {children}
       {hint && (
-        <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--k-text-muted)' }}>
           {hint}
         </p>
       )}
@@ -91,10 +91,10 @@ function ColorPicker({ value, onChange, presets, label }: {
   return (
     <div>
       <Label
-        className="mb-2.5 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide"
-        style={{ color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}
+        className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: 'var(--k-text-muted)' }}
       >
-        <Palette className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
+        <Palette className="h-3.5 w-3.5" style={{ color: 'var(--k-primary)' }} />
         {label}
       </Label>
 
@@ -104,7 +104,7 @@ function ColorPicker({ value, onChange, presets, label }: {
           type="button"
           onClick={() => colorRef.current?.click()}
           className="h-12 w-12 rounded-xl border-2 shrink-0 transition-shadow hover:shadow-md cursor-pointer"
-          style={{ backgroundColor: value, borderColor: 'var(--color-border)' }}
+          style={{ backgroundColor: value, borderColor: 'var(--k-border)' }}
         />
         <input
           ref={colorRef}
@@ -136,8 +136,8 @@ function ColorPicker({ value, onChange, presets, label }: {
             className="h-7 w-7 rounded-lg border-2 transition-all hover:scale-110"
             style={{
               backgroundColor: preset,
-              borderColor: value === preset ? 'var(--color-primary)' : 'transparent',
-              boxShadow: value === preset ? '0 0 0 2px var(--color-primary)' : 'none',
+              borderColor: value === preset ? 'var(--k-primary)' : 'transparent',
+              boxShadow: value === preset ? '0 0 0 2px var(--k-primary)' : 'none',
             }}
             title={preset}
           />
@@ -216,7 +216,7 @@ function ImageUploadZone({ value, onChange, type, maxSizeMB, hint, aspectLabel }
     <div>
       {/* Preview */}
       {value && (
-        <div className="relative mb-3 rounded-xl overflow-hidden border" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="relative mb-3 rounded-xl overflow-hidden border" style={{ borderColor: 'var(--k-border)' }}>
           <img
             src={value}
             alt={type === 'logo' ? 'Logo' : 'Banner'}
@@ -241,8 +241,8 @@ function ImageUploadZone({ value, onChange, type, maxSizeMB, hint, aspectLabel }
         onClick={() => fileRef.current?.click()}
         className="rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-200"
         style={{
-          borderColor: dragOver ? 'var(--color-primary)' : 'var(--color-border)',
-          background: dragOver ? 'var(--color-primary-light)' : 'var(--color-bg)',
+          borderColor: dragOver ? 'var(--k-primary)' : 'var(--k-border)',
+          background: dragOver ? 'var(--k-primary-light)' : 'var(--k-surface-hover)',
         }}
       >
         <input
@@ -255,22 +255,22 @@ function ImageUploadZone({ value, onChange, type, maxSizeMB, hint, aspectLabel }
 
         {uploading ? (
           <div className="flex flex-col items-center gap-2">
-            <span className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
-            <span className="text-[12px] font-medium" style={{ color: 'var(--color-text-muted)' }}>Yükleniyor...</span>
+            <span className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: 'var(--k-primary)', borderTopColor: 'transparent' }} />
+            <span className="text-[12px] font-medium" style={{ color: 'var(--k-text-muted)' }}>Yükleniyor...</span>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--color-primary-light)' }}>
-              <Upload className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--k-primary-light)' }}>
+              <Upload className="h-5 w-5" style={{ color: 'var(--k-primary)' }} />
             </div>
             <div>
-              <p className="text-[13px] font-medium" style={{ color: 'var(--color-text-primary)' }}>
+              <p className="text-[13px] font-medium" style={{ color: 'var(--k-text-primary)' }}>
                 Sürükle bırak veya tıkla
               </p>
-              <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--k-text-muted)' }}>
                 {hint}
               </p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--k-text-muted)' }}>
                 {aspectLabel}
               </p>
             </div>
@@ -279,7 +279,7 @@ function ImageUploadZone({ value, onChange, type, maxSizeMB, hint, aspectLabel }
       </div>
 
       {error && (
-        <p className="mt-2 text-[11px] font-medium" style={{ color: 'var(--color-error)' }}>{error}</p>
+        <p className="mt-2 text-[11px] font-medium" style={{ color: 'var(--k-error)' }}>{error}</p>
       )}
     </div>
   );
@@ -292,7 +292,7 @@ function LoginPreview({ settings }: { settings: SettingsData }) {
   return (
     <div
       className="rounded-xl overflow-hidden border"
-      style={{ borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
+      style={{ borderColor: 'var(--k-border)', boxShadow: 'var(--k-shadow-sm)' }}
     >
       <div className="flex h-48">
         {/* Left panel mock */}
@@ -334,16 +334,16 @@ function LoginPreview({ settings }: { settings: SettingsData }) {
         </div>
 
         {/* Right panel mock */}
-        <div className="w-1/2 p-4 flex flex-col justify-center" style={{ background: 'var(--color-surface)' }}>
+        <div className="w-1/2 p-4 flex flex-col justify-center" style={{ background: 'var(--k-surface)' }}>
           <p className="text-[8px] uppercase tracking-wider font-semibold mb-1" style={{ color: secondaryColor }}>
             Giriş Yap
           </p>
-          <p className="text-[11px] font-bold mb-3" style={{ color: 'var(--color-text-primary)' }}>
+          <p className="text-[11px] font-bold mb-3" style={{ color: 'var(--k-text-primary)' }}>
             Hoş Geldiniz
           </p>
           <div className="space-y-2">
-            <div className="h-5 rounded-md" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }} />
-            <div className="h-5 rounded-md" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }} />
+            <div className="h-5 rounded-md" style={{ background: 'var(--k-surface-hover)', border: '1px solid var(--k-border)' }} />
+            <div className="h-5 rounded-md" style={{ background: 'var(--k-surface-hover)', border: '1px solid var(--k-border)' }} />
             <div
               className="h-5 rounded-md"
               style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}dd)` }}
@@ -363,7 +363,7 @@ export default function BrandingTab({ settings, setSettings }: Props) {
         <h2 className="text-lg font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
           Marka Ayarları
         </h2>
-        <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-[13px] mt-1" style={{ color: 'var(--k-text-muted)' }}>
           Kurumunuzun görsel kimliğini özelleştirin. Logo, renkler ve giriş sayfası görünümünü yönetin.
         </p>
       </div>
@@ -396,11 +396,11 @@ export default function BrandingTab({ settings, setSettings }: Props) {
         {/* Section 3: Colors */}
         <div
           className="rounded-xl p-5 space-y-5"
-          style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+          style={{ background: 'var(--k-surface-hover)', border: '1px solid var(--k-border)' }}
         >
           <div className="flex items-center gap-2 mb-1">
-            <Palette className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
-            <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+            <Palette className="h-3.5 w-3.5" style={{ color: 'var(--k-primary)' }} />
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>
               Renk Paleti
             </span>
           </div>
@@ -430,20 +430,20 @@ export default function BrandingTab({ settings, setSettings }: Props) {
         <Field label="Özel Alan Adı" icon={Globe}>
           <div
             className="rounded-xl p-4 flex items-center gap-3"
-            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+            style={{ background: 'var(--k-surface-hover)', border: '1px solid var(--k-border)' }}
           >
-            <Globe className="h-5 w-5 shrink-0" style={{ color: 'var(--color-text-muted)' }} />
+            <Globe className="h-5 w-5 shrink-0" style={{ color: 'var(--k-text-muted)' }} />
             <div className="flex-1 min-w-0">
               {settings.customDomain ? (
-                <p className="text-[13px] font-mono font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
+                <p className="text-[13px] font-mono font-medium truncate" style={{ color: 'var(--k-text-primary)' }}>
                   {settings.customDomain}
                 </p>
               ) : (
-                <p className="text-[13px]" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-[13px]" style={{ color: 'var(--k-text-muted)' }}>
                   Henüz yapılandırılmadı
                 </p>
               )}
-              <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--k-text-muted)' }}>
                 Özel alan adı yapılandırması için destek ekibi ile iletişim kurun.
               </p>
             </div>

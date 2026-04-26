@@ -458,3 +458,46 @@ CREATE POLICY "super_admin_activity_logs_all" ON activity_logs FOR ALL USING ((S
 CREATE POLICY "admin_activity_logs_select" ON activity_logs FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 CREATE POLICY "staff_activity_logs_select" ON activity_logs FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "authenticated_activity_logs_insert" ON activity_logs FOR INSERT WITH CHECK (user_id = auth.uid() AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+
+-- ── AI İÇERİK STÜDYOSU RLS (NotebookLM) ──
+-- ai_notebook_accounts: admin rolü org-scoped CRUD; super_admin global okur.
+ALTER TABLE ai_notebook_accounts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_ai_notebook_accounts_all" ON ai_notebook_accounts FOR ALL USING (
+  (SELECT auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'super_admin')
+  AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+);
+
+CREATE POLICY "super_admin_ai_notebook_accounts_all" ON ai_notebook_accounts FOR ALL USING (
+  (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin'
+);
+
+-- ai_generations: admin org-scoped CRUD; super_admin global.
+ALTER TABLE ai_generations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_ai_generations_all" ON ai_generations FOR ALL USING (
+  (SELECT auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'super_admin')
+  AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+);
+
+CREATE POLICY "super_admin_ai_generations_all" ON ai_generations FOR ALL USING (
+  (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin'
+);
+
+-- artifact_type / status için CHECK constraint — DB seviyesinde tip güvenliği.
+-- Idempotent: re-apply güvenli (CLAUDE.md: fresh DB ve re-apply çalışmalı).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_artifact_type_check'
+  ) THEN
+    ALTER TABLE ai_generations ADD CONSTRAINT ai_generations_artifact_type_check
+      CHECK (artifact_type IN ('audio','video','slide_deck','infographic','report','mind_map','data_table','quiz','flashcards'));
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_status_check'
+  ) THEN
+    ALTER TABLE ai_generations ADD CONSTRAINT ai_generations_status_check
+      CHECK (status IN ('pending','processing','completed','failed'));
+  END IF;
+END $$;

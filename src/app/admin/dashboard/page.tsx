@@ -18,9 +18,9 @@ const TrendChart = dynamic(() => chartImport().then(m => ({ default: m.TrendChar
 const StatusDonut = dynamic(() => chartImport().then(m => ({ default: m.StatusDonut })), { ssr: false, loading: () => <ChartSkeletonInline /> })
 const DepartmentBar = dynamic(() => chartImport().then(m => ({ default: m.DepartmentBar })), { ssr: false, loading: () => <ChartSkeletonInline /> })
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { StatCard } from '@/components/shared/stat-card';
-import { PageHeader } from '@/components/shared/page-header';
-import { ChartCard } from '@/components/shared/chart-card';
+import { KStatCard } from '@/components/admin/k-stat-card';
+import { KChartCard } from '@/components/admin/k-chart-card';
+import { KQuickAction } from '@/components/admin/k-quick-action';
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/components/shared/toast';
@@ -30,13 +30,28 @@ import { RiskCenter } from './risk-center';
 // Küçük UI bileşenleri — static import (< 5KB)
 import { BlurFade } from '@/components/ui/blur-fade';
 import { MagicCard } from '@/components/ui/magic-card';
+
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 const MatrixMiniWidget = dynamic(() => import('./matrix-mini-widget').then(m => ({ default: m.MatrixMiniWidget })), {
   ssr: false,
-  loading: () => <div className="animate-pulse rounded-2xl border h-64" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />,
+  loading: () => <div className="animate-pulse h-64" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }} />,
 });
 
 function ChartSkeletonInline() {
-  return <div className="h-64 rounded-2xl animate-pulse" style={{ background: 'var(--color-surface)' }} />;
+  return <div className="h-64 animate-pulse" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14 }} />;
 }
 
 // ── Type definitions for split endpoints ──
@@ -67,12 +82,12 @@ interface CertsData {
 
 const iconMap: Record<string, typeof Users> = { Users, GraduationCap, TrendingUp, AlertTriangle, ShieldCheck };
 
-const typeColors: Record<string, string> = { success: 'var(--color-success)', error: 'var(--color-error)', info: 'var(--color-info)', warning: 'var(--color-warning)' };
+const typeColors: Record<string, string> = { success: K.PRIMARY, error: '#b91c1c', info: '#1d4ed8', warning: '#b45309' };
 
 const examStatusLabel: Record<string, { label: string; color: string; bg: string }> = {
-  pre_exam: { label: 'Ön sınav', color: 'var(--color-info)', bg: 'var(--color-info-bg)' },
-  watching_videos: { label: 'Video izliyor', color: 'var(--color-warning)', bg: 'var(--color-warning-bg)' },
-  post_exam: { label: 'Sınav', color: 'var(--color-accent)', bg: 'var(--color-warning-bg)' },
+  pre_exam: { label: 'Ön sınav', color: '#1d4ed8', bg: K.INFO_BG },
+  watching_videos: { label: 'Video izliyor', color: '#b45309', bg: K.WARNING_BG },
+  post_exam: { label: 'Sınav', color: K.ACCENT, bg: K.WARNING_BG },
 };
 
 function elapsedLabel(startedAt: string): string {
@@ -109,64 +124,64 @@ function LiveExamsCard() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 active:scale-[0.99]"
+        style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}
       >
-        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--color-primary-light)' }}>
-          <Radio className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
+        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: K.PRIMARY_LIGHT }}>
+          <Radio className="h-4.5 w-4.5" style={{ color: K.PRIMARY }} />
           {displayCount > 0 && (
             <span
               className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2"
               style={{
-                background: 'var(--color-success)',
+                background: K.SUCCESS,
                 animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
               }}
             />
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold leading-tight">Anlık Sınavlar</p>
-          <p className="text-[11px] leading-tight truncate" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-[13px] font-semibold leading-tight" style={{ color: K.TEXT_PRIMARY }}>Anlık Sınavlar</p>
+          <p className="text-[11px] leading-tight truncate" style={{ color: K.TEXT_MUTED }}>
             {isLoading ? 'Yükleniyor…' : `${displayCount} aktif · ${isConnected ? 'Canlı' : 'Çevrimdışı'}`}
           </p>
         </div>
         <span
           className="inline-flex min-w-5.5 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-bold"
           style={{
-            background: displayCount > 0 ? 'var(--color-success-bg)' : 'var(--color-bg)',
-            color: displayCount > 0 ? 'var(--color-success)' : 'var(--color-text-muted)',
+            background: displayCount > 0 ? K.SUCCESS_BG : K.BG,
+            color: displayCount > 0 ? K.PRIMARY : K.TEXT_MUTED,
           }}
         >
           {isLoading ? '…' : displayCount}
         </span>
-        <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5" style={{ color: 'var(--color-text-muted)' }} />
+        <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5" style={{ color: K.TEXT_MUTED }} />
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
-                <Radio className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: K.PRIMARY_LIGHT }}>
+                <Radio className="h-4.5 w-4.5" style={{ color: K.PRIMARY }} />
               </div>
               <div>
-                <DialogTitle className="text-[15px] font-bold">Anlık Sınavlar</DialogTitle>
-                <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Şu an sınav yapan personel</p>
+                <DialogTitle style={{ fontSize: 18, fontWeight: 700, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}>Anlık Sınavlar</DialogTitle>
+                <p className="text-[11px]" style={{ color: K.TEXT_MUTED }}>Şu an sınav yapan personel</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-(--color-surface-hover) disabled:opacity-60"
+                className="flex h-8 w-8 items-center justify-center rounded-lg disabled:opacity-60"
                 title="Yenile"
-                style={{ background: refreshing ? 'var(--color-primary-light)' : 'transparent' }}
+                style={{ background: refreshing ? K.PRIMARY_LIGHT : 'transparent' }}
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} style={{ color: refreshing ? 'var(--color-primary)' : 'var(--color-text-muted)' }} />
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} style={{ color: refreshing ? K.PRIMARY : K.TEXT_MUTED }} />
               </button>
-              <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: isConnected ? 'var(--color-success-bg)' : 'var(--color-warning-bg)' }}>
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: isConnected ? 'var(--color-success)' : 'var(--color-warning)', animation: isConnected ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none' }} />
-                <span className="text-[10px] font-semibold" style={{ color: isConnected ? 'var(--color-success)' : 'var(--color-warning)' }}>
+              <div className="flex items-center gap-1.5 rounded-full" style={{ padding: '3px 8px', background: isConnected ? K.SUCCESS_BG : K.WARNING_BG }}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: isConnected ? K.SUCCESS : K.WARNING, animation: isConnected ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none' }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: isConnected ? K.PRIMARY : '#b45309' }}>
                   {isConnected ? 'Canlı' : 'Çevrimdışı'}
                 </span>
               </div>
@@ -177,15 +192,15 @@ function LiveExamsCard() {
             {isLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map(i => (
-                  <div key={i} className="h-12 animate-pulse rounded-xl" style={{ background: 'var(--color-bg)' }} />
+                  <div key={i} className="h-12 animate-pulse rounded-xl" style={{ background: K.BG }} />
                 ))}
               </div>
             ) : displayExams.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl mb-3" style={{ background: 'var(--color-bg)' }}>
-                  <BookOpen className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl mb-3" style={{ background: K.BG }}>
+                  <BookOpen className="h-6 w-6" style={{ color: K.TEXT_MUTED }} />
                 </div>
-                <p className="text-[13px]" style={{ color: 'var(--color-text-muted)' }}>Şu an aktif sınav yok</p>
+                <p className="text-[13px]" style={{ color: K.TEXT_MUTED }}>Şu an aktif sınav yok</p>
               </div>
             ) : (
               <div className="space-y-2 pr-1">
@@ -194,29 +209,29 @@ function LiveExamsCard() {
                   return (
                     <div
                       key={attempt.id}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2.5"
-                      style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+                      className="flex items-center gap-3 px-3 py-2.5"
+                      style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}`, borderRadius: 14 }}
                     >
                       <div
                         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                        style={{ background: 'var(--color-primary)' }}
+                        style={{ background: K.PRIMARY }}
                       >
                         {attempt.user.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="truncate text-[13px] font-semibold">{attempt.user.name}</p>
-                        <p className="truncate text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                        <p className="truncate text-[13px] font-semibold" style={{ color: K.TEXT_PRIMARY }}>{attempt.user.name}</p>
+                        <p className="truncate text-[11px]" style={{ color: K.TEXT_MUTED }}>
                           {attempt.training.title.length > 32 ? attempt.training.title.slice(0, 32) + '…' : attempt.training.title}
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
                         <span
-                          className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
-                          style={{ background: st.bg, color: st.color }}
+                          className="inline-flex items-center rounded-full"
+                          style={{ padding: '2px 8px', fontSize: 11, fontWeight: 600, background: st.bg, color: st.color }}
                         >
                           {st.label}
                         </span>
-                        <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
+                        <span className="text-[11px] font-mono" style={{ color: K.TEXT_MUTED }}>
                           {elapsedLabel(attempt.startedAt)}
                         </span>
                       </div>
@@ -233,10 +248,10 @@ function LiveExamsCard() {
 }
 
 const quickActions = [
-  { label: 'Yeni Eğitim', desc: 'Video tabanlı eğitim oluştur', icon: Plus, href: '/admin/trainings/new', color: 'var(--color-primary)', gradient: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent) 0%, color-mix(in srgb, var(--brand-600) calc(0.02 * 100%), transparent) 100%)', glowColor: 'color-mix(in srgb, var(--brand-600) calc(0.06 * 100%), transparent)' },
-  { label: 'Personel Ekle', desc: 'Yeni personel kaydı', icon: UserPlus, href: '/admin/staff', color: 'var(--color-info)', gradient: 'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.02) 100%)', glowColor: 'rgba(59,130,246,0.06)' },
-  { label: 'Hatırlatma Gönder', desc: 'Toplu bildirim gönder', icon: Send, href: '/admin/notifications', color: 'var(--color-accent)', gradient: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%)', glowColor: 'rgba(245,158,11,0.06)' },
-  { label: 'Rapor İndir', desc: 'Excel ve PDF raporları', icon: Download, href: '/admin/reports', color: 'var(--color-success)', gradient: 'linear-gradient(135deg, rgba(34,197,94,0.08) 0%, rgba(34,197,94,0.02) 100%)', glowColor: 'rgba(34,197,94,0.06)' },
+  { label: 'Yeni Eğitim', desc: 'Video tabanlı eğitim oluştur', icon: Plus, href: '/admin/trainings/new', color: K.PRIMARY, gradient: K.PRIMARY, glowColor: K.PRIMARY_LIGHT },
+  { label: 'Personel Ekle', desc: 'Yeni personel kaydı', icon: UserPlus, href: '/admin/staff', color: K.INFO, gradient: K.INFO, glowColor: K.INFO_BG },
+  { label: 'Hatırlatma Gönder', desc: 'Toplu bildirim gönder', icon: Send, href: '/admin/notifications', color: K.ACCENT, gradient: K.ACCENT, glowColor: K.WARNING_BG },
+  { label: 'Rapor İndir', desc: 'Excel ve PDF raporları', icon: Download, href: '/admin/reports', color: K.SUCCESS, gradient: K.SUCCESS, glowColor: K.SUCCESS_BG },
 ];
 
 
@@ -302,39 +317,42 @@ export default function AdminDashboard() {
   // ── Derived values from certs ──
   const expiringCerts = certs.data?.expiringCerts ?? [];
 
+  // Claude Design pattern: "Merhaba, [Ad]" + günün saatine göre selamlama
+  const firstName = (user?.firstName || 'Yönetici').trim();
+  const hour = new Date().getHours();
+  const greeting = hour < 6 ? 'İyi geceler' : hour < 12 ? 'Günaydın' : hour < 18 ? 'Merhaba' : 'İyi akşamlar';
+
   return (
-    <div className="space-y-6">
+    <div className="k-page">
       {/* ── Always renders immediately (no API dependency) ── */}
       <BlurFade delay={0}>
-        <PageHeader title="Dashboard" subtitle={`${user?.department || 'Hastane'} genel durumu`} />
+        <header className="k-page-header">
+          <div>
+            <div className="k-breadcrumb">
+              <span data-current="true">Panel</span>
+            </div>
+            <h1 className="k-page-title">
+              {greeting}, <span style={{ color: K.PRIMARY }}>{firstName}</span>
+            </h1>
+            <p className="k-page-subtitle">
+              Bu hafta {user?.department || 'hastanenizde'} eğitim ve uyum durumuna genel bir bakış.
+            </p>
+          </div>
+        </header>
       </BlurFade>
 
       {/* Quick Actions */}
       <BlurFade delay={0.03}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {quickActions.map((a) => (
-            <Link
+            <KQuickAction
               key={a.label}
               href={a.href}
-              className="group flex items-center gap-3 rounded-xl border px-4 py-3 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] active:duration-75"
-              style={{
-                background: 'var(--color-surface)',
-                borderColor: 'var(--color-border)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = a.color; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
-            >
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-[transform] duration-200 group-hover:scale-110"
-                style={{ background: `color-mix(in srgb, ${a.color} 12%, transparent)` }}
-              >
-                <a.icon className="h-[18px] w-[18px]" style={{ color: a.color }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[13px] font-semibold leading-tight">{a.label}</p>
-                <p className="text-[11px] leading-tight truncate" style={{ color: 'var(--color-text-muted)' }}>{a.desc}</p>
-              </div>
-            </Link>
+              label={a.label}
+              desc={a.desc}
+              icon={a.icon}
+              color={a.color}
+            />
           ))}
         </div>
       </BlurFade>
@@ -343,17 +361,31 @@ export default function AdminDashboard() {
       {stats.error ? (
         <SectionError message={stats.error} onRetry={stats.refetch} />
       ) : (
-        <>
-          {/* Stat Cards */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
-            {stats.isLoading
-              ? Array.from({ length: 5 }).map((_, i) => <StatCardSkeleton key={i} />)
-              : statCards.map((stat, i) => (
-                  <BlurFade key={stat.title} delay={0.02 + i * 0.02}><StatCard {...stat} /></BlurFade>
-                ))
-            }
-          </div>
-        </>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
+          {stats.isLoading
+            ? Array.from({ length: 5 }).map((_, i) => <StatCardSkeleton key={i} />)
+            : statCards.map((stat, i) => {
+                // accentColor "var(--color-primary)" gibi geliyor — Klinova hex map
+                const accent = stat.accentColor
+                  ?.replace('var(--color-primary)', K.PRIMARY)
+                  .replace('var(--color-success)', K.SUCCESS)
+                  .replace('var(--color-info)', K.INFO)
+                  .replace('var(--color-error)', K.ERROR)
+                  .replace('var(--color-warning)', K.WARNING)
+                  .replace('var(--color-accent)', K.ACCENT) ?? K.PRIMARY;
+                return (
+                  <BlurFade key={stat.title} delay={0.02 + i * 0.02}>
+                    <KStatCard
+                      title={stat.title}
+                      value={stat.value}
+                      icon={stat.icon}
+                      accentColor={accent}
+                      trend={stat.trend}
+                    />
+                  </BlurFade>
+                );
+              })}
+        </div>
       )}
 
       {/* Anlık Sınavlar + Risk Merkezi — kompakt tetikleyici; modal'da açılır */}
@@ -379,25 +411,24 @@ export default function AdminDashboard() {
           ) : charts.isLoading ? (
             <ChartSkeleton />
           ) : (
-            <ChartCard title="Aylık Eğitim Trendi" icon={<TrendingUp className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
+            <KChartCard title="Aylık Eğitim Trendi" icon={<TrendingUp size={15} />}>
               {hasTrendData ? (
                 <div className="h-72">
                   <TrendChart data={trendData} />
                 </div>
               ) : (
-                <div className="h-72 flex items-center justify-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz eğitim ataması yapılmamış. Personele eğitim atadıkça burada aylık trend görünecek.</div>
+                <div className="h-72 flex items-center justify-center text-sm" style={{ color: K.TEXT_MUTED }}>Henüz eğitim ataması yapılmamış. Personele eğitim atadıkça burada aylık trend görünecek.</div>
               )}
-            </ChartCard>
+            </KChartCard>
           )}
         </BlurFade>
 
-        {/* Status Donut — data from stats endpoint */}
+        {/* Status Donut */}
         <BlurFade delay={0}>
           {stats.isLoading ? (
             <ChartSkeleton />
           ) : (
-            <div className="rounded-2xl border p-6 h-full" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-              <h3 className="text-sm font-bold mb-4">Eğitim Durum Dağılımı</h3>
+            <KChartCard title="Eğitim Durum Dağılımı" className="h-full">
               {totalAssignments > 0 ? (
                 <>
                   <div className="h-44">
@@ -408,17 +439,17 @@ export default function AdminDashboard() {
                       <div key={s.name} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
-                          <span style={{ color: 'var(--color-text-secondary)' }}>{s.name}</span>
+                          <span style={{ color: K.TEXT_SECONDARY }}>{s.name}</span>
                         </div>
-                        <span className="font-mono font-semibold">{s.value}</span>
+                        <span className="font-mono font-semibold tabular-nums" style={{ color: K.TEXT_PRIMARY }}>{s.value}</span>
                       </div>
                     ))}
                   </div>
                 </>
               ) : (
-                <div className="h-44 flex items-center justify-center text-sm text-center px-4" style={{ color: 'var(--color-text-muted)' }}>Personele eğitim atandığında durum dağılımı burada görünecek</div>
+                <div className="h-44 flex items-center justify-center text-sm text-center px-4" style={{ color: K.TEXT_MUTED }}>Personele eğitim atandığında durum dağılımı burada görünecek</div>
               )}
-            </div>
+            </KChartCard>
           )}
         </BlurFade>
       </div>
@@ -430,15 +461,15 @@ export default function AdminDashboard() {
         ) : charts.isLoading ? (
           <ChartSkeleton />
         ) : (
-          <ChartCard title="Departman Karşılaştırması" icon={<Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />}>
+          <KChartCard title="Departman Karşılaştırması" icon={<Building2 size={15} />}>
             {departmentComparison.length > 0 ? (
               <div className="h-64">
                 <DepartmentBar data={departmentComparison} />
               </div>
             ) : (
-              <div className="h-64 flex items-center justify-center text-sm text-center px-4" style={{ color: 'var(--color-text-muted)' }}>Personele eğitim atandığında departman karşılaştırması burada görünecek</div>
+              <div className="h-64 flex items-center justify-center text-sm text-center px-4" style={{ color: K.TEXT_MUTED }}>Personele eğitim atandığında departman karşılaştırması burada görünecek</div>
             )}
-          </ChartCard>
+          </KChartCard>
         )}
       </BlurFade>
 
@@ -456,36 +487,36 @@ export default function AdminDashboard() {
           ) : activity.isLoading ? (
             <ListSkeleton rows={4} />
           ) : (
-            <MagicCard gradientColor="rgba(245, 158, 11, 0.04)" gradientOpacity={0.4} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+            <MagicCard gradientColor="rgba(168, 85, 247, 0.04)" gradientOpacity={0.4} className="p-0" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
               <div className="p-6">
                 <div className="mb-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-accent-light)' }}>
-                      <Trophy className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: K.WARNING_BG }}>
+                      <Trophy className="h-4 w-4" style={{ color: K.ACCENT }} />
                     </div>
-                    <h3 className="text-sm font-bold">En Başarılı Personeller</h3>
+                    <h3 style={{ fontSize: 18, fontWeight: 700, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}>En Başarılı Personeller</h3>
                   </div>
-                  <Link href="/admin/staff" className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>Tümü</Link>
+                  <Link href="/admin/staff" className="text-xs font-semibold" style={{ color: K.PRIMARY }}>Tümü</Link>
                 </div>
                 {topPerformers.length > 0 ? (
                   <div className="space-y-2">
                     {topPerformers.map((p, idx) => (
                       <div key={p.name} className="clickable-row flex items-center gap-3 rounded-xl px-3 py-3">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: idx < 3 ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>{idx + 1}</div>
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: idx < 3 ? K.ACCENT : K.TEXT_MUTED }}>{idx + 1}</div>
                         <Avatar className="h-9 w-9"><AvatarFallback className="text-xs font-semibold text-white" style={{ background: p.color }}>{p.initials}</AvatarFallback></Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="truncate text-sm font-semibold">{p.name}</p>
-                          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{p.department}</p>
+                          <p className="truncate text-sm font-semibold" style={{ color: K.TEXT_PRIMARY }}>{p.name}</p>
+                          <p className="text-xs" style={{ color: K.TEXT_MUTED }}>{p.department}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold font-mono" style={{ color: p.score >= 95 ? 'var(--color-success)' : 'var(--color-text-primary)' }}>{p.score}%</p>
-                          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{p.courses} eğitim</p>
+                          <p className="text-sm font-bold font-mono" style={{ color: p.score >= 95 ? K.PRIMARY : K.TEXT_PRIMARY }}>{p.score}%</p>
+                          <p className="text-[10px]" style={{ color: K.TEXT_MUTED }}>{p.courses} eğitim</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Personel sınavları tamamladıkça performans verileri görünecek.</div>
+                  <div className="text-sm" style={{ color: K.TEXT_MUTED }}>Personel sınavları tamamladıkça performans verileri görünecek.</div>
                 )}
               </div>
             </MagicCard>
@@ -499,36 +530,36 @@ export default function AdminDashboard() {
           ) : activity.isLoading ? (
             <ListSkeleton rows={4} />
           ) : (
-            <MagicCard gradientColor="color-mix(in srgb, var(--brand-600) calc(0.04 * 100%), transparent)" gradientOpacity={0.4} className="rounded-2xl border p-0" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+            <MagicCard gradientColor="rgba(13, 150, 104, 0.04)" gradientOpacity={0.4} className="p-0" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
               <div className="p-6">
                 <div className="mb-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-light)' }}>
-                      <Activity className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: K.PRIMARY_LIGHT }}>
+                      <Activity className="h-4 w-4" style={{ color: K.PRIMARY }} />
                     </div>
-                    <h3 className="text-sm font-bold">Son Aktiviteler</h3>
+                    <h3 style={{ fontSize: 18, fontWeight: 700, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}>Son Aktiviteler</h3>
                   </div>
-                  <Link href="/admin/audit-logs" className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>Tümü</Link>
+                  <Link href="/admin/audit-logs" className="text-xs font-semibold" style={{ color: K.PRIMARY }}>Tümü</Link>
                 </div>
                 {recentActivity.length > 0 ? (
                   <div className="space-y-4">
                     {recentActivity.map((item, idx) => (
                       <div key={idx} className="flex gap-3">
-                        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: `${typeColors[item.type] ?? 'var(--color-info)'}15` }}>
-                          <div className="h-2 w-2 rounded-full" style={{ background: typeColors[item.type] ?? 'var(--color-info)' }} />
+                        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: `${typeColors[item.type] ?? K.INFO}15` }}>
+                          <div className="h-2 w-2 rounded-full" style={{ background: typeColors[item.type] ?? K.INFO }} />
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm"><span className="font-semibold">{item.user}</span> <span style={{ color: 'var(--color-text-secondary)' }}>{item.action}</span></p>
+                          <p className="text-sm" style={{ color: K.TEXT_PRIMARY }}><span className="font-semibold">{item.user}</span> <span style={{ color: K.TEXT_SECONDARY }}>{item.action}</span></p>
                           <div className="flex items-center gap-1 mt-0.5">
-                            <Clock className="h-3 w-3" style={{ color: 'var(--color-text-muted)' }} />
-                            <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>{elapsedLabel(item.time)}</span>
+                            <Clock className="h-3 w-3" style={{ color: K.TEXT_MUTED }} />
+                            <span className="text-[11px] font-mono" style={{ color: K.TEXT_MUTED }}>{elapsedLabel(item.time)}</span>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Sertifika süreleri yaklaştıkça hatırlatmalar burada görünecek.</div>
+                  <div className="text-sm" style={{ color: K.TEXT_MUTED }}>Sertifika süreleri yaklaştıkça hatırlatmalar burada görünecek.</div>
                 )}
               </div>
             </MagicCard>

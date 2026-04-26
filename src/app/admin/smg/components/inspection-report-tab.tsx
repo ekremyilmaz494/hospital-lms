@@ -1,11 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Download, Printer, ChevronDown, ChevronRight, FileCheck2 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { Button } from '@/components/ui/button';
 import { exportExcel } from '@/lib/export';
+
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9', BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
 
 interface Period {
   id: string;
@@ -68,9 +81,9 @@ interface Props {
 }
 
 function rateColor(rate: number) {
-  if (rate >= 100) return { bg: 'var(--color-success-bg)', fg: 'var(--color-success)' };
-  if (rate >= 50) return { bg: 'var(--color-warning-bg)', fg: 'var(--color-warning)' };
-  return { bg: 'var(--color-error-bg)', fg: 'var(--color-error)' };
+  if (rate >= 100) return { bg: K.SUCCESS_BG, fg: K.SUCCESS };
+  if (rate >= 50) return { bg: K.WARNING_BG, fg: K.WARNING };
+  return { bg: K.ERROR_BG, fg: K.ERROR };
 }
 
 export function InspectionReportTab({ periods, syncWithUrl = false }: Props) {
@@ -82,7 +95,6 @@ export function InspectionReportTab({ periods, syncWithUrl = false }: Props) {
   const [periodId, setPeriodId] = useState(urlPeriodId || periods[0]?.id || '');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // URL ↔ state senkronu (yalnızca syncWithUrl=true olduğunda)
   useEffect(() => {
     if (!syncWithUrl) return;
     if (urlPeriodId !== periodId) {
@@ -124,10 +136,10 @@ export function InspectionReportTab({ periods, syncWithUrl = false }: Props) {
   };
 
   if (isLoading && !data) {
-    return <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Rapor hazırlanıyor...</div>;
+    return <div className="p-8 text-center text-sm" style={{ color: K.TEXT_MUTED }}>Rapor hazırlanıyor...</div>;
   }
   if (!data) {
-    return <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Rapor verisi alınamadı.</div>;
+    return <div className="p-8 text-center text-sm" style={{ color: K.TEXT_MUTED }}>Rapor verisi alınamadı.</div>;
   }
 
   const { summary, staffDetail, period, organizationName, generatedAt } = data;
@@ -137,37 +149,47 @@ export function InspectionReportTab({ periods, syncWithUrl = false }: Props) {
     <div className="p-4 space-y-6 print:p-0">
       {/* Filtre & export */}
       <div className="flex flex-wrap items-center gap-3 print:hidden">
-        <label className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Dönem:</label>
+        <label className="text-xs font-semibold" style={{ color: K.TEXT_SECONDARY }}>Dönem:</label>
         <select
           value={periodId}
           onChange={e => setPeriodId(e.target.value)}
-          className="text-sm rounded-xl px-3 py-1.5 border outline-none"
-          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}
+          className="text-sm rounded-xl px-3 py-1.5 outline-none"
+          style={{ border: `1.5px solid ${K.BORDER}`, background: K.SURFACE, color: K.TEXT_PRIMARY }}
         >
           <option value="">Aktif Dönem</option>
           {periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <div className="ml-auto flex gap-2">
-          <Button variant="outline" onClick={handleExportExcel} className="gap-1.5 rounded-xl">
+          <Button
+            variant="outline"
+            onClick={handleExportExcel}
+            className="gap-1.5 rounded-xl"
+            style={{ background: K.SURFACE, borderColor: K.BORDER, color: K.TEXT_PRIMARY }}
+          >
             <Download className="h-4 w-4" /> Excel İndir
           </Button>
-          <Button variant="outline" onClick={() => window.print()} className="gap-1.5 rounded-xl">
+          <Button
+            variant="outline"
+            onClick={() => window.print()}
+            className="gap-1.5 rounded-xl"
+            style={{ background: K.SURFACE, borderColor: K.BORDER, color: K.TEXT_PRIMARY }}
+          >
             <Printer className="h-4 w-4" /> Yazdır
           </Button>
         </div>
       </div>
 
       {/* Rapor Başlığı (print için) */}
-      <div className="text-center border-b pb-4" style={{ borderColor: 'var(--color-border)' }}>
-        <FileCheck2 className="h-10 w-10 mx-auto mb-2" style={{ color: 'var(--color-primary)' }} />
-        <h2 className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>SKS Denetim Raporu</h2>
-        <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>{organizationName}</p>
+      <div className="text-center pb-4" style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+        <FileCheck2 className="h-10 w-10 mx-auto mb-2" style={{ color: K.PRIMARY }} />
+        <h2 className="text-xl font-bold" style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY }}>SKS Denetim Raporu</h2>
+        <p className="text-sm mt-1" style={{ color: K.TEXT_SECONDARY }}>{organizationName}</p>
         {period && (
-          <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-xs mt-1" style={{ color: K.TEXT_MUTED }}>
             {period.name} · {new Date(period.startDate).toLocaleDateString('tr-TR')} — {new Date(period.endDate).toLocaleDateString('tr-TR')}
           </p>
         )}
-        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-xs mt-1" style={{ color: K.TEXT_MUTED }}>
           Rapor tarihi: {new Date(generatedAt).toLocaleString('tr-TR')}
         </p>
       </div>
@@ -180,46 +202,59 @@ export function InspectionReportTab({ periods, syncWithUrl = false }: Props) {
         <SummaryCard label="Bekleyen Onay" value={summary.pendingApprovals.toString()} />
       </div>
 
-      {/* Unvana göre */}
       <SummaryTable title="Unvana Göre Uyum" rows={summary.byUnvan.map(r => ({ label: r.unvan, total: r.total, compliant: r.compliant, rate: r.rate }))} />
 
-      {/* Departmana göre */}
       <SummaryTable title="Departmana Göre Uyum" rows={summary.byDepartment.map(r => ({ label: r.department, total: r.total, compliant: r.compliant, rate: r.rate }))} />
 
       {/* Personel detay */}
       <div>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>Personel Detayı</h3>
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+        <h3 className="font-bold mb-3" style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY, fontSize: 18 }}>
+          Personel Detayı
+        </h3>
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{ border: `1.5px solid ${K.BORDER}`, background: K.SURFACE, boxShadow: K.SHADOW_CARD }}
+        >
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>
+              <tr style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}`, background: K.BG }}>
                 <th className="w-8"></th>
                 {['Ad Soyad', 'Unvan', 'Departman', 'Puan', 'İlerleme', 'Durum'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
+                  <th
+                    key={h}
+                    className="text-left px-4 py-3 font-semibold uppercase tracking-wide"
+                    style={{ color: K.TEXT_MUTED, fontSize: 11 }}
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {staffDetail.map(s => {
+              {staffDetail.map((s, idx) => {
                 const sColor = rateColor(s.progress);
                 const isOpen = expanded.has(s.userId);
                 return (
-                  <>
-                    <tr key={s.userId} style={{ borderBottom: '1px solid var(--color-border)' }} className="cursor-pointer" onClick={() => toggleRow(s.userId)}>
-                      <td className="pl-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</td>
-                      <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{s.name}</td>
-                      <td className="px-4 py-3" style={{ color: 'var(--color-text-secondary)' }}>{s.unvan ?? '-'}</td>
-                      <td className="px-4 py-3" style={{ color: 'var(--color-text-secondary)' }}>{s.department ?? '-'}</td>
+                  <Fragment key={`${s.userId}-${idx}`}>
+                    <tr
+                      style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
+                      className="cursor-pointer"
+                      onClick={() => toggleRow(s.userId)}
+                    >
+                      <td className="pl-2" style={{ color: K.TEXT_MUTED }}>{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</td>
+                      <td className="px-4 py-3 font-medium" style={{ color: K.TEXT_PRIMARY }}>{s.name}</td>
+                      <td className="px-4 py-3" style={{ color: K.TEXT_SECONDARY }}>{s.unvan ?? '-'}</td>
+                      <td className="px-4 py-3" style={{ color: K.TEXT_SECONDARY }}>{s.department ?? '-'}</td>
                       <td className="px-4 py-3">
-                        <span className="font-semibold" style={{ color: 'var(--color-primary)' }}>{s.earnedPoints}</span>
-                        <span className="text-xs ml-1" style={{ color: 'var(--color-text-muted)' }}>/ {s.requiredPoints}</span>
+                        <span className="font-semibold" style={{ color: K.PRIMARY }}>{s.earnedPoints}</span>
+                        <span className="text-xs ml-1" style={{ color: K.TEXT_MUTED }}>/ {s.requiredPoints}</span>
                       </td>
                       <td className="px-4 py-3" style={{ minWidth: 120 }}>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 rounded-full h-2 overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                          <div className="flex-1 rounded-full h-2 overflow-hidden" style={{ background: K.BORDER_LIGHT }}>
                             <div className="h-2 rounded-full" style={{ width: `${s.progress}%`, background: sColor.fg }} />
                           </div>
-                          <span className="text-xs font-medium w-9 text-right" style={{ color: 'var(--color-text-secondary)' }}>%{s.progress}</span>
+                          <span className="text-xs font-medium w-9 text-right" style={{ color: K.TEXT_SECONDARY }}>%{s.progress}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -232,13 +267,13 @@ export function InspectionReportTab({ periods, syncWithUrl = false }: Props) {
                       <tr>
                         <td></td>
                         <td colSpan={6} className="p-0">
-                          <div className="px-4 py-3" style={{ background: 'var(--color-surface-2)' }}>
+                          <div className="px-4 py-3" style={{ background: K.BG }}>
                             {s.activities.length === 0 ? (
-                              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Bu personelin onaylı aktivitesi yok.</p>
+                              <p className="text-xs" style={{ color: K.TEXT_MUTED }}>Bu personelin onaylı aktivitesi yok.</p>
                             ) : (
                               <table className="w-full text-xs">
                                 <thead>
-                                  <tr style={{ color: 'var(--color-text-muted)' }}>
+                                  <tr style={{ color: K.TEXT_MUTED }}>
                                     <th className="text-left py-1 font-medium">Aktivite</th>
                                     <th className="text-left py-1 font-medium">Kategori</th>
                                     <th className="text-left py-1 font-medium">Sağlayıcı</th>
@@ -249,11 +284,11 @@ export function InspectionReportTab({ periods, syncWithUrl = false }: Props) {
                                 <tbody>
                                   {s.activities.map((a, i) => (
                                     <tr key={i}>
-                                      <td className="py-1" style={{ color: 'var(--color-text)' }}>{a.title}</td>
-                                      <td className="py-1" style={{ color: 'var(--color-text-secondary)' }}>{a.categoryName}</td>
-                                      <td className="py-1" style={{ color: 'var(--color-text-secondary)' }}>{a.provider ?? '-'}</td>
-                                      <td className="py-1" style={{ color: 'var(--color-text-muted)' }}>{new Date(a.completionDate).toLocaleDateString('tr-TR')}</td>
-                                      <td className="py-1 text-right font-semibold" style={{ color: 'var(--color-primary)' }}>{a.smgPoints}</td>
+                                      <td className="py-1" style={{ color: K.TEXT_PRIMARY }}>{a.title}</td>
+                                      <td className="py-1" style={{ color: K.TEXT_SECONDARY }}>{a.categoryName}</td>
+                                      <td className="py-1" style={{ color: K.TEXT_SECONDARY }}>{a.provider ?? '-'}</td>
+                                      <td className="py-1" style={{ color: K.TEXT_MUTED }}>{new Date(a.completionDate).toLocaleDateString('tr-TR')}</td>
+                                      <td className="py-1 text-right font-semibold" style={{ color: K.PRIMARY }}>{a.smgPoints}</td>
                                     </tr>
                                   ))}
                                 </tbody>
@@ -263,7 +298,7 @@ export function InspectionReportTab({ periods, syncWithUrl = false }: Props) {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -282,9 +317,21 @@ function SummaryCard({
   big,
 }: { label: string; value: string; accentBg?: string; accentFg?: string; big?: boolean }) {
   return (
-    <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--color-border)', background: accentBg ?? 'var(--color-surface)' }}>
-      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
-      <p className={`${big ? 'text-3xl' : 'text-2xl'} font-black mt-1`} style={{ color: accentFg ?? 'var(--color-text)' }}>{value}</p>
+    <div
+      className="rounded-2xl p-4"
+      style={{
+        border: `1.5px solid ${K.BORDER}`,
+        background: accentBg ?? K.SURFACE,
+        boxShadow: K.SHADOW_CARD,
+      }}
+    >
+      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: K.TEXT_MUTED, fontSize: 11 }}>{label}</p>
+      <p
+        className={`${big ? 'text-3xl' : 'text-2xl'} font-black mt-1`}
+        style={{ color: accentFg ?? K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY }}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -293,28 +340,31 @@ function SummaryTable({ title, rows }: { title: string; rows: Array<{ label: str
   if (rows.length === 0) return null;
   return (
     <div>
-      <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>{title}</h3>
-      <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+      <h3 className="font-bold mb-3" style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY, fontSize: 18 }}>{title}</h3>
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{ border: `1.5px solid ${K.BORDER}`, background: K.SURFACE, boxShadow: K.SHADOW_CARD }}
+      >
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>
-              <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Kategori</th>
-              <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Toplam</th>
-              <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Uyumlu</th>
-              <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Oran</th>
+            <tr style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}`, background: K.BG }}>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wide" style={{ color: K.TEXT_MUTED, fontSize: 11 }}>Kategori</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wide" style={{ color: K.TEXT_MUTED, fontSize: 11 }}>Toplam</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wide" style={{ color: K.TEXT_MUTED, fontSize: 11 }}>Uyumlu</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wide" style={{ color: K.TEXT_MUTED, fontSize: 11 }}>Oran</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => {
               const c = rateColor(r.rate);
               return (
-                <tr key={i} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td className="px-4 py-2 font-medium" style={{ color: 'var(--color-text)' }}>{r.label}</td>
-                  <td className="px-4 py-2" style={{ color: 'var(--color-text-secondary)' }}>{r.total}</td>
-                  <td className="px-4 py-2" style={{ color: 'var(--color-text-secondary)' }}>{r.compliant}</td>
+                <tr key={i} style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+                  <td className="px-4 py-2 font-medium" style={{ color: K.TEXT_PRIMARY }}>{r.label}</td>
+                  <td className="px-4 py-2" style={{ color: K.TEXT_SECONDARY }}>{r.total}</td>
+                  <td className="px-4 py-2" style={{ color: K.TEXT_SECONDARY }}>{r.compliant}</td>
                   <td className="px-4 py-2" style={{ minWidth: 180 }}>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 rounded-full h-2 overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                      <div className="flex-1 rounded-full h-2 overflow-hidden" style={{ background: K.BORDER_LIGHT }}>
                         <div className="h-2 rounded-full" style={{ width: `${r.rate}%`, background: c.fg }} />
                       </div>
                       <span className="text-xs font-medium w-9 text-right" style={{ color: c.fg }}>%{r.rate}</span>

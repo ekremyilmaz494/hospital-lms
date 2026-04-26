@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser,
+  getAuthUserStrict,
   requireRole,
   jsonResponse,
   errorResponse,
@@ -12,7 +12,7 @@ import { createContentLibrarySchema } from '@/lib/validations'
 
 /** GET /api/super-admin/content-library — tüm içerikleri listele */
 export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
 
 /** POST /api/super-admin/content-library — yeni içerik ekle */
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])

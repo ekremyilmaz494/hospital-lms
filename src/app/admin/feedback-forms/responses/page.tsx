@@ -10,6 +10,20 @@ import { PageHeader } from '@/components/shared/page-header';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 interface ResponseItem {
   id: string;
   submittedAt: string;
@@ -23,12 +37,12 @@ interface ResponseItem {
 interface Data { items: ResponseItem[]; total: number; page: number; limit: number; }
 
 function ScorePill({ score }: { score: number | null }) {
-  if (score === null) return <span className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>—</span>;
-  const col = score >= 4 ? 'var(--color-success)' : score >= 3 ? 'var(--brand-600)' : score >= 2 ? '#f59e0b' : 'var(--color-error)';
-  const bg = score >= 4 ? 'var(--color-success-bg)' : score >= 3 ? 'var(--brand-100)10' : score >= 2 ? '#fef3c710' : 'var(--color-error-bg)';
+  if (score === null) return <span className="text-[12px]" style={{ color: K.TEXT_MUTED }}>—</span>;
+  const col = score >= 4 ? K.SUCCESS : score >= 3 ? K.PRIMARY : score >= 2 ? K.WARNING : K.ERROR;
+  const bg = score >= 4 ? K.SUCCESS_BG : score >= 3 ? K.PRIMARY_LIGHT : score >= 2 ? K.WARNING_BG : K.ERROR_BG;
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-bold tabular-nums"
-      style={{ background: bg, color: col, border: `1px solid ${col}30` }}>
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold tabular-nums"
+      style={{ background: bg, color: col }}>
       {score.toFixed(2)}<span className="text-[10px] font-normal opacity-60">/ 5</span>
     </span>
   );
@@ -105,27 +119,27 @@ function FeedbackResponsesContent() {
       />
 
       {/* Filters */}
-      <div className="rounded-2xl px-5 py-4 flex flex-wrap gap-3 items-center"
-        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+      <div className="px-5 py-4 flex flex-wrap gap-3 items-center"
+        style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--color-text-muted)' }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: K.TEXT_MUTED }} />
           <Input placeholder="Eğitim ID ile filtrele" value={trainingFilter}
             onChange={e => { setTrainingFilter(e.target.value); setPage(1); }}
             className="pl-9" />
         </div>
 
         {/* Segment control */}
-        <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+        <div className="flex gap-1 p-1 rounded-xl" style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}` }}>
           {(['all', 'true', 'false'] as const).map(v => (
             <button key={v} onClick={() => { setPassedFilter(v); setPage(1); }}
-              className="px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-all"
+              className="px-3.5 py-1.5 rounded-lg text-[12px] font-semibold"
               style={{
                 background: passedFilter === v
-                  ? v === 'true' ? 'var(--color-success-bg)' : v === 'false' ? 'var(--color-error-bg)' : 'var(--color-surface)'
+                  ? v === 'true' ? K.SUCCESS_BG : v === 'false' ? K.ERROR_BG : K.SURFACE
                   : 'transparent',
                 color: passedFilter === v
-                  ? v === 'true' ? 'var(--color-success)' : v === 'false' ? 'var(--color-error)' : 'var(--color-text)'
-                  : 'var(--color-text-muted)',
+                  ? v === 'true' ? K.SUCCESS : v === 'false' ? K.ERROR : K.TEXT_PRIMARY
+                  : K.TEXT_MUTED,
                 boxShadow: passedFilter === v ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
               }}>
               {v === 'all' ? 'Tümü' : v === 'true' ? 'Geçti' : 'Kaldı'}
@@ -136,31 +150,33 @@ function FeedbackResponsesContent() {
         <div className="flex gap-2 ml-auto">
           <Button variant="outline" size="sm" onClick={() => runExport('xlsx')}
             disabled={exporting || !data || data.total === 0}
-            className="gap-1.5">
+            className="gap-1.5"
+            style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}>
             <Download className="w-3.5 h-3.5" /> Excel
           </Button>
           <Button variant="outline" size="sm" onClick={() => runExport('pdf')}
             disabled={exporting || !data || data.total === 0}
-            className="gap-1.5">
+            className="gap-1.5"
+            style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}>
             <FileText className="w-3.5 h-3.5" /> PDF
           </Button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+      <div className="overflow-hidden" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--color-border)', borderTopColor: 'var(--color-primary)' }} />
+            <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: K.BORDER_LIGHT, borderTopColor: K.PRIMARY }} />
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <tr style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
                   {['Tarih', 'Eğitim', 'Katılımcı', 'Departman', 'Durum', 'Puan', ''].map(h => (
-                    <th key={h} className="px-5 py-3.5 text-left text-[10px] uppercase tracking-[2px] font-bold"
-                      style={{ color: 'var(--color-text-muted)', background: 'var(--color-bg)' }}>{h}</th>
+                    <th key={h} className="px-5 py-3.5 text-left text-[11px] uppercase tracking-wider font-semibold"
+                      style={{ color: K.TEXT_MUTED, background: K.BG }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -168,50 +184,50 @@ function FeedbackResponsesContent() {
                 {(data?.items ?? []).map((r, i) => (
                   <tr key={r.id} className="group"
                     style={{
-                      borderBottom: '1px solid var(--color-border)',
+                      borderBottom: `1px solid ${K.BORDER_LIGHT}`,
                       opacity: 0,
                       animation: `fadeIn 300ms ease ${i * 25}ms forwards`,
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = K.SURFACE_HOVER)}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
+                      <div className="flex items-center gap-1.5 text-[12px]" style={{ color: K.TEXT_MUTED }}>
                         <Calendar className="w-3.5 h-3.5 shrink-0" />
                         {new Date(r.submittedAt).toLocaleDateString('tr-TR')}
                       </div>
                     </td>
                     <td className="px-5 py-3.5 max-w-[260px]">
-                      <p className="text-[13px] font-medium truncate" style={{ color: 'var(--color-text)' }} title={r.trainingTitle}>{r.trainingTitle}</p>
+                      <p className="text-[13px] font-medium truncate" style={{ color: K.TEXT_PRIMARY }} title={r.trainingTitle}>{r.trainingTitle}</p>
                     </td>
                     <td className="px-5 py-3.5">
                       {r.participant ? (
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                            style={{ background: 'var(--color-primary)' }}>
+                            style={{ background: K.PRIMARY }}>
                             {r.participant.name.charAt(0)}
                           </div>
-                          <span className="text-[13px] font-medium" style={{ color: 'var(--color-text)' }}>{r.participant.name}</span>
+                          <span className="text-[13px] font-medium" style={{ color: K.TEXT_PRIMARY }}>{r.participant.name}</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+                        <div className="flex items-center gap-2" style={{ color: K.TEXT_MUTED }}>
                           <UserX className="w-4 h-4" />
                           <span className="text-[13px]">Anonim</span>
                         </div>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 text-[13px]" style={{ color: 'var(--color-text-muted)' }}>
+                    <td className="px-5 py-3.5 text-[13px]" style={{ color: K.TEXT_MUTED }}>
                       {r.participant?.departmentName ?? '—'}
                     </td>
                     <td className="px-5 py-3.5">
                       {r.isPassed ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
-                          style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)', border: '1px solid var(--color-success)30' }}>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+                          style={{ background: K.SUCCESS_BG, color: K.SUCCESS }}>
                           <Check className="w-3 h-3" /> Geçti
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
-                          style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)', border: '1px solid var(--color-error)30' }}>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+                          style={{ background: K.ERROR_BG, color: K.ERROR }}>
                           <X className="w-3 h-3" /> Kaldı
                         </span>
                       )}
@@ -220,7 +236,7 @@ function FeedbackResponsesContent() {
                     <td className="px-5 py-3.5 text-right">
                       <Link href={`/admin/feedback-forms/responses/${r.id}`}>
                         <button className="px-3 py-1.5 rounded-lg text-[12px] font-semibold opacity-0 group-hover:opacity-100"
-                          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)30', transition: 'opacity 150ms' }}>
+                          style={{ background: K.PRIMARY, color: '#fff', transition: 'opacity 150ms' }}>
                           Detay
                         </button>
                       </Link>
@@ -228,7 +244,7 @@ function FeedbackResponsesContent() {
                   </tr>
                 ))}
                 {(data?.items ?? []).length === 0 && !loading && (
-                  <tr><td colSpan={7} className="px-5 py-16 text-center" style={{ color: 'var(--color-text-muted)' }}>
+                  <tr><td colSpan={7} className="px-5 py-16 text-center" style={{ color: K.TEXT_MUTED }}>
                     Eşleşen yanıt bulunamadı
                   </td></tr>
                 )}
@@ -238,14 +254,14 @@ function FeedbackResponsesContent() {
         )}
 
         {data && data.total > data.limit && (
-          <div className="px-5 py-4 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border)' }}>
-            <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
-              <span className="font-bold" style={{ color: 'var(--color-text)' }}>{data.total}</span> yanıt · Sayfa {page} / {totalPages}
+          <div className="px-5 py-4 flex items-center justify-between" style={{ borderTop: `1px solid ${K.BORDER_LIGHT}` }}>
+            <p className="text-[12px]" style={{ color: K.TEXT_MUTED }}>
+              <span className="font-bold" style={{ color: K.TEXT_PRIMARY }}>{data.total}</span> yanıt · Sayfa {page} / {totalPages}
             </p>
             <div className="flex items-center gap-1">
               <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg disabled:opacity-30"
-                style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                style={{ background: K.SURFACE, color: K.TEXT_SECONDARY, border: `1px solid ${K.BORDER}` }}>
                 <ChevronLeft className="w-4 h-4" />
               </button>
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -255,9 +271,9 @@ function FeedbackResponsesContent() {
                   <button key={p} onClick={() => setPage(p)}
                     className="w-8 h-8 flex items-center justify-center rounded-lg text-[12px] font-bold"
                     style={{
-                      background: p === page ? 'var(--color-primary)' : 'var(--color-bg)',
-                      color: p === page ? 'white' : 'var(--color-text-muted)',
-                      border: p === page ? 'none' : '1px solid var(--color-border)',
+                      background: p === page ? K.PRIMARY : K.SURFACE,
+                      color: p === page ? 'white' : K.TEXT_SECONDARY,
+                      border: p === page ? 'none' : `1px solid ${K.BORDER}`,
                     }}>
                     {p}
                   </button>
@@ -265,7 +281,7 @@ function FeedbackResponsesContent() {
               })}
               <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg disabled:opacity-30"
-                style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                style={{ background: K.SURFACE, color: K.TEXT_SECONDARY, border: `1px solid ${K.BORDER}` }}>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

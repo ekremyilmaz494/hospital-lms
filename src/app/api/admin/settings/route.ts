@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { z } from 'zod/v4'
 
 const settingsSchema = z.object({
@@ -19,10 +19,10 @@ const settingsSchema = z.object({
 
 // GET /api/admin/settings — Hastane ayarlarını getir
 export async function GET() {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId
@@ -52,10 +52,10 @@ export async function GET() {
 
 // PUT /api/admin/settings — Hastane ayarlarını güncelle
 export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId

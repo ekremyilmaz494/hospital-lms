@@ -7,6 +7,20 @@ import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useEffect, useMemo, useState } from 'react';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 interface Cell { trainingId: string; state: string; score?: number | null }
 interface StaffRow { id: string; name: string; department: string; cells: Cell[]; completionRate: number }
 interface Training { id: string; title: string; isCompulsory: boolean }
@@ -22,12 +36,12 @@ interface MatrixData {
 }
 
 const stateConfig: Record<string, { icon: typeof CheckCircle; bg: string; border: string; color: string; label: string }> = {
-  passed:      { icon: CheckCircle, bg: 'var(--color-success-bg)',  border: 'var(--color-success)',  color: 'var(--color-success)',  label: 'Başarılı' },
-  failed:      { icon: XCircle,     bg: 'var(--color-error-bg)',    border: 'var(--color-error)',    color: 'var(--color-error)',    label: 'Başarısız' },
-  in_progress: { icon: Clock,       bg: 'var(--color-warning-bg)', border: 'var(--color-warning)', color: 'var(--color-warning)', label: 'Devam' },
-  assigned:    { icon: Clock,       bg: 'var(--color-info-bg)',     border: 'var(--color-info)',     color: 'var(--color-info)',     label: 'Atandı' },
-  locked:      { icon: Lock,        bg: 'var(--color-error-bg)',    border: 'var(--color-error)',    color: 'var(--color-error)',    label: 'Kilitli' },
-  unassigned:  { icon: Minus,       bg: 'transparent',              border: 'var(--color-border)',   color: 'var(--color-text-muted)', label: 'Atanmadı' },
+  passed:      { icon: CheckCircle, bg: K.SUCCESS_BG,  border: K.SUCCESS,  color: K.SUCCESS,  label: 'Başarılı' },
+  failed:      { icon: XCircle,     bg: K.ERROR_BG,    border: K.ERROR,    color: K.ERROR,    label: 'Başarısız' },
+  in_progress: { icon: Clock,       bg: K.WARNING_BG, border: K.WARNING, color: K.WARNING, label: 'Devam' },
+  assigned:    { icon: Clock,       bg: K.INFO_BG,     border: K.INFO,     color: K.INFO,     label: 'Atandı' },
+  locked:      { icon: Lock,        bg: K.ERROR_BG,    border: K.ERROR,    color: K.ERROR,    label: 'Kilitli' },
+  unassigned:  { icon: Minus,       bg: 'transparent',              border: K.BORDER_LIGHT,   color: K.TEXT_MUTED, label: 'Atanmadı' },
 };
 
 const nameHue = (name: string) => name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
@@ -73,40 +87,43 @@ export default function CompetencyMatrixPage() {
   const isFiltered = Boolean(debouncedSearch || departmentId);
 
   const summaryCards = [
-    { label: 'Toplam Personel', value: data?.summary.totalStaff ?? 0, color: 'var(--color-primary)', bg: 'var(--color-primary-light)', icon: '👥' },
-    { label: 'Aktif Eğitim',    value: data?.summary.totalTrainings ?? 0, color: 'var(--color-info)', bg: 'var(--color-info-bg)',       icon: '📚' },
-    { label: 'Zorunlu Eğitim',  value: data?.summary.compulsoryTrainings ?? 0, color: 'var(--color-error)', bg: 'var(--color-error-bg)', icon: '⚠️' },
+    { label: 'Toplam Personel', value: data?.summary.totalStaff ?? 0, color: K.PRIMARY, bg: K.PRIMARY_LIGHT, icon: '' },
+    { label: 'Aktif Eğitim',    value: data?.summary.totalTrainings ?? 0, color: K.INFO, bg: K.INFO_BG,       icon: '' },
+    { label: 'Zorunlu Eğitim',  value: data?.summary.compulsoryTrainings ?? 0, color: K.ERROR, bg: K.ERROR_BG, icon: '' },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="k-page">
       <BlurFade delay={0}>
-        <PageHeader title="Yetkinlik Matrisi" subtitle={`${totalStaff} personel × ${trainings.length} eğitim`} />
+        <header className="k-page-header">
+          <div>
+            <div className="k-breadcrumb">
+              <span>Panel</span>
+              <ChevronRight size={12} />
+              <span data-current="true">Yetkinlik Matrisi</span>
+            </div>
+            <h1 className="k-page-title">Yetkinlik Matrisi</h1>
+            <p className="k-page-subtitle">
+              <strong style={{ color: K.TEXT_PRIMARY }}>{totalStaff}</strong> personel ×{' '}
+              <strong style={{ color: K.TEXT_PRIMARY }}>{trainings.length}</strong> eğitim ısı haritası
+            </p>
+          </div>
+        </header>
       </BlurFade>
 
       {/* Summary cards */}
       <BlurFade delay={0.05}>
         <div className="grid grid-cols-3 gap-4">
           {summaryCards.map(s => (
-            <div
-              key={s.label}
-              className="rounded-2xl border p-5"
-              style={{
-                background: 'var(--color-surface)',
-                borderColor: 'var(--color-border)',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-              }}
-            >
-              <div className="flex items-start justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
-                <span
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-sm"
-                  style={{ background: s.bg }}
-                >
+            <div key={s.label} className="k-stat-card">
+              <div className="k-stat-card-rail" style={{ background: s.color }} />
+              <div className="k-stat-card-head">
+                <div className="k-stat-card-label">{s.label}</div>
+                <div className="k-stat-card-icon" style={{ background: s.bg, color: s.color }}>
                   {s.icon}
-                </span>
+                </div>
               </div>
-              <p className="mt-3 text-3xl font-bold tabular-nums tracking-tight" style={{ color: s.color }}>{s.value}</p>
+              <div className="k-stat-card-value" style={{ color: s.color }}>{s.value}</div>
             </div>
           ))}
         </div>
@@ -114,81 +131,63 @@ export default function CompetencyMatrixPage() {
 
       {/* Filters */}
       <BlurFade delay={0.08}>
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div
-            className="flex items-center gap-2 rounded-xl border px-3 py-2"
-            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', minWidth: 220 }}
-          >
-            <Search className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-text-muted)' }} />
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="k-input" style={{ minWidth: 220 }}>
+            <Search size={14} />
             <input
               type="text"
               placeholder="Personel ara…"
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
-              className="w-full bg-transparent text-sm outline-none"
-              style={{ color: 'var(--color-text-primary)' }}
             />
           </div>
 
-          {/* Department filter */}
-          <select
-            value={departmentId}
-            onChange={e => setDepartmentId(e.target.value)}
-            className="rounded-xl border px-3 py-2 text-sm font-medium outline-none"
-            style={{
-              background: 'var(--color-surface)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="">Tüm Departmanlar</option>
-            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
+          <div className="k-input">
+            <select
+              value={departmentId}
+              onChange={e => setDepartmentId(e.target.value)}
+              style={{ cursor: 'pointer' }}
+            >
+              <option value="">Tüm Departmanlar</option>
+              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
 
           {isFiltered && (
-            <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+            <span className="k-badge k-badge-no-dot" style={{ background: K.PRIMARY_LIGHT, color: K.PRIMARY }}>
               {totalStaff} sonuç
             </span>
           )}
           {isLoading && data && (
-            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Yükleniyor…</span>
+            <span className="text-xs" style={{ color: K.TEXT_MUTED }}>Yükleniyor…</span>
           )}
         </div>
       </BlurFade>
 
       {/* Matrix table */}
       <BlurFade delay={0.12}>
-        <div
-          className="overflow-hidden rounded-2xl border"
-          style={{
-            background: 'var(--color-surface)',
-            borderColor: 'var(--color-border)',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-          }}
-        >
+        <div className="k-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
+                <tr style={{ background: K.BG, borderBottom: '1px solid #c9c4be' }}>
                   {/* Sticky name column */}
                   <th
                     className="sticky left-0 z-10 px-5 py-3.5 text-left"
-                    style={{ background: 'var(--color-bg)', minWidth: 192, borderRight: '1px solid var(--color-border)' }}
+                    style={{ background: K.BG, minWidth: 192, borderRight: '1px solid #c9c4be' }}
                   >
-                    <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Personel</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Personel</span>
                   </th>
                   {/* Completion rate column */}
                   <th className="px-4 py-3.5 text-center" style={{ minWidth: 80 }}>
-                    <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Oran</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Oran</span>
                   </th>
                   {/* Training columns */}
                   {trainings.map(t => (
                     <th key={t.id} className="px-2 py-3.5 text-center" style={{ minWidth: 44, verticalAlign: 'bottom' }}>
                       <div className="flex flex-col items-center gap-1.5">
                         {t.isCompulsory && (
-                          <AlertTriangle className="h-3 w-3 shrink-0" style={{ color: 'var(--color-error)' }} />
+                          <AlertTriangle className="h-3 w-3 shrink-0" style={{ color: K.ERROR }} />
                         )}
                         <span
                           style={{
@@ -196,7 +195,7 @@ export default function CompetencyMatrixPage() {
                             transform: 'rotate(180deg)',
                             fontSize: 10,
                             fontWeight: 600,
-                            color: 'var(--color-text-muted)',
+                            color: K.TEXT_MUTED,
                             letterSpacing: '0.03em',
                             height: 62,
                             lineHeight: 1.25,
@@ -211,7 +210,7 @@ export default function CompetencyMatrixPage() {
                         <span
                           style={{
                             width: 5, height: 5, borderRadius: '50%', display: 'block',
-                            background: t.isCompulsory ? 'var(--color-error)' : 'var(--color-info)',
+                            background: t.isCompulsory ? K.ERROR : K.INFO,
                           }}
                         />
                       </div>
@@ -222,24 +221,24 @@ export default function CompetencyMatrixPage() {
               <tbody>
                 {staff.map((s, si) => {
                   const rate = s.completionRate;
-                  const rateColor = rate >= 80 ? 'var(--color-success)' : rate >= 50 ? 'var(--color-warning)' : 'var(--color-error)';
+                  const rateColor = rate >= 80 ? K.SUCCESS : rate >= 50 ? K.WARNING : K.ERROR;
                   const hue = nameHue(s.name);
                   return (
                     <tr
                       key={s.id}
                       style={{
-                        borderBottom: si < staff.length - 1 ? '1px solid var(--color-border)' : 'none',
+                        borderBottom: si < staff.length - 1 ? `1px solid ${K.BORDER_LIGHT}` : 'none',
                         transition: 'background 0.15s',
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg)')}
+                      onMouseEnter={e => (e.currentTarget.style.background = K.BG)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       {/* Sticky name cell */}
                       <td
                         className="sticky left-0 z-10 px-5 py-3"
                         style={{
-                          background: 'var(--color-surface)',
-                          borderRight: '1px solid var(--color-border)',
+                          background: K.SURFACE,
+                          borderRight: `1px solid ${K.BORDER_LIGHT}`,
                         }}
                       >
                         <div className="flex items-center gap-3">
@@ -256,7 +255,7 @@ export default function CompetencyMatrixPage() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold leading-tight">{s.name}</p>
-                            <p className="mt-0.5 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{s.department}</p>
+                            <p className="mt-0.5 text-[11px]" style={{ color: K.TEXT_MUTED }}>{s.department}</p>
                           </div>
                         </div>
                       </td>
@@ -265,7 +264,7 @@ export default function CompetencyMatrixPage() {
                       <td className="px-4 py-3 text-center">
                         <div className="flex flex-col items-center gap-1">
                           <span className="text-sm font-bold tabular-nums" style={{ color: rateColor }}>%{rate}</span>
-                          <div style={{ width: 44, height: 4, borderRadius: 2, background: 'var(--color-border)', overflow: 'hidden' }}>
+                          <div style={{ width: 44, height: 4, borderRadius: 2, background: K.BORDER_LIGHT, overflow: 'hidden' }}>
                             <div style={{ height: '100%', width: `${rate}%`, background: rateColor, borderRadius: 2, transition: 'width 0.6s ease' }} />
                           </div>
                         </div>
@@ -311,7 +310,7 @@ export default function CompetencyMatrixPage() {
           </div>
 
           {staff.length === 0 && (
-            <div className="py-16 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            <div className="py-16 text-center text-sm" style={{ color: K.TEXT_MUTED }}>
               Personel bulunamadı
             </div>
           )}
@@ -319,9 +318,9 @@ export default function CompetencyMatrixPage() {
           {totalPages > 1 && (
             <div
               className="flex items-center justify-between px-5 py-3"
-              style={{ borderTop: '1px solid var(--color-border)' }}
+              style={{ borderTop: `1px solid ${K.BORDER_LIGHT}` }}
             >
-              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="text-xs" style={{ color: K.TEXT_MUTED }}>
                 Sayfa {currentPage} / {totalPages} · toplam {totalStaff} kayıt
               </span>
               <div className="flex items-center gap-2">
@@ -330,7 +329,7 @@ export default function CompetencyMatrixPage() {
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={currentPage <= 1 || isLoading}
                   className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
-                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                  style={{ background: K.SURFACE, borderColor: K.BORDER_LIGHT }}
                 >
                   <ChevronLeft className="h-3.5 w-3.5" /> Önceki
                 </button>
@@ -339,7 +338,7 @@ export default function CompetencyMatrixPage() {
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage >= totalPages || isLoading}
                   className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
-                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                  style={{ background: K.SURFACE, borderColor: K.BORDER_LIGHT }}
                 >
                   Sonraki <ChevronRight className="h-3.5 w-3.5" />
                 </button>
@@ -353,10 +352,10 @@ export default function CompetencyMatrixPage() {
       <BlurFade delay={0.18}>
         <div
           className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border px-5 py-3.5"
-          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+          style={{ background: K.SURFACE, borderColor: K.BORDER_LIGHT }}
         >
-          <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Durum</span>
-          <div className="h-4 w-px" style={{ background: 'var(--color-border)' }} />
+          <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Durum</span>
+          <div className="h-4 w-px" style={{ background: K.BORDER_LIGHT }} />
           {Object.entries(stateConfig).map(([key, cfg]) => {
             const Icon = cfg.icon;
             return (
@@ -371,12 +370,12 @@ export default function CompetencyMatrixPage() {
                 >
                   <Icon style={{ width: 10, height: 10, color: cfg.color }} />
                 </div>
-                <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{cfg.label}</span>
+                <span className="text-xs font-medium" style={{ color: K.TEXT_SECONDARY }}>{cfg.label}</span>
               </div>
             );
           })}
-          <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-            <AlertTriangle className="h-3 w-3" style={{ color: 'var(--color-error)' }} />
+          <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: K.TEXT_MUTED }}>
+            <AlertTriangle className="h-3 w-3" style={{ color: K.ERROR }} />
             Kırmızı nokta = zorunlu eğitim
           </div>
         </div>

@@ -13,6 +13,20 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/shared/toast';
 import { exportPDF } from '@/lib/export';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 // ── Types ─────────────────────────────────────────────────────
 interface CompetencyItem { id?: string; text: string; description: string; order: number }
 interface CompetencyCategory { id?: string; name: string; weight: number; order: number; items: CompetencyItem[] }
@@ -36,7 +50,7 @@ interface StaffData { staff: StaffUser[] }
 const EVALUATOR_LABELS: Record<string, string> = {
   SELF: 'Öz Değerlendirme', MANAGER: 'Yönetici', PEER: 'Akran', SUBORDINATE: 'Ast',
 };
-const RADAR_COLORS = ['#6366f1', '#f59e0b', 'var(--brand-500)', '#ef4444'];
+const RADAR_COLORS = ['#6366f1', '#f59e0b', K.PRIMARY, '#ef4444'];
 
 // ── New Form Modal ─────────────────────────────────────────────
 function NewFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
@@ -100,30 +114,30 @@ function NewFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Form Başlığı *</label>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Form Başlığı *</label>
               <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Örn: 2026 Yılı Hemşire Yetkinlik Değerlendirmesi" className="rounded-xl" />
             </div>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Dönem Başlangıcı *</label>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Dönem Başlangıcı *</label>
               <Input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} className="rounded-xl" />
             </div>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Dönem Bitişi *</label>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Dönem Bitişi *</label>
               <Input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} className="rounded-xl" />
             </div>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Hedef Rol (opsiyonel)</label>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Hedef Rol (opsiyonel)</label>
               <Input value={targetRole} onChange={e => setTargetRole(e.target.value)} placeholder="Hemşire, Doktor, Teknisyen..." className="rounded-xl" />
             </div>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Açıklama (opsiyonel)</label>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Açıklama (opsiyonel)</label>
               <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Kısa açıklama..." className="rounded-xl" />
             </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Kategoriler</span>
+              <span className="text-sm font-semibold" style={{ color: K.TEXT_PRIMARY }}>Kategoriler</span>
               <Button variant="outline" size="sm" onClick={addCategory} className="rounded-xl text-xs gap-1">
                 <Plus className="h-3 w-3" /> Kategori Ekle
               </Button>
@@ -137,10 +151,10 @@ function NewFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                   onDragOver={e => e.preventDefault()}
                   onDrop={() => handleDrop(catIdx)}
                   className="rounded-xl border p-3"
-                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-2)' }}
+                  style={{ borderColor: K.BORDER, background: K.BG }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <GripVertical className="h-4 w-4 flex-shrink-0 cursor-grab" style={{ color: 'var(--color-text-muted)' }} />
+                    <GripVertical className="h-4 w-4 flex-shrink-0 cursor-grab" style={{ color: K.TEXT_MUTED }} />
                     <Input
                       value={cat.name}
                       onChange={e => updateCategory(catIdx, 'name', e.target.value)}
@@ -154,10 +168,10 @@ function NewFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                       className="rounded-lg text-sm w-20"
                       title="Ağırlık %"
                     />
-                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>%</span>
+                    <span className="text-xs" style={{ color: K.TEXT_MUTED }}>%</span>
                     {categories.length > 1 && (
                       <button onClick={() => removeCategory(catIdx)}>
-                        <X className="h-4 w-4" style={{ color: 'var(--color-error)' }} />
+                        <X className="h-4 w-4" style={{ color: K.ERROR }} />
                       </button>
                     )}
                   </div>
@@ -172,7 +186,7 @@ function NewFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                         />
                         {cat.items.length > 1 && (
                           <button onClick={() => removeItem(catIdx, itemIdx)}>
-                            <Trash2 className="h-3.5 w-3.5" style={{ color: 'var(--color-error)' }} />
+                            <Trash2 className="h-3.5 w-3.5" style={{ color: K.ERROR }} />
                           </button>
                         )}
                       </div>
@@ -180,7 +194,7 @@ function NewFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                     <button
                       onClick={() => addItem(catIdx)}
                       className="text-xs font-medium flex items-center gap-1 mt-1"
-                      style={{ color: 'var(--color-primary)' }}
+                      style={{ color: K.PRIMARY }}
                     >
                       <Plus className="h-3 w-3" /> Madde Ekle
                     </button>
@@ -241,43 +255,43 @@ function StartEvaluationModal({ forms, onClose, onSaved }: { forms: CompetencyFo
         <DialogHeader><DialogTitle>Değerlendirme Başlat</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Değerlendirme Formu *</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Değerlendirme Formu *</label>
             <select value={formId} onChange={e => setFormId(e.target.value)}
               className="w-full text-sm rounded-xl px-3 py-2 border outline-none"
-              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}>
+              style={{ borderColor: K.BORDER, background: K.SURFACE, color: K.TEXT_PRIMARY }}>
               <option value="">Form seçin...</option>
               {forms.filter(f => f.isActive).map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Değerlendirilen Kişi *</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Değerlendirilen Kişi *</label>
             <select value={subjectId} onChange={e => setSubjectId(e.target.value)}
               className="w-full text-sm rounded-xl px-3 py-2 border outline-none"
-              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}>
+              style={{ borderColor: K.BORDER, background: K.SURFACE, color: K.TEXT_PRIMARY }}>
               <option value="">Personel seçin...</option>
               {staff.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.departmentRel ? ` (${s.departmentRel.name})` : ''}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Yönetici</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Yönetici</label>
             <select value={managerId} onChange={e => setManagerId(e.target.value)}
               className="w-full text-sm rounded-xl px-3 py-2 border outline-none"
-              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}>
+              style={{ borderColor: K.BORDER, background: K.SURFACE, color: K.TEXT_PRIMARY }}>
               <option value="">Yönetici seçin (opsiyonel)...</option>
               {staff.filter(s => s.id !== subjectId).map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Akranlar (max 5, virgülle ID girin)</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Akranlar (max 5, virgülle ID girin)</label>
             <Input value={peerIds} onChange={e => setPeerIds(e.target.value)} placeholder="uuid1, uuid2, ..." className="rounded-xl" />
           </div>
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Astlar (max 3, virgülle ID girin)</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Astlar (max 3, virgülle ID girin)</label>
             <Input value={subordinateIds} onChange={e => setSubordinateIds(e.target.value)} placeholder="uuid1, uuid2, ..." className="rounded-xl" />
           </div>
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" checked={includeSelf} onChange={e => setIncludeSelf(e.target.checked)} className="rounded" />
-            <span style={{ color: 'var(--color-text)' }}>Öz değerlendirme dahil et</span>
+            <span style={{ color: K.TEXT_PRIMARY }}>Öz değerlendirme dahil et</span>
           </label>
         </div>
         <DialogFooter>
@@ -339,26 +353,26 @@ function ResultsPanel() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <select value={selectedSubjectId} onChange={e => setSelectedSubjectId(e.target.value)}
           className="text-sm rounded-xl px-3 py-2 border outline-none"
-          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}>
+          style={{ borderColor: K.BORDER, background: K.SURFACE, color: K.TEXT_PRIMARY }}>
           <option value="">Personel seçin...</option>
           {staff.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.departmentRel ? ` (${s.departmentRel.name})` : ''}</option>)}
         </select>
         <select value={selectedFormId} onChange={e => setSelectedFormId(e.target.value)}
           className="text-sm rounded-xl px-3 py-2 border outline-none"
-          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}>
+          style={{ borderColor: K.BORDER, background: K.SURFACE, color: K.TEXT_PRIMARY }}>
           <option value="">Form seçin...</option>
           {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
         </select>
       </div>
 
-      {isLoading && <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}><Loader2 className="h-5 w-5 animate-spin mx-auto" /></div>}
+      {isLoading && <div className="p-8 text-center text-sm" style={{ color: K.TEXT_MUTED }}><Loader2 className="h-5 w-5 animate-spin mx-auto" /></div>}
 
       {results && !isLoading && radarData.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex gap-3">
               {radarKeys.map((k, i) => (
-                <span key={k} className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                <span key={k} className="flex items-center gap-1 text-xs" style={{ color: K.TEXT_SECONDARY }}>
                   <span className="w-3 h-3 rounded-full" style={{ background: RADAR_COLORS[i % RADAR_COLORS.length] }} />
                   {typeLabels[k] ?? k}: <strong>{overallByType[k]?.toFixed(1)}</strong>
                 </span>
@@ -369,13 +383,13 @@ function ResultsPanel() {
             </Button>
           </div>
 
-          <div className="rounded-2xl border p-4" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+          <div className="rounded-2xl border p-4" style={{ background: K.SURFACE, borderColor: K.BORDER }}>
             <ResponsiveContainer width="100%" height={320}>
               <RadarChart data={radarData}>
                 <PolarGrid />
-                <PolarAngleAxis dataKey="category" tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} />
-                <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickCount={6} />
-                <Tooltip contentStyle={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', fontSize: '12px' }} />
+                <PolarAngleAxis dataKey="category" tick={{ fontSize: 11, fill: K.TEXT_SECONDARY }} />
+                <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10, fill: K.TEXT_MUTED }} tickCount={6} />
+                <Tooltip contentStyle={{ background: K.SURFACE, border: `1px solid ${K.BORDER_LIGHT}`, borderRadius: '12px', fontSize: '12px' }} />
                 <Legend />
                 {radarKeys.map((k, i) => (
                   <Radar key={k} name={typeLabels[k] ?? k} dataKey={k} stroke={RADAR_COLORS[i % RADAR_COLORS.length]} fill={RADAR_COLORS[i % RADAR_COLORS.length]} fillOpacity={0.15} />
@@ -386,32 +400,32 @@ function ResultsPanel() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {strengths.length > 0 && (
-              <div className="rounded-xl border p-3" style={{ borderColor: 'var(--color-success)', background: 'var(--color-success-bg)' }}>
-                <p className="text-xs font-bold mb-2" style={{ color: 'var(--color-success)' }}>Güçlü Yönler (≥4.0)</p>
-                {strengths.map(s => <p key={s} className="text-xs flex items-center gap-1" style={{ color: 'var(--color-success)' }}><CheckCircle className="h-3 w-3" />{s}</p>)}
+              <div className="rounded-xl border p-3" style={{ borderColor: K.SUCCESS, background: K.SUCCESS_BG }}>
+                <p className="text-xs font-bold mb-2" style={{ color: K.SUCCESS }}>Güçlü Yönler (≥4.0)</p>
+                {strengths.map(s => <p key={s} className="text-xs flex items-center gap-1" style={{ color: K.SUCCESS }}><CheckCircle className="h-3 w-3" />{s}</p>)}
               </div>
             )}
             {improvements.length > 0 && (
-              <div className="rounded-xl border p-3" style={{ borderColor: 'var(--color-warning)', background: 'var(--color-warning-bg)' }}>
-                <p className="text-xs font-bold mb-2" style={{ color: 'var(--color-warning)' }}>Gelişim Alanları (&lt;3.0)</p>
-                {improvements.map(s => <p key={s} className="text-xs flex items-center gap-1" style={{ color: 'var(--color-warning)' }}><AlertCircle className="h-3 w-3" />{s}</p>)}
+              <div className="rounded-xl border p-3" style={{ borderColor: K.WARNING, background: K.WARNING_BG }}>
+                <p className="text-xs font-bold mb-2" style={{ color: K.WARNING }}>Gelişim Alanları (&lt;3.0)</p>
+                {improvements.map(s => <p key={s} className="text-xs flex items-center gap-1" style={{ color: K.WARNING }}><AlertCircle className="h-3 w-3" />{s}</p>)}
               </div>
             )}
           </div>
 
           {statusSummary.length > 0 && (
-            <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="rounded-xl border overflow-hidden" style={{ borderColor: K.BORDER }}>
               <table className="w-full text-sm">
-                <thead><tr style={{ background: 'var(--color-surface-2)', borderBottom: '1px solid var(--color-border)' }}>
-                  {['Değerlendirici', 'Tip', 'Durum'].map(h => <th key={h} className="text-left px-4 py-2 text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>{h}</th>)}
+                <thead><tr style={{ background: K.BG, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+                  {['Değerlendirici', 'Tip', 'Durum'].map(h => <th key={h} className="text-left px-4 py-2 text-xs font-semibold" style={{ color: K.TEXT_MUTED }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {statusSummary.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td className="px-4 py-2" style={{ color: 'var(--color-text)' }}>{r.evaluatorName}</td>
-                      <td className="px-4 py-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>{r.evaluatorType}</td>
+                    <tr key={i} style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+                      <td className="px-4 py-2" style={{ color: K.TEXT_PRIMARY }}>{r.evaluatorName}</td>
+                      <td className="px-4 py-2 text-xs" style={{ color: K.TEXT_SECONDARY }}>{r.evaluatorType}</td>
                       <td className="px-4 py-2">
-                        <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: r.status === 'COMPLETED' ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                        <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: r.status === 'COMPLETED' ? K.SUCCESS : K.WARNING }}>
                           {r.status === 'COMPLETED' ? <CheckCircle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
                           {r.status === 'COMPLETED' ? 'Tamamlandı' : 'Bekliyor'}
                         </span>
@@ -426,10 +440,10 @@ function ResultsPanel() {
       )}
 
       {!isLoading && (!results || radarData.length === 0) && selectedSubjectId && selectedFormId && (
-        <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Bu kişi için henüz tamamlanmış değerlendirme bulunmuyor.</div>
+        <div className="p-8 text-center text-sm" style={{ color: K.TEXT_MUTED }}>Bu kişi için henüz tamamlanmış değerlendirme bulunmuyor.</div>
       )}
       {!selectedSubjectId || !selectedFormId ? (
-        <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Personel ve form seçerek sonuçları görüntüleyin.</div>
+        <div className="p-8 text-center text-sm" style={{ color: K.TEXT_MUTED }}>Personel ve form seçerek sonuçları görüntüleyin.</div>
       ) : null}
     </div>
   );
@@ -498,7 +512,7 @@ export default function AdminCompetencyPage() {
       {showStartEval && <StartEvaluationModal forms={forms} onClose={() => setShowStartEval(false)} onSaved={() => { setEvalsKey(k => k + 1); refetchEvals?.(); }} />}
 
       <BlurFade delay={0}>
-        <div className="relative overflow-hidden rounded-2xl shadow-lg" style={{ background: 'linear-gradient(135deg, #4338ca 0%, #6d28d9 100%)' }}>
+        <div className="relative overflow-hidden rounded-2xl shadow-lg" style={{ background: K.PRIMARY }}>
           <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full opacity-10" style={{ background: 'white' }} />
           <div className="relative px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -527,17 +541,17 @@ export default function AdminCompetencyPage() {
       </BlurFade>
 
       <BlurFade delay={0.05}>
-        <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+        <div className="rounded-2xl border overflow-hidden" style={{ background: K.SURFACE, borderColor: K.BORDER }}>
           {/* Tabs */}
-          <div className="flex border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div className="flex border-b" style={{ borderColor: K.BORDER }}>
             {tabs.map(tab => {
               const Icon = tab.icon;
               return (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                   className="flex items-center gap-1.5 px-5 py-3.5 text-sm font-semibold transition-colors"
                   style={{
-                    color: activeTab === tab.key ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                    borderBottom: activeTab === tab.key ? '2px solid var(--color-primary)' : '2px solid transparent',
+                    color: activeTab === tab.key ? K.PRIMARY : K.TEXT_SECONDARY,
+                    borderBottom: activeTab === tab.key ? `2px solid ${K.PRIMARY}` : '2px solid transparent',
                   }}>
                   <Icon className="h-4 w-4" /> {tab.label}
                 </button>
@@ -550,20 +564,20 @@ export default function AdminCompetencyPage() {
             {activeTab === 'forms' && (
               <div className="space-y-3">
                 {forms.length === 0 ? (
-                  <div className="py-12 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                  <div className="py-12 text-center text-sm" style={{ color: K.TEXT_MUTED }}>
                     {'Henüz form oluşturulmadı. "Yeni Form" butonuyla başlayın.'}
                   </div>
                 ) : (
                   forms.map(form => (
-                    <div key={form.id} className="rounded-xl border" style={{ borderColor: 'var(--color-border)' }}>
+                    <div key={form.id} className="rounded-xl border" style={{ borderColor: K.BORDER }}>
                       <div className="flex items-center justify-between px-4 py-3 gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                           <button onClick={() => setExpandedForm(expandedForm === form.id ? null : form.id)}>
-                            {expandedForm === form.id ? <ChevronUp className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} /> : <ChevronDown className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />}
+                            {expandedForm === form.id ? <ChevronUp className="h-4 w-4" style={{ color: K.TEXT_MUTED }} /> : <ChevronDown className="h-4 w-4" style={{ color: K.TEXT_MUTED }} />}
                           </button>
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text)' }}>{form.title}</p>
-                            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                            <p className="text-sm font-semibold truncate" style={{ color: K.TEXT_PRIMARY }}>{form.title}</p>
+                            <p className="text-xs mt-0.5" style={{ color: K.TEXT_MUTED }}>
                               {form.targetRole && <span className="mr-2">{form.targetRole}</span>}
                               {new Date(form.periodStart).toLocaleDateString('tr-TR')} – {new Date(form.periodEnd).toLocaleDateString('tr-TR')}
                               <span className="ml-2">{form._count.evaluations} değerlendirme</span>
@@ -571,14 +585,14 @@ export default function AdminCompetencyPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: form.isActive ? 'var(--color-success-bg)' : 'var(--color-surface-2)', color: form.isActive ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: form.isActive ? K.SUCCESS_BG : K.BG, color: form.isActive ? K.SUCCESS : K.TEXT_MUTED }}>
                             {form.isActive ? 'Aktif' : 'Pasif'}
                           </span>
-                          <button onClick={() => toggleFormActive(form.id, form.isActive)} className="text-xs px-2 py-1 rounded-lg border" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
+                          <button onClick={() => toggleFormActive(form.id, form.isActive)} className="text-xs px-2 py-1 rounded-lg border" style={{ borderColor: K.BORDER, color: K.TEXT_SECONDARY }}>
                             {form.isActive ? 'Pasife Al' : 'Aktive Et'}
                           </button>
                           <button onClick={() => deleteForm(form.id)}>
-                            <Trash2 className="h-4 w-4" style={{ color: 'var(--color-error)' }} />
+                            <Trash2 className="h-4 w-4" style={{ color: K.ERROR }} />
                           </button>
                         </div>
                       </div>
@@ -593,29 +607,29 @@ export default function AdminCompetencyPage() {
               <div className="overflow-x-auto">
                 {evalsLoading ? <div className="py-8 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></div> :
                   evaluations.length === 0 ? (
-                    <div className="py-12 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz değerlendirme başlatılmadı.</div>
+                    <div className="py-12 text-center text-sm" style={{ color: K.TEXT_MUTED }}>Henüz değerlendirme başlatılmadı.</div>
                   ) : (
                     <table className="w-full text-sm">
                       <thead>
-                        <tr style={{ background: 'var(--color-surface-2)', borderBottom: '1px solid var(--color-border)' }}>
+                        <tr style={{ background: K.BG, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
                           {['Değerlendirilen', 'Form', 'Değerlendirici', 'Tip', 'Durum', 'İşlem'].map(h => (
-                            <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
+                            <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: K.TEXT_MUTED }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {evaluations.map(ev => (
-                          <tr key={ev.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                            <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{ev.subject.firstName} {ev.subject.lastName}</td>
-                            <td className="px-4 py-3 text-xs max-w-[160px] truncate" style={{ color: 'var(--color-text-secondary)' }}>{ev.form.title}</td>
-                            <td className="px-4 py-3" style={{ color: 'var(--color-text-secondary)' }}>{ev.evaluator.firstName} {ev.evaluator.lastName}</td>
+                          <tr key={ev.id} style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+                            <td className="px-4 py-3 font-medium" style={{ color: K.TEXT_PRIMARY }}>{ev.subject.firstName} {ev.subject.lastName}</td>
+                            <td className="px-4 py-3 text-xs max-w-[160px] truncate" style={{ color: K.TEXT_SECONDARY }}>{ev.form.title}</td>
+                            <td className="px-4 py-3" style={{ color: K.TEXT_SECONDARY }}>{ev.evaluator.firstName} {ev.evaluator.lastName}</td>
                             <td className="px-4 py-3">
-                              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-secondary)' }}>
+                              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: K.BG, color: K.TEXT_SECONDARY }}>
                                 {EVALUATOR_LABELS[ev.evaluatorType] ?? ev.evaluatorType}
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              <span className="flex items-center gap-1 text-xs font-semibold w-max" style={{ color: ev.status === 'COMPLETED' ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                              <span className="flex items-center gap-1 text-xs font-semibold w-max" style={{ color: ev.status === 'COMPLETED' ? K.SUCCESS : K.WARNING }}>
                                 {ev.status === 'COMPLETED' ? <CheckCircle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
                                 {ev.status === 'COMPLETED' ? 'Tamamlandı' : 'Bekliyor'}
                               </span>
@@ -624,7 +638,7 @@ export default function AdminCompetencyPage() {
                               {ev.status === 'PENDING' && (
                                 <button onClick={() => sendReminder(ev.id, ev.evaluator.id)}
                                   className="text-xs px-2.5 py-1 rounded-lg font-semibold"
-                                  style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
+                                  style={{ background: K.WARNING_BG, color: K.WARNING }}>
                                   Hatırlat
                                 </button>
                               )}

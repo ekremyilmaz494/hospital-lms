@@ -38,7 +38,7 @@
 ## C. Altyapi
 
 ### Vercel
-- [ ] Production deployment basarili: `pnpm build --webpack`
+- [ ] Production deployment basarili: `pnpm build`
 - [ ] Frankfurt (`fra1`) bolgesi secili
 - [ ] Custom domain bagli
 - [ ] Environment variable'lar tamamlandi (asagidaki listeye bak)
@@ -53,8 +53,8 @@
 - [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - [ ] `SUPABASE_SERVICE_ROLE_KEY`
 - [ ] `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`
-- [ ] `CLOUDFRONT_DOMAIN`, `CLOUDFRONT_KEY_PAIR_ID`, `CLOUDFRONT_PRIVATE_KEY`
-- [ ] `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- [ ] `AWS_CLOUDFRONT_DOMAIN`, `AWS_CLOUDFRONT_KEY_PAIR_ID`, `AWS_CLOUDFRONT_PRIVATE_KEY`
+- [ ] `REDIS_URL`, `REDIS_TOKEN`
 - [ ] `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 - [ ] `CRON_SECRET`
 - [ ] `NEXT_PUBLIC_APP_URL` (production domain)
@@ -159,7 +159,7 @@
 
 ## K. Son Kontroller
 
-- [ ] `pnpm build --webpack` hatasiz tamamlandi
+- [ ] `pnpm build` hatasiz tamamlandi
 - [ ] Browser console'da hata yok (tum paneller kontrol edildi)
 - [ ] Tum environment variable'lar production degerlerine ayarlandi
 - [ ] Git tag olusturuldu: `git tag -a v1.0.0 -m "Production release v1.0.0"`

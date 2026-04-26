@@ -7,6 +7,20 @@ import { CertTable } from './cert-table'
 import type { Certificate, CertGroup as CertGroupType } from '../_types'
 import type { BundleFormat } from '../_hooks/use-cert-pdf'
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+}
+
 interface Props {
   group: CertGroupType
   defaultOpen?: boolean
@@ -30,16 +44,17 @@ export function CertGroup({ group, defaultOpen = false, onSelectCert, onDownload
 
   return (
     <div
-      className={`relative rounded-2xl border mb-3 ${menuOpen ? 'z-40' : 'z-0'}`}
+      className={`relative mb-3 ${menuOpen ? 'z-40' : 'z-0'}`}
       style={{
-        background: 'var(--color-surface)',
-        borderColor: 'var(--color-border)',
-        boxShadow: 'var(--shadow-sm)',
+        background: K.SURFACE,
+        border: `1.5px solid ${K.BORDER}`,
+        borderRadius: 14,
+        boxShadow: K.SHADOW_CARD,
       }}
     >
       <div
         className="relative z-20 flex items-center gap-3 px-5 py-3.5"
-        style={{ borderBottom: open ? '1px solid var(--color-border)' : 'none' }}
+        style={{ borderBottom: open ? `1px solid ${K.BORDER_LIGHT}` : 'none' }}
       >
         <button
           onClick={() => setOpen(v => !v)}
@@ -52,32 +67,37 @@ export function CertGroup({ group, defaultOpen = false, onSelectCert, onDownload
             transition={{ duration: 0.15 }}
             className="flex-shrink-0"
           >
-            <ChevronDown className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+            <ChevronDown className="h-4 w-4" style={{ color: K.TEXT_MUTED }} />
           </motion.div>
 
           <div
             className="flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0"
-            style={{ background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)' }}
+            style={{ background: K.PRIMARY_LIGHT }}
           >
-            <Award className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+            <Award className="h-4 w-4" style={{ color: K.PRIMARY }} />
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-semibold truncate text-[14px]">{group.training.title}</p>
+              <p
+                className="truncate"
+                style={{ fontSize: 18, fontWeight: 700, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}
+              >
+                {group.training.title}
+              </p>
               {group.training.category && (
                 <span
                   className="text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
                   style={{
-                    background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)',
-                    color: 'var(--color-primary)',
+                    background: K.PRIMARY_LIGHT,
+                    color: K.PRIMARY,
                   }}
                 >
                   {group.training.category}
                 </span>
               )}
             </div>
-            <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-[11px] mt-0.5" style={{ color: K.TEXT_MUTED }}>
               {group.certificates.length} sertifika
             </p>
           </div>
@@ -91,9 +111,9 @@ export function CertGroup({ group, defaultOpen = false, onSelectCert, onDownload
             aria-expanded={menuOpen}
             className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold transition-colors duration-150 disabled:opacity-60"
             style={{
-              background: 'var(--color-bg)',
-              color: 'var(--color-text-primary)',
-              border: '1px solid var(--color-border)',
+              background: K.SURFACE,
+              color: K.TEXT_SECONDARY,
+              border: `1px solid ${K.BORDER}`,
             }}
           >
             {anyPending ? (
@@ -114,33 +134,40 @@ export function CertGroup({ group, defaultOpen = false, onSelectCert, onDownload
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
                   transition={{ duration: 0.12 }}
-                  className="absolute right-0 top-full mt-1 z-20 rounded-xl border py-1 min-w-[220px]"
+                  className="absolute right-0 top-full mt-1 z-20 py-1 min-w-[220px]"
                   style={{
-                    background: 'var(--color-surface)',
-                    borderColor: 'var(--color-border)',
-                    boxShadow: 'var(--shadow-lg)',
+                    background: K.SURFACE,
+                    border: `1.5px solid ${K.BORDER}`,
+                    borderRadius: 14,
+                    boxShadow: K.SHADOW_CARD,
                   }}
                 >
                   <button
                     onClick={() => handleDownload('list')}
-                    className="flex items-start gap-2.5 w-full px-3 py-2 text-left hover:bg-(--color-bg) transition-colors duration-150"
+                    className="flex items-start gap-2.5 w-full px-3 py-2 text-left transition-colors duration-150"
+                    style={{ background: 'transparent' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                   >
-                    <FileText className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                    <FileText className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: K.PRIMARY }} />
                     <div>
-                      <p className="text-[12px] font-semibold">Özet Liste</p>
-                      <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                      <p className="text-[12px] font-semibold" style={{ color: K.TEXT_PRIMARY }}>Özet Liste</p>
+                      <p className="text-[10px]" style={{ color: K.TEXT_MUTED }}>
                         Tablo formatında tüm sertifikalar
                       </p>
                     </div>
                   </button>
                   <button
                     onClick={() => handleDownload('bundle')}
-                    className="flex items-start gap-2.5 w-full px-3 py-2 text-left hover:bg-(--color-bg) transition-colors duration-150"
+                    className="flex items-start gap-2.5 w-full px-3 py-2 text-left transition-colors duration-150"
+                    style={{ background: 'transparent' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                   >
-                    <Files className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                    <Files className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: K.PRIMARY }} />
                     <div>
-                      <p className="text-[12px] font-semibold">Sertifika Paketi</p>
-                      <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                      <p className="text-[12px] font-semibold" style={{ color: K.TEXT_PRIMARY }}>Sertifika Paketi</p>
+                      <p className="text-[10px]" style={{ color: K.TEXT_MUTED }}>
                         Her sertifika tam A4 tasarımı (dağıtım için)
                       </p>
                     </div>

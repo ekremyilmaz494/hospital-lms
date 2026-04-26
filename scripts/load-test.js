@@ -7,8 +7,8 @@
  *
  * 3 Senaryo:
  *   A) 50 VU  — Login → Dashboard → Logout (2 dk)
- *   B) 200 VU — Dashboard okuma (read-heavy, 5 dk)
- *   C) 20 VU  — Sınav başlatma + yanıt gönderme (3 dk)
+ *   B) 200 VU — Authenticated dashboard okuma (read-heavy, 5 dk)
+ *   C) 20 VU  — Authenticated sınav/personel API smoke (3 dk)
  */
 
 import http from 'k6/http';
@@ -25,7 +25,32 @@ const examDuration = new Trend('exam_duration');
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
 const DEMO_EMAIL = __ENV.DEMO_EMAIL;
 const DEMO_PASS = __ENV.DEMO_PASS;
-if (!DEMO_EMAIL || !DEMO_PASS) { throw new Error('DEMO_EMAIL ve DEMO_PASS env değişkenleri gerekli'); }
+const DEMO_USERS = parseDemoUsers(__ENV.DEMO_USERS_JSON);
+if (DEMO_USERS.length === 0 && (!DEMO_EMAIL || !DEMO_PASS)) {
+  throw new Error('DEMO_EMAIL/DEMO_PASS veya DEMO_USERS_JSON env değişkenleri gerekli');
+}
+
+let vuLoggedIn = false;
+
+function parseDemoUsers(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((u) => u && typeof u.email === 'string' && typeof u.password === 'string')
+      .map((u) => ({ email: u.email, password: u.password }));
+  } catch {
+    throw new Error('DEMO_USERS_JSON geçerli JSON array olmalı: [{"email":"...","password":"..."}]');
+  }
+}
+
+function getCredentials() {
+  if (DEMO_USERS.length > 0) {
+    return DEMO_USERS[(__VU - 1) % DEMO_USERS.length];
+  }
+  return { email: DEMO_EMAIL, password: DEMO_PASS };
+}
 
 // ── Senaryolar ──
 export const options = {
@@ -95,13 +120,22 @@ function login(email, password) {
   return res;
 }
 
+function ensureLoggedIn() {
+  if (vuLoggedIn) return true;
+  const creds = getCredentials();
+  const loginRes = login(creds.email, creds.password);
+  vuLoggedIn = loginRes.status === 200;
+  return vuLoggedIn;
+}
+
 // ══════════════════════════════════════════════════════════════
 // SENARYO A: Login → Dashboard → Logout
 // ══════════════════════════════════════════════════════════════
 export function loginFlow() {
   group('Login Flow', () => {
     // 1. Login
-    const loginRes = login(DEMO_EMAIL, DEMO_PASS);
+    const creds = getCredentials();
+    const loginRes = login(creds.email, creds.password);
     if (loginRes.status !== 200) { sleep(1); return; }
 
     sleep(0.5);
@@ -132,12 +166,14 @@ export function loginFlow() {
 // ══════════════════════════════════════════════════════════════
 export function dashboardRead() {
   group('Dashboard Read', () => {
+    if (!ensureLoggedIn()) { sleep(1); return; }
+
     // Dashboard combined API
     const res = http.get(`${BASE_URL}/api/admin/dashboard/combined`);
     dashboardDuration.add(res.timings.duration);
 
     const success = check(res, {
-      'dashboard status ok': (r) => r.status === 200 || r.status === 307,
+      'dashboard 200': (r) => r.status === 200,
     });
     errorRate.add(!success);
 
@@ -150,9 +186,7 @@ export function dashboardRead() {
 // ══════════════════════════════════════════════════════════════
 export function examFlow() {
   group('Exam Flow', () => {
-    // 1. Login
-    const loginRes = login(DEMO_EMAIL, DEMO_PASS);
-    if (loginRes.status !== 200) { sleep(1); return; }
+    if (!ensureLoggedIn()) { sleep(1); return; }
 
     sleep(0.5);
 

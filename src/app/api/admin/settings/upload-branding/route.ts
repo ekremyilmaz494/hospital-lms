@@ -1,4 +1,4 @@
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { brandingKey, uploadBuffer } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 
@@ -7,10 +7,10 @@ const MAX_LOGO_SIZE = 2 * 1024 * 1024 // 2MB
 const MAX_BANNER_SIZE = 5 * 1024 * 1024 // 5MB
 
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId

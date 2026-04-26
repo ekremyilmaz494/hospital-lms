@@ -17,11 +17,20 @@ export interface EncryptResult {
   isEncrypted: boolean
 }
 
-/** AES-256-GCM ile plaintext şifreler. Anahtar yoksa plaintext döner. */
+/**
+ * AES-256-GCM ile plaintext şifreler.
+ * Production'da BACKUP_ENCRYPTION_KEY zorunlu — yoksa throw.
+ * Dev'de plaintext fallback var (lokal test akışını bozmamak için).
+ */
 export function encryptBackup(plaintext: string): EncryptResult {
   const key = process.env.BACKUP_ENCRYPTION_KEY
   if (!key || key.length !== 64) {
-    logger.warn('Backup', 'BACKUP_ENCRYPTION_KEY tanımlı değil veya geçersiz — yedek şifrelenmeden kaydedilecek')
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'BACKUP_ENCRYPTION_KEY production ortamında zorunludur (64 karakter hex). Yedek oluşturulamadı.'
+      )
+    }
+    logger.warn('Backup', 'BACKUP_ENCRYPTION_KEY tanımlı değil veya geçersiz — yedek şifrelenmeden kaydedilecek (dev only)')
     return { data: plaintext, isEncrypted: false }
   }
 

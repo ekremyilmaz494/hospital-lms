@@ -22,6 +22,7 @@ import {
   ClipboardList,
   Activity,
   MessageSquare,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -116,6 +117,7 @@ export const adminNav: NavGroup[] = [
         ],
       },
       { title: 'İçerik Kütüphanesi', href: '/admin/content-library', icon: Library },
+      { title: 'AI İçerik Stüdyosu', href: '/admin/ai-content-studio', icon: Sparkles },
     ],
   },
   {

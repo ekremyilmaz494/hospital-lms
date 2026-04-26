@@ -8,6 +8,20 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { AlertSkeleton } from '@/components/shared/skeletons';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 interface OverdueTraining {
   assignmentId: string;
   trainingId: string;
@@ -64,9 +78,9 @@ export function RiskCenter({
   );
 
   const tabs: { key: TabKey; label: string; count: number; icon: typeof AlertTriangle; tone: string }[] = [
-    { key: 'overdue',    label: 'Geciken Eğitimler', count: overdueTrainings.length, icon: AlertTriangle, tone: 'var(--color-error)' },
-    { key: 'compliance', label: 'Uyum Alarmları',    count: complianceAlerts.length, icon: Shield,         tone: 'var(--color-warning)' },
-    { key: 'certs',      label: 'Sertifika Süreleri',count: expiringCerts.length,    icon: CalendarClock,  tone: 'var(--color-info)' },
+    { key: 'overdue',    label: 'Geciken Eğitimler', count: overdueTrainings.length, icon: AlertTriangle, tone: K.ERROR },
+    { key: 'compliance', label: 'Uyum Alarmları',    count: complianceAlerts.length, icon: Shield,         tone: K.WARNING },
+    { key: 'certs',      label: 'Sertifika Süreleri',count: expiringCerts.length,    icon: CalendarClock,  tone: K.INFO },
   ];
 
   const firstWithData = tabs.find(t => t.count > 0)?.key ?? 'overdue';
@@ -78,32 +92,45 @@ export function RiskCenter({
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border px-4 py-3" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-        <div className="h-9 w-full animate-pulse rounded-lg" style={{ background: 'var(--color-bg)' }} />
+      <div
+        className="px-4 py-3"
+        style={{
+          background: K.SURFACE,
+          border: `1.5px solid ${K.BORDER}`,
+          borderRadius: 14,
+          boxShadow: K.SHADOW_CARD,
+        }}
+      >
+        <div className="h-9 w-full animate-pulse rounded-lg" style={{ background: K.BG }} />
       </div>
     );
   }
 
   const hasUrgent = totalRisk > 0;
-  const triggerIconBg = hasUrgent ? 'var(--color-error-bg)' : 'var(--color-success-bg)';
-  const triggerIconColor = hasUrgent ? 'var(--color-error)' : 'var(--color-success)';
-  const badgeBg = hasUrgent ? 'var(--color-error-bg)' : 'var(--color-bg)';
-  const badgeColor = hasUrgent ? 'var(--color-error)' : 'var(--color-text-muted)';
+  const triggerIconBg = hasUrgent ? K.ERROR_BG : K.SUCCESS_BG;
+  const triggerIconColor = hasUrgent ? '#b91c1c' : K.PRIMARY;
+  const badgeBg = hasUrgent ? K.ERROR_BG : K.BG;
+  const badgeColor = hasUrgent ? '#b91c1c' : K.TEXT_MUTED;
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 active:scale-[0.99]"
+        style={{
+          background: K.SURFACE,
+          border: `1.5px solid ${K.BORDER}`,
+          borderRadius: 14,
+          boxShadow: K.SHADOW_CARD,
+        }}
       >
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: triggerIconBg }}>
           <ShieldAlert className="h-4.5 w-4.5" style={{ color: triggerIconColor }} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold leading-tight">Risk Merkezi</p>
-          <p className="text-[11px] leading-tight truncate" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-[13px] font-semibold leading-tight" style={{ color: K.TEXT_PRIMARY }}>Risk Merkezi</p>
+          <p className="text-[11px] leading-tight truncate" style={{ color: K.TEXT_MUTED }}>
             {hasUrgent ? `${totalRisk} acil · ${totalItems} izlenen` : 'Aciliyet yok, izleme listesi'}
           </p>
         </div>
@@ -113,19 +140,24 @@ export function RiskCenter({
         >
           {totalItems}
         </span>
-        <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5" style={{ color: 'var(--color-text-muted)' }} />
+        <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5" style={{ color: K.TEXT_MUTED }} />
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-3xl">
-          <div className="flex items-center justify-between gap-3 pb-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
+          <div className="flex items-center justify-between gap-3 pb-3" style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: triggerIconBg }}>
                 <ShieldAlert className="h-5 w-5" style={{ color: triggerIconColor }} />
               </div>
               <div className="min-w-0">
-                <DialogTitle className="text-[15px] font-bold truncate">Risk Merkezi</DialogTitle>
-                <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                <DialogTitle
+                  className="truncate"
+                  style={{ fontSize: 18, fontWeight: 700, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}
+                >
+                  Risk Merkezi
+                </DialogTitle>
+                <p className="text-[11px]" style={{ color: K.TEXT_MUTED }}>
                   {hasUrgent ? `${totalRisk} acil madde bekliyor` : 'Aciliyet yok, izleme listesi'}
                 </p>
               </div>
@@ -133,7 +165,7 @@ export function RiskCenter({
             <Link
               href="/admin/reports"
               className="shrink-0 text-[11px] md:text-xs font-semibold"
-              style={{ color: 'var(--color-primary)' }}
+              style={{ color: K.PRIMARY }}
               onClick={() => setOpen(false)}
             >
               Rapor →
@@ -142,7 +174,7 @@ export function RiskCenter({
 
           <div
             className="flex gap-1 overflow-x-auto px-1 py-2 -mx-1"
-            style={{ borderBottom: '1px solid var(--color-border)' }}
+            style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
           >
             {tabs.map(t => {
               const isActive = active === t.key;
@@ -154,9 +186,9 @@ export function RiskCenter({
                   onClick={() => setActive(t.key)}
                   className="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold transition-colors duration-150"
                   style={{
-                    background: isActive ? 'var(--color-bg)' : 'transparent',
-                    color: isActive ? t.tone : 'var(--color-text-muted)',
-                    border: isActive ? `1px solid ${t.tone}30` : '1px solid transparent',
+                    background: isActive ? K.BG : 'transparent',
+                    color: isActive ? t.tone : K.TEXT_MUTED,
+                    border: isActive ? `1px solid ${K.BORDER_LIGHT}` : '1px solid transparent',
                   }}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -165,8 +197,8 @@ export function RiskCenter({
                     <span
                       className="inline-flex min-w-4.5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
                       style={{
-                        background: isActive ? t.tone : 'var(--color-border)',
-                        color: isActive ? '#fff' : 'var(--color-text-secondary)',
+                        background: isActive ? t.tone : K.BORDER_LIGHT,
+                        color: isActive ? '#fff' : K.TEXT_SECONDARY,
                       }}
                     >
                       {t.count}
@@ -217,10 +249,10 @@ export function RiskCenter({
 function EmptyState({ icon: Icon, label }: { icon: typeof AlertTriangle; label: string }) {
   return (
     <div className="flex items-center justify-center gap-2.5 py-3">
-      <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: 'var(--color-bg)' }}>
-        <Icon className="h-4 w-4" style={{ color: 'var(--color-success)' }} />
+      <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: K.BG }}>
+        <Icon className="h-4 w-4" style={{ color: K.PRIMARY }} />
       </div>
-      <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+      <p className="text-[12px]" style={{ color: K.TEXT_MUTED }}>{label}</p>
     </div>
   );
 }
@@ -241,8 +273,8 @@ function OverdueList({
         {items.map(t => (
           <div
             key={t.assignmentId}
-            className="rounded-xl border p-3"
-            style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
+            className="p-3"
+            style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}`, borderRadius: 14 }}
           >
             <div className="flex items-center gap-2.5 mb-2">
               <Avatar className="h-8 w-8">
@@ -251,22 +283,22 @@ function OverdueList({
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-semibold truncate">{t.name}</p>
-                <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{t.dept}</p>
+                <p className="text-[13px] font-semibold truncate" style={{ color: K.TEXT_PRIMARY }}>{t.name}</p>
+                <p className="text-[11px] truncate" style={{ color: K.TEXT_MUTED }}>{t.dept}</p>
               </div>
               <span
-                className="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
-                style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
+                className="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                style={{ background: K.ERROR_BG, color: '#b91c1c' }}
               >
                 {t.daysOverdue} gün
               </span>
             </div>
-            <p className="text-[12px] mb-2 truncate">{t.training}</p>
+            <p className="text-[12px] mb-2 truncate" style={{ color: K.TEXT_SECONDARY }}>{t.training}</p>
             <Button
               size="sm"
               variant="outline"
               className="w-full gap-1.5 rounded-lg text-xs"
-              style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+              style={{ borderColor: K.PRIMARY, color: K.PRIMARY }}
               disabled={sendingReminder === t.assignmentId}
               onClick={() => onSendReminder(t.assignmentId, t.name)}
             >
@@ -281,18 +313,18 @@ function OverdueList({
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
-            <tr style={{ background: 'var(--color-bg)' }}>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Personel</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Departman</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Eğitim</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Son Tarih</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Gecikme</th>
-              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>İşlem</th>
+            <tr style={{ background: K.BG }}>
+              <th className="px-4 py-3 text-left" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: K.TEXT_MUTED }}>Personel</th>
+              <th className="px-4 py-3 text-left" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: K.TEXT_MUTED }}>Departman</th>
+              <th className="px-4 py-3 text-left" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: K.TEXT_MUTED }}>Eğitim</th>
+              <th className="px-4 py-3 text-left" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: K.TEXT_MUTED }}>Son Tarih</th>
+              <th className="px-4 py-3 text-left" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: K.TEXT_MUTED }}>Gecikme</th>
+              <th className="px-4 py-3 text-right" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: K.TEXT_MUTED }}>İşlem</th>
             </tr>
           </thead>
           <tbody>
             {items.map(t => (
-              <tr key={t.assignmentId} className="clickable-row" style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <tr key={t.assignmentId} className="clickable-row" style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
                 <td className="px-4 py-3.5">
                   <div className="flex items-center gap-2.5">
                     <Avatar className="h-8 w-8">
@@ -300,14 +332,14 @@ function OverdueList({
                         {t.name.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="font-semibold">{t.name}</span>
+                    <span className="font-semibold" style={{ color: K.TEXT_PRIMARY }}>{t.name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3.5" style={{ color: 'var(--color-text-secondary)' }}>{t.dept}</td>
-                <td className="px-4 py-3.5">{t.training}</td>
-                <td className="px-4 py-3.5 font-mono text-xs" style={{ color: 'var(--color-text-muted)' }}>{t.dueDate}</td>
+                <td className="px-4 py-3.5" style={{ color: K.TEXT_SECONDARY }}>{t.dept}</td>
+                <td className="px-4 py-3.5" style={{ color: K.TEXT_PRIMARY }}>{t.training}</td>
+                <td className="px-4 py-3.5 font-mono text-xs" style={{ color: K.TEXT_MUTED }}>{t.dueDate}</td>
                 <td className="px-4 py-3.5">
-                  <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>
+                  <span className="inline-flex items-center gap-1 rounded-full" style={{ padding: '3px 8px', fontSize: 11, fontWeight: 600, background: K.ERROR_BG, color: '#b91c1c' }}>
                     {t.daysOverdue} gün gecikmiş
                   </span>
                 </td>
@@ -316,7 +348,7 @@ function OverdueList({
                     size="sm"
                     variant="outline"
                     className="gap-1.5 rounded-lg text-xs"
-                    style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                    style={{ borderColor: K.PRIMARY, color: K.PRIMARY }}
                     disabled={sendingReminder === t.assignmentId}
                     onClick={() => onSendReminder(t.assignmentId, t.name)}
                   >
@@ -338,32 +370,35 @@ function ComplianceList({ items }: { items: ComplianceAlert[] }) {
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((alert, i) => {
         const isCritical = alert.status === 'critical' || alert.status === 'overdue';
+        const tone = isCritical ? '#b91c1c' : '#b45309';
+        const toneBg = isCritical ? K.ERROR_BG : K.WARNING_BG;
         return (
           <div
             key={i}
-            className="flex items-start gap-3 rounded-xl p-3"
+            className="flex items-start gap-3 p-3"
             style={{
-              background: isCritical ? 'var(--color-error-bg)' : 'var(--color-warning-bg, #fffbeb)',
-              border: `1px solid ${isCritical ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)'}30`,
+              background: toneBg,
+              border: `1px solid ${K.BORDER_LIGHT}`,
+              borderRadius: 14,
             }}
           >
             <AlertTriangle
               className="h-4 w-4 mt-0.5 shrink-0"
-              style={{ color: isCritical ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)' }}
+              style={{ color: tone }}
             />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{alert.training}</p>
+              <p className="text-xs font-semibold truncate" style={{ color: K.TEXT_PRIMARY }}>{alert.training}</p>
               {alert.regulatoryBody && (
-                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{alert.regulatoryBody}</p>
+                <p className="text-xs" style={{ color: K.TEXT_MUTED }}>{alert.regulatoryBody}</p>
               )}
               <div className="flex items-center gap-2 mt-1">
                 <span
                   className="text-xs font-bold"
-                  style={{ color: isCritical ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)' }}
+                  style={{ color: tone }}
                 >
                   {alert.status === 'overdue' ? 'Süre Doldu!' : `${alert.daysLeft} gün`}
                 </span>
-                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>· %{alert.complianceRate} uyumlu</span>
+                <span className="text-xs" style={{ color: K.TEXT_MUTED }}>· %{alert.complianceRate} uyumlu</span>
               </div>
             </div>
           </div>
@@ -377,23 +412,23 @@ function CertsList({ items }: { items: ExpiringCert[] }) {
   return (
     <div className="space-y-3">
       {items.map(c => {
-        const tone = c.status === 'critical' ? 'var(--color-error)' : c.status === 'warning' ? 'var(--color-warning)' : 'var(--color-success)';
-        const toneBg = c.status === 'critical' ? 'var(--color-error-bg)' : c.status === 'warning' ? 'var(--color-warning-bg)' : 'var(--color-success-bg)';
+        const tone = c.status === 'critical' ? '#b91c1c' : c.status === 'warning' ? '#b45309' : K.PRIMARY;
+        const toneBg = c.status === 'critical' ? K.ERROR_BG : c.status === 'warning' ? K.WARNING_BG : K.SUCCESS_BG;
         return (
           <div
             key={c.name}
-            className="flex items-center gap-3 rounded-xl p-3 transition-colors duration-150 hover:bg-(--color-surface-hover)"
-            style={{ border: '1px solid var(--color-border)' }}
+            className="flex items-center gap-3 p-3 transition-colors duration-150"
+            style={{ border: `1px solid ${K.BORDER_LIGHT}`, borderRadius: 14, background: K.SURFACE }}
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: toneBg }}>
               <CalendarClock className="h-5 w-5" style={{ color: tone }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">{c.name}</p>
-              <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{c.cert}</p>
+              <p className="text-sm font-semibold truncate" style={{ color: K.TEXT_PRIMARY }}>{c.name}</p>
+              <p className="text-[11px] truncate" style={{ color: K.TEXT_MUTED }}>{c.cert}</p>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-xs font-mono" style={{ color: 'var(--color-text-muted)' }}>{c.expiryDate}</p>
+              <p className="text-xs font-mono" style={{ color: K.TEXT_MUTED }}>{c.expiryDate}</p>
               <p className="text-xs font-bold" style={{ color: tone }}>{c.daysLeft} gün</p>
             </div>
           </div>

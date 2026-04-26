@@ -6,6 +6,21 @@ import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
 
+// ── Klinova palette ──
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 interface Training {
   id: string;
   title: string;
@@ -137,7 +152,7 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           summary={
             <span>
               {selectedTrainings.length > 0
-                ? <><strong style={{ color: '#0a0a0a' }}>{selectedTrainings.length.toString().padStart(2, '0')}</strong> eğitim seçildi</>
+                ? <><strong style={{ color: K.PRIMARY }}>{selectedTrainings.length.toString().padStart(2, '0')}</strong> eğitim seçildi</>
                 : 'Eğitim seç'}
             </span>
           }
@@ -258,7 +273,7 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           left: 14px;
           width: 16px;
           height: 16px;
-          color: #8a8578;
+          color: ${K.TEXT_MUTED};
           pointer-events: none;
         }
         .atm-search-input {
@@ -266,17 +281,17 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           height: 44px;
           padding: 0 14px 0 40px;
           border-radius: 10px;
-          border: 1px solid #ebe7df;
-          background: #ffffff;
+          border: 1.5px solid ${K.BORDER_LIGHT};
+          background: ${K.SURFACE};
           font-size: 14px;
-          color: #0a0a0a;
+          color: ${K.TEXT_PRIMARY};
           outline: none;
           font-family: inherit;
           transition: border-color 160ms ease, box-shadow 160ms ease;
         }
         .atm-search-input:focus {
-          border-color: #0a0a0a;
-          box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.06);
+          border-color: ${K.PRIMARY};
+          box-shadow: 0 0 0 3px rgba(13, 150, 104, 0.12);
         }
         .atm-all {
           display: inline-flex;
@@ -284,18 +299,18 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           height: 44px;
           padding: 0 14px;
           border-radius: 999px;
-          background: transparent;
-          color: #6b6a63;
-          border: 1px solid #ebe7df;
-          font-family: var(--font-display, system-ui);
+          background: ${K.SURFACE};
+          color: ${K.TEXT_SECONDARY};
+          border: 1.5px solid ${K.BORDER};
+          font-family: ${K.FONT_DISPLAY};
           font-size: 12px;
-          font-weight: 500;
+          font-weight: 600;
           cursor: pointer;
           white-space: nowrap;
           transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
         }
-        .atm-all:hover { background: #0a0a0a; color: #fafaf7; border-color: #0a0a0a; }
-        .atm-all[aria-pressed="true"] { background: #faf8f2; border-color: #0a0a0a; color: #0a0a0a; }
+        .atm-all:hover { background: ${K.PRIMARY}; color: #ffffff; border-color: ${K.PRIMARY}; }
+        .atm-all[aria-pressed="true"] { background: ${K.PRIMARY_LIGHT}; border-color: ${K.PRIMARY}; color: ${K.PRIMARY}; }
 
         /* ── List ── */
         .atm-list {
@@ -308,7 +323,7 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
         }
         .atm-list::-webkit-scrollbar { width: 8px; }
         .atm-list::-webkit-scrollbar-track { background: transparent; }
-        .atm-list::-webkit-scrollbar-thumb { background: #ebe7df; border-radius: 4px; }
+        .atm-list::-webkit-scrollbar-thumb { background: ${K.BORDER_LIGHT}; border-radius: 4px; }
 
         .atm-group { display: flex; flex-direction: column; gap: 4px; }
         .atm-group-head {
@@ -316,22 +331,20 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           align-items: baseline;
           justify-content: space-between;
           gap: 10px;
-          padding: 6px 2px;
-          font-family: var(--font-editorial, serif);
+          padding: 6px 2px 8px;
+          font-family: ${K.FONT_DISPLAY};
           font-size: 13px;
-          font-weight: 500;
-          color: #0a0a0a;
-          font-variation-settings: 'opsz' 24;
+          font-weight: 700;
+          color: ${K.TEXT_PRIMARY};
           letter-spacing: -0.005em;
           margin: 0;
-          border-bottom: 1px dashed #ebe7df;
-          padding-bottom: 8px;
+          border-bottom: 1px dashed ${K.BORDER_LIGHT};
         }
         .atm-group-count {
-          font-family: var(--font-display, system-ui);
+          font-family: ${K.FONT_DISPLAY};
           font-size: 10px;
           font-weight: 600;
-          color: #8a8578;
+          color: ${K.TEXT_MUTED};
           letter-spacing: 0.06em;
           font-variant-numeric: tabular-nums;
         }
@@ -351,8 +364,8 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           width: 100%;
           padding: 10px 12px;
           border-radius: 10px;
-          background: #ffffff;
-          border: 1px solid transparent;
+          background: ${K.SURFACE};
+          border: 1.5px solid transparent;
           text-align: left;
           cursor: pointer;
           font-family: inherit;
@@ -364,31 +377,31 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           from { opacity: 0; transform: translateY(3px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .atm-item:hover { border-color: #ebe7df; background: #faf8f2; }
+        .atm-item:hover { border-color: ${K.BORDER_LIGHT}; background: ${K.SURFACE_HOVER}; }
         .atm-item-on {
-          background: #0a0a0a;
-          border-color: #0a0a0a;
+          background: ${K.PRIMARY_LIGHT};
+          border-color: ${K.PRIMARY};
         }
-        .atm-item-on:hover { background: #0a0a0a; border-color: #0a0a0a; }
-        .atm-item:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
+        .atm-item-on:hover { background: ${K.PRIMARY_LIGHT}; border-color: ${K.PRIMARY}; }
+        .atm-item:focus-visible { outline: 2px solid ${K.PRIMARY}; outline-offset: 2px; }
 
         .atm-check {
           flex-shrink: 0;
           width: 20px;
           height: 20px;
           border-radius: 999px;
-          border: 1.5px solid #d9d4c4;
+          border: 1.5px solid ${K.BORDER};
           display: flex;
           align-items: center;
           justify-content: center;
           background: transparent;
-          color: #0a0a0a;
+          color: ${K.PRIMARY};
           transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
         }
         .atm-check-on {
-          background: #fafaf7;
-          border-color: #fafaf7;
-          color: #0a0a0a;
+          background: ${K.PRIMARY};
+          border-color: ${K.PRIMARY};
+          color: #ffffff;
         }
 
         .atm-item-icon {
@@ -396,16 +409,16 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           width: 28px;
           height: 28px;
           border-radius: 8px;
-          background: #faf8f2;
-          color: #0a0a0a;
+          background: ${K.BG};
+          color: ${K.PRIMARY};
           display: flex;
           align-items: center;
           justify-content: center;
           transition: background 160ms ease, color 160ms ease;
         }
         .atm-item-on .atm-item-icon {
-          background: rgba(255, 255, 255, 0.14);
-          color: #fafaf7;
+          background: ${K.SURFACE};
+          color: ${K.PRIMARY};
         }
 
         .atm-item-body {
@@ -416,25 +429,24 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           gap: 2px;
         }
         .atm-item-title {
-          font-family: var(--font-editorial, serif);
+          font-family: ${K.FONT_DISPLAY};
           font-size: 14px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 24;
-          color: #0a0a0a;
+          font-weight: 600;
+          color: ${K.TEXT_PRIMARY};
           letter-spacing: -0.005em;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .atm-item-on .atm-item-title { color: #fafaf7; }
+        .atm-item-on .atm-item-title { color: ${K.TEXT_PRIMARY}; }
         .atm-item-cat {
           font-size: 11px;
-          color: #6b6a63;
+          color: ${K.TEXT_MUTED};
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .atm-item-on .atm-item-cat { color: rgba(250, 250, 247, 0.65); }
+        .atm-item-on .atm-item-cat { color: ${K.TEXT_SECONDARY}; }
 
         /* ── Status / Empty ── */
         .atm-status {
@@ -444,12 +456,12 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           text-align: center;
           padding: 48px 20px;
           gap: 12px;
-          color: #8a8578;
+          color: ${K.TEXT_MUTED};
         }
         :global(.atm-spin) {
           width: 24px;
           height: 24px;
-          color: #0a0a0a;
+          color: ${K.PRIMARY};
           animation: atm-rot 900ms linear infinite;
         }
         @keyframes atm-rot { to { transform: rotate(360deg); } }
@@ -457,8 +469,8 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
           width: 44px;
           height: 44px;
           border-radius: 999px;
-          background: #faf8f2;
-          color: #0a0a0a;
+          background: ${K.PRIMARY_LIGHT};
+          color: ${K.PRIMARY};
           display: flex;
           align-items: center;
           justify-content: center;

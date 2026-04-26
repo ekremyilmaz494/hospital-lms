@@ -1,15 +1,13 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Star, Users, CheckCircle, Clock, Download, Check, X, ChevronDown, Plus, Loader2, FileText } from 'lucide-react';
-import { StatCard } from '@/components/shared/stat-card';
+import { Users, CheckCircle, Clock, Download, Check, X, Plus, Loader2, FileText, ChevronRight } from 'lucide-react';
+import { KStatCard } from '@/components/admin/k-stat-card';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { exportExcel } from '@/lib/export';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/shared/toast';
 import { CertificateViewerModal } from './components/certificate-viewer-modal';
 import { CategoriesTab } from './components/categories-tab';
@@ -249,86 +247,86 @@ export default function AdminSmgPage() {
 
   if (reportLoading && !reportData) return <PageLoading />;
 
+  const tabs = [
+    { key: 'staff' as const, label: 'Personel İlerlemesi' },
+    { key: 'pending' as const, label: `Bekleyen Onaylar${activities.length > 0 ? ` (${activities.length})` : ''}` },
+    { key: 'categories' as const, label: 'Kategoriler' },
+    { key: 'targets' as const, label: 'Hedefler' },
+    { key: 'inspection' as const, label: 'SKS Denetim Raporu' },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="k-page">
       <BlurFade delay={0}>
-        <div className="relative overflow-hidden rounded-2xl shadow-lg" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' }}>
-          <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full opacity-10" style={{ background: 'white' }} />
-          <div className="relative px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                <Star className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-black text-white">SMG Takibi</h1>
-                <p className="text-indigo-200 text-sm">Sürekli Mesleki Gelişim puan takibi</p>
-              </div>
+        <header className="k-page-header">
+          <div>
+            <div className="k-breadcrumb">
+              <span>Panel</span>
+              <ChevronRight size={12} />
+              <span data-current="true">SMG Takibi</span>
             </div>
-            <div className="flex items-center gap-2">
-              {periods.length > 0 && (
-                <div className="relative">
-                  <select
-                    value={selectedPeriodId}
-                    onChange={e => setSelectedPeriodId(e.target.value)}
-                    className="appearance-none text-sm font-medium rounded-xl px-4 py-2 pr-8 border-0 outline-none cursor-pointer"
-                    style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}
-                  >
-                    <option value="" style={{ background: '#4f46e5' }}>Aktif Dönem</option>
-                    {periods.map(p => (
-                      <option key={p.id} value={p.id} style={{ background: '#4f46e5' }}>{p.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2 top-2.5 h-4 w-4 text-white pointer-events-none" />
-                </div>
-              )}
-              <button
-                onClick={() => setPeriodModalOpen(true)}
-                className="flex items-center gap-1.5 text-sm font-medium rounded-xl px-4 py-2 transition-colors"
-                style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}
-              >
-                <Plus className="h-4 w-4" /> Dönem Ekle
-              </button>
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-1.5 text-sm font-medium rounded-xl px-4 py-2 transition-colors"
-                style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}
-              >
-                <Download className="h-4 w-4" /> Excel
-              </button>
-            </div>
+            <h1 className="k-page-title">SMG Takibi</h1>
+            <p className="k-page-subtitle">Sürekli Mesleki Gelişim puan takibi ve dönem yönetimi.</p>
           </div>
-        </div>
+          <div className="flex items-center gap-2">
+            {periods.length > 0 && (
+              <select
+                value={selectedPeriodId}
+                onChange={e => setSelectedPeriodId(e.target.value)}
+                className="k-btn k-btn-ghost"
+                style={{ paddingRight: 28 }}
+              >
+                <option value="">Aktif Dönem</option>
+                {periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            )}
+            <button onClick={() => setPeriodModalOpen(true)} className="k-btn k-btn-ghost">
+              <Plus size={15} /> Dönem Ekle
+            </button>
+            <button onClick={handleExport} className="k-btn k-btn-primary">
+              <Download size={15} /> Excel
+            </button>
+          </div>
+        </header>
       </BlurFade>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {[
-          { title: 'Toplam Personel', value: stats?.totalStaff ?? 0, icon: Users, accentColor: 'var(--color-primary)' },
-          { title: 'Hedefe Ulaşan', value: `${stats?.completedCount ?? 0} (%${stats?.completionRate ?? 0})`, icon: CheckCircle, accentColor: 'var(--color-success)' },
-          { title: 'Bekleyen Onay', value: activitiesData?.total ?? 0, icon: Clock, accentColor: 'var(--color-warning)' },
-        ].map((s, i) => (
-          <BlurFade key={s.title} delay={0.05 + i * 0.03}><StatCard {...s} /></BlurFade>
-        ))}
+        <BlurFade delay={0.05}>
+          <KStatCard
+            title="Toplam Personel"
+            value={stats?.totalStaff ?? 0}
+            icon={Users}
+            accentColor="var(--k-primary)"
+          />
+        </BlurFade>
+        <BlurFade delay={0.08}>
+          <KStatCard
+            title="Hedefe Ulaşan"
+            value={`${stats?.completedCount ?? 0} (%${stats?.completionRate ?? 0})`}
+            icon={CheckCircle}
+            accentColor="var(--k-success)"
+          />
+        </BlurFade>
+        <BlurFade delay={0.11}>
+          <KStatCard
+            title="Bekleyen Onay"
+            value={activitiesData?.total ?? 0}
+            icon={Clock}
+            accentColor="var(--k-warning)"
+          />
+        </BlurFade>
       </div>
 
       <BlurFade delay={0.15}>
-        <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+        <div className="k-card" style={{ padding: 0, overflow: 'hidden' }}>
           {/* Tabs */}
-          <div className="flex border-b overflow-x-auto" style={{ borderColor: 'var(--color-border)' }}>
-            {([
-              { key: 'staff', label: 'Personel İlerlemesi' },
-              { key: 'pending', label: `Bekleyen Onaylar${activities.length > 0 ? ` (${activities.length})` : ''}` },
-              { key: 'categories', label: 'Kategoriler' },
-              { key: 'targets', label: 'Hedefler' },
-              { key: 'inspection', label: 'SKS Denetim Raporu' },
-            ] as const).map(tab => (
+          <div className="k-tabs" style={{ borderBottom: '1px solid var(--k-border)', overflowX: 'auto' }}>
+            {tabs.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className="px-5 py-3.5 text-sm font-semibold transition-colors whitespace-nowrap"
-                style={{
-                  color: activeTab === tab.key ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                  borderBottom: activeTab === tab.key ? '2px solid var(--color-primary)' : '2px solid transparent',
-                }}
+                className="k-tab"
+                data-active={activeTab === tab.key}
               >
                 {tab.label}
               </button>
@@ -339,49 +337,41 @@ export default function AdminSmgPage() {
           {activeTab === 'staff' && (
             <div className="overflow-x-auto">
               {reportLoading ? (
-                <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Yükleniyor...</div>
+                <div className="p-8 text-center text-sm" style={{ color: 'var(--k-text-muted)' }}>Yükleniyor...</div>
               ) : report.length === 0 ? (
-                <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                <div className="p-8 text-center text-sm" style={{ color: 'var(--k-text-muted)' }}>
                   {reportData?.period ? 'Bu dönemde henüz SMG aktivitesi kaydedilmemiş.' : 'Aktif dönem bulunamadı. Lütfen önce bir SMG dönemi oluşturun.'}
                 </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>
+                    <tr style={{ borderBottom: '1px solid var(--k-border)', background: 'var(--k-surface-hover)' }}>
                       {['Ad Soyad', 'Departman', 'Kazanılan', 'Hedef', 'İlerleme', 'Durum'].map(h => (
-                        <th key={h} className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
+                        <th key={h} className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--k-text-muted)' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {report.map(row => (
-                      <tr key={row.userId} className="transition-colors" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>{row.name}</td>
-                        <td className="px-4 py-3" style={{ color: 'var(--color-text-secondary)' }}>{row.department}</td>
-                        <td className="px-4 py-3 font-semibold" style={{ color: 'var(--color-primary)' }}>{row.earnedPoints} puan</td>
-                        <td className="px-4 py-3" style={{ color: 'var(--color-text-secondary)' }}>{row.requiredPoints} puan</td>
+                      <tr key={row.userId} className="transition-colors" style={{ borderBottom: '1px solid var(--k-border)' }}>
+                        <td className="px-4 py-3 font-medium" style={{ color: 'var(--k-text-primary)' }}>{row.name}</td>
+                        <td className="px-4 py-3" style={{ color: 'var(--k-text-secondary)' }}>{row.department}</td>
+                        <td className="px-4 py-3 font-semibold" style={{ color: 'var(--k-primary)' }}>{row.earnedPoints} puan</td>
+                        <td className="px-4 py-3" style={{ color: 'var(--k-text-secondary)' }}>{row.requiredPoints} puan</td>
                         <td className="px-4 py-3" style={{ minWidth: 120 }}>
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 rounded-full h-2 overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                            <div className="k-progress flex-1">
                               <div
-                                className="h-2 rounded-full transition-all"
-                                style={{
-                                  width: `${row.progress}%`,
-                                  background: row.isCompleted ? 'var(--color-success)' : 'var(--color-primary)',
-                                }}
+                                className="k-progress-fill"
+                                data-variant={row.isCompleted ? 'success' : 'primary'}
+                                style={{ width: `${row.progress}%` }}
                               />
                             </div>
-                            <span className="text-xs font-medium w-9 text-right" style={{ color: 'var(--color-text-secondary)' }}>%{row.progress}</span>
+                            <span className="text-xs font-medium w-9 text-right" style={{ color: 'var(--k-text-secondary)' }}>%{row.progress}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                            style={{
-                              background: row.isCompleted ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
-                              color: row.isCompleted ? 'var(--color-success)' : 'var(--color-warning)',
-                            }}
-                          >
+                          <span className={`k-badge ${row.isCompleted ? 'k-badge-success' : 'k-badge-warning'}`}>
                             {row.isCompleted ? 'Tamamlandı' : 'Devam Ediyor'}
                           </span>
                         </td>
@@ -402,78 +392,78 @@ export default function AdminSmgPage() {
             <div className="overflow-x-auto">
               {/* Bulk actions bar */}
               {activities.length > 0 && (
-                <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-2)' }}>
+                <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--k-border)', background: 'var(--k-surface-hover)' }}>
                   <button
                     onClick={handleBulkApprove}
                     disabled={selectedActivities.size === 0 || bulkApproving}
-                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
-                    style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}
+                    className="k-btn k-btn-primary"
+                    style={{ padding: '6px 12px', fontSize: 12 }}
                   >
                     {bulkApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                     Tümünü Onayla ({selectedActivities.size})
                   </button>
-                  <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  <span className="text-xs" style={{ color: 'var(--k-text-muted)' }}>
                     {selectedActivities.size > 0 ? `${selectedActivities.size} seçili` : 'Onaylamak için seçin'}
                   </span>
                 </div>
               )}
               {activitiesLoading ? (
-                <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Yükleniyor...</div>
+                <div className="p-8 text-center text-sm" style={{ color: 'var(--k-text-muted)' }}>Yükleniyor...</div>
               ) : activities.length === 0 ? (
-                <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Bekleyen aktivite onayı yok.</div>
+                <div className="p-8 text-center text-sm" style={{ color: 'var(--k-text-muted)' }}>Bekleyen aktivite onayı yok.</div>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>
+                    <tr style={{ borderBottom: '1px solid var(--k-border)', background: 'var(--k-surface-hover)' }}>
                       <th className="px-4 py-3 w-10">
                         <input
                           type="checkbox"
                           checked={allSelected}
                           onChange={toggleSelectAll}
                           className="rounded cursor-pointer"
-                          style={{ accentColor: 'var(--color-primary)' }}
+                          style={{ accentColor: 'var(--k-primary)' }}
                         />
                       </th>
                       {['Aktivite', 'Personel', 'Departman', 'Tip', 'Puan', 'Tarih', 'Sertifika', 'İşlem'].map(h => (
-                        <th key={h} className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
+                        <th key={h} className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--k-text-muted)' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {activities.map(a => (
-                      <tr key={a.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <tr key={a.id} style={{ borderBottom: '1px solid var(--k-border)' }}>
                         <td className="px-4 py-3">
                           <input
                             type="checkbox"
                             checked={selectedActivities.has(a.id)}
                             onChange={() => toggleSelectActivity(a.id)}
                             className="rounded cursor-pointer"
-                            style={{ accentColor: 'var(--color-primary)' }}
+                            style={{ accentColor: 'var(--k-primary)' }}
                           />
                         </td>
-                        <td className="px-4 py-3 font-medium max-w-xs truncate" style={{ color: 'var(--color-text)' }}>{a.title}</td>
-                        <td className="px-4 py-3" style={{ color: 'var(--color-text-secondary)' }}>{a.user.firstName} {a.user.lastName}</td>
-                        <td className="px-4 py-3" style={{ color: 'var(--color-text-secondary)' }}>{a.user.departmentRel?.name ?? '-'}</td>
+                        <td className="px-4 py-3 font-medium max-w-xs truncate" style={{ color: 'var(--k-text-primary)' }}>{a.title}</td>
+                        <td className="px-4 py-3" style={{ color: 'var(--k-text-secondary)' }}>{a.user.firstName} {a.user.lastName}</td>
+                        <td className="px-4 py-3" style={{ color: 'var(--k-text-secondary)' }}>{a.user.departmentRel?.name ?? '-'}</td>
                         <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: 'var(--color-surface-2)', color: 'var(--color-text-secondary)' }}>
+                          <span className="k-badge k-badge-muted">
                             {activityTypeLabels[a.activityType] ?? a.activityType}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-semibold" style={{ color: 'var(--color-primary)' }}>{a.smgPoints}</td>
-                        <td className="px-4 py-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                        <td className="px-4 py-3 font-semibold" style={{ color: 'var(--k-primary)' }}>{a.smgPoints}</td>
+                        <td className="px-4 py-3 text-xs" style={{ color: 'var(--k-text-muted)' }}>
                           {new Date(a.completionDate).toLocaleDateString('tr-TR')}
                         </td>
                         <td className="px-4 py-3">
                           {a.certificateUrl ? (
                             <button
                               onClick={() => setCertificateActivityId(a.id)}
-                              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors"
-                              style={{ background: 'var(--color-primary-bg)', color: 'var(--color-primary)' }}
+                              className="k-btn k-btn-ghost"
+                              style={{ padding: '4px 10px', fontSize: 12 }}
                             >
                               <FileText className="h-3.5 w-3.5" /> Görüntüle
                             </button>
                           ) : (
-                            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>—</span>
+                            <span className="text-xs" style={{ color: 'var(--k-text-muted)' }}>—</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -481,16 +471,16 @@ export default function AdminSmgPage() {
                             <button
                               disabled={approving === a.id}
                               onClick={() => handleApprove(a.id, 'APPROVED')}
-                              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
-                              style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}
+                              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                              style={{ background: 'color-mix(in srgb, var(--k-success) 14%, transparent)', color: 'var(--k-success)' }}
                             >
                               <Check className="h-3.5 w-3.5" /> Onayla
                             </button>
                             <button
                               disabled={approving === a.id}
                               onClick={() => handleRejectClick(a.id)}
-                              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
-                              style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
+                              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                              style={{ background: 'color-mix(in srgb, var(--k-error) 14%, transparent)', color: 'var(--k-error)' }}
                             >
                               <X className="h-3.5 w-3.5" /> Reddet
                             </button>
@@ -514,60 +504,66 @@ export default function AdminSmgPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Dönem Adı *</label>
-              <Input
+              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--k-text-secondary)' }}>Dönem Adı *</label>
+              <input
+                type="text"
                 value={periodForm.name}
                 onChange={e => setPeriodForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="Örn: 2026 Yılı SMG Dönemi"
-                className="rounded-xl"
+                className="k-input"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Başlangıç Tarihi *</label>
-                <Input
+                <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--k-text-secondary)' }}>Başlangıç Tarihi *</label>
+                <input
                   type="date"
                   value={periodForm.startDate}
                   onChange={e => setPeriodForm(f => ({ ...f, startDate: e.target.value }))}
-                  className="rounded-xl"
+                  className="k-input"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Bitiş Tarihi *</label>
-                <Input
+                <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--k-text-secondary)' }}>Bitiş Tarihi *</label>
+                <input
                   type="date"
                   value={periodForm.endDate}
                   onChange={e => setPeriodForm(f => ({ ...f, endDate: e.target.value }))}
-                  className="rounded-xl"
+                  className="k-input"
                 />
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Hedef Puan *</label>
-              <Input
+              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--k-text-secondary)' }}>Hedef Puan *</label>
+              <input
                 type="number"
                 min={1}
                 max={9999}
                 value={periodForm.requiredPoints}
                 onChange={e => setPeriodForm(f => ({ ...f, requiredPoints: e.target.value }))}
                 placeholder="Örn: 50"
-                className="rounded-xl"
+                className="k-input"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPeriodModalOpen(false)} disabled={periodSubmitting} className="rounded-xl">
+            <button
+              type="button"
+              onClick={() => setPeriodModalOpen(false)}
+              disabled={periodSubmitting}
+              className="k-btn k-btn-ghost"
+            >
               İptal
-            </Button>
-            <Button
+            </button>
+            <button
+              type="button"
               onClick={handlePeriodSubmit}
               disabled={periodSubmitting}
-              className="gap-1.5 rounded-xl"
-              style={{ background: 'var(--color-primary)', color: 'white' }}
+              className="k-btn k-btn-primary"
             >
               {periodSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               Oluştur
-            </Button>
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -587,30 +583,35 @@ export default function AdminSmgPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Red Nedeni (opsiyonel)</label>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--k-text-secondary)' }}>Red Nedeni (opsiyonel)</label>
               <textarea
                 value={rejectionReason}
                 onChange={e => setRejectionReason(e.target.value)}
                 placeholder="Reddetme nedeninizi yazın..."
                 maxLength={500}
                 rows={3}
-                className="w-full text-sm rounded-xl px-3 py-2 border outline-none resize-none"
-                style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}
+                className="k-input"
+                style={{ resize: 'none' }}
               />
-              <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{rejectionReason.length}/500</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--k-text-muted)' }}>{rejectionReason.length}/500</p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectModalOpen(false)} className="rounded-xl">
+            <button
+              type="button"
+              onClick={() => setRejectModalOpen(false)}
+              className="k-btn k-btn-ghost"
+            >
               İptal
-            </Button>
-            <Button
+            </button>
+            <button
+              type="button"
               onClick={handleRejectConfirm}
-              className="gap-1.5 rounded-xl"
-              style={{ background: 'var(--color-error)', color: 'white' }}
+              className="k-btn k-btn-primary"
+              style={{ background: 'var(--k-error)' }}
             >
               <X className="h-4 w-4" /> Reddet
-            </Button>
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

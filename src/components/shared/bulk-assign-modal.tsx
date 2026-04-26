@@ -17,6 +17,32 @@ interface BulkAssignModalProps {
 
 type StepId = 'trainings' | 'staff' | 'review';
 
+// ─── Klinova palette (sabit hex, Tailwind v4 cache'den bağımsız) ───
+const K = {
+  PRIMARY: '#0d9668',
+  PRIMARY_HOVER: '#087a54',
+  PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff',
+  SURFACE_HOVER: '#f5f5f4',
+  BG: '#fafaf9',
+  BORDER: '#c9c4be',
+  BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917',
+  TEXT_SECONDARY: '#44403c',
+  TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981',
+  SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b',
+  WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444',
+  ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6',
+  INFO_BG: '#dbeafe',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+} as const;
+
+const FONT_DISPLAY = 'var(--font-display, system-ui)';
+
 export function BulkAssignModal({
   trainings: trainingsFromProps,
   staff: staffFromProps,
@@ -70,7 +96,6 @@ export function BulkAssignModal({
     [staff, staffSearch]
   );
 
-  // Departmana göre grupla — departman sırası: alfabetik (stable)
   const deptGroups = useMemo(() => {
     const groups = filteredStaff.reduce<Record<string, Staff[]>>((acc, s) => {
       const dept = s.department || 'Atanmamış';
@@ -145,7 +170,6 @@ export function BulkAssignModal({
 
   const totalAssignments = selectedTrainings.size * selectedStaff.size;
 
-  // Seçili eğitimleri/personelleri özet için hazırla
   const selectedTrainingsList = useMemo(
     () => trainings.filter(t => selectedTrainings.has(t.id)),
     [trainings, selectedTrainings]
@@ -193,6 +217,26 @@ export function BulkAssignModal({
     setStep(id as StepId);
   };
 
+  // ─── Reusable inline style objects (Klinova) ───
+  const cardBase: React.CSSProperties = {
+    background: K.SURFACE,
+    border: `1.5px solid ${K.BORDER}`,
+    borderRadius: 14,
+    transition: 'border-color 160ms ease, background 160ms ease, transform 160ms ease',
+  };
+
+  const inputBase: React.CSSProperties = {
+    height: 40,
+    border: `1.5px solid ${K.BORDER}`,
+    borderRadius: 10,
+    background: K.SURFACE,
+    color: K.TEXT_PRIMARY,
+    fontFamily: FONT_DISPLAY,
+    fontSize: 13.5,
+    outline: 'none',
+    transition: 'border-color 160ms ease, box-shadow 160ms ease',
+  };
+
   return (
     <PremiumModal
       isOpen
@@ -208,15 +252,25 @@ export function BulkAssignModal({
       footer={
         <PremiumModalFooter
           summary={
-            <span className="bam-summary">
-              <b>{selectedTrainings.size.toString().padStart(2, '0')}</b> eğitim
-              <span className="bam-dot" aria-hidden>·</span>
-              <b>{selectedStaff.size.toString().padStart(2, '0')}</b> personel
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: FONT_DISPLAY, fontSize: 13, color: K.TEXT_SECONDARY, fontVariantNumeric: 'tabular-nums' }}>
+              <b style={{ fontWeight: 600, color: K.TEXT_PRIMARY }}>{selectedTrainings.size.toString().padStart(2, '0')}</b> eğitim
+              <span style={{ color: K.BORDER }} aria-hidden>·</span>
+              <b style={{ fontWeight: 600, color: K.TEXT_PRIMARY }}>{selectedStaff.size.toString().padStart(2, '0')}</b> personel
               {totalAssignments > 0 && (
                 <>
-                  <span className="bam-dot" aria-hidden>·</span>
-                  <span className="bam-accent">
-                    <b>{totalAssignments.toString()}</b> atama oluşacak
+                  <span style={{ color: K.BORDER }} aria-hidden>·</span>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 10px',
+                    background: K.PRIMARY,
+                    color: '#fff',
+                    borderRadius: 999,
+                    fontWeight: 500,
+                    fontSize: 12,
+                  }}>
+                    <b style={{ fontWeight: 700 }}>{totalAssignments.toString()}</b> atama
                   </span>
                 </>
               )}
@@ -263,30 +317,92 @@ export function BulkAssignModal({
       }
     >
       {dataLoading ? (
-        <div className="bam-loading">
-          <div className="bam-spinner" aria-hidden />
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+          padding: '80px 20px',
+          color: K.TEXT_MUTED,
+          fontFamily: FONT_DISPLAY,
+          fontSize: 13,
+        }}>
+          <div
+            aria-hidden
+            style={{
+              width: 24,
+              height: 24,
+              border: `2px solid ${K.BORDER_LIGHT}`,
+              borderTopColor: K.PRIMARY,
+              borderRadius: '50%',
+              animation: 'bam-spin 700ms linear infinite',
+            }}
+          />
           <p>Veriler yükleniyor…</p>
         </div>
       ) : (
         <>
           {/* ─────── STEP 1: EĞİTİMLER ─────── */}
           {step === 'trainings' && (
-            <div className="bam-step" key="trainings">
-              <div className="bam-toolbar">
-                <div className="bam-search">
+            <div key="trainings" style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 360 }}>
+              {/* Toolbar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="bam-search-wrap" style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '0 14px',
+                  ...inputBase,
+                  color: K.TEXT_MUTED,
+                }}>
                   <Search className="h-4 w-4" strokeWidth={1.5} />
                   <input
                     value={trainingSearch}
                     onChange={e => setTrainingSearch(e.target.value)}
                     placeholder="Eğitim başlığında ara…"
                     aria-label="Eğitim ara"
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      outline: 'none',
+                      background: 'transparent',
+                      fontFamily: FONT_DISPLAY,
+                      fontSize: 13.5,
+                      color: K.TEXT_PRIMARY,
+                      height: '100%',
+                    }}
                   />
                 </div>
                 <button
                   type="button"
                   onClick={selectAllTrainings}
-                  className="bam-chip"
                   disabled={filteredTrainings.length === 0}
+                  style={{
+                    padding: '0 14px',
+                    height: 38,
+                    background: 'transparent',
+                    border: `1.5px solid ${K.BORDER}`,
+                    borderRadius: 999,
+                    fontFamily: FONT_DISPLAY,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: K.TEXT_PRIMARY,
+                    cursor: filteredTrainings.length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: filteredTrainings.length === 0 ? 0.4 : 1,
+                    transition: 'background 160ms ease, border-color 160ms ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (filteredTrainings.length === 0) return;
+                    e.currentTarget.style.background = K.SURFACE_HOVER;
+                    e.currentTarget.style.borderColor = K.PRIMARY;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = K.BORDER;
+                  }}
                 >
                   {filteredTrainings.length > 0 && filteredTrainings.every(t => selectedTrainings.has(t.id))
                     ? 'Tümünü kaldır'
@@ -295,32 +411,76 @@ export function BulkAssignModal({
               </div>
 
               {filteredTrainings.length === 0 ? (
-                <div className="bam-empty">
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '60px 20px',
+                  textAlign: 'center',
+                  color: K.TEXT_MUTED,
+                }}>
                   <BookOpen className="h-6 w-6" strokeWidth={1.25} />
-                  <p>{trainings.length === 0 ? 'Henüz eğitim oluşturulmamış' : 'Arama sonucu yok'}</p>
+                  <p style={{ margin: '12px 0 4px', fontFamily: FONT_DISPLAY, fontSize: 14, fontWeight: 500, color: K.TEXT_PRIMARY }}>
+                    {trainings.length === 0 ? 'Henüz eğitim oluşturulmamış' : 'Arama sonucu yok'}
+                  </p>
                   {trainings.length === 0 && (
-                    <small>Toplu atama için önce eğitim kütüphanesine içerik ekleyin.</small>
+                    <small style={{ fontFamily: FONT_DISPLAY, fontSize: 12, lineHeight: 1.5, color: K.TEXT_MUTED, maxWidth: 280 }}>
+                      Toplu atama için önce eğitim kütüphanesine içerik ekleyin.
+                    </small>
                   )}
                 </div>
               ) : (
-                <ul className="bam-list">
-                  {filteredTrainings.map((t, i) => {
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {filteredTrainings.map((t) => {
                     const selected = selectedTrainings.has(t.id);
                     return (
-                      <li key={t.id} style={{ animationDelay: `${Math.min(i * 18, 300)}ms` }}>
+                      <li key={t.id}>
                         <button
                           type="button"
                           role="checkbox"
                           aria-checked={selected}
                           onClick={() => toggleTraining(t.id)}
-                          className={`bam-row ${selected ? 'bam-row-selected' : ''}`}
+                          style={{
+                            ...cardBase,
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 14,
+                            padding: '12px 14px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            borderColor: selected ? K.PRIMARY : K.BORDER,
+                            background: selected ? K.PRIMARY_LIGHT : K.SURFACE,
+                          }}
+                          onMouseEnter={(e) => {
+                            if (selected) return;
+                            e.currentTarget.style.borderColor = K.PRIMARY;
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (selected) return;
+                            e.currentTarget.style.borderColor = K.BORDER;
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}
                         >
-                          <span className={`bam-check ${selected ? 'bam-check-on' : ''}`} aria-hidden>
-                            {selected && <Check className="h-3 w-3" strokeWidth={2.5} />}
-                          </span>
-                          <span className="bam-row-main">
-                            <span className="bam-row-title">{t.title}</span>
-                            {t.category && <span className="bam-row-meta">{t.category}</span>}
+                          <CheckBox selected={selected} />
+                          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                            <span style={{
+                              fontFamily: FONT_DISPLAY,
+                              fontSize: 14,
+                              fontWeight: 500,
+                              color: K.TEXT_PRIMARY,
+                              lineHeight: 1.35,
+                            }}>{t.title}</span>
+                            {t.category && (
+                              <span style={{
+                                fontFamily: FONT_DISPLAY,
+                                fontSize: 11.5,
+                                color: K.TEXT_MUTED,
+                                marginTop: 3,
+                              }}>{t.category}</span>
+                            )}
                           </span>
                         </button>
                       </li>
@@ -333,62 +493,140 @@ export function BulkAssignModal({
 
           {/* ─────── STEP 2: PERSONEL ─────── */}
           {step === 'staff' && (
-            <div className="bam-step" key="staff">
-              <div className="bam-toolbar">
-                <div className="bam-search">
+            <div key="staff" style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 360 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '0 14px',
+                  ...inputBase,
+                  color: K.TEXT_MUTED,
+                }}>
                   <Search className="h-4 w-4" strokeWidth={1.5} />
                   <input
                     value={staffSearch}
                     onChange={e => setStaffSearch(e.target.value)}
                     placeholder="Personel veya departman ara…"
                     aria-label="Personel ara"
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      outline: 'none',
+                      background: 'transparent',
+                      fontFamily: FONT_DISPLAY,
+                      fontSize: 13.5,
+                      color: K.TEXT_PRIMARY,
+                      height: '100%',
+                    }}
                   />
                 </div>
-                <span className="bam-hint">
-                  <b>{Object.keys(deptGroups).length.toString().padStart(2, '0')}</b> departman
+                <span style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontSize: 12,
+                  color: K.TEXT_MUTED,
+                  fontVariantNumeric: 'tabular-nums',
+                  padding: '0 12px',
+                }}>
+                  <b style={{ fontWeight: 600, color: K.TEXT_PRIMARY }}>
+                    {Object.keys(deptGroups).length.toString().padStart(2, '0')}
+                  </b> departman
                 </span>
               </div>
 
               {Object.keys(deptGroups).length === 0 ? (
-                <div className="bam-empty">
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '60px 20px',
+                  textAlign: 'center',
+                  color: K.TEXT_MUTED,
+                }}>
                   <UsersIcon className="h-6 w-6" strokeWidth={1.25} />
-                  <p>Sonuç bulunamadı</p>
+                  <p style={{ margin: '12px 0 4px', fontFamily: FONT_DISPLAY, fontSize: 14, fontWeight: 500, color: K.TEXT_PRIMARY }}>
+                    Sonuç bulunamadı
+                  </p>
                 </div>
               ) : (
-                <ul className="bam-dept-list">
-                  {Object.entries(deptGroups).map(([dept, members], i) => {
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {Object.entries(deptGroups).map(([dept, members]) => {
                     const allSelected = members.every(s => selectedStaff.has(s.id));
                     const someSelected = members.some(s => selectedStaff.has(s.id));
                     const selectedCount = members.filter(s => selectedStaff.has(s.id)).length;
                     const isExpanded = expandedDepts.has(dept);
                     return (
-                      <li key={dept} style={{ animationDelay: `${Math.min(i * 24, 300)}ms` }}>
-                        <div className={`bam-dept ${someSelected ? 'bam-dept-active' : ''}`}>
+                      <li key={dept}>
+                        <div style={{
+                          ...cardBase,
+                          display: 'flex',
+                          alignItems: 'stretch',
+                          overflow: 'hidden',
+                          borderColor: someSelected ? K.PRIMARY : K.BORDER,
+                          background: someSelected ? K.PRIMARY_LIGHT : K.SURFACE,
+                        }}>
                           <button
                             type="button"
                             role="checkbox"
                             aria-checked={allSelected ? true : someSelected ? 'mixed' : false}
                             onClick={() => toggleDept(dept)}
-                            className={`bam-check bam-check-dept ${allSelected ? 'bam-check-on' : someSelected ? 'bam-check-mixed' : ''}`}
                             aria-label={`${dept} departmanının tümünü seç`}
+                            style={{
+                              margin: '14px 0 14px 14px',
+                              cursor: 'pointer',
+                              background: 'transparent',
+                              border: 'none',
+                              padding: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
                           >
-                            {allSelected && <Check className="h-3 w-3" strokeWidth={2.5} />}
-                            {someSelected && !allSelected && <span className="bam-check-dash" aria-hidden />}
+                            <CheckBox selected={allSelected} mixed={someSelected && !allSelected} />
                           </button>
                           <button
                             type="button"
-                            className="bam-dept-main"
                             onClick={() => setExpandedDepts(prev => {
                               const n = new Set(prev);
                               if (n.has(dept)) n.delete(dept); else n.add(dept);
                               return n;
                             })}
                             aria-expanded={isExpanded}
+                            style={{
+                              flex: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: '12px 14px 12px 8px',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              color: K.TEXT_PRIMARY,
+                            }}
                           >
-                            <span className="bam-dept-name">{dept}</span>
-                            <span className="bam-dept-count">
-                              <b>{selectedCount.toString().padStart(2, '0')}</b>
-                              <span className="bam-dept-slash">/</span>
+                            <span style={{
+                              flex: 1,
+                              fontFamily: FONT_DISPLAY,
+                              fontSize: 14,
+                              fontWeight: 600,
+                              color: K.TEXT_PRIMARY,
+                            }}>{dept}</span>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '2px 10px',
+                              borderRadius: 999,
+                              background: someSelected ? K.PRIMARY : K.BORDER_LIGHT,
+                              color: someSelected ? '#fff' : K.TEXT_SECONDARY,
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              fontVariantNumeric: 'tabular-nums',
+                            }}>
+                              {selectedCount.toString().padStart(2, '0')}
+                              <span style={{ margin: '0 3px', opacity: 0.6 }}>/</span>
                               {members.length.toString().padStart(2, '0')}
                             </span>
                             {isExpanded
@@ -397,7 +635,15 @@ export function BulkAssignModal({
                           </button>
                         </div>
                         {isExpanded && (
-                          <ul className="bam-staff-list">
+                          <ul style={{
+                            listStyle: 'none',
+                            padding: 0,
+                            margin: '6px 0 0 0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 4,
+                            paddingLeft: 16,
+                          }}>
                             {members.map(s => {
                               const sel = selectedStaff.has(s.id);
                               return (
@@ -407,11 +653,32 @@ export function BulkAssignModal({
                                     role="checkbox"
                                     aria-checked={sel}
                                     onClick={() => toggleStaff(s.id)}
-                                    className={`bam-staff ${sel ? 'bam-staff-selected' : ''}`}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 12,
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      background: sel ? K.PRIMARY_LIGHT : 'transparent',
+                                      border: `1.5px solid ${sel ? K.PRIMARY : 'transparent'}`,
+                                      borderRadius: 10,
+                                      cursor: 'pointer',
+                                      textAlign: 'left',
+                                      fontFamily: FONT_DISPLAY,
+                                      fontSize: 13,
+                                      color: K.TEXT_PRIMARY,
+                                      transition: 'background 140ms ease, border-color 140ms ease',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (sel) return;
+                                      e.currentTarget.style.background = K.SURFACE_HOVER;
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (sel) return;
+                                      e.currentTarget.style.background = 'transparent';
+                                    }}
                                   >
-                                    <span className={`bam-check bam-check-sm ${sel ? 'bam-check-on' : ''}`} aria-hidden>
-                                      {sel && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
-                                    </span>
+                                    <CheckBox selected={sel} small />
                                     <span>{s.name}</span>
                                   </button>
                                 </li>
@@ -429,13 +696,41 @@ export function BulkAssignModal({
 
           {/* ─────── STEP 3: ÖZET ─────── */}
           {step === 'review' && (
-            <div className="bam-step" key="review">
-              <div className="bam-review-hero">
-                <span className="bam-eyebrow-sm">Onay Bekliyor</span>
-                <h3 className="bam-review-title">
-                  <em>{totalAssignments}</em> yeni atama oluşturulacak
+            <div key="review" style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 360 }}>
+              <div style={{ padding: '8px 0 20px', borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+                <span style={{
+                  display: 'inline-block',
+                  padding: '4px 12px',
+                  background: K.PRIMARY_LIGHT,
+                  color: K.PRIMARY,
+                  borderRadius: 999,
+                  fontFamily: FONT_DISPLAY,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}>
+                  Onay Bekliyor
+                </span>
+                <h3 style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontSize: 26,
+                  fontWeight: 600,
+                  lineHeight: 1.2,
+                  letterSpacing: '-0.015em',
+                  color: K.TEXT_PRIMARY,
+                  margin: '12px 0 8px',
+                }}>
+                  <span style={{ color: K.PRIMARY, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{totalAssignments}</span>
+                  {' '}yeni atama oluşturulacak
                 </h3>
-                <p className="bam-review-sub">
+                <p style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontSize: 13.5,
+                  lineHeight: 1.6,
+                  color: K.TEXT_SECONDARY,
+                  margin: 0,
+                }}>
                   {selectedTrainings.size} eğitim, {selectedStaff.size} personele atanacak.
                   Personel başına her eğitim için{' '}
                   <input
@@ -444,41 +739,153 @@ export function BulkAssignModal({
                     max={10}
                     value={maxAttempts}
                     onChange={e => setMaxAttempts(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
-                    className="bam-attempts"
                     aria-label="Deneme hakkı"
+                    style={{
+                      width: 56,
+                      height: 32,
+                      padding: '0 8px',
+                      margin: '0 4px',
+                      border: `1.5px solid ${K.PRIMARY}`,
+                      borderRadius: 8,
+                      background: K.SURFACE,
+                      textAlign: 'center',
+                      fontFamily: FONT_DISPLAY,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: K.PRIMARY,
+                      fontVariantNumeric: 'tabular-nums',
+                      outline: 'none',
+                    }}
                   />{' '}
                   deneme hakkı tanımlanacak.
                 </p>
               </div>
 
-              <div className="bam-review-warn">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" strokeWidth={1.8} />
+              <div style={{
+                display: 'flex',
+                gap: 10,
+                padding: '12px 14px',
+                background: K.WARNING_BG,
+                border: `1.5px solid ${K.WARNING}`,
+                borderRadius: 10,
+                color: K.TEXT_PRIMARY,
+                fontFamily: FONT_DISPLAY,
+                fontSize: 12.5,
+                lineHeight: 1.55,
+              }}>
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" strokeWidth={1.8} style={{ color: K.WARNING }} />
                 <span>
                   Zaten var olan atamalar atlanır, yenileri eklenir. Bu işlem geri alınamaz —
                   personele bildirim gönderilecek.
                 </span>
               </div>
 
-              <div className="bam-review-grid">
+              <div className="bam-review-grid" style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                gap: 24,
+              }}>
                 <section>
-                  <h4>Eğitimler</h4>
-                  <ul className="bam-review-list">
+                  <h4 style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.15em',
+                    textTransform: 'uppercase',
+                    color: K.TEXT_MUTED,
+                    margin: '0 0 12px',
+                  }}>Eğitimler</h4>
+                  <ul style={{
+                    listStyle: 'none',
+                    padding: 0,
+                    margin: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    maxHeight: 240,
+                    overflowY: 'auto',
+                  }}>
                     {selectedTrainingsList.map(t => (
-                      <li key={t.id}>
-                        <span className="bam-bullet" aria-hidden />
-                        <span>{t.title}</span>
-                        {t.category && <em>{t.category}</em>}
+                      <li key={t.id} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 12px',
+                        background: K.SURFACE,
+                        border: `1.5px solid ${K.BORDER_LIGHT}`,
+                        borderRadius: 10,
+                        fontFamily: FONT_DISPLAY,
+                        fontSize: 13,
+                        color: K.TEXT_PRIMARY,
+                      }}>
+                        <span aria-hidden style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: K.PRIMARY,
+                          flexShrink: 0,
+                        }} />
+                        <span style={{ flex: 1 }}>{t.title}</span>
+                        {t.category && (
+                          <em style={{
+                            fontStyle: 'normal',
+                            fontSize: 11,
+                            color: K.TEXT_MUTED,
+                            padding: '2px 8px',
+                            background: K.SURFACE_HOVER,
+                            borderRadius: 999,
+                          }}>{t.category}</em>
+                        )}
                       </li>
                     ))}
                   </ul>
                 </section>
                 <section>
-                  <h4>Personel <span className="bam-review-count">({selectedStaff.size})</span></h4>
-                  <ul className="bam-review-list">
+                  <h4 style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.15em',
+                    textTransform: 'uppercase',
+                    color: K.TEXT_MUTED,
+                    margin: '0 0 12px',
+                  }}>
+                    Personel <span style={{ fontWeight: 500, color: K.TEXT_SECONDARY, letterSpacing: 0, textTransform: 'none' }}>({selectedStaff.size})</span>
+                  </h4>
+                  <ul style={{
+                    listStyle: 'none',
+                    padding: 0,
+                    margin: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    maxHeight: 240,
+                    overflowY: 'auto',
+                  }}>
                     {Object.entries(selectedStaffByDept).map(([dept, members]) => (
-                      <li key={dept} className="bam-review-dept">
-                        <span className="bam-review-deptname">{dept}</span>
-                        <span className="bam-review-deptcount">
+                      <li key={dept} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 12px',
+                        background: K.SURFACE,
+                        border: `1.5px solid ${K.BORDER_LIGHT}`,
+                        borderRadius: 10,
+                        fontFamily: FONT_DISPLAY,
+                        fontSize: 13,
+                        color: K.TEXT_PRIMARY,
+                      }}>
+                        <span style={{ fontWeight: 500 }}>{dept}</span>
+                        <span style={{
+                          fontFamily: FONT_DISPLAY,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#fff',
+                          background: K.PRIMARY,
+                          padding: '2px 10px',
+                          borderRadius: 999,
+                          fontVariantNumeric: 'tabular-nums',
+                        }}>
                           {members.length.toString().padStart(2, '0')}
                         </span>
                       </li>
@@ -492,497 +899,47 @@ export function BulkAssignModal({
       )}
 
       <style jsx>{`
-        .bam-step {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          min-height: 360px;
-        }
-
-        /* ───── Toolbar ───── */
-        .bam-toolbar {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .bam-search {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 0 14px;
-          height: 42px;
-          background: #fff;
-          border: 1px solid #ebe7df;
-          border-radius: 12px;
-          color: #8a8578;
-          transition: border-color 180ms ease, box-shadow 180ms ease;
-        }
-        .bam-search:focus-within {
-          border-color: #0a0a0a;
-          box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.04);
-        }
-        .bam-search input {
-          flex: 1;
-          border: none;
-          outline: none;
-          background: transparent;
-          font-family: var(--font-display, system-ui);
-          font-size: 13.5px;
-          color: #0a0a0a;
-        }
-        .bam-search input::placeholder {
-          color: #a7a296;
-        }
-        .bam-chip {
-          padding: 8px 14px;
-          background: transparent;
-          border: 1px solid #d9d4c4;
-          border-radius: 999px;
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          font-weight: 500;
-          color: #0a0a0a;
-          cursor: pointer;
-          transition: background 160ms ease, border-color 160ms ease;
-          white-space: nowrap;
-        }
-        .bam-chip:hover:not(:disabled) {
-          background: rgba(15, 23, 42, 0.03);
-          border-color: #b8b1a0;
-        }
-        .bam-chip:disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
-        }
-        .bam-hint {
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          color: #8a8578;
-          font-variant-numeric: tabular-nums;
-          padding: 0 12px;
-        }
-        .bam-hint b {
-          font-weight: 600;
-          color: #0a0a0a;
-        }
-
-        /* ───── Checkbox ───── */
-        .bam-check {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 18px;
-          height: 18px;
-          border-radius: 5px;
-          border: 1.5px solid #cdc6b4;
-          background: #fff;
-          color: #fff;
-          flex-shrink: 0;
-          transition: background 160ms ease, border-color 160ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .bam-check-on {
-          background: var(--color-primary);
-          border-color: var(--color-primary);
-        }
-        .bam-check-mixed {
-          background: rgba(13, 150, 104, 0.15);
-          border-color: var(--color-primary);
-        }
-        .bam-check-dash {
-          width: 8px;
-          height: 1.5px;
-          background: var(--color-primary);
-          border-radius: 1px;
-        }
-        .bam-check-sm {
-          width: 15px;
-          height: 15px;
-          border-radius: 4px;
-        }
-        .bam-check-dept {
-          margin: 14px 0 14px 16px;
-          cursor: pointer;
-        }
-
-        /* ───── Training list ───── */
-        .bam-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .bam-list li {
-          animation: bam-fade-up 340ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-        }
-        .bam-row {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          padding: 14px 16px;
-          background: #fff;
-          border: 1px solid #ebe7df;
-          border-radius: 12px;
-          cursor: pointer;
-          text-align: left;
-          transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
-        }
-        .bam-row:hover {
-          border-color: #cdc6b4;
-        }
-        .bam-row-selected {
-          background: #fffefa;
-          border-color: var(--color-primary);
-          box-shadow: inset 0 0 0 1px var(--color-primary);
-        }
-        .bam-row-main {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          min-width: 0;
-        }
-        .bam-row-title {
-          font-family: var(--font-display, system-ui);
-          font-size: 14px;
-          font-weight: 500;
-          color: #0a0a0a;
-          letter-spacing: -0.005em;
-          line-height: 1.35;
-        }
-        .bam-row-meta {
-          font-family: var(--font-display, system-ui);
-          font-size: 11.5px;
-          color: #8a8578;
-          margin-top: 3px;
-          letter-spacing: 0.01em;
-        }
-
-        /* ───── Department list ───── */
-        .bam-dept-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .bam-dept-list > li {
-          animation: bam-fade-up 340ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-        }
-        .bam-dept {
-          display: flex;
-          align-items: stretch;
-          background: #fff;
-          border: 1px solid #ebe7df;
-          border-radius: 12px;
-          overflow: hidden;
-          transition: border-color 160ms ease;
-        }
-        .bam-dept:hover {
-          border-color: #cdc6b4;
-        }
-        .bam-dept-active {
-          border-color: var(--color-primary);
-          background: #fffefa;
-        }
-        .bam-dept-main {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 16px 12px 4px;
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          text-align: left;
-        }
-        .bam-dept-name {
-          flex: 1;
-          font-family: var(--font-display, system-ui);
-          font-size: 14px;
-          font-weight: 600;
-          color: #0a0a0a;
-          letter-spacing: -0.005em;
-        }
-        .bam-dept-count {
-          font-family: var(--font-mono, monospace);
-          font-size: 11.5px;
-          color: #8a8578;
-          font-variant-numeric: tabular-nums;
-          letter-spacing: 0.02em;
-        }
-        .bam-dept-count b {
-          font-weight: 500;
-          color: #0a0a0a;
-        }
-        .bam-dept-slash {
-          margin: 0 2px;
-          opacity: 0.5;
-        }
-        .bam-staff-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          border-top: 1px solid #ebe7df;
-        }
-        .bam-staff {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          width: 100%;
-          padding: 10px 16px 10px 38px;
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          text-align: left;
-          font-family: var(--font-display, system-ui);
-          font-size: 13px;
-          color: #0a0a0a;
-          transition: background 140ms ease;
-        }
-        .bam-staff:hover {
-          background: rgba(15, 23, 42, 0.025);
-        }
-        .bam-staff-selected {
-          background: rgba(13, 150, 104, 0.04);
-        }
-
-        /* ───── Review step ───── */
-        .bam-review-hero {
-          padding: 20px 0 24px;
-          border-bottom: 1px solid #ebe7df;
-        }
-        .bam-eyebrow-sm {
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.22em;
-          text-transform: uppercase;
-          color: var(--color-primary);
-        }
-        .bam-review-title {
-          font-family: var(--font-editorial, Georgia, serif);
-          font-size: 30px;
-          font-weight: 400;
-          line-height: 1.15;
-          letter-spacing: -0.02em;
-          color: #0a0a0a;
-          margin: 8px 0 8px;
-          font-variation-settings: 'opsz' 48;
-        }
-        .bam-review-title em {
-          font-style: italic;
-          font-weight: 500;
-          color: var(--color-primary);
-          font-variant-numeric: tabular-nums;
-        }
-        .bam-review-sub {
-          font-family: var(--font-display, system-ui);
-          font-size: 13.5px;
-          line-height: 1.6;
-          color: #4a4a42;
-          margin: 0;
-        }
-        .bam-attempts {
-          width: 44px;
-          padding: 2px 6px;
-          margin: 0 2px;
-          border: none;
-          border-bottom: 1.5px solid var(--color-primary);
-          background: transparent;
-          text-align: center;
-          font-family: var(--font-mono, monospace);
-          font-size: 14px;
-          font-weight: 600;
-          color: var(--color-primary);
-          font-variant-numeric: tabular-nums;
-          outline: none;
-        }
-        .bam-attempts::-webkit-inner-spin-button,
-        .bam-attempts::-webkit-outer-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-        .bam-review-warn {
-          display: flex;
-          gap: 10px;
-          padding: 12px 16px;
-          margin: 18px 0 20px;
-          background: rgba(245, 158, 11, 0.06);
-          border: 1px solid rgba(245, 158, 11, 0.22);
-          border-radius: 10px;
-          color: #78551a;
-          font-family: var(--font-display, system-ui);
-          font-size: 12.5px;
-          line-height: 1.55;
-        }
-        .bam-review-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 28px;
-        }
-        @media (min-width: 680px) {
-          .bam-review-grid {
-            grid-template-columns: 1.2fr 1fr;
-          }
-        }
-        .bam-review-grid section h4 {
-          font-family: var(--font-display, system-ui);
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          color: #8a8578;
-          margin: 0 0 12px;
-        }
-        .bam-review-count {
-          font-weight: 500;
-          color: #4a4a42;
-          letter-spacing: 0;
-        }
-        .bam-review-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          max-height: 240px;
-          overflow-y: auto;
-        }
-        .bam-review-list li {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 8px 0;
-          border-bottom: 1px solid #f0ece3;
-          font-family: var(--font-display, system-ui);
-          font-size: 13px;
-          color: #1a1a1a;
-        }
-        .bam-review-list li em {
-          margin-left: auto;
-          font-style: normal;
-          font-size: 11px;
-          color: #8a8578;
-          letter-spacing: 0.02em;
-        }
-        .bam-bullet {
-          width: 4px;
-          height: 4px;
-          border-radius: 50%;
-          background: var(--color-primary);
-          flex-shrink: 0;
-        }
-        .bam-review-dept {
-          justify-content: space-between;
-        }
-        .bam-review-deptname {
-          font-weight: 500;
-        }
-        .bam-review-deptcount {
-          font-family: var(--font-mono, monospace);
-          font-size: 12px;
-          color: #0a0a0a;
-          font-variant-numeric: tabular-nums;
-          background: rgba(13, 150, 104, 0.08);
-          padding: 2px 8px;
-          border-radius: 999px;
-        }
-
-        /* ───── Empty state ───── */
-        .bam-empty {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 60px 20px;
-          text-align: center;
-          color: #8a8578;
-        }
-        .bam-empty p {
-          margin: 12px 0 4px;
-          font-family: var(--font-display, system-ui);
-          font-size: 14px;
-          font-weight: 500;
-          color: #0a0a0a;
-        }
-        .bam-empty small {
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          line-height: 1.5;
-          color: #8a8578;
-          max-width: 280px;
-        }
-
-        /* ───── Loading ───── */
-        .bam-loading {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 16px;
-          padding: 80px 20px;
-          color: #8a8578;
-          font-family: var(--font-display, system-ui);
-          font-size: 13px;
-        }
-        .bam-spinner {
-          width: 24px;
-          height: 24px;
-          border: 2px solid #ebe7df;
-          border-top-color: var(--color-primary);
-          border-radius: 50%;
-          animation: bam-spin 700ms linear infinite;
-        }
         @keyframes bam-spin {
           to { transform: rotate(360deg); }
         }
-
-        /* ───── Footer summary ───── */
-        .bam-summary {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          font-variant-numeric: tabular-nums;
-        }
-        .bam-summary b {
-          font-weight: 600;
-          color: #0a0a0a;
-        }
-        .bam-dot {
-          color: #c9c4b4;
-        }
-        .bam-accent {
-          color: var(--color-primary);
-          font-weight: 500;
-        }
-
-        /* ───── Animations ───── */
-        @keyframes bam-fade-up {
-          from {
-            opacity: 0;
-            transform: translateY(6px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
+        @media (min-width: 680px) {
+          :global(.bam-review-grid) {
+            grid-template-columns: 1.2fr 1fr !important;
           }
         }
-
-        @media (prefers-reduced-motion: reduce) {
-          .bam-list li,
-          .bam-dept-list > li {
-            animation: none;
-          }
-          .bam-spinner {
-            animation-duration: 2s;
-          }
+        .bam-search-wrap:focus-within {
+          border-color: ${K.PRIMARY} !important;
+          box-shadow: 0 0 0 3px rgba(13, 150, 104, 0.15);
         }
       `}</style>
     </PremiumModal>
+  );
+}
+
+// ─── Reusable check box (Klinova emerald) ───
+function CheckBox({ selected, mixed, small }: { selected: boolean; mixed?: boolean; small?: boolean }) {
+  const size = small ? 16 : 20;
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: size,
+        height: size,
+        borderRadius: small ? 5 : 6,
+        border: `1.5px solid ${selected || mixed ? '#0d9668' : '#c9c4be'}`,
+        background: selected ? '#0d9668' : mixed ? 'rgba(13, 150, 104, 0.18)' : '#ffffff',
+        color: '#fff',
+        flexShrink: 0,
+        transition: 'background 160ms ease, border-color 160ms ease',
+      }}
+    >
+      {selected && <Check className={small ? 'h-2.5 w-2.5' : 'h-3 w-3'} strokeWidth={2.8} />}
+      {mixed && !selected && (
+        <span style={{ width: 8, height: 1.5, background: '#0d9668', borderRadius: 1 }} />
+      )}
+    </span>
   );
 }

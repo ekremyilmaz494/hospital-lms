@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-import { GradientTracing } from "@/components/ui/gradient-tracing"
 
 interface KlinovaMarkProps {
   width?: number
@@ -19,75 +18,123 @@ interface KlinovaMarkProps {
   glowStrength?: number
 }
 
-// Full "KLINOVA" geometric wordmark — each letter as stroked subpaths so the
-// gradient tracing sweeps the entire word in one pass (gradient userSpaceOnUse
-// covers the bbox; subpath M jumps don't break the visual trace).
-//
-// Layout on a 360×80 canvas, baseline y=12-72, letter cells ~46px wide + gaps:
-//   K @ 10-44 · L @ 56-86 · I @ 100-100 · N @ 114-150 · O @ 162-200 · V @ 212-244 · A @ 256-298
-const KLINOVA_PATH = [
-  // K
-  "M10,12 L10,72",
-  "M10,42 L44,12",
-  "M10,42 L44,72",
-  // L
-  "M56,12 L56,72 L86,72",
-  // I
-  "M100,12 L100,72",
-  // N
-  "M114,72 L114,12 L150,72 L150,12",
-  // O — octagonal stroke (closed-ish polyline)
-  "M170,12 L192,12 L200,22 L200,62 L192,72 L170,72 L162,62 L162,22 Z",
-  // V
-  "M212,12 L228,72 L244,12",
-  // A
-  "M256,72 L277,12 L298,72",
-  "M263,52 L291,52",
-].join(" ")
-
 export const KlinovaMark: React.FC<KlinovaMarkProps> = ({
   width = 360,
   height = 80,
   showLabel = false,
-  baseColor = "#c9a961",
-  gradientColors = ["#c9a96100", "#f59e0b", "#c9a96100"],
-  animationDuration = 2.6,
-  strokeWidth = 3.5,
-  labelColor = "#c9a961",
+  baseColor = "#ecfdf5",
+  gradientColors = ["#a7f3d000", "#6ee7b7", "#a7f3d000"],
+  animationDuration = 3.6,
+  labelColor = "#a7f3d0",
   className,
-  drawIn = true,
-  drawDuration = 1.8,
-  glow = true,
-  glowStrength = 2.2,
 }) => {
+  const fontSize = Math.round(height * 0.78)
+  const shineColor = gradientColors[1] ?? "#6ee7b7"
+  const id = React.useId().replace(/:/g, "")
+
   return (
-    <div className={className} style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
-      <GradientTracing
-        width={width}
-        height={height}
-        baseColor={baseColor}
-        gradientColors={gradientColors}
-        animationDuration={animationDuration}
-        strokeWidth={strokeWidth}
-        path={KLINOVA_PATH}
-        drawIn={drawIn}
-        drawDuration={drawDuration}
-        glow={glow}
-        glowStrength={glowStrength}
-      />
-      {showLabel && (
+    <div
+      className={className}
+      style={{
+        display: "inline-flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: 12,
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          display: "inline-flex",
+          alignItems: "baseline",
+        }}
+      >
         <span
+          aria-label="Klinova"
+          className={`klinova-wordmark-${id}`}
           style={{
-            fontFamily: "var(--font-jetbrains-mono), ui-monospace, monospace",
-            fontSize: 11,
-            letterSpacing: "0.34em",
-            color: labelColor,
-            paddingLeft: 2,
+            fontFamily: "var(--font-editorial), Georgia, 'Times New Roman', serif",
+            fontWeight: 400,
+            fontStyle: "italic",
+            fontSize,
+            letterSpacing: "-0.01em",
+            lineHeight: 1,
+            color: baseColor,
+            display: "inline-block",
+            position: "relative",
           }}
         >
-          KLINOVA
+          Klinova
         </span>
-      )}
+        {/* Premium serif accent — small dot after the wordmark */}
+        <span
+          style={{
+            display: "inline-block",
+            width: Math.max(5, Math.round(fontSize * 0.09)),
+            height: Math.max(5, Math.round(fontSize * 0.09)),
+            borderRadius: "9999px",
+            background: shineColor,
+            marginLeft: Math.round(fontSize * 0.08),
+            boxShadow: `0 0 12px ${shineColor}aa`,
+            transform: `translateY(-${Math.round(fontSize * 0.05)}px)`,
+          }}
+        />
+
+        <style>{`
+          .klinova-wordmark-${id} {
+            background-image: linear-gradient(
+              105deg,
+              ${baseColor} 0%,
+              ${baseColor} 40%,
+              ${shineColor} 47%,
+              #ffffff 50%,
+              ${shineColor} 53%,
+              ${baseColor} 60%,
+              ${baseColor} 100%
+            );
+            background-size: 300% 100%;
+            background-position: 150% 50%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            animation: klinova-shine-${id} ${animationDuration}s linear infinite;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.18);
+            filter: drop-shadow(0 0 18px ${shineColor}55);
+          }
+          @keyframes klinova-shine-${id} {
+            0%   { background-position: 150% 50%; }
+            70%  { background-position: -50% 50%; }
+            100% { background-position: -50% 50%; }
+          }
+        `}</style>
+      </div>
+
+      {/* Hairline rule with refined uppercase tag */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: 2 }}>
+        <span
+          style={{
+            display: "inline-block",
+            width: 36,
+            height: 1,
+            background: `linear-gradient(90deg, ${labelColor}cc, transparent)`,
+          }}
+        />
+        {showLabel && (
+          <span
+            style={{
+              fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
+              fontSize: 10,
+              fontWeight: 500,
+              letterSpacing: "0.42em",
+              color: labelColor,
+              textTransform: "uppercase",
+            }}
+          >
+            Hospital Suite
+          </span>
+        )}
+      </div>
     </div>
   )
 }

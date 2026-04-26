@@ -32,15 +32,15 @@ function Field({ label, hint, icon: Icon, children }: {
   return (
     <div className="group">
       <Label
-        className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide"
-        style={{ color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}
+        className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: 'var(--k-text-muted)' }}
       >
-        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
+        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--k-primary)' }} />
         {label}
       </Label>
       {children}
       {hint && (
-        <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--k-text-muted)' }}>
           {hint}
         </p>
       )}
@@ -55,8 +55,8 @@ interface Props {
   handleSave: () => void;
 }
 
-const inputClass = 'h-12 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--color-primary)]/20';
-const inputStyle = { background: 'var(--color-bg)', borderColor: 'var(--color-border)' };
+const inputClass = 'h-12 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--k-primary)]/20';
+const inputStyle = { background: 'var(--k-surface-hover)', borderColor: 'var(--k-border)' };
 
 export default function HospitalTab({ settings, setSettings }: Props) {
   return (
@@ -66,7 +66,7 @@ export default function HospitalTab({ settings, setSettings }: Props) {
           Kurum Bilgileri
         </h2>
 
-        <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-[13px] mt-1" style={{ color: 'var(--k-text-muted)' }}>
           Hastanenizin temel bilgilerini ve iletişim detaylarını yönetin.
         </p>
       </div>
@@ -83,17 +83,17 @@ export default function HospitalTab({ settings, setSettings }: Props) {
 
         <div
           className="rounded-xl p-5 space-y-5"
-          style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+          style={{ background: 'var(--k-surface-hover)', border: '1px solid var(--k-border)' }}
         >
           <div className="flex items-center gap-2 mb-1">
-            <Mail className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
-            <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+            <Mail className="h-3.5 w-3.5" style={{ color: 'var(--k-primary)' }} />
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>
               İletişim Bilgileri
             </span>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label className="text-[11px] font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>
+              <Label className="text-[11px] font-semibold mb-1.5 block" style={{ color: 'var(--k-text-secondary)' }}>
                 E-posta Adresi
               </Label>
               <Input
@@ -102,11 +102,11 @@ export default function HospitalTab({ settings, setSettings }: Props) {
                 onChange={(e) => setSettings({ email: e.target.value })}
                 placeholder="info@hastane.com"
                 className={inputClass}
-                style={{ ...inputStyle, background: 'var(--color-surface)' }}
+                style={{ ...inputStyle, background: 'var(--k-surface)' }}
               />
             </div>
             <div>
-              <Label className="text-[11px] font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>
+              <Label className="text-[11px] font-semibold mb-1.5 block" style={{ color: 'var(--k-text-secondary)' }}>
                 Telefon Numarası
               </Label>
               <Input
@@ -114,12 +114,12 @@ export default function HospitalTab({ settings, setSettings }: Props) {
                 onChange={(e) => setSettings({ phone: e.target.value })}
                 placeholder="+90 (___) ___ __ __"
                 className={inputClass}
-                style={{ ...inputStyle, background: 'var(--color-surface)' }}
+                style={{ ...inputStyle, background: 'var(--k-surface)' }}
               />
             </div>
           </div>
           <div>
-            <Label className="text-[11px] font-semibold mb-1.5 block" style={{ color: 'var(--color-text-secondary)' }}>
+            <Label className="text-[11px] font-semibold mb-1.5 block" style={{ color: 'var(--k-text-secondary)' }}>
               Adres
             </Label>
             <Textarea
@@ -128,7 +128,7 @@ export default function HospitalTab({ settings, setSettings }: Props) {
               placeholder="Hastane adresi..."
               rows={2}
               className="rounded-xl resize-none text-[13px]"
-              style={{ ...inputStyle, background: 'var(--color-surface)' }}
+              style={{ ...inputStyle, background: 'var(--k-surface)' }}
             />
           </div>
         </div>

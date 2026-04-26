@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
-import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
+import { AdminSidebar } from '@/components/layouts/admin/admin-sidebar';
+import { AdminTopbar } from '@/components/layouts/admin/admin-topbar';
 import { MobileSidebarDrawer } from '@/components/layouts/mobile-sidebar-drawer';
 import { MobileBottomNav, type MobileBottomNavItem } from '@/components/layouts/mobile-bottom-nav';
 import { adminNav } from '@/components/layouts/sidebar/sidebar-config';
@@ -112,17 +112,19 @@ export default function AdminLayout({
 
   const displayRole = roleLabels[user.role] ?? user.role;
 
+  const sidebarWidth = sidebarCollapsed ? 72 : 252;
+
   return (
     <TooltipProvider>
-      <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
+      <div className="min-h-screen" style={{ background: 'var(--k-bg, #fafaf9)' }}>
+
         {/* Sidebar: sadece md ve üzerinde göster */}
         <div className="hidden md:block">
-          <AppSidebar
+          <AdminSidebar
             navGroups={adminNav}
             collapsed={sidebarCollapsed}
-            onToggleCollapse={toggleSidebar}
-            orgName={branding?.orgName || user?.department || ''}
-            orgCode={branding?.orgCode || ''}
+            orgName={branding?.orgName || user?.department || 'Klinova LMS'}
+            orgCode={branding?.orgCode || 'Hastane Yönetici'}
             orgLogoUrl={branding?.orgLogoUrl ?? undefined}
             userName={fullName}
             userRole={displayRole}
@@ -144,19 +146,20 @@ export default function AdminLayout({
         />
 
         <main
-          className="min-h-screen"
-          style={{ marginLeft: isMobile ? 0 : 72 }}
+          className="min-h-screen flex flex-col"
+          style={{
+            paddingLeft: isMobile ? 0 : sidebarWidth,
+            transition: 'padding-left 320ms cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
         >
           <ImpersonationBanner />
-          <AppTopbar
-            title=""
-            orgName={branding?.orgName}
+          <AdminTopbar
             onToggleSidebar={toggleSidebar}
             userName={fullName}
             userRole={displayRole}
             userInitials={initials}
           />
-          <div className="p-4 pb-20 md:p-8 md:pb-8">{children}</div>
+          <div className="p-4 pb-20 md:p-8 md:pb-8 flex-1">{children}</div>
         </main>
         <MobileBottomNav
           items={adminBottomNavItems}

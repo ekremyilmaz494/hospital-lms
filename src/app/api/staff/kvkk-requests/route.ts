@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { getAuthUserStrict, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
@@ -23,7 +23,7 @@ const createRequestSchema = z.object({
 
 /** GET /api/staff/kvkk-requests — Kullanicinin KVKK taleplerini listele */
 export async function GET() {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   try {
@@ -50,7 +50,7 @@ export async function GET() {
 
 /** POST /api/staff/kvkk-requests — Yeni KVKK hak talebi olustur */
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   if (!dbUser!.organizationId) {

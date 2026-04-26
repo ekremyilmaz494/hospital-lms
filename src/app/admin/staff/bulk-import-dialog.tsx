@@ -6,6 +6,21 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton, type PremiumModalStep } from '@/components/shared/premium-modal';
 
+// ── Klinova palette ──
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2', ERROR_TEXT: '#b91c1c',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 type Stage = 'idle' | 'uploading' | 'preview' | 'importing' | 'done';
 
 interface ParsedRow {
@@ -273,8 +288,8 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         <PremiumModalFooter
           summary={
             <span>
-              <strong style={{ color: '#0a7a47' }}>{validCount.toString().padStart(2, '0')}</strong> geçerli
-              {errorCount > 0 && <> · <strong style={{ color: '#b3261e' }}>{errorCount.toString().padStart(2, '0')}</strong> hatalı</>}
+              <strong style={{ color: K.PRIMARY }}>{validCount.toString().padStart(2, '0')}</strong> geçerli
+              {errorCount > 0 && <> · <strong style={{ color: K.ERROR_TEXT }}>{errorCount.toString().padStart(2, '0')}</strong> hatalı</>}
             </span>
           }
           actions={
@@ -523,7 +538,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         @media (max-width: 768px) { .bid-idle { grid-template-columns: 1fr; } }
 
         .bid-drop {
-          border: 1.5px dashed #d9d4c4;
+          border: 1.5px dashed #c9c4be;
           border-radius: 14px;
           padding: 40px 28px;
           background: #ffffff;
@@ -535,30 +550,30 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           gap: 10px;
           transition: border-color 180ms ease, background 180ms ease, transform 220ms cubic-bezier(0.16,1,0.3,1);
         }
-        .bid-drop:hover { border-color: #0a0a0a; background: #faf8f2; transform: translateY(-1px); }
+        .bid-drop:hover { border-color: #0d9668; background: #fafaf9; transform: translateY(-1px); }
         .bid-drop-icon {
           width: 56px;
           height: 56px;
           border-radius: 999px;
-          background: #0a0a0a;
-          color: #fafaf7;
+          background: #0d9668;
+          color: #ffffff;
           display: flex;
           align-items: center;
           justify-content: center;
           margin-bottom: 6px;
+          box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04);
         }
         .bid-drop h4 {
-          font-family: var(--font-editorial, serif);
-          font-size: 22px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 42;
-          color: #0a0a0a;
-          letter-spacing: -0.01em;
+          font-family: var(--font-display, system-ui);
+          font-size: 18px;
+          font-weight: 700;
+          color: #1c1917;
+          letter-spacing: -0.005em;
           margin: 0;
         }
         .bid-drop p {
           font-size: 13px;
-          color: #6b6a63;
+          color: #78716c;
           max-width: 360px;
           line-height: 1.55;
           margin: 0;
@@ -570,48 +585,47 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           gap: 14px;
           padding: 22px;
           border-radius: 14px;
-          background: #faf8f2;
-          border: 1px solid #ebe7df;
+          background: #fafaf9;
+          border: 1.5px solid #c9c4be;
+          box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04);
         }
         .bid-template-icon {
           flex-shrink: 0;
           width: 32px;
           height: 32px;
           border-radius: 8px;
-          background: #ffffff;
-          color: #0a0a0a;
+          background: #d1fae5;
+          color: #0d9668;
           display: flex;
           align-items: center;
           justify-content: center;
-          border: 1px solid #ebe7df;
         }
         .bid-template-body { flex: 1; }
         .bid-template h5 {
-          font-family: var(--font-editorial, serif);
-          font-size: 16px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 32;
-          color: #0a0a0a;
+          font-family: var(--font-display, system-ui);
+          font-size: 14px;
+          font-weight: 700;
+          color: #1c1917;
           margin: 0 0 6px;
         }
-        .bid-template p { font-size: 12px; color: #6b6a63; line-height: 1.55; margin: 0 0 12px; }
-        .bid-template em { font-style: italic; color: #0a0a0a; font-family: var(--font-editorial, serif); }
+        .bid-template p { font-size: 12px; color: #78716c; line-height: 1.55; margin: 0 0 12px; }
+        .bid-template em { font-style: normal; color: #1c1917; font-weight: 600; }
         .bid-template-btn {
           display: inline-flex;
           align-items: center;
           gap: 6px;
           padding: 7px 12px;
-          border-radius: 999px;
-          border: 1px solid #d9d4c4;
+          border-radius: 8px;
+          border: 1.5px solid #c9c4be;
           background: #ffffff;
           font-size: 12px;
           font-weight: 600;
-          color: #0a0a0a;
+          color: #44403c;
           cursor: pointer;
           font-family: var(--font-display, system-ui);
-          transition: border-color 160ms ease, background 160ms ease;
+          transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
         }
-        .bid-template-btn:hover { border-color: #0a0a0a; background: #faf8f2; }
+        .bid-template-btn:hover { border-color: #0d9668; color: #0d9668; background: #ffffff; }
 
         /* ── Status panels (uploading / importing) ── */
         .bid-status {
@@ -625,21 +639,20 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         :global(.bid-spin) {
           width: 36px;
           height: 36px;
-          color: #0a0a0a;
+          color: #0d9668;
           animation: bid-rot 900ms linear infinite;
         }
         @keyframes bid-rot { to { transform: rotate(360deg); } }
         .bid-status h4 {
-          font-family: var(--font-editorial, serif);
-          font-size: 22px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 42;
-          color: #0a0a0a;
+          font-family: var(--font-display, system-ui);
+          font-size: 18px;
+          font-weight: 700;
+          color: #1c1917;
           margin: 0;
         }
         .bid-status p {
           font-size: 13px;
-          color: #6b6a63;
+          color: #78716c;
           max-width: 420px;
           line-height: 1.55;
           margin: 0;
@@ -660,20 +673,21 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           gap: 10px;
           padding: 12px 14px;
           border-radius: 10px;
-          background: #fef6e7;
-          border: 1px solid #e9c977;
-          color: #6a4e11;
+          background: #fef3c7;
+          border: 1px solid #fcd34d;
+          color: #92400e;
           font-size: 12px;
           line-height: 1.5;
         }
-        .bid-warn :global(svg) { flex-shrink: 0; margin-top: 2px; color: #b4820b; }
-        .bid-warn strong { color: #4a3608; }
+        .bid-warn :global(svg) { flex-shrink: 0; margin-top: 2px; color: #f59e0b; }
+        .bid-warn strong { color: #78350f; }
 
         .bid-table-wrap {
-          border: 1px solid #ebe7df;
-          border-radius: 12px;
+          border: 1.5px solid #c9c4be;
+          border-radius: 14px;
           overflow: hidden;
           background: #ffffff;
+          box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04);
         }
         .bid-table-scroll {
           overflow: auto;
@@ -683,25 +697,25 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         .bid-table thead th {
           position: sticky;
           top: 0;
-          background: #faf8f2;
+          background: #fafaf9;
           padding: 10px 10px;
           text-align: left;
           font-family: var(--font-display, system-ui);
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 600;
           letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: #6b6a63;
-          border-bottom: 1px solid #ebe7df;
+          color: #78716c;
+          border-bottom: 1px solid #e7e5e4;
           white-space: nowrap;
         }
-        .bid-table tbody tr { border-top: 1px solid #f1ede3; }
-        .bid-table tbody tr.bid-row-err { background: #fdf5f2; }
+        .bid-table tbody tr { border-top: 1px solid #e7e5e4; }
+        .bid-table tbody tr.bid-row-err { background: #fee2e2; }
         .bid-table td { padding: 4px 6px; vertical-align: middle; }
         .bid-rowidx {
           font-family: var(--font-mono, monospace);
           font-size: 10px;
-          color: #8a8578;
+          color: #78716c;
           padding-left: 10px;
           font-variant-numeric: tabular-nums;
         }
@@ -709,16 +723,16 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         .bid-sel {
           width: 100%;
           height: 32px;
-          border-radius: 6px;
-          border: 1px solid #ebe7df;
+          border-radius: 8px;
+          border: 1.5px solid #e7e5e4;
           background: #ffffff;
           padding: 0 6px;
           font-size: 12px;
-          color: #0a0a0a;
+          color: #1c1917;
           font-family: inherit;
         }
-        .bid-sel:focus { outline: 2px solid #0a0a0a; outline-offset: 1px; border-color: #0a0a0a; }
-        .bid-sel-err { border-color: #b3261e; background: #fdf5f2; }
+        .bid-sel:focus { outline: 2px solid #0d9668; outline-offset: 1px; border-color: #0d9668; }
+        .bid-sel-err { border-color: #ef4444; background: #fee2e2; }
 
         .bid-status-ok, .bid-status-err {
           display: inline-flex;
@@ -731,8 +745,8 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .bid-status-ok { color: #0a7a47; }
-        .bid-status-err { color: #b3261e; }
+        .bid-status-ok { color: #0d9668; }
+        .bid-status-err { color: #b91c1c; }
         .bid-status-ok :global(svg), .bid-status-err :global(svg) { flex-shrink: 0; }
 
         .bid-skip {
@@ -741,16 +755,16 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           gap: 10px;
           padding: 12px 14px;
           border-radius: 10px;
-          background: #faf8f2;
-          border: 1px solid #ebe7df;
+          background: #fafaf9;
+          border: 1.5px solid #e7e5e4;
           font-size: 13px;
-          color: #0a0a0a;
+          color: #1c1917;
           cursor: pointer;
         }
         .bid-skip input[type="checkbox"] {
           width: 16px;
           height: 16px;
-          accent-color: #0a0a0a;
+          accent-color: #0d9668;
         }
 
         /* ── Done stage ── */
@@ -767,53 +781,53 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           width: 60px;
           height: 60px;
           border-radius: 999px;
-          background: #0a7a47;
-          color: #fafaf7;
+          background: #0d9668;
+          color: #ffffff;
           display: flex;
           align-items: center;
           justify-content: center;
+          box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04);
         }
         .bid-done h3 {
-          font-family: var(--font-editorial, serif);
-          font-size: 26px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 48, 'SOFT' 50;
-          color: #0a0a0a;
+          font-family: var(--font-display, system-ui);
+          font-size: 22px;
+          font-weight: 700;
+          color: #1c1917;
           margin: 0;
-          letter-spacing: -0.015em;
+          letter-spacing: -0.01em;
         }
         .bid-done h3 em {
-          font-style: italic;
-          color: #0a7a47;
+          font-style: normal;
+          color: #0d9668;
           font-variant-numeric: tabular-nums;
         }
-        .bid-done-failed { font-style: normal; color: #b3261e; font-size: 18px; font-weight: 400; }
-        .bid-done p { font-size: 13px; color: #6b6a63; margin: 0; }
+        .bid-done-failed { font-style: normal; color: #b91c1c; font-size: 16px; font-weight: 600; }
+        .bid-done p { font-size: 13px; color: #78716c; margin: 0; }
 
         .bid-err-card {
           display: flex;
           gap: 14px;
           padding: 18px;
-          border-radius: 12px;
-          background: #fdf5f2;
-          border: 1px solid #e9c9c0;
+          border-radius: 14px;
+          background: #fee2e2;
+          border: 1.5px solid #fecaca;
         }
-        .bid-err-card :global(svg) { flex-shrink: 0; color: #b3261e; margin-top: 2px; }
+        .bid-err-card :global(svg) { flex-shrink: 0; color: #b91c1c; margin-top: 2px; }
         .bid-err-card h5 {
-          font-family: var(--font-editorial, serif);
-          font-size: 16px;
-          font-weight: 500;
-          color: #7a1d14;
+          font-family: var(--font-display, system-ui);
+          font-size: 14px;
+          font-weight: 700;
+          color: #b91c1c;
           margin: 0 0 4px;
         }
-        .bid-err-card p { font-size: 12px; color: #6b6a63; margin: 0 0 10px; line-height: 1.5; }
+        .bid-err-card p { font-size: 12px; color: #44403c; margin: 0 0 10px; line-height: 1.5; }
         .bid-err-btn {
           display: inline-flex;
           align-items: center;
           gap: 6px;
           padding: 7px 12px;
-          border-radius: 999px;
-          background: #b3261e;
+          border-radius: 8px;
+          background: #ef4444;
           color: #fff;
           border: none;
           font-size: 12px;
@@ -822,7 +836,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           font-family: var(--font-display, system-ui);
           transition: background 160ms ease;
         }
-        .bid-err-btn:hover { background: #8f1e17; }
+        .bid-err-btn:hover { background: #b91c1c; }
       `}</style>
     </PremiumModal>
   );
@@ -834,14 +848,14 @@ function CellInput({ value, onChange }: { value: string; onChange: (v: string) =
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="h-8 text-xs px-2"
-      style={{ background: '#ffffff', borderColor: '#ebe7df' }}
+      style={{ background: K.SURFACE, borderColor: K.BORDER_LIGHT }}
     />
   );
 }
 
 function StatTile({ label, value, tone, icon }: { label: string; value: number; tone: 'neutral' | 'ok' | 'err'; icon?: React.ReactNode }) {
-  const color = tone === 'ok' ? '#0a7a47' : tone === 'err' ? '#b3261e' : '#0a0a0a';
-  const bg = tone === 'ok' ? '#eaf6ef' : tone === 'err' ? '#fdf5f2' : '#faf8f2';
+  const color = tone === 'ok' ? K.PRIMARY : tone === 'err' ? K.ERROR_TEXT : K.TEXT_PRIMARY;
+  const bg = tone === 'ok' ? K.PRIMARY_LIGHT : tone === 'err' ? K.ERROR_BG : K.BG;
   return (
     <div className="st-tile">
       <div className="st-head">
@@ -852,28 +866,27 @@ function StatTile({ label, value, tone, icon }: { label: string; value: number; 
       <style jsx>{`
         .st-tile {
           padding: 14px 16px;
-          border-radius: 12px;
+          border-radius: 14px;
           background: ${bg};
-          border: 1px solid #ebe7df;
+          border: 1.5px solid ${K.BORDER_LIGHT};
         }
         .st-head {
           display: flex;
           align-items: center;
           gap: 6px;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
+          font-family: ${K.FONT_DISPLAY};
+          font-size: 11px;
           font-weight: 600;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: #6b6a63;
+          color: ${K.TEXT_MUTED};
           margin-bottom: 6px;
         }
         .st-head :global(svg) { color: ${color}; }
         .st-value {
-          font-family: var(--font-editorial, serif);
+          font-family: ${K.FONT_DISPLAY};
           font-size: 28px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 48, 'SOFT' 50;
+          font-weight: 700;
           color: ${color};
           line-height: 1;
           letter-spacing: -0.02em;

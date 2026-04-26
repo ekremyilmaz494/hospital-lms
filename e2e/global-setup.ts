@@ -33,12 +33,17 @@ const CREDENTIALS = {
 }
 
 const STATE_DIR = path.join(process.cwd(), '.playwright')
+const LOGIN_FORM_SELECTOR = '[data-testid="login-form"][data-hydrated="true"]'
+const LOGIN_SUBMIT_SELECTOR = '[data-testid="login-submit"]'
+const KVKK_ACCEPT_BUTTON = /KABUL ED|Kabul Ed/
 
 async function loginAndSave(
   role: keyof typeof CREDENTIALS,
   baseURL: string,
 ) {
   const { email, password, dashboard } = CREDENTIALS[role]
+  const stateFile = path.join(STATE_DIR, `${role}.json`)
+  fs.rmSync(stateFile, { force: true })
 
   // Credentials yoksa skip et (local geliştirme ortamında env set edilmemiş olabilir)
   if (!email || !password) {
@@ -59,7 +64,7 @@ async function loginAndSave(
 
   try {
     await page.goto(`${baseURL}/auth/login`, { waitUntil: 'domcontentloaded' })
-    await page.waitForSelector('[type="email"]', { timeout: 30000 })
+    await page.waitForSelector(LOGIN_FORM_SELECTOR, { timeout: 30000 })
 
     await page.fill('[type="email"]', email)
     await page.fill('[type="password"]', password)
@@ -67,24 +72,35 @@ async function loginAndSave(
     // KVKK checkbox login form'undan kaldırıldı (Nisan 2026). Submit zımni kabul.
 
     // ShimmerButton dynamic import → text-based selector (placeholder text'siz)
-    const submitBtn = page.getByRole('button', { name: /Giriş Yap/i })
+    const submitBtn = page.locator(LOGIN_SUBMIT_SELECTOR)
     await submitBtn.waitFor({ state: 'visible', timeout: 15000 })
-    await submitBtn.click()
+    const [loginResp] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/auth/login') && r.request().method() === 'POST', { timeout: 30000 }),
+      submitBtn.click(),
+    ])
+    if (!loginResp.ok()) {
+      throw new Error(`login HTTP ${loginResp.status()}`)
+    }
 
-    // KVKK Notice Modal: önce checkbox (accepted=true), sonra "Kabul Ediyorum" butonu enable
+    // KVKK Notice Modal: once checkbox (accepted=true), sonra accept butonu enable olur.
+    const kvkkCheck = page.locator('button[role="checkbox"][aria-checked]')
     try {
-      const kvkkCheck = page.locator('button[role="checkbox"][aria-checked]')
       await kvkkCheck.waitFor({ state: 'visible', timeout: 8000 })
       await kvkkCheck.click()
-      const acceptBtn = page.getByRole('button', { name: /Kabul Ediyorum/i })
-      await acceptBtn.waitFor({ state: 'visible', timeout: 3000 })
-      await acceptBtn.click()
-    } catch { /* modal yok */ }
+      const acceptBtn = page.getByRole('button', { name: KVKK_ACCEPT_BUTTON })
+      await acceptBtn.waitFor({ state: 'visible', timeout: 5000 })
+      const [ackResp] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes('/api/auth/kvkk-acknowledge') && r.request().method() === 'POST', { timeout: 30000 }),
+        acceptBtn.click(),
+      ])
+      if (!ackResp.ok()) throw new Error(`kvkk HTTP ${ackResp.status()}`)
+    } catch (err) {
+      if (await kvkkCheck.isVisible().catch(() => false)) throw err
+    }
 
-    await page.waitForURL(`**${dashboard}`, { timeout: 30000 })
+    await page.waitForURL(`**${dashboard}`, { timeout: 60000 })
 
     // Session'ı kaydet
-    const stateFile = path.join(STATE_DIR, `${role}.json`)
     await context.storageState({ path: stateFile })
     console.log(`[global-setup] ${role}: login tamam → ${stateFile}`)
   } catch (err) {

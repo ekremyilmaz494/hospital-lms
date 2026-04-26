@@ -8,6 +8,9 @@ import {
   createAuditLog,
 } from '@/lib/api-helpers'
 
+// Vercel Pro max: 300s. Large Excel parse + bulk insert için default 60s yetersiz.
+export const maxDuration = 300
+
 const CORRECT_MAP: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 }
 const VALID_DIFFICULTIES = ['easy', 'medium', 'hard']
 
@@ -15,7 +18,7 @@ export async function POST(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const formData = await request.formData()

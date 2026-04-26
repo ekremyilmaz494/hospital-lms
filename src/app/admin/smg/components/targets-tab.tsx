@@ -7,6 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/shared/toast';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9', BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 interface Period {
   id: string;
   name: string;
@@ -49,7 +62,6 @@ export function TargetsTab({ periods }: Props) {
   const { data, refetch } = useFetch<TargetsData>(url);
   const targets = data?.targets ?? [];
 
-  // Unvan → target map
   const byUnvan = new Map<string, Target>();
   let defaultTarget: Target | null = null;
   const userTargets: Target[] = [];
@@ -61,7 +73,6 @@ export function TargetsTab({ periods }: Props) {
 
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
-  // Kişisel override formu
   const [userSearch, setUserSearch] = useState('');
   const [searchResults, setSearchResults] = useState<Array<{ id: string; firstName: string; lastName: string; title: string | null }>>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -157,7 +168,7 @@ export function TargetsTab({ periods }: Props) {
 
   if (periods.length === 0) {
     return (
-      <div className="p-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
+      <div className="p-8 text-center text-sm" style={{ color: K.TEXT_MUTED }}>
         Henüz SMG dönemi yok. Hedef tanımlamak için önce bir dönem oluşturun.
       </div>
     );
@@ -166,12 +177,12 @@ export function TargetsTab({ periods }: Props) {
   return (
     <div className="p-4 space-y-6">
       <div className="flex items-center gap-3">
-        <label className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Dönem:</label>
+        <label className="text-xs font-semibold" style={{ color: K.TEXT_SECONDARY }}>Dönem:</label>
         <select
           value={periodId}
           onChange={e => setPeriodId(e.target.value)}
-          className="text-sm rounded-xl px-3 py-1.5 border outline-none"
-          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)' }}
+          className="text-sm rounded-xl px-3 py-1.5 outline-none"
+          style={{ border: `1.5px solid ${K.BORDER}`, background: K.SURFACE, color: K.TEXT_PRIMARY }}
         >
           {periods.map(p => (
             <option key={p.id} value={p.id}>{p.name}</option>
@@ -181,14 +192,19 @@ export function TargetsTab({ periods }: Props) {
 
       {/* Unvana göre hedefler */}
       <div>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>Unvana Göre Hedefler</h3>
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+        <h3 className="font-bold mb-3" style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY, fontSize: 18 }}>
+          Unvana Göre Hedefler
+        </h3>
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{ border: `1.5px solid ${K.BORDER}`, background: K.SURFACE, boxShadow: K.SHADOW_CARD }}
+        >
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>
-                <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Unvan</th>
-                <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Hedef Puan</th>
-                <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>İşlem</th>
+              <tr style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}`, background: K.BG }}>
+                <th className="text-left px-4 py-3 font-semibold uppercase tracking-wide" style={{ color: K.TEXT_MUTED, fontSize: 11 }}>Unvan</th>
+                <th className="text-left px-4 py-3 font-semibold uppercase tracking-wide" style={{ color: K.TEXT_MUTED, fontSize: 11 }}>Hedef Puan</th>
+                <th className="text-left px-4 py-3 font-semibold uppercase tracking-wide" style={{ color: K.TEXT_MUTED, fontSize: 11 }}>İşlem</th>
               </tr>
             </thead>
             <tbody>
@@ -217,11 +233,16 @@ export function TargetsTab({ periods }: Props) {
 
       {/* Bireysel override */}
       <div>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text)' }}>Bireysel Hedef Override</h3>
-        <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'var(--color-border)' }}>
+        <h3 className="font-bold mb-3" style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY, fontSize: 18 }}>
+          Bireysel Hedef Override
+        </h3>
+        <div
+          className="rounded-2xl p-4 space-y-3"
+          style={{ border: `1.5px solid ${K.BORDER}`, background: K.SURFACE, boxShadow: K.SHADOW_CARD }}
+        >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="md:col-span-2 relative">
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Personel Ara</label>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Personel Ara</label>
               <Input
                 value={userSearch}
                 onChange={e => handleUserSearch(e.target.value)}
@@ -229,7 +250,10 @@ export function TargetsTab({ periods }: Props) {
                 className="rounded-xl"
               />
               {searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border shadow-lg z-10 max-h-48 overflow-y-auto" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
+                <div
+                  className="absolute top-full left-0 right-0 mt-1 rounded-xl z-10 max-h-48 overflow-y-auto"
+                  style={{ border: `1.5px solid ${K.BORDER}`, background: K.SURFACE, boxShadow: K.SHADOW_CARD }}
+                >
                   {searchResults.map(u => (
                     <button
                       key={u.id}
@@ -240,36 +264,49 @@ export function TargetsTab({ periods }: Props) {
                         setSearchResults([]);
                       }}
                       className="block w-full text-left px-3 py-2 text-sm hover:opacity-80"
-                      style={{ color: 'var(--color-text)' }}
+                      style={{ color: K.TEXT_PRIMARY }}
                     >
-                      {u.firstName} {u.lastName}{u.title && <span className="text-xs ml-2" style={{ color: 'var(--color-text-muted)' }}>{u.title}</span>}
+                      {u.firstName} {u.lastName}{u.title && <span className="text-xs ml-2" style={{ color: K.TEXT_MUTED }}>{u.title}</span>}
                     </button>
                   ))}
                 </div>
               )}
             </div>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--color-text-secondary)' }}>Hedef Puan</label>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: K.TEXT_SECONDARY }}>Hedef Puan</label>
               <div className="flex gap-2">
                 <Input type="number" min={1} value={userPoints} onChange={e => setUserPoints(e.target.value)} className="rounded-xl" />
-                <Button onClick={addUserTarget} className="gap-1 rounded-xl"><Plus className="h-4 w-4" /></Button>
+                <Button
+                  onClick={addUserTarget}
+                  className="gap-1 rounded-xl"
+                  style={{ background: K.PRIMARY, color: '#ffffff' }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           </div>
 
           {userTargets.length > 0 && (
-            <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ border: `1px solid ${K.BORDER_LIGHT}`, background: K.SURFACE }}
+            >
               <table className="w-full text-sm">
                 <tbody>
                   {userTargets.map(t => (
-                    <tr key={t.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td className="px-4 py-2 font-medium" style={{ color: 'var(--color-text)' }}>
+                    <tr key={t.id} style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+                      <td className="px-4 py-2 font-medium" style={{ color: K.TEXT_PRIMARY }}>
                         {t.user ? `${t.user.firstName} ${t.user.lastName}` : 'Silinmiş kullanıcı'}
-                        {t.user?.title && <span className="text-xs ml-2" style={{ color: 'var(--color-text-muted)' }}>{t.user.title}</span>}
+                        {t.user?.title && <span className="text-xs ml-2" style={{ color: K.TEXT_MUTED }}>{t.user.title}</span>}
                       </td>
-                      <td className="px-4 py-2 font-semibold" style={{ color: 'var(--color-primary)' }}>{t.requiredPoints} puan</td>
+                      <td className="px-4 py-2 font-semibold" style={{ color: K.PRIMARY }}>{t.requiredPoints} puan</td>
                       <td className="px-4 py-2">
-                        <button onClick={() => deleteTarget(t.id)} className="p-1.5 rounded-lg" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>
+                        <button
+                          onClick={() => deleteTarget(t.id)}
+                          className="p-1.5 rounded-lg"
+                          style={{ background: K.ERROR_BG, color: K.ERROR }}
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </td>
@@ -303,11 +340,11 @@ function TargetRow({
   const [value, setValue] = useState((existing?.requiredPoints ?? '').toString());
 
   return (
-    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-      <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>
+    <tr style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+      <td className="px-4 py-3 font-medium" style={{ color: K.TEXT_PRIMARY }}>
         {label}
         {!existing && fallback !== undefined && (
-          <span className="text-xs ml-2" style={{ color: 'var(--color-text-muted)' }}>(dönem: {fallback})</span>
+          <span className="text-xs ml-2" style={{ color: K.TEXT_MUTED }}>(dönem: {fallback})</span>
         )}
       </td>
       <td className="px-4 py-3">
@@ -325,13 +362,17 @@ function TargetRow({
       </td>
       <td className="px-4 py-3">
         {busy ? (
-          <Loader2 className="h-4 w-4 animate-spin" style={{ color: 'var(--color-text-muted)' }} />
+          <Loader2 className="h-4 w-4 animate-spin" style={{ color: K.TEXT_MUTED }} />
         ) : existing && onDelete ? (
-          <button onClick={onDelete} className="p-1.5 rounded-lg" style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}>
+          <button
+            onClick={onDelete}
+            className="p-1.5 rounded-lg"
+            style={{ background: K.ERROR_BG, color: K.ERROR }}
+          >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         ) : (
-          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Yeni</span>
+          <span className="text-xs" style={{ color: K.TEXT_MUTED }}>Yeni</span>
         )}
       </td>
     </tr>

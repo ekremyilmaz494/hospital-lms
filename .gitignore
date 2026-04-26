@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /.next.nosync/
+/.next-build-*/
 /out/
 
 # next-pwa / Serwist build artifacts (her build'de hash değişir)
@@ -73,6 +74,18 @@ ai-content-service/auth_store/*.enc
 ai-content-service/temp/
 ai-content-service/.env
 ai-content-service/_auth_b64.txt
+ai-content-service/__pycache__/
+ai-content-service/**/__pycache__/
+ai-content-service/**/*.pyc
+
+# Workspace packages — node_modules ignored, source committed
+/packages/**/node_modules/
+/packages/**/dist/
+
+# Workspace artifacts
+*.zip
+"Klinova — Admin Paneli (Print).html"
+/scripts/_login-shot 2.mjs
 
 # Claude Code hook logs
 .claude/command-log.txt

@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
-import { GraduationCap, Plus, MoreHorizontal, Eye, Edit, Trash2, Calendar, Users, X, Layers } from 'lucide-react';
+import { GraduationCap, Plus, MoreHorizontal, Eye, Edit, Trash2, Calendar, Users, X, Layers, ChevronRight, BookOpen, CheckCircle2, FileEdit, Archive } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { PageHeader } from '@/components/shared/page-header';
 import { DataTable } from '@/components/shared/data-table';
 import { BulkAssignModal } from '@/components/shared/bulk-assign-modal';
+import { KStatCard } from '@/components/admin/k-stat-card';
 import Link from 'next/link';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -20,7 +20,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 
 interface Training {
   id: string;
@@ -37,20 +36,20 @@ interface Training {
   createdBy: string;
 }
 
-const publishStatusConfig: Record<string, { label: string; bg: string; text: string }> = {
-  published: { label: 'Yayında', bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
-  draft: { label: 'Taslak', bg: 'var(--color-warning-bg)', text: 'var(--color-warning)' },
-  archived: { label: 'Arşivlendi', bg: 'var(--color-info-bg)', text: 'var(--color-info)' },
+const publishStatusConfig: Record<string, { label: string; badgeClass: string; color: string }> = {
+  published: { label: 'Yayında', badgeClass: 'k-badge k-badge-success', color: 'var(--k-success)' },
+  draft: { label: 'Taslak', badgeClass: 'k-badge k-badge-warning', color: 'var(--k-warning)' },
+  archived: { label: 'Arşivlendi', badgeClass: 'k-badge k-badge-info', color: 'var(--k-info)' },
 };
 
 
 const categoryColors: Record<string, string> = {
-  'Enfeksiyon': 'var(--color-error)',
-  'İş Güvenliği': 'var(--color-accent)',
-  'Hasta Hakları': 'var(--color-info)',
-  'Radyoloji': 'var(--color-primary)',
-  'Laboratuvar': 'var(--color-success)',
-  'Eczane': 'var(--color-warning)',
+  'Enfeksiyon': 'var(--k-error)',
+  'İş Güvenliği': 'var(--k-warning)',
+  'Hasta Hakları': 'var(--k-info)',
+  'Radyoloji': 'var(--k-primary)',
+  'Laboratuvar': 'var(--k-success)',
+  'Eczane': 'var(--k-warning)',
 };
 
 const allCategories = Object.keys(categoryColors);
@@ -59,10 +58,13 @@ export default function TrainingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { data, isLoading, error, refetch } = useFetch<{ trainings: Training[]; total: number }>('/api/admin/trainings');
-  const { data: staffData } = useFetch<{ staff: { id: string; name: string; department: string }[] }>('/api/admin/staff?limit=500');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
+  // Lazy: sadece BulkAssignModal açılınca 500 personeli çek (TTFB'yi düşürür)
+  const { data: staffData } = useFetch<{ staff: { id: string; name: string; department: string }[] }>(
+    showBulkAssign ? '/api/admin/staff?limit=500' : null,
+  );
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Training | null>(null);
   const [forceTarget, setForceTarget] = useState<{ training: Training; activeAttemptCount: number } | null>(null);
@@ -72,7 +74,7 @@ export default function TrainingsPage() {
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--k-error)'}}>{error}</div></div>;
   }
 
   const allTrainings = data?.trainings ?? [];
@@ -140,27 +142,27 @@ export default function TrainingsPage() {
         <Link href={`/admin/trainings/${row.original.id}`} className="flex items-center gap-3 group min-w-0">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-            style={{ background: `${categoryColors[row.original.category] || 'var(--color-primary)'}20` }}
+            style={{ background: `color-mix(in srgb, ${categoryColors[row.original.category] || 'var(--k-primary)'} 14%, transparent)` }}
           >
-            <GraduationCap className="h-5 w-5" style={{ color: categoryColors[row.original.category] || 'var(--color-primary)' }} />
+            <GraduationCap className="h-5 w-5" style={{ color: categoryColors[row.original.category] || 'var(--k-primary)' }} />
           </div>
           <div className="min-w-0">
             <p
               className="font-semibold truncate"
-              style={{ color: 'var(--color-text-primary)', transition: 'color var(--transition-fast)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+              style={{ color: 'var(--k-text-primary)', transition: 'color 160ms ease' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--k-primary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--k-text-primary)'; }}
             >
               {row.getValue('title')}
             </p>
             <div className="flex items-center gap-2 mt-0.5">
               <span
                 className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold"
-                style={{ background: `${categoryColors[row.original.category] || 'var(--color-primary)'}15`, color: categoryColors[row.original.category] || 'var(--color-primary)' }}
+                style={{ background: `color-mix(in srgb, ${categoryColors[row.original.category] || 'var(--k-primary)'} 12%, transparent)`, color: categoryColors[row.original.category] || 'var(--k-primary)' }}
               >
                 {row.original.category}
               </span>
-              <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="text-[11px]" style={{ color: 'var(--k-text-muted)' }}>
                 {row.original.createdBy}
               </span>
             </div>
@@ -174,8 +176,8 @@ export default function TrainingsPage() {
       size: 80,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-          <span className="font-medium" style={{ fontFamily: 'var(--font-mono)' }}>{row.getValue('assignedCount')}</span>
+          <Users className="h-3.5 w-3.5" style={{ color: 'var(--k-text-muted)' }} />
+          <span className="font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--k-text-primary)' }}>{row.getValue('assignedCount')}</span>
         </div>
       ),
     },
@@ -184,7 +186,7 @@ export default function TrainingsPage() {
       header: 'Tamamlayan',
       size: 100,
       cell: ({ row }) => (
-        <span className="font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-primary)' }}>
+        <span className="font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--k-primary)' }}>
           {row.original.completedCount}/{row.original.assignedCount}
         </span>
       ),
@@ -195,11 +197,11 @@ export default function TrainingsPage() {
       size: 140,
       cell: ({ row }) => {
         const rate = row.getValue('completionRate') as number;
-        const color = rate >= 80 ? 'var(--color-success)' : rate >= 50 ? 'var(--color-warning)' : 'var(--color-error)';
+        const color = rate >= 80 ? 'var(--k-success)' : rate >= 50 ? 'var(--k-warning)' : 'var(--k-error)';
         return (
           <div className="flex items-center gap-2.5">
-            <div className="h-2 w-20 rounded-full" style={{ background: 'var(--color-border)' }}>
-              <div className="h-full rounded-full" style={{ width: `${rate}%`, background: color, transition: 'width var(--transition-base)' }} />
+            <div className="h-2 w-20 rounded-full" style={{ background: 'var(--k-border)' }}>
+              <div className="h-full rounded-full" style={{ width: `${rate}%`, background: color, transition: 'width 240ms ease' }} />
             </div>
             <span className="text-xs font-bold" style={{ fontFamily: 'var(--font-mono)', color }}>{rate}%</span>
           </div>
@@ -214,8 +216,7 @@ export default function TrainingsPage() {
         const ps = (row.original.publishStatus ?? 'published') as string;
         const cfg = publishStatusConfig[ps] || publishStatusConfig.published;
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold" style={{ background: cfg.bg, color: cfg.text }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: cfg.text }} />
+          <span className={cfg.badgeClass}>
             {cfg.label}
           </span>
         );
@@ -227,8 +228,8 @@ export default function TrainingsPage() {
       size: 110,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
-          <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-secondary)' }}>{new Date(row.getValue('endDate') as string).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+          <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--k-text-muted)' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--k-text-secondary)' }}>{new Date(row.getValue('endDate') as string).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
         </div>
       ),
     },
@@ -250,17 +251,17 @@ export default function TrainingsPage() {
             </DropdownMenuItem>
             {row.original.publishStatus !== 'published' && (
               <DropdownMenuItem className="gap-2" onClick={() => handlePublishStatus(row.original, 'published')}>
-                <Eye className="h-4 w-4" style={{ color: 'var(--color-success)' }} /> Yayınla
+                <Eye className="h-4 w-4" style={{ color: 'var(--k-success)' }} /> Yayınla
               </DropdownMenuItem>
             )}
             {row.original.publishStatus !== 'draft' && (
               <DropdownMenuItem className="gap-2" onClick={() => handlePublishStatus(row.original, 'draft')}>
-                <Edit className="h-4 w-4" style={{ color: 'var(--color-warning)' }} /> Taslağa Al
+                <Edit className="h-4 w-4" style={{ color: 'var(--k-warning)' }} /> Taslağa Al
               </DropdownMenuItem>
             )}
             {row.original.publishStatus !== 'archived' && (
               <DropdownMenuItem className="gap-2" onClick={() => handlePublishStatus(row.original, 'archived')}>
-                <X className="h-4 w-4" style={{ color: 'var(--color-info)' }} /> Arşivle
+                <X className="h-4 w-4" style={{ color: 'var(--k-info)' }} /> Arşivle
               </DropdownMenuItem>
             )}
             <DropdownMenuItem className="gap-2 text-red-500" disabled={deletingId === row.original.id} onClick={() => setDeleteTarget(row.original)}>
@@ -273,13 +274,28 @@ export default function TrainingsPage() {
   ];
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Eğitim Yönetimi"
-        subtitle={`${filteredTrainings.length} eğitim listeleniyor`}
-        action={{ label: 'Yeni Eğitim', icon: Plus, onClick: () => router.push('/admin/trainings/new') }}
-        secondaryAction={{ label: 'Toplu Eğitim Ata', icon: Layers, onClick: () => setShowBulkAssign(true) }}
-      />
+    <div className="k-page">
+      <header className="k-page-header">
+        <div>
+          <div className="k-breadcrumb">
+            <span>Panel</span>
+            <ChevronRight size={12} />
+            <span data-current="true">Eğitimler</span>
+          </div>
+          <h1 className="k-page-title">Eğitim Yönetimi</h1>
+          <p className="k-page-subtitle">
+            <strong style={{ color: 'var(--k-text-primary)' }}>{filteredTrainings.length}</strong> eğitim listeleniyor
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowBulkAssign(true)} className="k-btn k-btn-ghost">
+            <Layers size={15} /> Toplu Eğitim Ata
+          </button>
+          <button onClick={() => router.push('/admin/trainings/new')} className="k-btn k-btn-primary">
+            <Plus size={15} /> Yeni Eğitim
+          </button>
+        </div>
+      </header>
       {showBulkAssign && (
         <BulkAssignModal
           trainings={allTrainings.map(t => ({ id: t.id, title: t.title, category: t.category }))}
@@ -291,44 +307,57 @@ export default function TrainingsPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: 'Toplam', value: allTrainings.length, color: 'var(--color-primary)' },
-          { label: 'Yayında', value: allTrainings.filter(t => t.publishStatus === 'published').length, color: 'var(--color-success)' },
-          { label: 'Taslak', value: allTrainings.filter(t => t.publishStatus === 'draft').length, color: 'var(--color-warning)' },
-          { label: 'Arşivlendi', value: allTrainings.filter(t => t.publishStatus === 'archived').length, color: 'var(--color-info)' },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="flex items-center gap-3 rounded-xl border px-4 py-3"
-            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-          >
-            <div className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
-            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{s.label}</span>
-            <span className="ml-auto text-lg font-bold font-heading" style={{ color: s.color }}>{s.value}</span>
-          </div>
-        ))}
+        <KStatCard
+          title="Toplam"
+          value={allTrainings.length}
+          icon={BookOpen}
+          accentColor="var(--k-primary)"
+        />
+        <KStatCard
+          title="Yayında"
+          value={allTrainings.filter(t => t.publishStatus === 'published').length}
+          icon={CheckCircle2}
+          accentColor="var(--k-success)"
+        />
+        <KStatCard
+          title="Taslak"
+          value={allTrainings.filter(t => t.publishStatus === 'draft').length}
+          icon={FileEdit}
+          accentColor="var(--k-warning)"
+        />
+        <KStatCard
+          title="Arşivlendi"
+          value={allTrainings.filter(t => t.publishStatus === 'archived').length}
+          icon={Archive}
+          accentColor="var(--k-info)"
+        />
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Filtreler:</span>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>Filtreler:</span>
 
-        <div className="flex gap-1.5">
+        <div className="k-tabs" role="tablist" aria-label="Yayın durumu filtresi">
+          <button
+            type="button"
+            className="k-tab"
+            data-active={statusFilter === null}
+            onClick={() => setStatusFilter(null)}
+            aria-pressed={statusFilter === null}
+          >
+            Tümü
+          </button>
           {Object.entries(publishStatusConfig).map(([key, cfg]) => {
             const isActive = statusFilter === key;
             return (
               <button
                 key={key}
+                type="button"
+                className="k-tab"
+                data-active={isActive}
                 onClick={() => setStatusFilter(isActive ? null : key)}
                 aria-label={`Filtrele: ${cfg.label}`}
                 aria-pressed={isActive}
-                className="rounded-full px-3 py-1 text-[11px] font-semibold"
-                style={{
-                  background: isActive ? cfg.bg : 'transparent',
-                  color: isActive ? cfg.text : 'var(--color-text-muted)',
-                  border: `1.5px solid ${isActive ? cfg.text : 'var(--color-border)'}`,
-                  transition: 'background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast)',
-                }}
               >
                 {cfg.label}
               </button>
@@ -336,28 +365,38 @@ export default function TrainingsPage() {
           })}
         </div>
 
+        <label className="k-input" style={{ minWidth: 200 }}>
+          <span className="text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--k-text-muted)' }}>Kategori</span>
+          <select
+            value={categoryFilter ?? ''}
+            onChange={(e) => setCategoryFilter(e.target.value || null)}
+            aria-label="Kategori filtresi"
+          >
+            <option value="">Tümü</option>
+            {allCategories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </label>
 
         {activeFilters > 0 && (
           <button
             onClick={() => { setStatusFilter(null); setCategoryFilter(null); }}
             aria-label="Filtreleri temizle"
-            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-            style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
+            className="k-btn k-btn-ghost k-btn-sm"
+            style={{ color: 'var(--k-error)' }}
           >
-            <X className="h-3 w-3" /> Temizle
+            <X size={13} /> Temizle
           </button>
         )}
       </div>
 
       {/* Table */}
-      <div
-        className="rounded-2xl border p-6"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
-      >
+      <div className="k-card p-5">
         {filteredTrainings.length > 0 ? (
           <DataTable columns={columns} data={filteredTrainings} searchKey="title" searchPlaceholder="Eğitim adı veya kategori ara..." />
         ) : (
-          <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz eğitim oluşturulmadı. İlk eğitimi ekleyerek başlayın.</div>
+          <div className="text-sm text-center py-8" style={{ color: 'var(--k-text-muted)' }}>Henüz eğitim oluşturulmadı. İlk eğitimi ekleyerek başlayın.</div>
         )}
       </div>
 
@@ -370,14 +409,16 @@ export default function TrainingsPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" disabled={!!deletingId} onClick={() => setDeleteTarget(null)}>Vazgeç</Button>
-            <Button
+            <button type="button" className="k-btn k-btn-ghost" disabled={!!deletingId} onClick={() => setDeleteTarget(null)}>Vazgeç</button>
+            <button
+              type="button"
+              className="k-btn k-btn-primary"
               disabled={!!deletingId}
-              style={{ background: 'var(--color-error)', color: 'white' }}
+              style={{ background: 'var(--k-error)', borderColor: 'var(--k-error)' }}
               onClick={() => deleteTarget && confirmDelete(deleteTarget, false)}
             >
               {deletingId ? 'Siliniyor...' : 'Evet, sil'}
-            </Button>
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -391,14 +432,16 @@ export default function TrainingsPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" disabled={!!deletingId} onClick={() => setForceTarget(null)}>Vazgeç</Button>
-            <Button
+            <button type="button" className="k-btn k-btn-ghost" disabled={!!deletingId} onClick={() => setForceTarget(null)}>Vazgeç</button>
+            <button
+              type="button"
+              className="k-btn k-btn-primary"
               disabled={!!deletingId}
-              style={{ background: 'var(--color-error)', color: 'white' }}
+              style={{ background: 'var(--k-error)', borderColor: 'var(--k-error)' }}
               onClick={() => forceTarget && confirmDelete(forceTarget.training, true)}
             >
               {deletingId ? 'Siliniyor...' : 'Yine de sil'}
-            </Button>
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

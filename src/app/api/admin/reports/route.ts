@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const { dbUser, error } = await getAuthUser()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId!
@@ -144,7 +144,10 @@ export async function GET(request: Request) {
     const statusMap = Object.fromEntries(assignmentStatusGroups.map(s => [s.status, s._count]))
     const totalAssignments = assignmentStatusGroups.reduce((sum, s) => sum + s._count, 0)
     const passedCount = statusMap['passed'] ?? 0
-    const failedCount = statusMap['failed'] ?? 0
+    // "locked" = maksimum denemeyi kullanmış + geçmemiş → iş kuralı gereği başarısız sayılır.
+    // Ayrı lockedCount metriği UI'da gerekirse ileride eklenebilir.
+    const lockedCount = statusMap['locked'] ?? 0
+    const failedCount = (statusMap['failed'] ?? 0) + lockedCount
     const avgScore = avgScoreResult._avg.postExamScore ? Math.round(Number(avgScoreResult._avg.postExamScore)) : 0
     const completionRate = totalAssignments > 0 ? Math.round((passedCount / totalAssignments) * 100) : 0
 

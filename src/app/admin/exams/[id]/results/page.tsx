@@ -6,11 +6,8 @@ import {
   Users,
   Target,
   Clock,
-  TrendingUp,
   Download,
   FileSpreadsheet,
-  ChevronDown,
-  ChevronUp,
   Search,
   X,
 } from 'lucide-react';
@@ -18,17 +15,45 @@ import dynamic from 'next/dynamic';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/shared/toast';
-
-const ChartSkeleton = () => (
-  <div className="h-64 rounded-2xl animate-pulse" style={{ background: 'var(--color-surface)' }} />
-);
-const PassRateRadial = dynamic(() => import('@/components/shared/charts/exam-results-charts').then(m => ({ default: m.PassRateRadial })), { ssr: false, loading: ChartSkeleton });
-const ScoreDistributionChart = dynamic(() => import('@/components/shared/charts/exam-results-charts').then(m => ({ default: m.ScoreDistributionChart })), { ssr: false, loading: ChartSkeleton });
 import { Input } from '@/components/ui/input';
 import { StatCard } from '@/components/shared/stat-card';
 import { DataTable } from '@/components/shared/data-table';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
+
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
+const cardStyle: React.CSSProperties = {
+  background: K.SURFACE,
+  border: `1.5px solid ${K.BORDER}`,
+  borderRadius: 14,
+  boxShadow: K.SHADOW_CARD,
+};
+
+const sectionHeading: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 700,
+  fontFamily: K.FONT_DISPLAY,
+  color: K.TEXT_PRIMARY,
+};
+
+const ChartSkeleton = () => (
+  <div className="h-64 rounded-2xl animate-pulse" style={{ background: K.BG }} />
+);
+const PassRateRadial = dynamic(() => import('@/components/shared/charts/exam-results-charts').then(m => ({ default: m.PassRateRadial })), { ssr: false, loading: ChartSkeleton });
+const ScoreDistributionChart = dynamic(() => import('@/components/shared/charts/exam-results-charts').then(m => ({ default: m.ScoreDistributionChart })), { ssr: false, loading: ChartSkeleton });
 
 interface ExamInfo {
   id: string;
@@ -100,7 +125,6 @@ export default function ExamResultsPage() {
   const exam = data?.exam;
   const summary = data?.summary;
   const departmentStats = data?.departmentStats ?? [];
-  const questionStats = data?.questionStats ?? [];
   const attempts = data?.attempts ?? [];
 
   // Skor dağılımı histogram
@@ -164,7 +188,7 @@ export default function ExamResultsPage() {
   if (error || !data) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-sm" style={{ color: 'var(--color-error)' }}>
+        <div className="text-sm" style={{ color: K.ERROR }}>
           {error || 'Veriler yüklenemedi'}
         </div>
       </div>
@@ -178,7 +202,7 @@ export default function ExamResultsPage() {
       header: 'İsim',
       size: 200,
       cell: ({ row }) => (
-        <span className="font-medium truncate block" style={{ color: 'var(--color-text-primary)' }}>
+        <span className="font-medium truncate block" style={{ color: K.TEXT_PRIMARY }}>
           {row.getValue('userFullName')}
         </span>
       ),
@@ -188,7 +212,7 @@ export default function ExamResultsPage() {
       header: 'Departman',
       size: 130,
       cell: ({ row }) => (
-        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+        <span className="text-xs" style={{ color: K.TEXT_SECONDARY }}>
           {row.getValue('department') || '-'}
         </span>
       ),
@@ -205,7 +229,7 @@ export default function ExamResultsPage() {
             className="font-bold"
             style={{
               fontFamily: 'var(--font-mono)',
-              color: isBelow ? 'var(--color-error)' : 'var(--color-text-primary)',
+              color: isBelow ? K.ERROR : K.TEXT_PRIMARY,
             }}
           >
             {score !== null ? `${score}/100` : '-'}
@@ -219,16 +243,19 @@ export default function ExamResultsPage() {
       size: 90,
       cell: ({ row }) => (
         <span
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+          className="inline-flex items-center gap-1.5 rounded-full"
           style={{
-            background: row.original.isPassed ? 'var(--color-success-bg)' : 'var(--color-error-bg)',
-            color: row.original.isPassed ? 'var(--color-success)' : 'var(--color-error)',
+            padding: '2px 10px',
+            fontSize: 11,
+            fontWeight: 600,
+            background: row.original.isPassed ? K.PRIMARY_LIGHT : K.ERROR_BG,
+            color: row.original.isPassed ? K.PRIMARY : K.ERROR,
           }}
         >
           <span
             className="h-1.5 w-1.5 rounded-full"
             style={{
-              background: row.original.isPassed ? 'var(--color-success)' : 'var(--color-error)',
+              background: row.original.isPassed ? K.PRIMARY : K.ERROR,
             }}
           />
           {row.original.isPassed ? 'Geçti' : 'Kaldı'}
@@ -250,7 +277,7 @@ export default function ExamResultsPage() {
       header: 'Süre',
       size: 70,
       cell: ({ row }) => (
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: K.TEXT_SECONDARY }}>
           {row.getValue('durationMinutes')} dk
         </span>
       ),
@@ -260,7 +287,7 @@ export default function ExamResultsPage() {
       header: 'Tarih',
       size: 100,
       cell: ({ row }) => (
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-text-muted)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: K.TEXT_MUTED }}>
           {row.original.completedAt
             ? new Date(row.original.completedAt).toLocaleDateString('tr-TR', {
                 day: '2-digit',
@@ -278,9 +305,9 @@ export default function ExamResultsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-balance">{exam!.title}</h2>
+          <h2 style={{ ...sectionHeading, fontSize: 22 }} className="text-balance">{exam!.title}</h2>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+            <span className="text-sm" style={{ color: K.TEXT_SECONDARY }}>
               {exam!.totalQuestions} soru · Baraj: {exam!.passingScore}%
             </span>
           </div>
@@ -291,7 +318,7 @@ export default function ExamResultsPage() {
             onClick={() => handleDownload('pdf')}
             disabled={downloading === 'pdf'}
             className="gap-2 rounded-xl text-sm"
-            style={{ borderColor: 'var(--color-border)' }}
+            style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}
           >
             <Download className="h-4 w-4" />
             {downloading === 'pdf' ? 'İndiriliyor...' : 'PDF İndir'}
@@ -301,7 +328,7 @@ export default function ExamResultsPage() {
             onClick={() => handleDownload('xlsx')}
             disabled={downloading === 'xlsx'}
             className="gap-2 rounded-xl text-sm"
-            style={{ borderColor: 'var(--color-border)' }}
+            style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}
           >
             <FileSpreadsheet className="h-4 w-4" />
             {downloading === 'xlsx' ? 'İndiriliyor...' : 'Excel İndir'}
@@ -315,23 +342,19 @@ export default function ExamResultsPage() {
           title="Toplam Katılımcı"
           value={summary!.totalAssigned}
           icon={Users}
-          accentColor="var(--color-primary)"
+          accentColor={K.PRIMARY}
         />
         <div
-          className="relative overflow-hidden rounded-2xl p-6"
-          style={{
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            boxShadow: 'var(--shadow-sm)',
-          }}
+          className="relative overflow-hidden p-6"
+          style={cardStyle}
         >
-          <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: 'var(--color-success)' }} />
+          <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: K.PRIMARY }} />
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: K.TEXT_MUTED }}>
                 Geçme Oranı
               </p>
-              <p className="mt-2 text-3xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-success)' }}>
+              <p className="mt-2 text-3xl font-bold" style={{ fontFamily: K.FONT_DISPLAY, color: K.PRIMARY }}>
                 %{summary!.passRate}
               </p>
             </div>
@@ -344,26 +367,23 @@ export default function ExamResultsPage() {
           title="Ortalama Puan"
           value={summary!.avgScore}
           icon={Target}
-          accentColor="var(--color-accent)"
+          accentColor={K.ACCENT}
         />
         <StatCard
           title="Ortalama Süre"
           value={`${summary!.avgDurationMinutes} dk`}
           icon={Clock}
-          accentColor="var(--color-info)"
+          accentColor={K.INFO}
         />
       </div>
 
       {/* 2 Column: Department + Score Distribution */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Departman Analizi */}
-        <div
-          className="rounded-2xl border p-6"
-          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-        >
-          <h3 className="text-sm font-bold mb-4">Departman Analizi</h3>
+        <div className="p-6" style={cardStyle}>
+          <h3 style={{ ...sectionHeading, marginBottom: 16 }}>Departman Analizi</h3>
           {sortedDepts.length === 0 ? (
-            <p className="text-sm text-center py-6" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-sm text-center py-6" style={{ color: K.TEXT_MUTED }}>
               Personel sınavı tamamladıkça sonuçlar burada görünecek.
             </p>
           ) : (
@@ -371,20 +391,20 @@ export default function ExamResultsPage() {
               {sortedDepts.map((d) => (
                 <div key={d.departmentName}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                    <span className="text-xs font-medium" style={{ color: K.TEXT_PRIMARY }}>
                       {d.departmentName}
                     </span>
-                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    <span className="text-xs" style={{ color: K.TEXT_MUTED }}>
                       {d.passed}/{d.totalAssigned} geçti
                     </span>
                   </div>
-                  <div className="h-2 w-full rounded-full" style={{ background: 'var(--color-border)' }}>
+                  <div className="h-2 w-full rounded-full" style={{ background: K.BORDER_LIGHT }}>
                     <div
                       className="h-full rounded-full"
                       style={{
                         width: `${d.passRate}%`,
-                        background: d.passRate >= 70 ? 'var(--color-success)' : d.passRate >= 50 ? 'var(--color-warning)' : 'var(--color-error)',
-                        transition: 'width var(--transition-base)',
+                        background: d.passRate >= 70 ? K.PRIMARY : d.passRate >= 50 ? K.WARNING : K.ERROR,
+                        transition: 'width 0.3s',
                       }}
                     />
                   </div>
@@ -395,23 +415,17 @@ export default function ExamResultsPage() {
         </div>
 
         {/* Skor Dağılımı */}
-        <div
-          className="rounded-2xl border p-6"
-          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-        >
-          <h3 className="text-sm font-bold mb-4">Skor Dağılımı</h3>
+        <div className="p-6" style={cardStyle}>
+          <h3 style={{ ...sectionHeading, marginBottom: 16 }}>Skor Dağılımı</h3>
           <ScoreDistributionChart data={scoreDistribution} passingScore={exam!.passingScore} />
         </div>
       </div>
 
 
       {/* Katılımcı Tablosu */}
-      <div
-        className="rounded-2xl border p-6"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-      >
+      <div className="p-6" style={cardStyle}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold">Katılımcı Sonuçları</h3>
+          <h3 style={sectionHeading}>Katılımcı Sonuçları</h3>
           <div className="flex items-center gap-2">
             {/* Filtreler */}
             {(['all', 'passed', 'failed'] as AttemptFilter[]).map((f) => {
@@ -421,11 +435,13 @@ export default function ExamResultsPage() {
                 <button
                   key={f}
                   onClick={() => setAttemptFilter(f)}
-                  className="rounded-full px-3 py-1 text-[11px] font-semibold"
+                  className="rounded-full px-3 py-1"
                   style={{
-                    background: isActive ? 'var(--color-primary-light)' : 'transparent',
-                    color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                    border: `1.5px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: isActive ? K.PRIMARY_LIGHT : 'transparent',
+                    color: isActive ? K.PRIMARY : K.TEXT_MUTED,
+                    border: `1.5px solid ${isActive ? K.PRIMARY : K.BORDER}`,
                   }}
                 >
                   {labels[f]}
@@ -436,7 +452,7 @@ export default function ExamResultsPage() {
             <div className="relative">
               <Search
                 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5"
-                style={{ color: 'var(--color-text-muted)' }}
+                style={{ color: K.TEXT_MUTED }}
               />
               <Input
                 value={attemptSearch}
@@ -449,7 +465,7 @@ export default function ExamResultsPage() {
                   onClick={() => setAttemptSearch('')}
                   className="absolute right-2 top-1/2 -translate-y-1/2"
                 >
-                  <X className="h-3 w-3" style={{ color: 'var(--color-text-muted)' }} />
+                  <X className="h-3 w-3" style={{ color: K.TEXT_MUTED }} />
                 </button>
               )}
             </div>
@@ -459,7 +475,7 @@ export default function ExamResultsPage() {
         {filteredAttempts.length > 0 ? (
           <DataTable columns={attemptColumns} data={filteredAttempts} />
         ) : (
-          <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>
             Katılımcı bulunamadı
           </p>
         )}

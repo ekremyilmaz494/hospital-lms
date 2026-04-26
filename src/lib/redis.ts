@@ -1,9 +1,26 @@
 import { Redis } from '@upstash/redis'
 import { logger } from '@/lib/logger'
 
-// ── Lazy Redis client — null if not configured or unreachable ──
+// ⚠️ Multi-instance uyarısı (Vercel serverless):
+// In-memory fallback (memoryTimers, memoryRateLimits, memoryCache) her serverless
+// instance'ta ayrı. Redis down ise rate limit ve exam timer instance'lar arası
+// divergence yapar. Production'da her fallback kullanımı logger.error ile alarma
+// düşer — Sentry'de yakalanmalı. Env validation (scripts/validate-env.js) prod'da
+// REDIS_URL+REDIS_TOKEN zorunlu kılar; boot-time null olması beklenmez, sadece
+// runtime network hatalarında geçici fallback olur.
+
 let _redis: Redis | null = null
 let _constructorWarned = false
+
+/** Production'da memory fallback kullanıldığında loud alarm — Sentry yakalar. */
+function warnFallback(scope: string, attemptId?: string) {
+  if (process.env.NODE_ENV !== 'production') return
+  logger.error('Redis', `Memory fallback in production — multi-instance inconsistent (${scope})`, {
+    scope,
+    attemptId,
+  })
+}
+
 export function getRedis(): Redis | null {
   if (_redis) return _redis
   const url = process.env.REDIS_URL
@@ -32,6 +49,17 @@ function resetRedis() {
   _redis = null
 }
 
+const REDIS_TIMEOUT_MS = Number(process.env.REDIS_TIMEOUT_MS ?? (process.env.NODE_ENV === 'production' ? 1500 : 500))
+
+async function withRedisTimeout<T>(promise: Promise<T>): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('redis_timeout')), REDIS_TIMEOUT_MS)
+    }),
+  ])
+}
+
 // ── In-memory fallback (dev/staging when Redis is not configured or unreachable) ──
 const memoryTimers = new Map<string, number>()
 const memoryRateLimits = new Map<string, { count: number; expiresAt: number }>()
@@ -53,6 +81,7 @@ export async function startExamTimer(attemptId: string, durationMinutes: number)
       resetRedis()
     }
   }
+  warnFallback('startExamTimer', attemptId)
   memoryTimers.set(attemptId, expiresAt)
   return expiresAt
 }
@@ -82,9 +111,11 @@ export async function getExamTimeRemaining(attemptId: string): Promise<number | 
       expiresAt = await redis.get<number>(`${EXAM_TIMER_PREFIX}${attemptId}`)
     } catch {
       resetRedis()
+      warnFallback('getExamTimeRemaining', attemptId)
       expiresAt = memoryTimers.get(attemptId) ?? null
     }
   } else {
+    warnFallback('getExamTimeRemaining', attemptId)
     expiresAt = memoryTimers.get(attemptId) ?? null
   }
   if (!expiresAt) return null
@@ -284,7 +315,7 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
       const pipeline = redis.pipeline()
       pipeline.set(k, 0, { nx: true, ex: windowSeconds })
       pipeline.incr(k)
-      const results = await pipeline.exec()
+      const results = await withRedisTimeout(pipeline.exec())
       const current = results[1] as number
       return current <= effectiveMax
     } catch {
@@ -294,6 +325,7 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
   }
 
   // In-memory fallback
+  warnFallback('checkRateLimit')
   const k = `ratelimit:${key}`
   const now = Date.now()
   const entry = memoryRateLimits.get(k)
@@ -312,7 +344,7 @@ export async function getRateLimitCount(key: string): Promise<number> {
   const redis = getRedis()
   if (redis) {
     try {
-      const val = await redis.get(`ratelimit:${key}`)
+      const val = await withRedisTimeout(redis.get(`ratelimit:${key}`))
       return typeof val === 'number' ? val : (parseInt(String(val ?? '0'), 10) || 0)
     } catch {
       resetRedis()
@@ -336,7 +368,7 @@ export async function incrementRateLimit(key: string, windowSeconds: number): Pr
       const pipeline = redis.pipeline()
       pipeline.set(k, 0, { nx: true, ex: windowSeconds })
       pipeline.incr(k)
-      await pipeline.exec()
+      await withRedisTimeout(pipeline.exec())
       return
     } catch {
       resetRedis()
@@ -360,7 +392,7 @@ export async function deleteRateLimit(key: string): Promise<void> {
   const redis = getRedis()
   if (redis) {
     try {
-      await redis.del(`ratelimit:${key}`)
+      await withRedisTimeout(redis.del(`ratelimit:${key}`))
     } catch {
       resetRedis()
     }

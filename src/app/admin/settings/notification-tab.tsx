@@ -75,15 +75,15 @@ function Field({ label, hint, icon: Icon, children }: {
   return (
     <div className="group">
       <Label
-        className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide"
-        style={{ color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}
+        className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: 'var(--k-text-muted)' }}
       >
-        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
+        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--k-primary)' }} />
         {label}
       </Label>
       {children}
       {hint && (
-        <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--k-text-muted)' }}>
           {hint}
         </p>
       )}
@@ -98,8 +98,8 @@ interface Props {
   handleSave: () => void;
 }
 
-const inputClass = 'h-12 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--color-primary)]/20';
-const inputStyle = { background: 'var(--color-bg)', borderColor: 'var(--color-border)' };
+const inputClass = 'h-12 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--k-primary)]/20';
+const inputStyle = { background: 'var(--k-surface-hover)', borderColor: 'var(--k-border)' };
 
 export default function NotificationTab({ settings, setSettings }: Props) {
   return (
@@ -108,7 +108,7 @@ export default function NotificationTab({ settings, setSettings }: Props) {
         <h2 className="text-lg font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
           Bildirim Tercihleri
         </h2>
-        <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-[13px] mt-1" style={{ color: 'var(--k-text-muted)' }}>
           E-posta ve uygulama içi bildirim ayarlarını yapılandırın.
         </p>
       </div>
@@ -120,21 +120,21 @@ export default function NotificationTab({ settings, setSettings }: Props) {
             icon: Mail,
             label: 'E-posta Bildirimleri',
             desc: 'Önemli olaylarda personele otomatik e-posta gönderilir',
-            color: 'var(--color-info)',
+            color: 'var(--k-info)',
           },
           {
             key: 'notifyOnComplete' as const,
             icon: Award,
             label: 'Tamamlanma Bildirimi',
             desc: 'Personel bir eğitimi başarıyla tamamladığında bildirim alın',
-            color: 'var(--color-success)',
+            color: 'var(--k-success)',
           },
           {
             key: 'notifyOnFail' as const,
             icon: BellRing,
             label: 'Başarısızlık Bildirimi',
             desc: 'Personel sınavda başarısız olduğunda bildirim alın',
-            color: 'var(--color-error)',
+            color: 'var(--k-error)',
           },
         ].map((item) => (
           <div
@@ -143,31 +143,31 @@ export default function NotificationTab({ settings, setSettings }: Props) {
             style={{
               background: settings[item.key]
                 ? `linear-gradient(135deg, ${item.color}06, ${item.color}03)`
-                : 'var(--color-bg)',
-              border: `1px solid ${settings[item.key] ? `${item.color}20` : 'var(--color-border)'}`,
+                : 'var(--k-surface-hover)',
+              border: `1px solid ${settings[item.key] ? `${item.color}20` : 'var(--k-border)'}`,
             }}
           >
             <div
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all duration-200"
               style={{
-                background: settings[item.key] ? `${item.color}12` : 'var(--color-surface)',
-                border: `1px solid ${settings[item.key] ? `${item.color}20` : 'var(--color-border)'}`,
+                background: settings[item.key] ? `${item.color}12` : 'var(--k-surface)',
+                border: `1px solid ${settings[item.key] ? `${item.color}20` : 'var(--k-border)'}`,
               }}
             >
               <item.icon
                 className="h-5 w-5 transition-colors duration-200"
-                style={{ color: settings[item.key] ? item.color : 'var(--color-text-muted)' }}
+                style={{ color: settings[item.key] ? item.color : 'var(--k-text-muted)' }}
               />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-semibold">{item.label}</p>
-              <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{item.desc}</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--k-text-muted)' }}>{item.desc}</p>
             </div>
             <Toggle checked={settings[item.key]} onChange={(v) => setSettings({ [item.key]: v })} />
           </div>
         ))}
 
-        <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
+        <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--k-border)' }}>
           <Field
             label="Hatırlatma Zamanlaması"
             icon={CalendarClock}
@@ -183,7 +183,7 @@ export default function NotificationTab({ settings, setSettings }: Props) {
                 className={`${inputClass} font-mono text-lg font-bold pr-24`}
                 style={inputStyle}
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>gün önce</span>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold" style={{ color: 'var(--k-text-muted)' }}>gün önce</span>
             </div>
           </Field>
         </div>

@@ -17,6 +17,45 @@ const DASHBOARD_ROUTES: Record<UserRole, string> = {
 }
 
 const STATE_DIR = path.join(process.cwd(), '.playwright')
+const AUTH_STATE_MAX_AGE_MS = 6 * 60 * 60 * 1000
+const LOGIN_FORM_SELECTOR = '[data-testid="login-form"][data-hydrated="true"]'
+const LOGIN_SUBMIT_SELECTOR = '[data-testid="login-submit"]'
+const KVKK_ACCEPT_BUTTON = /KABUL ED|Kabul Ed/
+
+async function waitForLoginForm(page: Page) {
+  await page.waitForSelector(LOGIN_FORM_SELECTOR, { timeout: 30000 })
+}
+
+async function acknowledgeKvkkIfPresent(page: Page) {
+  const kvkkCheck = page.locator('button[role="checkbox"][aria-checked]')
+  try {
+    await kvkkCheck.waitFor({ state: 'visible', timeout: 8000 })
+  } catch {
+    return
+  }
+
+  await kvkkCheck.click()
+  const acceptBtn = page.getByRole('button', { name: KVKK_ACCEPT_BUTTON })
+  await acceptBtn.waitFor({ state: 'visible', timeout: 5000 })
+  await expect(acceptBtn).toBeEnabled({ timeout: 5000 })
+
+  const [ackResponse] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/auth/kvkk-acknowledge') && r.request().method() === 'POST', { timeout: 30000 }),
+    acceptBtn.click(),
+  ])
+  if (!ackResponse.ok()) {
+    throw new Error(`KVKK acknowledge failed: HTTP ${ackResponse.status()}`)
+  }
+}
+
+function isFreshStateFile(stateFile: string): boolean {
+  try {
+    const stat = fs.statSync(stateFile)
+    return Date.now() - stat.mtimeMs < AUTH_STATE_MAX_AGE_MS
+  } catch {
+    return false
+  }
+}
 
 /**
  * Global setup'ın kaydettiği storageState dosyası var mı kontrol et.
@@ -25,6 +64,7 @@ const STATE_DIR = path.join(process.cwd(), '.playwright')
 export async function applyStoredAuth(context: BrowserContext, role: UserRole): Promise<boolean> {
   const stateFile = path.join(STATE_DIR, `${role}.json`)
   if (!fs.existsSync(stateFile)) return false
+  if (!isFreshStateFile(stateFile)) return false
 
   try {
     const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'))
@@ -50,7 +90,7 @@ export async function login(page: Page, role: UserRole = 'admin') {
 
   // Önce kaydedilmiş session ile dene
   const stateFile = path.join(STATE_DIR, `${role}.json`)
-  if (fs.existsSync(stateFile)) {
+  if (fs.existsSync(stateFile) && isFreshStateFile(stateFile)) {
     try {
       const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'))
       await page.context().addCookies(state.cookies ?? [])
@@ -61,6 +101,7 @@ export async function login(page: Page, role: UserRole = 'admin') {
       return
     } catch {
       // Session geçersiz — normal login yap
+      await page.context().clearCookies()
     }
   }
 
@@ -71,7 +112,7 @@ export async function login(page: Page, role: UserRole = 'admin') {
   // 'load' tüm dynamic import'ların bitmesini bekleyip 30s timeout veriyor.
   // Email selector zaten waitForSelector ile beklenecek, asset yüklenmesini beklemeye gerek yok.
   await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
-  await page.waitForSelector('[type="email"]', { timeout: 30000 })
+  await waitForLoginForm(page)
 
   await page.fill('[type="email"]', email)
   await page.fill('[type="password"]', password)
@@ -82,25 +123,19 @@ export async function login(page: Page, role: UserRole = 'admin') {
   // Tek checkbox kaldı: rememberMe (Bu cihazda oturumumu açık tut).
 
   // ShimmerButton dynamic import — placeholder mount olana kadar gerçek button beklenmeli.
-  // Placeholder'da text yok; submit butonu "Giriş Yap" text'i içeriyor.
-  const submitBtn = page.getByRole('button', { name: /Giriş Yap/i })
+  const submitBtn = page.locator(LOGIN_SUBMIT_SELECTOR)
   await submitBtn.waitFor({ state: 'visible', timeout: 15000 })
-  await submitBtn.click()
-
-  // Login sonrası KVKK Notice Modal açılır (E2E user'ların acknowledged metadata'sı yok).
-  // Modal yapısı: önce role=checkbox tıklanır (accepted=true), sonra "Kabul Ediyorum" butonu enable olur.
-  try {
-    const kvkkCheck = page.locator('button[role="checkbox"][aria-checked]')
-    await kvkkCheck.waitFor({ state: 'visible', timeout: 8000 })
-    await kvkkCheck.click()
-    const acceptBtn = page.getByRole('button', { name: /Kabul Ediyorum/i })
-    await acceptBtn.waitFor({ state: 'visible', timeout: 3000 })
-    await acceptBtn.click()
-  } catch {
-    // Modal yoksa zaten dashboard'a yönlendi — devam
+  const [loginResponse] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/auth/login') && r.request().method() === 'POST', { timeout: 30000 }),
+    submitBtn.click(),
+  ])
+  if (!loginResponse.ok()) {
+    throw new Error(`Login failed for ${role}: HTTP ${loginResponse.status()}`)
   }
 
-  await page.waitForURL(`**${dashboard}`, { timeout: 30000 })
+  await acknowledgeKvkkIfPresent(page)
+
+  await page.waitForURL(`**${dashboard}`, { timeout: 60000 })
 }
 
 /**

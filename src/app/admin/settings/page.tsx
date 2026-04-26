@@ -12,7 +12,7 @@ import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
-const tabLoading = () => <div className="h-64 animate-pulse rounded-lg m-8" style={{ background: 'var(--color-bg)' }} />;
+const tabLoading = () => <div className="h-64 animate-pulse rounded-lg m-8" style={{ background: 'var(--k-surface-hover)' }} />;
 const HospitalTab = dynamic(() => import('./hospital-tab'), { ssr: false, loading: tabLoading });
 const NotificationTab = dynamic(() => import('./notification-tab'), { ssr: false, loading: tabLoading });
 const BrandingTab = dynamic(() => import('./branding-tab'), { ssr: false, loading: tabLoading });
@@ -120,30 +120,19 @@ export default function AdminSettingsPage() {
   const tabProps = { settings: activeData, setSettings: update, saving, handleSave };
 
   return (
-    <div className="space-y-0">
-      {/* Header */}
+    <div className="k-page">
       <BlurFade delay={0}>
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-1">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-2xl"
-              style={{
-                background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-                boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
-              }}
-            >
-              <Settings className="h-5 w-5 text-white" />
+        <header className="k-page-header">
+          <div>
+            <div className="k-breadcrumb">
+              <span>Panel</span>
+              <ChevronRight size={12} />
+              <span data-current="true">Ayarlar</span>
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                Platform Ayarları
-              </h1>
-              <p className="text-[13px]" style={{ color: 'var(--color-text-muted)' }}>
-                Kurum bilgileri, marka ve bildirim tercihleri
-              </p>
-            </div>
+            <h1 className="k-page-title">Platform Ayarları</h1>
+            <p className="k-page-subtitle">Kurum bilgileri, marka, bildirim ve entegrasyon tercihleri.</p>
           </div>
-        </div>
+        </header>
       </BlurFade>
 
       <div className="flex gap-8">
@@ -156,21 +145,25 @@ export default function AdminSettingsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className="group flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[13px] font-medium transition-all duration-200"
+                  className="group flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[13px] transition-colors duration-200"
                   style={{
-                    background: isActive
-                      ? 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))'
-                      : 'transparent',
-                    color: isActive ? 'white' : 'var(--color-text-secondary)',
-                    boxShadow: isActive ? '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' : 'none',
+                    background: isActive ? 'var(--k-primary-light)' : 'transparent',
+                    color: isActive ? 'var(--k-primary)' : 'var(--k-text-secondary)',
+                    fontWeight: isActive ? 600 : 500,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) e.currentTarget.style.background = 'var(--k-surface-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) e.currentTarget.style.background = 'transparent';
                   }}
                 >
-                  <tab.icon className="h-4 w-4" style={{ opacity: isActive ? 1 : 0.6 }} />
+                  <tab.icon className="h-4 w-4" style={{ opacity: isActive ? 1 : 0.7 }} />
                   <span className="flex-1">{tab.label}</span>
                   <ChevronRight
                     className="h-3.5 w-3.5 transition-transform duration-200"
                     style={{
-                      opacity: isActive ? 0.8 : 0,
+                      opacity: isActive ? 0.9 : 0,
                       transform: isActive ? 'translateX(0)' : 'translateX(-4px)',
                     }}
                   />
@@ -179,17 +172,11 @@ export default function AdminSettingsPage() {
             })}
 
             {/* Save button in sidebar */}
-            <div className="pt-4 mt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <div className="pt-4 mt-4" style={{ borderTop: '1px solid var(--k-border)' }}>
               <button
                 onClick={handleSave}
                 disabled={saving || saved}
-                className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold text-white transition-all duration-300 disabled:opacity-70"
-                style={{
-                  background: saved
-                    ? 'linear-gradient(135deg, var(--brand-600), #047857)'
-                    : 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-                  boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
-                }}
+                className="k-btn k-btn-primary w-full justify-center"
               >
                 {saving ? (
                   <>
@@ -217,9 +204,9 @@ export default function AdminSettingsPage() {
           <div
             className="rounded-2xl border"
             style={{
-              background: 'var(--color-surface)',
-              borderColor: 'var(--color-border)',
-              boxShadow: 'var(--shadow-sm)',
+              background: 'var(--k-surface)',
+              borderColor: 'var(--k-border)',
+              boxShadow: 'var(--k-shadow-sm)',
             }}
           >
             {activeTab === 'hospital' && <HospitalTab {...tabProps} />}

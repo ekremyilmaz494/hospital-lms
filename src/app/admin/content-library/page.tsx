@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation'
 import {
   Library, Clock, Star, CheckCircle2, Plus, Layers, X, ArrowRight,
   Film, Sparkles, Search,
-  BookOpen, GraduationCap, Upload, AlertCircle, Trash2,
+  BookOpen, GraduationCap, Upload, AlertCircle, Trash2, ChevronRight,
 } from 'lucide-react'
 import { generateVideoThumbnail } from '@/lib/video-thumbnail'
 import { useFetch } from '@/hooks/use-fetch'
 import { PageLoading } from '@/components/shared/page-loading'
 import { useToast } from '@/components/shared/toast'
+import { KStatCard } from '@/components/admin/k-stat-card'
 import {
   CONTENT_LIBRARY_CATEGORIES,
   CONTENT_LIBRARY_DIFFICULTY,
@@ -18,6 +19,36 @@ import {
   type ContentLibraryCategoryKey,
   type ContentLibraryDifficulty,
 } from '@/lib/content-library-categories'
+
+// ── Klinova Design Tokens (sabit hex'ler — CSS var bypass) ────────────────
+const K = {
+  PRIMARY: '#0d9668',
+  PRIMARY_HOVER: '#087a54',
+  PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff',
+  BG: '#fafaf9',
+  SURFACE_HOVER: '#f5f5f4',
+  BORDER: '#c9c4be',
+  BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917',
+  TEXT_SECONDARY: '#44403c',
+  TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981',
+  SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b',
+  WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444',
+  ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6',
+  INFO_BG: '#dbeafe',
+  ACCENT: '#f59e0b',
+  VIDEO: '#3b82f6',
+  AUDIO: '#f59e0b',
+  PDF: '#dc2626',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  SHADOW_HOVER: '0 4px 8px rgba(15, 23, 42, 0.08), 0 16px 40px rgba(15, 23, 42, 0.08)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+} as const
 
 interface ContentLibraryItem {
   id: string
@@ -82,53 +113,71 @@ function BulkInstallModal({ items, onClose, onSuccess }: BulkInstallModalProps) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backdropFilter: 'blur(12px)', background: 'rgba(0,0,0,0.5)' }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backdropFilter: 'blur(8px)', background: 'rgba(28, 25, 23, 0.45)' }}
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl"
+        className="w-full max-w-md overflow-hidden"
         style={{
-          background: 'var(--color-surface)',
-          borderColor: 'color-mix(in srgb, var(--color-border) 60%, transparent)',
+          background: K.SURFACE,
+          border: `1.5px solid ${K.BORDER}`,
+          borderRadius: 16,
+          boxShadow: K.SHADOW_HOVER,
           animation: 'modalIn 0.2s ease-out',
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="relative px-6 pt-6 pb-4">
-          <div
-            className="absolute inset-0 opacity-[0.03]"
-            style={{ background: 'radial-gradient(ellipse at top, var(--color-primary), transparent 70%)' }}
-          />
-          <div className="relative flex items-center justify-between">
+        <div style={{ padding: '20px 24px 16px', borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 70%, #000))' }}
+                className="flex h-10 w-10 items-center justify-center"
+                style={{ background: K.PRIMARY_LIGHT, borderRadius: 10, color: K.PRIMARY }}
               >
-                <Layers className="h-4.5 w-4.5 text-white" />
+                <Layers size={18} strokeWidth={1.75} />
               </div>
               <div>
-                <h2 className="text-base font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>
+                <h2 style={{ fontFamily: K.FONT_DISPLAY, fontSize: 16, fontWeight: 700, color: K.TEXT_PRIMARY, lineHeight: 1.2 }}>
                   Toplu İçerik Ekle
                 </h2>
-                <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Kategori bazlı hızlı kurulum</p>
+                <p style={{ fontSize: 12, color: K.TEXT_MUTED, marginTop: 2 }}>Kategori bazlı hızlı kurulum</p>
               </div>
             </div>
-            <button onClick={onClose} className="rounded-lg p-2 transition-colors hover:bg-[var(--color-surface-hover)]">
-              <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+            <button
+              onClick={onClose}
+              style={{ padding: 8, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: K.TEXT_MUTED }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+            >
+              <X size={16} />
             </button>
           </div>
         </div>
 
-        <div className="px-6 pb-6 space-y-4">
+        <div style={{ padding: '20px 24px' }} className="space-y-4">
           <div>
-            <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+            <label style={{ display: 'block', marginBottom: 8, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: K.TEXT_MUTED }}>
               Kategori Seç
             </label>
             <select
-              className="w-full rounded-xl border px-4 py-2.5 text-sm font-medium outline-none transition-colors focus:border-[var(--color-primary)]"
-              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
+              style={{
+                width: '100%',
+                background: K.SURFACE,
+                border: `1.5px solid ${K.BORDER}`,
+                borderRadius: 10,
+                padding: '10px 14px',
+                fontSize: 14,
+                fontWeight: 500,
+                color: K.TEXT_PRIMARY,
+                outline: 'none',
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = K.PRIMARY; e.currentTarget.style.boxShadow = `0 0 0 3px ${K.PRIMARY_LIGHT}` }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = K.BORDER; e.currentTarget.style.boxShadow = 'none' }}
             >
               <option value="">Kategori seçin...</option>
               {Object.entries(CONTENT_LIBRARY_CATEGORIES).map(([key, cfg]) => {
@@ -145,42 +194,69 @@ function BulkInstallModal({ items, onClose, onSuccess }: BulkInstallModalProps) 
 
           {selectedCategory && (
             <div
-              className="flex items-center gap-3 rounded-xl p-4"
+              className="flex items-center gap-3"
               style={{
-                background: uninstalledInCategory.length > 0 ? 'var(--color-primary-light)' : 'var(--color-surface-hover)',
-                border: `1px solid ${uninstalledInCategory.length > 0 ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'transparent'}`,
+                background: uninstalledInCategory.length > 0 ? K.PRIMARY_LIGHT : K.SURFACE_HOVER,
+                border: `1px solid ${uninstalledInCategory.length > 0 ? K.PRIMARY : K.BORDER_LIGHT}`,
+                borderRadius: 12,
+                padding: 14,
               }}
             >
               {uninstalledInCategory.length > 0 ? (
                 <>
-                  <Sparkles className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary)' }} />
-                  <p className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
+                  <Sparkles size={16} style={{ color: K.PRIMARY, flexShrink: 0 }} />
+                  <p style={{ fontSize: 13, fontWeight: 600, color: K.PRIMARY }}>
                     {uninstalledInCategory.length} içerik kurumunuza eklenecek
                   </p>
                 </>
               ) : (
-                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                <p style={{ fontSize: 13, color: K.TEXT_MUTED }}>
                   Bu kategorideki tüm içerikler zaten eklenmiş.
                 </p>
               )}
             </div>
           )}
+        </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <button onClick={onClose}
-              className="rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-[var(--color-surface-hover)]"
-              style={{ color: 'var(--color-text-secondary)' }}>
-              İptal
-            </button>
-            <button
-              onClick={handleInstall}
-              disabled={!selectedCategory || loading || uninstalledInCategory.length === 0}
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white disabled:opacity-40 transition-all duration-200 hover:shadow-lg disabled:hover:shadow-none"
-              style={{ background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, #000))' }}>
-              <Plus className="h-4 w-4" />
-              {loading ? 'Ekleniyor...' : `${uninstalledInCategory.length} İçerik Ekle`}
-            </button>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '16px 24px', borderTop: `1px solid ${K.BORDER_LIGHT}`, background: K.BG }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: K.TEXT_SECONDARY,
+              background: K.SURFACE,
+              border: `1.5px solid ${K.BORDER}`,
+              borderRadius: 10,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE }}
+          >
+            İptal
+          </button>
+          <button
+            onClick={handleInstall}
+            disabled={!selectedCategory || loading || uninstalledInCategory.length === 0}
+            className="flex items-center gap-2"
+            style={{
+              padding: '10px 18px',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#fff',
+              background: !selectedCategory || loading || uninstalledInCategory.length === 0 ? K.TEXT_MUTED : K.PRIMARY,
+              border: 'none',
+              borderRadius: 10,
+              cursor: !selectedCategory || loading || uninstalledInCategory.length === 0 ? 'not-allowed' : 'pointer',
+              opacity: !selectedCategory || loading || uninstalledInCategory.length === 0 ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = K.PRIMARY_HOVER }}
+            onMouseLeave={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = K.PRIMARY }}
+          >
+            <Plus size={14} />
+            {loading ? 'Ekleniyor...' : `${uninstalledInCategory.length} İçerik Ekle`}
+          </button>
         </div>
       </div>
     </div>
@@ -210,51 +286,62 @@ function DeleteConfirmModal({ item, loading, onCancel, onConfirm }: DeleteConfir
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backdropFilter: 'blur(12px)', background: 'rgba(0,0,0,0.5)' }}
+      style={{ backdropFilter: 'blur(8px)', background: 'rgba(28, 25, 23, 0.45)' }}
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl"
+        className="w-full max-w-md overflow-hidden"
         style={{
-          background: 'var(--color-surface)',
-          borderColor: 'color-mix(in srgb, var(--color-error) 30%, var(--color-border))',
+          background: K.SURFACE,
+          border: `1.5px solid ${K.BORDER}`,
+          borderRadius: 16,
+          boxShadow: K.SHADOW_HOVER,
           animation: 'modalIn 0.2s ease-out',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start gap-4 px-6 pt-6 pb-4">
+        <div style={{ padding: '24px 24px 16px' }} className="flex items-start gap-4">
           <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-            style={{ background: 'var(--color-error-bg)' }}
+            className="flex shrink-0 items-center justify-center"
+            style={{ width: 44, height: 44, background: K.ERROR_BG, borderRadius: 12, color: K.ERROR }}
           >
-            <AlertCircle className="h-6 w-6" style={{ color: 'var(--color-error)' }} />
+            <AlertCircle size={22} strokeWidth={1.75} />
           </div>
           <div className="flex-1">
-            <h3 className="font-bold font-heading" style={{ fontSize: '16px', color: 'var(--color-text-primary)' }}>
+            <h3 style={{ fontFamily: K.FONT_DISPLAY, fontSize: 16, fontWeight: 700, color: K.TEXT_PRIMARY, lineHeight: 1.3 }}>
               İçeriği silmek istediğinize emin misiniz?
             </h3>
-            <p className="mt-1 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-              <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-                &ldquo;{item.title}&rdquo;
-              </span>{' '}
+            <p style={{ marginTop: 6, fontSize: 13, color: K.TEXT_SECONDARY, lineHeight: 1.5 }}>
+              <span style={{ fontWeight: 600, color: K.TEXT_PRIMARY }}>&ldquo;{item.title}&rdquo;</span>{' '}
               kalıcı olarak silinecek. Depolamadaki dosyalar da kaldırılacak.
             </p>
-            <p className="mt-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            <p style={{ marginTop: 8, fontSize: 12, color: K.TEXT_MUTED, lineHeight: 1.5 }}>
               Eğer bu içerik bir eğitimde kullanılıyorsa silme reddedilecek — önce ilgili eğitimi silmelisiniz.
             </p>
           </div>
         </div>
 
         <div
-          className="flex items-center justify-end gap-2 border-t px-6 py-4"
-          style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}
+          className="flex items-center justify-end gap-2"
+          style={{ padding: '16px 24px', borderTop: `1px solid ${K.BORDER_LIGHT}`, background: K.BG }}
         >
           <button
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="rounded-xl px-4 py-2 text-sm font-semibold transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
-            style={{ border: '1.5px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+            style={{
+              padding: '10px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: K.TEXT_SECONDARY,
+              background: K.SURFACE,
+              border: `1.5px solid ${K.BORDER}`,
+              borderRadius: 10,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = K.SURFACE_HOVER }}
+            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = K.SURFACE }}
           >
             Vazgeç
           </button>
@@ -262,10 +349,20 @@ function DeleteConfirmModal({ item, loading, onCancel, onConfirm }: DeleteConfir
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:shadow-lg disabled:opacity-60"
-            style={{ background: 'var(--color-error)' }}
+            className="flex items-center gap-2"
+            style={{
+              padding: '10px 16px',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#fff',
+              background: K.ERROR,
+              border: 'none',
+              borderRadius: 10,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+            }}
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 size={14} />
             {loading ? 'Siliniyor...' : 'Evet, sil'}
           </button>
         </div>
@@ -279,73 +376,83 @@ function ContentCard({ item, onInstall, installing, onDelete, deleting }: Conten
   const cat = CONTENT_LIBRARY_CATEGORIES[item.category as ContentLibraryCategoryKey]
   const diff = CONTENT_LIBRARY_DIFFICULTY[item.difficulty as ContentLibraryDifficulty]
   const roleLabels = CONTENT_LIBRARY_TARGET_ROLES.filter(r => item.targetRoles.includes(r.value))
-  const catColor = cat?.color ?? 'var(--color-primary)'
+  const catColor = cat?.color ?? K.PRIMARY
 
   return (
     <div
-      className="group relative flex flex-col overflow-hidden rounded-2xl border transition-all duration-300 hover:-translate-y-1"
+      className="group relative flex flex-col overflow-hidden"
       style={{
-        background: 'var(--color-surface)',
-        borderColor: 'var(--color-border)',
-        boxShadow: 'var(--shadow-sm)',
+        background: K.SURFACE,
+        border: `1.5px solid ${K.BORDER}`,
+        borderRadius: 14,
+        boxShadow: K.SHADOW_CARD,
+        transition: 'border-color 200ms ease, transform 260ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = `0 12px 32px -8px color-mix(in srgb, ${catColor} 20%, transparent)`
-        e.currentTarget.style.borderColor = `color-mix(in srgb, ${catColor} 30%, var(--color-border))`
+        e.currentTarget.style.boxShadow = K.SHADOW_HOVER
+        e.currentTarget.style.borderColor = K.PRIMARY
+        e.currentTarget.style.transform = 'translateY(-2px)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = 'var(--shadow-sm)'
-        e.currentTarget.style.borderColor = 'var(--color-border)'
+        e.currentTarget.style.boxShadow = K.SHADOW_CARD
+        e.currentTarget.style.borderColor = K.BORDER
+        e.currentTarget.style.transform = 'translateY(0)'
       }}
     >
-      {/* Thumbnail / Gradient Banner */}
-      <div className="relative h-36 shrink-0 overflow-hidden">
+      {/* Thumbnail / Banner — 16:9 */}
+      <div style={{ position: 'relative', aspectRatio: '16 / 9', overflow: 'hidden', flexShrink: 0, background: K.BG }}>
         {item.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={item.thumbnailUrl}
             alt={item.title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
           <div
             className="flex h-full w-full items-center justify-center"
-            style={{
-              background: `linear-gradient(135deg, color-mix(in srgb, ${catColor} 12%, var(--color-surface)), color-mix(in srgb, ${catColor} 25%, var(--color-surface)))`,
-            }}
+            style={{ background: `linear-gradient(135deg, ${catColor}14, ${catColor}28)` }}
           >
-            <div className="relative">
-              <Library className="h-12 w-12 opacity-20" style={{ color: catColor }} />
-              <div
-                className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                style={{ filter: 'blur(12px)' }}
-              >
-                <Library className="h-12 w-12 opacity-40" style={{ color: catColor }} />
-              </div>
-            </div>
+            <Library size={42} strokeWidth={1.25} style={{ color: catColor, opacity: 0.4 }} />
           </div>
         )}
 
-        {/* Gradient overlay */}
-        <div
-          className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-          style={{ background: `linear-gradient(to top, color-mix(in srgb, ${catColor} 15%, transparent), transparent 50%)` }}
-        />
-
-        {/* Badge overlay */}
-        <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
-          <span className="rounded-lg px-2.5 py-1 text-[10px] font-bold backdrop-blur-md"
-            style={{ background: `color-mix(in srgb, ${catColor} 90%, #000)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+        {/* Bottom badges */}
+        <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
+          <span
+            style={{
+              padding: '4px 10px',
+              fontSize: 10,
+              fontWeight: 700,
+              color: '#fff',
+              background: catColor,
+              borderRadius: 999,
+              letterSpacing: '0.02em',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+            }}
+          >
             {cat?.label ?? item.category}
           </span>
-          <span className="rounded-lg px-2 py-1 text-[10px] font-bold backdrop-blur-md"
-            style={{ background: `color-mix(in srgb, ${diff?.color ?? '#888'} 90%, #000)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-            {diff?.label ?? item.difficulty}
-          </span>
+          {diff && (
+            <span
+              style={{
+                padding: '4px 10px',
+                fontSize: 10,
+                fontWeight: 700,
+                color: '#fff',
+                background: diff.color,
+                borderRadius: 999,
+                letterSpacing: '0.02em',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+              }}
+            >
+              {diff.label}
+            </span>
+          )}
         </div>
 
-        {/* Top-right badges */}
-        <div className="absolute top-3 right-3 flex items-center gap-2">
+        {/* Top-right actions */}
+        <div className="absolute top-2.5 right-2.5 flex items-center gap-2">
           {item.isOwned && (
             <button
               type="button"
@@ -353,84 +460,120 @@ function ContentCard({ item, onInstall, installing, onDelete, deleting }: Conten
               disabled={deleting}
               title="İçeriği sil"
               aria-label="İçeriği sil"
-              className="flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-white backdrop-blur-md transition-all duration-200 hover:scale-105 hover:shadow-lg disabled:opacity-50"
+              className="flex items-center justify-center opacity-0 group-hover:opacity-100"
               style={{
-                background: 'var(--color-error)',
-                boxShadow: '0 4px 12px color-mix(in srgb, var(--color-error) 40%, transparent)',
-                border: '1.5px solid rgba(255,255,255,0.2)',
+                width: 30,
+                height: 30,
+                color: K.TEXT_SECONDARY,
+                background: 'rgba(255,255,255,0.92)',
+                backdropFilter: 'blur(6px)',
+                border: `1px solid ${K.BORDER}`,
+                borderRadius: 8,
+                cursor: deleting ? 'not-allowed' : 'pointer',
+                boxShadow: '0 2px 6px rgba(15, 23, 42, 0.08)',
+                transition: 'opacity 160ms ease, color 160ms ease, border-color 160ms ease',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = K.ERROR; e.currentTarget.style.borderColor = K.ERROR }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = K.TEXT_SECONDARY; e.currentTarget.style.borderColor = K.BORDER }}
             >
-              <Trash2 className="h-3.5 w-3.5" />
-              Sil
+              <Trash2 size={14} />
             </button>
           )}
           {item.isInstalled && (
-            <div className="flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-md"
-              style={{ background: 'rgba(255,255,255,0.95)', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
-              <CheckCircle2 className="h-5 w-5" style={{ color: 'var(--color-success)' }} />
+            <div
+              className="flex items-center justify-center"
+              style={{ width: 30, height: 30, background: K.SURFACE, borderRadius: 999, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
+            >
+              <CheckCircle2 size={16} style={{ color: K.SUCCESS }} />
             </div>
           )}
         </div>
       </div>
 
-      {/* İçerik */}
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <h3 className="line-clamp-2 font-bold font-heading leading-snug" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
+      {/* Content */}
+      <div className="flex flex-1 flex-col gap-3" style={{ padding: 16 }}>
+        <h3
+          className="line-clamp-2"
+          style={{ fontFamily: K.FONT_DISPLAY, fontSize: 14, fontWeight: 700, color: K.TEXT_PRIMARY, lineHeight: 1.35, letterSpacing: '-0.01em' }}
+        >
           {item.title}
         </h3>
         {item.description && (
-          <p className="line-clamp-2 text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="line-clamp-2" style={{ fontSize: 12, color: K.TEXT_MUTED, lineHeight: 1.5 }}>
             {item.description}
           </p>
         )}
 
         {/* Stats bar */}
         <div
-          className="flex items-center gap-3 rounded-xl px-3 py-2"
-          style={{ background: 'var(--color-bg)' }}
+          className="flex items-center gap-3"
+          style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}`, borderRadius: 10, padding: '8px 12px' }}
         >
           <div className="flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-            <span className="text-xs font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>
+            <Clock size={13} style={{ color: K.TEXT_MUTED }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: K.TEXT_SECONDARY }}>
               {item.duration} dk
             </span>
           </div>
-          <div className="h-3 w-px" style={{ background: 'var(--color-border)' }} />
+          <div style={{ width: 1, height: 12, background: K.BORDER }} />
           <div className="flex items-center gap-1.5">
-            <Star className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
-            <span className="text-xs font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
+            <Star size={13} style={{ color: K.ACCENT }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: K.ACCENT }}>
               {item.smgPoints} SMG
             </span>
           </div>
         </div>
 
-        {/* Hedef Roller */}
+        {/* Target roles */}
         {roleLabels.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {roleLabels.map(r => (
-              <span key={r.value} className="rounded-md px-2 py-0.5 text-[10px] font-semibold"
-                style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}>
+              <span
+                key={r.value}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: K.TEXT_SECONDARY,
+                  background: K.SURFACE_HOVER,
+                  border: `1px solid ${K.BORDER_LIGHT}`,
+                  borderRadius: 999,
+                }}
+              >
                 {r.label}
               </span>
             ))}
           </div>
         )}
 
-        {/* Eylem butonu */}
+        {/* Action */}
         <div className="mt-auto pt-1">
           {item.isInstalled ? (
             <div className="flex items-center gap-2">
-              <div className="flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
-                style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-                <CheckCircle2 className="h-4 w-4" />
-                Eklendi
+              <div
+                className="flex flex-1 items-center justify-center gap-2"
+                style={{ padding: '10px 0', fontSize: 13, fontWeight: 600, background: K.SUCCESS_BG, color: K.SUCCESS, borderRadius: 10 }}
+              >
+                <CheckCircle2 size={14} />
+                Eğitimde
               </div>
               <button
                 onClick={() => router.push('/admin/trainings')}
-                className="flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-colors hover:bg-[var(--color-surface-hover)]"
-                style={{ border: '1.5px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+                className="flex items-center gap-1"
+                style={{
+                  padding: '10px 12px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: K.TEXT_SECONDARY,
+                  background: K.SURFACE,
+                  border: `1.5px solid ${K.BORDER}`,
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER; e.currentTarget.style.borderColor = K.PRIMARY }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE; e.currentTarget.style.borderColor = K.BORDER }}
               >
-                <ArrowRight className="h-3.5 w-3.5" />
+                <ArrowRight size={13} />
                 Git
               </button>
             </div>
@@ -438,14 +581,26 @@ function ContentCard({ item, onInstall, installing, onDelete, deleting }: Conten
             <button
               onClick={() => onInstall(item.id)}
               disabled={installing}
-              className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white transition-all duration-200 disabled:opacity-50 hover:shadow-lg disabled:hover:shadow-none"
-              style={{ background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, #000))' }}
+              className="flex w-full items-center justify-center gap-2"
+              style={{
+                padding: '10px 0',
+                fontSize: 13,
+                fontWeight: 700,
+                color: '#fff',
+                background: K.PRIMARY,
+                border: 'none',
+                borderRadius: 10,
+                cursor: installing ? 'not-allowed' : 'pointer',
+                opacity: installing ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => { if (!installing) e.currentTarget.style.background = K.PRIMARY_HOVER }}
+              onMouseLeave={(e) => { if (!installing) e.currentTarget.style.background = K.PRIMARY }}
             >
               {installing ? (
                 <span>Ekleniyor...</span>
               ) : (
                 <>
-                  <GraduationCap className="h-4 w-4" />
+                  <GraduationCap size={14} />
                   Eğitim olarak ata
                 </>
               )}
@@ -491,7 +646,7 @@ function MyVideosTab() {
 
   if (isLoading) return <PageLoading />
   if (error) return (
-    <div className="flex h-64 items-center justify-center text-sm" style={{ color: 'var(--color-error)' }}>
+    <div className="flex h-64 items-center justify-center" style={{ fontSize: 13, color: K.ERROR }}>
       {error}
     </div>
   )
@@ -512,96 +667,82 @@ function MyVideosTab() {
 
   return (
     <div className="space-y-5">
-      {/* Stats + Search bar */}
-      {allItems.length > 0 && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center">
-            {[
-              { label: 'İçerik', value: allItems.length, icon: Library, color: 'var(--color-primary)' },
-              { label: 'Eğitimde', value: linkedTrainingIds.size, icon: GraduationCap, color: 'var(--color-info)' },
-              { label: 'Süre', value: `${totalDurationMin}dk`, icon: Clock, color: 'var(--color-accent)' },
-              { label: 'SMG', value: totalSmg, icon: Star, color: 'var(--color-accent)' },
-            ].map(stat => (
-              <div
-                key={stat.label}
-                className="flex items-center gap-3 rounded-xl border px-4 py-2.5"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-              >
-                <div
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                  style={{ background: `color-mix(in srgb, ${stat.color} 10%, transparent)` }}
-                >
-                  <stat.icon className="h-4 w-4" style={{ color: stat.color }} />
-                </div>
-                <div>
-                  <p className="text-base font-bold font-heading leading-none" style={{ color: 'var(--color-text-primary)' }}>
-                    {stat.value}
-                  </p>
-                  <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                    {stat.label}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Section header */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 style={{ fontFamily: K.FONT_DISPLAY, fontSize: 20, fontWeight: 700, color: K.TEXT_PRIMARY, letterSpacing: '-0.018em' }}>
+            Eğitim Videolarım
+          </h2>
+          <p style={{ marginTop: 4, fontSize: 13, color: K.TEXT_MUTED }}>
+            Kurumunuzun eğitimlerinde kullanılan içerikler — {allItems.length} öğe · {linkedTrainingIds.size} eğitime bağlı · {totalDurationMin}dk
+          </p>
+        </div>
+      </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
+      {/* KPI bar */}
+      {allItems.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <KStatCard title="Toplam İçerik" value={allItems.length} icon={Library} accentColor={K.PRIMARY} />
+          <KStatCard title="Eğitime Bağlı" value={linkedTrainingIds.size} icon={GraduationCap} accentColor={K.INFO} />
+          <KStatCard title="Toplam Süre" value={`${totalDurationMin}dk`} icon={Clock} accentColor={K.WARNING} />
+          <KStatCard title="SMG Puanı" value={totalSmg} icon={Star} accentColor={K.ACCENT} />
+        </div>
+      )}
+
+      {/* Search */}
+      {allItems.length > 0 && (
+        <div className="flex items-center justify-end">
+          <div style={{ position: 'relative', width: 280 }}>
+            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: K.TEXT_MUTED }} />
             <input
               type="text"
               placeholder="İçerik ara..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="rounded-xl border py-2 pl-9 pr-4 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
-              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', width: '220px' }}
+              style={{
+                width: '100%',
+                height: 40,
+                padding: '0 12px 0 38px',
+                fontSize: 13,
+                background: K.SURFACE,
+                border: `1.5px solid ${K.BORDER}`,
+                borderRadius: 10,
+                color: K.TEXT_PRIMARY,
+                outline: 'none',
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = K.PRIMARY; e.currentTarget.style.boxShadow = `0 0 0 3px ${K.PRIMARY_LIGHT}` }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = K.BORDER; e.currentTarget.style.boxShadow = 'none' }}
             />
           </div>
         </div>
       )}
 
-      {/* Kategori Filtreleri */}
+      {/* Category filter pills */}
       {allItems.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <FilterPill
+            active={!categoryFilter}
             onClick={() => setCategoryFilter(null)}
-            className="rounded-xl px-4 py-2 text-[11px] font-bold transition-all duration-200"
-            style={{
-              background: !categoryFilter ? 'var(--color-primary)' : 'var(--color-surface)',
-              color: !categoryFilter ? '#fff' : 'var(--color-text-muted)',
-              border: `1.5px solid ${!categoryFilter ? 'var(--color-primary)' : 'var(--color-border)'}`,
-              boxShadow: !categoryFilter ? '0 4px 12px color-mix(in srgb, var(--color-primary) 25%, transparent)' : 'none',
-            }}
-          >
-            Tümü ({allItems.length})
-          </button>
+            label={`Tümü (${allItems.length})`}
+          />
           {Object.entries(CONTENT_LIBRARY_CATEGORIES).map(([key, cfg]) => {
             const count = allItems.filter(i => i.category === key).length
             if (count === 0) return null
             const active = categoryFilter === key
             return (
-              <button
+              <FilterPill
                 key={key}
+                active={active}
                 onClick={() => setCategoryFilter(active ? null : key)}
-                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[11px] font-bold transition-all duration-200"
-                style={{
-                  background: active ? cfg.color : 'var(--color-surface)',
-                  color: active ? '#fff' : 'var(--color-text-muted)',
-                  border: `1.5px solid ${active ? cfg.color : 'var(--color-border)'}`,
-                  boxShadow: active ? `0 4px 12px color-mix(in srgb, ${cfg.color} 25%, transparent)` : 'none',
-                }}
-              >
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ background: active ? '#fff' : cfg.color }}
-                />
-                {cfg.label} ({count})
-              </button>
+                label={`${cfg.label} (${count})`}
+                color={cfg.color}
+              />
             )
           })}
         </div>
       )}
 
-      {/* İçerik Kartları */}
+      {/* Cards */}
       {filtered.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map(item => (
@@ -613,46 +754,122 @@ function MyVideosTab() {
           ))}
         </div>
       ) : (
-        <div
-          className="flex flex-col items-center justify-center rounded-2xl border py-20 gap-5"
-          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        <EmptyState
+          icon={searchQuery ? Search : Film}
+          title={
+            searchQuery
+              ? `"${searchQuery}" için sonuç bulunamadı`
+              : categoryFilter
+                ? 'Bu kategoride kullanılan içerik yok'
+                : 'Henüz bir eğitime bağlanmış içerik yok'
+          }
+          description={
+            searchQuery
+              ? 'Farklı bir arama deneyin'
+              : categoryFilter
+                ? 'Filtreyi temizleyerek tümünü görün'
+                : "Platform Kütüphanesi'nden bir içeriği eğitim olarak atadığınızda burada görünür"
+          }
+          action={(categoryFilter || searchQuery) ? {
+            label: 'Filtreleri Temizle',
+            onClick: () => { setCategoryFilter(null); setSearchQuery('') },
+          } : undefined}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Reusable Filter Pill ──────────────────────────────────────────────────
+
+interface FilterPillProps {
+  active: boolean
+  onClick: () => void
+  label: string
+  color?: string
+}
+
+function FilterPill({ active, onClick, label, color }: FilterPillProps) {
+  const accent = color ?? K.PRIMARY
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '8px 14px',
+        fontSize: 12,
+        fontWeight: 600,
+        borderRadius: 999,
+        background: active ? accent : K.SURFACE,
+        color: active ? '#fff' : K.TEXT_SECONDARY,
+        border: `1.5px solid ${active ? accent : K.BORDER}`,
+        cursor: 'pointer',
+        transition: 'background 160ms ease, color 160ms ease, border-color 160ms ease',
+        whiteSpace: 'nowrap',
+      }}
+      onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = K.SURFACE_HOVER; e.currentTarget.style.borderColor = accent } }}
+      onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = K.SURFACE; e.currentTarget.style.borderColor = K.BORDER } }}
+    >
+      {!active && color && (
+        <span style={{ width: 7, height: 7, borderRadius: 999, background: color }} />
+      )}
+      {label}
+    </button>
+  )
+}
+
+// ── Reusable Empty State ──────────────────────────────────────────────────
+
+interface EmptyStateProps {
+  icon: React.ElementType
+  title: string
+  description: string
+  action?: { label: string; onClick: () => void }
+}
+
+function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center text-center"
+      style={{
+        background: K.SURFACE,
+        border: `1.5px solid ${K.BORDER}`,
+        borderRadius: 14,
+        padding: '64px 24px',
+        gap: 16,
+      }}
+    >
+      <div
+        className="flex items-center justify-center"
+        style={{ width: 56, height: 56, background: K.BG, border: `1.5px solid ${K.BORDER_LIGHT}`, borderRadius: 14, color: K.TEXT_MUTED }}
+      >
+        <Icon size={28} strokeWidth={1.5} />
+      </div>
+      <div>
+        <p style={{ fontFamily: K.FONT_DISPLAY, fontSize: 15, fontWeight: 700, color: K.TEXT_PRIMARY }}>{title}</p>
+        <p style={{ marginTop: 4, fontSize: 12, color: K.TEXT_MUTED }}>{description}</p>
+      </div>
+      {action && (
+        <button
+          onClick={action.onClick}
+          className="flex items-center gap-1.5"
+          style={{
+            padding: '8px 14px',
+            fontSize: 12,
+            fontWeight: 600,
+            color: K.TEXT_SECONDARY,
+            background: K.SURFACE,
+            border: `1.5px solid ${K.BORDER}`,
+            borderRadius: 10,
+            cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE }}
         >
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-2xl"
-            style={{ background: 'var(--color-bg)' }}
-          >
-            {searchQuery ? (
-              <Search className="h-8 w-8" style={{ color: 'var(--color-text-muted)' }} />
-            ) : (
-              <Film className="h-8 w-8" style={{ color: 'var(--color-text-muted)' }} />
-            )}
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-bold" style={{ color: 'var(--color-text-secondary)' }}>
-              {searchQuery
-                ? `"${searchQuery}" için sonuç bulunamadı`
-                : categoryFilter
-                  ? 'Bu kategoride kullanılan içerik yok'
-                  : 'Henüz bir eğitime bağlanmış içerik yok'}
-            </p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              {searchQuery
-                ? 'Farklı bir arama deneyin'
-                : categoryFilter
-                  ? 'Filtreyi temizleyerek tümünü görün'
-                  : 'Platform Kütüphanesi\'nden bir içeriği eğitim olarak atadığınızda burada görünür'}
-            </p>
-          </div>
-          {(categoryFilter || searchQuery) && (
-            <button
-              onClick={() => { setCategoryFilter(null); setSearchQuery('') }}
-              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-colors hover:bg-[var(--color-surface-hover)]"
-              style={{ border: '1.5px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
-            >
-              <X className="h-3.5 w-3.5" /> Filtreleri Temizle
-            </button>
-          )}
-        </div>
+          <X size={13} /> {action.label}
+        </button>
       )}
     </div>
   )
@@ -672,124 +889,163 @@ interface MyVideoCardProps {
 function MyVideoCard({ item, onNavigate }: MyVideoCardProps) {
   const cat = CONTENT_LIBRARY_CATEGORIES[item.category as ContentLibraryCategoryKey]
   const diff = CONTENT_LIBRARY_DIFFICULTY[item.difficulty as ContentLibraryDifficulty]
-  const catColor = cat?.color ?? 'var(--color-primary)'
+  const catColor = cat?.color ?? K.PRIMARY
   const primaryTraining = item.usedInTrainings[0]
 
   return (
     <div
-      className="group relative flex flex-col overflow-hidden rounded-2xl border transition-all duration-300 hover:-translate-y-1"
+      className="group relative flex flex-col overflow-hidden"
       style={{
-        background: 'var(--color-surface)',
-        borderColor: 'var(--color-border)',
-        boxShadow: 'var(--shadow-sm)',
+        background: K.SURFACE,
+        border: `1.5px solid ${K.BORDER}`,
+        borderRadius: 14,
+        boxShadow: K.SHADOW_CARD,
+        transition: 'border-color 200ms ease, transform 260ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = `0 12px 32px -8px color-mix(in srgb, ${catColor} 20%, transparent)`
-        e.currentTarget.style.borderColor = `color-mix(in srgb, ${catColor} 30%, var(--color-border))`
+        e.currentTarget.style.boxShadow = K.SHADOW_HOVER
+        e.currentTarget.style.borderColor = K.PRIMARY
+        e.currentTarget.style.transform = 'translateY(-2px)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = 'var(--shadow-sm)'
-        e.currentTarget.style.borderColor = 'var(--color-border)'
+        e.currentTarget.style.boxShadow = K.SHADOW_CARD
+        e.currentTarget.style.borderColor = K.BORDER
+        e.currentTarget.style.transform = 'translateY(0)'
       }}
     >
-      {/* Thumbnail */}
-      <div className="relative h-36 shrink-0 overflow-hidden">
+      {/* Thumbnail — 16:9 */}
+      <div style={{ position: 'relative', aspectRatio: '16 / 9', overflow: 'hidden', flexShrink: 0, background: K.BG }}>
         {item.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={item.thumbnailUrl}
             alt={item.title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
           <div
             className="flex h-full w-full items-center justify-center"
-            style={{
-              background: `linear-gradient(135deg, color-mix(in srgb, ${catColor} 12%, var(--color-surface)), color-mix(in srgb, ${catColor} 25%, var(--color-surface)))`,
-            }}
+            style={{ background: `linear-gradient(135deg, ${catColor}14, ${catColor}28)` }}
           >
-            <Library className="h-12 w-12 opacity-20" style={{ color: catColor }} />
+            <Library size={42} strokeWidth={1.25} style={{ color: catColor, opacity: 0.4 }} />
           </div>
         )}
 
-        {/* Kategori / zorluk rozetleri */}
-        <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+        {/* Bottom badges */}
+        <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
           <span
-            className="rounded-lg px-2.5 py-1 text-[10px] font-bold backdrop-blur-md"
-            style={{ background: `color-mix(in srgb, ${catColor} 90%, #000)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+            style={{
+              padding: '4px 10px',
+              fontSize: 10,
+              fontWeight: 700,
+              color: '#fff',
+              background: catColor,
+              borderRadius: 999,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+            }}
           >
             {cat?.label ?? item.category}
           </span>
-          <span
-            className="rounded-lg px-2 py-1 text-[10px] font-bold backdrop-blur-md"
-            style={{ background: `color-mix(in srgb, ${diff?.color ?? '#888'} 90%, #000)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-          >
-            {diff?.label ?? item.difficulty}
-          </span>
+          {diff && (
+            <span
+              style={{
+                padding: '4px 10px',
+                fontSize: 10,
+                fontWeight: 700,
+                color: '#fff',
+                background: diff.color,
+                borderRadius: 999,
+                boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+              }}
+            >
+              {diff.label}
+            </span>
+          )}
         </div>
 
-        {/* Kullanım rozeti */}
-        <div className="absolute top-3 right-3">
+        {/* Usage badge — top-right */}
+        <div className="absolute top-2.5 right-2.5">
           <div
-            className="flex items-center gap-1 rounded-full px-2.5 py-1 backdrop-blur-md"
-            style={{ background: 'rgba(255,255,255,0.95)', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+            className="flex items-center gap-1"
+            style={{
+              padding: '4px 10px',
+              background: K.SURFACE,
+              borderRadius: 999,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+              border: `1px solid ${K.SUCCESS_BG}`,
+            }}
           >
-            <GraduationCap className="h-3.5 w-3.5" style={{ color: 'var(--color-success)' }} />
-            <span className="text-[10px] font-bold" style={{ color: 'var(--color-success)' }}>
-              {item.usageCount} eğitim
+            <GraduationCap size={12} style={{ color: K.SUCCESS }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: K.SUCCESS }}>
+              Eğitimde {item.usageCount}
             </span>
           </div>
         </div>
       </div>
 
-      {/* İçerik */}
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <h3 className="line-clamp-2 font-bold font-heading leading-snug" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
+      {/* Content */}
+      <div className="flex flex-1 flex-col gap-3" style={{ padding: 16 }}>
+        <h3
+          className="line-clamp-2"
+          style={{ fontFamily: K.FONT_DISPLAY, fontSize: 14, fontWeight: 700, color: K.TEXT_PRIMARY, lineHeight: 1.35, letterSpacing: '-0.01em' }}
+        >
           {item.title}
         </h3>
         {item.description && (
-          <p className="line-clamp-2 text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="line-clamp-2" style={{ fontSize: 12, color: K.TEXT_MUTED, lineHeight: 1.5 }}>
             {item.description}
           </p>
         )}
 
         {/* Stats */}
         <div
-          className="flex items-center gap-3 rounded-xl px-3 py-2"
-          style={{ background: 'var(--color-bg)' }}
+          className="flex items-center gap-3"
+          style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}`, borderRadius: 10, padding: '8px 12px' }}
         >
           <div className="flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-            <span className="text-xs font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>
+            <Clock size={13} style={{ color: K.TEXT_MUTED }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: K.TEXT_SECONDARY }}>
               {item.duration} dk
             </span>
           </div>
-          <div className="h-3 w-px" style={{ background: 'var(--color-border)' }} />
+          <div style={{ width: 1, height: 12, background: K.BORDER }} />
           <div className="flex items-center gap-1.5">
-            <Star className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
-            <span className="text-xs font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
+            <Star size={13} style={{ color: K.ACCENT }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: K.ACCENT }}>
               {item.smgPoints} SMG
             </span>
           </div>
         </div>
 
-        {/* Eğitim linki */}
+        {/* Linked training */}
         {primaryTraining && (
           <div className="mt-auto pt-1">
             <button
               onClick={() => onNavigate(primaryTraining.id)}
-              className="flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition-colors hover:bg-[var(--color-surface-hover)]"
-              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+              className="flex w-full items-center justify-between gap-2"
+              style={{
+                padding: '10px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                textAlign: 'left',
+                color: K.TEXT_SECONDARY,
+                background: K.SURFACE,
+                border: `1.5px solid ${K.BORDER}`,
+                borderRadius: 10,
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = K.PRIMARY_LIGHT; e.currentTarget.style.borderColor = K.PRIMARY; e.currentTarget.style.color = K.PRIMARY }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE; e.currentTarget.style.borderColor = K.BORDER; e.currentTarget.style.color = K.TEXT_SECONDARY }}
             >
               <span className="flex min-w-0 items-center gap-2">
-                <GraduationCap className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-primary)' }} />
+                <GraduationCap size={13} style={{ color: K.PRIMARY, flexShrink: 0 }} />
                 <span className="truncate">
                   {item.usageCount > 1
                     ? `${primaryTraining.title} +${item.usageCount - 1}`
                     : primaryTraining.title}
                 </span>
               </span>
-              <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+              <ArrowRight size={13} style={{ flexShrink: 0 }} />
             </button>
           </div>
         )}
@@ -995,60 +1251,111 @@ function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
     }
   }, [selectedFiles, title, category, description, difficulty, targetRoles, smgPoints, toast, onSuccess, onClose])
 
+  const inputBaseStyle: React.CSSProperties = {
+    width: '100%',
+    background: K.SURFACE,
+    border: `1.5px solid ${K.BORDER}`,
+    borderRadius: 10,
+    padding: '10px 14px',
+    fontSize: 13,
+    color: K.TEXT_PRIMARY,
+    outline: 'none',
+  }
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    marginBottom: 6,
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: K.TEXT_MUTED,
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backdropFilter: 'blur(12px)', background: 'rgba(0,0,0,0.5)' }}
+      style={{ backdropFilter: 'blur(8px)', background: 'rgba(28, 25, 23, 0.45)' }}
     >
       <div
-        className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl"
+        className="w-full max-w-xl max-h-[90vh] overflow-y-auto"
         style={{
-          background: 'var(--color-surface)',
-          borderColor: 'color-mix(in srgb, var(--color-border) 60%, transparent)',
+          background: K.SURFACE,
+          border: `1.5px solid ${K.BORDER}`,
+          borderRadius: 16,
+          boxShadow: K.SHADOW_HOVER,
           animation: 'modalIn 0.2s ease-out',
         }}
       >
-        <div className="flex items-center justify-between px-6 pt-6 pb-4">
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: `1px solid ${K.BORDER_LIGHT}`, position: 'sticky', top: 0, background: K.SURFACE, zIndex: 1 }} className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-xl"
-              style={{ background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 70%, #000))' }}
+              className="flex items-center justify-center"
+              style={{ width: 40, height: 40, background: K.PRIMARY_LIGHT, borderRadius: 10, color: K.PRIMARY }}
             >
-              <Upload className="h-4.5 w-4.5 text-white" />
+              <Upload size={18} strokeWidth={1.75} />
             </div>
             <div>
-              <h2 className="text-base font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>
+              <h2 style={{ fontFamily: K.FONT_DISPLAY, fontSize: 16, fontWeight: 700, color: K.TEXT_PRIMARY }}>
                 İçerik Yükle
               </h2>
-              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Video, PDF veya ses dosyası</p>
+              <p style={{ fontSize: 12, color: K.TEXT_MUTED, marginTop: 2 }}>Video, PDF veya ses dosyası</p>
             </div>
           </div>
           <button
             onClick={onClose}
             disabled={uploading}
-            className="rounded-lg p-2 transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+            style={{ padding: 8, borderRadius: 10, background: 'transparent', border: 'none', cursor: uploading ? 'not-allowed' : 'pointer', color: K.TEXT_MUTED, opacity: uploading ? 0.5 : 1 }}
+            onMouseEnter={(e) => { if (!uploading) e.currentTarget.style.background = K.SURFACE_HOVER }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
           >
-            <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+            <X size={16} />
           </button>
         </div>
 
-        <div className="px-6 pb-6 space-y-4">
-          {/* Dosya seç */}
+        <div style={{ padding: '20px 24px' }} className="space-y-4">
+          {/* Drop zone */}
           <div>
-            <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-              Dosya <span style={{ color: 'var(--color-error)' }}>*</span>
+            <label style={labelStyle}>
+              Dosya <span style={{ color: K.ERROR }}>*</span>
             </label>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-sm font-medium transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
-              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+              className="flex w-full flex-col items-center justify-center gap-2"
+              style={{
+                background: selectedFiles.length > 0 ? K.PRIMARY_LIGHT : K.BG,
+                border: `2px dashed ${selectedFiles.length > 0 ? K.PRIMARY : K.BORDER}`,
+                borderRadius: 14,
+                padding: '36px 16px',
+                fontSize: 13,
+                fontWeight: 500,
+                color: selectedFiles.length > 0 ? K.PRIMARY : K.TEXT_SECONDARY,
+                cursor: uploading ? 'not-allowed' : 'pointer',
+                opacity: uploading ? 0.5 : 1,
+                transition: 'background 200ms ease, border-color 200ms ease, color 200ms ease',
+              }}
+              onMouseEnter={(e) => {
+                if (uploading) return
+                e.currentTarget.style.background = K.PRIMARY_LIGHT
+                e.currentTarget.style.borderColor = K.PRIMARY
+                e.currentTarget.style.color = K.PRIMARY
+              }}
+              onMouseLeave={(e) => {
+                if (uploading || selectedFiles.length > 0) return
+                e.currentTarget.style.background = K.BG
+                e.currentTarget.style.borderColor = K.BORDER
+                e.currentTarget.style.color = K.TEXT_SECONDARY
+              }}
             >
-              <Upload className="h-4 w-4" />
-              {selectedFiles.length > 0
-                ? `${selectedFiles.length} dosya seçildi`
-                : 'Dosya seç (video, PDF, ses)'}
+              <Upload size={26} strokeWidth={1.5} />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>
+                {selectedFiles.length > 0
+                  ? `${selectedFiles.length} dosya seçildi`
+                  : 'Buraya bırakın veya tıklayın'}
+              </span>
+              <span style={{ fontSize: 11, color: K.TEXT_MUTED }}>video · ses · PDF · pptx</span>
             </button>
             <input
               ref={fileInputRef}
@@ -1062,18 +1369,25 @@ function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
               }}
             />
             {selectedFiles.length > 0 && (
-              <ul className="mt-2 space-y-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              <ul style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {selectedFiles.map(f => (
-                  <li key={f.name} className="truncate">• {f.name}</li>
+                  <li
+                    key={f.name}
+                    className="flex items-center gap-2"
+                    style={{ fontSize: 12, color: K.TEXT_SECONDARY, padding: '4px 8px', background: K.BG, borderRadius: 6 }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: 999, background: K.PRIMARY, flexShrink: 0 }} />
+                    <span className="truncate">{f.name}</span>
+                  </li>
                 ))}
               </ul>
             )}
           </div>
 
-          {/* Başlık */}
+          {/* Title */}
           <div>
-            <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-              Başlık <span style={{ color: 'var(--color-error)' }}>*</span>
+            <label style={labelStyle}>
+              Başlık <span style={{ color: K.ERROR }}>*</span>
             </label>
             <input
               type="text"
@@ -1081,22 +1395,24 @@ function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
               onChange={e => setTitle(e.target.value)}
               disabled={uploading}
               placeholder="Örn. Enfeksiyon Kontrolü Eğitimi"
-              className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
-              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+              style={inputBaseStyle}
+              onFocus={(e) => { e.currentTarget.style.borderColor = K.PRIMARY; e.currentTarget.style.boxShadow = `0 0 0 3px ${K.PRIMARY_LIGHT}` }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = K.BORDER; e.currentTarget.style.boxShadow = 'none' }}
             />
           </div>
 
-          {/* Kategori */}
+          {/* Category */}
           <div>
-            <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-              Kategori <span style={{ color: 'var(--color-error)' }}>*</span>
+            <label style={labelStyle}>
+              Kategori <span style={{ color: K.ERROR }}>*</span>
             </label>
             <select
               value={category}
               onChange={e => setCategory(e.target.value)}
               disabled={uploading}
-              className="w-full rounded-xl border px-4 py-2.5 text-sm font-medium outline-none transition-colors focus:border-[var(--color-primary)]"
-              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+              style={{ ...inputBaseStyle, fontWeight: 500 }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = K.PRIMARY; e.currentTarget.style.boxShadow = `0 0 0 3px ${K.PRIMARY_LIGHT}` }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = K.BORDER; e.currentTarget.style.boxShadow = 'none' }}
             >
               <option value="">Kategori seçin...</option>
               {Object.entries(CONTENT_LIBRARY_CATEGORIES).map(([key, cfg]) => (
@@ -1105,37 +1421,37 @@ function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
             </select>
           </div>
 
-          {/* Açıklama (opsiyonel) */}
+          {/* Description */}
           <div>
-            <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-              Açıklama <span style={{ color: 'var(--color-text-muted)' }}>(opsiyonel)</span>
+            <label style={labelStyle}>
+              Açıklama <span style={{ color: K.TEXT_MUTED, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(opsiyonel)</span>
             </label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               disabled={uploading}
               rows={2}
-              className="w-full resize-none rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
-              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+              style={{ ...inputBaseStyle, resize: 'none' }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = K.PRIMARY; e.currentTarget.style.boxShadow = `0 0 0 3px ${K.PRIMARY_LIGHT}` }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = K.BORDER; e.currentTarget.style.boxShadow = 'none' }}
             />
           </div>
 
-          {/* Opsiyonel alanlar */}
-          <details className="group">
-            <summary className="cursor-pointer text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+          {/* Advanced */}
+          <details>
+            <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: K.TEXT_SECONDARY, padding: '6px 0' }}>
               Gelişmiş seçenekler (opsiyonel)
             </summary>
             <div className="mt-3 space-y-3">
               <div>
-                <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                  Zorluk
-                </label>
+                <label style={labelStyle}>Zorluk</label>
                 <select
                   value={difficulty}
                   onChange={e => setDifficulty(e.target.value)}
                   disabled={uploading}
-                  className="w-full rounded-xl border px-4 py-2.5 text-sm font-medium outline-none transition-colors focus:border-[var(--color-primary)]"
-                  style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                  style={{ ...inputBaseStyle, fontWeight: 500 }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = K.PRIMARY; e.currentTarget.style.boxShadow = `0 0 0 3px ${K.PRIMARY_LIGHT}` }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = K.BORDER; e.currentTarget.style.boxShadow = 'none' }}
                 >
                   {Object.entries(CONTENT_LIBRARY_DIFFICULTY).map(([key, cfg]) => (
                     <option key={key} value={key}>{cfg.label}</option>
@@ -1144,9 +1460,7 @@ function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
               </div>
 
               <div>
-                <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                  Hedef Roller
-                </label>
+                <label style={labelStyle}>Hedef Roller</label>
                 <div className="flex flex-wrap gap-2">
                   {CONTENT_LIBRARY_TARGET_ROLES.map(r => {
                     const active = targetRoles.includes(r.value)
@@ -1156,11 +1470,16 @@ function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
                         type="button"
                         onClick={() => toggleRole(r.value)}
                         disabled={uploading}
-                        className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
                         style={{
-                          background: active ? 'var(--color-primary)' : 'var(--color-surface)',
-                          color: active ? '#fff' : 'var(--color-text-secondary)',
-                          border: `1.5px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                          padding: '6px 12px',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: active ? '#fff' : K.TEXT_SECONDARY,
+                          background: active ? K.PRIMARY : K.SURFACE,
+                          border: `1.5px solid ${active ? K.PRIMARY : K.BORDER}`,
+                          borderRadius: 999,
+                          cursor: uploading ? 'not-allowed' : 'pointer',
+                          opacity: uploading ? 0.5 : 1,
                         }}
                       >
                         {r.label}
@@ -1171,9 +1490,7 @@ function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
               </div>
 
               <div>
-                <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                  SMG Puanı
-                </label>
+                <label style={labelStyle}>SMG Puanı</label>
                 <input
                   type="number"
                   min={0}
@@ -1181,8 +1498,9 @@ function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
                   onChange={e => setSmgPoints(e.target.value === '' ? '' : Number(e.target.value))}
                   disabled={uploading}
                   placeholder="0"
-                  className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
-                  style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                  style={inputBaseStyle}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = K.PRIMARY; e.currentTarget.style.boxShadow = `0 0 0 3px ${K.PRIMARY_LIGHT}` }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = K.BORDER; e.currentTarget.style.boxShadow = 'none' }}
                 />
               </div>
             </div>
@@ -1190,39 +1508,33 @@ function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
 
           {/* Progress */}
           {Object.keys(progress).length > 0 && (
-            <div className="space-y-2 rounded-xl p-3" style={{ background: 'var(--color-bg)' }}>
+            <div
+              className="space-y-2"
+              style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}`, borderRadius: 12, padding: 12 }}
+            >
               {Object.values(progress).map(p => {
                 const pct = p.total > 0 ? Math.min(100, Math.round((p.loaded / p.total) * 100)) : 0
+                const pctColor =
+                  p.status === 'error' ? K.ERROR
+                    : p.status === 'done' ? K.SUCCESS
+                      : K.PRIMARY
                 return (
                   <div key={p.fileName} className="space-y-1">
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="flex items-center gap-1.5 truncate" style={{ color: 'var(--color-text-primary)' }}>
-                        {p.status === 'error' && <AlertCircle className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-error)' }} />}
-                        {p.status === 'done' && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-success)' }} />}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 truncate" style={{ fontSize: 12, color: K.TEXT_PRIMARY }}>
+                        {p.status === 'error' && <AlertCircle size={13} style={{ color: K.ERROR, flexShrink: 0 }} />}
+                        {p.status === 'done' && <CheckCircle2 size={13} style={{ color: K.SUCCESS, flexShrink: 0 }} />}
                         <span className="truncate">{p.fileName}</span>
                       </span>
                       <span
-                        className="shrink-0 font-mono text-[10px] font-bold tabular-nums"
-                        style={{
-                          color:
-                            p.status === 'error' ? 'var(--color-error)'
-                              : p.status === 'done' ? 'var(--color-success)'
-                                : 'var(--color-primary)',
-                        }}
+                        style={{ flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: pctColor, fontVariantNumeric: 'tabular-nums' }}
                       >
                         {p.status === 'error' ? 'HATA' : `${pct}%`}
                       </span>
                     </div>
-                    <div className="h-1 overflow-hidden rounded-full" style={{ background: 'var(--color-border)' }}>
+                    <div style={{ height: 4, overflow: 'hidden', borderRadius: 999, background: K.BORDER_LIGHT }}>
                       <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${pct}%`,
-                          background:
-                            p.status === 'error' ? 'var(--color-error)'
-                              : p.status === 'done' ? 'var(--color-success)'
-                                : 'var(--color-primary)',
-                        }}
+                        style={{ height: '100%', width: `${pct}%`, background: pctColor, transition: 'width 200ms ease' }}
                       />
                     </div>
                   </div>
@@ -1230,26 +1542,53 @@ function UploadContentModal({ onClose, onSuccess }: UploadContentModalProps) {
               })}
             </div>
           )}
+        </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              disabled={uploading}
-              className="rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              İptal
-            </button>
-            <button
-              onClick={handleUpload}
-              disabled={uploading || selectedFiles.length === 0 || !title.trim() || !category}
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all duration-200 disabled:opacity-40 hover:shadow-lg disabled:hover:shadow-none"
-              style={{ background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, #000))' }}
-            >
-              <Upload className="h-4 w-4" />
-              {uploading ? 'Yükleniyor...' : 'Yükle'}
-            </button>
-          </div>
+        {/* Footer */}
+        <div
+          className="flex items-center justify-end gap-2"
+          style={{ padding: '16px 24px', borderTop: `1px solid ${K.BORDER_LIGHT}`, background: K.BG, position: 'sticky', bottom: 0 }}
+        >
+          <button
+            onClick={onClose}
+            disabled={uploading}
+            style={{
+              padding: '10px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: K.TEXT_SECONDARY,
+              background: K.SURFACE,
+              border: `1.5px solid ${K.BORDER}`,
+              borderRadius: 10,
+              cursor: uploading ? 'not-allowed' : 'pointer',
+              opacity: uploading ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => { if (!uploading) e.currentTarget.style.background = K.SURFACE_HOVER }}
+            onMouseLeave={(e) => { if (!uploading) e.currentTarget.style.background = K.SURFACE }}
+          >
+            İptal
+          </button>
+          <button
+            onClick={handleUpload}
+            disabled={uploading || selectedFiles.length === 0 || !title.trim() || !category}
+            className="flex items-center gap-2"
+            style={{
+              padding: '10px 18px',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#fff',
+              background: K.PRIMARY,
+              border: 'none',
+              borderRadius: 10,
+              cursor: (uploading || selectedFiles.length === 0 || !title.trim() || !category) ? 'not-allowed' : 'pointer',
+              opacity: (uploading || selectedFiles.length === 0 || !title.trim() || !category) ? 0.4 : 1,
+            }}
+            onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = K.PRIMARY_HOVER }}
+            onMouseLeave={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = K.PRIMARY }}
+          >
+            <Upload size={14} />
+            {uploading ? 'Yükleniyor...' : 'Yükle'}
+          </button>
         </div>
       </div>
     </div>
@@ -1271,7 +1610,7 @@ function PlatformLibraryTab() {
 
   if (isLoading) return <PageLoading />
   if (error) return (
-    <div className="flex h-64 items-center justify-center text-sm" style={{ color: 'var(--color-error)' }}>
+    <div className="flex h-64 items-center justify-center" style={{ fontSize: 13, color: K.ERROR }}>
       {error}
     </div>
   )
@@ -1285,6 +1624,8 @@ function PlatformLibraryTab() {
     : afterCategory
   const installedCount = allItems.filter(i => i.isInstalled).length
   const installRate = allItems.length > 0 ? Math.round((installedCount / allItems.length) * 100) : 0
+  const totalDurationMin = allItems.reduce((s, i) => s + i.duration, 0)
+  const totalSmg = allItems.reduce((s, i) => s + i.smgPoints, 0)
 
   const handleInstall = async (id: string) => {
     setInstallingId(id)
@@ -1345,115 +1686,118 @@ function PlatformLibraryTab() {
         />
       )}
 
-      {/* Stats + Search + Actions bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          {/* Progress indicator */}
-          <div className="flex items-center gap-3">
-            <div className="relative h-10 w-10">
-              <svg className="h-10 w-10 -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--color-border)" strokeWidth="3" />
-                <circle
-                  cx="18" cy="18" r="15.5" fill="none"
-                  stroke="var(--color-primary)" strokeWidth="3"
-                  strokeDasharray={`${installRate} 100`}
-                  strokeLinecap="round"
-                  style={{ transition: 'stroke-dasharray 0.6s ease' }}
-                />
-              </svg>
-              <span
-                className="absolute inset-0 flex items-center justify-center text-[9px] font-bold"
-                style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}
-              >
-                {installRate}%
-              </span>
-            </div>
-            <div>
-              <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
-                {installedCount}/{allItems.length} içerik
-              </p>
-              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>kurumunuza eklendi</p>
-            </div>
-          </div>
+      {/* Section header */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 style={{ fontFamily: K.FONT_DISPLAY, fontSize: 20, fontWeight: 700, color: K.TEXT_PRIMARY, letterSpacing: '-0.018em' }}>
+            Platform Kütüphanesi
+          </h2>
+          <p style={{ marginTop: 4, fontSize: 13, color: K.TEXT_MUTED }}>
+            Hazır eğitim içerikleri — kuruma eklediğiniz oran <strong style={{ color: K.PRIMARY, fontWeight: 700 }}>%{installRate}</strong> ({installedCount}/{allItems.length})
+          </p>
         </div>
-
         <div className="flex items-center gap-2">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
-            <input
-              type="text"
-              placeholder="İçerik ara..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="rounded-xl border py-2 pl-9 pr-4 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
-              style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', width: '220px' }}
-            />
-          </div>
-
-          {/* İçerik Yükle */}
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition-all duration-200 hover:shadow-lg"
-            style={{ background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, #000))' }}
-          >
-            <Plus className="h-4 w-4" />
-            İçerik Yükle
-          </button>
-
-          {/* Toplu Ekle */}
           <button
             onClick={() => setShowBulkModal(true)}
-            className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition-colors hover:bg-[var(--color-surface-hover)]"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            className="flex items-center gap-2"
+            style={{
+              padding: '10px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: K.TEXT_SECONDARY,
+              background: K.SURFACE,
+              border: `1.5px solid ${K.BORDER}`,
+              borderRadius: 10,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER; e.currentTarget.style.borderColor = K.PRIMARY }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE; e.currentTarget.style.borderColor = K.BORDER }}
           >
-            <Layers className="h-4 w-4" />
+            <Layers size={15} />
             Toplu Ekle
+          </button>
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="flex items-center gap-2"
+            style={{
+              padding: '10px 18px',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#fff',
+              background: K.PRIMARY,
+              border: 'none',
+              borderRadius: 10,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = K.PRIMARY_HOVER }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = K.PRIMARY }}
+          >
+            <Plus size={15} />
+            Yeni İçerik Yükle
           </button>
         </div>
       </div>
 
-      {/* Kategori Filtreleri */}
+      {/* KPI bar */}
+      {allItems.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <KStatCard title="Toplam İçerik" value={allItems.length} icon={Library} accentColor={K.PRIMARY} />
+          <KStatCard title="Eğitimde" value={installedCount} icon={GraduationCap} accentColor={K.INFO} />
+          <KStatCard title="Toplam Süre" value={`${totalDurationMin}dk`} icon={Clock} accentColor={K.WARNING} />
+          <KStatCard title="SMG Puanı" value={totalSmg} icon={Star} accentColor={K.ACCENT} />
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="flex items-center justify-end">
+        <div style={{ position: 'relative', width: 280 }}>
+          <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: K.TEXT_MUTED }} />
+          <input
+            type="text"
+            placeholder="İçerik ara..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              height: 40,
+              padding: '0 12px 0 38px',
+              fontSize: 13,
+              background: K.SURFACE,
+              border: `1.5px solid ${K.BORDER}`,
+              borderRadius: 10,
+              color: K.TEXT_PRIMARY,
+              outline: 'none',
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = K.PRIMARY; e.currentTarget.style.boxShadow = `0 0 0 3px ${K.PRIMARY_LIGHT}` }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = K.BORDER; e.currentTarget.style.boxShadow = 'none' }}
+          />
+        </div>
+      </div>
+
+      {/* Category filter pills */}
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        <FilterPill
+          active={!categoryFilter}
           onClick={() => setCategoryFilter(null)}
-          className="rounded-xl px-4 py-2 text-[11px] font-bold transition-all duration-200"
-          style={{
-            background: !categoryFilter ? 'var(--color-primary)' : 'var(--color-surface)',
-            color: !categoryFilter ? '#fff' : 'var(--color-text-muted)',
-            border: `1.5px solid ${!categoryFilter ? 'var(--color-primary)' : 'var(--color-border)'}`,
-            boxShadow: !categoryFilter ? '0 4px 12px color-mix(in srgb, var(--color-primary) 25%, transparent)' : 'none',
-          }}
-        >
-          Tümü ({allItems.length})
-        </button>
+          label={`Tümü (${allItems.length})`}
+        />
         {Object.entries(CONTENT_LIBRARY_CATEGORIES).map(([key, cfg]) => {
           const count = allItems.filter(i => i.category === key).length
           if (count === 0) return null
           const active = categoryFilter === key
           return (
-            <button
+            <FilterPill
               key={key}
+              active={active}
               onClick={() => setCategoryFilter(active ? null : key)}
-              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[11px] font-bold transition-all duration-200"
-              style={{
-                background: active ? cfg.color : 'var(--color-surface)',
-                color: active ? '#fff' : 'var(--color-text-muted)',
-                border: `1.5px solid ${active ? cfg.color : 'var(--color-border)'}`,
-                boxShadow: active ? `0 4px 12px color-mix(in srgb, ${cfg.color} 25%, transparent)` : 'none',
-              }}
-            >
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ background: active ? '#fff' : cfg.color }}
-              />
-              {cfg.label} ({count})
-            </button>
+              label={`${cfg.label} (${count})`}
+              color={cfg.color}
+            />
           )
         })}
       </div>
 
-      {/* İçerik Kartları */}
+      {/* Cards */}
       {filtered.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map(item => (
@@ -1468,37 +1812,27 @@ function PlatformLibraryTab() {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-2xl border py-20 gap-5"
-          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl"
-            style={{ background: 'var(--color-bg)' }}>
-            {searchQuery ? (
-              <Search className="h-8 w-8" style={{ color: 'var(--color-text-muted)' }} />
-            ) : (
-              <Library className="h-8 w-8" style={{ color: 'var(--color-text-muted)' }} />
-            )}
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-bold" style={{ color: 'var(--color-text-secondary)' }}>
-              {searchQuery ? `"${searchQuery}" için sonuç bulunamadı`
-                : categoryFilter ? 'Bu kategoride içerik bulunamadı'
-                  : 'Super Admin tarafından içerik kütüphanesi hazırlandıkça burada görünecek.'}
-            </p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              {searchQuery ? 'Farklı bir arama deneyin'
-                : categoryFilter ? 'Filtreyi temizleyerek tüm içerikleri görün'
-                  : 'Platform yöneticisi içerik eklediğinde burada görünür'}
-            </p>
-          </div>
-          {(categoryFilter || searchQuery) && (
-            <button
-              onClick={() => { setCategoryFilter(null); setSearchQuery(''); }}
-              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-colors hover:bg-[var(--color-surface-hover)]"
-              style={{ border: '1.5px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-              <X className="h-3.5 w-3.5" /> Filtreleri Temizle
-            </button>
-          )}
-        </div>
+        <EmptyState
+          icon={searchQuery ? Search : Library}
+          title={
+            searchQuery
+              ? `"${searchQuery}" için sonuç bulunamadı`
+              : categoryFilter
+                ? 'Bu kategoride içerik bulunamadı'
+                : 'Super Admin tarafından içerik kütüphanesi hazırlandıkça burada görünecek.'
+          }
+          description={
+            searchQuery
+              ? 'Farklı bir arama deneyin'
+              : categoryFilter
+                ? 'Filtreyi temizleyerek tüm içerikleri görün'
+                : 'Platform yöneticisi içerik eklediğinde burada görünür'
+          }
+          action={(categoryFilter || searchQuery) ? {
+            label: 'Filtreleri Temizle',
+            onClick: () => { setCategoryFilter(null); setSearchQuery('') },
+          } : undefined}
+        />
       )}
     </div>
   )
@@ -1517,62 +1851,42 @@ export default function AdminContentLibraryPage() {
   ]
 
   return (
-    <div className="space-y-6">
-      {/* Premium Header */}
-      <div
-        className="relative overflow-hidden rounded-2xl border"
-        style={{
-          background: 'var(--color-surface)',
-          borderColor: 'var(--color-border)',
-        }}
-      >
-        {/* Gradient background */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 6%, transparent) 0%, transparent 50%, color-mix(in srgb, var(--color-accent) 4%, transparent) 100%)',
-          }}
-        />
-        {/* Subtle pattern overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.02]"
-          style={{
-            backgroundImage: 'radial-gradient(circle at 1px 1px, var(--color-text-primary) 1px, transparent 0)',
-            backgroundSize: '24px 24px',
-          }}
-        />
-
-        <div className="relative px-6 py-6 sm:px-8 sm:py-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div
-                className="flex h-12 w-12 items-center justify-center rounded-xl"
-                style={{
-                  background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 70%, #000))',
-                  boxShadow: '0 8px 24px color-mix(in srgb, var(--color-primary) 25%, transparent)',
-                }}
-              >
-                <BookOpen className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold font-heading" style={{ color: 'var(--color-text-primary)' }}>
-                  İçerik Kütüphanesi
-                </h1>
-                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  Platform içerikleri ve yüklenen eğitim videoları
-                </p>
-              </div>
-            </div>
+    <div className="k-page space-y-6">
+      {/* Page header */}
+      <header className="k-page-header">
+        <div>
+          <div className="k-breadcrumb">
+            <span>Panel</span>
+            <ChevronRight size={12} />
+            <span data-current="true">İçerik Kütüphanesi</span>
           </div>
+          <h1 className="k-page-title">İçerik Kütüphanesi</h1>
+          <p className="k-page-subtitle">Platform içerikleri ve kuruma yüklediğiniz eğitim videoları</p>
         </div>
-      </div>
+        <div
+          className="flex items-center justify-center"
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 12,
+            background: K.PRIMARY_LIGHT,
+            color: K.PRIMARY,
+            flexShrink: 0,
+          }}
+        >
+          <BookOpen size={22} strokeWidth={1.75} />
+        </div>
+      </header>
 
-      {/* Tab Switcher — Refined */}
+      {/* Tab switcher (segmented pill) */}
       <div
-        className="inline-flex items-center gap-1 rounded-xl p-1"
+        className="inline-flex items-center"
         style={{
-          background: 'var(--color-bg)',
-          border: '1px solid var(--color-border)',
+          background: K.BG,
+          border: `1.5px solid ${K.BORDER}`,
+          borderRadius: 12,
+          padding: 4,
+          gap: 2,
         }}
       >
         {tabs.map(tab => {
@@ -1582,28 +1896,35 @@ export default function AdminContentLibraryPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="flex items-center gap-2.5 rounded-lg px-5 py-2.5 text-sm font-bold transition-all duration-200"
+              className="flex items-center gap-2"
               style={{
-                background: active ? 'var(--color-surface)' : 'transparent',
-                color: active ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                boxShadow: active ? 'var(--shadow-sm)' : 'none',
+                padding: '9px 18px',
+                fontSize: 13,
+                fontWeight: 700,
+                background: active ? K.SURFACE : 'transparent',
+                color: active ? K.TEXT_PRIMARY : K.TEXT_MUTED,
+                border: 'none',
+                borderRadius: 8,
+                cursor: 'pointer',
+                boxShadow: active ? '0 1px 3px rgba(15, 23, 42, 0.08)' : 'none',
+                transition: 'background 160ms ease, color 160ms ease, box-shadow 160ms ease',
               }}
             >
-              <Icon className="h-4 w-4" style={{ color: active ? 'var(--color-primary)' : 'var(--color-text-muted)' }} />
+              <Icon size={15} strokeWidth={1.75} style={{ color: active ? K.PRIMARY : K.TEXT_MUTED }} />
               {tab.label}
             </button>
           )
         })}
       </div>
 
-      {/* Tab İçerikleri */}
+      {/* Tab content */}
       {activeTab === 'platform' && <PlatformLibraryTab />}
       {activeTab === 'my-videos' && <MyVideosTab />}
 
       {/* Modal animation */}
       <style jsx global>{`
         @keyframes modalIn {
-          from { opacity: 0; transform: scale(0.95) translateY(8px); }
+          from { opacity: 0; transform: scale(0.96) translateY(8px); }
           to { opacity: 1; transform: scale(1) translateY(0); }
         }
       `}</style>

@@ -1,8 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { encrypt } from '@/lib/crypto'
+import { logger } from '@/lib/logger'
 
 export async function GET() {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
   const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
@@ -41,7 +43,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
   const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
@@ -59,6 +61,18 @@ export async function PUT(request: Request) {
     ssoAutoProvision, ssoDefaultRole,
   } = body
 
+  // OIDC client secret at-rest encryption — boş string gönderildiyse dokunma
+  // (UI'da "değiştirme" için placeholder geçilmiş olabilir).
+  let oidcClientSecretEncrypted: string | undefined
+  if (typeof oidcClientSecret === 'string' && oidcClientSecret.length > 0) {
+    try {
+      oidcClientSecretEncrypted = encrypt(oidcClientSecret)
+    } catch (err) {
+      logger.error('sso:config', 'OIDC client secret şifrelenemedi', err)
+      return errorResponse('OIDC secret güvenli şekilde saklanamadı. ENCRYPTION_KEY yapılandırmasını kontrol edin.', 500)
+    }
+  }
+
   await prisma.organization.update({
     where: { id: orgId },
     data: {
@@ -70,7 +84,7 @@ export async function PUT(request: Request) {
       ...(samlCert !== undefined && { samlCert }),
       ...(oidcDiscoveryUrl !== undefined && { oidcDiscoveryUrl }),
       ...(oidcClientId !== undefined && { oidcClientId }),
-      ...(oidcClientSecret !== undefined && { oidcClientSecret }),
+      ...(oidcClientSecretEncrypted !== undefined && { oidcClientSecret: oidcClientSecretEncrypted }),
       ...(ssoAutoProvision !== undefined && { ssoAutoProvision }),
       ...(ssoDefaultRole !== undefined && { ssoDefaultRole }),
     },

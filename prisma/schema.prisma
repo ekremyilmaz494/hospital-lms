@@ -78,14 +78,14 @@ model Organization {
   smsMfaEnforcedAt    DateTime? @map("sms_mfa_enforced_at") @db.Timestamptz
 
   // Per-tenant SMTP (hastane kendi mail sunucusundan gönderir)
-  smtpHost            String?  @map("smtp_host") @db.VarChar(255)
-  smtpPort            Int?     @default(587) @map("smtp_port")
-  smtpSecure          Boolean  @default(false) @map("smtp_secure")
-  smtpUser            String?  @map("smtp_user") @db.VarChar(255)
-  smtpPassEncrypted   String?  @map("smtp_pass_encrypted") @db.Text
-  smtpFrom            String?  @map("smtp_from") @db.VarChar(320)
-  smtpReplyTo         String?  @map("smtp_reply_to") @db.VarChar(320)
-  smtpEnabled         Boolean  @default(false) @map("smtp_enabled")
+  smtpHost          String? @map("smtp_host") @db.VarChar(255)
+  smtpPort          Int?    @default(587) @map("smtp_port")
+  smtpSecure        Boolean @default(false) @map("smtp_secure")
+  smtpUser          String? @map("smtp_user") @db.VarChar(255)
+  smtpPassEncrypted String? @map("smtp_pass_encrypted") @db.Text
+  smtpFrom          String? @map("smtp_from") @db.VarChar(320)
+  smtpReplyTo       String? @map("smtp_reply_to") @db.VarChar(320)
+  smtpEnabled       Boolean @default(false) @map("smtp_enabled")
 
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -102,21 +102,24 @@ model Organization {
   smgActivities          SmgActivity[]
   smgPeriods             SmgPeriod[]
   smgCategories          SmgCategory[]
-  smgTargetsList         SmgTarget[]                 @relation("SmgTargetOrg")
+  smgTargetsList         SmgTarget[]                  @relation("SmgTargetOrg")
   contentLibraryInstalls OrganizationContentLibrary[]
   hisIntegrations        HisIntegration[]
   competencyForms        CompetencyForm[]
   syncLogs               SyncLog[]
   accreditationReports   AccreditationReport[]
-  accreditationStandards AccreditationStandard[]     @relation("OrgAccreditationStandards")
+  accreditationStandards AccreditationStandard[]      @relation("OrgAccreditationStandards")
   trainingCategories     TrainingCategory[]
   questionBank           QuestionBank[]
-  orgContentLibrary      ContentLibrary[]      @relation("OrgContentLibrary")
+  orgContentLibrary      ContentLibrary[]             @relation("OrgContentLibrary")
   examAttempts           ExamAttempt[]
   certificates           Certificate[]
   // EY.FR.40 Eğitim Geri Bildirim
   feedbackForm           TrainingFeedbackForm?
   feedbackResponses      TrainingFeedbackResponse[]
+  // AI İçerik Stüdyosu (NotebookLM)
+  aiNotebookAccount      AiNotebookAccount?
+  aiGenerations          AiGeneration[]
 
   @@map("organizations")
 }
@@ -226,53 +229,55 @@ model Department {
 
 // ── KULLANICILAR ──
 model User {
-  id                 String    @id @db.Uuid
-  organizationId     String?   @map("organization_id") @db.Uuid
-  email              String    @unique @db.VarChar(255)
-  firstName          String    @map("first_name") @db.VarChar(100)
-  lastName           String    @map("last_name") @db.VarChar(100)
-  phone              String?   @db.VarChar(20)
-  phoneVerifiedAt    DateTime? @map("phone_verified_at") @db.Timestamptz
-  departmentId       String?   @map("department_id") @db.Uuid
-  title              String?   @db.VarChar(100)
-  role               String    @db.VarChar(20)
-  avatarUrl          String?   @map("avatar_url") @db.Text
-  isActive           Boolean   @default(true) @map("is_active")
-  hisExternalId      String?   @map("his_external_id") @db.VarChar(100)
+  id                       String    @id @db.Uuid
+  organizationId           String?   @map("organization_id") @db.Uuid
+  email                    String    @unique @db.VarChar(255)
+  firstName                String    @map("first_name") @db.VarChar(100)
+  lastName                 String    @map("last_name") @db.VarChar(100)
+  phone                    String?   @db.VarChar(20)
+  phoneVerifiedAt          DateTime? @map("phone_verified_at") @db.Timestamptz
+  departmentId             String?   @map("department_id") @db.Uuid
+  title                    String?   @db.VarChar(100)
+  role                     String    @db.VarChar(20)
+  avatarUrl                String?   @map("avatar_url") @db.Text
+  isActive                 Boolean   @default(true) @map("is_active")
+  hisExternalId            String?   @map("his_external_id") @db.VarChar(100)
   kvkkNoticeAcknowledgedAt DateTime? @map("kvkk_notice_acknowledged_at") @db.Timestamptz
-  mustChangePassword Boolean   @default(false) @map("must_change_password")
-  termsAccepted      Boolean   @default(false) @map("terms_accepted")
-  termsAcceptedAt    DateTime? @map("terms_accepted_at") @db.Timestamptz
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  mustChangePassword       Boolean   @default(false) @map("must_change_password")
+  termsAccepted            Boolean   @default(false) @map("terms_accepted")
+  termsAcceptedAt          DateTime? @map("terms_accepted_at") @db.Timestamptz
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  organization            Organization?                @relation(fields: [organizationId], references: [id])
-  departmentRel           Department?                  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  createdTrainings        Training[]                   @relation("TrainingCreator")
-  assignments             TrainingAssignment[]         @relation("AssignedUser")
-  assignedBy              TrainingAssignment[]         @relation("AssignedByUser")
-  examAttempts            ExamAttempt[]
-  videoProgress           VideoProgress[]
-  notifications           Notification[]
-  auditLogs               AuditLog[]
-  certificates            Certificate[]
-  kvkkRequests            KvkkRequest[]                @relation("KvkkRequester")
-  kvkkResponses           KvkkRequest[]                @relation("KvkkResponder")
-  scormAttempts           ScormAttempt[]
-  smgActivities           SmgActivity[]                @relation("UserSmgActivities")
-  smgApprovals            SmgActivity[]                @relation("SmgApprovals")
-  smgTargetOverrides      SmgTarget[]                  @relation("SmgTargetOverrides")
-  createdContentLibraries ContentLibrary[]             @relation("ContentLibraryCreator")
-  contentLibraryInstalls  OrganizationContentLibrary[] @relation("ContentLibraryInstaller")
-  subjectEvaluations      CompetencyEvaluation[]       @relation("EvaluationSubject")
-  evaluatorEvaluations    CompetencyEvaluation[]       @relation("EvaluationEvaluator")
-  pushSubscriptions       PushSubscription[]
-  accreditationReports    AccreditationReport[]
-  createdAccreditationStandards AccreditationStandard[] @relation("AccreditationStandardCreator")
+  organization                  Organization?                @relation(fields: [organizationId], references: [id])
+  departmentRel                 Department?                  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdTrainings              Training[]                   @relation("TrainingCreator")
+  assignments                   TrainingAssignment[]         @relation("AssignedUser")
+  assignedBy                    TrainingAssignment[]         @relation("AssignedByUser")
+  examAttempts                  ExamAttempt[]
+  videoProgress                 VideoProgress[]
+  notifications                 Notification[]
+  auditLogs                     AuditLog[]
+  certificates                  Certificate[]
+  kvkkRequests                  KvkkRequest[]                @relation("KvkkRequester")
+  kvkkResponses                 KvkkRequest[]                @relation("KvkkResponder")
+  scormAttempts                 ScormAttempt[]
+  smgActivities                 SmgActivity[]                @relation("UserSmgActivities")
+  smgApprovals                  SmgActivity[]                @relation("SmgApprovals")
+  smgTargetOverrides            SmgTarget[]                  @relation("SmgTargetOverrides")
+  createdContentLibraries       ContentLibrary[]             @relation("ContentLibraryCreator")
+  contentLibraryInstalls        OrganizationContentLibrary[] @relation("ContentLibraryInstaller")
+  subjectEvaluations            CompetencyEvaluation[]       @relation("EvaluationSubject")
+  evaluatorEvaluations          CompetencyEvaluation[]       @relation("EvaluationEvaluator")
+  pushSubscriptions             PushSubscription[]
+  accreditationReports          AccreditationReport[]
+  createdAccreditationStandards AccreditationStandard[]      @relation("AccreditationStandardCreator")
   // EY.FR.40 Eğitim Geri Bildirim
-  feedbackResponses       TrainingFeedbackResponse[]
+  feedbackResponses             TrainingFeedbackResponse[]
   // SMS MFA — güvenilir cihazlar
-  trustedDevices          TrustedDevice[]
+  trustedDevices                TrustedDevice[]
+  // AI İçerik Stüdyosu — kullanıcı bazlı üretim geçmişi
+  aiGenerations                 AiGeneration[]
 
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
@@ -318,30 +323,30 @@ model Training {
   scormVersion      String? @map("scorm_version") @db.VarChar(10)
 
   // Bağımsız Sınav
-  examOnly            Boolean @default(false) @map("exam_only")
+  examOnly              Boolean @default(false) @map("exam_only")
   // Default false: mevcut davranışı korur (retry'da pre-exam atlanır).
   // Admin true yaparsa retry'da da pre-exam yapılır.
   requirePreExamOnRetry Boolean @default(false) @map("require_pre_exam_on_retry")
   // Default true: mevcut davranışı korur (sorular her zaman karıştırılır).
   // Admin false yaparsa sorular sortOrder'a göre sabit sırada gelir.
-  randomizeQuestions  Boolean @default(true) @map("randomize_questions")
-  randomQuestionCount Int?    @map("random_question_count")
+  randomizeQuestions    Boolean @default(true) @map("randomize_questions")
+  randomQuestionCount   Int?    @map("random_question_count")
 
   // İçerik Kütüphanesi
   isFromLibrary   Boolean @default(false) @map("is_from_library")
   sourceLibraryId String? @map("source_library_id") @db.Uuid
 
-  organization    Organization             @relation(fields: [organizationId], references: [id])
-  sourceLibrary   ContentLibrary?          @relation("TrainingFromLibrary", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
-  createdBy       User?                    @relation("TrainingCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  videos          TrainingVideo[]
-  questions       Question[]
-  assignments     TrainingAssignment[]
-  examAttempts    ExamAttempt[]
-  notifications   Notification[]
-  certificates    Certificate[]
-  scormAttempts   ScormAttempt[]
-  departmentRules DepartmentTrainingRule[]
+  organization      Organization               @relation(fields: [organizationId], references: [id])
+  sourceLibrary     ContentLibrary?            @relation("TrainingFromLibrary", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
+  createdBy         User?                      @relation("TrainingCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  videos            TrainingVideo[]
+  questions         Question[]
+  assignments       TrainingAssignment[]
+  examAttempts      ExamAttempt[]
+  notifications     Notification[]
+  certificates      Certificate[]
+  scormAttempts     ScormAttempt[]
+  departmentRules   DepartmentTrainingRule[]
   // EY.FR.40 Eğitim Geri Bildirim
   feedbackResponses TrainingFeedbackResponse[]
 
@@ -413,16 +418,16 @@ model QuestionOption {
 
 // ── EĞİTİM ATAMALARI ──
 model TrainingAssignment {
-  id             String    @id @default(uuid()) @db.Uuid
-  trainingId     String    @map("training_id") @db.Uuid
-  userId         String    @map("user_id") @db.Uuid
-  status         String    @default("assigned") @db.VarChar(30)
+  id                  String    @id @default(uuid()) @db.Uuid
+  trainingId          String    @map("training_id") @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  status              String    @default("assigned") @db.VarChar(30)
   currentAttempt      Int       @default(0) @map("current_attempt")
   maxAttempts         Int       @default(3) @map("max_attempts")
   originalMaxAttempts Int       @default(3) @map("original_max_attempts")
   assignedById        String?   @map("assigned_by") @db.Uuid
-  assignedAt     DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
-  completedAt    DateTime? @map("completed_at") @db.Timestamptz
+  assignedAt          DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz
 
   training     Training      @relation(fields: [trainingId], references: [id], onDelete: Cascade)
   user         User          @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -462,13 +467,13 @@ model ExamAttempt {
   signatureMethod     String?   @map("signature_method") @db.VarChar(20)
   organizationId      String    @map("organization_id") @db.Uuid
 
-  assignment    TrainingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  user          User               @relation(fields: [userId], references: [id])
-  training      Training           @relation(fields: [trainingId], references: [id])
-  organization  Organization       @relation(fields: [organizationId], references: [id])
-  examAnswers   ExamAnswer[]
-  videoProgress VideoProgress[]
-  certificates  Certificate[]
+  assignment       TrainingAssignment        @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user             User                      @relation(fields: [userId], references: [id])
+  training         Training                  @relation(fields: [trainingId], references: [id])
+  organization     Organization              @relation(fields: [organizationId], references: [id])
+  examAnswers      ExamAnswer[]
+  videoProgress    VideoProgress[]
+  certificates     Certificate[]
   // EY.FR.40 Eğitim Geri Bildirim (attempt başına 1 yanıt)
   feedbackResponse TrainingFeedbackResponse?
 
@@ -687,18 +692,18 @@ model DepartmentTrainingRule {
 
 // ── SMG AKTİVİTELERİ ──
 model SmgActivity {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String    @map("user_id") @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  activityType   String    @map("activity_type") @db.VarChar(50)
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  activityType    String    @map("activity_type") @db.VarChar(50)
   // COURSE_COMPLETION | EXTERNAL_TRAINING | CONFERENCE | PUBLICATION
-  title          String    @db.VarChar(255)
-  provider       String?   @db.VarChar(255)
-  completionDate DateTime  @map("completion_date") @db.Date
-  smgPoints      Int       @map("smg_points")
-  certificateUrl String?   @map("certificate_url") @db.VarChar(1000)
-  categoryId     String?   @map("category_id") @db.Uuid
-  approvalStatus String    @default("PENDING") @map("approval_status") @db.VarChar(20)
+  title           String    @db.VarChar(255)
+  provider        String?   @db.VarChar(255)
+  completionDate  DateTime  @map("completion_date") @db.Date
+  smgPoints       Int       @map("smg_points")
+  certificateUrl  String?   @map("certificate_url") @db.VarChar(1000)
+  categoryId      String?   @map("category_id") @db.Uuid
+  approvalStatus  String    @default("PENDING") @map("approval_status") @db.VarChar(20)
   // PENDING | APPROVED | REJECTED
   approvedBy      String?   @map("approved_by") @db.Uuid
   approvedAt      DateTime? @map("approved_at") @db.Timestamptz
@@ -801,10 +806,10 @@ model ContentLibrary {
   contentData    Json?    @map("content_data") // quiz/flashcards JSON verisi
   organizationId String?  @map("organization_id") @db.Uuid
 
-  createdBy     User?                        @relation("ContentLibraryCreator", fields: [createdById], references: [id])
-  organization  Organization?                @relation("OrgContentLibrary", fields: [organizationId], references: [id], onDelete: SetNull)
-  installs      OrganizationContentLibrary[]
-  trainings     Training[]                   @relation("TrainingFromLibrary")
+  createdBy    User?                        @relation("ContentLibraryCreator", fields: [createdById], references: [id])
+  organization Organization?                @relation("OrgContentLibrary", fields: [organizationId], references: [id], onDelete: SetNull)
+  installs     OrganizationContentLibrary[]
+  trainings    Training[]                   @relation("TrainingFromLibrary")
 
   @@index([category], map: "idx_content_library_category")
   @@index([contentType], map: "idx_content_library_content_type")
@@ -990,18 +995,18 @@ model PushSubscription {
 // Uniqueness: (code, organization_id) — aynı kod birden fazla hastanede
 // kullanılabilir ama bir hastane içinde tekil.
 model AccreditationStandard {
-  id                         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code                       String        @db.VarChar(50)
-  title                      String        @db.VarChar(500)
-  description                String?       @db.Text
-  standardBody               String        @map("standard_body") @db.VarChar(20)
-  requiredTrainingCategories Json          @default("[]") @map("required_training_categories")
-  requiredCompletionRate     Int           @default(80) @map("required_completion_rate")
-  isActive                   Boolean       @default(true) @map("is_active")
-  organizationId             String?       @map("organization_id") @db.Uuid
-  createdById                String?       @map("created_by") @db.Uuid
-  createdAt                  DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt                  DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                       String   @db.VarChar(50)
+  title                      String   @db.VarChar(500)
+  description                String?  @db.Text
+  standardBody               String   @map("standard_body") @db.VarChar(20)
+  requiredTrainingCategories Json     @default("[]") @map("required_training_categories")
+  requiredCompletionRate     Int      @default(80) @map("required_completion_rate")
+  isActive                   Boolean  @default(true) @map("is_active")
+  organizationId             String?  @map("organization_id") @db.Uuid
+  createdById                String?  @map("created_by") @db.Uuid
+  createdAt                  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization? @relation("OrgAccreditationStandards", fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy    User?         @relation("AccreditationStandardCreator", fields: [createdById], references: [id], onDelete: SetNull)
@@ -1187,19 +1192,80 @@ model TrainingFeedbackAnswer {
 // 7 gün boyunca aynı cihazdan login'de SMS tekrar istenmez.
 // token_hash sadece hash olarak saklanır — plaintext token cookie'de yaşar.
 model TrustedDevice {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
-  tokenHash  String   @unique @map("token_hash") @db.VarChar(128)
-  userAgent  String?  @map("user_agent") @db.Text
-  ipAddress  String?  @map("ip_address") @db.VarChar(45)
-  lastUsedAt DateTime @default(now()) @map("last_used_at") @db.Timestamptz
-  expiresAt  DateTime @map("expires_at") @db.Timestamptz
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(128)
+  userAgent  String?   @map("user_agent") @db.Text
+  ipAddress  String?   @map("ip_address") @db.VarChar(45)
+  lastUsedAt DateTime  @default(now()) @map("last_used_at") @db.Timestamptz
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz
   revokedAt  DateTime? @map("revoked_at") @db.Timestamptz
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId], map: "idx_trusted_devices_user")
   @@index([expiresAt], map: "idx_trusted_devices_expires")
   @@map("trusted_devices")
+}
+
+// ──────────────────────────────────────────────────────────────
+// AI İÇERİK STÜDYOSU — NotebookLM Entegrasyonu
+//
+// Per-org NotebookLM Google hesabı. storage_state.json
+// (Playwright session) AES-256-GCM ile şifreli saklanır.
+// Worker servisi storage_state'i çözer ve `notebooklm` CLI'ye besler.
+// ──────────────────────────────────────────────────────────────
+model AiNotebookAccount {
+  id                    String    @id @default(uuid()) @db.Uuid
+  organizationId        String    @unique @map("organization_id") @db.Uuid
+  // notebooklm-py storage_state.json içeriği — src/lib/crypto.ts encrypt() ile
+  storageStateEncrypted String    @map("storage_state_encrypted") @db.Text
+  googleEmail           String?   @map("google_email") @db.VarChar(255)
+  connectedAt           DateTime  @default(now()) @map("connected_at") @db.Timestamptz
+  lastVerifiedAt        DateTime? @map("last_verified_at") @db.Timestamptz
+  lastUsedAt            DateTime? @map("last_used_at") @db.Timestamptz
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_notebook_accounts")
+}
+
+// AI üretim geçmişi — her bir generation isteği bir satır.
+// status pending → processing → (completed | failed)
+model AiGeneration {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  createdById    String    @map("created_by_id") @db.Uuid
+  // 9 desteklenen tip — string olarak saklanır (CHECK constraint RLS SQL'de)
+  // 'audio' | 'video' | 'slide_deck' | 'infographic' | 'report' |
+  // 'mind_map' | 'data_table' | 'quiz' | 'flashcards'
+  artifactType   String    @map("artifact_type") @db.VarChar(20)
+  prompt         String?   @db.Text
+  // [{ s3Key, name, size, mimeType }] — admin yüklediği kaynaklar
+  sourceFiles    Json?     @map("source_files") @db.JsonB
+  // YouTube/web URL kaynakları (string array)
+  sourceUrls     String[]  @default([]) @map("source_urls")
+  // Tipe özel opsiyonlar: { style, length, format, language, orientation, detail, ... }
+  options        Json?     @db.JsonB
+  // pending | processing | completed | failed
+  status         String    @default("pending") @db.VarChar(20)
+  // Worker'ın iç jobId'si — status pull için
+  workerJobId    String?   @map("worker_job_id") @db.VarChar(100)
+  // S3 obj — örn. "ai-content/{orgId}/{generationId}/output.mp3"
+  s3Key          String?   @map("s3_key") @db.Text
+  fileSize       Int?      @map("file_size") @db.Integer
+  mimeType       String?   @map("mime_type") @db.VarChar(100)
+  errorMessage   String?   @map("error_message") @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  @@index([organizationId, status, createdAt(sort: Desc)], map: "idx_ai_gen_org_status_created")
+  @@index([organizationId, createdById, createdAt(sort: Desc)], map: "idx_ai_gen_org_user_created")
+  @@map("ai_generations")
 }

@@ -31,6 +31,14 @@ const ALLOWED_CONTENT_TYPES = [
   'image/jpeg',
   'image/svg+xml',
   'image/webp',
+  // AI Stüdyo kaynakları (NotebookLM)
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'text/markdown',
+  'application/rtf',
+  'video/quicktime',
 ]
 
 /** Generate presigned URL for uploading video to S3 */
@@ -198,6 +206,39 @@ export function audioKey(orgId: string, trainingId: string, filename: string) {
   }
   const id = crypto.randomUUID()
   return `audio/${orgId}/${trainingId}/${id}.${ext}`
+}
+
+// AI İçerik Stüdyosu — kabul edilen kaynak uzantıları (admin'in yüklediği)
+const ALLOWED_AI_SOURCE_EXTENSIONS = [
+  // Doküman
+  'pdf', 'docx', 'doc', 'txt', 'md', 'rtf',
+  // Sunum / tablo
+  'pptx', 'xlsx',
+  // Görsel
+  'png', 'jpg', 'jpeg', 'webp',
+  // Ses
+  'mp3', 'wav', 'm4a', 'ogg', 'aac',
+  // Video
+  'mp4', 'webm', 'mov',
+]
+
+/** AI Stüdyo kaynak dosyası için S3 key — admin yüklediği prompt input'u */
+export function aiSourceKey(orgId: string, generationId: string, filename: string) {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  if (!ALLOWED_AI_SOURCE_EXTENSIONS.includes(ext)) {
+    throw new Error(`İzin verilmeyen kaynak uzantısı: .${ext}`)
+  }
+  const id = crypto.randomUUID()
+  return `ai-content/${orgId}/${generationId}/sources/${id}.${ext}`
+}
+
+/** AI Stüdyo üretilen artifact için S3 key — worker'ın upload edeceği final dosya */
+export function aiArtifactKey(orgId: string, generationId: string, ext: string) {
+  const safeExt = ext.replace(/^\./, '').toLowerCase()
+  if (!/^[a-z0-9]{1,5}$/.test(safeExt)) {
+    throw new Error(`Geçersiz artifact uzantısı: ${ext}`)
+  }
+  return `ai-content/${orgId}/${generationId}/output.${safeExt}`
 }
 
 /** Organizasyonun toplam storage kullanımını byte cinsinden hesapla */

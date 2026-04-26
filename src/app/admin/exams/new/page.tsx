@@ -27,14 +27,42 @@ import { Label } from '@/components/ui/label';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
+const cardStyle: React.CSSProperties = {
+  background: K.SURFACE,
+  border: `1.5px solid ${K.BORDER}`,
+  borderRadius: 14,
+  boxShadow: K.SHADOW_CARD,
+};
+
+const sectionHeading: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 700,
+  fontFamily: K.FONT_DISPLAY,
+  color: K.TEXT_PRIMARY,
+};
+
 const RichTextEditor = dynamic(
   () => import('@/components/ui/rich-text-editor').then((m) => ({ default: m.RichTextEditor })),
   {
     ssr: false,
     loading: () => (
       <div
-        className="animate-pulse rounded-lg border h-28"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        className="animate-pulse rounded-lg h-28"
+        style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}` }}
       />
     ),
   },
@@ -58,14 +86,14 @@ interface BankQuestion {
 }
 
 const TRAINING_CATEGORIES = [
-  { value: 'Enfeksiyon', label: 'Enfeksiyon', icon: '🦠' },
-  { value: 'İş Güvenliği', label: 'İş Güvenliği', icon: '⛑️' },
-  { value: 'Hasta Hakları', label: 'Hasta Hakları', icon: '⚖️' },
-  { value: 'Radyoloji', label: 'Radyoloji', icon: '☢️' },
-  { value: 'Laboratuvar', label: 'Laboratuvar', icon: '🔬' },
-  { value: 'Eczane', label: 'Eczane', icon: '💊' },
-  { value: 'Acil', label: 'Acil', icon: '🚑' },
-  { value: 'Genel', label: 'Genel', icon: '📋' },
+  { value: 'Enfeksiyon', label: 'Enfeksiyon', icon: 'syringe' },
+  { value: 'İş Güvenliği', label: 'İş Güvenliği', icon: 'hardhat' },
+  { value: 'Hasta Hakları', label: 'Hasta Hakları', icon: 'scale' },
+  { value: 'Radyoloji', label: 'Radyoloji', icon: 'radiation' },
+  { value: 'Laboratuvar', label: 'Laboratuvar', icon: 'flask' },
+  { value: 'Eczane', label: 'Eczane', icon: 'pill' },
+  { value: 'Acil', label: 'Acil', icon: 'ambulance' },
+  { value: 'Genel', label: 'Genel', icon: 'clipboard' },
 ];
 
 const steps = [
@@ -278,8 +306,8 @@ export default function NewExamPage() {
       {/* Step Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-balance">Yeni Sınav Oluştur</h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+          <h2 style={{ ...sectionHeading, fontSize: 22 }} className="text-balance">Yeni Sınav Oluştur</h2>
+          <p className="text-sm mt-1" style={{ color: K.TEXT_SECONDARY }}>
             Video olmadan, sadece sorulardan oluşan bağımsız sınav
           </p>
         </div>
@@ -296,7 +324,7 @@ export default function NewExamPage() {
               {idx > 0 && (
                 <div
                   className="h-[2px] w-8"
-                  style={{ background: isCompleted ? 'var(--color-primary)' : 'var(--color-border)' }}
+                  style={{ background: isCompleted ? K.PRIMARY : K.BORDER }}
                 />
               )}
               <button
@@ -304,29 +332,29 @@ export default function NewExamPage() {
                 className="flex items-center gap-2.5 rounded-xl px-4 py-2.5"
                 style={{
                   background: isActive
-                    ? 'linear-gradient(135deg, var(--color-primary), #0f4a35)'
+                    ? K.PRIMARY
                     : isCompleted
-                      ? 'var(--color-success-bg)'
-                      : 'var(--color-surface)',
-                  border: `1.5px solid ${isActive ? 'transparent' : isCompleted ? 'var(--color-success)' : 'var(--color-border)'}`,
+                      ? K.PRIMARY_LIGHT
+                      : K.SURFACE,
+                  border: `1.5px solid ${isActive ? K.PRIMARY : isCompleted ? K.PRIMARY : K.BORDER}`,
                   cursor: step.id <= currentStep ? 'pointer' : 'default',
                   opacity: step.id > currentStep ? 0.5 : 1,
                 }}
               >
                 <StepIcon
                   className="h-4 w-4"
-                  style={{ color: isActive ? 'white' : isCompleted ? 'var(--color-success)' : 'var(--color-text-muted)' }}
+                  style={{ color: isActive ? '#fff' : isCompleted ? K.PRIMARY : K.TEXT_MUTED }}
                 />
                 <div className="text-left">
                   <p
                     className="text-xs font-semibold"
-                    style={{ color: isActive ? 'white' : isCompleted ? 'var(--color-success)' : 'var(--color-text-primary)' }}
+                    style={{ color: isActive ? '#fff' : isCompleted ? K.PRIMARY : K.TEXT_PRIMARY }}
                   >
                     {step.title}
                   </p>
                   <p
                     className="text-[10px]"
-                    style={{ color: isActive ? 'rgba(255,255,255,0.7)' : 'var(--color-text-muted)' }}
+                    style={{ color: isActive ? 'rgba(255,255,255,0.8)' : K.TEXT_MUTED }}
                   >
                     {step.description}
                   </p>
@@ -349,11 +377,8 @@ export default function NewExamPage() {
           {currentStep === 1 && (
             <div className="space-y-6">
               {/* Kart 1: Sınav Bilgileri */}
-              <div
-                className="rounded-2xl border p-6"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-              >
-                <h3 className="text-sm font-bold mb-4">Sınav Bilgileri</h3>
+              <div className="p-6" style={cardStyle}>
+                <h3 style={{ ...sectionHeading, marginBottom: 16 }}>Sınav Bilgileri</h3>
                 <div className="space-y-4">
                   <div>
                     <Label>Sınav Adı *</Label>
@@ -379,11 +404,8 @@ export default function NewExamPage() {
               </div>
 
               {/* Kart 2: Tarihler */}
-              <div
-                className="rounded-2xl border p-6"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-              >
-                <h3 className="text-sm font-bold mb-4">Sınav Tarihleri</h3>
+              <div className="p-6" style={cardStyle}>
+                <h3 style={{ ...sectionHeading, marginBottom: 16 }}>Sınav Tarihleri</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Başlangıç Tarihi *</Label>
@@ -407,11 +429,8 @@ export default function NewExamPage() {
               </div>
 
               {/* Kart 3: Ayarlar */}
-              <div
-                className="rounded-2xl border p-6"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-              >
-                <h3 className="text-sm font-bold mb-4">Sınav Ayarları</h3>
+              <div className="p-6" style={cardStyle}>
+                <h3 style={{ ...sectionHeading, marginBottom: 16 }}>Sınav Ayarları</h3>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label>Baraj Puanı (%)</Label>
@@ -451,10 +470,10 @@ export default function NewExamPage() {
                 {/* Soruları Karıştır */}
                 <div className="mt-4 flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                    <p className="text-sm font-medium" style={{ color: K.TEXT_PRIMARY }}>
                       Soruları Karıştır
                     </p>
-                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    <p className="text-xs" style={{ color: K.TEXT_MUTED }}>
                       Her personele farklı soru sırası gösterilir
                     </p>
                   </div>
@@ -463,15 +482,15 @@ export default function NewExamPage() {
                     onClick={() => setRandomizeQuestions((v) => !v)}
                     className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent"
                     style={{
-                      background: randomizeQuestions ? 'var(--color-primary)' : 'var(--color-border)',
-                      transition: 'background var(--transition-fast)',
+                      background: randomizeQuestions ? K.PRIMARY : K.BORDER,
+                      transition: 'background 0.25s',
                     }}
                   >
                     <span
                       className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow"
                       style={{
                         transform: randomizeQuestions ? 'translateX(20px)' : 'translateX(0)',
-                        transition: 'transform var(--transition-fast)',
+                        transition: 'transform 0.25s',
                       }}
                     />
                   </button>
@@ -480,27 +499,24 @@ export default function NewExamPage() {
               </div>
 
               {/* Kart 4: Departman & Personel Atama */}
-              <div
-                className="rounded-2xl border p-6"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-              >
+              <div className="p-6" style={cardStyle}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
-                    <h3 className="text-sm font-bold">Departman & Personel Atama</h3>
+                    <Building2 className="h-4 w-4" style={{ color: K.PRIMARY }} />
+                    <h3 style={sectionHeading}>Departman & Personel Atama</h3>
                   </div>
                   {departments && departments.length > 0 && (
                     <button
                       type="button"
                       onClick={toggleAllDepts}
                       className="text-xs font-semibold px-3 py-1.5 rounded-lg"
-                      style={{ color: 'var(--color-primary)', background: 'var(--color-primary-light)' }}
+                      style={{ color: K.PRIMARY, background: K.PRIMARY_LIGHT }}
                     >
                       {selectedDepts.size === departments.length ? 'Tümünü Kaldır' : 'Tümünü Seç'}
                     </button>
                   )}
                 </div>
-                <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-xs mb-3" style={{ color: K.TEXT_MUTED }}>
                   Sınavı hangi departmanlara atamak istediğinizi seçin. Seçmezseniz sınav kimseye atanmaz.
                 </p>
 
@@ -515,24 +531,24 @@ export default function NewExamPage() {
                             key={dept.id}
                             type="button"
                             onClick={() => toggleDept(dept.id)}
-                            className="flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-left"
+                            className="flex items-center gap-2.5 rounded-xl px-3.5 py-3 text-left"
                             style={{
-                              borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                              background: isSelected ? 'var(--color-primary-light)' : 'var(--color-bg)',
-                              transition: 'border-color var(--transition-fast), background var(--transition-fast)',
+                              border: `1.5px solid ${isSelected ? K.PRIMARY : K.BORDER}`,
+                              background: isSelected ? K.PRIMARY_LIGHT : K.BG,
+                              transition: 'border-color 0.15s, background 0.15s',
                             }}
                           >
                             <div
                               className="h-3 w-3 rounded-full shrink-0"
-                              style={{ background: dept.color || 'var(--color-primary)' }}
+                              style={{ background: dept.color || K.PRIMARY }}
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium truncate" style={{ color: isSelected ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}>
+                              <p className="text-sm font-medium truncate" style={{ color: isSelected ? K.PRIMARY : K.TEXT_SECONDARY }}>
                                 {dept.name}
                               </p>
-                              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{dept.count} personel</p>
+                              <p className="text-[10px]" style={{ color: K.TEXT_MUTED }}>{dept.count} personel</p>
                             </div>
-                            {isSelected && <Check className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary)' }} />}
+                            {isSelected && <Check className="h-4 w-4 shrink-0" style={{ color: K.PRIMARY }} />}
                           </button>
                         );
                       })}
@@ -543,8 +559,8 @@ export default function NewExamPage() {
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <Users className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-                            <p className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                            <Users className="h-3.5 w-3.5" style={{ color: K.TEXT_MUTED }} />
+                            <p className="text-xs font-semibold" style={{ color: K.TEXT_SECONDARY }}>
                               Atanacak Personel ({selectedStaffCount} kişi)
                             </p>
                           </div>
@@ -553,15 +569,15 @@ export default function NewExamPage() {
                               type="button"
                               onClick={() => setExcludedStaff(new Set())}
                               className="text-[10px] font-medium px-2 py-1 rounded"
-                              style={{ color: 'var(--color-text-muted)' }}
+                              style={{ color: K.TEXT_MUTED }}
                             >
                               Hariç tutulanları temizle
                             </button>
                           )}
                         </div>
                         <div
-                          className="rounded-xl border p-3 max-h-48 overflow-y-auto space-y-1"
-                          style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}
+                          className="rounded-xl p-3 max-h-48 overflow-y-auto space-y-1"
+                          style={{ border: `1px solid ${K.BORDER_LIGHT}`, background: K.BG }}
                         >
                           {departments
                             .filter(d => selectedDepts.has(d.id))
@@ -576,22 +592,22 @@ export default function NewExamPage() {
                                   className="flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left"
                                   style={{
                                     opacity: isExcluded ? 0.45 : 1,
-                                    background: isExcluded ? 'var(--color-error-bg, rgba(239,68,68,0.06))' : 'transparent',
-                                    transition: 'opacity var(--transition-fast), background var(--transition-fast)',
+                                    background: isExcluded ? K.ERROR_BG : 'transparent',
+                                    transition: 'opacity 0.15s, background 0.15s',
                                   }}
                                 >
                                   <div
                                     className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold text-white"
-                                    style={{ background: s.deptColor || 'var(--color-primary)' }}
+                                    style={{ background: s.deptColor || K.PRIMARY }}
                                   >
                                     {s.initials}
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)', textDecoration: isExcluded ? 'line-through' : 'none' }}>{s.name}</p>
-                                    <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{s.deptName}{s.title ? ` · ${s.title}` : ''}</p>
+                                    <p className="text-xs font-medium truncate" style={{ color: K.TEXT_PRIMARY, textDecoration: isExcluded ? 'line-through' : 'none' }}>{s.name}</p>
+                                    <p className="text-[10px] truncate" style={{ color: K.TEXT_MUTED }}>{s.deptName}{s.title ? ` · ${s.title}` : ''}</p>
                                   </div>
                                   {isExcluded && (
-                                    <span className="text-[10px] font-semibold shrink-0 px-2 py-0.5 rounded-full" style={{ background: 'var(--color-error-bg, rgba(239,68,68,0.1))', color: 'var(--color-error)' }}>
+                                    <span className="shrink-0 rounded-full" style={{ padding: '2px 8px', fontSize: 11, fontWeight: 600, background: K.ERROR_BG, color: K.ERROR }}>
                                       Hariç
                                     </span>
                                   )}
@@ -601,26 +617,23 @@ export default function NewExamPage() {
                           {departments
                             .filter(d => selectedDepts.has(d.id))
                             .every(d => d.staff.length === 0) && (
-                            <p className="text-xs text-center py-3" style={{ color: 'var(--color-text-muted)' }}>Seçili departmanlarda aktif personel yok</p>
+                            <p className="text-xs text-center py-3" style={{ color: K.TEXT_MUTED }}>Seçili departmanlarda aktif personel yok</p>
                           )}
                         </div>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Henüz departman tanımlanmamış</p>
+                  <p className="text-xs" style={{ color: K.TEXT_MUTED }}>Henüz departman tanımlanmamış</p>
                 )}
               </div>
 
               {/* Kart 5: Zorunlu */}
-              <div
-                className="rounded-2xl border p-6"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-              >
+              <div className="p-6" style={cardStyle}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold">Zorunlu Sınav</h3>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    <h3 style={sectionHeading}>Zorunlu Sınav</h3>
+                    <p className="text-xs mt-0.5" style={{ color: K.TEXT_MUTED }}>
                       Personelin tamamlaması zorunlu sınav olarak işaretler
                     </p>
                   </div>
@@ -629,15 +642,15 @@ export default function NewExamPage() {
                     onClick={() => setIsCompulsory((v) => !v)}
                     className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent"
                     style={{
-                      background: isCompulsory ? 'var(--color-warning, #f59e0b)' : 'var(--color-border)',
-                      transition: 'background var(--transition-fast)',
+                      background: isCompulsory ? K.WARNING : K.BORDER,
+                      transition: 'background 0.25s',
                     }}
                   >
                     <span
                       className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow"
                       style={{
                         transform: isCompulsory ? 'translateX(20px)' : 'translateX(0)',
-                        transition: 'transform var(--transition-fast)',
+                        transition: 'transform 0.25s',
                       }}
                     />
                   </button>
@@ -650,18 +663,18 @@ export default function NewExamPage() {
             <div className="space-y-4">
               {/* Üst bilgi */}
               <div
-                className="flex items-center gap-4 rounded-xl border px-5 py-3"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                className="flex items-center gap-4 px-5 py-3"
+                style={cardStyle}
               >
-                <span className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
+                <span className="text-sm font-semibold" style={{ color: K.PRIMARY }}>
                   {questions.length} soru
                 </span>
-                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>·</span>
-                <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                <span className="text-xs" style={{ color: K.TEXT_MUTED }}>·</span>
+                <span className="text-sm" style={{ color: K.TEXT_SECONDARY }}>
                   Toplam {totalPoints} puan
                 </span>
-                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>·</span>
-                <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                <span className="text-xs" style={{ color: K.TEXT_MUTED }}>·</span>
+                <span className="text-sm" style={{ color: K.TEXT_SECONDARY }}>
                   Tahmini {estimatedMinutes} dk
                 </span>
               </div>
@@ -670,14 +683,14 @@ export default function NewExamPage() {
               {questions.map((q, idx) => (
                 <div
                   key={q.id}
-                  className="rounded-2xl border p-5"
-                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                  className="p-5"
+                  style={cardStyle}
                 >
                   <div className="flex items-start gap-3">
                     {/* Drag handle */}
                     <div
                       className="mt-2 cursor-grab"
-                      style={{ color: 'var(--color-text-muted)' }}
+                      style={{ color: K.TEXT_MUTED }}
                     >
                       <GripVertical className="h-4 w-4" />
                     </div>
@@ -687,7 +700,7 @@ export default function NewExamPage() {
                       <div className="flex items-center justify-between">
                         <span
                           className="text-xs font-bold uppercase tracking-wider"
-                          style={{ color: 'var(--color-primary)' }}
+                          style={{ color: K.PRIMARY }}
                         >
                           Soru {idx + 1}
                         </span>
@@ -709,7 +722,7 @@ export default function NewExamPage() {
                             <button
                               onClick={() => removeQuestion(q.id)}
                               className="rounded-md p-1.5"
-                              style={{ color: 'var(--color-error)' }}
+                              style={{ color: K.ERROR }}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -723,11 +736,11 @@ export default function NewExamPage() {
                         onChange={(e) => updateQuestion(q.id, { text: e.target.value })}
                         placeholder="Soru metnini yazın..."
                         rows={2}
-                        className="w-full rounded-lg border px-3 py-2 text-sm resize-none"
+                        className="w-full rounded-lg px-3 py-2 text-sm resize-none"
                         style={{
-                          background: 'var(--color-bg)',
-                          borderColor: 'var(--color-border)',
-                          color: 'var(--color-text-primary)',
+                          background: K.BG,
+                          border: `1px solid ${K.BORDER}`,
+                          color: K.TEXT_PRIMARY,
                         }}
                       />
 
@@ -736,13 +749,13 @@ export default function NewExamPage() {
                         {['A', 'B', 'C', 'D'].map((letter, optIdx) => (
                           <label
                             key={letter}
-                            className="flex items-center gap-2.5 rounded-lg border px-3 py-2.5 cursor-pointer"
+                            className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 cursor-pointer"
                             style={{
-                              border: `1.5px solid ${q.correct === optIdx ? 'var(--color-success)' : 'var(--color-border)'}`,
+                              border: `1.5px solid ${q.correct === optIdx ? K.SUCCESS : K.BORDER}`,
                               background:
-                                q.correct === optIdx ? 'var(--color-success-bg)' : 'var(--color-surface)',
+                                q.correct === optIdx ? K.SUCCESS_BG : K.SURFACE,
                               transition:
-                                'border-color var(--transition-fast), background var(--transition-fast)',
+                                'border-color 0.15s, background 0.15s',
                             }}
                           >
                             <input
@@ -756,8 +769,8 @@ export default function NewExamPage() {
                               className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
                               style={{
                                 background:
-                                  q.correct === optIdx ? 'var(--color-success)' : 'var(--color-border)',
-                                color: q.correct === optIdx ? 'white' : 'var(--color-text-muted)',
+                                  q.correct === optIdx ? K.SUCCESS : K.BORDER,
+                                color: q.correct === optIdx ? '#fff' : K.TEXT_MUTED,
                               }}
                             >
                               {q.correct === optIdx ? <Check className="h-3 w-3" /> : letter}
@@ -782,7 +795,7 @@ export default function NewExamPage() {
                   variant="outline"
                   onClick={addQuestion}
                   className="gap-2 rounded-xl flex-1"
-                  style={{ borderColor: 'var(--color-border)' }}
+                  style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}
                 >
                   <Plus className="h-4 w-4" /> Manuel Soru Ekle
                 </Button>
@@ -790,7 +803,7 @@ export default function NewExamPage() {
                   variant="outline"
                   onClick={() => setShowBankModal(true)}
                   className="gap-2 rounded-xl flex-1"
-                  style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                  style={{ background: K.PRIMARY_LIGHT, border: `1px solid ${K.PRIMARY}`, color: K.PRIMARY }}
                 >
                   <Library className="h-4 w-4" /> Soru Bankasından Seç
                 </Button>
@@ -801,15 +814,12 @@ export default function NewExamPage() {
       </AnimatePresence>
 
       {/* Bottom Navigation */}
-      <div
-        className="flex items-center justify-between rounded-2xl border px-6 py-4"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-      >
+      <div className="flex items-center justify-between px-6 py-4" style={cardStyle}>
         <Button
           variant="outline"
           onClick={() => (currentStep > 1 ? setCurrentStep(currentStep - 1) : router.back())}
           className="gap-2 rounded-xl"
-          style={{ borderColor: 'var(--color-border)' }}
+          style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}
         >
           <ArrowLeft className="h-4 w-4" />
           {currentStep === 1 ? 'İptal' : 'Geri'}
@@ -823,8 +833,8 @@ export default function NewExamPage() {
               className="h-1.5 rounded-full"
               style={{
                 width: step.id === currentStep ? '24px' : '8px',
-                background: step.id <= currentStep ? 'var(--color-primary)' : 'var(--color-border)',
-                transition: 'width var(--transition-fast), background var(--transition-fast)',
+                background: step.id <= currentStep ? K.PRIMARY : K.BORDER,
+                transition: 'width 0.2s, background 0.2s',
               }}
             />
           ))}
@@ -834,10 +844,10 @@ export default function NewExamPage() {
           <Button
             onClick={() => setCurrentStep(2)}
             disabled={!canGoNext()}
-            className="gap-2 rounded-xl font-semibold text-white"
+            className="gap-2 rounded-xl font-semibold"
             style={{
-              background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)',
-              boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
+              background: K.PRIMARY,
+              color: '#fff',
             }}
           >
             Sonraki Adım <ArrowRight className="h-4 w-4" />
@@ -849,17 +859,17 @@ export default function NewExamPage() {
               onClick={() => handleSubmit('draft')}
               disabled={publishing}
               className="gap-2 rounded-xl"
-              style={{ borderColor: 'var(--color-border)' }}
+              style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}
             >
               <Save className="h-4 w-4" /> Taslak Kaydet
             </Button>
             <Button
               onClick={() => handleSubmit('published')}
               disabled={publishing}
-              className="gap-2 rounded-xl font-semibold text-white"
+              className="gap-2 rounded-xl font-semibold"
               style={{
-                background: 'linear-gradient(135deg, var(--color-primary), #0f4a35)',
-                boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
+                background: K.PRIMARY,
+                color: '#fff',
               }}
             >
               <Sparkles className="h-4 w-4" /> {publishing ? 'Kaydediliyor...' : 'Yayınla'}
@@ -875,26 +885,26 @@ export default function NewExamPage() {
           style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
         >
           <div
-            className="mx-4 w-full max-w-2xl rounded-2xl overflow-hidden"
-            style={{ background: 'var(--color-surface)', boxShadow: 'var(--shadow-lg)' }}
+            className="mx-4 w-full max-w-2xl overflow-hidden"
+            style={{ ...cardStyle, boxShadow: '0 20px 60px rgba(15, 23, 42, 0.25)' }}
           >
             {/* Header */}
             <div
-              className="flex items-center justify-between px-6 py-4 border-b"
-              style={{ borderColor: 'var(--color-border)' }}
+              className="flex items-center justify-between px-6 py-4"
+              style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
             >
-              <h3 className="text-sm font-bold">Soru Bankasından Seç</h3>
+              <h3 style={sectionHeading}>Soru Bankasından Seç</h3>
               <button onClick={() => setShowBankModal(false)}>
-                <X className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+                <X className="h-4 w-4" style={{ color: K.TEXT_MUTED }} />
               </button>
             </div>
 
             {/* Filters */}
-            <div className="flex gap-2 px-6 py-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="flex gap-2 px-6 py-3" style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
               <div className="relative flex-1">
                 <Search
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5"
-                  style={{ color: 'var(--color-text-muted)' }}
+                  style={{ color: K.TEXT_MUTED }}
                 />
                 <Input
                   value={bankSearch}
@@ -907,7 +917,7 @@ export default function NewExamPage() {
                 value={bankDifficulty}
                 onChange={(e) => setBankDifficulty(e.target.value)}
                 className="rounded-lg border px-2 text-xs h-8"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                style={{ background: K.SURFACE, borderColor: K.BORDER }}
               >
                 <option value="">Tüm Zorluklar</option>
                 <option value="easy">Kolay</option>
@@ -918,7 +928,7 @@ export default function NewExamPage() {
                 value={bankCategory}
                 onChange={(e) => setBankCategory(e.target.value)}
                 className="rounded-lg border px-2 text-xs h-8"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                style={{ background: K.SURFACE, borderColor: K.BORDER }}
               >
                 <option value="">Tüm Kategoriler</option>
                 {categories.map((c) => (
@@ -932,7 +942,7 @@ export default function NewExamPage() {
             {/* Question List */}
             <div className="max-h-80 overflow-y-auto px-6 py-3">
               {(bankData?.questions ?? []).length === 0 ? (
-                <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>
                   Soru bankasında soru bulunamadı
                 </p>
               ) : (
@@ -950,49 +960,52 @@ export default function NewExamPage() {
                             return next;
                           })
                         }
-                        className="flex w-full items-center gap-3 rounded-lg border p-3 text-left"
+                        className="flex w-full items-center gap-3 rounded-lg p-3 text-left"
                         style={{
-                          borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                          background: isSelected ? 'var(--color-primary-light)' : 'transparent',
+                          border: `1px solid ${isSelected ? K.PRIMARY : K.BORDER_LIGHT}`,
+                          background: isSelected ? K.PRIMARY_LIGHT : 'transparent',
                         }}
                       >
                         <div
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded border"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded"
                           style={{
-                            borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                            background: isSelected ? 'var(--color-primary)' : 'transparent',
+                            border: `1px solid ${isSelected ? K.PRIMARY : K.BORDER}`,
+                            background: isSelected ? K.PRIMARY : 'transparent',
                           }}
                         >
                           {isSelected && <Check className="h-3 w-3 text-white" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
+                          <p className="text-xs font-medium truncate" style={{ color: K.TEXT_PRIMARY }}>
                             {bq.text}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                            <span className="text-[10px]" style={{ color: K.TEXT_MUTED }}>
                               {bq.category}
                             </span>
                             <span
-                              className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
+                              className="rounded-full"
                               style={{
+                                padding: '1px 6px',
+                                fontSize: 10,
+                                fontWeight: 600,
                                 background:
                                   bq.difficulty === 'easy'
-                                    ? 'var(--color-success-bg)'
+                                    ? K.SUCCESS_BG
                                     : bq.difficulty === 'hard'
-                                      ? 'var(--color-error-bg)'
-                                      : 'var(--color-warning-bg)',
+                                      ? K.ERROR_BG
+                                      : K.WARNING_BG,
                                 color:
                                   bq.difficulty === 'easy'
-                                    ? 'var(--color-success)'
+                                    ? K.SUCCESS
                                     : bq.difficulty === 'hard'
-                                      ? 'var(--color-error)'
-                                      : 'var(--color-warning)',
+                                      ? K.ERROR
+                                      : K.WARNING,
                               }}
                             >
                               {bq.difficulty === 'easy' ? 'Kolay' : bq.difficulty === 'hard' ? 'Zor' : 'Orta'}
                             </span>
-                            <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                            <span className="text-[10px]" style={{ color: K.TEXT_MUTED }}>
                               {bq.points} puan
                             </span>
                           </div>
@@ -1006,10 +1019,10 @@ export default function NewExamPage() {
 
             {/* Footer */}
             <div
-              className="flex items-center justify-between px-6 py-3 border-t"
-              style={{ borderColor: 'var(--color-border)' }}
+              className="flex items-center justify-between px-6 py-3"
+              style={{ borderTop: `1px solid ${K.BORDER_LIGHT}` }}
             >
-              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="text-xs" style={{ color: K.TEXT_MUTED }}>
                 {selectedBankIds.size} soru seçildi
               </span>
               <div className="flex gap-2">
@@ -1018,6 +1031,7 @@ export default function NewExamPage() {
                   size="sm"
                   onClick={() => setShowBankModal(false)}
                   className="rounded-lg"
+                  style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}
                 >
                   İptal
                 </Button>
@@ -1025,8 +1039,8 @@ export default function NewExamPage() {
                   size="sm"
                   onClick={addFromBank}
                   disabled={selectedBankIds.size === 0}
-                  className="rounded-lg gap-1.5 text-white"
-                  style={{ background: 'var(--color-primary)' }}
+                  className="rounded-lg gap-1.5"
+                  style={{ background: K.PRIMARY, color: '#fff' }}
                 >
                   <Plus className="h-3.5 w-3.5" /> {selectedBankIds.size} Soruyu Ekle
                 </Button>

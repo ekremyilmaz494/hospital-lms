@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, createAuditLog } from '@/lib/api-helpers'
 import { uploadBuffer, backupKey } from '@/lib/s3'
 import { encryptBackup } from '@/lib/backup-crypto'
 
@@ -8,10 +8,10 @@ import { encryptBackup } from '@/lib/backup-crypto'
 export { decryptBackup } from '@/lib/backup-crypto'
 
 export async function GET(_request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId!
@@ -45,10 +45,10 @@ export async function GET(_request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
-  const roleError = requireRole(dbUser!.role, ['admin'])
+  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
   if (roleError) return roleError
 
   const orgId = dbUser!.organizationId!

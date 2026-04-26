@@ -13,7 +13,6 @@ import 'dotenv/config'
 import { PrismaClient } from '../src/generated/prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { createClient } from '@supabase/supabase-js'
-import { randomUUID } from 'crypto'
 
 // ── ENV CHECK ──────────────────────────────────────────────
 const DATABASE_URL = process.env.DATABASE_URL

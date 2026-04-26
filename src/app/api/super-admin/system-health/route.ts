@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, assertRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { getAuthUserStrict, assertRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { getRedis } from '@/lib/redis'
 import { s3 } from '@/lib/s3'
@@ -118,7 +118,7 @@ async function checkSupabaseAuth(): Promise<ServiceStatus> {
 }
 
 export async function GET() {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   try {

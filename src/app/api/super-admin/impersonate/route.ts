@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, setCached } from '@/lib/redis'
 import { z } from 'zod/v4'
@@ -21,7 +21,7 @@ const impersonateSchema = z.object({
  * - The caller's tab remains authenticated; impersonation opens in a new tab
  */
 export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
+  const { dbUser, error } = await getAuthUserStrict()
   if (error) return error
 
   const roleError = requireRole(dbUser!.role, ['super_admin'])
