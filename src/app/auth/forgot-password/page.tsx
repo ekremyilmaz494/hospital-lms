@@ -16,12 +16,12 @@ const MeshGradient = dynamic(
   { ssr: false }
 );
 
-// Clinical Editorial palette
-const INK = '#0a1628';
-const CREAM = '#faf7f2';
-const RULE = '#e5e0d5';
-const GOLD = '#c9a961';
-const INK_SOFT = '#5b6478';
+// Klinova palette
+const INK = '#063a26';        // deep emerald-ink
+const CREAM = '#f0fdf4';      // emerald cream
+const RULE = '#a7f3d0';       // light emerald border
+const GOLD = '#10b981';       // emerald primary
+const INK_SOFT = '#475569';   // slate
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -93,7 +93,7 @@ export default function ForgotPasswordPage() {
       <div className="absolute inset-0 z-0">
         <MeshGradient
           style={{ width: '100%', height: '100%' }}
-          colors={['#faf7f2', '#f3dfa6', '#d4a437', '#c9a961', '#A9C4B3', '#e7c97a']}
+          colors={['#f0fdf4', '#a7f3d0', '#34d399', '#10b981', '#22d3ee', '#6ee7b7']}
           distortion={1.1}
           swirl={0.55}
           speed={0.35}
@@ -101,29 +101,52 @@ export default function ForgotPasswordPage() {
           grainMixer={0}
           grainOverlay={0}
         />
-        <div className="absolute inset-0" style={{ background: 'rgba(250, 247, 242, 0.12)' }} />
-        <div
-          className="absolute inset-0 opacity-[0.22]"
-          style={{
-            backgroundImage: `radial-gradient(circle, ${RULE} 1px, transparent 1px)`,
-            backgroundSize: '32px 32px',
-          }}
-        />
+        <div className="absolute inset-0" style={{ background: 'rgba(240, 253, 244, 0.18)' }} />
       </div>
 
       <div className="relative z-10 w-full max-w-[460px]">
-        {/* Masthead — logo */}
+        {/* Masthead — Klinova brand mark */}
         <BlurFade delay={0.05} duration={0.4}>
           <div className="mb-6 flex items-center gap-3">
             <div
-              className="flex h-9 w-9 items-center justify-center ed-display text-base font-semibold"
-              style={{ background: INK, color: GOLD }}
+              className="flex h-10 w-10 items-center justify-center"
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                borderRadius: 11,
+                boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255,255,255,0.3)',
+              }}
             >
-              H
+              <span
+                style={{
+                  fontFamily: "var(--font-editorial), Georgia, serif",
+                  fontStyle: 'italic', fontWeight: 700, fontSize: 22,
+                  color: '#ffffff', lineHeight: 1, transform: 'translateY(1px)',
+                }}
+              >
+                K
+              </span>
             </div>
-            <span className="ed-display text-lg font-semibold" style={{ color: INK }}>
-              Devakent Hastanesi
-            </span>
+            <div className="flex flex-col">
+              <span
+                style={{
+                  fontFamily: "var(--font-editorial), Georgia, serif",
+                  fontStyle: 'italic', fontWeight: 500, fontSize: 22,
+                  color: INK, lineHeight: 1, letterSpacing: '-0.01em',
+                }}
+              >
+                Klinova
+              </span>
+              <span
+                className="ed-mono"
+                style={{
+                  fontSize: 9, fontWeight: 600,
+                  letterSpacing: '0.28em',
+                  color: GOLD, marginTop: 3, textTransform: 'uppercase',
+                }}
+              >
+                Hospital Suite
+              </span>
+            </div>
           </div>
         </BlurFade>
 
@@ -161,9 +184,9 @@ export default function ForgotPasswordPage() {
               <BlurFade delay={0.18} duration={0.4}>
                 <div
                   className="mb-6 flex items-start gap-4 px-4 py-4"
-                  style={{ background: '#f1f7f3', borderLeft: `3px solid #1a3a28` }}
+                  style={{ background: '#d1fae5', borderLeft: `3px solid ${GOLD}` }}
                 >
-                  <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#1a3a28' }} />
+                  <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" style={{ color: GOLD }} />
                   <div className="text-[13px] leading-relaxed" style={{ color: INK }}>
                     <strong style={{ color: INK }}>{email}</strong> adresine şifre sıfırlama bağlantısı
                     gönderildi. Lütfen gelen kutunuzu kontrol edin.
@@ -186,7 +209,7 @@ export default function ForgotPasswordPage() {
                     style={{
                       height: 52,
                       background: INK,
-                      color: '#f8f4ea',
+                      color: '#ecfdf5',
                       border: `1.5px solid ${INK}`,
                       boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px ${GOLD}55`,
                     }}
@@ -264,7 +287,7 @@ export default function ForgotPasswordPage() {
                     style={{
                       height: 52,
                       background: INK,
-                      color: '#f8f4ea',
+                      color: '#ecfdf5',
                       border: `1.5px solid ${INK}`,
                       boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px ${GOLD}55`,
                     }}
@@ -306,8 +329,8 @@ export default function ForgotPasswordPage() {
         {/* Footer */}
         <BlurFade delay={0.32} duration={0.4}>
           <div className="mt-6 flex items-center justify-between ed-mono text-[10px] tracking-[0.25em]" style={{ color: INK_SOFT }}>
-            <span>© 2026 · DEVAKENT HASTANESI</span>
-            <span style={{ color: GOLD }}>HOSPITAL LMS</span>
+            <span>© 2026 · KLINOVA</span>
+            <span style={{ color: GOLD }}>HOSPITAL SUITE</span>
           </div>
         </BlurFade>
       </div>

@@ -13,12 +13,12 @@ type CookiePreferences = {
 const COOKIE_CONSENT_KEY = 'lms_cookie_consent'
 const COOKIE_PREFS_KEY = 'lms_cookie_prefs'
 
-/* ─── Editorial palette ─── */
-const INK = '#0a1628'
-const INK_SOFT = '#5b6478'
-const CREAM = '#faf7f2'
-const RULE = '#e5e0d5'
-const GOLD = '#c9a961'
+/* ─── Klinova palette ─── */
+const INK = '#063a26'        // deep emerald-ink
+const INK_SOFT = '#475569'   // slate
+const CREAM = '#f0fdf4'      // emerald cream
+const RULE = '#a7f3d0'       // light emerald border
+const GOLD = '#10b981'       // emerald primary (semantic name preserved for diff minimalism)
 
 function getStoredConsent(): boolean {
   if (typeof window === 'undefined') return false
@@ -35,8 +35,8 @@ function getStoredPrefs(): CookiePreferences {
 }
 
 /**
- * Çerez onay banner'ı — Clinical Editorial dilinde.
- * Cream zemin + ink border top + gold left-rail accent.
+ * Çerez onay banner'ı — Klinova dilinde.
+ * Soft-mint zemin + emerald-ink border + emerald left-rail accent.
  * Alt kenarda fixed, max-w-3xl merkezli, rounded yok.
  */
 export function CookieConsent() {
@@ -218,7 +218,7 @@ export function CookieConsent() {
                 color: CREAM,
                 background: INK,
                 border: `1px solid ${INK}`,
-                boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px #c9a96155`,
+                boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px #10b98155`,
               }}
             >
               <Check className="h-3.5 w-3.5" style={{ color: GOLD }} />
@@ -250,7 +250,7 @@ export function CookieConsent() {
                   color: CREAM,
                   background: INK,
                   border: `1px solid ${INK}`,
-                  boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px #c9a96155`,
+                  boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px #10b98155`,
                 }}
               >
                 <span>TÜMÜNÜ KABUL ET</span>
@@ -303,7 +303,7 @@ function PrefRow({
           className="ck-mono text-[9px] tracking-[0.22em] px-2 py-1"
           style={{
             color: GOLD,
-            background: 'rgba(201, 169, 97, 0.1)',
+            background: 'rgba(16, 185, 129, 0.1)',
             border: `1px solid ${GOLD}`,
             borderRadius: '2px',
             fontWeight: 700,
