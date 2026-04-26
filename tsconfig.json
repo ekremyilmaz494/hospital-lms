@@ -44,6 +44,8 @@
     "node_modules",
     "prisma.config.ts",
     "worker",
-    "src/generated"
+    "src/generated",
+    "packages",
+    "ai-content-service"
   ]
 }
