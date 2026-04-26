@@ -16,7 +16,6 @@ const MeshGradient = dynamic(
   () => import('@paper-design/shaders-react').then(m => ({ default: m.MeshGradient })),
   { ssr: false }
 );
-
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { useOrgBranding } from '@/hooks/use-org-branding';
@@ -43,10 +42,10 @@ const K = {
   FONT_DISPLAY: 'var(--font-display, system-ui)',
 };
 
-// Dark hero ink (deep emerald) — used for the left brand panel backdrop
-const HERO_INK = '#063a26';
-const HERO_TEXT = '#f5fbf7';
-const HERO_TEXT_SOFT = 'rgba(245, 251, 247, 0.66)';
+// Dark hero ink (admin warm-dark) — used for the left brand panel backdrop
+const HERO_INK = '#1c1917';
+const HERO_TEXT = '#fafaf9';
+const HERO_TEXT_SOFT = 'rgba(250, 250, 249, 0.66)';
 
 function LoginForm() {
   const router = useRouter();
@@ -260,19 +259,19 @@ function LoginForm() {
         .ed-pulse { animation: ed-glow 6s ease-in-out infinite; }
       `}</style>
 
-      {/* ── LEFT — Aurora Hero (emerald + cyan, 2-color) ── */}
+      {/* ── LEFT — Aurora Hero (warm-dark + emerald, admin-aligned) ── */}
       <aside
         className="relative hidden lg:flex lg:w-1/2 flex-col overflow-hidden"
-        style={{ background: 'linear-gradient(150deg, #042f2e 0%, #064e3b 55%, #083344 100%)' }}
+        style={{ background: 'linear-gradient(150deg, #1c1917 0%, #292524 55%, #1c1917 100%)' }}
       >
         {branding?.loginBannerUrl && (
           <div className="absolute inset-0 z-0">
             <Image src={branding.loginBannerUrl} alt="" fill className="object-cover" unoptimized />
-            <div className="absolute inset-0" style={{ background: 'rgba(6, 78, 59, 0.85)' }} />
+            <div className="absolute inset-0" style={{ background: 'rgba(28, 25, 23, 0.85)' }} />
           </div>
         )}
 
-        {/* Aurora animation — emerald & cyan ribbons */}
+        {/* Aurora animation — emerald monochrome on warm-dark */}
         <style>{`
           @keyframes aurora-drift-1 {
             0% { transform: translate(-10%, -10%) rotate(0deg); }
@@ -291,21 +290,21 @@ function LoginForm() {
           .aurora-1 {
             position: absolute; top: -20%; left: -20%;
             width: 80%; height: 80%; border-radius: 9999px;
-            background: radial-gradient(circle, #10b981 0%, transparent 65%);
+            background: radial-gradient(circle, #0d9668 0%, transparent 65%);
             filter: blur(60px);
             animation: aurora-drift-1 28s ease-in-out infinite, aurora-pulse 8s ease-in-out infinite;
           }
           .aurora-2 {
             position: absolute; bottom: -25%; right: -20%;
             width: 85%; height: 85%; border-radius: 9999px;
-            background: radial-gradient(circle, #06b6d4 0%, transparent 65%);
+            background: radial-gradient(circle, #087a54 0%, transparent 65%);
             filter: blur(70px);
             animation: aurora-drift-2 32s ease-in-out infinite, aurora-pulse 10s ease-in-out infinite;
           }
           .aurora-3 {
             position: absolute; top: 30%; left: 30%;
             width: 50%; height: 50%; border-radius: 9999px;
-            background: radial-gradient(circle, #34d39966 0%, transparent 70%);
+            background: radial-gradient(circle, #10b98166 0%, transparent 70%);
             filter: blur(50px);
             animation: aurora-drift-1 22s ease-in-out infinite reverse;
           }
@@ -324,7 +323,7 @@ function LoginForm() {
               <div
                 className="flex h-11 w-11 items-center justify-center"
                 style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                  background: 'linear-gradient(135deg, #10b981 0%, #087a54 100%)',
                   borderRadius: 12,
                   boxShadow: '0 8px 28px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255,255,255,0.25)',
                 }}
@@ -354,7 +353,7 @@ function LoginForm() {
                     fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
                     fontSize: 10, fontWeight: 600,
                     letterSpacing: '0.28em',
-                    background: 'linear-gradient(90deg, #6ee7b7, #67e8f9)',
+                    background: 'linear-gradient(90deg, #6ee7b7, #a7f3d0)',
                     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text', marginTop: 3, textTransform: 'uppercase',
                   }}
@@ -384,7 +383,7 @@ function LoginForm() {
                     fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
                     fontSize: 11, fontWeight: 600,
                     letterSpacing: '0.22em',
-                    background: 'linear-gradient(90deg, #6ee7b7, #67e8f9)',
+                    background: 'linear-gradient(90deg, #6ee7b7, #a7f3d0)',
                     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text', textTransform: 'uppercase',
                   }}
@@ -409,7 +408,7 @@ function LoginForm() {
                 <br />
                 <span
                   style={{
-                    background: 'linear-gradient(110deg, #6ee7b7 0%, #34d399 40%, #22d3ee 75%, #67e8f9 100%)',
+                    background: 'linear-gradient(110deg, #6ee7b7 0%, #34d399 40%, #34d399 75%, #a7f3d0 100%)',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
@@ -458,7 +457,7 @@ function LoginForm() {
                     <div
                       className="flex h-9 w-9 items-center justify-center mb-3"
                       style={{
-                        background: 'linear-gradient(135deg, #10b981, #06b6d4)',
+                        background: 'linear-gradient(135deg, #10b981, #087a54)',
                         borderRadius: 10,
                         boxShadow: '0 8px 18px rgba(16, 185, 129, 0.4)',
                       }}
@@ -483,7 +482,7 @@ function LoginForm() {
               <div
                 className="mt-12 flex items-stretch gap-px overflow-hidden max-w-md"
                 style={{
-                  background: 'linear-gradient(90deg, #10b98166, #06b6d466)',
+                  background: 'linear-gradient(90deg, #10b98166, #0d966866)',
                   borderRadius: 14,
                   padding: 1,
                 }}
@@ -498,8 +497,8 @@ function LoginForm() {
                 >
                   {[
                     { value: '120+', label: 'HASTANE', accent: '#34d399' },
-                    { value: '50K+', label: 'PERSONEL', accent: '#22d3ee' },
-                    { value: '99.9%', label: 'UPTIME', accent: '#67e8f9' },
+                    { value: '50K+', label: 'PERSONEL', accent: '#34d399' },
+                    { value: '99.9%', label: 'UPTIME', accent: '#a7f3d0' },
                   ].map((s, i) => (
                     <React.Fragment key={s.label}>
                       {i > 0 && <span style={{ width: 1, background: 'rgba(255,255,255,0.12)' }} />}
@@ -566,7 +565,7 @@ function LoginForm() {
               <span>© 2026 Klinova</span>
               <span
                 style={{
-                  background: 'linear-gradient(90deg, #6ee7b7, #67e8f9)',
+                  background: 'linear-gradient(90deg, #6ee7b7, #a7f3d0)',
                   WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                   backgroundClip: 'text',
                 }}
