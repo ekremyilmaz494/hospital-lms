@@ -3,16 +3,23 @@ import { ArrowLeft, Shield, Database, Share2, Clock, UserCheck, Mail, Scale } fr
 import { BlurFade } from '@/components/ui/blur-fade'
 
 export const metadata = {
-  title: 'KVKK Aydınlatma Metni — Devakent Hastanesi',
+  title: 'KVKK Aydınlatma Metni — Klinova',
   description: 'Kişisel Verilerin Korunması Kanunu kapsamında aydınlatma metni',
 }
+
+// Klinova palette
+const INK = '#063a26'
+const INK_SOFT = '#475569'
+const CREAM = '#f0fdf4'
+const RULE = '#a7f3d0'
+const ACCENT = '#10b981'
 
 const sections = [
   {
     icon: Shield,
     title: '1. Veri Sorumlusu',
     content:
-      'Devakent Hastanesi Platformu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan amaçlar doğrultusunda ve kanuna uygun olarak işlemekteyiz.',
+      'Klinova Hospital Suite olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan amaçlar doğrultusunda ve kanuna uygun olarak işlemekteyiz.',
   },
   {
     icon: Database,
@@ -86,40 +93,60 @@ const sections = [
     title: '8. İletişim',
     content:
       'KVKK kapsamındaki haklarınızı kullanmak için aşağıdaki kanallardan bizimle iletişime geçebilirsiniz. Başvurularınız en geç 30 (otuz) gün içinde sonuçlandırılacaktır.',
-    footer: 'E-posta: kvkk@hastanelms.com',
+    footer: 'E-posta: kvkk@klinova.app',
   },
 ]
 
 export default function KVKKPage() {
   return (
-    <div className="min-h-screen" style={{ background: '#f5f0e6' }}>
+    <div className="min-h-screen" style={{ background: CREAM }}>
       {/* Header */}
       <header
         className="sticky top-0 z-30 border-b"
         style={{
-          background: 'rgba(245, 240, 230, 0.85)',
+          background: 'rgba(240, 253, 244, 0.85)',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          borderColor: 'rgba(26, 58, 40, 0.08)',
+          borderColor: RULE,
         }}
       >
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 sm:px-6">
           <Link
             href="/"
             className="flex items-center gap-2 text-sm font-semibold transition-colors duration-150"
-            style={{ color: 'var(--brand-600)' }}
+            style={{ color: ACCENT }}
           >
             <ArrowLeft className="h-4 w-4" />
             Giriş Sayfasına Dön
           </Link>
           <div className="flex items-center gap-2.5">
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-xl text-sm font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, var(--brand-600), #1a3a28)' }}
+              className="flex h-9 w-9 items-center justify-center"
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                borderRadius: 10,
+                boxShadow: '0 6px 18px rgba(16, 185, 129, 0.32), inset 0 1px 0 rgba(255,255,255,0.3)',
+              }}
             >
-              D
+              <span
+                style={{
+                  fontFamily: "var(--font-editorial), Georgia, serif",
+                  fontStyle: 'italic', fontWeight: 700, fontSize: 18,
+                  color: '#ffffff', lineHeight: 1, transform: 'translateY(1px)',
+                }}
+              >
+                K
+              </span>
             </div>
-            <span className="text-sm font-semibold" style={{ color: '#1a3a28' }}>Devakent Hastanesi</span>
+            <span
+              style={{
+                fontFamily: "var(--font-editorial), Georgia, serif",
+                fontStyle: 'italic', fontWeight: 500, fontSize: 18,
+                color: INK, letterSpacing: '-0.01em',
+              }}
+            >
+              Klinova
+            </span>
           </div>
         </div>
       </header>
@@ -131,17 +158,18 @@ export default function KVKKPage() {
             <div
               className="mb-4 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold"
               style={{
-                background: 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)',
-                color: 'var(--brand-600)',
+                background: 'rgba(16, 185, 129, 0.1)',
+                color: ACCENT,
+                border: `1px solid ${RULE}`,
               }}
             >
               <Shield className="h-3.5 w-3.5" />
               6698 Sayılı Kanun
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3" style={{ color: '#1a3a28' }}>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3" style={{ color: INK }}>
               KVKK Aydınlatma Metni
             </h1>
-            <p className="text-sm leading-relaxed" style={{ color: '#4a7060' }}>
+            <p className="text-sm leading-relaxed" style={{ color: INK_SOFT }}>
               Kişisel Verilerin Korunması Kanunu kapsamında veri işleme faaliyetlerimize ilişkin aydınlatma metni.
             </p>
           </div>
@@ -153,25 +181,24 @@ export default function KVKKPage() {
               <section
                 className="rounded-2xl p-5 sm:p-6 bg-white"
                 style={{
-                  border: '1px solid rgba(26, 58, 40, 0.08)',
+                  border: `1px solid ${RULE}`,
+                  boxShadow: '0 1px 3px rgba(6, 58, 38, 0.04)',
                 }}
               >
                 <div className="mb-4 flex items-center gap-3">
                   <div
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                    style={{
-                      background: 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)',
-                    }}
+                    style={{ background: 'rgba(16, 185, 129, 0.1)' }}
                   >
-                    <section.icon className="h-4.5 w-4.5" style={{ color: 'var(--brand-600)' }} />
+                    <section.icon className="h-4.5 w-4.5" style={{ color: ACCENT }} />
                   </div>
-                  <h2 className="text-lg font-bold tracking-tight" style={{ color: '#1a3a28' }}>{section.title}</h2>
+                  <h2 className="text-lg font-bold tracking-tight" style={{ color: INK }}>{section.title}</h2>
                 </div>
 
                 {section.content && (
                   <p
                     className="text-sm leading-relaxed mb-3"
-                    style={{ color: '#4a7060' }}
+                    style={{ color: INK_SOFT }}
                   >
                     {section.content}
                   </p>
@@ -180,10 +207,10 @@ export default function KVKKPage() {
                 {section.items && (
                   <ul className="space-y-2 ml-1">
                     {section.items.map((item) => (
-                      <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#4a7060' }}>
+                      <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: INK_SOFT }}>
                         <span
                           className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ background: 'var(--brand-600)' }}
+                          style={{ background: ACCENT }}
                         />
                         {item}
                       </li>
@@ -194,7 +221,7 @@ export default function KVKKPage() {
                 {section.footer && (
                   <p
                     className="mt-4 text-sm font-medium"
-                    style={{ color: '#1a3a28' }}
+                    style={{ color: INK }}
                   >
                     {section.footer}
                   </p>
@@ -206,8 +233,8 @@ export default function KVKKPage() {
 
         <BlurFade delay={0.6}>
           <div className="mt-12 text-center">
-            <p className="text-xs" style={{ color: '#4a7060' }}>
-              Son güncelleme: Mart 2026 &middot; &copy; 2026 Devakent Hastanesi Platformu
+            <p className="text-xs" style={{ color: INK_SOFT }}>
+              Son güncelleme: Nisan 2026 &middot; &copy; 2026 Klinova Hospital Suite
             </p>
           </div>
         </BlurFade>
