@@ -11,17 +11,13 @@ const BlurFade = dynamic(
   () => import('@/components/ui/blur-fade').then(m => ({ default: m.BlurFade })),
   { ssr: false, loading: () => <div /> }
 );
-const MeshGradient = dynamic(
-  () => import('@paper-design/shaders-react').then(m => ({ default: m.MeshGradient })),
-  { ssr: false }
-);
 
-// Klinova palette
-const INK = '#063a26';        // deep emerald-ink
-const CREAM = '#f0fdf4';      // emerald cream
-const RULE = '#a7f3d0';       // light emerald border
-const GOLD = '#10b981';       // emerald primary
-const INK_SOFT = '#475569';   // slate
+// Klinova palette (admin chrome tokens)
+const INK = '#1c1917';        // --k-text-primary (warm dark)
+const CREAM = '#fafaf9';      // --k-bg (warm gray)
+const RULE = '#e7e5e4';       // --k-border (warm gray)
+const GOLD = '#0d9668';       // --k-primary (emerald-600)
+const INK_SOFT = '#78716c';   // --k-text-muted (warm gray)
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -89,19 +85,14 @@ export default function ForgotPasswordPage() {
         .ed-input::placeholder { color: ${INK_SOFT}; opacity: 0.6; }
       `}</style>
 
-      {/* MeshGradient ambient backdrop */}
-      <div className="absolute inset-0 z-0">
-        <MeshGradient
-          style={{ width: '100%', height: '100%' }}
-          colors={['#f0fdf4', '#a7f3d0', '#34d399', '#10b981', '#22d3ee', '#6ee7b7']}
-          distortion={1.1}
-          swirl={0.55}
-          speed={0.35}
-          offsetX={0.05}
-          grainMixer={0}
-          grainOverlay={0}
+      {/* Subtle ambient backdrop — soft emerald wash */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div
+          className="absolute inset-0"
+          style={{
+            background: 'radial-gradient(circle at 20% 30%, rgba(13, 150, 104, 0.08) 0%, transparent 55%), radial-gradient(circle at 80% 70%, rgba(13, 150, 104, 0.06) 0%, transparent 50%)',
+          }}
         />
-        <div className="absolute inset-0" style={{ background: 'rgba(240, 253, 244, 0.18)' }} />
       </div>
 
       <div className="relative z-10 w-full max-w-[460px]">
@@ -184,7 +175,7 @@ export default function ForgotPasswordPage() {
               <BlurFade delay={0.18} duration={0.4}>
                 <div
                   className="mb-6 flex items-start gap-4 px-4 py-4"
-                  style={{ background: '#d1fae5', borderLeft: `3px solid ${GOLD}` }}
+                  style={{ background: '#ecfdf5', borderLeft: `3px solid ${GOLD}` }}
                 >
                   <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" style={{ color: GOLD }} />
                   <div className="text-[13px] leading-relaxed" style={{ color: INK }}>
@@ -209,7 +200,7 @@ export default function ForgotPasswordPage() {
                     style={{
                       height: 52,
                       background: INK,
-                      color: '#ecfdf5',
+                      color: '#fafaf9',
                       border: `1.5px solid ${INK}`,
                       boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px ${GOLD}55`,
                     }}
@@ -287,7 +278,7 @@ export default function ForgotPasswordPage() {
                     style={{
                       height: 52,
                       background: INK,
-                      color: '#ecfdf5',
+                      color: '#fafaf9',
                       border: `1.5px solid ${INK}`,
                       boxShadow: `0 0 0 1px ${GOLD}, 0 0 0 3px #fff, 0 0 0 4px ${GOLD}55`,
                     }}
