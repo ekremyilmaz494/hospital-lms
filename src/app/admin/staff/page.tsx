@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
 import {
   Users, Plus, Upload, MoreHorizontal, Eye, Edit, GraduationCap, Mail,
-  Building2, Trash2, UserPlus, ChevronRight, Search, X, Save, History
+  Building2, Trash2, UserPlus, ChevronRight, Search, X, Save, History, Award,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { DataTable } from '@/components/shared/data-table';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -18,6 +20,21 @@ import { useToast } from '@/components/shared/toast';
 import { AssignTrainingModal } from './assign-training-modal';
 import { BulkImportDialog } from './bulk-import-dialog';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
+
+// ── Klinova palette ──
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2', ERROR_TEXT: '#b91c1c',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
 
 // ── Types ──
 interface Staff {
@@ -52,17 +69,46 @@ interface StaffPageData {
   totalPages: number;
 }
 
-const DEPARTMENT_COLORS = [
-  'var(--brand-600)', '#dc2626', '#2563eb', 'var(--brand-600)', '#f59e0b', '#d97706', '#6366f1', '#ec4899',
-  '#14b8a6', '#8b5cf6', '#f97316', '#06b6d4',
-];
-
-const statusColors: Record<string, { bg: string; text: string }> = {
-  'Aktif': { bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
-  'Pasif': { bg: 'var(--color-error-bg)', text: 'var(--color-error)' },
+// Prototip semantic department palette (klinova-admin/styles.css:825-839)
+// Key → ana renk. Custom departmanlar için palette fallback kullanılır.
+const DEPT_SEMANTIC: Record<string, string> = {
+  acil: '#dc2626',
+  cerrahi: '#7c3aed',
+  pediatri: '#f59e0b',
+  kardio: '#e11d48',
+  noroloji: '#0284c7',
+  onkoloji: '#0d9668',
+  radyo: '#64748b',
+  labor: '#0891b2',
 };
 
-// ── Staff Actions Component ──
+const DEPARTMENT_COLORS = [
+  '#0d9668', '#dc2626', '#7c3aed', '#e11d48', '#0284c7', '#f59e0b',
+  '#0891b2', '#64748b', '#d97706', '#ec4899', '#14b8a6', '#f97316',
+];
+
+// Türkçe departman adını semantic key'e çevirir. Bulursa renk döner, yoksa null.
+function semanticDeptColor(name: string): string | null {
+  const n = name
+    .toLocaleLowerCase('tr-TR')
+    .replace(/[ıi̇]/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c');
+  if (n.includes('acil')) return DEPT_SEMANTIC.acil;
+  if (n.includes('cerrah')) return DEPT_SEMANTIC.cerrahi;
+  if (n.includes('cocuk') || n.includes('pediatri')) return DEPT_SEMANTIC.pediatri;
+  if (n.includes('kardi') || n.includes('kalp')) return DEPT_SEMANTIC.kardio;
+  if (n.includes('norol') || n.includes('beyin') || n.includes('sinir')) return DEPT_SEMANTIC.noroloji;
+  if (n.includes('onkol') || n.includes('kanser')) return DEPT_SEMANTIC.onkoloji;
+  if (n.includes('radyol') || n.includes('goruntul')) return DEPT_SEMANTIC.radyo;
+  if (n.includes('labor') || n.includes('laborat') || n.includes('tahlil')) return DEPT_SEMANTIC.labor;
+  return null;
+}
+
+// ── Staff Actions Dropdown ──
 function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: () => void }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -90,27 +136,54 @@ function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: () => voi
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg transition-colors duration-150 hover:bg-(--color-surface-hover)" aria-label="Personel işlemleri">
-          <MoreHorizontal className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+        <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 rounded-lg transition-colors duration-150 hover:bg-[var(--k-surface-hover)]" aria-label="Personel işlemleri">
+          <MoreHorizontal className="h-4 w-4" style={{ color: 'var(--k-text-muted)' }} />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/staff/${staff.id}`)}>
+        <DropdownMenuContent
+          align="end"
+          style={{
+            background: K.SURFACE,
+            border: `1.5px solid ${K.BORDER}`,
+            borderRadius: 14,
+            boxShadow: K.SHADOW_CARD,
+            padding: 6,
+            minWidth: 200,
+          }}
+        >
+          <DropdownMenuItem
+            className="gap-2"
+            onClick={() => router.push(`/admin/staff/${staff.id}`)}
+            style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+          >
             <Eye className="h-4 w-4" /> Detay
           </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/staff/${staff.id}/edit`)}>
+          <DropdownMenuItem
+            className="gap-2"
+            onClick={() => router.push(`/admin/staff/${staff.id}/edit`)}
+            style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+          >
             <Edit className="h-4 w-4" /> Düzenle
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem className="gap-2" onClick={() => setAssignTrainingOpen(true)}>
+          <DropdownMenuSeparator style={{ background: K.BORDER_LIGHT, margin: '4px 0' }} />
+          <DropdownMenuItem
+            className="gap-2"
+            onClick={() => setAssignTrainingOpen(true)}
+            style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+          >
             <GraduationCap className="h-4 w-4" /> Eğitim Ata
           </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2" onClick={() => window.location.href = `mailto:${staff.email}`}>
+          <DropdownMenuItem
+            className="gap-2"
+            onClick={() => { window.location.href = `mailto:${staff.email}`; }}
+            style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+          >
             <Mail className="h-4 w-4" /> E-posta Gönder
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator style={{ background: K.BORDER_LIGHT, margin: '4px 0' }} />
           <DropdownMenuItem
-            className="gap-2 text-red-500"
+            className="gap-2"
             onClick={() => setConfirmDelete(true)}
+            style={{ borderRadius: 8, color: K.ERROR, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 600 }}
           >
             <Trash2 className="h-4 w-4" /> Sil
           </DropdownMenuItem>
@@ -142,80 +215,39 @@ function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: () => voi
           />
         }
       >
-        <div className="sdx-choices">
+        <div className="grid gap-3">
           <button
             onClick={() => handleDelete(false)}
             disabled={deleting}
-            className="sdx-choice sdx-soft"
+            className="text-left rounded-xl border p-5 transition-all hover:-translate-y-px disabled:opacity-50"
+            style={{ borderColor: 'var(--k-border)', background: 'var(--k-surface)' }}
           >
-            <div className="sdx-choice-head">
-              <span className="sdx-badge sdx-badge-soft">Önerilen</span>
-              <h4>Pasifleştir</h4>
-            </div>
-            <p>Personel giriş yapamaz, ancak geçmiş sınav ve sertifika kayıtları korunur. Daha sonra yeniden aktifleştirilebilir.</p>
+            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider mb-2"
+                  style={{ background: 'var(--k-primary-light)', color: 'var(--k-primary)' }}>
+              Önerilen
+            </span>
+            <h4 className="text-base font-semibold mb-1" style={{ color: 'var(--k-text-primary)' }}>Pasifleştir</h4>
+            <p className="text-sm" style={{ color: 'var(--k-text-secondary)' }}>
+              Personel giriş yapamaz; geçmiş sınav ve sertifika kayıtları korunur. Daha sonra yeniden aktifleştirilebilir.
+            </p>
           </button>
 
           <button
             onClick={() => handleDelete(true)}
             disabled={deleting}
-            className="sdx-choice sdx-hard"
+            className="text-left rounded-xl border p-5 transition-all hover:-translate-y-px disabled:opacity-50"
+            style={{ borderColor: 'var(--k-error)', background: 'var(--k-error-bg)' }}
           >
-            <div className="sdx-choice-head">
-              <span className="sdx-badge sdx-badge-hard">KVKK · Geri alınamaz</span>
-              <h4>Kalıcı olarak sil</h4>
-            </div>
-            <p>Kullanıcı hesabı ve kişisel veriler tamamen kaldırılır. Bu işlem geri alınamaz.</p>
+            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider mb-2"
+                  style={{ background: 'var(--k-error)', color: '#fff' }}>
+              KVKK · Geri alınamaz
+            </span>
+            <h4 className="text-base font-semibold mb-1" style={{ color: 'var(--k-error)' }}>Kalıcı olarak sil</h4>
+            <p className="text-sm" style={{ color: 'var(--k-text-secondary)' }}>
+              Kullanıcı hesabı ve kişisel veriler tamamen kaldırılır. Bu işlem geri alınamaz.
+            </p>
           </button>
         </div>
-
-        <style jsx>{`
-          .sdx-choices { display: grid; gap: 12px; }
-          .sdx-choice {
-            text-align: left;
-            padding: 18px 20px;
-            border-radius: 14px;
-            background: #ffffff;
-            border: 1px solid #ebe7df;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6);
-            cursor: pointer;
-            transition: border-color 160ms ease, transform 220ms cubic-bezier(0.16,1,0.3,1), background 160ms ease;
-            font-family: inherit;
-          }
-          .sdx-choice:hover:not(:disabled) { transform: translateY(-1px); }
-          .sdx-choice:disabled { opacity: 0.5; cursor: not-allowed; }
-          .sdx-soft:hover:not(:disabled) { border-color: #0a0a0a; }
-          .sdx-hard { border-color: #e9c9c0; background: #fdf5f2; }
-          .sdx-hard:hover:not(:disabled) { border-color: #b3261e; background: #faeae4; }
-          .sdx-choice-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-          .sdx-choice h4 {
-            font-family: var(--font-editorial, serif);
-            font-size: 18px;
-            font-weight: 500;
-            font-variation-settings: 'opsz' 36;
-            color: #0a0a0a;
-            margin: 0;
-            letter-spacing: -0.01em;
-          }
-          .sdx-hard h4 { color: #7a1d14; }
-          .sdx-choice p {
-            font-size: 13px;
-            line-height: 1.55;
-            color: #6b6a63;
-            margin: 0;
-          }
-          .sdx-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 3px 8px;
-            border-radius: 999px;
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-          }
-          .sdx-badge-soft { background: #f0ece1; color: #5c5a4e; }
-          .sdx-badge-hard { background: #b3261e; color: #fff; }
-        `}</style>
       </PremiumModal>
     </>
   );
@@ -240,7 +272,6 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
     if (!form.soyad.trim()) e.soyad = 'Soyad zorunludur';
     if (!form.email.trim()) e.email = 'E-posta zorunludur';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Geçerli bir e-posta girin';
-    // Şifre opsiyonel — boşsa backend üretir, doluysa en az 8 karakter
     if (form.sifre.trim() && form.sifre.length < 8) e.sifre = 'Şifre en az 8 karakter olmalıdır';
     if (form.telefon && !/^0\d{10}$/.test(form.telefon.replace(/\s/g, ''))) e.telefon = 'Geçerli telefon formatı: 05XX XXX XX XX';
     if (!form.departman) e.departman = 'Departman seçiniz';
@@ -279,8 +310,8 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
   };
 
   const fieldStyle = (field: string) => ({
-    background: 'var(--color-bg)',
-    borderColor: errors[field] ? 'var(--color-error)' : 'var(--color-border)',
+    background: 'var(--k-surface)',
+    borderColor: errors[field] ? 'var(--k-error)' : 'var(--k-border)',
   });
 
   return (
@@ -295,7 +326,7 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
       footer={
         !saved ? (
           <PremiumModalFooter
-            summary={<span>Zorunlu alanlar <em style={{ fontStyle: 'italic', color: '#0a0a0a' }}>*</em> ile işaretli</span>}
+            summary={<span className="text-sm" style={{ color: 'var(--k-text-muted)' }}>Zorunlu alanlar * ile işaretli</span>}
             actions={
               <>
                 <PremiumButton variant="ghost" onClick={onClose} disabled={saving}>İptal</PremiumButton>
@@ -309,144 +340,77 @@ function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void;
       }
     >
       {saved ? (
-        <div className="nsm-saved">
-          <div className="nsm-saved-icon">
+        <div className="flex flex-col items-center text-center py-8 gap-3">
+          <div className="w-14 h-14 rounded-full flex items-center justify-center"
+               style={{ background: 'var(--k-primary)', color: '#fff' }}>
             <UserPlus className="h-6 w-6" />
           </div>
-          <h4>Personel başarıyla eklendi</h4>
-          <p>Giriş bilgileri {form.email} adresine gönderildi.</p>
+          <h4 className="text-lg font-semibold" style={{ color: 'var(--k-text-primary)' }}>
+            Personel başarıyla eklendi
+          </h4>
+          <p className="text-sm" style={{ color: 'var(--k-text-secondary)' }}>
+            Giriş bilgileri {form.email} adresine gönderildi.
+          </p>
         </div>
       ) : (
-        <div className="nsm-form">
-          <div className="nsm-row">
-            <div className="nsm-field">
-              <Label className="nsm-label">Ad *</Label>
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Ad *" error={errors.ad}>
               <Input placeholder="Personel adı" className="h-10" value={form.ad} onChange={(e) => setForm(f => ({ ...f, ad: e.target.value }))} style={fieldStyle('ad')} />
-              {errors.ad && <p className="nsm-err">{errors.ad}</p>}
-            </div>
-            <div className="nsm-field">
-              <Label className="nsm-label">Soyad *</Label>
+            </Field>
+            <Field label="Soyad *" error={errors.soyad}>
               <Input placeholder="Personel soyadı" className="h-10" value={form.soyad} onChange={(e) => setForm(f => ({ ...f, soyad: e.target.value }))} style={fieldStyle('soyad')} />
-              {errors.soyad && <p className="nsm-err">{errors.soyad}</p>}
-            </div>
+            </Field>
           </div>
-          <div className="nsm-row">
-            <div className="nsm-field">
-              <Label className="nsm-label">E-posta *</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="E-posta *" error={errors.email}>
               <Input type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} style={fieldStyle('email')} />
-              {errors.email && <p className="nsm-err">{errors.email}</p>}
-            </div>
-            <div className="nsm-field">
-              <Label className="nsm-label">Şifre</Label>
+            </Field>
+            <Field label="Şifre" error={errors.sifre} hint={!errors.sifre ? 'Boş bırakın — otomatik üretilip e-posta ile iletilir.' : undefined}>
               <Input type="password" placeholder="Boş bırakın — sistem üretir" className="h-10" value={form.sifre} onChange={(e) => setForm(f => ({ ...f, sifre: e.target.value }))} style={fieldStyle('sifre')} />
-              {errors.sifre ? (
-                <p className="nsm-err">{errors.sifre}</p>
-              ) : (
-                <p className="nsm-hint">Otomatik üretilip personelin e-postasına gönderilir.</p>
-              )}
-            </div>
+            </Field>
           </div>
-          <div className="nsm-field">
-            <Label className="nsm-label">Telefon</Label>
-            <Input placeholder="05XX XXX XX XX" className="h-10" value={form.telefon} onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))} style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
-            {errors.telefon && <p className="nsm-err">{errors.telefon}</p>}
-          </div>
-          <div className="nsm-row">
-            <div className="nsm-field">
-              <Label className="nsm-label">Departman *</Label>
+          <Field label="Telefon" error={errors.telefon}>
+            <Input placeholder="05XX XXX XX XX" className="h-10"
+                   value={form.telefon}
+                   onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))}
+                   style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Departman *" error={errors.departman}>
               <select
-                className="nsm-select"
-                style={{ ...fieldStyle('departman') }}
+                className="h-10 w-full rounded-lg border px-3 text-sm"
+                style={fieldStyle('departman')}
                 value={form.departman}
                 onChange={(e) => setForm(f => ({ ...f, departman: e.target.value }))}
               >
                 <option value="">Seçin...</option>
                 {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
-              {errors.departman && <p className="nsm-err">{errors.departman}</p>}
-            </div>
-            <div className="nsm-field">
-              <Label className="nsm-label">Unvan</Label>
+            </Field>
+            <Field label="Unvan">
               <Input placeholder="örn. Hemşire" className="h-10" value={form.unvan} onChange={(e) => setForm(f => ({ ...f, unvan: e.target.value }))} style={fieldStyle('unvan')} />
-            </div>
+            </Field>
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        .nsm-form { display: flex; flex-direction: column; gap: 18px; }
-        .nsm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        @media (max-width: 640px) { .nsm-row { grid-template-columns: 1fr; } }
-        .nsm-field { display: flex; flex-direction: column; }
-        :global(.nsm-label) {
-          font-family: var(--font-display, system-ui);
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          color: #6b6a63;
-          margin-bottom: 6px;
-          display: block;
-        }
-        .nsm-err {
-          font-size: 11px;
-          color: #b3261e;
-          margin-top: 6px;
-          font-weight: 500;
-        }
-        .nsm-hint {
-          font-size: 11px;
-          color: #8a8578;
-          margin-top: 6px;
-          font-style: italic;
-        }
-        .nsm-select {
-          width: 100%;
-          height: 40px;
-          border-radius: 8px;
-          border: 1px solid #ebe7df;
-          background: #ffffff;
-          padding: 0 12px;
-          font-size: 14px;
-          color: #0a0a0a;
-          font-family: inherit;
-        }
-        .nsm-select:focus { outline: 2px solid #0a0a0a; outline-offset: 1px; }
-
-        .nsm-saved {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          padding: 32px 20px;
-          gap: 14px;
-        }
-        .nsm-saved-icon {
-          width: 56px;
-          height: 56px;
-          border-radius: 999px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #0a0a0a;
-          color: #fafaf7;
-        }
-        .nsm-saved h4 {
-          font-family: var(--font-editorial, serif);
-          font-size: 22px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 42;
-          color: #0a0a0a;
-          margin: 0;
-          letter-spacing: -0.01em;
-        }
-        .nsm-saved p { font-size: 13px; color: #6b6a63; margin: 0; }
-      `}</style>
     </PremiumModal>
   );
 }
 
-// ── Assign Existing Staff Modal ──
+function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col">
+      <Label className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider"
+             style={{ color: 'var(--k-text-muted)' }}>{label}</Label>
+      {children}
+      {error && <p className="mt-1.5 text-[11px] font-medium" style={{ color: 'var(--k-error)' }}>{error}</p>}
+      {hint && !error && <p className="mt-1.5 text-[11px] italic" style={{ color: 'var(--k-text-muted)' }}>{hint}</p>}
+    </div>
+  );
+}
+
+// ── Assign Existing Staff to Department Modal ──
 function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
   deptId: string; deptName: string; allStaff: Staff[]; onClose: () => void; onSaved: () => void;
 }) {
@@ -507,21 +471,16 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
       footer={
         <PremiumModalFooter
           summary={
-            <span>
-              {selected.size > 0
-                ? <><strong style={{ color: '#0a0a0a' }}>{selected.size.toString().padStart(2, '0')}</strong> personel seçildi</>
-                : 'Personel seç'}
+            <span className="text-sm" style={{ color: 'var(--k-text-secondary)' }}>
+              {selected.size > 0 ? (
+                <><strong style={{ color: 'var(--k-text-primary)' }}>{selected.size}</strong> personel seçildi</>
+              ) : 'Personel seçin'}
             </span>
           }
           actions={
             <>
               <PremiumButton variant="ghost" onClick={onClose} disabled={saving}>İptal</PremiumButton>
-              <PremiumButton
-                onClick={handleAssign}
-                disabled={selected.size === 0}
-                loading={saving}
-                icon={<UserPlus className="h-4 w-4" />}
-              >
+              <PremiumButton onClick={handleAssign} disabled={selected.size === 0} loading={saving} icon={<UserPlus className="h-4 w-4" />}>
                 {saving ? 'Ekleniyor' : 'Ekle'}
               </PremiumButton>
             </>
@@ -529,176 +488,59 @@ function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
         />
       }
     >
-      <div className="asm-root">
-        <div className="asm-search">
-          <Search className="asm-search-icon" />
+      <div className="flex flex-col gap-3">
+        <div className="k-input" style={{ height: 42 }}>
+          <Search size={15} />
           <input
-            className="asm-search-input"
-            placeholder="İsim veya e-posta ile ara..."
-            aria-label="Personel ara"
+            placeholder="İsim veya e-posta ile ara…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Personel ara"
             autoFocus
           />
         </div>
 
-        <div className="asm-list">
+        <div className="flex flex-col gap-1.5 max-h-80 overflow-y-auto pr-1">
           {available.length === 0 ? (
-            <div className="asm-empty">
+            <div className="flex flex-col items-center gap-2 py-10" style={{ color: 'var(--k-text-muted)' }}>
               <Users className="h-7 w-7" />
-              <p>{search ? 'Sonuç bulunamadı' : 'Eklenebilecek personel yok'}</p>
+              <p className="text-sm">{search ? 'Sonuç bulunamadı' : 'Eklenebilecek personel yok'}</p>
             </div>
-          ) : available.map((s, i) => {
+          ) : available.map(s => {
             const isSelected = selected.has(s.id);
             return (
               <button
                 key={s.id}
                 onClick={() => toggle(s.id)}
-                className={`asm-row ${isSelected ? 'asm-row-on' : ''}`}
-                style={{ animationDelay: `${Math.min(i * 18, 240)}ms` }}
+                className="flex items-center gap-3 p-2.5 rounded-xl border transition-all text-left"
+                style={{
+                  borderColor: isSelected ? 'var(--k-primary)' : 'var(--k-border)',
+                  background: isSelected ? 'var(--k-primary-light)' : 'var(--k-surface)',
+                }}
               >
                 <Avatar className="h-9 w-9 shrink-0">
-                  <AvatarFallback className="text-xs font-semibold text-white" style={{ background: '#0a0a0a' }}>{s.initials}</AvatarFallback>
+                  <AvatarFallback className="text-xs font-semibold text-white" style={{ background: 'var(--k-primary)' }}>{s.initials}</AvatarFallback>
                 </Avatar>
-                <div className="asm-row-body">
-                  <p className="asm-row-name">{s.name}</p>
-                  <p className="asm-row-meta">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--k-text-primary)' }}>{s.name}</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--k-text-muted)' }}>
                     {s.email}{s.department ? ` · ${s.department}` : ' · Departmansız'}
                   </p>
                 </div>
-                <div className={`asm-check ${isSelected ? 'asm-check-on' : ''}`}>
-                  {isSelected && <span>✓</span>}
+                <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
+                     style={{
+                       borderColor: isSelected ? 'var(--k-primary)' : 'var(--k-border-hover)',
+                       background: isSelected ? 'var(--k-primary)' : 'transparent',
+                       color: '#fff',
+                       fontSize: 11,
+                     }}>
+                  {isSelected && '✓'}
                 </div>
               </button>
             );
           })}
         </div>
       </div>
-
-      <style jsx>{`
-        .asm-root { display: flex; flex-direction: column; gap: 14px; }
-        .asm-search {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-        :global(.asm-search-icon) {
-          position: absolute;
-          left: 14px;
-          width: 16px;
-          height: 16px;
-          color: #8a8578;
-          pointer-events: none;
-        }
-        .asm-search-input {
-          width: 100%;
-          height: 44px;
-          padding: 0 14px 0 40px;
-          border-radius: 10px;
-          border: 1px solid #ebe7df;
-          background: #ffffff;
-          font-size: 14px;
-          color: #0a0a0a;
-          outline: none;
-          font-family: inherit;
-          transition: border-color 160ms ease, box-shadow 160ms ease;
-        }
-        .asm-search-input:focus {
-          border-color: #0a0a0a;
-          box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.06);
-        }
-
-        .asm-list {
-          max-height: 340px;
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          padding-right: 4px;
-        }
-        .asm-list::-webkit-scrollbar { width: 8px; }
-        .asm-list::-webkit-scrollbar-track { background: transparent; }
-        .asm-list::-webkit-scrollbar-thumb { background: #ebe7df; border-radius: 4px; }
-
-        .asm-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          width: 100%;
-          text-align: left;
-          padding: 10px 12px;
-          border-radius: 10px;
-          background: #ffffff;
-          border: 1px solid #ebe7df;
-          cursor: pointer;
-          font-family: inherit;
-          opacity: 0;
-          animation: asm-in 320ms cubic-bezier(0.16,1,0.3,1) forwards;
-          transition: border-color 160ms ease, background 160ms ease;
-        }
-        @keyframes asm-in {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .asm-row:hover { border-color: #c8c2b0; }
-        .asm-row-on {
-          background: #0a0a0a;
-          border-color: #0a0a0a;
-        }
-        .asm-row-on .asm-row-name,
-        .asm-row-on .asm-row-meta { color: #fafaf7; }
-        .asm-row-on .asm-row-meta { opacity: 0.7; }
-
-        .asm-row-body { flex: 1; min-width: 0; }
-        .asm-row-name {
-          font-size: 13px;
-          font-weight: 600;
-          color: #0a0a0a;
-          margin: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .asm-row-meta {
-          font-size: 11px;
-          color: #6b6a63;
-          margin: 2px 0 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .asm-check {
-          flex-shrink: 0;
-          width: 22px;
-          height: 22px;
-          border-radius: 999px;
-          border: 1.5px solid #d9d4c4;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: transparent;
-          color: #fafaf7;
-          font-size: 11px;
-          font-weight: 700;
-          transition: background 160ms ease, border-color 160ms ease;
-        }
-        .asm-check-on {
-          background: #fafaf7;
-          border-color: #fafaf7;
-          color: #0a0a0a;
-        }
-
-        .asm-empty {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 10px;
-          padding: 40px 20px;
-          color: #8a8578;
-        }
-        .asm-empty p { font-size: 13px; margin: 0; }
-      `}</style>
     </PremiumModal>
   );
 }
@@ -711,10 +553,12 @@ export default function StaffPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeView, setActiveView] = useState<'all' | 'departments'>('departments');
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
-  const { data, isLoading, refetch } = useFetch<StaffPageData>(`/api/admin/staff?page=${currentPage}&limit=10${selectedDept ? `&department=${selectedDept}` : ''}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`);
+  const { data, isLoading, refetch } = useFetch<StaffPageData>(
+    `/api/admin/staff?page=${currentPage}&limit=10${selectedDept ? `&department=${selectedDept}` : ''}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`
+  );
 
-  // ADIM 4: Debounce arama — 300ms bekle, her tuşta API çağrısı yapma
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Debounce search
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSearch = useCallback((query: string) => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
@@ -722,6 +566,7 @@ export default function StaffPage() {
       setCurrentPage(1);
     }, 300);
   }, []);
+
   const [showAddDept, setShowAddDept] = useState(false);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -733,13 +578,9 @@ export default function StaffPage() {
   const [editDeptSaving, setEditDeptSaving] = useState(false);
   const [deletingDeptId, setDeletingDeptId] = useState<string | null>(null);
 
-  // ⚠️ Rules of Hooks: tüm hook çağrıları early return'ün ÜSTÜNDE olmalı.
-  // Referans stabilliği için `data` değiştikçe array üret — downstream useMemo'ların
-  // her render'da recompute olmasını engeller.
   const allStaff = useMemo(() => data?.staff ?? [], [data]);
   const allDepartments = useMemo(() => data?.departments ?? [], [data]);
 
-  // ── Departman/Staff lookup map'leri (O(1) erişim, her render'da find() yerine) ──
   const departmentMap = useMemo(
     () => new Map(allDepartments.map(d => [d.id, d])),
     [allDepartments]
@@ -755,7 +596,6 @@ export default function StaffPage() {
     return map;
   }, [allStaff]);
 
-  // ── Columns ──
   const columns: ColumnDef<Staff>[] = useMemo(() => [
     {
       accessorKey: 'name',
@@ -763,14 +603,15 @@ export default function StaffPage() {
       size: 250,
       cell: ({ row }) => {
         const dept = departmentMap.get(row.original.departmentId ?? '');
+        const color = dept ? (semanticDeptColor(dept.name) ?? dept.color) : 'var(--k-primary)';
         return (
-          <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9 shrink-0">
-              <AvatarFallback className="text-xs font-semibold text-white" style={{ background: dept?.color || 'var(--color-primary)' }}>{row.original.initials}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">{row.getValue('name')}</p>
-              <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{row.original.email}</p>
+          <div className="k-person">
+            <div className="k-person-avatar" style={{ background: color }}>
+              {row.original.initials}
+            </div>
+            <div className="k-person-meta">
+              <p className="k-person-name">{row.getValue('name')}</p>
+              <p className="k-person-email">{row.original.email}</p>
             </div>
           </div>
         );
@@ -782,23 +623,46 @@ export default function StaffPage() {
       size: 140,
       cell: ({ row }) => {
         const dept = departmentMap.get(row.original.departmentId ?? '');
-        const color = dept?.color || 'var(--color-primary)';
+        const color = dept ? (semanticDeptColor(dept.name) ?? dept.color) : 'var(--k-primary)';
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold truncate" style={{ background: `${color}15`, color }}>
-            <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: color }} />
+          <span className="k-badge k-badge-no-dot"
+                style={{ background: `${color}20`, color }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
             {row.getValue('department')}
           </span>
         );
       },
     },
-    { accessorKey: 'title', header: 'Unvan', size: 120, cell: ({ row }) => <span className="text-sm truncate block" style={{ color: 'var(--color-text-secondary)' }}>{row.getValue('title')}</span> },
+    {
+      accessorKey: 'title',
+      header: 'Unvan',
+      size: 120,
+      cell: ({ row }) => (
+        <span className="text-sm truncate block" style={{ color: 'var(--k-text-secondary)' }}>
+          {row.getValue('title')}
+        </span>
+      ),
+    },
     {
       accessorKey: 'completedTrainings',
       header: 'Eğitim',
-      size: 80,
-      cell: ({ row }) => (
-        <span className="text-sm font-mono font-medium">{row.getValue('completedTrainings')}/{row.original.assignedTrainings}</span>
-      ),
+      size: 160,
+      cell: ({ row }) => {
+        const total = row.original.assignedTrainings || 1;
+        const done = Number(row.getValue('completedTrainings')) || 0;
+        const pct = Math.min(100, Math.round((done / total) * 100));
+        const variant = pct > 80 ? 'success' : pct > 50 ? undefined : 'warning';
+        return (
+          <div className="flex items-center gap-2">
+            <div className="k-progress flex-1">
+              <div className="k-progress-fill" style={{ width: `${pct}%` }} data-variant={variant} />
+            </div>
+            <span className="text-xs font-mono tabular-nums w-12 text-right" style={{ color: 'var(--k-text-secondary)' }}>
+              {done}/{row.original.assignedTrainings}
+            </span>
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'avgScore',
@@ -806,7 +670,7 @@ export default function StaffPage() {
       size: 90,
       cell: ({ row }) => {
         const score = row.getValue('avgScore') as number;
-        const color = score >= 80 ? 'var(--color-success)' : score >= 60 ? 'var(--color-warning)' : 'var(--color-error)';
+        const color = score >= 80 ? 'var(--k-success)' : score >= 60 ? 'var(--k-warning)' : 'var(--k-error)';
         return <span className="text-sm font-mono font-bold" style={{ color }}>{score}%</span>;
       },
     },
@@ -816,302 +680,185 @@ export default function StaffPage() {
       size: 90,
       cell: ({ row }) => {
         const status = row.getValue('status') as string;
-        const colors = statusColors[status] || statusColors['Aktif'];
+        const s = status.toLocaleLowerCase('tr-TR');
+        let bg = K.SURFACE_HOVER, fg = K.TEXT_MUTED;
+        if (s.includes('aktif') && !s.includes('pas') && !s.includes('in')) {
+          bg = K.PRIMARY_LIGHT; fg = K.PRIMARY;
+        } else if (s.includes('beklemede') || s.includes('pending') || s.includes('davet')) {
+          bg = K.WARNING_BG; fg = '#92400e';
+        } else if (s.includes('pasif') || s.includes('locked') || s.includes('kilit') || s.includes('inactive')) {
+          bg = K.ERROR_BG; fg = K.ERROR_TEXT;
+        }
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: colors.bg, color: colors.text }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: colors.text }} />
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '3px 10px',
+              borderRadius: 999,
+              background: bg,
+              color: fg,
+              fontFamily: K.FONT_DISPLAY,
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.01em',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {status}
           </span>
         );
       },
     },
     {
-      id: 'actions', header: '', size: 50,
-      cell: ({ row }) => (
-        <StaffActions staff={row.original} onChanged={refetch} />
-      ),
+      id: 'actions',
+      header: '',
+      size: 50,
+      cell: ({ row }) => <StaffActions staff={row.original} onChanged={refetch} />,
     },
   ], [departmentMap, refetch]);
 
-  // Early return — artık tüm hook'lar çağrıldıktan SONRA
   if (isLoading) {
     return <PageLoading />;
   }
 
-  // API hatası olsa bile sayfayı boş veri ile render et (backend henüz yapılandırılmamış olabilir)
   const statsData = data?.stats ?? { totalStaff: 0, activeStaff: 0, departmentCount: 0, avgScore: 0 };
   const filteredStaff = allStaff;
   const selectedDeptData = selectedDept ? departmentMap.get(selectedDept) : null;
+  const selectedDeptColor = selectedDeptData
+    ? (semanticDeptColor(selectedDeptData.name) ?? selectedDeptData.color)
+    : 'var(--k-primary)';
 
   return (
-    <div className="sp-page">
-      {/* ── Editorial Header ── */}
-      <header className="sp-header">
-        <div className="sp-header-main">
-          <span className="sp-eyebrow">Personel</span>
-          <h1 className="sp-title">
-            İnsan kaynağını <em>yönet</em>
-          </h1>
-          <p className="sp-subtitle">Departmanları düzenle, yeni personel ekle, performans verilerini incele.</p>
+    <div className="k-page">
+      {/* Header */}
+      <header className="k-page-header">
+        <div>
+          <div className="k-breadcrumb">
+            <span>Panel</span>
+            <ChevronRight size={12} />
+            <span data-current="true">Personel</span>
+          </div>
+          <h1 className="k-page-title">Personel Yönetimi</h1>
+          <p className="k-page-subtitle">
+            {statsData.totalStaff > 0 ? (
+              <>
+                <strong style={{ color: 'var(--k-text-primary)' }}>{statsData.totalStaff}</strong> kayıtlı personel ·{' '}
+                <strong style={{ color: 'var(--k-text-primary)' }}>{statsData.activeStaff}</strong> aktif ·{' '}
+                <strong style={{ color: 'var(--k-text-primary)' }}>{statsData.departmentCount}</strong> departman
+              </>
+            ) : 'Departmanları düzenle, yeni personel ekle, performans verilerini incele.'}
+          </p>
         </div>
-
-        <div className="sp-actions">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => router.push('/admin/staff/imports')}
-            className="sp-link"
+            className="k-btn k-btn-ghost k-btn-sm"
             title="Toplu yükleme geçmişi"
           >
-            <History className="h-3.5 w-3.5" />
-            <span>Yükleme Geçmişi</span>
+            <History size={14} /> Yükleme Geçmişi
           </button>
-          <button
-            onClick={() => setShowBulkImport(true)}
-            className="sp-btn sp-btn-outline"
-          >
-            <Upload className="h-4 w-4" />
-            <span>Toplu Yükle</span>
+          <button onClick={() => setShowBulkImport(true)} className="k-btn k-btn-ghost">
+            <Upload size={15} /> Toplu Yükle
           </button>
-          <button
-            onClick={() => setShowAddStaff(true)}
-            className="sp-btn sp-btn-primary"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Yeni Personel</span>
+          <button onClick={() => setShowAddStaff(true)} className="k-btn k-btn-primary">
+            <Plus size={15} /> Yeni Personel
           </button>
         </div>
       </header>
 
-      {/* ── Editorial Stats ── */}
-      <section className="sp-stats" aria-label="Personel istatistikleri">
-        <StatTile label="Toplam Personel" value={statsData.totalStaff} suffix="kişi" icon={<Users className="h-4 w-4" />} tone="ink" />
-        <StatTile label="Aktif" value={statsData.activeStaff} suffix="aktif" icon={<Users className="h-4 w-4" />} tone="ok" />
-        <StatTile label="Departman" value={statsData.departmentCount} suffix="birim" icon={<Building2 className="h-4 w-4" />} tone="amber" />
-        <StatTile label="Ort. Başarı" value={statsData.avgScore} suffix="%" icon={<GraduationCap className="h-4 w-4" />} tone="emerald" isPercent />
+      {/* KPIs */}
+      <section className="k-kpi-grid" aria-label="Personel istatistikleri">
+        <Kpi icon={<Users size={18} />} label="Toplam Personel" value={statsData.totalStaff} />
+        <Kpi icon={<Users size={18} />} label="Aktif" value={statsData.activeStaff} />
+        <Kpi icon={<Building2 size={18} />} label="Departman" value={statsData.departmentCount} />
+        <Kpi icon={<Award size={18} />} label="Ort. Başarı" value={statsData.avgScore} suffix="%" />
       </section>
 
-      <style jsx>{`
-        .sp-page {
-          display: flex;
-          flex-direction: column;
-          gap: 28px;
-        }
-
-        /* ── Header ── */
-        .sp-header {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 24px;
-          padding-bottom: 24px;
-          border-bottom: 1px solid #ebe7df;
-          flex-wrap: wrap;
-        }
-        .sp-header-main { flex: 1; min-width: 260px; }
-        .sp-eyebrow {
-          display: inline-block;
-          font-family: var(--font-display, system-ui);
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: #8a8578;
-          margin-bottom: 10px;
-        }
-        .sp-title {
-          font-family: var(--font-editorial, serif);
-          font-size: clamp(28px, 4vw, 44px);
-          font-weight: 500;
-          font-variation-settings: 'opsz' 72, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.025em;
-          line-height: 1.05;
-          margin: 0;
-        }
-        .sp-title em {
-          font-style: italic;
-          color: #0a7a47;
-          font-variation-settings: 'opsz' 72, 'SOFT' 100;
-        }
-        .sp-subtitle {
-          font-size: 14px;
-          color: #6b6a63;
-          margin: 10px 0 0;
-          max-width: 520px;
-          line-height: 1.55;
-        }
-
-        .sp-actions {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-        .sp-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          height: 36px;
-          padding: 0 10px;
-          border-radius: 999px;
-          background: transparent;
-          color: #6b6a63;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: color 160ms ease, background 160ms ease;
-          border: none;
-          font-family: inherit;
-        }
-        .sp-link:hover { color: #0a0a0a; background: #faf8f2; }
-
-        .sp-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          height: 44px;
-          padding: 0 18px;
-          border-radius: 999px;
-          font-family: var(--font-display, system-ui);
-          font-size: 13px;
-          font-weight: 600;
-          letter-spacing: -0.005em;
-          cursor: pointer;
-          border: 1px solid transparent;
-          transition: background 160ms ease, border-color 160ms ease, transform 220ms cubic-bezier(0.16,1,0.3,1);
-        }
-        .sp-btn:active { transform: scale(0.96); }
-        .sp-btn-outline {
-          background: transparent;
-          color: #0a0a0a;
-          border-color: #d9d4c4;
-        }
-        .sp-btn-outline:hover { border-color: #0a0a0a; background: #faf8f2; }
-        .sp-btn-primary {
-          background: #0a0a0a;
-          color: #fafaf7;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-        }
-        .sp-btn-primary:hover { background: #1a1a1a; }
-
-        @media (max-width: 640px) {
-          .sp-header {
-            flex-direction: column;
-            align-items: stretch;
-            padding-bottom: 20px;
-          }
-          .sp-actions {
-            gap: 8px;
-          }
-          .sp-actions > * { flex: 1; justify-content: center; min-width: 0; }
-          .sp-link { flex: 0 0 auto; }
-          .sp-btn { padding: 0 14px; }
-        }
-
-        /* ── Stats ── */
-        .sp-stats {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 14px;
-        }
-        @media (max-width: 900px) { .sp-stats { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 420px) { .sp-stats { grid-template-columns: 1fr; } }
-      `}</style>
-
-      {/* ── Editorial View Toggle ── */}
-      <div className="sp-toggle-wrap">
-        <div className="sp-toggle" role="tablist" aria-label="Görünüm seçimi">
-          {[
+      {/* View toggle */}
+      <div>
+        <div className="k-tabs" role="tablist" aria-label="Görünüm seçimi">
+          {([
             { key: 'departments' as const, label: 'Departmanlar', icon: Building2 },
             { key: 'all' as const, label: 'Tüm Personel', icon: Users },
-          ].map((v) => {
-            const active = activeView === v.key;
+          ]).map(v => {
+            const Icon = v.icon;
             return (
               <button
                 key={v.key}
                 role="tab"
-                aria-selected={active}
+                aria-selected={activeView === v.key}
+                className="k-tab"
+                data-active={activeView === v.key}
                 onClick={() => { setActiveView(v.key); setSelectedDept(null); setCurrentPage(1); setSearchQuery(''); }}
-                className={`sp-toggle-btn ${active ? 'sp-toggle-on' : ''}`}
               >
-                <v.icon className="h-4 w-4" />
-                <span>{v.label}</span>
+                <Icon size={14} />
+                {v.label}
               </button>
             );
           })}
         </div>
       </div>
 
-      <style jsx>{`
-        .sp-toggle-wrap { display: flex; }
-        .sp-toggle {
-          display: inline-flex;
-          padding: 4px;
-          border-radius: 999px;
-          background: #faf8f2;
-          border: 1px solid #ebe7df;
-          gap: 2px;
-        }
-        .sp-toggle-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          height: 40px;
-          padding: 0 18px;
-          border-radius: 999px;
-          font-family: var(--font-display, system-ui);
-          font-size: 13px;
-          font-weight: 500;
-          color: #6b6a63;
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          transition: background 180ms ease, color 180ms ease;
-        }
-        .sp-toggle-btn:hover { color: #0a0a0a; }
-        .sp-toggle-on {
-          background: #0a0a0a;
-          color: #fafaf7;
-          font-weight: 600;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-        }
-        .sp-toggle-on:hover { color: #fafaf7; }
-        @media (max-width: 420px) {
-          .sp-toggle { width: 100%; }
-          .sp-toggle-btn { flex: 1; justify-content: center; padding: 0 12px; }
-        }
-      `}</style>
-
-      {/* ── Editorial Department Grid ── */}
+      {/* Department grid */}
       {activeView === 'departments' && !selectedDept && (
-        <div className="sp-dept-grid">
-          {allDepartments.map((dept, i) => (
+        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+          {allDepartments.map(dept => {
+            const deptColor = semanticDeptColor(dept.name) ?? dept.color;
+            return (
             <article
               key={dept.id}
               onClick={() => { setSelectedDept(dept.id); setCurrentPage(1); setSearchQuery(''); }}
-              className="sp-dept"
-              style={{ animationDelay: `${Math.min(i * 30, 240)}ms`, ['--d-accent' as string]: dept.color }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDept(dept.id); setCurrentPage(1); setSearchQuery(''); } }}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDept(dept.id); setCurrentPage(1); setSearchQuery(''); } }}
+              className="k-card group relative cursor-pointer p-5 transition-all hover:-translate-y-0.5"
+              style={{ borderLeft: `3px solid ${deptColor}` }}
             >
-              <div className="sp-dept-head">
-                <div className="sp-dept-icon">
-                  <Building2 className="h-4 w-4" />
+              <div className="flex items-start justify-between mb-3">
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center"
+                  style={{ background: `${deptColor}1f`, color: deptColor }}
+                >
+                  <Building2 size={16} />
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger
-                    className="sp-dept-menu"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--k-surface-hover)] transition-opacity"
                     onClick={(e) => e.stopPropagation()}
                     aria-label="Departman işlemleri"
                   >
-                    <MoreHorizontal className="h-3.5 w-3.5" />
+                    <MoreHorizontal size={14} style={{ color: 'var(--k-text-muted)' }} />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); setEditingDept({ id: dept.id, name: dept.name, color: dept.color }); }}><Edit className="h-4 w-4" /> Düzenle</DropdownMenuItem>
-                    <DropdownMenuItem className="gap-2" onClick={(e) => { e.stopPropagation(); setSelectedDept(dept.id); setShowAssignStaff(true); }}><UserPlus className="h-4 w-4" /> Personel Ekle</DropdownMenuItem>
-                    <DropdownMenuSeparator />
+                  <DropdownMenuContent
+                    align="end"
+                    style={{
+                      background: K.SURFACE,
+                      border: `1.5px solid ${K.BORDER}`,
+                      borderRadius: 14,
+                      boxShadow: K.SHADOW_CARD,
+                      padding: 6,
+                      minWidth: 200,
+                    }}
+                  >
                     <DropdownMenuItem
-                      className="gap-2 text-red-500"
+                      className="gap-2"
+                      onClick={(e) => { e.stopPropagation(); setEditingDept({ id: dept.id, name: dept.name, color: dept.color }); }}
+                      style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+                    >
+                      <Edit className="h-4 w-4" /> Düzenle
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onClick={(e) => { e.stopPropagation(); setSelectedDept(dept.id); setShowAssignStaff(true); }}
+                      style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+                    >
+                      <UserPlus className="h-4 w-4" /> Personel Ekle
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator style={{ background: K.BORDER_LIGHT, margin: '4px 0' }} />
+                    <DropdownMenuItem
+                      className="gap-2"
+                      style={{ borderRadius: 8, color: K.ERROR, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 600 }}
                       disabled={deletingDeptId === dept.id}
                       onClick={async (e) => {
                         e.stopPropagation();
@@ -1138,83 +885,97 @@ export default function StaffPage() {
                 </DropdownMenu>
               </div>
 
-              <h3 className="sp-dept-name">{dept.name}</h3>
-              {dept.description && <p className="sp-dept-desc">{dept.description}</p>}
+              <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--k-text-primary)' }}>
+                {dept.name}
+              </h3>
+              {dept.description && (
+                <p className="text-xs line-clamp-2 mb-4" style={{ color: 'var(--k-text-muted)' }}>
+                  {dept.description}
+                </p>
+              )}
 
-              <div className="sp-dept-foot">
-                <div className="sp-dept-avatars">
-                  {(staffByDeptMap.get(dept.id) ?? [])
-                    .slice(0, 3)
-                    .map((s) => (
-                      <Avatar key={s.id} className="sp-dept-avatar">
-                        <AvatarFallback className="text-[9px] font-semibold text-white" style={{ background: dept.color }}>{s.initials}</AvatarFallback>
-                      </Avatar>
-                    ))}
+              <div className="flex items-center gap-2.5 pt-3 border-t" style={{ borderColor: 'var(--k-border)' }}>
+                <div className="flex">
+                  {(staffByDeptMap.get(dept.id) ?? []).slice(0, 3).map(s => (
+                    <Avatar key={s.id} className="h-6 w-6 -ml-1.5 first:ml-0 ring-2 ring-white">
+                      <AvatarFallback className="text-[9px] font-semibold text-white" style={{ background: deptColor }}>
+                        {s.initials}
+                      </AvatarFallback>
+                    </Avatar>
+                  ))}
                   {dept.staffCount > 3 && (
-                    <div className="sp-dept-avatar sp-dept-more">+{dept.staffCount - 3}</div>
+                    <div className="h-6 w-6 rounded-full -ml-1.5 ring-2 ring-white flex items-center justify-center text-[9px] font-bold"
+                         style={{ background: 'var(--k-surface-hover)', color: 'var(--k-text-muted)' }}>
+                      +{dept.staffCount - 3}
+                    </div>
                   )}
                 </div>
-                <span className="sp-dept-count">
-                  <strong>{dept.staffCount.toString().padStart(2, '0')}</strong> kişi
+                <span className="text-xs ml-auto tabular-nums" style={{ color: 'var(--k-text-muted)' }}>
+                  <strong style={{ color: 'var(--k-text-primary)' }}>{dept.staffCount}</strong> kişi
                 </span>
-                <ChevronRight className="sp-dept-chev" />
+                <ChevronRight size={14} style={{ color: 'var(--k-text-muted)' }} className="transition-transform group-hover:translate-x-0.5" />
               </div>
             </article>
-          ))}
+            );
+          })}
 
-          {/* Add Department Card */}
+          {/* New Department tile / inline editor */}
           {!showAddDept ? (
             <button
               onClick={() => setShowAddDept(true)}
-              className="sp-dept-add"
+              className="flex flex-col items-center justify-center gap-2.5 min-h-[180px] p-7 rounded-2xl border-2 border-dashed transition-all hover:-translate-y-0.5"
+              style={{ borderColor: 'var(--k-border)', color: 'var(--k-text-muted)' }}
             >
-              <div className="sp-dept-add-icon">
-                <Plus className="h-5 w-5" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                   style={{ background: 'var(--k-surface-hover)' }}>
+                <Plus size={18} />
               </div>
-              <span className="sp-dept-add-label">Yeni Departman</span>
+              <span className="text-sm font-semibold">Yeni Departman</span>
             </button>
           ) : (
-            <div className="sp-dept-new">
-              <div className="sp-dept-new-head">
-                <span className="sp-dept-new-eyebrow">Yeni Departman</span>
-                <button onClick={() => setShowAddDept(false)} className="sp-dept-new-close" aria-label="Kapat">
-                  <X className="h-4 w-4" />
+            <div className="k-card p-5 flex flex-col gap-3" style={{ borderColor: 'var(--k-primary)' }}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>
+                  Yeni Departman
+                </span>
+                <button onClick={() => setShowAddDept(false)} className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-[var(--k-surface-hover)]" aria-label="Kapat">
+                  <X size={14} style={{ color: 'var(--k-text-muted)' }} />
                 </button>
               </div>
-
-              <div className="sp-dept-new-field">
-                <label>Departman Adı</label>
+              <Field label="Departman Adı">
                 <Input
                   placeholder="Örn: Kardiyoloji"
                   value={newDeptName}
                   onChange={(e) => setNewDeptName(e.target.value)}
                   className="h-10"
-                  style={{ background: '#ffffff', borderColor: '#ebe7df' }}
+                  style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
                 />
-              </div>
-
-              <div className="sp-dept-new-field">
-                <label>Renk</label>
-                <div className="sp-dept-new-colors">
-                  {DEPARTMENT_COLORS.map((c) => {
+              </Field>
+              <Field label="Renk">
+                <div className="flex flex-wrap gap-2">
+                  {DEPARTMENT_COLORS.map(c => {
                     const active = newDeptColor === c;
                     return (
                       <button
                         key={c}
+                        type="button"
                         onClick={() => setNewDeptColor(c)}
-                        className={`sp-color ${active ? 'sp-color-on' : ''}`}
-                        style={{ background: c }}
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold transition-transform hover:scale-110"
+                        style={{
+                          background: c,
+                          outline: active ? `2px solid var(--k-text-primary)` : 'none',
+                          outlineOffset: 2,
+                        }}
                         aria-label={`Renk: ${c}`}
                       >
-                        {active && <span>✓</span>}
+                        {active && '✓'}
                       </button>
                     );
                   })}
                 </div>
-              </div>
-
+              </Field>
               <button
-                className="sp-dept-new-save"
+                className="k-btn k-btn-primary w-full"
                 disabled={!newDeptName.trim() || isSavingDept}
                 onClick={async () => {
                   setIsSavingDept(true);
@@ -1239,328 +1000,52 @@ export default function StaffPage() {
               >
                 {isSavingDept ? (
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
+                ) : <Plus size={15} />}
                 {isSavingDept ? 'Oluşturuluyor…' : 'Departman Oluştur'}
               </button>
             </div>
           )}
-
-          <style>{`
-            .sp-dept-grid {
-              display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-              gap: 14px;
-            }
-
-            .sp-dept {
-              position: relative;
-              padding: 22px 22px 18px;
-              background: #ffffff;
-              border: 1px solid #ebe7df;
-              border-radius: 16px;
-              cursor: pointer;
-              overflow: hidden;
-              opacity: 0;
-              animation: sp-dept-in 360ms cubic-bezier(0.16,1,0.3,1) forwards;
-              transition: border-color 220ms ease, transform 260ms cubic-bezier(0.16,1,0.3,1), box-shadow 220ms ease;
-            }
-            @keyframes sp-dept-in {
-              from { opacity: 0; transform: translateY(6px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            .sp-dept::before {
-              content: '';
-              position: absolute;
-              left: 0; top: 0; bottom: 0;
-              width: 3px;
-              background: var(--d-accent);
-              opacity: 0;
-              transition: opacity 220ms ease;
-            }
-            .sp-dept:hover {
-              border-color: var(--d-accent);
-              transform: translateY(-2px);
-              box-shadow: 0 4px 20px rgba(10, 10, 10, 0.06);
-            }
-            .sp-dept:hover::before { opacity: 1; }
-            .sp-dept:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
-
-            .sp-dept-head {
-              display: flex;
-              align-items: flex-start;
-              justify-content: space-between;
-              margin-bottom: 16px;
-            }
-            .sp-dept-icon {
-              width: 36px;
-              height: 36px;
-              border-radius: 10px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              background: color-mix(in srgb, var(--d-accent) 12%, transparent);
-              color: var(--d-accent);
-            }
-            :global(.sp-dept-menu) {
-              width: 30px;
-              height: 30px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              border-radius: 8px;
-              color: #8a8578;
-              opacity: 0;
-              transition: opacity 180ms ease, background 180ms ease;
-            }
-            .sp-dept:hover :global(.sp-dept-menu),
-            .sp-dept:focus-within :global(.sp-dept-menu) { opacity: 1; }
-            :global(.sp-dept-menu:hover) { background: #faf8f2; color: #0a0a0a; }
-
-            .sp-dept-name {
-              font-family: var(--font-editorial, serif);
-              font-size: 20px;
-              font-weight: 500;
-              font-variation-settings: 'opsz' 36, 'SOFT' 50;
-              color: #0a0a0a;
-              letter-spacing: -0.015em;
-              margin: 0 0 6px;
-            }
-            .sp-dept-desc {
-              font-size: 12px;
-              color: #6b6a63;
-              line-height: 1.5;
-              margin: 0 0 18px;
-              display: -webkit-box;
-              -webkit-line-clamp: 2;
-              -webkit-box-orient: vertical;
-              overflow: hidden;
-            }
-
-            .sp-dept-foot {
-              display: flex;
-              align-items: center;
-              gap: 10px;
-              padding-top: 14px;
-              border-top: 1px solid #f1ede3;
-            }
-            .sp-dept-avatars {
-              display: flex;
-            }
-            :global(.sp-dept-avatar) {
-              width: 26px !important;
-              height: 26px !important;
-              border: 2px solid #ffffff !important;
-              margin-left: -6px;
-            }
-            :global(.sp-dept-avatar:first-child) { margin-left: 0; }
-            .sp-dept-more {
-              display: flex !important;
-              align-items: center;
-              justify-content: center;
-              border-radius: 999px;
-              background: #faf8f2;
-              color: #6b6a63;
-              font-size: 9px;
-              font-weight: 700;
-              font-variant-numeric: tabular-nums;
-            }
-            .sp-dept-count {
-              font-size: 12px;
-              color: #6b6a63;
-              margin-left: auto;
-              font-variant-numeric: tabular-nums;
-            }
-            .sp-dept-count strong {
-              color: #0a0a0a;
-              font-weight: 600;
-              font-family: var(--font-editorial, serif);
-              font-variation-settings: 'opsz' 20;
-              font-size: 13px;
-            }
-            :global(.sp-dept-chev) {
-              width: 14px;
-              height: 14px;
-              color: #8a8578;
-              transition: transform 220ms cubic-bezier(0.16,1,0.3,1), color 220ms ease;
-            }
-            .sp-dept:hover :global(.sp-dept-chev) {
-              transform: translateX(2px);
-              color: #0a0a0a;
-            }
-
-            /* Add dept tile */
-            .sp-dept-add {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              gap: 10px;
-              min-height: 180px;
-              padding: 28px;
-              border-radius: 16px;
-              border: 1.5px dashed #d9d4c4;
-              background: transparent;
-              color: #8a8578;
-              cursor: pointer;
-              font-family: inherit;
-              transition: border-color 200ms ease, color 200ms ease, background 200ms ease, transform 260ms cubic-bezier(0.16,1,0.3,1);
-            }
-            .sp-dept-add:hover {
-              border-color: #0a0a0a;
-              color: #0a0a0a;
-              background: #faf8f2;
-              transform: translateY(-1px);
-            }
-            .sp-dept-add-icon {
-              width: 40px;
-              height: 40px;
-              border-radius: 12px;
-              background: #faf8f2;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            }
-            .sp-dept-add:hover .sp-dept-add-icon { background: #0a0a0a; color: #fafaf7; }
-            .sp-dept-add-label {
-              font-family: var(--font-display, system-ui);
-              font-size: 13px;
-              font-weight: 600;
-            }
-
-            /* Inline "new dept" editor */
-            .sp-dept-new {
-              padding: 22px;
-              border-radius: 16px;
-              background: #ffffff;
-              border: 1px solid #0a0a0a;
-              box-shadow: 0 6px 24px rgba(10, 10, 10, 0.08);
-              display: flex;
-              flex-direction: column;
-              gap: 16px;
-            }
-            .sp-dept-new-head {
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-            }
-            .sp-dept-new-eyebrow {
-              font-family: var(--font-display, system-ui);
-              font-size: 10px;
-              font-weight: 600;
-              letter-spacing: 0.08em;
-              text-transform: uppercase;
-              color: #6b6a63;
-            }
-            .sp-dept-new-close {
-              width: 28px;
-              height: 28px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              border-radius: 8px;
-              background: transparent;
-              color: #8a8578;
-              border: none;
-              cursor: pointer;
-              transition: background 160ms ease, color 160ms ease;
-            }
-            .sp-dept-new-close:hover { background: #faf8f2; color: #0a0a0a; }
-            .sp-dept-new-field { display: flex; flex-direction: column; gap: 6px; }
-            .sp-dept-new-field label {
-              font-family: var(--font-display, system-ui);
-              font-size: 10px;
-              font-weight: 600;
-              letter-spacing: 0.06em;
-              text-transform: uppercase;
-              color: #6b6a63;
-            }
-            .sp-dept-new-colors { display: flex; flex-wrap: wrap; gap: 8px; }
-            .sp-color {
-              width: 28px;
-              height: 28px;
-              border-radius: 999px;
-              border: 2px solid transparent;
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: #fff;
-              font-size: 11px;
-              font-weight: 700;
-              transition: transform 220ms cubic-bezier(0.16,1,0.3,1);
-              box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-            }
-            .sp-color:hover { transform: scale(1.08); }
-            .sp-color-on { border-color: #0a0a0a; transform: scale(1.05); }
-            .sp-dept-new-save {
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              gap: 8px;
-              height: 44px;
-              border-radius: 999px;
-              background: #0a0a0a;
-              color: #fafaf7;
-              font-family: var(--font-display, system-ui);
-              font-size: 13px;
-              font-weight: 600;
-              border: none;
-              cursor: pointer;
-              transition: background 160ms ease, transform 220ms cubic-bezier(0.16,1,0.3,1);
-            }
-            .sp-dept-new-save:hover:not(:disabled) { background: #1a1a1a; }
-            .sp-dept-new-save:active:not(:disabled) { transform: scale(0.98); }
-            .sp-dept-new-save:disabled { opacity: 0.5; cursor: not-allowed; }
-
-            @media (max-width: 420px) {
-              .sp-dept-grid { grid-template-columns: 1fr; }
-              .sp-dept { padding: 20px 18px 16px; }
-              /* Always show menu on mobile (no hover) */
-              :global(.sp-dept-menu) { opacity: 1; }
-            }
-          `}</style>
         </div>
       )}
 
-      {/* ── Selected Department Header + Table ── */}
+      {/* Selected department detail + table */}
       {activeView === 'departments' && selectedDept && selectedDeptData && (
-        <section className="sp-dept-detail" style={{ ['--d-accent' as string]: selectedDeptData.color }}>
-          <header className="sp-detail-head">
+        <section className="flex flex-col gap-4">
+          <header className="k-card flex flex-wrap items-center gap-5 p-5" style={{ borderLeft: `3px solid ${selectedDeptColor}` }}>
             <button
               onClick={() => { setSelectedDept(null); setCurrentPage(1); setSearchQuery(''); }}
-              className="sp-back"
+              className="k-btn k-btn-subtle k-btn-sm"
               aria-label="Departmanlara dön"
             >
-              <ChevronRight className="h-4 w-4 rotate-180" />
-              <span>Tüm Departmanlar</span>
+              <ChevronRight size={14} className="rotate-180" /> Tüm Departmanlar
             </button>
-
-            <div className="sp-detail-title">
-              <div className="sp-detail-icon">
-                <Building2 className="h-5 w-5" />
+            <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                   style={{ background: `${selectedDeptColor}20`, color: selectedDeptColor }}>
+                <Building2 size={20} />
               </div>
               <div>
-                <span className="sp-detail-eyebrow">Departman</span>
-                <h2 className="sp-detail-name">{selectedDeptData.name}</h2>
-                <p className="sp-detail-meta">
-                  <strong>{(data?.total ?? filteredStaff.length).toString().padStart(2, '0')}</strong> personel
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>
+                  Departman
+                </span>
+                <h2 className="text-xl font-bold" style={{ color: 'var(--k-text-primary)' }}>
+                  {selectedDeptData.name}
+                </h2>
+                <p className="text-xs tabular-nums" style={{ color: 'var(--k-text-muted)' }}>
+                  <strong style={{ color: 'var(--k-text-primary)' }}>{data?.total ?? filteredStaff.length}</strong> personel
                 </p>
               </div>
             </div>
-
-            <div className="sp-detail-actions">
-              <button className="sp-act sp-act-ghost" onClick={() => setShowAssignStaff(true)}>
-                <UserPlus className="h-4 w-4" />
-                <span>Personel Ekle</span>
+            <div className="flex gap-2 flex-wrap">
+              <button className="k-btn k-btn-ghost" onClick={() => setShowAssignStaff(true)}>
+                <UserPlus size={15} /> Personel Ekle
               </button>
-              <button className="sp-act sp-act-ghost" onClick={() => setEditingDept({ id: selectedDeptData.id, name: selectedDeptData.name, color: selectedDeptData.color })}>
-                <Edit className="h-4 w-4" />
-                <span>Düzenle</span>
+              <button className="k-btn k-btn-ghost" onClick={() => setEditingDept({ id: selectedDeptData.id, name: selectedDeptData.name, color: selectedDeptData.color })}>
+                <Edit size={15} /> Düzenle
               </button>
               <button
-                className="sp-act sp-act-danger"
+                className="k-btn k-btn-ghost"
+                style={{ color: 'var(--k-error)', borderColor: 'var(--k-error-bg)' }}
                 disabled={deletingDeptId === selectedDept}
                 onClick={async () => {
                   if (deletingDeptId) return;
@@ -1580,13 +1065,12 @@ export default function StaffPage() {
                   }
                 }}
               >
-                <Trash2 className="h-4 w-4" />
-                <span>{deletingDeptId === selectedDept ? 'Siliniyor…' : 'Sil'}</span>
+                <Trash2 size={15} /> {deletingDeptId === selectedDept ? 'Siliniyor…' : 'Sil'}
               </button>
             </div>
           </header>
 
-          <div className="sp-table-shell">
+          <div className="k-card p-5">
             <DataTable
               columns={columns}
               data={filteredStaff}
@@ -1603,9 +1087,9 @@ export default function StaffPage() {
         </section>
       )}
 
-      {/* ── All Staff View ── */}
+      {/* All staff view */}
       {activeView === 'all' && (
-        <div className="sp-table-shell">
+        <div className="k-card p-5">
           <DataTable
             columns={columns}
             data={allStaff}
@@ -1620,338 +1104,6 @@ export default function StaffPage() {
           />
         </div>
       )}
-
-      <style jsx>{`
-        .sp-dept-detail { display: flex; flex-direction: column; gap: 18px; }
-
-        .sp-detail-head {
-          display: grid;
-          grid-template-columns: auto 1fr auto;
-          align-items: center;
-          gap: 24px;
-          padding: 22px 24px;
-          background: #ffffff;
-          border: 1px solid #ebe7df;
-          border-radius: 16px;
-          position: relative;
-          overflow: hidden;
-        }
-        .sp-detail-head::before {
-          content: '';
-          position: absolute;
-          left: 0; top: 0; bottom: 0;
-          width: 3px;
-          background: var(--d-accent);
-        }
-
-        .sp-back {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          height: 36px;
-          padding: 0 12px 0 8px;
-          border-radius: 999px;
-          background: #faf8f2;
-          color: #6b6a63;
-          border: none;
-          cursor: pointer;
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          font-weight: 500;
-          transition: background 160ms ease, color 160ms ease;
-        }
-        .sp-back:hover { background: #0a0a0a; color: #fafaf7; }
-
-        .sp-detail-title { display: flex; align-items: center; gap: 16px; }
-        .sp-detail-icon {
-          width: 48px;
-          height: 48px;
-          border-radius: 12px;
-          background: color-mix(in srgb, var(--d-accent) 14%, transparent);
-          color: var(--d-accent);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-        .sp-detail-eyebrow {
-          display: block;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #8a8578;
-          margin-bottom: 2px;
-        }
-        .sp-detail-name {
-          font-family: var(--font-editorial, serif);
-          font-size: 26px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 48, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.02em;
-          line-height: 1.1;
-          margin: 0;
-        }
-        .sp-detail-meta {
-          font-size: 12px;
-          color: #6b6a63;
-          margin: 4px 0 0;
-          font-variant-numeric: tabular-nums;
-        }
-        .sp-detail-meta strong {
-          font-family: var(--font-editorial, serif);
-          font-weight: 500;
-          color: #0a0a0a;
-          font-size: 13px;
-        }
-
-        .sp-detail-actions {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-        }
-        .sp-act {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          height: 40px;
-          padding: 0 14px;
-          border-radius: 999px;
-          font-family: var(--font-display, system-ui);
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          border: 1px solid #ebe7df;
-          background: #ffffff;
-          transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 220ms cubic-bezier(0.16,1,0.3,1);
-        }
-        .sp-act:active:not(:disabled) { transform: scale(0.97); }
-        .sp-act:disabled { opacity: 0.5; cursor: not-allowed; }
-        .sp-act-ghost { color: #0a0a0a; }
-        .sp-act-ghost:hover:not(:disabled) { border-color: #0a0a0a; background: #faf8f2; }
-        .sp-act-danger { color: #b3261e; border-color: #e9c9c0; }
-        .sp-act-danger:hover:not(:disabled) { background: #fdf5f2; border-color: #b3261e; }
-
-        /* ── Table shell: editorial hairline + horizontal scroll on mobile ── */
-        .sp-table-shell {
-          background: #ffffff;
-          border: 1px solid #ebe7df;
-          border-radius: 16px;
-          padding: 20px;
-          overflow: hidden;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(10, 10, 10, 0.02);
-        }
-
-        /* Scoped Editorial overrides for shared DataTable (inline styles → use !important) */
-        .sp-table-shell :global(input) {
-          background: #ffffff !important;
-          border-color: #ebe7df !important;
-          border-radius: 10px !important;
-          height: 42px !important;
-          font-family: inherit !important;
-        }
-        .sp-table-shell :global(input:focus-visible) {
-          border-color: #0a0a0a !important;
-          box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.06) !important;
-          outline: none !important;
-        }
-        /* Inner border wrapper: drop its own border to let shell carry the hairline */
-        .sp-table-shell :global(.overflow-x-auto.rounded-xl.border) {
-          border: 1px solid #ebe7df !important;
-          border-radius: 12px !important;
-          background: #ffffff !important;
-        }
-        /* Table header */
-        .sp-table-shell :global(thead tr) {
-          background: #faf8f2 !important;
-          border-bottom-color: #ebe7df !important;
-          border-bottom-width: 1px !important;
-        }
-        .sp-table-shell :global(thead th) {
-          color: #8a8578 !important;
-          font-family: var(--font-display, system-ui) !important;
-          font-weight: 600 !important;
-          letter-spacing: 0.08em !important;
-          text-transform: uppercase !important;
-          font-size: 10px !important;
-          padding-top: 14px !important;
-          padding-bottom: 14px !important;
-        }
-        /* Body rows */
-        .sp-table-shell :global(tbody tr) {
-          border-color: #f1ede3 !important;
-          transition: background 160ms ease !important;
-        }
-        .sp-table-shell :global(tbody tr:hover) {
-          background: #faf8f2 !important;
-        }
-        .sp-table-shell :global(tbody td) {
-          color: #0a0a0a !important;
-          font-size: 13px !important;
-        }
-        /* Names column — use Fraunces editorial */
-        .sp-table-shell :global(tbody td p.text-sm.font-semibold) {
-          font-family: var(--font-editorial, serif) !important;
-          font-size: 15px !important;
-          font-weight: 500 !important;
-          font-variation-settings: 'opsz' 28 !important;
-          letter-spacing: -0.005em !important;
-          color: #0a0a0a !important;
-        }
-        /* Email meta */
-        .sp-table-shell :global(tbody td p.text-xs) {
-          color: #6b6a63 !important;
-          font-size: 11px !important;
-        }
-        /* Score column — tabular-nums */
-        .sp-table-shell :global(tbody td .font-mono) {
-          font-variant-numeric: tabular-nums !important;
-        }
-        /* Mobile card fallback inside DataTable */
-        .sp-table-shell :global(.rounded-xl.border.p-4) {
-          background: #ffffff !important;
-          border-color: #ebe7df !important;
-          border-radius: 12px !important;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
-        }
-        /* Pagination buttons */
-        .sp-table-shell :global(button[aria-label*="sayfa"]),
-        .sp-table-shell :global(button[aria-label*="Sayfa"]) {
-          border-radius: 999px !important;
-          height: 36px !important;
-          min-width: 36px !important;
-          border-color: #ebe7df !important;
-          color: #6b6a63 !important;
-          font-family: var(--font-display, system-ui) !important;
-          font-weight: 500 !important;
-        }
-        .sp-table-shell :global(button[aria-label*="sayfa"]:hover:not(:disabled)),
-        .sp-table-shell :global(button[aria-label*="Sayfa"]:hover:not(:disabled)) {
-          background: #faf8f2 !important;
-          border-color: #0a0a0a !important;
-          color: #0a0a0a !important;
-        }
-        /* Active page button (aria-current="page") */
-        .sp-table-shell :global(button[aria-current="page"]) {
-          background: #0a0a0a !important;
-          color: #fafaf7 !important;
-          border: none !important;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-          font-weight: 600 !important;
-        }
-        /* Pagination range label */
-        .sp-table-shell :global(p.text-xs) {
-          font-variant-numeric: tabular-nums !important;
-        }
-        /* Empty state */
-        .sp-table-shell :global(.flex.flex-col.items-center.gap-2.py-12),
-        .sp-table-shell :global(.h-32) {
-          color: #8a8578 !important;
-        }
-
-        @media (max-width: 900px) {
-          .sp-detail-head {
-            grid-template-columns: 1fr;
-            gap: 16px;
-            padding: 20px;
-          }
-          .sp-detail-actions { justify-content: flex-start; }
-          .sp-detail-actions .sp-act { flex: 1; justify-content: center; min-width: 0; }
-          .sp-table-shell { padding: 14px; }
-        }
-
-        @media (max-width: 420px) {
-          .sp-detail-name { font-size: 22px; }
-          .sp-detail-actions { gap: 6px; }
-          .sp-act span { display: none; }
-          .sp-act {
-            width: 44px;
-            height: 44px;
-            padding: 0;
-            justify-content: center;
-          }
-        }
-
-        /* ── Edit Department Modal ── */
-        .edm-form { display: flex; flex-direction: column; gap: 22px; }
-        .edm-field { display: flex; flex-direction: column; }
-        :global(.edm-label) {
-          font-family: var(--font-display, system-ui);
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          color: #6b6a63;
-          margin-bottom: 8px;
-          display: block;
-        }
-        .edm-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
-        .edm-swatch {
-          width: 32px;
-          height: 32px;
-          border-radius: 999px;
-          border: 2px solid transparent;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #fff;
-          font-size: 11px;
-          font-weight: 700;
-          transition: transform 220ms cubic-bezier(0.16,1,0.3,1);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
-        }
-        .edm-swatch:hover { transform: scale(1.08); }
-        .edm-swatch-on {
-          border-color: #0a0a0a;
-          transform: scale(1.05);
-        }
-        .edm-swatch-check { text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
-
-        .edm-preview {
-          padding-top: 8px;
-          border-top: 1px solid #ebe7df;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .edm-preview-label {
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #8a8578;
-        }
-        .edm-preview-card {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 14px 16px;
-          border-radius: 12px;
-          border: 1px solid;
-        }
-        .edm-preview-icon {
-          width: 36px;
-          height: 36px;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .edm-preview-name {
-          font-family: var(--font-editorial, serif);
-          font-size: 16px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 32;
-          color: #0a0a0a;
-          letter-spacing: -0.005em;
-        }
-      `}</style>
 
       {/* Edit Department Modal */}
       <PremiumModal
@@ -1999,49 +1151,55 @@ export default function StaffPage() {
         }
       >
         {editingDept && (
-          <div className="edm-form">
-            <div className="edm-field">
-              <Label className="edm-label">Departman Adı</Label>
+          <div className="flex flex-col gap-5">
+            <Field label="Departman Adı">
               <Input
                 value={editingDept.name}
                 onChange={(e) => setEditingDept({ ...editingDept, name: e.target.value })}
                 className="h-10"
-                style={{ background: '#ffffff', borderColor: '#ebe7df' }}
+                style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
               />
-            </div>
-
-            <div className="edm-field">
-              <Label className="edm-label">Renk</Label>
-              <div className="edm-swatches">
-                {DEPARTMENT_COLORS.map((c) => {
+            </Field>
+            <Field label="Renk">
+              <div className="flex flex-wrap gap-2.5">
+                {DEPARTMENT_COLORS.map(c => {
                   const active = editingDept.color === c;
                   return (
                     <button
                       key={c}
+                      type="button"
                       onClick={() => setEditingDept({ ...editingDept, color: c })}
-                      className={`edm-swatch ${active ? 'edm-swatch-on' : ''}`}
-                      style={{ background: c }}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold transition-transform hover:scale-110"
+                      style={{
+                        background: c,
+                        outline: active ? `2px solid var(--k-text-primary)` : 'none',
+                        outlineOffset: 2,
+                      }}
                       aria-label={`Renk: ${c}`}
                     >
-                      {active && <span className="edm-swatch-check">✓</span>}
+                      {active && '✓'}
                     </button>
                   );
                 })}
               </div>
-            </div>
-
-            <div className="edm-preview">
-              <span className="edm-preview-label">Önizleme</span>
-              <div className="edm-preview-card" style={{ borderColor: `${editingDept.color}40`, background: `${editingDept.color}0c` }}>
-                <div className="edm-preview-icon" style={{ background: `${editingDept.color}20`, color: editingDept.color }}>
-                  <Building2 className="h-4 w-4" />
+            </Field>
+            <div className="pt-3 border-t flex flex-col gap-2" style={{ borderColor: 'var(--k-border)' }}>
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>
+                Önizleme
+              </span>
+              <div className="flex items-center gap-3 p-3.5 rounded-xl border"
+                   style={{ borderColor: `${editingDept.color}40`, background: `${editingDept.color}0c` }}>
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center"
+                     style={{ background: `${editingDept.color}20`, color: editingDept.color }}>
+                  <Building2 size={16} />
                 </div>
-                <span className="edm-preview-name">{editingDept.name || 'Departman adı'}</span>
+                <span className="text-base font-semibold" style={{ color: 'var(--k-text-primary)' }}>
+                  {editingDept.name || 'Departman adı'}
+                </span>
               </div>
             </div>
           </div>
         )}
-
       </PremiumModal>
 
       {showAddStaff && <NewStaffModal onClose={() => setShowAddStaff(false)} departments={allDepartments} onSaved={refetch} />}
@@ -2066,105 +1224,20 @@ export default function StaffPage() {
   );
 }
 
-// ── Editorial Stat Tile ──
-function StatTile({
-  label, value, suffix, icon, tone, isPercent,
-}: {
-  label: string;
-  value: number;
-  suffix?: string;
-  icon: React.ReactNode;
-  tone: 'ink' | 'ok' | 'amber' | 'emerald';
-  isPercent?: boolean;
-}) {
-  const toneColors: Record<typeof tone, { accent: string; dot: string }> = {
-    ink: { accent: '#0a0a0a', dot: '#0a0a0a' },
-    ok: { accent: '#0a7a47', dot: '#0a7a47' },
-    amber: { accent: '#b4820b', dot: '#b4820b' },
-    emerald: { accent: '#0a7a47', dot: '#0a7a47' },
-  };
-  const { accent } = toneColors[tone];
-  const formattedValue = isPercent ? value.toString() : value.toLocaleString('tr-TR');
-
+// ── KPI card ──
+function Kpi({ icon, label, value, suffix }: { icon: React.ReactNode; label: string; value: number; suffix?: string }) {
   return (
-    <div className="st-tile">
-      <div className="st-rail" />
-      <div className="st-head">
-        <span className="st-icon">{icon}</span>
-        <span className="st-label">{label}</span>
+    <div className="k-kpi">
+      <div className="k-kpi-top">
+        <div>
+          <div className="k-kpi-label">{label}</div>
+          <div className="k-kpi-value">
+            {value.toLocaleString('tr-TR')}
+            {suffix && <span className="text-base font-medium ml-1" style={{ color: 'var(--k-text-muted)' }}>{suffix}</span>}
+          </div>
+        </div>
+        <div className="k-kpi-icon">{icon}</div>
       </div>
-      <div className="st-value">
-        <span className="st-number">{formattedValue}</span>
-        {suffix && <span className="st-suffix">{suffix}</span>}
-      </div>
-      <style jsx>{`
-        .st-tile {
-          position: relative;
-          padding: 20px 22px 20px 26px;
-          background: #ffffff;
-          border-radius: 14px;
-          border: 1px solid #ebe7df;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(10, 10, 10, 0.03);
-          overflow: hidden;
-          transition: border-color 200ms ease, transform 260ms cubic-bezier(0.16,1,0.3,1);
-        }
-        .st-tile:hover { border-color: #d9d4c4; transform: translateY(-1px); }
-        .st-rail {
-          position: absolute;
-          left: 0;
-          top: 14px;
-          bottom: 14px;
-          width: 3px;
-          background: ${accent};
-          border-radius: 0 2px 2px 0;
-        }
-        .st-head {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 12px;
-        }
-        .st-icon {
-          display: inline-flex;
-          color: ${accent};
-          opacity: 0.75;
-        }
-        .st-label {
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #6b6a63;
-        }
-        .st-value {
-          display: flex;
-          align-items: baseline;
-          gap: 6px;
-        }
-        .st-number {
-          font-family: var(--font-editorial, serif);
-          font-size: 36px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 56, 'SOFT' 50;
-          color: #0a0a0a;
-          line-height: 1;
-          letter-spacing: -0.025em;
-          font-variant-numeric: tabular-nums;
-        }
-        .st-suffix {
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          font-weight: 500;
-          color: #8a8578;
-          letter-spacing: 0.01em;
-        }
-
-        @media (max-width: 420px) {
-          .st-tile { padding: 18px 20px 18px 22px; }
-          .st-number { font-size: 32px; }
-        }
-      `}</style>
     </div>
   );
 }

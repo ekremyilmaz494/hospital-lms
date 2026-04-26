@@ -13,6 +13,20 @@ import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { SectionError } from '@/components/shared/skeletons';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 // ── Tip tanımları ──────────────────────────────────────────────────────────────
 
 interface PlanData {
@@ -75,41 +89,41 @@ function UsageBar({ value, limit, label }: { value: number; limit: number | null
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
-        <span className="text-sm font-bold" style={{ color: isCritical ? 'var(--color-error)' : isWarning ? 'var(--color-warning)' : 'var(--color-text-primary)' }}>
+        <span className="text-sm font-medium" style={{ color: K.TEXT_SECONDARY }}>{label}</span>
+        <span className="text-sm font-bold" style={{ color: isCritical ? K.ERROR : isWarning ? K.WARNING : K.TEXT_PRIMARY }}>
           {value.toLocaleString('tr-TR')} / {limit ? limit.toLocaleString('tr-TR') : '∞'}
         </span>
       </div>
-      <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg)' }}>
+      <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: K.BORDER_LIGHT }}>
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{
             width: limit ? `${percent}%` : '0%',
-            backgroundColor: isCritical ? 'var(--color-error)' : isWarning ? 'var(--color-warning)' : 'var(--brand-600)',
+            backgroundColor: isCritical ? K.ERROR : isWarning ? K.WARNING : K.PRIMARY,
           }}
         />
       </div>
-      {limit && <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>%{percent} kullanıldı</p>}
+      {limit && <p className="text-xs mt-1" style={{ color: K.TEXT_MUTED }}>%{percent} kullanıldı</p>}
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; bg: string; color: string; Icon: typeof CheckCircle2 }> = {
-    active:     { label: 'Aktif',      bg: 'rgba(16,185,129,0.1)',  color: 'var(--brand-500)', Icon: CheckCircle2 },
-    trial:      { label: 'Deneme',     bg: 'rgba(245,158,11,0.1)',  color: '#f59e0b', Icon: Clock },
-    past_due:   { label: 'Gecikmiş',   bg: 'rgba(239,68,68,0.1)',   color: '#ef4444', Icon: AlertTriangle },
-    cancelled:  { label: 'İptal',      bg: 'rgba(100,116,139,0.1)', color: '#64748b', Icon: AlertTriangle },
-    paused:     { label: 'Duraklatıldı', bg: 'rgba(100,116,139,0.1)', color: '#64748b', Icon: Clock },
+    active:     { label: 'Aktif',        bg: K.SUCCESS_BG, color: K.SUCCESS,     Icon: CheckCircle2 },
+    trial:      { label: 'Deneme',       bg: K.WARNING_BG, color: K.WARNING,     Icon: Clock },
+    past_due:   { label: 'Gecikmiş',     bg: K.ERROR_BG,   color: K.ERROR,       Icon: AlertTriangle },
+    cancelled:  { label: 'İptal',        bg: K.BORDER_LIGHT, color: K.TEXT_MUTED, Icon: AlertTriangle },
+    paused:     { label: 'Duraklatıldı', bg: K.BORDER_LIGHT, color: K.TEXT_MUTED, Icon: Clock },
   };
   const cfg = map[status] ?? map['active'];
   const Icon = cfg.Icon;
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
       style={{ backgroundColor: cfg.bg, color: cfg.color }}
     >
-      <Icon className="w-3.5 h-3.5" />
+      <Icon className="w-3 h-3" />
       {cfg.label}
     </span>
   );
@@ -147,17 +161,17 @@ export default function SubscriptionPage() {
       <div className="p-6 lg:p-8">
         <PageHeader title="Aboneliğim" subtitle="Mevcut plan ve kullanım bilgileriniz" />
         <div className="mt-8 max-w-md mx-auto text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)' }}>
-            <CreditCard className="w-8 h-8" style={{ color: 'var(--brand-600)' }} />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: K.PRIMARY_LIGHT }}>
+            <CreditCard className="w-8 h-8" style={{ color: K.PRIMARY }} />
           </div>
-          <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>Aktif Abonelik Yok</h3>
-          <p className="text-sm mb-6" style={{ color: 'var(--color-text-secondary)' }}>
+          <h3 className="text-lg font-bold mb-2" style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY }}>Aktif Abonelik Yok</h3>
+          <p className="text-sm mb-6" style={{ color: K.TEXT_SECONDARY }}>
             Platformun tüm özelliklerine erişmek için bir plan seçin.
           </p>
           <Link
             href="/pricing"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white"
-            style={{ backgroundColor: 'var(--brand-600)' }}
+            style={{ backgroundColor: K.PRIMARY }}
           >
             Planları İncele <ArrowUpRight className="w-4 h-4" />
           </Link>
@@ -167,6 +181,7 @@ export default function SubscriptionPage() {
   }
 
   const { subscription, plan, usage, invoices } = data;
+  const isActivePlan = subscription!.status === 'active' || subscription!.status === 'trial';
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -179,22 +194,22 @@ export default function SubscriptionPage() {
       {daysLeftInfo?.urgent && (
         <BlurFade>
           <div
-            className="rounded-2xl px-5 py-4 flex items-center gap-3"
-            style={{ backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}
+            className="px-5 py-4 flex items-center gap-3"
+            style={{ backgroundColor: K.WARNING_BG, border: `1.5px solid ${K.WARNING}`, borderRadius: 14 }}
           >
-            <AlertTriangle className="w-5 h-5 flex-shrink-0" style={{ color: '#f59e0b' }} />
+            <AlertTriangle className="w-5 h-5 flex-shrink-0" style={{ color: K.WARNING }} />
             <div className="flex-1">
-              <p className="text-sm font-semibold" style={{ color: '#f59e0b' }}>
+              <p className="text-sm font-semibold" style={{ color: K.WARNING }}>
                 {subscription!.status === 'trial' ? 'Deneme süreniz bitiyor' : 'Aboneliğiniz sona eriyor'}
               </p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+              <p className="text-xs mt-0.5" style={{ color: K.TEXT_SECONDARY }}>
                 {daysLeftInfo.days} {daysLeftInfo.label}. Kesintisiz kullanım için aboneliğinizi yenileyin.
               </p>
             </div>
             <Link
               href="/demo"
-              className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg"
-              style={{ backgroundColor: '#f59e0b', color: '#0f172a' }}
+              className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg text-white"
+              style={{ backgroundColor: K.WARNING }}
             >
               Yükselt
             </Link>
@@ -209,27 +224,27 @@ export default function SubscriptionPage() {
             title="Mevcut Plan"
             value={plan!.name}
             icon={Zap}
-            accentColor="var(--brand-600)"
+            accentColor={K.PRIMARY}
           />
           <StatCard
             title="Personel Kullanımı"
             value={`${usage!.staffCount} / ${usage!.staffLimit ?? '∞'}`}
             icon={Users}
-            accentColor="#3b82f6"
+            accentColor={K.INFO}
             trend={usage!.staffLimit ? { value: usage!.staffPercent, label: 'kapasite', isPositive: usage!.staffPercent < 80 } : undefined}
           />
           <StatCard
             title="Eğitim Kullanımı"
             value={`${usage!.trainingCount} / ${usage!.trainingLimit ?? '∞'}`}
             icon={GraduationCap}
-            accentColor="#8b5cf6"
+            accentColor={K.ACCENT}
             trend={usage!.trainingLimit ? { value: usage!.trainingPercent, label: 'kapasite', isPositive: usage!.trainingPercent < 80 } : undefined}
           />
           <StatCard
             title="Abonelik Durumu"
             value={subscription!.status === 'trial' ? `${daysLeftInfo?.days ?? 0} gün deneme` : 'Aktif'}
             icon={Calendar}
-            accentColor={daysLeftInfo?.urgent ? '#f59e0b' : 'var(--brand-500)'}
+            accentColor={daysLeftInfo?.urgent ? K.WARNING : K.SUCCESS}
           />
         </div>
       </BlurFade>
@@ -239,18 +254,23 @@ export default function SubscriptionPage() {
         {/* Plan kartı */}
         <BlurFade className="lg:col-span-1">
           <div
-            className="rounded-2xl border p-6 h-full"
-            style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+            className="p-6 h-full"
+            style={{
+              backgroundColor: isActivePlan ? K.PRIMARY_LIGHT : K.SURFACE,
+              border: `1.5px solid ${isActivePlan ? K.PRIMARY : K.BORDER}`,
+              borderRadius: 14,
+              boxShadow: K.SHADOW_CARD,
+            }}
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)' }}>
-                  <CreditCard className="w-5 h-5" style={{ color: 'var(--brand-600)' }} />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: K.SURFACE }}>
+                  <CreditCard className="w-5 h-5" style={{ color: K.PRIMARY }} />
                 </div>
                 <div>
-                  <h3 className="font-bold" style={{ color: 'var(--color-text-primary)' }}>{plan!.name}</h3>
-                  <p className="text-xs capitalize" style={{ color: 'var(--color-text-muted)' }}>
-                    {subscription!.billingCycle === 'monthly' ? 'Ayl\u0131k' : subscription!.billingCycle === 'annual' ? 'Y\u0131ll\u0131k' : '\u00d6zel'}
+                  <h3 className="font-bold" style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY, fontSize: 18 }}>{plan!.name}</h3>
+                  <p className="text-xs capitalize" style={{ color: K.TEXT_MUTED }}>
+                    {subscription!.billingCycle === 'monthly' ? 'Aylık' : subscription!.billingCycle === 'annual' ? 'Yıllık' : 'Özel'}
                   </p>
                 </div>
               </div>
@@ -258,28 +278,28 @@ export default function SubscriptionPage() {
             </div>
 
             {plan!.priceMonthly && (
-              <div className="mb-5 pb-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                <span className="text-3xl font-black" style={{ color: 'var(--color-text-primary)' }}>
+              <div className="mb-5 pb-5 border-b" style={{ borderColor: K.BORDER_LIGHT }}>
+                <span className="text-3xl font-black" style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY }}>
                   ₺{plan!.priceMonthly.toLocaleString('tr-TR')}
                 </span>
-                <span className="text-sm ml-1" style={{ color: 'var(--color-text-muted)' }}>/ay</span>
+                <span className="text-sm ml-1" style={{ color: K.TEXT_MUTED }}>/ay</span>
               </div>
             )}
 
             {subscription!.trialEndsAt && (
-              <div className="mb-3 flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+              <div className="mb-3 flex items-center gap-2 text-sm" style={{ color: K.TEXT_SECONDARY }}>
                 <Clock className="w-4 h-4" />
                 Deneme bitiş: <span className="font-medium">{formatDate(subscription!.trialEndsAt)}</span>
               </div>
             )}
             {subscription!.expiresAt && !subscription!.trialEndsAt && (
-              <div className="mb-3 flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+              <div className="mb-3 flex items-center gap-2 text-sm" style={{ color: K.TEXT_SECONDARY }}>
                 <Calendar className="w-4 h-4" />
                 Yenileme: <span className="font-medium">{formatDate(subscription!.expiresAt)}</span>
               </div>
             )}
             {subscription!.startedAt && (
-              <div className="mb-5 flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+              <div className="mb-5 flex items-center gap-2 text-sm" style={{ color: K.TEXT_SECONDARY }}>
                 <TrendingUp className="w-4 h-4" />
                 Başlangıç: <span className="font-medium">{formatDate(subscription!.startedAt)}</span>
               </div>
@@ -288,21 +308,21 @@ export default function SubscriptionPage() {
             {Array.isArray(plan!.features) && plan!.features.length > 0 && (
               <ul className="space-y-2">
                 {(plan!.features as string[]).slice(0, 8).map((feat, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--brand-600)' }} />
+                  <li key={i} className="flex items-center gap-2 text-sm" style={{ color: K.TEXT_SECONDARY }}>
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: K.PRIMARY }} />
                     {feat}
                   </li>
                 ))}
               </ul>
             )}
 
-            <div className="mt-6 pt-5 border-t" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="mt-6 pt-5 border-t" style={{ borderColor: K.BORDER_LIGHT }}>
               <Link
                 href="/demo"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ backgroundColor: 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)', color: 'var(--brand-600)' }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white"
+                style={{ backgroundColor: K.PRIMARY }}
               >
                 Plan Yükseltme Talebi <ArrowUpRight className="w-4 h-4" />
               </Link>
@@ -313,10 +333,10 @@ export default function SubscriptionPage() {
         {/* Kullanım metrikleri */}
         <BlurFade delay={0.05} className="lg:col-span-2">
           <div
-            className="rounded-2xl border p-6 h-full"
-            style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+            className="p-6 h-full"
+            style={{ backgroundColor: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}
           >
-            <h3 className="font-bold mb-6" style={{ color: 'var(--color-text-primary)' }}>Kaynak Kullanımı</h3>
+            <h3 className="mb-6" style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY, fontSize: 18, fontWeight: 700 }}>Kaynak Kullanımı</h3>
             <div className="space-y-6">
               <UsageBar
                 value={usage!.staffCount}
@@ -331,12 +351,12 @@ export default function SubscriptionPage() {
               {plan!.maxStorageGb && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Depolama</span>
-                    <span className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                    <span className="text-sm font-medium" style={{ color: K.TEXT_SECONDARY }}>Depolama</span>
+                    <span className="text-sm font-bold" style={{ color: K.TEXT_PRIMARY }}>
                       {plan!.maxStorageGb} GB dahil
                     </span>
                   </div>
-                  <div className="rounded-xl px-4 py-3 text-sm" style={{ backgroundColor: 'var(--color-bg)', color: 'var(--color-text-secondary)' }}>
+                  <div className="rounded-xl px-4 py-3 text-sm" style={{ backgroundColor: K.BG, color: K.TEXT_SECONDARY }}>
                     Gerçek zamanlı depolama kullanımı yakında gösterilecek.
                   </div>
                 </div>
@@ -347,12 +367,12 @@ export default function SubscriptionPage() {
             {(usage!.staffPercent >= 95 || usage!.trainingPercent >= 95) && (
               <div
                 className="mt-6 rounded-xl px-4 py-3 flex items-start gap-3"
-                style={{ backgroundColor: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}
+                style={{ backgroundColor: K.ERROR_BG, border: `1px solid ${K.ERROR}` }}
               >
-                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: K.ERROR }} />
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: '#ef4444' }}>Kota Limitine Yaklaşıldı</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                  <p className="text-sm font-semibold" style={{ color: K.ERROR }}>Kota Limitine Yaklaşıldı</p>
+                  <p className="text-xs mt-0.5" style={{ color: K.TEXT_SECONDARY }}>
                     Limitin %95&apos;ini geçtiniz. Kesinti yaşamamak için planınızı yükseltin.
                   </p>
                 </div>
@@ -366,36 +386,34 @@ export default function SubscriptionPage() {
       {invoices && invoices.length > 0 && (
         <BlurFade delay={0.1}>
           <div
-            className="rounded-2xl border"
-            style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+            style={{ backgroundColor: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD, overflow: 'hidden' }}
           >
-            <div className="px-6 py-4 border-b flex items-center gap-3" style={{ borderColor: 'var(--color-border)' }}>
-              <FileText className="w-5 h-5" style={{ color: 'var(--brand-600)' }} />
-              <h3 className="font-bold" style={{ color: 'var(--color-text-primary)' }}>Fatura Geçmişi</h3>
+            <div className="px-6 py-4 border-b flex items-center gap-3" style={{ borderColor: K.BORDER_LIGHT }}>
+              <FileText className="w-5 h-5" style={{ color: K.PRIMARY }} />
+              <h3 style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY, fontSize: 18, fontWeight: 700 }}>Fatura Geçmişi</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr style={{ backgroundColor: 'var(--color-bg)' }}>
-                    <th className="px-6 py-3 text-left text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Fatura No</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Dönem</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Tarih</th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Tutar</th>
+                  <tr style={{ backgroundColor: K.BG }}>
+                    <th className="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Fatura No</th>
+                    <th className="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Dönem</th>
+                    <th className="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Tarih</th>
+                    <th className="px-6 py-3 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Tutar</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((inv, i) => (
+                  {invoices.map((inv) => (
                     <tr
                       key={inv.id}
-                      className="border-t"
-                      style={{ borderColor: 'var(--color-border)', backgroundColor: i % 2 !== 0 ? 'var(--color-bg)' : 'transparent' }}
+                      style={{ borderTop: `1px solid ${K.BORDER_LIGHT}` }}
                     >
-                      <td className="px-6 py-3.5 text-sm font-mono" style={{ color: 'var(--color-text-primary)' }}>{inv.invoiceNumber}</td>
-                      <td className="px-6 py-3.5 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                      <td className="px-6 py-3.5 text-sm font-mono" style={{ color: K.TEXT_PRIMARY }}>{inv.invoiceNumber}</td>
+                      <td className="px-6 py-3.5 text-sm" style={{ color: K.TEXT_SECONDARY }}>
                         {formatDate(inv.periodStart)} – {formatDate(inv.periodEnd)}
                       </td>
-                      <td className="px-6 py-3.5 text-sm" style={{ color: 'var(--color-text-secondary)' }}>{formatDate(inv.issuedAt)}</td>
-                      <td className="px-6 py-3.5 text-sm font-bold text-right" style={{ color: 'var(--color-text-primary)' }}>
+                      <td className="px-6 py-3.5 text-sm" style={{ color: K.TEXT_SECONDARY }}>{formatDate(inv.issuedAt)}</td>
+                      <td className="px-6 py-3.5 text-sm font-bold text-right" style={{ color: K.TEXT_PRIMARY }}>
                         {formatCurrency(inv.totalAmount)}
                       </td>
                     </tr>

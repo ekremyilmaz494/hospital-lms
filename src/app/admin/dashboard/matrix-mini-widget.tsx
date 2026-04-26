@@ -4,16 +4,30 @@ import Link from 'next/link';
 import { ArrowRight, Grid3X3 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 interface MiniCell { trainingId: string; state: string }
 interface MiniStaffRow { name: string; cells: MiniCell[] }
 interface MatrixPreview { trainings: { id: string; title: string; isCompulsory?: boolean }[]; staff: MiniStaffRow[] }
 
 const cellStyles: Record<string, { bg: string; border: string; label: string }> = {
-  passed:      { bg: 'var(--color-success-bg)',  border: 'var(--color-success)',  label: 'Başarılı' },
-  failed:      { bg: 'var(--color-error-bg)',    border: 'var(--color-error)',    label: 'Başarısız' },
-  in_progress: { bg: 'var(--color-warning-bg)', border: 'var(--color-warning)', label: 'Devam' },
-  assigned:    { bg: 'var(--color-info-bg)',     border: 'var(--color-info)',     label: 'Atandı' },
-  unassigned:  { bg: 'transparent',              border: 'var(--color-border)',   label: 'Atanmadı' },
+  passed:      { bg: K.SUCCESS_BG, border: K.PRIMARY,  label: 'Başarılı' },
+  failed:      { bg: K.ERROR_BG,   border: '#b91c1c',  label: 'Başarısız' },
+  in_progress: { bg: K.WARNING_BG, border: '#b45309',  label: 'Devam' },
+  assigned:    { bg: K.INFO_BG,    border: '#1d4ed8',  label: 'Atandı' },
+  unassigned:  { bg: 'transparent',border: K.BORDER,   label: 'Atanmadı' },
 };
 
 const nameHue = (name: string) => name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
@@ -23,21 +37,24 @@ export function MatrixMiniWidget() {
 
   if (isLoading) {
     return (
-      <div className="animate-pulse overflow-hidden rounded-2xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-        <div className="flex items-center gap-3 border-b px-5 py-4" style={{ borderColor: 'var(--color-border)' }}>
-          <div className="h-9 w-9 rounded-xl" style={{ background: 'var(--color-border)' }} />
+      <div
+        className="animate-pulse overflow-hidden"
+        style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}
+      >
+        <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+          <div className="h-9 w-9 rounded-xl" style={{ background: K.BORDER_LIGHT }} />
           <div className="space-y-2">
-            <div className="h-3.5 w-28 rounded" style={{ background: 'var(--color-border)' }} />
-            <div className="h-2.5 w-44 rounded" style={{ background: 'var(--color-border)' }} />
+            <div className="h-3.5 w-28 rounded" style={{ background: K.BORDER_LIGHT }} />
+            <div className="h-2.5 w-44 rounded" style={{ background: K.BORDER_LIGHT }} />
           </div>
         </div>
         <div className="space-y-2.5 p-5">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded-full" style={{ background: 'var(--color-border)' }} />
-              <div className="h-2.5 w-20 rounded" style={{ background: 'var(--color-border)' }} />
+              <div className="h-6 w-6 rounded-full" style={{ background: K.BORDER_LIGHT }} />
+              <div className="h-2.5 w-20 rounded" style={{ background: K.BORDER_LIGHT }} />
               {[...Array(6)].map((_, j) => (
-                <div key={j} className="h-6 w-6 rounded-full" style={{ background: 'var(--color-border)' }} />
+                <div key={j} className="h-6 w-6 rounded-full" style={{ background: K.BORDER_LIGHT }} />
               ))}
             </div>
           ))}
@@ -66,28 +83,30 @@ export function MatrixMiniWidget() {
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+    <div
+      className="overflow-hidden"
+      style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}
+    >
 
       {/* ── Header ── */}
       <div
         className="flex items-center justify-between px-5 py-4"
         style={{
-          borderBottom: '1px solid var(--color-border)',
-          background: 'linear-gradient(135deg, rgba(59,130,246,0.03) 0%, transparent 70%)',
+          borderBottom: `1px solid ${K.BORDER_LIGHT}`,
+          background: K.BG,
         }}
       >
         <div className="flex items-center gap-3">
           <div
             className="flex h-10 w-10 items-center justify-center rounded-xl"
             style={{
-              background: 'linear-gradient(135deg, var(--color-primary-light) 0%, rgba(59,130,246,0.12) 100%)',
-              boxShadow: '0 1px 4px rgba(59,130,246,0.18)',
+              background: K.PRIMARY_LIGHT,
             }}
           >
-            <Grid3X3 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+            <Grid3X3 className="h-4 w-4" style={{ color: K.PRIMARY }} />
           </div>
           <div>
-            <h3 className="text-sm font-bold tracking-tight">Yetkinlik Matrisi</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 700, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY, letterSpacing: '-0.01em' }}>Yetkinlik Matrisi</h3>
             <div className="mt-1 flex items-center gap-1.5">
               {[
                 { val: `${allStaff.length}`, unit: 'personel', accent: false },
@@ -96,15 +115,17 @@ export function MatrixMiniWidget() {
               ].map(({ val, unit, accent }) => (
                 <span
                   key={unit}
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  className="inline-flex items-center gap-1 rounded-full"
                   style={{
-                    background: accent ? 'var(--color-success-bg)' : 'var(--color-bg)',
-                    border: `1px solid ${accent ? 'var(--color-success)' : 'var(--color-border)'}`,
-                    color: accent ? 'var(--color-success)' : 'var(--color-text-muted)',
-                    opacity: accent ? 1 : 0.85,
+                    padding: '2px 8px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: accent ? K.SUCCESS_BG : K.SURFACE,
+                    border: `1px solid ${accent ? K.PRIMARY : K.BORDER_LIGHT}`,
+                    color: accent ? K.PRIMARY : K.TEXT_MUTED,
                   }}
                 >
-                  <strong style={{ color: accent ? 'var(--color-success)' : 'var(--color-text-secondary)', fontWeight: 700 }}>{val}</strong>
+                  <strong style={{ color: accent ? K.PRIMARY : K.TEXT_SECONDARY, fontWeight: 700 }}>{val}</strong>
                   {unit}
                 </span>
               ))}
@@ -115,7 +136,7 @@ export function MatrixMiniWidget() {
         <Link
           href="/admin/competency-matrix"
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80"
-          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
+          style={{ background: K.PRIMARY, color: '#ffffff' }}
         >
           Tümü <ArrowRight className="h-3 w-3" />
         </Link>
@@ -134,10 +155,11 @@ export function MatrixMiniWidget() {
                       style={{
                         writingMode: 'vertical-lr',
                         transform: 'rotate(180deg)',
-                        fontSize: 9.5,
+                        fontSize: 11,
                         fontWeight: 600,
-                        color: 'var(--color-text-muted)',
-                        letterSpacing: '0.03em',
+                        textTransform: 'uppercase',
+                        color: K.TEXT_MUTED,
+                        letterSpacing: '0.05em',
                         height: 54,
                         lineHeight: 1.25,
                         display: 'block',
@@ -151,7 +173,7 @@ export function MatrixMiniWidget() {
                       style={{
                         display: 'block',
                         width: 5, height: 5, borderRadius: '50%',
-                        background: t.isCompulsory ? 'var(--color-error)' : 'var(--color-info)',
+                        background: t.isCompulsory ? K.ERROR : K.INFO,
                         flexShrink: 0,
                       }}
                       title={t.isCompulsory ? 'Zorunlu eğitim' : undefined}
@@ -160,7 +182,7 @@ export function MatrixMiniWidget() {
                 </th>
               ))}
               <th style={{ width: 80, paddingBottom: 6, paddingLeft: 10, textAlign: 'left', verticalAlign: 'bottom' }}>
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>ORAN</span>
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: K.TEXT_MUTED }}>ORAN</span>
               </th>
             </tr>
           </thead>
@@ -168,10 +190,10 @@ export function MatrixMiniWidget() {
             {preview.staff.map((s, si) => {
               const staffFull = allStaff.find(st => st.name === s.name);
               const rate = staffFull?.completionRate ?? 0;
-              const rateColor = rate >= 80 ? 'var(--color-success)' : rate >= 50 ? 'var(--color-warning)' : 'var(--color-error)';
+              const rateColor = rate >= 80 ? K.PRIMARY : rate >= 50 ? '#b45309' : '#b91c1c';
               const hue = nameHue(s.name);
               return (
-                <tr key={s.name} style={{ borderTop: si > 0 ? '1px solid var(--color-border)' : 'none' }}>
+                <tr key={s.name} style={{ borderTop: si > 0 ? `1px solid ${K.BORDER_LIGHT}` : 'none' }}>
                   <td style={{ paddingRight: 10, paddingTop: 6, paddingBottom: 6 }}>
                     <div className="flex items-center gap-2">
                       <div
@@ -180,7 +202,6 @@ export function MatrixMiniWidget() {
                           background: `hsl(${hue}, 52%, 52%)`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 9, fontWeight: 800, color: '#fff',
-                          boxShadow: `0 1px 4px hsl(${hue}, 52%, 52%, 0.4)`,
                         }}
                       >
                         {s.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
@@ -188,7 +209,7 @@ export function MatrixMiniWidget() {
                       <span
                         style={{
                           fontSize: 12, fontWeight: 600,
-                          color: 'var(--color-text-primary)',
+                          color: K.TEXT_PRIMARY,
                           maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}
                         title={s.name}
@@ -211,7 +232,6 @@ export function MatrixMiniWidget() {
                             border: `2px solid ${cs.border}`,
                             opacity: isUnset ? 0.35 : 1,
                             margin: '0 auto',
-                            boxShadow: isUnset ? 'none' : `0 1px 4px rgba(0,0,0,0.08)`,
                             cursor: 'default',
                           }}
                         />
@@ -221,7 +241,7 @@ export function MatrixMiniWidget() {
 
                   <td style={{ paddingLeft: 10, paddingTop: 6, paddingBottom: 6 }}>
                     <div className="flex items-center gap-2">
-                      <div style={{ width: 38, height: 5, borderRadius: 3, background: 'var(--color-border)', overflow: 'hidden', flexShrink: 0 }}>
+                      <div style={{ width: 38, height: 5, borderRadius: 3, background: K.BORDER_LIGHT, overflow: 'hidden', flexShrink: 0 }}>
                         <div style={{ height: '100%', width: `${rate}%`, borderRadius: 3, background: rateColor, transition: 'width 0.6s ease' }} />
                       </div>
                       <span style={{ fontSize: 10, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: rateColor, minWidth: 28 }}>
@@ -239,7 +259,7 @@ export function MatrixMiniWidget() {
       {/* ── Legend ── */}
       <div
         className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-3"
-        style={{ borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)' }}
+        style={{ borderTop: `1px solid ${K.BORDER_LIGHT}`, background: K.BG }}
       >
         {[
           { state: 'passed',      label: 'Başarılı' },
@@ -251,12 +271,12 @@ export function MatrixMiniWidget() {
           return (
             <div key={state} className="flex items-center gap-1.5">
               <div style={{ width: 11, height: 11, borderRadius: '50%', background: cs.bg, border: `2px solid ${cs.border}` }} />
-              <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-muted)' }}>{label}</span>
+              <span style={{ fontSize: 11, fontWeight: 500, color: K.TEXT_MUTED }}>{label}</span>
             </div>
           );
         })}
         {allStaff.length > 8 && (
-          <span className="ml-auto text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+          <span className="ml-auto text-[11px]" style={{ color: K.TEXT_MUTED }}>
             +{allStaff.length - 8} personel daha
           </span>
         )}

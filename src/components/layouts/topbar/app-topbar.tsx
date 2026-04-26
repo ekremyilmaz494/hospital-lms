@@ -1,15 +1,14 @@
 'use client';
 
 /**
- * AppTopbar — "Clinical Editorial" redesign.
- * Cream masthead row + ink monospace meta + gold accents.
- * Arama · tema seçici · bildirim · kullanıcı menüsü (davranış aynı).
+ * AppTopbar — Klinova emerald chrome.
+ * Minimalist white surface, emerald accents, professional SaaS feel.
+ * Behavior unchanged: search · theme · notifications · user menu dropdowns.
  */
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTheme } from 'next-themes';
-import { Menu, Moon, Search, Sun, X, User, Bell, LogOut } from 'lucide-react';
+import { Menu, Search, X, User, Bell, LogOut, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { NotificationBell } from '@/components/shared/notification-bell';
@@ -25,14 +24,25 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRolePath } from '@/lib/route-helpers';
 
-/* ─── Editorial palette ─── */
-/* Topbar is chrome — fixed hex, not themed. Stays solid cream always. */
-const INK = '#0a1628';
-const INK_SOFT = '#5b6478';
-const CREAM = '#f4ead5';
-const RULE = '#e0d7c0';
-const GOLD = '#c9a961';
-const OLIVE = '#1a3a28';
+/* ─── Klinova palette (chrome — fixed hex, not themed) ─── */
+const K = {
+  PRIMARY: '#0d9668',
+  PRIMARY_HOVER: '#087a54',
+  PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff',
+  SURFACE_HOVER: '#f5f5f4',
+  BG: '#fafaf9',
+  BORDER: '#c9c4be',
+  BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917',
+  TEXT_SECONDARY: '#44403c',
+  TEXT_MUTED: '#78716c',
+  ERROR: '#ef4444',
+  ERROR_TEXT: '#b91c1c',
+  ERROR_BG: '#fee2e2',
+  SHADOW_CARD: '0 8px 24px rgba(15, 23, 42, 0.08)',
+  FONT_DISPLAY: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", system-ui, sans-serif',
+};
 
 interface AppTopbarProps {
   title: string;
@@ -57,7 +67,6 @@ export function AppTopbar({
   unreadNotifications = 0,
 }: AppTopbarProps) {
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
   const [searchOpen, setSearchOpen] = useState(false);
   const { user } = useAuthStore();
 
@@ -75,22 +84,20 @@ export function AppTopbar({
     <header
       className="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 px-4 sm:px-6"
       style={{
-        backgroundColor: '#f4ead5',
-        borderBottom: '1px solid #0a1628',
-        color: '#0a1628',
+        backgroundColor: K.SURFACE,
+        borderBottom: `1px solid ${K.BORDER_LIGHT}`,
+        color: K.TEXT_PRIMARY,
       }}
     >
-      {/* ── Left: hamburger (mobile) + masthead meta ──
-          Klasik Material/iOS navigation drawer pattern: top-left hamburger → drawer açılır.
-          Mobile primary navigation kaynağı (md:hidden), desktop'ta sidebar vardır. */}
+      {/* ── Left: hamburger (mobile) + masthead meta ── */}
       <div className="flex items-center gap-3 min-w-0">
         <button
           type="button"
           onClick={onToggleSidebar}
           aria-label="Menüyü aç"
           className="inline-flex h-10 w-10 items-center justify-center md:hidden transition-colors"
-          style={{ color: INK, background: 'transparent', borderRadius: '4px' }}
-          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(10, 22, 40, 0.06)'; }}
+          style={{ color: K.TEXT_SECONDARY, background: 'transparent', borderRadius: '8px' }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = K.SURFACE_HOVER; }}
           onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
         >
           <Menu className="h-5 w-5" strokeWidth={2} />
@@ -100,10 +107,10 @@ export function AppTopbar({
           <div className="flex items-center gap-2 min-w-0">
             {orgName && (
               <p
-                className="text-[11px] font-semibold uppercase tracking-[0.16em] truncate hidden sm:block"
+                className="text-[13px] font-semibold truncate hidden sm:block"
                 style={{
-                  color: INK,
-                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                  color: K.TEXT_PRIMARY,
+                  fontFamily: K.FONT_DISPLAY,
                 }}
               >
                 {orgName}
@@ -111,18 +118,18 @@ export function AppTopbar({
             )}
             {orgName && title && (
               <span
-                className="hidden sm:inline-block text-[12px]"
-                style={{ color: GOLD }}
+                className="hidden sm:inline-block text-[13px]"
+                style={{ color: K.TEXT_MUTED }}
               >
                 /
               </span>
             )}
             {title && (
               <p
-                className="text-[11px] font-semibold uppercase tracking-[0.14em] truncate"
+                className="text-[13px] font-medium truncate"
                 style={{
-                  color: INK_SOFT,
-                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                  color: K.TEXT_MUTED,
+                  fontFamily: K.FONT_DISPLAY,
                 }}
               >
                 {title}
@@ -140,7 +147,7 @@ export function AppTopbar({
             <div className="flex items-center">
               <Search
                 className="absolute left-2.5 h-3.5 w-3.5"
-                style={{ color: INK_SOFT }}
+                style={{ color: K.TEXT_MUTED }}
               />
               <input
                 placeholder="Ara..."
@@ -148,10 +155,10 @@ export function AppTopbar({
                 onBlur={() => setSearchOpen(false)}
                 className="w-full pl-8 pr-8 h-9 text-[13px] focus:outline-none"
                 style={{
-                  backgroundColor: '#ffffff',
-                  color: INK,
-                  border: `1px solid ${INK}`,
-                  borderRadius: '2px',
+                  backgroundColor: K.BG,
+                  color: K.TEXT_PRIMARY,
+                  border: `1px solid ${K.BORDER_LIGHT}`,
+                  borderRadius: '8px',
                   fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
                 }}
               />
@@ -160,7 +167,7 @@ export function AppTopbar({
                 onClick={() => setSearchOpen(false)}
                 aria-label="Aramayı kapat"
               >
-                <X className="h-3.5 w-3.5" style={{ color: INK_SOFT }} />
+                <X className="h-3.5 w-3.5" style={{ color: K.TEXT_MUTED }} />
               </button>
             </div>
           ) : (
@@ -169,13 +176,13 @@ export function AppTopbar({
                 onClick={() => setSearchOpen(true)}
                 className="inline-flex h-9 w-9 items-center justify-center"
                 style={{
-                  color: INK_SOFT,
-                  borderRadius: '2px',
+                  color: K.TEXT_MUTED,
+                  borderRadius: '9999px',
                   backgroundColor: 'transparent',
                   transition: 'color 160ms ease, background-color 160ms ease',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.color = INK; e.currentTarget.style.backgroundColor = 'rgba(10, 22, 40, 0.05)'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = INK_SOFT; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                onMouseEnter={e => { e.currentTarget.style.color = K.TEXT_SECONDARY; e.currentTarget.style.backgroundColor = K.SURFACE_HOVER; }}
+                onMouseLeave={e => { e.currentTarget.style.color = K.TEXT_MUTED; e.currentTarget.style.backgroundColor = 'transparent'; }}
                 aria-label="Ara"
               >
                 <Search className="h-4 w-4" />
@@ -185,139 +192,101 @@ export function AppTopbar({
           )}
         </div>
 
-        {/* Theme dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className="relative inline-flex h-9 w-9 items-center justify-center"
-            style={{
-              color: INK_SOFT,
-              borderRadius: '2px',
-              backgroundColor: 'transparent',
-              transition: 'color 160ms ease, background-color 160ms ease',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = INK; e.currentTarget.style.backgroundColor = 'rgba(10, 22, 40, 0.05)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = INK_SOFT; e.currentTarget.style.backgroundColor = 'transparent'; }}
-            aria-label="Tema ayarları"
-          >
-            <Sun className="h-4 w-4 rotate-0 scale-100 dark:-rotate-90 dark:scale-0" style={{ transition: 'transform 300ms ease' }} />
-            <Moon className="absolute h-4 w-4 rotate-90 scale-0 dark:rotate-0 dark:scale-100" style={{ transition: 'transform 300ms ease' }} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="w-60 p-0 overflow-hidden border-0"
-            style={{
-              backgroundColor: CREAM,
-              background: CREAM,
-              backdropFilter: 'none',
-              WebkitBackdropFilter: 'none',
-              border: `1px solid ${INK}`,
-              borderRadius: '4px',
-              boxShadow: '0 8px 24px rgba(6, 16, 33, 0.12)',
-            }}
-          >
-            <div className="px-3 pt-3 pb-2" style={{ borderBottom: `1px solid ${RULE}` }}>
-              <p
-                className="text-[9px] font-semibold uppercase tracking-[0.2em]"
-                style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-              >
-                № Tema
-              </p>
-            </div>
-
-            <DropdownMenuGroup>
-              <EditorialMenuItem
-                icon={Sun}
-                label="Aydınlık"
-                active={theme === 'light'}
-                onClick={() => setTheme('light')}
-              />
-              <EditorialMenuItem
-                icon={Moon}
-                label="Karanlık"
-                active={theme === 'dark'}
-                onClick={() => setTheme('dark')}
-              />
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
         {/* Notifications */}
         <NotificationBell unreadCount={unreadNotifications} />
 
         {/* User dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="flex items-center gap-2.5 px-2 py-1"
             style={{
-              borderRadius: '2px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              height: 40,
+              padding: '0 10px',
+              borderRadius: 9999,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
               transition: 'background-color 160ms ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(10, 22, 40, 0.05)'; }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = K.SURFACE_HOVER; }}
             onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
-            <Avatar className="h-8 w-8" style={{ border: `1.5px solid ${GOLD}` }}>
+            <Avatar className="h-9 w-9 shrink-0" style={{ border: `1.5px solid ${K.PRIMARY_LIGHT}` }}>
               <AvatarImage src={userAvatar} />
               <AvatarFallback
-                className="text-[11px] font-semibold"
+                className="text-[12px] font-semibold"
                 style={{
-                  backgroundColor: OLIVE,
-                  color: CREAM,
-                  fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                  backgroundColor: K.PRIMARY_LIGHT,
+                  color: K.PRIMARY,
+                  fontFamily: K.FONT_DISPLAY,
                 }}
               >
                 {userInitials}
               </AvatarFallback>
             </Avatar>
-            <div className="hidden text-left md:block">
-              <p
-                className="text-[12px] font-semibold tracking-[-0.01em] leading-tight"
+            <span
+              className="hidden md:flex"
+              style={{
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                lineHeight: 1.15,
+              }}
+            >
+              <span
                 style={{
-                  color: INK,
-                  fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: K.TEXT_PRIMARY,
+                  fontFamily: K.FONT_DISPLAY,
                 }}
               >
                 {userName}
-              </p>
-              <p
-                className="text-[9px] uppercase tracking-[0.18em] mt-0.5"
+              </span>
+              <span
                 style={{
-                  color: GOLD,
-                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: K.TEXT_MUTED,
+                  fontFamily: K.FONT_DISPLAY,
+                  marginTop: 2,
                 }}
               >
                 {userRole}
-              </p>
-            </div>
+              </span>
+            </span>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
             className="w-64 p-0 overflow-hidden border-0"
             style={{
-              backgroundColor: CREAM,
-              background: CREAM,
+              backgroundColor: K.SURFACE,
+              background: K.SURFACE,
               backdropFilter: 'none',
               WebkitBackdropFilter: 'none',
-              border: `1px solid ${INK}`,
-              borderRadius: '4px',
-              boxShadow: '0 8px 24px rgba(6, 16, 33, 0.12)',
+              border: `1px solid ${K.BORDER_LIGHT}`,
+              borderRadius: '12px',
+              boxShadow: K.SHADOW_CARD,
             }}
           >
             {/* Header card */}
             <div
               className="px-4 pt-4 pb-4 flex items-center gap-3"
               style={{
-                background: `linear-gradient(180deg, rgba(10, 22, 40, 0.03) 0%, transparent 100%)`,
-                borderBottom: `1px solid ${RULE}`,
+                backgroundColor: K.BG,
+                borderBottom: `1px solid ${K.BORDER_LIGHT}`,
               }}
             >
-              <Avatar className="h-12 w-12 shrink-0" style={{ border: `2px solid ${GOLD}` }}>
+              <Avatar className="h-11 w-11 shrink-0" style={{ border: `1.5px solid ${K.PRIMARY_LIGHT}` }}>
                 <AvatarImage src={userAvatar} />
                 <AvatarFallback
-                  className="text-[15px] font-semibold"
+                  className="text-[14px] font-semibold"
                   style={{
-                    backgroundColor: OLIVE,
-                    color: CREAM,
-                    fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                    backgroundColor: K.PRIMARY_LIGHT,
+                    color: K.PRIMARY,
+                    fontFamily: K.FONT_DISPLAY,
                   }}
                 >
                   {userInitials}
@@ -325,28 +294,19 @@ export function AppTopbar({
               </Avatar>
               <div className="min-w-0 flex-1">
                 <p
-                  className="text-[9px] font-semibold uppercase tracking-[0.2em]"
+                  className="text-[14px] font-bold truncate"
                   style={{
-                    color: INK_SOFT,
-                    fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
-                  }}
-                >
-                  Oturum
-                </p>
-                <p
-                  className="text-[15px] font-semibold tracking-[-0.01em] truncate"
-                  style={{
-                    color: INK,
-                    fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif',
+                    color: K.TEXT_PRIMARY,
+                    fontFamily: K.FONT_DISPLAY,
                   }}
                 >
                   {userName}
                 </p>
                 <p
-                  className="text-[9px] uppercase tracking-[0.18em] mt-0.5"
+                  className="text-[12px] font-medium mt-0.5"
                   style={{
-                    color: GOLD,
-                    fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                    color: K.TEXT_MUTED,
+                    fontFamily: K.FONT_DISPLAY,
                   }}
                 >
                   {userRole}
@@ -356,12 +316,12 @@ export function AppTopbar({
 
             {/* Items */}
             <div className="py-1">
-              <EditorialMenuItem
+              <KlinovaMenuItem
                 icon={User}
                 label="Profilim"
                 onClick={() => router.push(profilePath)}
               />
-              <EditorialMenuItem
+              <KlinovaMenuItem
                 icon={Bell}
                 label="Bildirimler"
                 onClick={() => router.push(notificationsPath)}
@@ -369,37 +329,28 @@ export function AppTopbar({
               />
             </div>
 
-            <DropdownMenuSeparator style={{ backgroundColor: RULE }} />
+            <DropdownMenuSeparator style={{ backgroundColor: K.BORDER_LIGHT }} />
 
             <div className="py-1">
               <DropdownMenuItem
                 onClick={handleLogout}
                 onSelect={e => e.preventDefault()}
-                className="cursor-pointer relative group"
+                className="cursor-pointer relative"
                 style={{
-                  borderRadius: 0,
-                  color: '#b3261e',
+                  borderRadius: '8px',
+                  margin: '0 4px',
+                  color: K.ERROR_TEXT,
                   padding: '10px 12px',
                   fontSize: '13px',
                   fontWeight: 500,
                   fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
                   transition: 'background-color 160ms ease',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#fdf5f2'; }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = K.ERROR_BG; }}
                 onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 <LogOut className="h-3.5 w-3.5 mr-2" />
                 <span>Çıkış Yap</span>
-                <span
-                  className="ml-auto text-[9px] uppercase tracking-[0.14em]"
-                  style={{
-                    color: '#b3261e',
-                    opacity: 0.6,
-                    fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
-                  }}
-                >
-                  →
-                </span>
               </DropdownMenuItem>
             </div>
           </DropdownMenuContent>
@@ -409,10 +360,10 @@ export function AppTopbar({
   );
 }
 
-function EditorialMenuItem({
+function KlinovaMenuItem({
   icon: Icon, label, active, onClick, badge,
 }: {
-  icon: typeof Sun;
+  icon: typeof User;
   label: string;
   active?: boolean;
   onClick?: () => void;
@@ -424,50 +375,36 @@ function EditorialMenuItem({
       onSelect={e => e.preventDefault()}
       className="cursor-pointer relative"
       style={{
-        borderRadius: 0,
+        borderRadius: '8px',
+        margin: '0 4px',
         padding: '10px 12px',
         fontSize: '13px',
         fontWeight: active ? 600 : 500,
-        color: active ? INK : INK_SOFT,
+        color: active ? K.TEXT_PRIMARY : K.TEXT_SECONDARY,
         fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        backgroundColor: active ? 'rgba(201, 169, 97, 0.08)' : 'transparent',
+        backgroundColor: 'transparent',
         transition: 'background-color 160ms ease, color 160ms ease',
       }}
-      onMouseEnter={e => { e.currentTarget.style.color = INK; e.currentTarget.style.backgroundColor = 'rgba(201, 169, 97, 0.06)'; }}
-      onMouseLeave={e => {
-        e.currentTarget.style.color = active ? INK : INK_SOFT;
-        e.currentTarget.style.backgroundColor = active ? 'rgba(201, 169, 97, 0.08)' : 'transparent';
-      }}
+      onMouseEnter={e => { e.currentTarget.style.backgroundColor = K.SURFACE_HOVER; }}
+      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
     >
-      {active && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-1/2 -translate-y-1/2"
-          style={{ width: 3, height: 16, backgroundColor: GOLD, borderRadius: '1px' }}
-        />
-      )}
-      <Icon className="h-3.5 w-3.5 mr-2" style={{ color: active ? GOLD : INK_SOFT }} />
+      <Icon className="h-3.5 w-3.5 mr-2" style={{ color: active ? K.PRIMARY : K.TEXT_SECONDARY }} />
       <span>{label}</span>
       {badge != null && badge > 0 && (
         <span
           className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold tabular-nums leading-none"
           style={{
-            color: INK,
-            backgroundColor: GOLD,
-            borderRadius: '2px',
-            fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+            color: K.PRIMARY,
+            backgroundColor: K.PRIMARY_LIGHT,
+            borderRadius: '9999px',
+            fontFamily: K.FONT_DISPLAY,
           }}
         >
           {badge}
         </span>
       )}
       {active && !badge && (
-        <span
-          className="ml-auto text-[11px] font-semibold"
-          style={{ color: GOLD, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-        >
-          ●
-        </span>
+        <Check className="ml-auto h-3.5 w-3.5" style={{ color: K.PRIMARY }} />
       )}
     </DropdownMenuItem>
   );

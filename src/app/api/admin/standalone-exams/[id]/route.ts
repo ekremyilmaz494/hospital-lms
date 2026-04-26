@@ -201,7 +201,6 @@ export async function PATCH(
             const created = await tx.question.create({
               data: {
                 trainingId: id,
-                organizationId: dbUser!.organizationId!,
                 questionText: q.text,
                 points: q.points,
                 sortOrder: idx,

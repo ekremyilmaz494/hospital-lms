@@ -3,9 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Bell, BellOff, Send, AlertTriangle, Info, Check, CheckCircle, Zap,
-  Filter, Clock, Inbox, Trash2, X, Users, UserMinus, Building2, Loader2,
+  Filter, Clock, Inbox, Trash2, X, Users, UserMinus, Building2, Loader2, ChevronRight,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BlurFade } from '@/components/ui/blur-fade';
@@ -25,11 +24,11 @@ interface Notification {
 interface StaffMember { id: string; firstName: string; lastName: string; title: string | null }
 interface Department { id: string; name: string; users: StaffMember[]; _count: { users: number } }
 
-const typeConfig: Record<string, { color: string; bg: string; icon: typeof Bell; label: string }> = {
-  warning: { color: 'var(--color-warning)', bg: 'var(--color-warning-bg)', icon: AlertTriangle, label: 'Uyarı' },
-  error: { color: 'var(--color-error)', bg: 'var(--color-error-bg)', icon: Zap, label: 'Acil' },
-  info: { color: 'var(--color-info)', bg: 'var(--color-info-bg)', icon: Info, label: 'Bilgi' },
-  success: { color: 'var(--color-success)', bg: 'var(--color-success-bg)', icon: CheckCircle, label: 'Başarılı' },
+const typeConfig: Record<string, { color: string; icon: typeof Bell; label: string }> = {
+  warning: { color: 'var(--k-warning)', icon: AlertTriangle, label: 'Uyarı' },
+  error: { color: 'var(--k-error)', icon: Zap, label: 'Acil' },
+  info: { color: 'var(--k-info)', icon: Info, label: 'Bilgi' },
+  success: { color: 'var(--k-success)', icon: CheckCircle, label: 'Başarılı' },
 };
 
 type FilterType = 'all' | 'unread' | 'warning' | 'error' | 'info' | 'success';
@@ -210,7 +209,7 @@ export default function NotificationsPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</div>
+        <div className="text-sm" style={{ color: 'var(--k-error)' }}>{error}</div>
       </div>
     );
   }
@@ -232,94 +231,90 @@ export default function NotificationsPage() {
   ];
 
   return (
-    <div>
-      {/* Header */}
+    <div className="k-page">
       <BlurFade delay={0}>
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-2xl"
-              style={{
-                background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-                boxShadow: '0 4px 14px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
-              }}
-            >
-              <Bell className="h-6 w-6 text-white" />
+        <header className="k-page-header">
+          <div>
+            <div className="k-breadcrumb">
+              <span>Panel</span>
+              <ChevronRight size={12} />
+              <span data-current="true">Bildirimler</span>
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                Bildirim Yonetimi
-              </h1>
-              <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                Personele bildirim gonderin ve takip edin
-              </p>
-            </div>
+            <h1 className="k-page-title">Bildirim Yönetimi</h1>
+            <p className="k-page-subtitle">Personele bildirim gönderin ve takip edin.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSendModal(true)}
-              className="flex items-center gap-2 rounded-xl h-10 px-5 text-[13px] font-semibold text-white transition-[transform] duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              style={{
-                background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-                boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
-              }}
-            >
-              <Send className="h-4 w-4" />
-              Bildirim Gönder
+            <button onClick={() => setShowSendModal(true)} className="k-btn k-btn-primary">
+              <Send size={15} /> Bildirim Gönder
             </button>
           </div>
-        </div>
+        </header>
       </BlurFade>
 
       <div className="flex gap-6">
         {/* Filter sidebar */}
         <BlurFade delay={0.05}>
-          <div className="w-52 shrink-0 space-y-1">
-            <div className="flex items-center gap-2 px-3 mb-3">
-              <Filter className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+          <div
+            className="w-52 shrink-0 p-2 rounded-xl border"
+            style={{
+              background: 'var(--k-surface)',
+              borderColor: 'var(--k-border)',
+            }}
+          >
+            <div className="flex items-center gap-2 px-3 py-2 mb-1">
+              <Filter className="h-3.5 w-3.5" style={{ color: 'var(--k-text-muted)' }} />
+              <span
+                className="text-[11px] font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--k-text-muted)' }}
+              >
                 Filtrele
               </span>
             </div>
-            {filters.map((f) => {
-              const isActive = filter === f.id;
-              const typeConf = typeConfig[f.id];
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => setFilter(f.id)}
-                  aria-label={`Filtrele: ${f.label}`}
-                  aria-pressed={filter === f.id}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] transition-all duration-200"
-                  style={{
-                    background: isActive ? 'var(--color-primary)' : 'transparent',
-                    color: isActive ? 'white' : 'var(--color-text-secondary)',
-                    fontWeight: isActive ? 600 : 500,
-                    boxShadow: isActive ? '0 2px 8px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' : 'none',
-                  }}
-                >
-                  <f.icon
-                    className="h-4 w-4"
+            <div className="space-y-0.5">
+              {filters.map((f) => {
+                const isActive = filter === f.id;
+                const typeConf = typeConfig[f.id];
+                const iconColor = typeConf?.color || 'var(--k-text-muted)';
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setFilter(f.id)}
+                    aria-label={`Filtrele: ${f.label}`}
+                    aria-pressed={isActive}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors duration-150"
                     style={{
-                      color: isActive ? 'white' : typeConf?.color || 'var(--color-text-muted)',
-                      opacity: isActive ? 1 : 0.7,
+                      background: isActive
+                        ? 'color-mix(in srgb, var(--k-primary) 12%, transparent)'
+                        : 'transparent',
+                      color: isActive ? 'var(--k-primary)' : 'var(--k-text-secondary)',
+                      fontWeight: isActive ? 600 : 500,
                     }}
-                  />
-                  <span className="flex-1 text-left">{f.label}</span>
-                  {f.count !== undefined && f.count > 0 && (
-                    <span
-                      className="flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
+                  >
+                    <f.icon
+                      className="h-4 w-4"
                       style={{
-                        background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--color-bg)',
-                        color: isActive ? 'white' : 'var(--color-text-muted)',
+                        color: isActive ? 'var(--k-primary)' : iconColor,
+                        opacity: isActive ? 1 : 0.85,
                       }}
-                    >
-                      {f.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                    />
+                    <span className="flex-1 text-left">{f.label}</span>
+                    {f.count !== undefined && f.count > 0 && (
+                      <span
+                        className="flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
+                        style={{
+                          background: isActive
+                            ? 'color-mix(in srgb, var(--k-primary) 18%, transparent)'
+                            : 'var(--k-bg)',
+                          color: isActive ? 'var(--k-primary)' : 'var(--k-text-muted)',
+                        }}
+                      >
+                        {f.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </BlurFade>
 
@@ -334,10 +329,10 @@ export default function NotificationsPage() {
                 return (
                   <BlurFade key={n.id} delay={0.08 + i * 0.03}>
                     <div
-                      className="group relative flex items-start gap-4 rounded-xl border p-5 transition-all duration-300"
+                      className="group relative flex items-start gap-4 rounded-xl border p-5 transition-colors duration-200"
                       style={{
-                        background: 'var(--color-surface)',
-                        borderColor: 'var(--color-border)',
+                        background: 'var(--k-surface)',
+                        borderColor: 'var(--k-border)',
                         borderLeftWidth: '3px',
                         borderLeftColor: cfg.color,
                         opacity: isDismissing ? 0 : 1,
@@ -346,10 +341,10 @@ export default function NotificationsPage() {
                     >
                       {/* Icon */}
                       <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                         style={{
-                          background: `${cfg.color}10`,
-                          border: `1px solid ${cfg.color}15`,
+                          background: `color-mix(in srgb, ${cfg.color} 14%, transparent)`,
+                          border: `1px solid color-mix(in srgb, ${cfg.color} 22%, transparent)`,
                         }}
                       >
                         <Icon className="h-5 w-5" style={{ color: cfg.color }} />
@@ -358,25 +353,28 @@ export default function NotificationsPage() {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2.5 mb-1">
-                          <p className="text-[13px] font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                          <p className="text-[13px] font-semibold" style={{ color: 'var(--k-text-primary)' }}>
                             {n.title}
                           </p>
                           <span
                             className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
-                            style={{ background: `${cfg.color}12`, color: cfg.color }}
+                            style={{
+                              background: `color-mix(in srgb, ${cfg.color} 14%, transparent)`,
+                              color: cfg.color,
+                            }}
                           >
                             {cfg.label}
                           </span>
                         </div>
                         <p
                           className="text-[13px] leading-relaxed"
-                          style={{ color: 'var(--color-text-secondary)' }}
+                          style={{ color: 'var(--k-text-secondary)' }}
                         >
                           {n.message}
                         </p>
                         <div className="flex items-center gap-1.5 mt-2">
-                          <Clock className="h-3 w-3" style={{ color: 'var(--color-text-muted)' }} />
-                          <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
+                          <Clock className="h-3 w-3" style={{ color: 'var(--k-text-muted)' }} />
+                          <span className="text-[11px] font-mono" style={{ color: 'var(--k-text-muted)' }}>
                             {timeAgo(n.time)}
                           </span>
                         </div>
@@ -386,7 +384,7 @@ export default function NotificationsPage() {
                       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <button
                           className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150 disabled:opacity-50"
-                          style={{ color: 'var(--color-error)' }}
+                          style={{ color: 'var(--k-error)' }}
                           title="Sil"
                           aria-label="Bildirimi sil"
                           disabled={dismissing === n.id}
@@ -404,17 +402,19 @@ export default function NotificationsPage() {
             </div>
           ) : (
             <div
-              className="flex flex-col items-center justify-center rounded-2xl border py-20"
-              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+              className="flex flex-col items-center justify-center rounded-xl border py-20"
+              style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
             >
               <div
                 className="flex h-16 w-16 items-center justify-center rounded-2xl mb-4"
-                style={{ background: 'var(--color-bg)' }}
+                style={{ background: 'var(--k-bg)' }}
               >
-                <BellOff className="h-7 w-7" style={{ color: 'var(--color-text-muted)' }} />
+                <BellOff className="h-7 w-7" style={{ color: 'var(--k-text-muted)' }} />
               </div>
-              <p className="text-[14px] font-semibold mb-1">Henüz bildirim yok</p>
-              <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-[14px] font-semibold mb-1" style={{ color: 'var(--k-text-primary)' }}>
+                Henüz bildirim yok
+              </p>
+              <p className="text-[12px]" style={{ color: 'var(--k-text-muted)' }}>
                 {filter !== 'all' ? 'Bu filtreye uygun bildirim yok' : 'Henüz bildirim yok. Personele bildirim göndermek için yukarıdaki butonu kullanın.'}
               </p>
             </div>
@@ -424,261 +424,333 @@ export default function NotificationsPage() {
 
       {/* ── Send Notification Modal ── */}
       {showSendModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(4px)' }}
+        >
           <div
-            className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border p-6"
-            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-xl)' }}
+            className="k-card w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+            style={{ borderColor: 'var(--k-border)' }}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="k-card-head flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)' }}>
-                  <Send className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold">Bildirim Gönder</h2>
-                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Personellere hedefli bildirim gönderin</p>
-                </div>
-              </div>
-              <button onClick={() => setShowSendModal(false)} aria-label="Kapat" className="rounded-lg p-2" style={{ color: 'var(--color-text-muted)' }}>
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Mode Toggle */}
-            <div className="flex gap-2 mb-5">
-              <button
-                onClick={() => { setSendMode('department'); setSelectedStaffIds(new Set()); }}
-                className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
-                style={{
-                  background: sendMode === 'department' ? 'var(--color-primary)' : 'var(--color-bg)',
-                  color: sendMode === 'department' ? 'white' : 'var(--color-text-secondary)',
-                  border: `1px solid ${sendMode === 'department' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                }}
-              >
-                <Building2 className="h-4 w-4" />
-                Departman Bazlı
-              </button>
-              <button
-                onClick={() => { setSendMode('individual'); setSelectedDeptId(''); setExcludedStaffIds(new Set()); }}
-                className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
-                style={{
-                  background: sendMode === 'individual' ? 'var(--color-primary)' : 'var(--color-bg)',
-                  color: sendMode === 'individual' ? 'white' : 'var(--color-text-secondary)',
-                  border: `1px solid ${sendMode === 'individual' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                }}
-              >
-                <Users className="h-4 w-4" />
-                Kişi Bazlı
-              </button>
-            </div>
-
-            {/* Recipient Selection */}
-            <div className="mb-5">
-              <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>
-                {sendMode === 'department' ? 'Departman Seçin' : 'Personel Seçin'}
-              </Label>
-
-              {sendMode === 'department' ? (
-                <div className="space-y-3">
-                  <select
-                    value={selectedDeptId}
-                    onChange={(e) => { setSelectedDeptId(e.target.value); setExcludedStaffIds(new Set()); }}
-                    className="w-full rounded-xl border h-11 px-3 text-sm"
-                    style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
-                  >
-                    <option value="">Departman seçin...</option>
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id}>{d.name} ({d.users?.length ?? 0} kişi)</option>
-                    ))}
-                  </select>
-
-                  {/* Departman personeli — çıkarma özelliği */}
-                  {selectedDeptId && deptStaff.length > 0 && (
-                    <div className="rounded-xl border p-3" style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-                          {deptStaff.length - excludedStaffIds.size} / {deptStaff.length} kişi alacak
-                        </p>
-                        {excludedStaffIds.size > 0 && (
-                          <button onClick={() => setExcludedStaffIds(new Set())} className="text-[11px] font-semibold" style={{ color: 'var(--color-primary)' }}>
-                            Tümünü Dahil Et
-                          </button>
-                        )}
-                      </div>
-                      <div className="space-y-1 max-h-40 overflow-y-auto">
-                        {deptStaff.map(s => {
-                          const isExcluded = excludedStaffIds.has(s.id);
-                          return (
-                            <div
-                              key={s.id}
-                              className="flex items-center justify-between rounded-lg px-3 py-2 text-sm"
-                              style={{ opacity: isExcluded ? 0.5 : 1, background: isExcluded ? 'var(--color-error-bg)' : 'var(--color-surface)' }}
-                            >
-                              <span className={isExcluded ? 'line-through' : ''}>{s.firstName} {s.lastName}</span>
-                              <button
-                                onClick={() => toggleExclude(s.id)}
-                                className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-semibold"
-                                style={{ color: isExcluded ? 'var(--color-primary)' : 'var(--color-error)' }}
-                              >
-                                {isExcluded ? (
-                                  <><CheckCircle className="h-3 w-3" /> Dahil Et</>
-                                ) : (
-                                  <><UserMinus className="h-3 w-3" /> Çıkar</>
-                                )}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Bireysel seçim */
-                <div className="space-y-3">
-                  <Input
-                    placeholder="Personel ara..."
-                    value={staffSearch}
-                    onChange={(e) => handleStaffSearch(e.target.value)}
-                    className="h-11 rounded-xl text-sm"
-                    style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
-                  />
-                  {selectedStaffIds.size > 0 && (
-                    <p className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
-                      {selectedStaffIds.size} kişi seçildi
-                    </p>
-                  )}
-                  <div className="rounded-xl border max-h-48 overflow-y-auto" style={{ borderColor: 'var(--color-border)' }}>
-                    {filteredStaff.length > 0 ? filteredStaff.map(s => {
-                      const isSelected = selectedStaffIds.has(s.id);
-                      return (
-                        <button
-                          key={s.id}
-                          onClick={() => toggleStaff(s.id)}
-                          className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors duration-100"
-                          style={{
-                            background: isSelected ? 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)' : 'transparent',
-                            borderBottom: '1px solid var(--color-border)',
-                          }}
-                        >
-                          <div
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded"
-                            style={{
-                              background: isSelected ? 'var(--color-primary)' : 'var(--color-bg)',
-                              border: isSelected ? 'none' : '1px solid var(--color-border)',
-                            }}
-                          >
-                            {isSelected && <Check className="h-3 w-3 text-white" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="font-medium">{s.firstName} {s.lastName}</span>
-                            {s.title && <span className="text-[11px] ml-1.5" style={{ color: 'var(--color-text-muted)' }}>· {s.title}</span>}
-                          </div>
-                        </button>
-                      );
-                    }) : (
-                      <div className="text-center py-6 text-sm" style={{ color: 'var(--color-text-muted)' }}>Personel bulunamadı</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Notification Content */}
-            <div className="space-y-4 mb-6">
-              <div>
-                <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>Bildirim Tipi</Label>
-                <div className="flex gap-2">
-                  {Object.entries(typeConfig).map(([key, cfg]) => {
-                    const Icon = cfg.icon;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setSendType(key)}
-                        className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium"
-                        style={{
-                          background: sendType === key ? cfg.bg : 'var(--color-bg)',
-                          color: sendType === key ? cfg.color : 'var(--color-text-muted)',
-                          border: `1px solid ${sendType === key ? cfg.color : 'var(--color-border)'}`,
-                        }}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                        {cfg.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>Başlık</Label>
-                <Input
-                  value={sendTitle}
-                  onChange={(e) => setSendTitle(e.target.value)}
-                  placeholder="Bildirim başlığı"
-                  className="h-11 rounded-xl text-sm"
-                  style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
-                />
-              </div>
-
-              <div>
-                <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>Mesaj</Label>
-                <textarea
-                  value={sendMessage}
-                  onChange={(e) => setSendMessage(e.target.value)}
-                  placeholder="Bildirim mesajı yazın..."
-                  rows={3}
-                  className="w-full rounded-xl border px-4 py-3 text-sm resize-none"
-                  style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
-                />
-              </div>
-            </div>
-
-            {/* E-posta seçeneği */}
-            <div className="mb-6">
-              <label className="flex items-center gap-3 cursor-pointer group">
                 <div
-                  onClick={() => setAlsoSendEmail(!alsoSendEmail)}
-                  role="checkbox"
-                  aria-checked={alsoSendEmail}
-                  aria-label="E-posta ile de gönder"
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors duration-150"
-                  style={{
-                    background: alsoSendEmail ? 'var(--color-primary)' : 'var(--color-bg)',
-                    border: alsoSendEmail ? 'none' : '2px solid var(--color-border)',
-                  }}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ background: 'color-mix(in srgb, var(--k-primary) 12%, transparent)' }}
                 >
-                  {alsoSendEmail && <Check className="h-3.5 w-3.5 text-white" />}
+                  <Send className="h-5 w-5" style={{ color: 'var(--k-primary)' }} />
                 </div>
                 <div>
-                  <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                    E-posta ile de gönder
-                  </span>
-                  <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                    Bildirimle birlikte alıcılara e-posta da gönderilir
+                  <h2 className="text-lg font-bold" style={{ color: 'var(--k-text-primary)' }}>
+                    Bildirim Gönder
+                  </h2>
+                  <p className="text-xs" style={{ color: 'var(--k-text-muted)' }}>
+                    Personellere hedefli bildirim gönderin
                   </p>
                 </div>
-              </label>
+              </div>
+              <button
+                onClick={() => setShowSendModal(false)}
+                aria-label="Kapat"
+                className="k-btn k-btn-ghost k-btn-sm"
+                style={{ padding: '0.5rem' }}
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-              <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                <span className="font-bold" style={{ color: 'var(--color-primary)' }}>{getRecipientCount()}</span> kişiye gönderilecek
-                {alsoSendEmail && <span className="ml-1.5">(+ e-posta)</span>}
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" className="rounded-xl" onClick={() => setShowSendModal(false)}>İptal</Button>
+            <div className="k-card-body">
+              {/* Mode Toggle */}
+              <div className="flex gap-2 mb-5">
                 <button
-                  onClick={handleSend}
-                  disabled={sending || getRecipientCount() === 0 || !sendTitle.trim() || !sendMessage.trim()}
-                  className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50 transition-[transform] duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))' }}
+                  onClick={() => { setSendMode('department'); setSelectedStaffIds(new Set()); }}
+                  className={sendMode === 'department' ? 'k-btn k-btn-primary' : 'k-btn k-btn-ghost'}
                 >
-                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  {sending ? 'Gönderiliyor...' : 'Gönder'}
+                  <Building2 className="h-4 w-4" />
+                  Departman Bazlı
                 </button>
+                <button
+                  onClick={() => { setSendMode('individual'); setSelectedDeptId(''); setExcludedStaffIds(new Set()); }}
+                  className={sendMode === 'individual' ? 'k-btn k-btn-primary' : 'k-btn k-btn-ghost'}
+                >
+                  <Users className="h-4 w-4" />
+                  Kişi Bazlı
+                </button>
+              </div>
+
+              {/* Recipient Selection */}
+              <div className="mb-5">
+                <Label
+                  className="text-xs font-semibold mb-2 block"
+                  style={{ color: 'var(--k-text-secondary)' }}
+                >
+                  {sendMode === 'department' ? 'Departman Seçin' : 'Personel Seçin'}
+                </Label>
+
+                {sendMode === 'department' ? (
+                  <div className="space-y-3">
+                    <select
+                      value={selectedDeptId}
+                      onChange={(e) => { setSelectedDeptId(e.target.value); setExcludedStaffIds(new Set()); }}
+                      className="k-input w-full"
+                    >
+                      <option value="">Departman seçin...</option>
+                      {departments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name} ({d.users?.length ?? 0} kişi)</option>
+                      ))}
+                    </select>
+
+                    {/* Departman personeli — çıkarma özelliği */}
+                    {selectedDeptId && deptStaff.length > 0 && (
+                      <div
+                        className="rounded-xl border p-3"
+                        style={{ borderColor: 'var(--k-border)', background: 'var(--k-bg)' }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold" style={{ color: 'var(--k-text-muted)' }}>
+                            {deptStaff.length - excludedStaffIds.size} / {deptStaff.length} kişi alacak
+                          </p>
+                          {excludedStaffIds.size > 0 && (
+                            <button
+                              onClick={() => setExcludedStaffIds(new Set())}
+                              className="text-[11px] font-semibold"
+                              style={{ color: 'var(--k-primary)' }}
+                            >
+                              Tümünü Dahil Et
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-1 max-h-40 overflow-y-auto">
+                          {deptStaff.map(s => {
+                            const isExcluded = excludedStaffIds.has(s.id);
+                            return (
+                              <div
+                                key={s.id}
+                                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm"
+                                style={{
+                                  opacity: isExcluded ? 0.6 : 1,
+                                  background: isExcluded
+                                    ? 'color-mix(in srgb, var(--k-error) 10%, transparent)'
+                                    : 'var(--k-surface)',
+                                  color: 'var(--k-text-primary)',
+                                }}
+                              >
+                                <span className={isExcluded ? 'line-through' : ''}>
+                                  {s.firstName} {s.lastName}
+                                </span>
+                                <button
+                                  onClick={() => toggleExclude(s.id)}
+                                  className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-semibold"
+                                  style={{
+                                    color: isExcluded ? 'var(--k-primary)' : 'var(--k-error)',
+                                  }}
+                                >
+                                  {isExcluded ? (
+                                    <><CheckCircle className="h-3 w-3" /> Dahil Et</>
+                                  ) : (
+                                    <><UserMinus className="h-3 w-3" /> Çıkar</>
+                                  )}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Bireysel seçim */
+                  <div className="space-y-3">
+                    <Input
+                      placeholder="Personel ara..."
+                      value={staffSearch}
+                      onChange={(e) => handleStaffSearch(e.target.value)}
+                      className="k-input"
+                    />
+                    {selectedStaffIds.size > 0 && (
+                      <p className="text-xs font-semibold" style={{ color: 'var(--k-primary)' }}>
+                        {selectedStaffIds.size} kişi seçildi
+                      </p>
+                    )}
+                    <div
+                      className="rounded-xl border max-h-48 overflow-y-auto"
+                      style={{ borderColor: 'var(--k-border)', background: 'var(--k-surface)' }}
+                    >
+                      {filteredStaff.length > 0 ? filteredStaff.map(s => {
+                        const isSelected = selectedStaffIds.has(s.id);
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => toggleStaff(s.id)}
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors duration-100"
+                            style={{
+                              background: isSelected
+                                ? 'color-mix(in srgb, var(--k-primary) 10%, transparent)'
+                                : 'transparent',
+                              borderBottom: '1px solid var(--k-border)',
+                              color: 'var(--k-text-primary)',
+                            }}
+                          >
+                            <div
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded"
+                              style={{
+                                background: isSelected ? 'var(--k-primary)' : 'var(--k-bg)',
+                                border: isSelected ? 'none' : '1px solid var(--k-border)',
+                              }}
+                            >
+                              {isSelected && <Check className="h-3 w-3 text-white" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium">{s.firstName} {s.lastName}</span>
+                              {s.title && (
+                                <span
+                                  className="text-[11px] ml-1.5"
+                                  style={{ color: 'var(--k-text-muted)' }}
+                                >
+                                  · {s.title}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      }) : (
+                        <div
+                          className="text-center py-6 text-sm"
+                          style={{ color: 'var(--k-text-muted)' }}
+                        >
+                          Personel bulunamadı
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Notification Content */}
+              <div className="space-y-4 mb-6">
+                <div>
+                  <Label
+                    className="text-xs font-semibold mb-2 block"
+                    style={{ color: 'var(--k-text-secondary)' }}
+                  >
+                    Bildirim Tipi
+                  </Label>
+                  <div className="flex gap-2 flex-wrap">
+                    {Object.entries(typeConfig).map(([key, cfg]) => {
+                      const Icon = cfg.icon;
+                      const isActive = sendType === key;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setSendType(key)}
+                          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors duration-150"
+                          style={{
+                            background: isActive
+                              ? `color-mix(in srgb, ${cfg.color} 14%, transparent)`
+                              : 'var(--k-bg)',
+                            color: isActive ? cfg.color : 'var(--k-text-muted)',
+                            border: `1px solid ${isActive ? cfg.color : 'var(--k-border)'}`,
+                          }}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {cfg.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <Label
+                    className="text-xs font-semibold mb-2 block"
+                    style={{ color: 'var(--k-text-secondary)' }}
+                  >
+                    Başlık
+                  </Label>
+                  <Input
+                    value={sendTitle}
+                    onChange={(e) => setSendTitle(e.target.value)}
+                    placeholder="Bildirim başlığı"
+                    className="k-input"
+                  />
+                </div>
+
+                <div>
+                  <Label
+                    className="text-xs font-semibold mb-2 block"
+                    style={{ color: 'var(--k-text-secondary)' }}
+                  >
+                    Mesaj
+                  </Label>
+                  <textarea
+                    value={sendMessage}
+                    onChange={(e) => setSendMessage(e.target.value)}
+                    placeholder="Bildirim mesajı yazın..."
+                    rows={3}
+                    className="k-input w-full resize-none"
+                    style={{ minHeight: '88px', paddingTop: '0.625rem', paddingBottom: '0.625rem' }}
+                  />
+                </div>
+              </div>
+
+              {/* E-posta seçeneği */}
+              <div className="mb-6">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div
+                    onClick={() => setAlsoSendEmail(!alsoSendEmail)}
+                    role="checkbox"
+                    aria-checked={alsoSendEmail}
+                    aria-label="E-posta ile de gönder"
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors duration-150"
+                    style={{
+                      background: alsoSendEmail ? 'var(--k-primary)' : 'var(--k-bg)',
+                      border: alsoSendEmail ? 'none' : '2px solid var(--k-border)',
+                    }}
+                  >
+                    {alsoSendEmail && <Check className="h-3.5 w-3.5 text-white" />}
+                  </div>
+                  <div>
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: 'var(--k-text-primary)' }}
+                    >
+                      E-posta ile de gönder
+                    </span>
+                    <p className="text-[11px]" style={{ color: 'var(--k-text-muted)' }}>
+                      Bildirimle birlikte alıcılara e-posta da gönderilir
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Footer */}
+              <div
+                className="flex items-center justify-between pt-4"
+                style={{ borderTop: '1px solid var(--k-border)' }}
+              >
+                <div className="text-xs" style={{ color: 'var(--k-text-muted)' }}>
+                  <span className="font-bold" style={{ color: 'var(--k-primary)' }}>
+                    {getRecipientCount()}
+                  </span> kişiye gönderilecek
+                  {alsoSendEmail && <span className="ml-1.5">(+ e-posta)</span>}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowSendModal(false)}
+                    className="k-btn k-btn-ghost"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    onClick={handleSend}
+                    disabled={sending || getRecipientCount() === 0 || !sendTitle.trim() || !sendMessage.trim()}
+                    className="k-btn k-btn-primary"
+                  >
+                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {sending ? 'Gönderiliyor...' : 'Gönder'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

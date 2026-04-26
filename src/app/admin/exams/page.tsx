@@ -15,6 +15,7 @@ import {
   X,
   Copy,
   Archive,
+  ChevronRight,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -51,23 +52,23 @@ interface Exam {
 
 type StatusFilter = 'all' | 'active' | 'upcoming' | 'expired' | 'draft';
 
-function getExamStatus(exam: Exam): { label: string; bg: string; text: string } {
+function getExamStatus(exam: Exam): { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'muted' } {
   if (exam.publishStatus === 'draft') {
-    return { label: 'Taslak', bg: 'var(--color-warning-bg)', text: 'var(--color-warning)' };
+    return { label: 'Taslak', variant: 'warning' };
   }
   if (exam.publishStatus === 'archived') {
-    return { label: 'Arşivlendi', bg: 'var(--color-bg)', text: 'var(--color-text-muted)' };
+    return { label: 'Arşivlendi', variant: 'muted' };
   }
   const now = new Date();
   const start = new Date(exam.startDate);
   const end = new Date(exam.endDate);
   if (now < start) {
-    return { label: 'Yaklaşan', bg: 'var(--color-info-bg)', text: 'var(--color-info)' };
+    return { label: 'Yaklaşan', variant: 'info' };
   }
   if (now > end) {
-    return { label: 'Sona Ermiş', bg: 'var(--color-bg)', text: 'var(--color-text-muted)' };
+    return { label: 'Sona Ermiş', variant: 'muted' };
   }
-  return { label: 'Aktif', bg: 'var(--color-success-bg)', text: 'var(--color-success)' };
+  return { label: 'Aktif', variant: 'success' };
 }
 
 function matchesStatusFilter(exam: Exam, filter: StatusFilter): boolean {
@@ -218,7 +219,7 @@ export default function ExamsPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</div>
+        <div className="text-sm" style={{ color: 'var(--k-error)' }}>{error}</div>
       </div>
     );
   }
@@ -234,19 +235,16 @@ export default function ExamsPage() {
         <div className="flex items-center gap-3">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-            style={{ background: 'var(--color-primary-light)' }}
+            style={{ background: 'color-mix(in srgb, var(--k-primary) 12%, transparent)' }}
           >
-            <ClipboardList className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+            <ClipboardList className="h-5 w-5" style={{ color: 'var(--k-primary)' }} />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
+            <p className="font-semibold truncate" style={{ color: 'var(--k-text-primary)' }}>
               {row.getValue('title')}
             </p>
             {row.original.category && (
-              <span
-                className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold mt-0.5"
-                style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
-              >
+              <span className="k-badge k-badge-info mt-0.5">
                 {row.original.category}
               </span>
             )}
@@ -270,7 +268,7 @@ export default function ExamsPage() {
       size: 90,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
+          <Users className="h-3.5 w-3.5" style={{ color: 'var(--k-text-muted)' }} />
           <span className="font-medium" style={{ fontFamily: 'var(--font-mono)' }}>
             {row.getValue('assignedCount')}
           </span>
@@ -287,15 +285,15 @@ export default function ExamsPage() {
         const rate = total > 0 ? Math.round((passed / total) * 100) : 0;
         const color =
           rate >= 80
-            ? 'var(--color-success)'
+            ? 'var(--k-success)'
             : rate >= 50
-              ? 'var(--color-warning)'
+              ? 'var(--k-warning)'
               : rate > 0
-                ? 'var(--color-error)'
-                : 'var(--color-text-muted)';
+                ? 'var(--k-error)'
+                : 'var(--k-text-muted)';
         return (
           <div className="flex items-center gap-2.5">
-            <div className="h-2 w-16 rounded-full" style={{ background: 'var(--color-border)' }}>
+            <div className="h-2 w-16 rounded-full" style={{ background: 'var(--k-border)' }}>
               <div
                 className="h-full rounded-full"
                 style={{
@@ -319,11 +317,7 @@ export default function ExamsPage() {
       cell: ({ row }) => {
         const status = getExamStatus(row.original);
         return (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold"
-            style={{ background: status.bg, color: status.text }}
-          >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: status.text }} />
+          <span className={`k-badge k-badge-${status.variant}`}>
             {status.label}
           </span>
         );
@@ -335,8 +329,8 @@ export default function ExamsPage() {
       size: 110,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
-          <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+          <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--k-text-muted)' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--k-text-secondary)' }}>
             {new Date(row.getValue('endDate') as string).toLocaleDateString('tr-TR', {
               day: '2-digit',
               month: '2-digit',
@@ -372,7 +366,7 @@ export default function ExamsPage() {
               <Copy className="h-4 w-4" /> Kopyala
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2" onClick={() => handleArchive(row.original)}>
-              <Archive className="h-4 w-4" style={{ color: 'var(--color-info)' }} /> Arşivle
+              <Archive className="h-4 w-4" style={{ color: 'var(--k-info)' }} /> Arşivle
             </DropdownMenuItem>
             <DropdownMenuItem
               className="gap-2 text-red-500"
@@ -389,86 +383,89 @@ export default function ExamsPage() {
   ];
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Sınav Yönetimi"
-        subtitle={`${filteredExams.length} sınav listeleniyor`}
-        action={{ label: 'Yeni Sınav', icon: Plus, onClick: () => router.push('/admin/exams/new') }}
-      />
+    <div className="k-page">
+      <header className="k-page-header">
+        <div>
+          <div className="k-breadcrumb">
+            <span>Panel</span>
+            <ChevronRight size={12} />
+            <span data-current="true">Sınavlar</span>
+          </div>
+          <h1 className="k-page-title">Sınav Yönetimi</h1>
+          <p className="k-page-subtitle">
+            <strong style={{ color: 'var(--k-text-primary)' }}>{stats.totalExams}</strong> toplam sınav ·{' '}
+            <strong style={{ color: 'var(--k-success)' }}>{stats.activeExams}</strong> aktif ·{' '}
+            <strong style={{ color: 'var(--k-text-primary)' }}>%{stats.avgPassRate}</strong> ortalama geçme
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => router.push('/admin/exams/new')} className="k-btn k-btn-primary">
+            <Plus size={15} /> Yeni Sınav
+          </button>
+        </div>
+      </header>
 
-      {/* Stat Kartları */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* KPI Kartları */}
+      <section className="k-kpi-grid" aria-label="Sınav istatistikleri">
         {[
-          { label: 'Toplam Sınav', value: stats.totalExams, color: 'var(--color-primary)' },
-          { label: 'Aktif Sınav', value: stats.activeExams, color: 'var(--color-success)' },
-          { label: 'Toplam Katılım', value: stats.thisMonthAttempts, color: 'var(--color-accent)' },
-          { label: 'Ort. Geçme Oranı', value: `%${stats.avgPassRate}`, color: 'var(--color-info)' },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="flex items-center gap-3 rounded-xl border px-4 py-3"
-            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-          >
-            <div className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
-            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{s.label}</span>
-            <span className="ml-auto text-lg font-bold font-heading" style={{ color: s.color }}>{s.value}</span>
+          { label: 'Toplam Sınav', value: stats.totalExams, icon: ClipboardList },
+          { label: 'Aktif Sınav', value: stats.activeExams, icon: Calendar },
+          { label: 'Toplam Katılım', value: stats.thisMonthAttempts, icon: Users },
+          { label: 'Ort. Geçme', value: stats.avgPassRate, suffix: '%', icon: ClipboardList },
+        ].map((kpi) => (
+          <div key={kpi.label} className="k-kpi">
+            <div className="k-kpi-top">
+              <div>
+                <div className="k-kpi-label">{kpi.label}</div>
+                <div className="k-kpi-value">
+                  {typeof kpi.value === 'number' ? kpi.value.toLocaleString('tr-TR') : kpi.value}
+                  {kpi.suffix && <span className="text-base font-medium ml-1" style={{ color: 'var(--k-text-muted)' }}>{kpi.suffix}</span>}
+                </div>
+              </div>
+              <div className="k-kpi-icon"><kpi.icon size={18} /></div>
+            </div>
           </div>
         ))}
-      </div>
+      </section>
 
       {/* Filtreler */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         <span
           className="text-xs font-semibold uppercase tracking-wider"
-          style={{ color: 'var(--color-text-muted)' }}
+          style={{ color: 'var(--k-text-muted)' }}
         >
-          Durum:
+          Durum
         </span>
-        <div className="flex gap-1.5">
-          {statusFilters.map((f) => {
-            const isActive = statusFilter === f.key;
-            return (
-              <button
-                key={f.key}
-                onClick={() => setStatusFilter(f.key)}
-                aria-label={`Filtrele: ${f.label}`}
-                aria-pressed={statusFilter === f.key}
-                className="rounded-full px-3 py-1 text-[11px] font-semibold"
-                style={{
-                  background: isActive ? 'var(--color-primary-light)' : 'transparent',
-                  color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                  border: `1.5px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                  transition:
-                    'background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast)',
-                }}
-              >
-                {f.label}
-              </button>
-            );
-          })}
+        <div className="k-tabs" role="tablist">
+          {statusFilters.map((f) => (
+            <button
+              key={f.key}
+              role="tab"
+              onClick={() => setStatusFilter(f.key)}
+              aria-label={`Filtrele: ${f.label}`}
+              aria-pressed={statusFilter === f.key}
+              data-active={statusFilter === f.key ? 'true' : undefined}
+              className="k-tab"
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
 
         {categories.length > 0 && (
-          <>
-            <span className="mx-1 text-xs" style={{ color: 'var(--color-border)' }}>|</span>
-            <select
-              value={categoryFilter ?? ''}
-              onChange={(e) => setCategoryFilter(e.target.value || null)}
-              className="rounded-lg border px-2.5 py-1 text-xs"
-              style={{
-                background: 'var(--color-surface)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-secondary)',
-              }}
-            >
-              <option value="">Tüm Kategoriler</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </>
+          <select
+            value={categoryFilter ?? ''}
+            onChange={(e) => setCategoryFilter(e.target.value || null)}
+            className="k-input"
+            style={{ maxWidth: 220, paddingTop: 6, paddingBottom: 6 }}
+          >
+            <option value="">Tüm Kategoriler</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         )}
 
         {activeFilters > 0 && (
@@ -478,8 +475,7 @@ export default function ExamsPage() {
               setCategoryFilter(null);
             }}
             aria-label="Filtreleri temizle"
-            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-            style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
+            className="k-btn k-btn-ghost k-btn-sm"
           >
             <X className="h-3 w-3" /> Temizle
           </button>
@@ -487,14 +483,7 @@ export default function ExamsPage() {
       </div>
 
       {/* Tablo */}
-      <div
-        className="rounded-2xl border p-6"
-        style={{
-          background: 'var(--color-surface)',
-          borderColor: 'var(--color-border)',
-          boxShadow: 'var(--shadow-sm)',
-        }}
-      >
+      <div className="k-card p-5">
         {filteredExams.length > 0 ? (
           <DataTable
             columns={columns}
@@ -503,7 +492,7 @@ export default function ExamsPage() {
             searchPlaceholder="Sınav adı ara..."
           />
         ) : (
-          <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>
+          <div className="text-sm text-center py-8" style={{ color: 'var(--k-text-muted)' }}>
             {allExams.length === 0
               ? 'Henüz sınav oluşturulmamış. "Yeni Sınav" butonuna tıklayarak başlayın.'
               : 'Filtrelere uygun sınav bulunamadı.'}

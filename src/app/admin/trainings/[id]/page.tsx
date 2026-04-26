@@ -24,6 +24,20 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 interface TrainingDetail {
   title: string;
   category: string;
@@ -48,10 +62,10 @@ interface TrainingDetail {
 }
 
 const statusMap: Record<string, { label: string; bg: string; text: string; icon: typeof CheckCircle2 }> = {
-  passed: { label: 'Başarılı', bg: 'var(--color-success-bg)', text: 'var(--color-success)', icon: CheckCircle2 },
-  failed: { label: 'Başarısız', bg: 'var(--color-error-bg)', text: 'var(--color-error)', icon: XCircle },
-  in_progress: { label: 'Devam Ediyor', bg: 'var(--color-warning-bg)', text: 'var(--color-warning)', icon: Timer },
-  assigned: { label: 'Atandı', bg: 'var(--color-info-bg)', text: 'var(--color-info)', icon: Users },
+  passed: { label: 'Başarılı', bg: K.SUCCESS_BG, text: K.PRIMARY, icon: CheckCircle2 },
+  failed: { label: 'Başarısız', bg: K.ERROR_BG, text: '#b91c1c', icon: XCircle },
+  in_progress: { label: 'Devam Ediyor', bg: K.WARNING_BG, text: '#b45309', icon: Timer },
+  assigned: { label: 'Atandı', bg: K.INFO_BG, text: '#1d4ed8', icon: Users },
 };
 
 export default function TrainingDetailPage() {
@@ -69,7 +83,7 @@ export default function TrainingDetailPage() {
   const [resetting, setResetting] = useState(false);
 
   if (!id) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitim bulunamadı</div></div>;
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: K.TEXT_MUTED }}>Eğitim bulunamadı</div></div>;
   }
 
   if (isLoading) {
@@ -77,11 +91,11 @@ export default function TrainingDetailPage() {
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: K.ERROR }}>{error}</div></div>;
   }
 
   if (!training) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Eğitim bulunamadı</div></div>;
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: K.TEXT_MUTED }}>Eğitim bulunamadı</div></div>;
   }
 
   const assignedStaff = training.assignedStaff ?? [];
@@ -96,6 +110,8 @@ export default function TrainingDetailPage() {
     { id: 'questions', label: 'Sorular', count: training.questionCount ?? 0 },
   ];
 
+  const ghostBtnStyle = { borderColor: K.BORDER, color: K.TEXT_SECONDARY, background: K.SURFACE };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -104,24 +120,24 @@ export default function TrainingDetailPage() {
           <button
             onClick={() => router.back()}
             className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', transition: 'border-color var(--transition-fast)' }}
+            style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+              <h2 className="text-2xl font-bold tracking-tight" style={{ fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}>
                 {training.title}
               </h2>
               <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
-                style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold"
+                style={{ background: K.SUCCESS_BG, color: K.PRIMARY }}
               >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--color-success)' }} />
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: K.SUCCESS }} />
                 {training.status ?? 'Aktif'}
               </span>
             </div>
-            <p className="mt-1 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="mt-1 text-sm" style={{ color: K.TEXT_MUTED }}>
               {training.category} • Baraj: {training.passingScore}% • {training.maxAttempts} deneme hakkı • {training.examDuration} dk sınav
             </p>
           </div>
@@ -130,7 +146,7 @@ export default function TrainingDetailPage() {
           <Button
             variant="outline"
             className="gap-2 rounded-xl"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            style={ghostBtnStyle}
             disabled={downloadingCompletion === 'pdf'}
             onClick={async () => {
               setDownloadingCompletion('pdf');
@@ -153,7 +169,7 @@ export default function TrainingDetailPage() {
           <Button
             variant="outline"
             className="gap-2 rounded-xl"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            style={ghostBtnStyle}
             disabled={downloadingCompletion === 'excel'}
             onClick={async () => {
               setDownloadingCompletion('excel');
@@ -173,10 +189,10 @@ export default function TrainingDetailPage() {
           >
             <Download className="h-4 w-4" /> {downloadingCompletion === 'excel' ? 'Hazırlanıyor...' : 'Excel Rapor'}
           </Button>
-          <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => router.push(`/admin/feedback-forms/responses?trainingId=${id}`)}>
+          <Button variant="outline" className="gap-2 rounded-xl" style={ghostBtnStyle} onClick={() => router.push(`/admin/feedback-forms/responses?trainingId=${id}`)}>
             <MessageSquare className="h-4 w-4" /> Geri Bildirimler
           </Button>
-          <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={() => router.push(`/admin/trainings/${id}/edit`)}>
+          <Button variant="outline" className="gap-2 rounded-xl" style={ghostBtnStyle} onClick={() => router.push(`/admin/trainings/${id}/edit`)}>
             <Edit className="h-4 w-4" /> Düzenle
           </Button>
           <Button
@@ -185,12 +201,7 @@ export default function TrainingDetailPage() {
             title={hasPlayableContent ? undefined : 'Atama için en az bir video veya ses içeriği eklenmelidir.'}
             className="gap-2 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              background: hasPlayableContent
-                ? 'linear-gradient(135deg, var(--color-primary), #0f4a35)'
-                : 'var(--color-text-muted)',
-              boxShadow: hasPlayableContent
-                ? '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)'
-                : 'none',
+              background: hasPlayableContent ? K.PRIMARY : K.TEXT_MUTED,
             }}
           >
             <Users className="h-4 w-4" /> Personel Ata
@@ -211,16 +222,16 @@ export default function TrainingDetailPage() {
       <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open && !resetting) setResetTarget(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Yeni deneme hakkı ver</DialogTitle>
-            <DialogDescription>
+            <DialogTitle style={{ fontSize: 18, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}>Yeni deneme hakkı ver</DialogTitle>
+            <DialogDescription style={{ color: K.TEXT_SECONDARY }}>
               {resetTarget?.name} için yeni bir deneme hakkı eklenecek. Bu işlem iptal edilemez. Devam etmek istediğinize emin misiniz?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" disabled={resetting} onClick={() => setResetTarget(null)}>Vazgeç</Button>
+            <Button variant="outline" disabled={resetting} onClick={() => setResetTarget(null)} style={ghostBtnStyle}>Vazgeç</Button>
             <Button
               disabled={resetting}
-              style={{ background: 'var(--color-primary)', color: 'white' }}
+              style={{ background: K.PRIMARY, color: 'white' }}
               onClick={async () => {
                 if (!resetTarget) return;
                 setResetting(true);
@@ -251,43 +262,42 @@ export default function TrainingDetailPage() {
       </Dialog>
 
       {/* Description */}
-      <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+      <p className="text-sm leading-relaxed" style={{ color: K.TEXT_SECONDARY }}>
         {training.description}
       </p>
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        <StatCard title="Atanan" value={training.assignedCount ?? 0} icon={Users} accentColor="var(--color-info)" />
-        <StatCard title="Tamamlayan" value={training.completedCount ?? 0} icon={TrendingUp} accentColor="var(--color-primary)" />
-        <StatCard title="Başarılı" value={training.passedCount ?? 0} icon={GraduationCap} accentColor="var(--color-success)" />
-        <StatCard title="Başarısız" value={training.failedCount ?? 0} icon={GraduationCap} accentColor="var(--color-error)" />
-        <StatCard title="Ort. Puan" value={training.avgScore ?? 0} icon={BarChart3} accentColor="var(--color-accent)" />
-        <StatCard title="İmzalanan" value={`${training.signedCount ?? 0}/${training.passedCount ?? 0}`} icon={PenLine} accentColor="var(--color-primary)" />
+        <StatCard title="Atanan" value={training.assignedCount ?? 0} icon={Users} accentColor={K.INFO} />
+        <StatCard title="Tamamlayan" value={training.completedCount ?? 0} icon={TrendingUp} accentColor={K.PRIMARY} />
+        <StatCard title="Başarılı" value={training.passedCount ?? 0} icon={GraduationCap} accentColor={K.SUCCESS} />
+        <StatCard title="Başarısız" value={training.failedCount ?? 0} icon={GraduationCap} accentColor={K.ERROR} />
+        <StatCard title="Ort. Puan" value={training.avgScore ?? 0} icon={BarChart3} accentColor={K.ACCENT} />
+        <StatCard title="İmzalanan" value={`${training.signedCount ?? 0}/${training.passedCount ?? 0}`} icon={PenLine} accentColor={K.PRIMARY} />
       </div>
 
       {/* Tabs Section */}
-      <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+      <div className="overflow-hidden" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
         {/* Tab Header */}
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-          <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: 'var(--color-bg)' }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+          <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: K.BG }}>
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
                 style={{
-                  background: activeTab === tab.id ? 'var(--color-surface)' : 'transparent',
-                  color: activeTab === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  boxShadow: activeTab === tab.id ? 'var(--shadow-sm)' : 'none',
-                  transition: 'background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast)',
+                  background: activeTab === tab.id ? K.SURFACE : 'transparent',
+                  color: activeTab === tab.id ? K.TEXT_PRIMARY : K.TEXT_MUTED,
+                  boxShadow: activeTab === tab.id ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
                 }}
               >
                 {tab.label}
                 <span
                   className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
                   style={{
-                    background: activeTab === tab.id ? 'var(--color-primary-light)' : 'var(--color-surface-hover)',
-                    color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                    background: activeTab === tab.id ? K.PRIMARY_LIGHT : K.SURFACE_HOVER,
+                    color: activeTab === tab.id ? K.PRIMARY : K.TEXT_MUTED,
                   }}
                 >
                   {tab.count}
@@ -301,7 +311,7 @@ export default function TrainingDetailPage() {
                 variant="outline"
                 size="sm"
                 className="gap-1.5 text-xs rounded-lg"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                style={ghostBtnStyle}
                 disabled={downloadingTab === 'excel'}
                 onClick={async () => {
                   setDownloadingTab('excel');
@@ -325,7 +335,7 @@ export default function TrainingDetailPage() {
                 variant="outline"
                 size="sm"
                 className="gap-1.5 text-xs rounded-lg"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                style={ghostBtnStyle}
                 disabled={downloadingTab === 'pdf'}
                 onClick={async () => {
                   setDownloadingTab('pdf');
@@ -358,81 +368,81 @@ export default function TrainingDetailPage() {
                 {assignedStaff.length > 0 ? (
                   <div>
                     {/* Header Row */}
-                    <div className="grid items-center px-4 py-2 mb-1" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 60px 60px 95px 75px 90px 90px', gap: '8px', color: 'var(--color-text-muted)' }}>
-                      <span className="text-xs font-semibold uppercase tracking-wide">Personel</span>
-                      <span className="text-xs font-semibold uppercase tracking-wide text-center">Deneme</span>
-                      <span className="text-xs font-semibold uppercase tracking-wide">İlerleme</span>
-                      <span className="text-xs font-semibold uppercase tracking-wide text-center">Ön Sınav</span>
-                      <span className="text-xs font-semibold uppercase tracking-wide text-center">Son Sınav</span>
-                      <span className="text-xs font-semibold uppercase tracking-wide">Durum</span>
-                      <span className="text-xs font-semibold uppercase tracking-wide text-center">Tarih</span>
-                      <span className="text-xs font-semibold uppercase tracking-wide text-center">İmza</span>
+                    <div className="grid items-center px-4 py-2 mb-1" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 60px 60px 95px 75px 90px 90px', gap: '8px', color: K.TEXT_MUTED, background: K.BG, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide">Personel</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center">Deneme</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide">İlerleme</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center">Ön Sınav</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center">Son Sınav</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide">Durum</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center">Tarih</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center">İmza</span>
                       <span />
                     </div>
                     {/* Data Rows */}
-                    <div className="space-y-1.5">
+                    <div>
                       {assignedStaff.map((s) => {
                         const st = statusMap[s.status] || statusMap.assigned;
                         const StatusIcon = st.icon;
                         return (
-                          <div key={s.name} className="grid items-center rounded-xl px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 60px 60px 95px 75px 90px 90px', gap: '8px', background: 'var(--color-bg)', border: '1px solid transparent', transition: 'border-color var(--transition-fast)' }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
+                          <div key={s.name} className="grid items-center px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 60px 60px 95px 75px 90px 90px', gap: '8px', background: K.SURFACE, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE; }}
                           >
                             {/* Personel */}
                             <div className="flex items-center gap-3 min-w-0">
-                              <Avatar className="h-9 w-9 shrink-0"><AvatarFallback className="text-xs font-semibold text-white" style={{ background: 'var(--color-primary)' }}>{s.name.split(' ').map(n => n[0]).join('')}</AvatarFallback></Avatar>
+                              <Avatar className="h-9 w-9 shrink-0"><AvatarFallback className="text-xs font-semibold text-white" style={{ background: K.PRIMARY }}>{s.name.split(' ').map(n => n[0]).join('')}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold truncate" title={s.name} style={{ color: 'var(--color-text-primary)' }}>{s.name}</p>
-                                <p className="text-xs truncate" title={s.department} style={{ color: 'var(--color-text-muted)' }}>{s.department}</p>
+                                <p className="text-sm font-semibold truncate" title={s.name} style={{ color: K.TEXT_PRIMARY }}>{s.name}</p>
+                                <p className="text-xs truncate" title={s.department} style={{ color: K.TEXT_MUTED }}>{s.department}</p>
                               </div>
                             </div>
                             {/* Deneme */}
-                            <p className="text-sm font-semibold text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{s.attempt}/{training.maxAttempts}</p>
+                            <p className="text-sm font-semibold text-center" style={{ fontFamily: 'var(--font-mono)', color: K.TEXT_SECONDARY }}>{s.attempt}/{training.maxAttempts}</p>
                             {/* İlerleme */}
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
-                                <div className="h-full rounded-full" style={{ width: `${s.progress}%`, background: s.progress === 0 ? 'var(--color-text-muted)' : s.progress === 100 ? 'var(--color-success)' : 'var(--color-info)', transition: 'width var(--transition-fast)' }} />
+                              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: K.BORDER_LIGHT }}>
+                                <div className="h-full rounded-full" style={{ width: `${s.progress}%`, background: s.progress === 0 ? K.TEXT_MUTED : s.progress === 100 ? K.SUCCESS : K.INFO }} />
                               </div>
-                              <span className="text-xs font-semibold shrink-0" style={{ fontFamily: 'var(--font-mono)', color: s.progress === 100 ? 'var(--color-success)' : s.progress > 0 ? 'var(--color-info)' : 'var(--color-text-muted)' }}>{s.progress}%</span>
+                              <span className="text-xs font-semibold shrink-0" style={{ fontFamily: 'var(--font-mono)', color: s.progress === 100 ? K.SUCCESS : s.progress > 0 ? K.INFO : K.TEXT_MUTED }}>{s.progress}%</span>
                             </div>
                             {/* Ön Sınav */}
-                            <p className="text-sm font-semibold text-center" style={{ fontFamily: 'var(--font-mono)', color: s.preScore !== null ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>{s.preScore !== null ? `${s.preScore}%` : '—'}</p>
+                            <p className="text-sm font-semibold text-center" style={{ fontFamily: 'var(--font-mono)', color: s.preScore !== null ? K.TEXT_SECONDARY : K.TEXT_MUTED }}>{s.preScore !== null ? `${s.preScore}%` : '—'}</p>
                             {/* Son Sınav */}
-                            <p className="text-sm font-bold text-center" style={{ fontFamily: 'var(--font-mono)', color: s.postScore !== null && s.postScore >= training.passingScore ? 'var(--color-success)' : s.postScore !== null ? 'var(--color-error)' : 'var(--color-text-muted)' }}>{s.postScore !== null ? `${s.postScore}%` : '—'}</p>
+                            <p className="text-sm font-bold text-center" style={{ fontFamily: 'var(--font-mono)', color: s.postScore !== null && s.postScore >= training.passingScore ? K.SUCCESS : s.postScore !== null ? K.ERROR : K.TEXT_MUTED }}>{s.postScore !== null ? `${s.postScore}%` : '—'}</p>
                             {/* Durum */}
                             <div>
-                              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: st.bg, color: st.text }}>
+                              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: st.bg, color: st.text }}>
                                 <StatusIcon className="h-3 w-3" />{st.label}
                               </span>
                             </div>
                             {/* Tarih */}
-                            <p className="text-xs font-medium text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{s.completedAt ? new Date(s.completedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</p>
+                            <p className="text-xs font-medium text-center" style={{ fontFamily: 'var(--font-mono)', color: K.TEXT_SECONDARY }}>{s.completedAt ? new Date(s.completedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</p>
                             {/* İmza */}
                             <div className="text-center">
                               {s.signedAt ? (
-                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-                                  {s.signatureMethod === 'canvas' ? '🖊️' : '✓'}
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: K.SUCCESS_BG, color: K.PRIMARY }}>
+                                  <CheckCircle2 className="h-3 w-3" />
                                   {new Date(s.signedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}
                                 </span>
                               ) : s.status === 'passed' ? (
-                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--color-warning-bg, #fef3c7)', color: 'var(--color-warning, #d97706)' }}>
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: K.WARNING_BG, color: '#b45309' }}>
                                   Bekleniyor
                                 </span>
                               ) : (
-                                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>—</span>
+                                <span className="text-xs" style={{ color: K.TEXT_MUTED }}>—</span>
                               )}
                             </div>
                             {/* Actions */}
                             <div className="flex justify-end">
                               {s.status === 'failed' && (
-                                <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold rounded-lg" style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                                <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold rounded-lg" style={{ borderColor: K.PRIMARY, color: K.PRIMARY, background: K.SURFACE }}
                                   onClick={() => setResetTarget({ userId: s.userId, name: s.name })}
                                 >
                                   <RotateCcw className="h-3.5 w-3.5" /> Yeni Hak Ver
                                 </Button>
                               )}
-                              <button onClick={() => router.push(`/admin/staff/${s.userId}`)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium" style={{ color: 'var(--color-text-muted)', transition: 'color var(--transition-fast)' }}>
+                              <button onClick={() => router.push(`/admin/staff/${s.userId}`)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium" style={{ color: K.TEXT_MUTED }}>
                                 <Eye className="h-3.5 w-3.5" /> Detay<ChevronRight className="h-3 w-3" />
                               </button>
                             </div>
@@ -442,7 +452,7 @@ export default function TrainingDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Bu eğitime henüz personel atanmadı.</div>
+                  <div className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Bu eğitime henüz personel atanmadı.</div>
                 )}
               </motion.div>
             )}
@@ -456,7 +466,7 @@ export default function TrainingDetailPage() {
                       const videoKey = v.id ?? `video-${vi}`;
                       const isActive = activeVideoId === videoKey;
                       return (
-                        <div key={videoKey} className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-bg)', border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--color-border)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: isActive ? '0 2px 12px color-mix(in srgb, var(--brand-600) calc(0.12 * 100%), transparent)' : 'none' }}>
+                        <div key={videoKey} className="overflow-hidden" style={{ background: K.SURFACE, border: isActive ? `1.5px solid ${K.PRIMARY}` : `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: isActive ? K.SHADOW_CARD : 'none', transition: 'border-color 0.2s, box-shadow 0.2s' }}>
                           {/* Video Row */}
                           <div
                             className="flex items-center gap-4 px-5 py-4 cursor-pointer group relative"
@@ -464,25 +474,25 @@ export default function TrainingDetailPage() {
                             onClick={() => setActiveVideoId(isActive ? null : videoKey)}
                           >
                             {/* Order Number */}
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold" style={{ background: isActive ? 'var(--color-primary)' : 'var(--color-primary-light)', color: isActive ? 'white' : 'var(--color-primary)', transition: 'all 0.3s' }}>
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold" style={{ background: isActive ? K.PRIMARY : K.PRIMARY_LIGHT, color: isActive ? 'white' : K.PRIMARY }}>
                               {vi + 1}
                             </div>
 
                             {/* Play Icon */}
-                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: isActive ? 'var(--color-primary)' : 'var(--color-surface)', transition: 'all 0.3s' }}>
+                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: isActive ? K.PRIMARY : K.BG }}>
                               {isActive ? (
                                 <Video className="h-5 w-5" style={{ color: 'white' }} />
                               ) : (
-                                <Play className="h-4 w-4" style={{ color: 'var(--color-primary)', marginLeft: 2 }} />
+                                <Play className="h-4 w-4" style={{ color: K.PRIMARY, marginLeft: 2 }} />
                               )}
                             </div>
 
                             {/* Title & Meta */}
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{v.title}</p>
+                              <p className="text-sm font-semibold truncate" style={{ color: K.TEXT_PRIMARY }}>{v.title}</p>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <Clock className="h-3 w-3" style={{ color: 'var(--color-text-muted)' }} />
-                                <span className="text-[11px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>{v.duration}</span>
+                                <Clock className="h-3 w-3" style={{ color: K.TEXT_MUTED }} />
+                                <span className="text-[11px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: K.TEXT_MUTED }}>{v.duration}</span>
                               </div>
                             </div>
 
@@ -493,13 +503,13 @@ export default function TrainingDetailPage() {
                                   initial={{ opacity: 0, scale: 0.8 }}
                                   animate={{ opacity: 1, scale: 1 }}
                                   className="flex items-center gap-1.5 rounded-full px-2.5 py-1"
-                                  style={{ background: 'color-mix(in srgb, var(--brand-600) calc(0.15 * 100%), transparent)', border: '1px solid color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)' }}
+                                  style={{ background: K.PRIMARY_LIGHT, border: `1px solid ${K.PRIMARY}` }}
                                 >
-                                  <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse" />
-                                  <span className="text-[10px] font-semibold tracking-wide uppercase text-brand-400">Oynatılıyor</span>
+                                  <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: K.PRIMARY }} />
+                                  <span className="text-[10px] font-semibold tracking-wide uppercase" style={{ color: K.PRIMARY }}>Oynatılıyor</span>
                                 </motion.span>
                               )}
-                              <ChevronRight className="h-4 w-4" style={{ color: isActive ? 'rgba(255,255,255,0.3)' : 'var(--color-text-muted)', transform: isActive ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.3s, color 0.3s, opacity 0.3s', opacity: isActive ? 1 : 0 }} />
+                              <ChevronRight className="h-4 w-4" style={{ color: K.TEXT_MUTED, transform: isActive ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.3s' }} />
                             </div>
                           </div>
 
@@ -533,10 +543,10 @@ export default function TrainingDetailPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-16 gap-3">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: 'var(--color-bg)' }}>
-                      <Video className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: K.BG }}>
+                      <Video className="h-6 w-6" style={{ color: K.TEXT_MUTED }} />
                     </div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Eğitime video veya PDF eklemek için 'İçerik Ekle' butonunu kullanın.</p>
+                    <p className="text-sm font-medium" style={{ color: K.TEXT_MUTED }}>Eğitime video veya PDF eklemek için &apos;İçerik Ekle&apos; butonunu kullanın.</p>
                   </div>
                 )}
               </motion.div>
@@ -548,15 +558,15 @@ export default function TrainingDetailPage() {
                 {trainingQuestions.length > 0 ? (
                   <div className="space-y-4">
                     {trainingQuestions.map((q, i) => (
-                      <div key={q.id ?? `q-${i}`} className="rounded-xl p-5" style={{ background: 'var(--color-bg)' }}>
+                      <div key={q.id ?? `q-${i}`} className="p-5" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
                         <div className="flex items-start gap-4">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold" style={{ background: 'var(--color-accent-light)', color: 'var(--color-accent)' }}>{i + 1}</div>
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold" style={{ background: K.PRIMARY_LIGHT, color: K.ACCENT }}>{i + 1}</div>
                           <div className="flex-1">
-                            <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{q.text}</p>
+                            <p className="text-sm font-medium" style={{ color: K.TEXT_PRIMARY }}>{q.text}</p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <Award className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
-                            <span className="text-xs font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>{q.points} puan</span>
+                            <Award className="h-3.5 w-3.5" style={{ color: K.ACCENT }} />
+                            <span className="text-xs font-semibold" style={{ fontFamily: 'var(--font-mono)', color: K.ACCENT }}>{q.points} puan</span>
                           </div>
                         </div>
                         {q.options.length > 0 ? (
@@ -566,34 +576,34 @@ export default function TrainingDetailPage() {
                                 key={o.id}
                                 className="flex items-center gap-3 rounded-lg px-3 py-2.5"
                                 style={{
-                                  background: o.isCorrect ? 'var(--color-success-bg)' : 'var(--color-surface)',
-                                  border: o.isCorrect ? '1px solid var(--color-success)' : '1px solid transparent',
+                                  background: o.isCorrect ? K.SUCCESS_BG : K.BG,
+                                  border: o.isCorrect ? `1px solid ${K.SUCCESS}` : `1px solid ${K.BORDER_LIGHT}`,
                                 }}
                               >
                                 <span
                                   className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-bold"
                                   style={{
-                                    background: o.isCorrect ? 'var(--color-success)' : 'var(--color-border)',
-                                    color: o.isCorrect ? 'white' : 'var(--color-text-muted)',
+                                    background: o.isCorrect ? K.SUCCESS : K.BORDER_LIGHT,
+                                    color: o.isCorrect ? 'white' : K.TEXT_MUTED,
                                   }}
                                 >
                                   {String.fromCharCode(65 + oi)}
                                 </span>
-                                <span className="flex-1 text-sm" style={{ color: o.isCorrect ? 'var(--color-success)' : 'var(--color-text-secondary)', fontWeight: o.isCorrect ? 600 : 400 }}>
+                                <span className="flex-1 text-sm" style={{ color: o.isCorrect ? K.PRIMARY : K.TEXT_SECONDARY, fontWeight: o.isCorrect ? 600 : 400 }}>
                                   {o.text}
                                 </span>
-                                {o.isCorrect && <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: 'var(--color-success)' }} />}
+                                {o.isCorrect && <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: K.SUCCESS }} />}
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="mt-3 ml-13 text-xs" style={{ color: 'var(--color-text-muted)' }}>Seçenek eklenmemiş</p>
+                          <p className="mt-3 ml-13 text-xs" style={{ color: K.TEXT_MUTED }}>Seçenek eklenmemiş</p>
                         )}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Bu eğitime henüz soru eklenmemiş.</div>
+                  <div className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Bu eğitime henüz soru eklenmemiş.</div>
                 )}
               </motion.div>
             )}

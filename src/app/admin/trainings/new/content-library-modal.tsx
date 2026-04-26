@@ -177,7 +177,7 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
       <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
-            <Library className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+            <Library className="h-5 w-5" style={{ color: '#0d9668' }} />
             Kütüphaneden İçerik Seç
           </DialogTitle>
           <DialogDescription>
@@ -188,7 +188,7 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
         {/* Search + Filters */}
         <div className="space-y-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#78716c' }} />
             <Input
               placeholder="İçerik veya eğitim adı ile ara..."
               value={search}
@@ -203,9 +203,9 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
                 onClick={() => setFilter(f.key)}
                 className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
                 style={{
-                  background: filter === f.key ? 'var(--color-primary)' : 'var(--color-surface)',
-                  color: filter === f.key ? 'white' : 'var(--color-text-secondary)',
-                  border: `1px solid ${filter === f.key ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                  background: filter === f.key ? '#0d9668' : '#ffffff',
+                  color: filter === f.key ? 'white' : '#44403c',
+                  border: `1px solid ${filter === f.key ? '#0d9668' : '#c9c4be'}`,
                 }}
               >
                 {f.label}
@@ -218,13 +218,13 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
         <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'var(--color-primary)' }} />
-              <span className="ml-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>Yükleniyor...</span>
+              <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#0d9668' }} />
+              <span className="ml-2 text-sm" style={{ color: '#78716c' }}>Yükleniyor...</span>
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-12">
-              <Library className="h-10 w-10 mx-auto mb-2" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
-              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+              <Library className="h-10 w-10 mx-auto mb-2" style={{ color: '#78716c', opacity: 0.5 }} />
+              <p className="text-sm" style={{ color: '#78716c' }}>
                 {search ? 'Aramanızla eşleşen içerik bulunamadı' : 'Henüz kütüphanede içerik yok'}
               </p>
             </div>
@@ -239,16 +239,16 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
                     onClick={() => toggleSelect(v.id)}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all"
                     style={{
-                      background: isSelected ? 'var(--color-primary-light)' : 'var(--color-surface)',
-                      border: `1.5px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                      background: isSelected ? '#d1fae5' : '#ffffff',
+                      border: `1.5px solid ${isSelected ? '#0d9668' : '#c9c4be'}`,
                     }}
                   >
                     {/* Check / Icon */}
                     <div
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
                       style={{
-                        background: isSelected ? 'var(--color-primary)' : 'var(--color-surface-hover)',
-                        color: isSelected ? 'white' : 'var(--color-text-muted)',
+                        background: isSelected ? '#0d9668' : '#f5f5f4',
+                        color: isSelected ? 'white' : '#78716c',
                       }}
                     >
                       {isSelected ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
@@ -256,10 +256,10 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
+                      <p className="text-sm font-medium truncate" style={{ color: '#1c1917' }}>
                         {v.title}
                       </p>
-                      <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
+                      <p className="text-xs truncate" style={{ color: '#78716c' }}>
                         {v.category}
                       </p>
                     </div>
@@ -270,7 +270,7 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
                         {CONTENT_LABEL[v.contentType] ?? 'Video'}
                       </Badge>
                       {v.durationSeconds > 0 && (
-                        <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                        <span className="flex items-center gap-1 text-xs" style={{ color: '#78716c' }}>
                           <Clock className="h-3 w-3" />
                           {formatDuration(v.durationSeconds)}
                         </span>
@@ -285,7 +285,7 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
 
         {/* Footer */}
         <DialogFooter className="flex items-center justify-between sm:justify-between">
-          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-xs" style={{ color: '#78716c' }}>
             {selected.size > 0 ? `${selected.size} içerik seçildi` : 'İçerik seçin'}
           </p>
           <div className="flex gap-2">
@@ -295,7 +295,7 @@ export function ContentLibraryModal({ open, onClose, onSelect, defaultFilter = '
             <Button
               onClick={handleConfirm}
               disabled={selected.size === 0}
-              style={{ background: 'var(--color-primary)', color: 'white' }}
+              style={{ background: '#0d9668', color: 'white' }}
             >
               <Check className="h-4 w-4 mr-1" />
               Seçilenleri Ekle ({selected.size})

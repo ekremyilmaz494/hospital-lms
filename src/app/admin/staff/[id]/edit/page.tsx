@@ -10,6 +10,21 @@ import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
+// ── Klinova palette ──
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 interface StaffEditData {
   id: string;
   firstName: string;
@@ -50,24 +65,16 @@ export default function EditStaffPage() {
 
   if (error) {
     return (
-      <div className="se-empty">
-        <p className="se-empty-msg">{error}</p>
-        <style jsx>{`
-          .se-empty { display: flex; align-items: center; justify-content: center; min-height: 300px; }
-          .se-empty-msg { font-family: var(--font-editorial, serif); font-size: 16px; color: #b3261e; }
-        `}</style>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+        <p style={{ fontFamily: K.FONT_DISPLAY, fontSize: 16, color: K.ERROR }}>{error}</p>
       </div>
     );
   }
 
   if (!formData) {
     return (
-      <div className="se-empty">
-        <p className="se-empty-msg">Personel bulunamadı.</p>
-        <style jsx>{`
-          .se-empty { display: flex; align-items: center; justify-content: center; min-height: 300px; }
-          .se-empty-msg { font-family: var(--font-editorial, serif); font-size: 18px; color: #6b6a63; }
-        `}</style>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+        <p style={{ fontFamily: K.FONT_DISPLAY, fontSize: 18, color: K.TEXT_MUTED }}>Personel bulunamadı.</p>
       </div>
     );
   }
@@ -116,45 +123,153 @@ export default function EditStaffPage() {
     setFormData(prev => prev ? { ...prev, [field]: value } : prev);
   };
 
+  const cardStyle: React.CSSProperties = {
+    padding: 28,
+    background: K.SURFACE,
+    border: `1.5px solid ${K.BORDER}`,
+    borderRadius: 14,
+    boxShadow: K.SHADOW_CARD,
+  };
+
+  const eyebrowStyle: React.CSSProperties = {
+    display: 'inline-block',
+    fontFamily: K.FONT_DISPLAY,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color: K.TEXT_MUTED,
+    marginBottom: 4,
+  };
+
   return (
     <div className="se-page">
       {/* ── Header ── */}
-      <header className="se-header">
-        <button onClick={() => router.back()} className="se-back" aria-label="Geri dön">
+      <header
+        className="se-header"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 18,
+          paddingBottom: 24,
+          borderBottom: `1px solid ${K.BORDER_LIGHT}`,
+        }}
+      >
+        <button
+          onClick={() => router.back()}
+          aria-label="Geri dön"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            height: 36,
+            padding: '0 14px 0 12px',
+            borderRadius: 999,
+            background: K.SURFACE,
+            color: K.TEXT_SECONDARY,
+            border: `1px solid ${K.BORDER}`,
+            cursor: 'pointer',
+            fontFamily: K.FONT_DISPLAY,
+            fontSize: 12,
+            fontWeight: 600,
+            alignSelf: 'flex-start',
+            transition: 'background 160ms ease, color 160ms ease',
+          }}
+        >
           <ArrowLeft className="h-4 w-4" />
           <span>Personel</span>
         </button>
 
         <div className="se-header-main">
           <Avatar className="se-avatar">
-            <AvatarFallback className="se-avatar-fb">{formData.initials}</AvatarFallback>
+            <AvatarFallback
+              className="se-avatar-fb"
+              style={{ background: K.PRIMARY_LIGHT, color: K.PRIMARY }}
+            >
+              {formData.initials}
+            </AvatarFallback>
           </Avatar>
-          <div className="se-identity">
-            <span className="se-eyebrow">Personel Düzenle</span>
-            <h1 className="se-title">
-              <em>{formData.firstName}</em> {formData.lastName}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={eyebrowStyle}>Personel Düzenle</span>
+            <h1 style={{
+              fontFamily: K.FONT_DISPLAY,
+              fontSize: 'clamp(24px, 4vw, 32px)',
+              fontWeight: 700,
+              color: K.TEXT_PRIMARY,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+              margin: 0,
+            }}>
+              {formData.firstName} {formData.lastName}
             </h1>
-            <p className="se-subtitle">
+            <p style={{
+              fontSize: 13,
+              color: K.TEXT_MUTED,
+              margin: '6px 0 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              flexWrap: 'wrap',
+            }}>
               {formData.email}
-              {!formData.isActive && <span className="se-inactive-chip">Pasif</span>}
+              {!formData.isActive && (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '2px 10px',
+                  borderRadius: 999,
+                  background: K.ERROR_BG,
+                  color: '#b91c1c',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                }}>
+                  Pasif
+                </span>
+              )}
             </p>
           </div>
         </div>
       </header>
 
       {/* ── Sections ── */}
-      <div className="se-sections">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {/* Personal Info */}
-        <section className="se-card">
-          <div className="se-card-head">
-            <div className="se-card-icon"><User className="h-4 w-4" /></div>
+        <section style={cardStyle}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            marginBottom: 24,
+            paddingBottom: 18,
+            borderBottom: `1px dashed ${K.BORDER_LIGHT}`,
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: K.PRIMARY_LIGHT, color: K.PRIMARY,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <User className="h-4 w-4" />
+            </div>
             <div>
-              <span className="se-card-eyebrow">Bölüm 01</span>
-              <h2 className="se-card-title">Kişisel Bilgiler</h2>
+              <span style={eyebrowStyle}>Bölüm 01</span>
+              <h2 style={{
+                fontFamily: K.FONT_DISPLAY,
+                fontSize: 18,
+                fontWeight: 700,
+                color: K.TEXT_PRIMARY,
+                letterSpacing: '-0.015em',
+                lineHeight: 1.1,
+                margin: 0,
+              }}>
+                Kişisel Bilgiler
+              </h2>
             </div>
           </div>
 
-          <div className="se-fields">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div className="se-row">
               <Field label="Ad *" error={errors.firstName}>
                 <Input
@@ -162,7 +277,7 @@ export default function EditStaffPage() {
                   onChange={(e) => update('firstName', e.target.value)}
                   autoComplete="given-name"
                   className="se-input"
-                  style={errorStyle(errors.firstName)}
+                  style={inputStyle(errors.firstName)}
                 />
               </Field>
               <Field label="Soyad *" error={errors.lastName}>
@@ -171,7 +286,7 @@ export default function EditStaffPage() {
                   onChange={(e) => update('lastName', e.target.value)}
                   autoComplete="family-name"
                   className="se-input"
-                  style={errorStyle(errors.lastName)}
+                  style={inputStyle(errors.lastName)}
                 />
               </Field>
             </div>
@@ -181,7 +296,13 @@ export default function EditStaffPage() {
                 value={formData.email}
                 disabled
                 autoComplete="email"
-                className="se-input se-input-disabled"
+                className="se-input"
+                style={{
+                  ...inputStyle(),
+                  background: K.BG,
+                  color: K.TEXT_MUTED,
+                  cursor: 'not-allowed',
+                }}
               />
             </Field>
 
@@ -191,24 +312,52 @@ export default function EditStaffPage() {
                 onChange={(e) => update('phone', e.target.value)}
                 autoComplete="tel"
                 placeholder="05XX XXX XX XX"
-                className="se-input se-input-mono"
-                style={errorStyle(errors.phone)}
+                className="se-input"
+                style={{
+                  ...inputStyle(errors.phone),
+                  fontFamily: 'var(--font-mono, monospace)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
               />
             </Field>
           </div>
         </section>
 
         {/* Work Info */}
-        <section className="se-card">
-          <div className="se-card-head">
-            <div className="se-card-icon"><Briefcase className="h-4 w-4" /></div>
+        <section style={cardStyle}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            marginBottom: 24,
+            paddingBottom: 18,
+            borderBottom: `1px dashed ${K.BORDER_LIGHT}`,
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: K.PRIMARY_LIGHT, color: K.PRIMARY,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <Briefcase className="h-4 w-4" />
+            </div>
             <div>
-              <span className="se-card-eyebrow">Bölüm 02</span>
-              <h2 className="se-card-title">Görev Bilgileri</h2>
+              <span style={eyebrowStyle}>Bölüm 02</span>
+              <h2 style={{
+                fontFamily: K.FONT_DISPLAY,
+                fontSize: 18,
+                fontWeight: 700,
+                color: K.TEXT_PRIMARY,
+                letterSpacing: '-0.015em',
+                lineHeight: 1.1,
+                margin: 0,
+              }}>
+                Görev Bilgileri
+              </h2>
             </div>
           </div>
 
-          <div className="se-fields">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div className="se-row">
               <Field label="Departman" icon={<Building2 className="h-3 w-3" />}>
                 <select
@@ -219,6 +368,7 @@ export default function EditStaffPage() {
                     if (selectedName) update('department', selectedName);
                   }}
                   className="se-select"
+                  style={inputStyle()}
                 >
                   <option value="">Seçin...</option>
                   {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -230,24 +380,67 @@ export default function EditStaffPage() {
                   onChange={(e) => update('title', e.target.value)}
                   className="se-input"
                   placeholder="örn. Hemşire"
+                  style={inputStyle()}
                 />
               </Field>
             </div>
 
             {/* Active/Inactive toggle */}
-            <div className="se-toggle-row">
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 16,
+              padding: '16px 18px',
+              background: K.BG,
+              border: `1px solid ${K.BORDER_LIGHT}`,
+              borderRadius: 12,
+            }}>
               <button
                 type="button"
                 onClick={() => update('isActive', !formData.isActive)}
-                className={`se-toggle ${formData.isActive ? 'se-toggle-on' : ''}`}
                 role="switch"
                 aria-checked={formData.isActive}
+                style={{
+                  flexShrink: 0,
+                  width: 44,
+                  height: 26,
+                  borderRadius: 999,
+                  background: formData.isActive ? K.PRIMARY : K.BORDER,
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  position: 'relative',
+                  transition: 'background 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
               >
-                <span className="se-toggle-dot" />
+                <span style={{
+                  position: 'absolute',
+                  top: 3,
+                  left: formData.isActive ? 21 : 3,
+                  width: 20,
+                  height: 20,
+                  borderRadius: 999,
+                  background: '#ffffff',
+                  boxShadow: '0 1px 2px rgba(15, 23, 42, 0.15)',
+                  transition: 'left 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+                }} />
               </button>
-              <div className="se-toggle-body">
-                <h4>{formData.isActive ? 'Aktif personel' : 'Pasif personel'}</h4>
-                <p>
+              <div>
+                <h4 style={{
+                  fontFamily: K.FONT_DISPLAY,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: K.TEXT_PRIMARY,
+                  margin: '0 0 4px',
+                }}>
+                  {formData.isActive ? 'Aktif personel' : 'Pasif personel'}
+                </h4>
+                <p style={{
+                  fontSize: 12,
+                  color: K.TEXT_SECONDARY,
+                  margin: 0,
+                  lineHeight: 1.5,
+                }}>
                   {formData.isActive
                     ? 'Giriş yapabilir, eğitimlere erişebilir ve raporlarda görünür.'
                     : 'Sisteme giriş yapamaz, eğitimlere erişemez ve raporlarda görünmez.'}
@@ -259,18 +452,59 @@ export default function EditStaffPage() {
       </div>
 
       {/* ── Sticky action bar ── */}
-      <div className="se-actions">
-        <button className="se-btn se-btn-ghost" onClick={() => router.back()} disabled={saving}>
+      <div
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          marginTop: 8,
+          background: `linear-gradient(to top, ${K.BG} 0%, ${K.BG} 75%, rgba(250, 250, 249, 0) 100%)`,
+          padding: '16px 0 12px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12,
+          zIndex: 5,
+        }}
+      >
+        <button
+          onClick={() => router.back()}
+          disabled={saving}
+          style={{
+            ...btnBase,
+            background: K.SURFACE,
+            color: K.TEXT_SECONDARY,
+            border: `1px solid ${K.BORDER}`,
+            opacity: saving ? 0.6 : 1,
+            cursor: saving ? 'not-allowed' : 'pointer',
+          }}
+        >
           İptal
         </button>
         <button
-          className={`se-btn ${saved ? 'se-btn-ok' : 'se-btn-primary'}`}
           onClick={handleSave}
           disabled={saving || saved}
+          style={{
+            ...btnBase,
+            background: saved ? K.SUCCESS : K.PRIMARY,
+            color: '#fff',
+            border: `1px solid ${saved ? K.SUCCESS : K.PRIMARY}`,
+            opacity: (saving || saved) ? (saved ? 1 : 0.7) : 1,
+            cursor: (saving || saved) ? 'not-allowed' : 'pointer',
+          }}
         >
           {saving ? (
             <>
-              <span className="se-spin" />
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  borderTopColor: '#ffffff',
+                  animation: 'se-rot 700ms linear infinite',
+                  display: 'inline-block',
+                }}
+              />
               <span>Kaydediliyor…</span>
             </>
           ) : saved ? (
@@ -294,304 +528,76 @@ export default function EditStaffPage() {
           display: flex;
           flex-direction: column;
           gap: 28px;
-          padding-bottom: 100px; /* space for sticky actions on mobile */
+          padding-bottom: 100px;
         }
-
-        /* ── Header ── */
-        .se-header {
-          display: flex;
-          flex-direction: column;
-          gap: 18px;
-          padding-bottom: 24px;
-          border-bottom: 1px solid #ebe7df;
-        }
-        .se-back {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          height: 36px;
-          padding: 0 12px 0 10px;
-          border-radius: 999px;
-          background: #faf8f2;
-          color: #6b6a63;
-          border: none;
-          cursor: pointer;
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          font-weight: 500;
-          align-self: flex-start;
-          transition: background 160ms ease, color 160ms ease;
-        }
-        .se-back:hover { background: #0a0a0a; color: #fafaf7; }
 
         .se-header-main { display: flex; align-items: center; gap: 18px; }
         :global(.se-avatar) {
           width: 64px !important;
           height: 64px !important;
           flex-shrink: 0;
-          border: 1px solid #ebe7df;
-          box-shadow: inset 0 0 0 3px #fff, 0 0 0 1px #ebe7df;
+          border: 1.5px solid ${K.BORDER};
         }
         :global(.se-avatar-fb) {
-          background: #0a0a0a !important;
-          color: #fafaf7 !important;
-          font-family: var(--font-editorial, serif);
           font-size: 22px !important;
-          font-weight: 500 !important;
-          font-variation-settings: 'opsz' 36, 'SOFT' 50;
-        }
-        .se-identity { min-width: 0; flex: 1; }
-        .se-eyebrow {
-          display: inline-block;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: #8a8578;
-          margin-bottom: 4px;
-        }
-        .se-title {
-          font-family: var(--font-editorial, serif);
-          font-size: clamp(26px, 4vw, 36px);
-          font-weight: 500;
-          font-variation-settings: 'opsz' 56, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.02em;
-          line-height: 1.1;
-          margin: 0;
-        }
-        .se-title em {
-          font-style: italic;
-          color: #0a7a47;
-          font-variation-settings: 'opsz' 56, 'SOFT' 100;
-        }
-        .se-subtitle {
-          font-size: 13px;
-          color: #6b6a63;
-          margin: 6px 0 0;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-        .se-inactive-chip {
-          display: inline-flex;
-          align-items: center;
-          padding: 2px 10px;
-          border-radius: 999px;
-          background: #fdf5f2;
-          color: #b3261e;
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
+          font-weight: 700 !important;
         }
 
-        /* ── Sections ── */
-        .se-sections { display: flex; flex-direction: column; gap: 18px; }
-
-        .se-card {
-          padding: 28px;
-          background: #ffffff;
-          border: 1px solid #ebe7df;
-          border-radius: 16px;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(10, 10, 10, 0.02);
-        }
-        .se-card-head {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          margin-bottom: 24px;
-          padding-bottom: 18px;
-          border-bottom: 1px dashed #ebe7df;
-        }
-        .se-card-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
-          background: #0a0a0a;
-          color: #fafaf7;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-        .se-card-eyebrow {
-          display: block;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: #8a8578;
-          margin-bottom: 2px;
-        }
-        .se-card-title {
-          font-family: var(--font-editorial, serif);
-          font-size: 20px;
-          font-weight: 500;
-          font-variation-settings: 'opsz' 36, 'SOFT' 50;
-          color: #0a0a0a;
-          letter-spacing: -0.015em;
-          line-height: 1.1;
-          margin: 0;
-        }
-
-        .se-fields { display: flex; flex-direction: column; gap: 20px; }
         .se-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 16px;
         }
 
-        /* Field (see Field component below) */
         :global(.se-input),
         :global(.se-select) {
           height: 44px !important;
           border-radius: 10px !important;
-          border: 1px solid #ebe7df !important;
-          background: #ffffff !important;
           padding: 0 14px !important;
           font-size: 14px !important;
-          color: #0a0a0a !important;
           font-family: inherit !important;
           transition: border-color 160ms ease, box-shadow 160ms ease !important;
         }
         :global(.se-input:focus-visible),
         :global(.se-select:focus-visible) {
-          border-color: #0a0a0a !important;
-          box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.06) !important;
+          border-color: ${K.PRIMARY} !important;
+          box-shadow: 0 0 0 3px ${K.PRIMARY_LIGHT} !important;
           outline: none !important;
         }
-        :global(.se-input-mono) {
-          font-family: var(--font-mono, monospace) !important;
-          font-variant-numeric: tabular-nums !important;
-        }
-        :global(.se-input-disabled) {
-          background: #faf8f2 !important;
-          color: #8a8578 !important;
-          cursor: not-allowed;
-        }
 
-        /* Active toggle */
-        .se-toggle-row {
-          display: flex;
-          align-items: flex-start;
-          gap: 16px;
-          padding: 16px 18px;
-          background: #faf8f2;
-          border: 1px solid #ebe7df;
-          border-radius: 12px;
-        }
-        .se-toggle {
-          flex-shrink: 0;
-          width: 44px;
-          height: 26px;
-          border-radius: 999px;
-          background: #d9d4c4;
-          border: none;
-          cursor: pointer;
-          padding: 0;
-          position: relative;
-          transition: background 220ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .se-toggle-on { background: #0a7a47; }
-        .se-toggle-dot {
-          position: absolute;
-          top: 3px;
-          left: 3px;
-          width: 20px;
-          height: 20px;
-          border-radius: 999px;
-          background: #ffffff;
-          box-shadow: 0 1px 2px rgba(10, 10, 10, 0.15);
-          transition: left 220ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .se-toggle-on .se-toggle-dot { left: 21px; }
-        .se-toggle:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
-
-        .se-toggle-body h4 {
-          font-family: var(--font-display, system-ui);
-          font-size: 13px;
-          font-weight: 600;
-          color: #0a0a0a;
-          margin: 0 0 4px;
-        }
-        .se-toggle-body p {
-          font-size: 12px;
-          color: #6b6a63;
-          margin: 0;
-          line-height: 1.5;
-        }
-
-        /* ── Sticky action bar ── */
-        .se-actions {
-          position: sticky;
-          bottom: 0;
-          margin-top: 8px;
-          background: linear-gradient(to top, #fafaf7 0%, #fafaf7 75%, rgba(250, 250, 247, 0) 100%);
-          padding: 16px 0 12px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-          z-index: 5;
-        }
-        .se-btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          height: 48px;
-          padding: 0 22px;
-          border-radius: 999px;
-          font-family: var(--font-display, system-ui);
-          font-size: 14px;
-          font-weight: 600;
-          letter-spacing: -0.005em;
-          cursor: pointer;
-          border: 1px solid transparent;
-          transition: background 160ms ease, border-color 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .se-btn:active:not(:disabled) { transform: scale(0.97); }
-        .se-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .se-btn-ghost { background: transparent; color: #6b6a63; border-color: #ebe7df; }
-        .se-btn-ghost:hover:not(:disabled) { background: #faf8f2; color: #0a0a0a; border-color: #0a0a0a; }
-
-        .se-btn-primary { background: #0a0a0a; color: #fafaf7; box-shadow: inset 0 1px 0 rgba(255,255,255,0.1); }
-        .se-btn-primary:hover:not(:disabled) { background: #1a1a1a; }
-
-        .se-btn-ok { background: #0a7a47; color: #fafaf7; }
-
-        .se-spin {
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          border: 2px solid rgba(255, 255, 255, 0.3);
-          border-top-color: #ffffff;
-          animation: se-rot 700ms linear infinite;
-        }
         @keyframes se-rot { to { transform: rotate(360deg); } }
 
-        /* ── Mobile ── */
         @media (max-width: 640px) {
           .se-row { grid-template-columns: 1fr; }
-          .se-card { padding: 22px 20px; }
           .se-header-main { gap: 14px; }
           :global(.se-avatar) { width: 56px !important; height: 56px !important; }
-          .se-toggle-row { padding: 14px 16px; }
-          .se-btn { flex: 1; padding: 0 16px; }
-        }
-
-        @media (max-width: 420px) {
-          .se-card-head { gap: 12px; margin-bottom: 20px; padding-bottom: 14px; }
-          .se-card-title { font-size: 18px; }
         }
       `}</style>
     </div>
   );
+}
+
+const btnBase: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  height: 44,
+  padding: '0 22px',
+  borderRadius: 999,
+  fontFamily: K.FONT_DISPLAY,
+  fontSize: 14,
+  fontWeight: 600,
+  letterSpacing: '-0.005em',
+  transition: 'background 160ms ease, border-color 160ms ease',
+};
+
+function inputStyle(err?: string): React.CSSProperties {
+  return {
+    border: `1.5px solid ${err ? K.ERROR : K.BORDER}`,
+    background: K.SURFACE,
+    color: K.TEXT_PRIMARY,
+  };
 }
 
 // ── Field helper ──
@@ -605,38 +611,27 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="f-root">
-      <Label className="f-label">
-        {icon && <span className="f-label-icon">{icon}</span>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Label style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        fontFamily: K.FONT_DISPLAY,
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        color: K.TEXT_MUTED,
+      }}>
+        {icon && <span style={{ color: K.TEXT_MUTED, display: 'inline-flex' }}>{icon}</span>}
         {label}
       </Label>
       {children}
       {error ? (
-        <p className="f-err">{error}</p>
+        <p style={{ fontSize: 11, color: K.ERROR, margin: 0, fontWeight: 500 }}>{error}</p>
       ) : hint ? (
-        <p className="f-hint">{hint}</p>
+        <p style={{ fontSize: 11, color: K.TEXT_MUTED, margin: 0, fontStyle: 'italic' }}>{hint}</p>
       ) : null}
-      <style jsx>{`
-        .f-root { display: flex; flex-direction: column; gap: 6px; }
-        :global(.f-label) {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-family: var(--font-display, system-ui);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: #6b6a63;
-        }
-        .f-label-icon { color: #8a8578; display: inline-flex; }
-        .f-err { font-size: 11px; color: #b3261e; margin: 0; font-weight: 500; }
-        .f-hint { font-size: 11px; color: #8a8578; margin: 0; font-style: italic; }
-      `}</style>
     </div>
   );
-}
-
-function errorStyle(err?: string): React.CSSProperties {
-  return err ? { borderColor: '#b3261e' } : {};
 }

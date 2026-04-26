@@ -13,7 +13,6 @@ import 'dotenv/config'
 import { PrismaClient } from '../src/generated/prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { createClient } from '@supabase/supabase-js'
-import { randomUUID } from 'crypto'
 
 // ── ENV CHECK ──────────────────────────────────────────────
 const DATABASE_URL = process.env.DATABASE_URL
@@ -511,7 +510,6 @@ async function main() {
       const question = await prisma.question.create({
         data: {
           trainingId: training.id,
-          organizationId: org.id,
           questionText: q.questionText,
           questionType: 'multiple_choice',
           points: 10,

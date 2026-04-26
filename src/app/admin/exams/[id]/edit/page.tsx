@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
-  ArrowLeft, Save, Plus, Trash2, GripVertical, Loader2,
+  ArrowLeft, Save, Plus, Trash2, GripVertical, Loader2, AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +12,37 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/shared/toast';
 import { PageLoading } from '@/components/shared/page-loading';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
+const cardStyle: React.CSSProperties = {
+  background: K.SURFACE,
+  border: `1.5px solid ${K.BORDER}`,
+  borderRadius: 14,
+  boxShadow: K.SHADOW_CARD,
+};
+
+const sectionHeading: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 700,
+  fontFamily: K.FONT_DISPLAY,
+  color: K.TEXT_PRIMARY,
+};
+
 const RichTextEditor = dynamic(
   () => import('@/components/ui/rich-text-editor').then((m) => ({ default: m.RichTextEditor })),
-  { ssr: false, loading: () => <div className="animate-pulse rounded-lg border h-28" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} /> },
+  { ssr: false, loading: () => <div className="animate-pulse rounded-lg h-28" style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}` }} /> },
 );
 
 interface QuestionItem {
@@ -166,23 +194,23 @@ export default function EditExamPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/admin/exams')}>
+          <Button variant="ghost" size="icon" onClick={() => router.push('/admin/exams')} style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>Sınavı Düzenle</h1>
-            <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>{title}</p>
+            <h1 style={{ ...sectionHeading, fontSize: 20 }}>Sınavı Düzenle</h1>
+            <p className="text-sm" style={{ color: K.TEXT_MUTED }}>{title}</p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="gap-2 font-semibold text-white rounded-xl" style={{ background: 'var(--color-primary)' }}>
+        <Button onClick={handleSave} disabled={saving} className="gap-2 font-semibold rounded-xl" style={{ background: K.PRIMARY, color: '#fff' }}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Kaydet
         </Button>
       </div>
 
       {/* Sınav Bilgileri */}
-      <div className="rounded-2xl border p-6" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-        <h3 className="text-sm font-bold mb-4">Sınav Bilgileri</h3>
+      <div className="p-6" style={cardStyle}>
+        <h3 style={{ ...sectionHeading, marginBottom: 16 }}>Sınav Bilgileri</h3>
         <div className="space-y-4">
           <div>
             <Label>Sınav Adı *</Label>
@@ -198,8 +226,8 @@ export default function EditExamPage() {
       </div>
 
       {/* Tarihler */}
-      <div className="rounded-2xl border p-6" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-        <h3 className="text-sm font-bold mb-4">Sınav Tarihleri</h3>
+      <div className="p-6" style={cardStyle}>
+        <h3 style={{ ...sectionHeading, marginBottom: 16 }}>Sınav Tarihleri</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label>Başlangıç Tarihi *</Label>
@@ -213,8 +241,8 @@ export default function EditExamPage() {
       </div>
 
       {/* Ayarlar */}
-      <div className="rounded-2xl border p-6" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-        <h3 className="text-sm font-bold mb-4">Sınav Ayarları</h3>
+      <div className="p-6" style={cardStyle}>
+        <h3 style={{ ...sectionHeading, marginBottom: 16 }}>Sınav Ayarları</h3>
         <div className="grid grid-cols-3 gap-4">
           <div>
             <Label>Baraj Puanı (%)</Label>
@@ -236,50 +264,51 @@ export default function EditExamPage() {
               type="button"
               onClick={() => setIsCompulsory((v) => !v)}
               className="relative inline-flex shrink-0 cursor-pointer rounded-full"
-              style={{ width: 48, height: 26, background: isCompulsory ? 'var(--color-primary)' : 'var(--color-border)', transition: 'background 0.25s' }}
+              style={{ width: 48, height: 26, background: isCompulsory ? K.PRIMARY : K.BORDER, transition: 'background 0.25s' }}
             >
               <span className="absolute rounded-full bg-white" style={{ width: 20, height: 20, top: 3, left: isCompulsory ? 25 : 3, boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.25s' }} />
             </button>
-            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Zorunlu Sınav</span>
+            <span className="text-sm" style={{ color: K.TEXT_SECONDARY }}>Zorunlu Sınav</span>
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setRandomizeQuestions((v) => !v)}
               className="relative inline-flex shrink-0 cursor-pointer rounded-full"
-              style={{ width: 48, height: 26, background: randomizeQuestions ? 'var(--color-primary)' : 'var(--color-border)', transition: 'background 0.25s' }}
+              style={{ width: 48, height: 26, background: randomizeQuestions ? K.PRIMARY : K.BORDER, transition: 'background 0.25s' }}
             >
               <span className="absolute rounded-full bg-white" style={{ width: 20, height: 20, top: 3, left: randomizeQuestions ? 25 : 3, boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.25s' }} />
             </button>
-            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Soruları Karıştır</span>
+            <span className="text-sm" style={{ color: K.TEXT_SECONDARY }}>Soruları Karıştır</span>
           </div>
         </div>
       </div>
 
       {/* Sorular */}
-      <div className="rounded-2xl border p-6" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+      <div className="p-6" style={cardStyle}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold">{questions.length} Soru</h3>
+          <h3 style={sectionHeading}>{questions.length} Soru</h3>
           {!hasAttempts && (
-            <Button onClick={addQuestion} variant="outline" className="gap-2 rounded-xl">
+            <Button onClick={addQuestion} variant="outline" className="gap-2 rounded-xl" style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}>
               <Plus className="h-4 w-4" /> Soru Ekle
             </Button>
           )}
         </div>
         {hasAttempts && (
-          <div className="mb-4 rounded-xl border p-3 text-xs" style={{ background: 'var(--color-warning-bg)', borderColor: 'var(--color-warning)', color: 'var(--color-warning)' }}>
-            Sınava katılım başladığı için sorular değiştirilemez. Değişiklik için önce sınavı arşivleyin veya yeni bir sınav oluşturun.
+          <div className="mb-4 rounded-xl border p-3 text-xs flex items-start gap-2" style={{ background: K.WARNING_BG, borderColor: K.WARNING, color: K.WARNING }}>
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>Sınava katılım başladığı için sorular değiştirilemez. Değişiklik için önce sınavı arşivleyin veya yeni bir sınav oluşturun.</span>
           </div>
         )}
 
         <div className="space-y-4">
           {questions.map((q, qi) => (
-            <div key={q.id} className="rounded-xl border p-4" style={{ borderColor: 'var(--color-border)' }}>
+            <div key={q.id} className="rounded-xl border p-4" style={{ borderColor: K.BORDER_LIGHT, background: K.BG }}>
               <div className="flex items-start gap-3">
-                <GripVertical className="h-5 w-5 mt-2 shrink-0" style={{ color: 'var(--color-text-muted)' }} />
+                <GripVertical className="h-5 w-5 mt-2 shrink-0" style={{ color: K.TEXT_MUTED }} />
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold" style={{ color: 'var(--color-text-muted)' }}>S{qi + 1}</span>
+                    <span className="text-xs font-bold" style={{ color: K.TEXT_MUTED }}>S{qi + 1}</span>
                     <Input
                       value={q.text}
                       readOnly={hasAttempts}
@@ -289,7 +318,7 @@ export default function EditExamPage() {
                     />
                     {!hasAttempts && (
                       <Button variant="ghost" size="icon" onClick={() => removeQuestion(qi)}>
-                        <Trash2 className="h-4 w-4" style={{ color: 'var(--color-error)' }} />
+                        <Trash2 className="h-4 w-4" style={{ color: K.ERROR }} />
                       </Button>
                     )}
                   </div>
@@ -301,9 +330,9 @@ export default function EditExamPage() {
                           onClick={() => setQuestions(prev => prev.map((p, i) => i === qi ? { ...p, correct: oi } : p))}
                           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold disabled:cursor-not-allowed"
                           style={{
-                            borderColor: q.correct === oi ? 'var(--color-success)' : 'var(--color-border)',
-                            background: q.correct === oi ? 'var(--color-success)' : 'transparent',
-                            color: q.correct === oi ? 'white' : 'var(--color-text-muted)',
+                            borderColor: q.correct === oi ? K.SUCCESS : K.BORDER,
+                            background: q.correct === oi ? K.SUCCESS : 'transparent',
+                            color: q.correct === oi ? '#fff' : K.TEXT_MUTED,
                           }}
                         >
                           {String.fromCharCode(65 + oi)}

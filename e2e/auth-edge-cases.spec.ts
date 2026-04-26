@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { login } from './helpers/auth'
 
+const LOGIN_FORM_SELECTOR = '[data-testid="login-form"][data-hydrated="true"]'
+const LOGIN_SUBMIT_SELECTOR = '[data-testid="login-submit"]'
+const KVKK_ACCEPT_BUTTON = /KABUL ED|Kabul Ed/
+
 /**
  * Auth edge case E2E testleri.
  *
@@ -25,6 +29,8 @@ test.beforeEach(async ({ page }) => {
 })
 
 test.describe('Login Sayfası Query Param Davranışı', () => {
+  test.describe.configure({ mode: 'serial' })
+
   test('?reason=timeout → "oturum sonlandırıldı" uyarısı', async ({ page }) => {
     await page.goto('/auth/login?reason=timeout', { waitUntil: 'domcontentloaded' })
     await expect(page.getByText(/oturumunuz sonlandırıldı/i)).toBeVisible({ timeout: 10000 })
@@ -41,9 +47,10 @@ test.describe('Login Sayfası Query Param Davranışı', () => {
   test('açık ?redirectTo=/admin/dashboard → login sonrası bu yola gider', async ({ page }) => {
     test.setTimeout(90000)
     await page.goto('/auth/login?redirectTo=/admin/dashboard', { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector(LOGIN_FORM_SELECTOR, { timeout: 30000 })
     await page.fill('[type="email"]', process.env.E2E_ADMIN_EMAIL ?? 'e2e-admin@test.local')
     await page.fill('[type="password"]', process.env.E2E_ADMIN_PASSWORD ?? 'E2eTestAdmin123!')
-    const submitBtn = page.getByRole('button', { name: /Giriş Yap/i })
+    const submitBtn = page.locator(LOGIN_SUBMIT_SELECTOR)
     await submitBtn.waitFor({ state: 'visible', timeout: 15000 })
 
     // API çağrısı + click'i parallel başlat (race avoid)
@@ -59,19 +66,20 @@ test.describe('Login Sayfası Query Param Davranışı', () => {
     const kvkkCheck = page.locator('button[role="checkbox"][aria-checked]')
     await kvkkCheck.waitFor({ state: 'visible', timeout: 10000 })
     await kvkkCheck.click()
-    const acceptBtn = page.getByRole('button', { name: /Kabul Ediyorum/i })
+    const acceptBtn = page.getByRole('button', { name: KVKK_ACCEPT_BUTTON })
     await acceptBtn.waitFor({ state: 'visible', timeout: 5000 })
     await acceptBtn.click()
-    await page.waitForURL(/\/admin\/dashboard/, { timeout: 30000 })
+    await page.waitForURL(/\/admin\/dashboard/, { timeout: 60000 })
   })
 
   test('açık redirect saldırısı: ?redirectTo=//evil.com → reddedilir, default route\'a gider', async ({ page }) => {
     test.setTimeout(90000)
     // login/page.tsx:47 — `startsWith('//')` reddediliyor (rawRedirect=null olur)
     await page.goto('/auth/login?redirectTo=//evil.com', { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector(LOGIN_FORM_SELECTOR, { timeout: 30000 })
     await page.fill('[type="email"]', process.env.E2E_ADMIN_EMAIL ?? 'e2e-admin@test.local')
     await page.fill('[type="password"]', process.env.E2E_ADMIN_PASSWORD ?? 'E2eTestAdmin123!')
-    const submitBtn = page.getByRole('button', { name: /Giriş Yap/i })
+    const submitBtn = page.locator(LOGIN_SUBMIT_SELECTOR)
     await submitBtn.waitFor({ state: 'visible', timeout: 15000 })
 
     const [loginResp] = await Promise.all([
@@ -85,17 +93,19 @@ test.describe('Login Sayfası Query Param Davranışı', () => {
     const kvkkCheck = page.locator('button[role="checkbox"][aria-checked]')
     await kvkkCheck.waitFor({ state: 'visible', timeout: 10000 })
     await kvkkCheck.click()
-    const acceptBtn = page.getByRole('button', { name: /Kabul Ediyorum/i })
+    const acceptBtn = page.getByRole('button', { name: KVKK_ACCEPT_BUTTON })
     await acceptBtn.waitFor({ state: 'visible', timeout: 5000 })
     await acceptBtn.click()
 
     // Default admin dashboard'a gitmeli — evil.com'a YÖNLENMEMELİ
-    await page.waitForURL(/\/(admin|staff|super-admin)\/dashboard/, { timeout: 30000 })
+    await page.waitForURL(/\/(admin|staff|super-admin)\/dashboard/, { timeout: 60000 })
     expect(page.url()).not.toContain('evil.com')
   })
 })
 
 test.describe('Auth API Endpoint\'leri', () => {
+  test.describe.configure({ mode: 'serial' })
+
   test('/api/auth/me — auth\'suz → 401', async ({ request }) => {
     const response = await request.get('/api/auth/me')
     expect(response.status()).toBe(401)

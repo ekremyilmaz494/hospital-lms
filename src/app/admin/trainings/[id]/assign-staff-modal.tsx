@@ -11,9 +11,23 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Check } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
+
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
 
 interface Staff {
   id: string;
@@ -37,7 +51,7 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
   const { toast } = useToast();
   // using large limit to get all staff for simple client side filtering
   const { data, isLoading } = useFetch<StaffResponse>('/api/admin/staff?limit=1000');
-  
+
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [assigning, setAssigning] = useState(false);
@@ -50,8 +64,8 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
   }, [open]);
 
   const allStaff = data?.staff || [];
-  const filteredStaff = allStaff.filter(s => 
-    s.name.toLowerCase().includes(search.toLowerCase()) || 
+  const filteredStaff = allStaff.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.department.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -105,37 +119,38 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" style={{ background: K.SURFACE }}>
         <DialogHeader>
-          <DialogTitle>Personel Ata</DialogTitle>
-          <DialogDescription>
+          <DialogTitle style={{ fontSize: 18, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY, fontWeight: 700 }}>Personel Ata</DialogTitle>
+          <DialogDescription style={{ color: K.TEXT_SECONDARY }}>
             Bu eğitime personel atayın. Seçilen personele bildirim gönderilecektir.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4 min-h-75">
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="İsim veya departman ara..." 
+            <Search className="absolute left-3 top-2.5 h-4 w-4" style={{ color: K.TEXT_MUTED }} />
+            <Input
+              placeholder="İsim veya departman ara..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
+              style={{ background: K.SURFACE, borderColor: K.BORDER, color: K.TEXT_PRIMARY }}
             />
           </div>
 
-          <div className="flex-1 overflow-y-auto border rounded-xl" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+          <div className="flex-1 overflow-y-auto" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
             {isLoading ? (
               <div className="flex items-center justify-center p-8">
-                <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'var(--color-primary)' }} />
+                <Loader2 className="h-6 w-6 animate-spin" style={{ color: K.PRIMARY }} />
               </div>
             ) : filteredStaff.length === 0 ? (
-              <div className="text-center p-8 text-sm" style={{ color: 'var(--color-text-muted)' }}>Personel bulunamadı</div>
+              <div className="text-center p-8 text-sm" style={{ color: K.TEXT_MUTED }}>Personel bulunamadı</div>
             ) : (
-              <div className="divide-y relative" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="relative">
                 <div
-                  className="sticky top-0 z-10 p-3 flex items-center gap-3 backdrop-blur-md cursor-pointer select-none"
-                  style={{ background: 'var(--color-surface)99', borderBottom: '1px solid var(--color-border)' }}
+                  className="sticky top-0 z-10 p-3 flex items-center gap-3 cursor-pointer select-none"
+                  style={{ background: K.BG, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
                   onClick={() => {
                     const allSelected = filteredStaff.length > 0 && filteredStaff.every(s => selectedStaff.includes(s.id));
                     toggleAll(!allSelected);
@@ -147,20 +162,16 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
                       <div
                         className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border"
                         style={{
-                          borderColor: allSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                          background: allSelected ? 'var(--color-primary)' : 'transparent',
+                          borderColor: allSelected ? K.PRIMARY : K.BORDER,
+                          background: allSelected ? K.PRIMARY : 'transparent',
                           transition: 'background 150ms, border-color 150ms',
                         }}
                       >
-                        {allSelected && (
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                            <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
+                        {allSelected && <Check className="h-3 w-3" style={{ color: 'white' }} strokeWidth={3} />}
                       </div>
                     );
                   })()}
-                  <span className="text-sm font-semibold flex-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide flex-1" style={{ color: K.TEXT_MUTED }}>
                     Tümünü Seç ({filteredStaff.length})
                   </span>
                 </div>
@@ -169,26 +180,25 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
                   return (
                     <div
                       key={s.id}
-                      className="flex items-center gap-3 p-3 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                      className="flex items-center gap-3 p-3 cursor-pointer"
+                      style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}`, background: K.SURFACE }}
                       onClick={() => toggleStaff(s.id, !isChecked)}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE; }}
                     >
                       <div
                         className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border"
                         style={{
-                          borderColor: isChecked ? 'var(--color-primary)' : 'var(--color-border)',
-                          background: isChecked ? 'var(--color-primary)' : 'transparent',
+                          borderColor: isChecked ? K.PRIMARY : K.BORDER,
+                          background: isChecked ? K.PRIMARY : 'transparent',
                           transition: 'background 150ms, border-color 150ms',
                         }}
                       >
-                        {isChecked && (
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                            <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
+                        {isChecked && <Check className="h-3 w-3" style={{ color: 'white' }} strokeWidth={3} />}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{s.name}</p>
-                        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{s.department}</p>
+                        <p className="text-sm font-medium" style={{ color: K.TEXT_PRIMARY }}>{s.name}</p>
+                        <p className="text-xs" style={{ color: K.TEXT_MUTED }}>{s.department}</p>
                       </div>
                     </div>
                   );
@@ -199,12 +209,12 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>İptal</Button>
-          <Button 
-            onClick={handleAssign} 
+          <Button variant="outline" onClick={() => onOpenChange(false)} style={{ background: K.SURFACE, borderColor: K.BORDER, color: K.TEXT_SECONDARY }}>İptal</Button>
+          <Button
+            onClick={handleAssign}
             disabled={assigning || selectedStaff.length === 0}
             className="gap-2 text-white"
-            style={{ background: 'var(--color-primary)' }}
+            style={{ background: K.PRIMARY }}
           >
             {assigning && <Loader2 className="h-4 w-4 animate-spin" />}
             Seçili {selectedStaff.length > 0 ? `(${selectedStaff.length}) ` : ''}Ata

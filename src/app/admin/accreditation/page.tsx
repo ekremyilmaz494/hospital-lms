@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   ClipboardCheck, CheckCircle2, AlertTriangle, XCircle,
   RefreshCw, Download, Plus, ChevronDown, Loader2, FileText,
-  Pencil, Trash2, Lock, X,
+  Pencil, Trash2, Lock, X, ChevronRight,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useToast } from '@/components/shared/toast';
@@ -84,9 +84,9 @@ type TabId = 'standards' | 'simulation' | 'reports';
 // ── Status Helpers ──
 
 const STATUS_CONFIG = {
-  compliant: { label: 'Uyumlu', color: 'var(--color-success)', bg: 'rgba(22,163,74,0.08)' },
-  at_risk: { label: 'Risk Altında', color: 'var(--color-warning, #d97706)', bg: 'rgba(217,119,6,0.08)' },
-  non_compliant: { label: 'Uyumsuz', color: 'var(--color-destructive, #dc2626)', bg: 'rgba(220,38,38,0.08)' },
+  compliant: { label: 'Uyumlu', color: 'var(--k-success)', bg: 'rgba(22,163,74,0.08)' },
+  at_risk: { label: 'Risk Altında', color: 'var(--k-warning)', bg: 'rgba(217,119,6,0.08)' },
+  non_compliant: { label: 'Uyumsuz', color: 'var(--k-error)', bg: 'rgba(220,38,38,0.08)' },
 };
 
 function StatusBadge({ status }: { status: FindingRecord['status'] }) {
@@ -105,10 +105,10 @@ function StatusBadge({ status }: { status: FindingRecord['status'] }) {
 
 function RateBar({ actual, required }: { actual: number; required: number }) {
   const pct = Math.min(100, actual);
-  const color = actual >= required ? 'var(--color-success)' : actual >= required * 0.8 ? '#d97706' : '#dc2626';
+  const color = actual >= required ? 'var(--k-success)' : actual >= required * 0.8 ? '#d97706' : '#dc2626';
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'var(--color-border, #e2e8f0)' }}>
+      <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'var(--k-border)' }}>
         <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: color, transition: 'width 0.4s' }} />
       </div>
       <span style={{ fontSize: 12, fontWeight: 600, color, minWidth: 36, textAlign: 'right' }}>{actual}%</span>
@@ -291,87 +291,38 @@ export default function AccreditationPage() {
   // ── UI Render ──
 
   const overallRate = compliance?.overallComplianceRate ?? 0;
-  const rateColor = overallRate >= 80 ? 'var(--color-success)' : overallRate >= 60 ? '#d97706' : '#dc2626';
+  const rateColor = overallRate >= 80 ? 'var(--k-success)' : overallRate >= 60 ? '#d97706' : '#dc2626';
 
   return (
-    <div style={{ padding: '32px 32px 64px', maxWidth: 1100, margin: '0 auto' }}>
+    <div className="k-page" style={{ maxWidth: 1100, margin: '0 auto' }}>
       <BlurFade delay={0.05}>
-        {/* ── Premium Hero Header ── */}
-        <div style={{
-          position: 'relative',
-          borderRadius: 24,
-          padding: '32px 36px',
-          marginBottom: 32,
-          background: 'linear-gradient(135deg, #0f172a 0%, var(--brand-900) 65%, var(--brand-600) 100%)',
-          color: '#fff',
-          overflow: 'hidden',
-          boxShadow: '0 20px 60px -20px color-mix(in srgb, var(--brand-600) calc(0.45 * 100%), transparent), 0 8px 24px -12px rgba(15,23,42,0.3)',
-        }}>
-          {/* Dekoratif ışık halkası */}
-          <div style={{
-            position: 'absolute', top: -80, right: -80, width: 280, height: 280,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(245,158,11,0.18) 0%, transparent 70%)',
-            pointerEvents: 'none',
-          }} />
-          <div style={{
-            position: 'absolute', bottom: -120, left: -100, width: 320, height: 320,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent) 0%, transparent 70%)',
-            pointerEvents: 'none',
-          }} />
-
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18, minWidth: 280 }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: 18,
-                background: 'rgba(255,255,255,0.12)',
-                backdropFilter: 'blur(8px)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '1px solid rgba(255,255,255,0.18)',
-              }}>
-                <ClipboardCheck size={28} color="#fff" />
-              </div>
-              <div>
-                <div style={{
-                  fontSize: 11, fontWeight: 700, letterSpacing: '0.14em',
-                  color: 'rgba(245,158,11,0.95)', textTransform: 'uppercase', marginBottom: 6,
-                }}>
-                  Akreditasyon &amp; Uyum
-                </div>
-                <h1 style={{ fontSize: 28, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.02em' }}>
-                  Denetim Hazırlık Merkezi
-                </h1>
-                <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.72)', margin: '6px 0 0', maxWidth: 460 }}>
-                  JCI, ISO 9001/15189, TJC ve OSHA standartlarında uyum takibi, simülasyon ve denetçiye hazır PDF raporlama.
-                </p>
-              </div>
+        <header className="k-page-header">
+          <div>
+            <div className="k-breadcrumb">
+              <span>Panel</span>
+              <ChevronRight size={12} />
+              <span data-current="true">Akreditasyon</span>
             </div>
-
-            {/* Quick stats */}
-            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-              {[
-                { label: 'Aktif Standart', value: STANDARD_BODIES.length, accent: 'var(--brand-400)' },
-                { label: 'Toplam Rapor', value: reports.length, accent: '#fbbf24' },
-              ].map(s => (
-                <div key={s.label} style={{
-                  padding: '12px 18px', borderRadius: 14,
-                  background: 'rgba(255,255,255,0.08)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  minWidth: 120,
-                }}>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: s.accent, lineHeight: 1 }}>{s.value}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 4, fontWeight: 500 }}>{s.label}</div>
-                </div>
-              ))}
+            <h1 className="k-page-title">Denetim Hazırlık Merkezi</h1>
+            <p className="k-page-subtitle">
+              JCI, ISO 9001/15189, TJC ve OSHA standartları · uyum takibi, simülasyon ve denetçiye hazır PDF raporlama.
+            </p>
+          </div>
+          <div className="k-kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, minWidth: 280 }}>
+            <div className="k-kpi" style={{ padding: '14px 16px' }}>
+              <div className="k-kpi-label">Aktif Standart</div>
+              <div className="k-kpi-value" style={{ fontSize: 22 }}>{STANDARD_BODIES.length}</div>
+            </div>
+            <div className="k-kpi" style={{ padding: '14px 16px' }}>
+              <div className="k-kpi-label">Toplam Rapor</div>
+              <div className="k-kpi-value" style={{ fontSize: 22 }}>{reports.length}</div>
             </div>
           </div>
-        </div>
+        </header>
 
         {/* ── Standart Seçici ── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontWeight: 500 }}>Standart:</span>
+          <span style={{ fontSize: 13, color: 'var(--k-text-muted)', fontWeight: 500 }}>Standart:</span>
           {STANDARD_BODIES.map(b => (
             <button
               key={b.value}
@@ -379,9 +330,9 @@ export default function AccreditationPage() {
               style={{
                 padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                 cursor: 'pointer', border: '1.5px solid',
-                borderColor: selectedBody === b.value ? 'var(--color-primary)' : 'var(--color-border, #e2e8f0)',
-                background: selectedBody === b.value ? 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)' : 'transparent',
-                color: selectedBody === b.value ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                borderColor: selectedBody === b.value ? 'var(--k-primary)' : 'var(--k-border)',
+                background: selectedBody === b.value ? 'color-mix(in srgb, var(--k-primary) calc(0.1 * 100%), transparent)' : 'transparent',
+                color: selectedBody === b.value ? 'var(--k-primary)' : 'var(--k-text-secondary)',
                 transition: 'all 0.15s',
               }}
             >
@@ -391,7 +342,7 @@ export default function AccreditationPage() {
         </div>
 
         {/* ── Sekmeler ── */}
-        <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--color-border, #e2e8f0)', marginBottom: 28 }}>
+        <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--k-border)', marginBottom: 28 }}>
           {([
             { id: 'standards', label: 'Standartlar' },
             { id: 'simulation', label: 'Denetim Simülasyonu' },
@@ -403,8 +354,8 @@ export default function AccreditationPage() {
               style={{
                 padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 border: 'none', background: 'transparent',
-                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                borderBottom: activeTab === tab.id ? '2px solid var(--color-primary)' : '2px solid transparent',
+                color: activeTab === tab.id ? 'var(--k-primary)' : 'var(--k-text-secondary)',
+                borderBottom: activeTab === tab.id ? '2px solid var(--k-primary)' : '2px solid transparent',
                 marginBottom: -2, transition: 'color 0.15s',
               }}
             >
@@ -419,7 +370,7 @@ export default function AccreditationPage() {
         {activeTab === 'standards' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              <div style={{ fontSize: 12, color: 'var(--k-text-muted)' }}>
                 Resmi standartlar <ShieldLockInline /> kilitli · kuruma özel olanları düzenleyebilirsiniz
               </div>
               <button
@@ -428,7 +379,7 @@ export default function AccreditationPage() {
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '8px 14px', borderRadius: 10, border: 'none',
-                  background: 'var(--color-primary)', color: 'white',
+                  background: 'var(--k-primary)', color: 'white',
                   fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 }}
               >
@@ -438,10 +389,10 @@ export default function AccreditationPage() {
 
             {loadingStandards ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-text-muted)' }} />
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--k-text-muted)' }} />
               </div>
             ) : standards.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-muted)', fontSize: 14 }}>
+              <div style={{ textAlign: 'center', padding: 48, color: 'var(--k-text-muted)', fontSize: 14 }}>
                 Bu standart için kayıt bulunamadı. Yeni standart eklemek için yukarıdaki butona basın.
               </div>
             ) : (
@@ -449,29 +400,29 @@ export default function AccreditationPage() {
                 {standards.map((std, i) => (
                   <BlurFade key={std.id} delay={0.03 * i}>
                     <div style={{
-                      background: 'var(--color-card, #fff)', borderRadius: 14,
+                      background: 'var(--k-surface)', borderRadius: 14,
                       border: std.isCustom
-                        ? '1px solid color-mix(in srgb, var(--brand-600) calc(0.35 * 100%), transparent)'
-                        : '1px solid var(--color-border, #e2e8f0)',
+                        ? '1px solid color-mix(in srgb, var(--k-primary) calc(0.35 * 100%), transparent)'
+                        : '1px solid var(--k-border)',
                       padding: '16px 20px',
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                             <span style={{
-                              fontSize: 11, fontWeight: 700, color: 'var(--color-primary)',
-                              background: 'color-mix(in srgb, var(--brand-600) calc(0.1 * 100%), transparent)', padding: '1px 7px', borderRadius: 6,
+                              fontSize: 11, fontWeight: 700, color: 'var(--k-primary)',
+                              background: 'color-mix(in srgb, var(--k-primary) calc(0.1 * 100%), transparent)', padding: '1px 7px', borderRadius: 6,
                             }}>
                               {std.code}
                             </span>
-                            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--k-text-primary)' }}>
                               {std.title}
                             </span>
                             {std.isCustom ? (
                               <span style={{
                                 fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
-                                background: 'color-mix(in srgb, var(--brand-600) calc(0.12 * 100%), transparent)',
-                                color: 'var(--color-primary)',
+                                background: 'color-mix(in srgb, var(--k-primary) calc(0.12 * 100%), transparent)',
+                                color: 'var(--k-primary)',
                               }}>
                                 KURUMA ÖZEL
                               </span>
@@ -479,15 +430,15 @@ export default function AccreditationPage() {
                               <span title="Resmi standart — düzenlenemez" style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 3,
                                 fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 6,
-                                background: 'var(--color-surface-hover, #f1f5f9)',
-                                color: 'var(--color-text-muted)',
+                                background: 'var(--k-surface-hover)',
+                                color: 'var(--k-text-muted)',
                               }}>
                                 🔒 RESMİ
                               </span>
                             )}
                           </div>
                           {std.description && (
-                            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 8px' }}>
+                            <p style={{ fontSize: 12, color: 'var(--k-text-muted)', margin: '0 0 8px' }}>
                               {std.description}
                             </p>
                           )}
@@ -497,7 +448,7 @@ export default function AccreditationPage() {
                               return (
                                 <span key={cat} style={{
                                   fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 8,
-                                  background: 'var(--color-surface-hover, #f1f5f9)', color: 'var(--color-text-muted)',
+                                  background: 'var(--k-surface-hover)', color: 'var(--k-text-muted)',
                                 }}>
                                   {opt?.label ?? cat}
                                 </span>
@@ -507,10 +458,10 @@ export default function AccreditationPage() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                           <div style={{ textAlign: 'center', minWidth: 72 }}>
-                            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-primary)' }}>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--k-primary)' }}>
                               %{std.requiredCompletionRate}
                             </div>
-                            <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>gerekli oran</div>
+                            <div style={{ fontSize: 10, color: 'var(--k-text-muted)' }}>gerekli oran</div>
                           </div>
                           {std.isCustom && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -519,8 +470,8 @@ export default function AccreditationPage() {
                                 onClick={() => { setEditingStandard(std); setShowStandardModal(true); }}
                                 title="Düzenle"
                                 style={{
-                                  padding: 6, borderRadius: 8, border: '1px solid var(--color-border)',
-                                  background: 'var(--color-card, #fff)', color: 'var(--color-text-muted)',
+                                  padding: 6, borderRadius: 8, border: '1px solid var(--k-border)',
+                                  background: 'var(--k-surface)', color: 'var(--k-text-muted)',
                                   cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                                 }}
                               >
@@ -531,8 +482,8 @@ export default function AccreditationPage() {
                                 onClick={() => handleDeleteStandard(std.id)}
                                 title="Sil"
                                 style={{
-                                  padding: 6, borderRadius: 8, border: '1px solid var(--color-border)',
-                                  background: 'var(--color-card, #fff)', color: 'var(--color-destructive, #dc2626)',
+                                  padding: 6, borderRadius: 8, border: '1px solid var(--k-border)',
+                                  background: 'var(--k-surface)', color: 'var(--k-error)',
                                   cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                                 }}
                               >
@@ -566,29 +517,29 @@ export default function AccreditationPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Dönem seçici + çalıştır */}
             <div style={{
-              background: 'var(--color-card, #fff)', borderRadius: 16,
-              border: '1px solid var(--color-border, #e2e8f0)', padding: 20,
+              background: 'var(--k-surface)', borderRadius: 16,
+              border: '1px solid var(--k-border)', padding: 20,
               display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap',
             }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', display: 'block', marginBottom: 6 }}>
                   Dönem Başlangıcı
                 </label>
                 <input type="date" value={simPeriodStart} onChange={e => setSimPeriodStart(e.target.value)}
                   style={{
-                    padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border, #e2e8f0)',
-                    fontSize: 13, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                    padding: '8px 12px', borderRadius: 8, border: '1px solid var(--k-border)',
+                    fontSize: 13, background: 'var(--k-bg)', color: 'var(--k-text-primary)',
                   }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', display: 'block', marginBottom: 6 }}>
                   Dönem Bitişi
                 </label>
                 <input type="date" value={simPeriodEnd} onChange={e => setSimPeriodEnd(e.target.value)}
                   style={{
-                    padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border, #e2e8f0)',
-                    fontSize: 13, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                    padding: '8px 12px', borderRadius: 8, border: '1px solid var(--k-border)',
+                    fontSize: 13, background: 'var(--k-bg)', color: 'var(--k-text-primary)',
                   }}
                 />
               </div>
@@ -598,7 +549,7 @@ export default function AccreditationPage() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '9px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                  background: 'var(--color-primary)', color: '#fff', border: 'none', cursor: 'pointer',
+                  background: 'var(--k-primary)', color: '#fff', border: 'none', cursor: 'pointer',
                   opacity: loadingCompliance ? 0.7 : 1,
                 }}
               >
@@ -616,39 +567,39 @@ export default function AccreditationPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
                   {[
                     { label: 'Genel Uyumluluk', value: `%${overallRate}`, color: rateColor },
-                    { label: 'Uyumlu', value: compliance.compliantCount, color: 'var(--color-success)' },
+                    { label: 'Uyumlu', value: compliance.compliantCount, color: 'var(--k-success)' },
                     { label: 'Risk Altında', value: compliance.atRiskCount, color: '#d97706' },
                     { label: 'Uyumsuz', value: compliance.nonCompliantCount, color: '#dc2626' },
                   ].map(card => (
                     <div key={card.label} style={{
-                      background: 'var(--color-card, #fff)', borderRadius: 14,
-                      border: '1px solid var(--color-border, #e2e8f0)', padding: '16px 20px',
+                      background: 'var(--k-surface)', borderRadius: 14,
+                      border: '1px solid var(--k-border)', padding: '16px 20px',
                       textAlign: 'center',
                     }}>
                       <div style={{ fontSize: 26, fontWeight: 800, color: card.color as string }}>{card.value}</div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{card.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--k-text-muted)', marginTop: 2 }}>{card.label}</div>
                     </div>
                   ))}
                 </div>
 
                 {/* Bulgular tablosu */}
                 <div style={{
-                  background: 'var(--color-card, #fff)', borderRadius: 16,
-                  border: '1px solid var(--color-border, #e2e8f0)', overflow: 'hidden',
+                  background: 'var(--k-surface)', borderRadius: 16,
+                  border: '1px solid var(--k-border)', overflow: 'hidden',
                 }}>
-                  <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border, #e2e8f0)' }}>
-                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--k-border)' }}>
+                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--k-text-primary)' }}>
                       Standart Bulgular
                     </h3>
                   </div>
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
-                        <tr style={{ background: 'var(--color-surface-hover)' }}>
+                        <tr style={{ background: 'var(--k-surface-hover)' }}>
                           {['Kod', 'Standart', 'Gereken', 'Gerçekleşen', 'Eksik Personel', 'Durum'].map(h => (
                             <th key={h} style={{
                               padding: '10px 14px', textAlign: 'left', fontSize: 11,
-                              fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '0.05em',
+                              fontWeight: 700, color: 'var(--k-text-muted)', letterSpacing: '0.05em',
                             }}>{h}</th>
                           ))}
                         </tr>
@@ -656,21 +607,21 @@ export default function AccreditationPage() {
                       <tbody>
                         {compliance.findings.map((f, i) => (
                           <tr key={f.standardCode} style={{
-                            borderTop: i > 0 ? '1px solid var(--color-border, #e2e8f0)' : undefined,
+                            borderTop: i > 0 ? '1px solid var(--k-border)' : undefined,
                           }}>
-                            <td style={{ padding: '12px 14px', fontSize: 12, fontWeight: 700, color: 'var(--color-primary)' }}>
+                            <td style={{ padding: '12px 14px', fontSize: 12, fontWeight: 700, color: 'var(--k-primary)' }}>
                               {f.standardCode}
                             </td>
-                            <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--color-text-primary)', maxWidth: 280 }}>
+                            <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--k-text-primary)', maxWidth: 280 }}>
                               {f.standardTitle}
                             </td>
-                            <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--color-text-muted)' }}>
+                            <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--k-text-muted)' }}>
                               %{f.requiredRate}
                             </td>
                             <td style={{ padding: '12px 14px', minWidth: 120 }}>
                               <RateBar actual={f.actualRate} required={f.requiredRate} />
                             </td>
-                            <td style={{ padding: '12px 14px', fontSize: 12, color: f.missingStaffCount > 0 ? '#dc2626' : 'var(--color-text-muted)' }}>
+                            <td style={{ padding: '12px 14px', fontSize: 12, color: f.missingStaffCount > 0 ? '#dc2626' : 'var(--k-text-muted)' }}>
                               {f.missingStaffCount > 0 ? `${f.missingStaffCount} kişi` : '—'}
                             </td>
                             <td style={{ padding: '12px 14px' }}>
@@ -687,17 +638,17 @@ export default function AccreditationPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   {/* Aksiyon Planı */}
                   <div style={{
-                    background: 'var(--color-card, #fff)', borderRadius: 16,
-                    border: '1px solid var(--color-border, #e2e8f0)', padding: 20,
+                    background: 'var(--k-surface)', borderRadius: 16,
+                    border: '1px solid var(--k-border)', padding: 20,
                   }}>
-                    <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                    <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700, color: 'var(--k-text-primary)' }}>
                       Aksiyon Planı Oluştur
                     </h3>
-                    <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
+                    <p style={{ fontSize: 12, color: 'var(--k-text-muted)', margin: '0 0 12px' }}>
                       Seçilen kategorilerde eksik eğitimleri tüm personele atar.
                     </p>
                     <div style={{ marginBottom: 12 }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', display: 'block', marginBottom: 6 }}>
                         Kategoriler (virgülle ayrılmış)
                       </label>
                       <input
@@ -706,20 +657,20 @@ export default function AccreditationPage() {
                         placeholder="enfeksiyon, genel, is-guvenligi"
                         style={{
                           width: '100%', padding: '8px 12px', borderRadius: 8,
-                          border: '1px solid var(--color-border, #e2e8f0)',
-                          fontSize: 12, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                          border: '1px solid var(--k-border)',
+                          fontSize: 12, background: 'var(--k-bg)', color: 'var(--k-text-primary)',
                           boxSizing: 'border-box',
                         }}
                       />
                     </div>
                     <div style={{ marginBottom: 16 }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', display: 'block', marginBottom: 6 }}>
                         Son Tamamlanma Tarihi (isteğe bağlı)
                       </label>
                       <input type="date" value={actionPlanDueDate} onChange={e => setActionPlanDueDate(e.target.value)}
                         style={{
-                          padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border, #e2e8f0)',
-                          fontSize: 12, background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                          padding: '8px 12px', borderRadius: 8, border: '1px solid var(--k-border)',
+                          fontSize: 12, background: 'var(--k-bg)', color: 'var(--k-text-primary)',
                         }}
                       />
                     </div>
@@ -729,7 +680,7 @@ export default function AccreditationPage() {
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                        background: 'var(--color-primary)', color: '#fff', border: 'none', cursor: 'pointer',
+                        background: 'var(--k-primary)', color: '#fff', border: 'none', cursor: 'pointer',
                         opacity: creatingPlan ? 0.7 : 1,
                       }}
                     >
@@ -742,18 +693,18 @@ export default function AccreditationPage() {
 
                   {/* Rapor Kaydet */}
                   <div style={{
-                    background: 'var(--color-card, #fff)', borderRadius: 16,
-                    border: '1px solid var(--color-border, #e2e8f0)', padding: 20,
+                    background: 'var(--k-surface)', borderRadius: 16,
+                    border: '1px solid var(--k-border)', padding: 20,
                     display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                   }}>
                     <div>
-                      <h3 style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                      <h3 style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, color: 'var(--k-text-primary)' }}>
                         Denetim Raporunu Kaydet
                       </h3>
-                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 8px' }}>
+                      <p style={{ fontSize: 12, color: 'var(--k-text-muted)', margin: '0 0 8px' }}>
                         Simülasyon sonucunu resmi rapor olarak kaydeder ve PDF indirebilirsiniz.
                       </p>
-                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
+                      <p style={{ fontSize: 12, color: 'var(--k-text-muted)', margin: 0 }}>
                         Dönem: <strong>{simPeriodStart}</strong> → <strong>{simPeriodEnd}</strong>
                       </p>
                     </div>
@@ -786,27 +737,27 @@ export default function AccreditationPage() {
           <div>
             {loadingReports ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-text-muted)' }} />
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--k-text-muted)' }} />
               </div>
             ) : reports.length === 0 ? (
               <div style={{
                 textAlign: 'center', padding: '64px 32px',
-                background: 'var(--color-surface)',
+                background: 'var(--k-surface)',
                 borderRadius: 20,
-                border: '1px dashed color-mix(in srgb, var(--brand-600) calc(0.35 * 100%), transparent)',
+                border: '1px dashed color-mix(in srgb, var(--k-primary) calc(0.35 * 100%), transparent)',
               }}>
                 <div style={{
                   width: 72, height: 72, borderRadius: 20,
-                  background: 'color-mix(in srgb, var(--brand-600) calc(0.12 * 100%), transparent)',
+                  background: 'color-mix(in srgb, var(--k-primary) calc(0.12 * 100%), transparent)',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   marginBottom: 18,
                 }}>
-                  <FileText size={32} color="var(--brand-600)" />
+                  <FileText size={32} color="var(--k-primary)" />
                 </div>
-                <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 6px' }}>
+                <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--k-text-primary)', margin: '0 0 6px' }}>
                   Henüz Akreditasyon Raporu Oluşturulmadı
                 </h3>
-                <p style={{ fontSize: 13.5, color: 'var(--color-text-secondary)', margin: '0 0 22px', maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
+                <p style={{ fontSize: 13.5, color: 'var(--k-text-secondary)', margin: '0 0 22px', maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
                   Denetim Simülasyonu sekmesinden uyum analizini çalıştırın, sonucu resmi rapor olarak kaydedin.
                 </p>
                 <button
@@ -814,9 +765,9 @@ export default function AccreditationPage() {
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 8,
                     padding: '11px 22px', borderRadius: 12, fontSize: 13.5, fontWeight: 700,
-                    background: 'var(--color-primary)', color: '#fff',
+                    background: 'var(--k-primary)', color: '#fff',
                     border: 'none', cursor: 'pointer',
-                    boxShadow: '0 8px 24px color-mix(in srgb, var(--brand-600) calc(0.3 * 100%), transparent)',
+                    boxShadow: '0 8px 24px color-mix(in srgb, var(--k-primary) calc(0.3 * 100%), transparent)',
                   }}
                 >
                   <RefreshCw size={15} />
@@ -831,7 +782,7 @@ export default function AccreditationPage() {
               }}>
                 {reports.map((r, i) => {
                   const rate = Number(r.overallComplianceRate);
-                  const color = rate >= 80 ? 'var(--brand-500)' : rate >= 60 ? '#f59e0b' : '#ef4444';
+                  const color = rate >= 80 ? 'var(--k-success)' : rate >= 60 ? '#f59e0b' : '#ef4444';
                   const colorBg = rate >= 80 ? 'rgba(16,185,129,0.08)' : rate >= 60 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)';
                   const status = rate >= 80 ? 'Uyumlu' : rate >= 60 ? 'Risk Altında' : 'Kritik';
                   const periodMonths = Math.round(
@@ -844,9 +795,9 @@ export default function AccreditationPage() {
                     <BlurFade key={r.id} delay={0.04 * i}>
                       <div style={{
                         position: 'relative',
-                        background: 'var(--color-surface)',
+                        background: 'var(--k-surface)',
                         borderRadius: 18,
-                        border: '1px solid var(--color-border)',
+                        border: '1px solid var(--k-border)',
                         overflow: 'hidden',
                         transition: 'transform 0.2s, box-shadow 0.2s',
                         boxShadow: '0 1px 3px rgba(15,23,42,0.04)',
@@ -869,21 +820,21 @@ export default function AccreditationPage() {
                             <span style={{
                               display: 'inline-flex', alignItems: 'center', gap: 5,
                               padding: '4px 10px', borderRadius: 8,
-                              background: 'color-mix(in srgb, var(--brand-600) calc(0.08 * 100%), transparent)',
-                              color: 'var(--color-primary)',
+                              background: 'color-mix(in srgb, var(--k-primary) calc(0.08 * 100%), transparent)',
+                              color: 'var(--k-primary)',
                               fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
                             }}>
                               <ClipboardCheck size={11} />
                               {r.standardBody.replace('_', ' ')}
                             </span>
-                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                            <span style={{ fontSize: 11, color: 'var(--k-text-muted)' }}>
                               {new Date(r.generatedAt).toLocaleDateString('tr-TR')}
                             </span>
                           </div>
 
                           {/* Başlık */}
                           <h3 style={{
-                            fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)',
+                            fontSize: 15, fontWeight: 700, color: 'var(--k-text-primary)',
                             margin: '0 0 18px', lineHeight: 1.35,
                             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                             overflow: 'hidden', minHeight: 40,
@@ -894,7 +845,7 @@ export default function AccreditationPage() {
                           {/* Donut + meta */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 18 }}>
                             <svg width={88} height={88} style={{ flexShrink: 0 }}>
-                              <circle cx={44} cy={44} r={36} stroke="var(--color-border, #e2e8f0)" strokeWidth={8} fill="none" />
+                              <circle cx={44} cy={44} r={36} stroke="var(--k-border)" strokeWidth={8} fill="none" />
                               <circle
                                 cx={44} cy={44} r={36}
                                 stroke={color} strokeWidth={8} fill="none"
@@ -918,10 +869,10 @@ export default function AccreditationPage() {
                               }}>
                                 {status}
                               </div>
-                              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 2 }}>
-                                <strong style={{ color: 'var(--color-text-secondary)' }}>Dönem:</strong> {periodMonths} ay
+                              <div style={{ fontSize: 12, color: 'var(--k-text-muted)', marginBottom: 2 }}>
+                                <strong style={{ color: 'var(--k-text-secondary)' }}>Dönem:</strong> {periodMonths} ay
                               </div>
-                              <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
+                              <div style={{ fontSize: 11.5, color: 'var(--k-text-muted)' }}>
                                 {new Date(r.periodStart).toLocaleDateString('tr-TR')} — {new Date(r.periodEnd).toLocaleDateString('tr-TR')}
                               </div>
                             </div>
@@ -935,10 +886,10 @@ export default function AccreditationPage() {
                               width: '100%',
                               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                               padding: '11px 16px', borderRadius: 12, fontSize: 13, fontWeight: 700,
-                              background: downloadingId === r.id ? 'color-mix(in srgb, var(--brand-600) calc(0.6 * 100%), transparent)' : 'var(--color-primary)',
+                              background: downloadingId === r.id ? 'color-mix(in srgb, var(--k-primary) calc(0.6 * 100%), transparent)' : 'var(--k-primary)',
                               color: '#fff',
                               border: 'none', cursor: downloadingId === r.id ? 'wait' : 'pointer',
-                              boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
+                              boxShadow: '0 4px 12px color-mix(in srgb, var(--k-primary) calc(0.25 * 100%), transparent)',
                               transition: 'transform 0.15s',
                             }}
                             onMouseEnter={e => { if (downloadingId !== r.id) e.currentTarget.style.transform = 'scale(1.02)'; }}
@@ -977,7 +928,7 @@ function ShieldLockInline() {
   return (
     <Lock
       size={11}
-      style={{ display: 'inline-block', verticalAlign: '-1px', margin: '0 2px', color: 'var(--color-text-muted)' }}
+      style={{ display: 'inline-block', verticalAlign: '-1px', margin: '0 2px', color: 'var(--k-text-muted)' }}
     />
   );
 }
@@ -1055,21 +1006,21 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: 'var(--color-card, #fff)', borderRadius: 16,
+          background: 'var(--k-surface)', borderRadius: 16,
           width: '100%', maxWidth: 560, maxHeight: '90vh',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
           boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
         }}
       >
         <div style={{
-          padding: '16px 20px', borderBottom: '1px solid var(--color-border)',
+          padding: '16px 20px', borderBottom: '1px solid var(--k-border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
               {initial ? 'Standart Düzenle' : 'Yeni Standart'}
             </h3>
-            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-text-muted)' }}>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--k-text-muted)' }}>
               Kuruma özel akreditasyon standardı tanımlayın
             </p>
           </div>
@@ -1078,7 +1029,7 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
             onClick={onClose}
             style={{
               padding: 6, borderRadius: 8, border: 'none',
-              background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer',
+              background: 'transparent', color: 'var(--k-text-muted)', cursor: 'pointer',
             }}
           >
             <X size={16} />
@@ -1088,7 +1039,7 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
         <div style={{ padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 5 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', marginBottom: 5 }}>
                 Kod *
               </label>
               <input
@@ -1098,13 +1049,13 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
                 maxLength={50}
                 style={{
                   width: '100%', padding: '8px 10px', borderRadius: 8,
-                  border: '1px solid var(--color-border)', fontSize: 13, fontFamily: 'var(--font-mono)',
-                  background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                  border: '1px solid var(--k-border)', fontSize: 13, fontFamily: 'var(--font-mono)',
+                  background: 'var(--k-bg)', color: 'var(--k-text-primary)',
                 }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 5 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', marginBottom: 5 }}>
                 Standart Kuruluşu *
               </label>
               <select
@@ -1112,8 +1063,8 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
                 onChange={e => setStandardBody(e.target.value as StandardBody)}
                 style={{
                   width: '100%', padding: '8px 10px', borderRadius: 8,
-                  border: '1px solid var(--color-border)', fontSize: 13,
-                  background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                  border: '1px solid var(--k-border)', fontSize: 13,
+                  background: 'var(--k-bg)', color: 'var(--k-text-primary)',
                 }}
               >
                 {STANDARD_BODIES.map(b => (
@@ -1124,7 +1075,7 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 5 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', marginBottom: 5 }}>
               Başlık *
             </label>
             <input
@@ -1134,14 +1085,14 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
               maxLength={500}
               style={{
                 width: '100%', padding: '8px 10px', borderRadius: 8,
-                border: '1px solid var(--color-border)', fontSize: 13,
-                background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                border: '1px solid var(--k-border)', fontSize: 13,
+                background: 'var(--k-bg)', color: 'var(--k-text-primary)',
               }}
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 5 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', marginBottom: 5 }}>
               Açıklama
             </label>
             <textarea
@@ -1152,15 +1103,15 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
               placeholder="Standardın ne kapsadığı..."
               style={{
                 width: '100%', padding: '8px 10px', borderRadius: 8,
-                border: '1px solid var(--color-border)', fontSize: 13, resize: 'vertical',
-                background: 'var(--color-bg, #f8fafc)', color: 'var(--color-text-primary)',
+                border: '1px solid var(--k-border)', fontSize: 13, resize: 'vertical',
+                background: 'var(--k-bg)', color: 'var(--k-text-primary)',
                 fontFamily: 'inherit',
               }}
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', marginBottom: 6 }}>
               Zorunlu Eğitim Kategorileri * ({categories.length} seçili)
             </label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -1173,9 +1124,9 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
                     onClick={() => toggleCategory(opt.value)}
                     style={{
                       padding: '6px 12px', borderRadius: 999,
-                      border: `1px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                      background: active ? 'var(--color-primary)' : 'var(--color-bg, #f8fafc)',
-                      color: active ? '#fff' : 'var(--color-text-secondary)',
+                      border: `1px solid ${active ? 'var(--k-primary)' : 'var(--k-border)'}`,
+                      background: active ? 'var(--k-primary)' : 'var(--k-bg)',
+                      color: active ? '#fff' : 'var(--k-text-secondary)',
                       fontSize: 12, fontWeight: 600, cursor: 'pointer',
                     }}
                   >
@@ -1187,7 +1138,7 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 5 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', marginBottom: 5 }}>
               Minimum Tamamlanma Oranı: %{rate}
             </label>
             <input
@@ -1202,7 +1153,7 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
         </div>
 
         <div style={{
-          padding: '12px 20px', borderTop: '1px solid var(--color-border)',
+          padding: '12px 20px', borderTop: '1px solid var(--k-border)',
           display: 'flex', justifyContent: 'flex-end', gap: 8,
         }}>
           <button
@@ -1211,8 +1162,8 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
             disabled={saving}
             style={{
               padding: '8px 14px', borderRadius: 10,
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-card, #fff)', color: 'var(--color-text-secondary)',
+              border: '1px solid var(--k-border)',
+              background: 'var(--k-surface)', color: 'var(--k-text-secondary)',
               fontSize: 13, fontWeight: 600, cursor: 'pointer',
             }}
           >
@@ -1224,7 +1175,7 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
             disabled={saving}
             style={{
               padding: '8px 16px', borderRadius: 10, border: 'none',
-              background: 'var(--color-primary)', color: '#fff',
+              background: 'var(--k-primary)', color: '#fff',
               fontSize: 13, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
               opacity: saving ? 0.7 : 1,
               display: 'inline-flex', alignItems: 'center', gap: 6,

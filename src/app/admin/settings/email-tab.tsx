@@ -68,20 +68,20 @@ function Field({ label, hint, icon: Icon, children }: {
   return (
     <div>
       <Label
-        className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide"
-        style={{ color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}
+        className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: 'var(--k-text-muted)' }}
       >
-        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
+        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--k-primary)' }} />
         {label}
       </Label>
       {children}
-      {hint && <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>{hint}</p>}
+      {hint && <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--k-text-muted)' }}>{hint}</p>}
     </div>
   );
 }
 
-const inputClass = 'h-11 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--color-primary)]/20';
-const inputStyle = { background: 'var(--color-bg)', borderColor: 'var(--color-border)' };
+const inputClass = 'h-11 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--k-primary)]/20';
+const inputStyle = { background: 'var(--k-surface-hover)', borderColor: 'var(--k-border)' };
 
 export default function EmailTab() {
   const { toast } = useToast();
@@ -173,7 +173,7 @@ export default function EmailTab() {
   };
 
   if (loading) {
-    return <div className="p-8 h-64 animate-pulse rounded-lg" style={{ background: 'var(--color-bg)' }} />;
+    return <div className="p-8 h-64 animate-pulse rounded-lg" style={{ background: 'var(--k-surface-hover)' }} />;
   }
 
   const canEnable = Boolean(data.smtpHost && data.smtpUser && (data.smtpPassword || data.hasPassword));
@@ -185,7 +185,7 @@ export default function EmailTab() {
         <h2 className="text-lg font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
           E-posta Gönderimi (SMTP)
         </h2>
-        <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-[13px] mt-1" style={{ color: 'var(--k-text-muted)' }}>
           Personele gönderilen otomatik bildirimler (eğitim ataması, hatırlatma vb.) burada tanımladığınız
           SMTP sunucusundan, kurumunuzun adıyla gönderilir.
         </p>
@@ -196,28 +196,28 @@ export default function EmailTab() {
         className="flex items-center gap-4 rounded-xl p-5 mb-6"
         style={{
           background: data.smtpEnabled
-            ? 'linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 6%, transparent), color-mix(in srgb, var(--color-primary) 3%, transparent))'
-            : 'var(--color-bg)',
-          border: `1px solid ${data.smtpEnabled ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'var(--color-border)'}`,
+            ? 'linear-gradient(135deg, color-mix(in srgb, var(--k-primary) 6%, transparent), color-mix(in srgb, var(--k-primary) 3%, transparent))'
+            : 'var(--k-surface-hover)',
+          border: `1px solid ${data.smtpEnabled ? 'color-mix(in srgb, var(--k-primary) 20%, transparent)' : 'var(--k-border)'}`,
         }}
       >
         <div
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
           style={{
             background: data.smtpEnabled
-              ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)'
-              : 'var(--color-surface)',
-            border: `1px solid ${data.smtpEnabled ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'var(--color-border)'}`,
+              ? 'color-mix(in srgb, var(--k-primary) 12%, transparent)'
+              : 'var(--k-surface)',
+            border: `1px solid ${data.smtpEnabled ? 'color-mix(in srgb, var(--k-primary) 20%, transparent)' : 'var(--k-border)'}`,
           }}
         >
           <Mail
             className="h-5 w-5"
-            style={{ color: data.smtpEnabled ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
+            style={{ color: data.smtpEnabled ? 'var(--k-primary)' : 'var(--k-text-muted)' }}
           />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold">E-posta Gönderimini Aktifleştir</p>
-          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--k-text-muted)' }}>
             {canEnable
               ? 'Aktif olduğunda eğitim atamaları e-posta olarak da gönderilir'
               : 'Aktifleştirmek için önce sunucu, kullanıcı ve şifre bilgilerini girin'}
@@ -287,12 +287,12 @@ export default function EmailTab() {
       {/* Security */}
       <div
         className="flex items-center gap-4 rounded-xl p-4 mb-6"
-        style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+        style={{ background: 'var(--k-surface-hover)', border: '1px solid var(--k-border)' }}
       >
-        <Lock className="h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
+        <Lock className="h-4 w-4" style={{ color: 'var(--k-text-muted)' }} />
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold">Bağlantı Güvenliği (SSL/TLS)</p>
-          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--k-text-muted)' }}>
             465 portu için aktif edin. 587 için kapalı bırakın (STARTTLS otomatik).
           </p>
         </div>
@@ -327,13 +327,13 @@ export default function EmailTab() {
       {/* Test block */}
       <div
         className="rounded-xl p-5 mb-6"
-        style={{ background: 'var(--color-bg)', border: '1px dashed var(--color-border)' }}
+        style={{ background: 'var(--k-surface-hover)', border: '1px dashed var(--k-border)' }}
       >
         <div className="flex items-center gap-2 mb-3">
-          <Send className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+          <Send className="h-4 w-4" style={{ color: 'var(--k-primary)' }} />
           <h3 className="text-[13px] font-semibold">Test E-postası Gönder</h3>
         </div>
-        <p className="text-[11px] mb-3" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-[11px] mb-3" style={{ color: 'var(--k-text-muted)' }}>
           Kaydetmeden önce yukarıdaki ayarlarla canlı bir test e-postası gönderin. Hatalı config varsa burada tespit edersiniz.
         </p>
         <div className="flex gap-2">
@@ -349,11 +349,7 @@ export default function EmailTab() {
             type="button"
             onClick={handleTest}
             disabled={testing || !testEmail}
-            className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-200 disabled:opacity-60"
-            style={{
-              background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-              boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.2 * 100%), transparent)',
-            }}
+            className="k-btn k-btn-primary"
           >
             {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Test Gönder
@@ -365,20 +361,20 @@ export default function EmailTab() {
       <div
         className="flex items-start gap-3 rounded-xl p-4 mb-6"
         style={{
-          background: 'color-mix(in srgb, var(--color-info, #3b82f6) 6%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--color-info, #3b82f6) 20%, transparent)',
+          background: 'color-mix(in srgb, var(--k-info) 6%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--k-info) 20%, transparent)',
         }}
       >
         {data.smtpEnabled ? (
-          <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--color-success, #16a34a)' }} />
+          <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--k-success)' }} />
         ) : (
-          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--color-info, #3b82f6)' }} />
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--k-info)' }} />
         )}
         <div>
           <p className="text-[13px] font-semibold">
             {data.smtpEnabled ? 'E-posta gönderimi aktif' : 'E-posta gönderimi pasif'}
           </p>
-          <p className="text-[11px] mt-1 leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-[11px] mt-1 leading-relaxed" style={{ color: 'var(--k-text-muted)' }}>
             {data.smtpEnabled
               ? 'Yeni eğitim atamaları personelin e-posta adresine otomatik gönderilecek. Şifreniz AES-256-GCM ile şifrelenerek saklanıyor.'
               : 'Şu an sadece uygulama içi bildirim kullanılıyor. SMTP konfigüre edip aktifleştirdiğinizde eğitim atamaları e-posta olarak da gidecek.'}
@@ -392,11 +388,7 @@ export default function EmailTab() {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-[13px] font-semibold text-white transition-all duration-200 disabled:opacity-60"
-          style={{
-            background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-            boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
-          }}
+          className="k-btn k-btn-primary"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {saving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}

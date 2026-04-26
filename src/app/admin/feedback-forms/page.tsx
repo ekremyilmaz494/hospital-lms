@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, Loader2, GripVertical, AlertCircle, Sparkles, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, Save, Loader2, GripVertical, AlertCircle, Sparkles, RotateCcw, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/shared/page-header';
@@ -45,7 +45,7 @@ const DEFAULT_TEMPLATE: Category[] = [
 ];
 
 const TYPE_META: Record<QuestionType, { label: string; col: string; bg: string }> = {
-  likert_5: { label: '1–5 Puan', col: 'var(--color-success)', bg: 'var(--color-success-bg)' },
+  likert_5: { label: '1–5 Puan', col: 'var(--k-success)', bg: 'var(--k-success-bg)' },
   yes_partial_no: { label: 'Evet / Kısmen / Hayır', col: '#6366f1', bg: '#eef2ff' },
   text: { label: 'Serbest Metin', col: '#f59e0b', bg: '#fffbeb' },
 };
@@ -105,34 +105,41 @@ export default function FeedbackFormEditorPage() {
   if (loading) return <PageLoading />;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
-      <PageHeader
-        title="Geri Bildirim Formu"
-        subtitle="EY.FR.40 eğitim değerlendirme anketini özelleştirin"
-      />
+    <div className="k-page max-w-4xl mx-auto">
+      <header className="k-page-header">
+        <div>
+          <div className="k-breadcrumb">
+            <span>Panel</span>
+            <ChevronRight size={12} />
+            <span data-current="true">Geri Bildirim Formu</span>
+          </div>
+          <h1 className="k-page-title">Geri Bildirim Formu</h1>
+          <p className="k-page-subtitle">EY.FR.40 eğitim değerlendirme anketini özelleştirin.</p>
+        </div>
+      </header>
 
       {/* Meta */}
-      <div className="rounded-2xl p-6" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-        <p className="text-[10px] uppercase tracking-[3px] font-bold mb-4" style={{ color: 'var(--color-text-muted)' }}>Form Bilgileri</p>
+      <div className="rounded-2xl p-6" style={{ background: 'var(--k-surface)', border: '1px solid var(--k-border)' }}>
+        <p className="text-[10px] uppercase tracking-[3px] font-bold mb-4" style={{ color: 'var(--k-text-muted)' }}>Form Bilgileri</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Form Başlığı</label>
+            <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--k-text-muted)' }}>Form Başlığı</label>
             <Input value={form.title} onChange={e => updateForm('title', e.target.value)} />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Doküman Kodu</label>
+            <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--k-text-muted)' }}>Doküman Kodu</label>
             <Input value={form.documentCode} onChange={e => updateForm('documentCode', e.target.value)} placeholder="EY.FR.40" />
           </div>
           <div className="md:col-span-3">
-            <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Açıklama</label>
+            <label className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--k-text-muted)' }}>Açıklama</label>
             <Input value={form.description} onChange={e => updateForm('description', e.target.value)} placeholder="Opsiyonel..." />
           </div>
           <div className="md:col-span-3">
             <label className="flex items-center gap-2.5 cursor-pointer w-fit" onClick={() => updateForm('isActive', !form.isActive)}>
-              <div className="relative w-9 h-5 rounded-full" style={{ background: form.isActive ? 'var(--color-primary)' : 'var(--color-border)', transition: 'background 200ms' }}>
+              <div className="relative w-9 h-5 rounded-full" style={{ background: form.isActive ? 'var(--k-primary)' : 'var(--k-border)', transition: 'background 200ms' }}>
                 <div className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm" style={{ left: form.isActive ? 'calc(100% - 18px)' : '2px', transition: 'left 200ms cubic-bezier(0.34,1.56,0.64,1)' }} />
               </div>
-              <span className="text-[13px] font-medium" style={{ color: form.isActive ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+              <span className="text-[13px] font-medium" style={{ color: form.isActive ? 'var(--k-text-primary)' : 'var(--k-text-muted)' }}>
                 Form aktif — yeni eğitim tamamlamalarında gösterilir
               </span>
             </label>
@@ -142,20 +149,20 @@ export default function FeedbackFormEditorPage() {
 
       {/* Empty state */}
       {form.categories.length === 0 ? (
-        <div className="rounded-2xl p-14 text-center" style={{ background: 'var(--color-surface)', border: '2px dashed var(--color-border)' }}>
+        <div className="rounded-2xl p-14 text-center" style={{ background: 'var(--k-surface)', border: '2px dashed var(--k-border)' }}>
           <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-            style={{ background: 'var(--color-primary-light)' }}>
-            <AlertCircle className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+            style={{ background: 'var(--k-primary-light)' }}>
+            <AlertCircle className="w-6 h-6" style={{ color: 'var(--k-primary)' }} />
           </div>
-          <p className="text-[16px] font-bold mb-1" style={{ color: 'var(--color-text)' }}>Henüz kategori yok</p>
-          <p className="text-[13px] mb-6" style={{ color: 'var(--color-text-muted)' }}>EY.FR.40 varsayılanını yükleyin ya da sıfırdan başlayın.</p>
+          <p className="text-[16px] font-bold mb-1" style={{ color: 'var(--k-text-primary)' }}>Henüz kategori yok</p>
+          <p className="text-[13px] mb-6" style={{ color: 'var(--k-text-muted)' }}>EY.FR.40 varsayılanını yükleyin ya da sıfırdan başlayın.</p>
           <div className="flex gap-2 justify-center">
             <button onClick={loadTemplate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold"
-              style={{ background: 'var(--color-primary)', color: 'white' }}>
+              style={{ background: 'var(--k-primary)', color: 'white' }}>
               <Sparkles className="w-4 h-4" /> EY.FR.40 Şablonunu Yükle
             </button>
             <button onClick={addCategory} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold"
-              style={{ background: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}>
+              style={{ background: 'var(--k-surface)', color: 'var(--k-text-primary)', border: '1px solid var(--k-border)' }}>
               <Plus className="w-4 h-4" /> Boş Kategori
             </button>
           </div>
@@ -165,13 +172,13 @@ export default function FeedbackFormEditorPage() {
           <div className="space-y-3">
             {form.categories.map((cat, catIdx) => (
               <div key={catIdx} className="rounded-2xl overflow-hidden group/cat"
-                style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                style={{ background: 'var(--k-surface)', border: '1px solid var(--k-border)' }}>
                 {/* Category header */}
                 <div className="px-5 py-3.5 flex items-center gap-3"
-                  style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
-                  <GripVertical className="w-4 h-4 shrink-0 cursor-grab" style={{ color: 'var(--color-text-muted)' }} />
+                  style={{ background: 'var(--k-bg)', borderBottom: '1px solid var(--k-border)' }}>
+                  <GripVertical className="w-4 h-4 shrink-0 cursor-grab" style={{ color: 'var(--k-text-muted)' }} />
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-black shrink-0"
-                    style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)30' }}>
+                    style={{ background: 'var(--k-primary-light)', color: 'var(--k-primary)', border: '1px solid var(--k-primary)30' }}>
                     {catIdx + 1}
                   </div>
                   <input
@@ -179,11 +186,11 @@ export default function FeedbackFormEditorPage() {
                     onChange={e => updateCategory(catIdx, 'name', e.target.value)}
                     placeholder="KATEGORİ ADI"
                     className="flex-1 bg-transparent text-[13px] font-bold uppercase tracking-wider outline-none"
-                    style={{ color: 'var(--color-text)' }}
+                    style={{ color: 'var(--k-text-primary)' }}
                   />
                   <button onClick={() => removeCategory(catIdx)}
                     className="p-1.5 rounded-lg opacity-0 group-hover/cat:opacity-100"
-                    style={{ color: 'var(--color-error)', background: 'var(--color-error-bg)', transition: 'opacity 150ms' }}>
+                    style={{ color: 'var(--k-error)', background: 'var(--k-error-bg)', transition: 'opacity 150ms' }}>
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -194,14 +201,14 @@ export default function FeedbackFormEditorPage() {
                     const meta = TYPE_META[item.questionType];
                     return (
                       <div key={itemIdx} className="px-5 py-3 flex items-center gap-3 group/item"
-                        style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <span className="text-[10px] font-black w-5 text-center shrink-0 tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{itemIdx + 1}</span>
+                        style={{ borderBottom: '1px solid var(--k-border)' }}>
+                        <span className="text-[10px] font-black w-5 text-center shrink-0 tabular-nums" style={{ color: 'var(--k-text-muted)' }}>{itemIdx + 1}</span>
                         <input
                           value={item.text}
                           onChange={e => updateItem(catIdx, itemIdx, 'text', e.target.value)}
                           placeholder="Soru metni..."
                           className="flex-1 bg-transparent text-[13px] outline-none"
-                          style={{ color: 'var(--color-text)' }}
+                          style={{ color: 'var(--k-text-primary)' }}
                         />
                         <select value={item.questionType} onChange={e => updateItem(catIdx, itemIdx, 'questionType', e.target.value as QuestionType)}
                           className="rounded-lg px-2.5 py-1.5 text-[11px] font-bold shrink-0 cursor-pointer"
@@ -212,12 +219,12 @@ export default function FeedbackFormEditorPage() {
                         </select>
                         <label className="flex items-center gap-1.5 shrink-0 cursor-pointer">
                           <input type="checkbox" checked={item.isRequired} onChange={e => updateItem(catIdx, itemIdx, 'isRequired', e.target.checked)}
-                            className="w-3.5 h-3.5 rounded" style={{ accentColor: 'var(--color-primary)' }} />
-                          <span className="text-[11px] font-medium" style={{ color: 'var(--color-text-muted)' }}>Zorunlu</span>
+                            className="w-3.5 h-3.5 rounded" style={{ accentColor: 'var(--k-primary)' }} />
+                          <span className="text-[11px] font-medium" style={{ color: 'var(--k-text-muted)' }}>Zorunlu</span>
                         </label>
                         <button onClick={() => removeItem(catIdx, itemIdx)}
                           className="p-1.5 rounded-lg opacity-0 group-hover/item:opacity-100"
-                          style={{ color: 'var(--color-error)', background: 'var(--color-error-bg)', transition: 'opacity 150ms' }}>
+                          style={{ color: 'var(--k-error)', background: 'var(--k-error-bg)', transition: 'opacity 150ms' }}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -226,7 +233,7 @@ export default function FeedbackFormEditorPage() {
                   <div className="px-5 py-3">
                     <button onClick={() => addItem(catIdx)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold"
-                      style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                      style={{ background: 'var(--k-bg)', color: 'var(--k-text-muted)', border: '1px solid var(--k-border)' }}>
                       <Plus className="w-3.5 h-3.5" /> Soru Ekle
                     </button>
                   </div>

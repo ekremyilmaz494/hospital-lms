@@ -186,7 +186,6 @@ export async function POST(request: Request) {
           const question = await tx.question.create({
             data: {
               trainingId: t.id,
-              organizationId: dbUser!.organizationId!,
               questionText: q.text,
               points: q.points,
               sortOrder: idx,

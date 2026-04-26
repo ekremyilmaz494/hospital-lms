@@ -47,7 +47,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     data: {
       ...questionData,
       trainingId: id,
-      organizationId: dbUser!.organizationId!,
       options: { create: options },
     },
     include: { options: true },

@@ -2,10 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Search, Download, History, ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { PageHeader } from '@/components/shared/page-header';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -38,21 +35,32 @@ interface AuditLogResponse {
   totalPages: number;
 }
 
-const typeColors: Record<string, { bg: string; text: string; label: string }> = {
-  training: { bg: 'var(--color-primary-light)', text: 'var(--color-primary)', label: 'Eğitim' },
-  assignment: { bg: 'var(--color-accent-light)', text: 'var(--color-accent)', label: 'Atama' },
-  user: { bg: 'var(--color-info-bg)', text: 'var(--color-info)', label: 'Kullanıcı' },
-  staff: { bg: 'var(--color-info-bg)', text: 'var(--color-info)', label: 'Personel' },
-  certificate: { bg: 'var(--color-success-bg)', text: 'var(--color-success)', label: 'Sertifika' },
-  exam_attempt: { bg: 'var(--color-warning-bg)', text: 'var(--color-warning)', label: 'Sınav' },
-  export: { bg: 'var(--color-accent-light)', text: 'var(--color-accent)', label: 'Dışa Aktarım' },
-  backup: { bg: 'var(--color-surface-hover)', text: 'var(--color-text-muted)', label: 'Yedek' },
-  department: { bg: 'var(--color-primary-light)', text: 'var(--color-primary)', label: 'Departman' },
-  settings: { bg: 'var(--color-surface-hover)', text: 'var(--color-text-muted)', label: 'Ayarlar' },
-  notification: { bg: 'var(--color-info-bg)', text: 'var(--color-info)', label: 'Bildirim' },
-  video: { bg: 'var(--color-primary-light)', text: 'var(--color-primary)', label: 'Video' },
-  question: { bg: 'var(--color-accent-light)', text: 'var(--color-accent)', label: 'Soru' },
+// Entity tip → Klinova badge variant + label eşlemesi
+const entityBadgeMap: Record<string, { variant: string; label: string }> = {
+  training: { variant: 'k-badge-info', label: 'Eğitim' },
+  assignment: { variant: 'k-badge-info', label: 'Atama' },
+  user: { variant: 'k-badge-info', label: 'Kullanıcı' },
+  staff: { variant: 'k-badge-info', label: 'Personel' },
+  certificate: { variant: 'k-badge-success', label: 'Sertifika' },
+  exam_attempt: { variant: 'k-badge-warning', label: 'Sınav' },
+  export: { variant: 'k-badge-info', label: 'Dışa Aktarım' },
+  backup: { variant: 'k-badge-muted', label: 'Yedek' },
+  department: { variant: 'k-badge-info', label: 'Departman' },
+  settings: { variant: 'k-badge-muted', label: 'Ayarlar' },
+  notification: { variant: 'k-badge-info', label: 'Bildirim' },
+  video: { variant: 'k-badge-info', label: 'Video' },
+  question: { variant: 'k-badge-info', label: 'Soru' },
 };
+
+// Action türü → semantic badge variant (CREATE/UPDATE/DELETE/READ)
+function getActionBadgeVariant(action: string): string {
+  const a = action.toLowerCase();
+  if (a.includes('delete') || a.includes('remove') || a.includes('suspend')) return 'k-badge-error';
+  if (a.includes('create') || a.includes('assign') || a.includes('add')) return 'k-badge-success';
+  if (a.includes('update') || a.includes('reset') || a.includes('reopen') || a.includes('restore')) return 'k-badge-warning';
+  if (a.includes('export') || a.includes('read') || a.includes('view')) return 'k-badge-info';
+  return 'k-badge-muted';
+}
 
 const actionLabels: Record<string, string> = {
   create: 'Oluşturma',
@@ -80,7 +88,7 @@ const actionLabels: Record<string, string> = {
 };
 
 const avatarColors = [
-  'var(--brand-600)', '#e67e22', '#3498db', '#9b59b6', '#e74c3c',
+  'var(--k-primary)', '#e67e22', '#3498db', '#9b59b6', '#e74c3c',
   '#1abc9c', '#f39c12', '#2980b9', '#8e44ad', '#c0392b',
 ];
 
@@ -109,7 +117,7 @@ function getActionLabel(action: string): string {
 }
 
 function getEntityLabel(entityType: string): string {
-  return typeColors[entityType]?.label ?? entityType.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return entityBadgeMap[entityType]?.label ?? entityType.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 function formatDate(dateStr: string): string {
@@ -201,7 +209,7 @@ export default function AdminAuditLogsPage() {
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</div></div>;
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: 'var(--k-error)' }}>{error}</div></div>;
   }
 
   const logs = data?.logs ?? [];
@@ -213,33 +221,43 @@ export default function AdminAuditLogsPage() {
         const term = search.toLowerCase();
         const userName = getUserName(log.user).toLowerCase();
         const actionLabel = getActionLabel(log.action).toLowerCase();
-        const entityLabel = (typeColors[log.entityType]?.label ?? '').toLowerCase();
+        const entityLabel = (entityBadgeMap[log.entityType]?.label ?? '').toLowerCase();
         return userName.includes(term) || actionLabel.includes(term) || entityLabel.includes(term) || log.action.toLowerCase().includes(term);
       })
     : logs;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <PageHeader title="İşlem Geçmişi" subtitle="Tüm sistem işlemlerini görüntüle" />
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={handleVerifyChain} disabled={verifying}>
-            <ShieldCheck className="h-4 w-4" /> {verifying ? 'Dogrulanıyor...' : 'Zinciri Doğrula'}
-          </Button>
-          <Button variant="outline" className="gap-2 rounded-xl" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }} onClick={handleExportCSV}>
-            <Download className="h-4 w-4" /> Dışa Aktar
-          </Button>
+    <div className="k-page">
+      <header className="k-page-header">
+        <div>
+          <div className="k-breadcrumb">
+            <span>Panel</span>
+            <ChevronRight size={12} />
+            <span data-current="true">İşlem Geçmişi</span>
+          </div>
+          <h1 className="k-page-title">İşlem Geçmişi</h1>
+          <p className="k-page-subtitle">
+            <strong style={{ color: 'var(--k-text-primary)' }}>{filteredLogs.length}</strong> işlem listeleniyor — KVKK denetlenebilir, hash zinciriyle korumalı
+          </p>
         </div>
-      </div>
+        <div className="flex items-center gap-2">
+          <button onClick={handleVerifyChain} disabled={verifying} className="k-btn k-btn-ghost">
+            <ShieldCheck size={15} /> {verifying ? 'Doğrulanıyor…' : 'Zinciri Doğrula'}
+          </button>
+          <button onClick={handleExportCSV} className="k-btn k-btn-ghost">
+            <Download size={15} /> Dışa Aktar
+          </button>
+        </div>
+      </header>
 
       <BlurFade delay={0.05}>
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--color-text-muted)' }} />
-            <Input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 pointer-events-none" style={{ color: 'var(--k-text-muted)' }} />
+            <input
+              type="text"
               placeholder="İşlem veya kullanıcı ara..."
-              className="pl-9 h-10 rounded-xl"
-              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+              className="k-input pl-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -247,8 +265,8 @@ export default function AdminAuditLogsPage() {
           <select
             value={entityTypeFilter}
             onChange={(e) => { setEntityTypeFilter(e.target.value); setPage(1); }}
-            className="rounded-lg border px-3 py-2 text-sm"
-            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            className="k-input"
+            style={{ width: 'auto', minWidth: '160px' }}
           >
             <option value="">Tüm Tipler</option>
             <option value="training">Eğitim</option>
@@ -264,104 +282,98 @@ export default function AdminAuditLogsPage() {
       </BlurFade>
 
       <BlurFade delay={0.1}>
-        <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+        <div className="k-card p-5">
           {filteredLogs.length > 0 ? (
             <>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ background: 'var(--color-bg)' }}>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Kullanıcı</th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>İşlem</th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Kaynak</th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tür</th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tarih</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLogs.map((log) => {
-                    const tc = typeColors[log.entityType] ?? typeColors.backup;
-                    const color = getAvatarColor(log.userId);
-                    const initials = getInitials(log.user);
-                    const userName = getUserName(log.user);
-                    return (
-                      <tr key={log.id} className="transition-colors duration-100 hover:bg-(--color-surface-hover)" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2.5">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="text-[10px] font-semibold text-white" style={{ background: color }}>{initials}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <span className="font-semibold text-sm" style={{ color: 'var(--color-text-primary)' }}>{userName}</span>
-                              {log.user?.email && (
-                                <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{log.user.email}</p>
-                              )}
+              <div className="overflow-x-auto -mx-5 -mt-5">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ background: 'var(--k-bg)' }}>
+                      <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>Kullanıcı</th>
+                      <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>İşlem</th>
+                      <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>Kaynak</th>
+                      <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>Tür</th>
+                      <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>Tarih</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredLogs.map((log) => {
+                      const entityBadge = entityBadgeMap[log.entityType] ?? { variant: 'k-badge-muted', label: log.entityType };
+                      const actionVariant = getActionBadgeVariant(log.action);
+                      const color = getAvatarColor(log.userId);
+                      const initials = getInitials(log.user);
+                      const userName = getUserName(log.user);
+                      return (
+                        <tr key={log.id} style={{ borderBottom: '1px solid var(--k-border)' }}>
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-2.5">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-[10px] font-semibold text-white" style={{ background: color }}>{initials}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <span className="font-semibold text-sm" style={{ color: 'var(--k-text-primary)' }}>{userName}</span>
+                                {log.user?.email && (
+                                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--k-text-muted)' }}>{log.user.email}</p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{getActionLabel(log.action)}</span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                            {log.entityId ? `${log.entityId.slice(0, 8)}...` : '-'}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: tc.bg, color: tc.text }}>
-                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: tc.text }} />
-                            {tc.label}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-xs font-mono" style={{ color: 'var(--color-text-muted)' }}>
-                          {formatDate(log.createdAt)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className={`k-badge ${actionVariant}`}>{getActionLabel(log.action)}</span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className="text-sm font-mono" style={{ color: 'var(--k-text-secondary)' }}>
+                              {log.entityId ? `${log.entityId.slice(0, 8)}...` : '-'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className={`k-badge ${entityBadge.variant}`}>{entityBadge.label}</span>
+                          </td>
+                          <td className="px-5 py-4 text-xs font-mono" style={{ color: 'var(--k-text-muted)' }}>
+                            {formatDate(log.createdAt)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
-                  <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                <div className="flex items-center justify-between pt-4 mt-1" style={{ borderTop: '1px solid var(--k-border)' }}>
+                  <span className="text-xs" style={{ color: 'var(--k-text-muted)' }}>
                     Toplam {total} kayıt
                   </span>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0 rounded-lg"
-                      style={{ borderColor: 'var(--color-border)' }}
+                    <button
+                      className="k-btn k-btn-ghost k-btn-sm"
                       disabled={page <= 1}
                       onClick={() => setPage(p => Math.max(1, p - 1))}
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-xs font-medium px-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="text-xs font-medium px-2" style={{ color: 'var(--k-text-secondary)' }}>
                       {page} / {totalPages}
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0 rounded-lg"
-                      style={{ borderColor: 'var(--color-border)' }}
+                    <button
+                      className="k-btn k-btn-ghost k-btn-sm"
                       disabled={page >= totalPages}
                       onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                      <ChevronRight size={14} />
+                    </button>
                   </div>
                 </div>
               )}
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: 'var(--color-bg)' }}>
-                <History className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: 'var(--k-bg)' }}>
+                <History className="h-6 w-6" style={{ color: 'var(--k-text-muted)' }} />
               </div>
-              <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Sistem kullanıldıkça işlem kayıtları burada görünecek.</p>
-              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Sistem işlemleri burada görüntülenecek</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--k-text-muted)' }}>Sistem kullanıldıkça işlem kayıtları burada görünecek.</p>
+              <p className="text-xs" style={{ color: 'var(--k-text-muted)' }}>Sistem işlemleri burada görüntülenecek</p>
             </div>
           )}
         </div>

@@ -11,6 +11,20 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import { useToast } from '@/components/shared/toast';
 import type { HisIntegration, SyncLog } from '@/types/database';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 // ── Alan Eşleştirme Sabitleri ──
 
 const LMS_FIELDS = [
@@ -46,13 +60,10 @@ interface IntegrationForm {
   authType: 'API_KEY' | 'BASIC_AUTH' | 'OAUTH2';
   syncInterval: number;
   isActive: boolean;
-  // API_KEY
   apiKey: string;
   headerName: string;
-  // BASIC_AUTH
   username: string;
   password: string;
-  // OAUTH2
   tokenUrl: string;
   clientId: string;
   clientSecret: string;
@@ -76,17 +87,17 @@ interface SyncLogRow extends Omit<SyncLog, 'errors'> {
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, { bg: string; color: string; label: string }> = {
-    SUCCESS: { bg: 'rgba(16,185,129,0.12)', color: 'var(--brand-500)', label: 'Başarılı' },
-    FAILED:  { bg: 'rgba(239,68,68,0.12)',  color: '#ef4444', label: 'Başarısız' },
-    RUNNING: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', label: 'Çalışıyor' },
+    SUCCESS: { bg: K.SUCCESS_BG, color: K.SUCCESS, label: 'Başarılı' },
+    FAILED:  { bg: K.ERROR_BG,   color: K.ERROR,   label: 'Başarısız' },
+    RUNNING: { bg: K.WARNING_BG, color: K.WARNING, label: 'Çalışıyor' },
   };
-  const s = styles[status] ?? { bg: 'rgba(100,116,139,0.12)', color: '#64748b', label: status };
+  const s = styles[status] ?? { bg: K.BORDER_LIGHT, color: K.TEXT_MUTED, label: status };
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '3px 10px', borderRadius: 20,
+      padding: '3px 10px', borderRadius: 999,
       background: s.bg, color: s.color,
-      fontSize: 12, fontWeight: 600,
+      fontSize: 11, fontWeight: 600,
     }}>
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }} />
       {s.label}
@@ -104,9 +115,9 @@ function SyncTypeBadge({ type }: { type: string }) {
   };
   return (
     <span style={{
-      fontSize: 12, padding: '2px 8px', borderRadius: 4,
-      background: 'var(--color-surface-2, rgba(100,116,139,0.1))',
-      color: 'var(--color-text-muted)',
+      fontSize: 11, padding: '3px 10px', borderRadius: 999,
+      background: K.BG, fontWeight: 600,
+      color: K.TEXT_MUTED, border: `1px solid ${K.BORDER_LIGHT}`,
     }}>
       {labels[type] ?? type}
     </span>
@@ -128,18 +139,18 @@ function Modal({ onClose, children, title }: {
       padding: 16,
     }} onClick={onClose}>
       <div style={{
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 16, padding: 24,
+        background: K.SURFACE,
+        border: `1.5px solid ${K.BORDER}`,
+        borderRadius: 14, padding: 24,
         width: '100%', maxWidth: 560,
         maxHeight: '80vh', overflow: 'auto',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        boxShadow: K.SHADOW_CARD,
       }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontWeight: 700, fontSize: 16, color: 'var(--color-text)' }}>{title}</h3>
+          <h3 style={{ margin: 0, fontFamily: K.FONT_DISPLAY, fontWeight: 700, fontSize: 18, color: K.TEXT_PRIMARY }}>{title}</h3>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--color-text-muted)', padding: 4, borderRadius: 6,
+            color: K.TEXT_MUTED, padding: 4, borderRadius: 6,
             display: 'flex', alignItems: 'center',
           }}>
             <X size={18} />
@@ -156,7 +167,6 @@ function Modal({ onClose, children, title }: {
 export default function HisIntegrationsPage() {
   const { toast } = useToast();
 
-  // Konfigürasyon durumu
   const [integration, setIntegration] = useState<HisIntegration | null>(null);
   const [form, setForm] = useState<IntegrationForm>({
     name: '',
@@ -174,7 +184,6 @@ export default function HisIntegrationsPage() {
   });
   const [fieldMapping, setFieldMapping] = useState(DEFAULT_FIELD_MAPPING);
 
-  // UI durumu
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -182,12 +191,10 @@ export default function HisIntegrationsPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
 
-  // Log listesi
   const [logs, setLogs] = useState<SyncLogRow[]>([]);
   const [logsTotal, setLogsTotal] = useState(0);
   const [logsPage, setLogsPage] = useState(1);
 
-  // Modallar
   const [testModal, setTestModal] = useState<{
     show: boolean;
     success: boolean;
@@ -200,8 +207,6 @@ export default function HisIntegrationsPage() {
     show: false,
     log: null,
   });
-
-  // ── Veri Yükleme ──
 
   const loadIntegration = useCallback(async () => {
     try {
@@ -242,8 +247,6 @@ export default function HisIntegrationsPage() {
     void loadLogs();
   }, [loadIntegration, loadLogs]);
 
-  // ── Form Helpers ──
-
   function buildCredentials() {
     if (form.authType === 'API_KEY') {
       return { apiKey: form.apiKey, headerName: form.headerName };
@@ -251,7 +254,6 @@ export default function HisIntegrationsPage() {
     if (form.authType === 'BASIC_AUTH') {
       return { username: form.username, password: form.password };
     }
-    // OAUTH2
     return { tokenUrl: form.tokenUrl, clientId: form.clientId, clientSecret: form.clientSecret };
   }
 
@@ -262,8 +264,6 @@ export default function HisIntegrationsPage() {
         .map(r => [r.hisField.trim(), r.lmsField])
     );
   }
-
-  // ── Kaydet ──
 
   async function handleSave() {
     setSaving(true);
@@ -293,8 +293,6 @@ export default function HisIntegrationsPage() {
     }
   }
 
-  // ── Bağlantı Testi ──
-
   async function handleTest() {
     setTesting(true);
     try {
@@ -305,8 +303,6 @@ export default function HisIntegrationsPage() {
       setTesting(false);
     }
   }
-
-  // ── Manuel Sync ──
 
   async function handleSync() {
     setSyncing(true);
@@ -330,16 +326,12 @@ export default function HisIntegrationsPage() {
     }
   }
 
-  // ── Hata Detayı ──
-
   async function handleViewErrors(logId: string) {
     const res = await fetch(`/api/admin/integrations/his/logs/${logId}`);
     if (!res.ok) return;
     const data = await res.json() as { log: SyncLog };
     setErrorModal({ show: true, log: data.log });
   }
-
-  // ── Alan Eşleştirme ──
 
   function updateMappingRow(index: number, field: 'hisField' | 'lmsField', value: string) {
     setFieldMapping(prev => prev.map((r, i) => i === index ? { ...r, [field]: value } : r));
@@ -356,12 +348,61 @@ export default function HisIntegrationsPage() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-        <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-primary)' }} />
+        <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: K.PRIMARY }} />
       </div>
     );
   }
 
   const isConnected = !!(integration?.isActive);
+
+  const cardStyle: React.CSSProperties = {
+    background: K.SURFACE,
+    border: `1.5px solid ${K.BORDER}`,
+    borderRadius: 14,
+    padding: 24,
+    marginBottom: 20,
+    boxShadow: K.SHADOW_CARD,
+  };
+
+  const sectionHeading: React.CSSProperties = {
+    margin: '0 0 16px',
+    fontFamily: K.FONT_DISPLAY,
+    fontSize: 18,
+    fontWeight: 700,
+    color: K.TEXT_PRIMARY,
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 13,
+    color: K.TEXT_SECONDARY,
+    marginBottom: 6,
+    display: 'block',
+    fontWeight: 500,
+  };
+
+  const selectStyle: React.CSSProperties = {
+    width: '100%', padding: '8px 36px 8px 12px',
+    borderRadius: 8, border: `1px solid ${K.BORDER}`,
+    background: K.SURFACE, color: K.TEXT_PRIMARY,
+    fontSize: 14, cursor: 'pointer', appearance: 'none',
+  };
+
+  const primaryButton: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 8,
+    padding: '9px 18px', borderRadius: 10,
+    background: K.PRIMARY, color: '#fff',
+    border: 'none', fontWeight: 600, fontSize: 14,
+    cursor: 'pointer',
+  };
+
+  const ghostButton: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 8,
+    padding: '9px 18px', borderRadius: 10,
+    background: K.SURFACE,
+    color: K.TEXT_SECONDARY, border: `1px solid ${K.BORDER}`,
+    fontWeight: 600, fontSize: 14,
+    cursor: 'pointer',
+  };
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
@@ -371,16 +412,16 @@ export default function HisIntegrationsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
             <div style={{
               width: 40, height: 40, borderRadius: 12,
-              background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 70%, #000))',
+              background: K.PRIMARY,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <Plug size={20} color="#fff" />
             </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--color-text)' }}>
+              <h1 style={{ margin: 0, fontFamily: K.FONT_DISPLAY, fontSize: 22, fontWeight: 700, color: K.TEXT_PRIMARY }}>
                 HIS Entegrasyonu
               </h1>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-muted)' }}>
+              <p style={{ margin: 0, fontSize: 13, color: K.TEXT_MUTED }}>
                 Hastane Bilgi Sistemi ile çift yönlü personel senkronizasyonu
               </p>
             </div>
@@ -389,21 +430,20 @@ export default function HisIntegrationsPage() {
 
         {/* ── Durum Kartı ── */}
         <div style={{
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 16, padding: 20, marginBottom: 20,
+          ...cardStyle,
+          padding: 20,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {isConnected
-              ? <CheckCircle2 size={22} color="var(--brand-500)" />
-              : <AlertTriangle size={22} color="#f59e0b" />
+              ? <CheckCircle2 size={22} color={K.SUCCESS} />
+              : <AlertTriangle size={22} color={K.WARNING} />
             }
             <div>
-              <div style={{ fontWeight: 600, color: 'var(--color-text)', fontSize: 15 }}>
+              <div style={{ fontWeight: 600, color: K.TEXT_PRIMARY, fontSize: 15 }}>
                 {isConnected ? 'Bağlantı Aktif' : 'Bağlantı Kurulmadı'}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: K.TEXT_MUTED, marginTop: 2 }}>
                 {integration?.lastSyncAt
                   ? `Son sync: ${new Date(integration.lastSyncAt).toLocaleString('tr-TR')}`
                   : 'Hiç senkronize edilmedi'
@@ -414,9 +454,10 @@ export default function HisIntegrationsPage() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {integration && (
               <span style={{
-                fontSize: 12, color: 'var(--color-text-muted)',
-                background: 'var(--color-surface-2, rgba(100,116,139,0.1))',
-                padding: '4px 10px', borderRadius: 20,
+                fontSize: 11, fontWeight: 600, color: isConnected ? K.PRIMARY : K.TEXT_MUTED,
+                background: isConnected ? K.SUCCESS_BG : K.BG,
+                border: `1px solid ${isConnected ? K.PRIMARY : K.BORDER_LIGHT}`,
+                padding: '4px 10px', borderRadius: 999,
               }}>
                 Her {integration.syncInterval} dakikada bir
               </span>
@@ -424,9 +465,10 @@ export default function HisIntegrationsPage() {
             {integration?.webhookToken && (
               <span style={{
                 fontSize: 11, fontFamily: 'var(--font-mono)',
-                color: 'var(--color-text-muted)',
-                background: 'var(--color-surface-2, rgba(100,116,139,0.1))',
-                padding: '4px 10px', borderRadius: 20,
+                color: K.TEXT_MUTED,
+                background: K.BG,
+                border: `1px solid ${K.BORDER_LIGHT}`,
+                padding: '4px 10px', borderRadius: 999,
               }}>
                 Token: {integration.webhookToken.slice(0, 8)}…
               </span>
@@ -435,20 +477,12 @@ export default function HisIntegrationsPage() {
         </div>
 
         {/* ── Konfigürasyon Formu ── */}
-        <div style={{
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 16, padding: 24, marginBottom: 20,
-        }}>
-          <h2 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>
-            Bağlantı Ayarları
-          </h2>
+        <div style={cardStyle}>
+          <h2 style={sectionHeading}>Bağlantı Ayarları</h2>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
             <div>
-              <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                Entegrasyon Adı
-              </Label>
+              <Label style={labelStyle}>Entegrasyon Adı</Label>
               <Input
                 value={form.name}
                 onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
@@ -456,9 +490,7 @@ export default function HisIntegrationsPage() {
               />
             </div>
             <div>
-              <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                Sync Aralığı (dakika)
-              </Label>
+              <Label style={labelStyle}>Sync Aralığı (dakika)</Label>
               <Input
                 type="number"
                 min={1}
@@ -470,9 +502,7 @@ export default function HisIntegrationsPage() {
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-              HIS API URL
-            </Label>
+            <Label style={labelStyle}>HIS API URL</Label>
             <Input
               type="url"
               value={form.baseUrl}
@@ -482,19 +512,12 @@ export default function HisIntegrationsPage() {
           </div>
 
           <div style={{ marginBottom: 20 }}>
-            <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-              Kimlik Doğrulama Tipi
-            </Label>
+            <Label style={labelStyle}>Kimlik Doğrulama Tipi</Label>
             <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
               <select
                 value={form.authType}
                 onChange={e => setForm(p => ({ ...p, authType: e.target.value as IntegrationForm['authType'] }))}
-                style={{
-                  width: '100%', padding: '8px 36px 8px 12px',
-                  borderRadius: 8, border: '1px solid var(--color-border)',
-                  background: 'var(--color-surface)', color: 'var(--color-text)',
-                  fontSize: 14, cursor: 'pointer', appearance: 'none',
-                }}
+                style={selectStyle}
               >
                 <option value="API_KEY">API Key</option>
                 <option value="BASIC_AUTH">Basic Auth (Kullanıcı/Şifre)</option>
@@ -503,18 +526,15 @@ export default function HisIntegrationsPage() {
               <ChevronDown size={16} style={{
                 position: 'absolute', right: 12, top: '50%',
                 transform: 'translateY(-50%)', pointerEvents: 'none',
-                color: 'var(--color-text-muted)',
+                color: K.TEXT_MUTED,
               }} />
             </div>
           </div>
 
-          {/* Kimlik bilgileri — auth tipine göre */}
           {form.authType === 'API_KEY' && (
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
               <div>
-                <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                  API Key
-                </Label>
+                <Label style={labelStyle}>API Key</Label>
                 <div style={{ position: 'relative' }}>
                   <Input
                     type={showPassword ? 'text' : 'password'}
@@ -530,7 +550,7 @@ export default function HisIntegrationsPage() {
                       position: 'absolute', right: 10, top: '50%',
                       transform: 'translateY(-50%)',
                       background: 'none', border: 'none', cursor: 'pointer',
-                      color: 'var(--color-text-muted)',
+                      color: K.TEXT_MUTED,
                     }}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -538,9 +558,7 @@ export default function HisIntegrationsPage() {
                 </div>
               </div>
               <div>
-                <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                  Header Adı
-                </Label>
+                <Label style={labelStyle}>Header Adı</Label>
                 <Input
                   value={form.headerName}
                   onChange={e => setForm(p => ({ ...p, headerName: e.target.value }))}
@@ -553,18 +571,14 @@ export default function HisIntegrationsPage() {
           {form.authType === 'BASIC_AUTH' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               <div>
-                <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                  Kullanıcı Adı
-                </Label>
+                <Label style={labelStyle}>Kullanıcı Adı</Label>
                 <Input
                   value={form.username}
                   onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
                 />
               </div>
               <div>
-                <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                  Şifre
-                </Label>
+                <Label style={labelStyle}>Şifre</Label>
                 <div style={{ position: 'relative' }}>
                   <Input
                     type={showPassword ? 'text' : 'password'}
@@ -580,7 +594,7 @@ export default function HisIntegrationsPage() {
                       position: 'absolute', right: 10, top: '50%',
                       transform: 'translateY(-50%)',
                       background: 'none', border: 'none', cursor: 'pointer',
-                      color: 'var(--color-text-muted)',
+                      color: K.TEXT_MUTED,
                     }}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -593,9 +607,7 @@ export default function HisIntegrationsPage() {
           {form.authType === 'OAUTH2' && (
             <div style={{ display: 'grid', gap: 16, marginBottom: 16 }}>
               <div>
-                <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                  Token URL
-                </Label>
+                <Label style={labelStyle}>Token URL</Label>
                 <Input
                   type="url"
                   value={form.tokenUrl}
@@ -605,18 +617,14 @@ export default function HisIntegrationsPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
-                  <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                    Client ID
-                  </Label>
+                  <Label style={labelStyle}>Client ID</Label>
                   <Input
                     value={form.clientId}
                     onChange={e => setForm(p => ({ ...p, clientId: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <Label style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                    Client Secret
-                  </Label>
+                  <Label style={labelStyle}>Client Secret</Label>
                   <div style={{ position: 'relative' }}>
                     <Input
                       type={showSecret ? 'text' : 'password'}
@@ -632,7 +640,7 @@ export default function HisIntegrationsPage() {
                         position: 'absolute', right: 10, top: '50%',
                         transform: 'translateY(-50%)',
                         background: 'none', border: 'none', cursor: 'pointer',
-                        color: 'var(--color-text-muted)',
+                        color: K.TEXT_MUTED,
                       }}
                     >
                       {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -647,14 +655,7 @@ export default function HisIntegrationsPage() {
             <button
               onClick={() => void handleSave()}
               disabled={saving}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '9px 18px', borderRadius: 10,
-                background: 'var(--color-primary)', color: '#fff',
-                border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
-                fontWeight: 600, fontSize: 14, opacity: saving ? 0.7 : 1,
-                transition: 'opacity 200ms',
-              }}
+              style={{ ...primaryButton, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
             >
               {saving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />}
               {saving ? 'Kaydediliyor…' : 'Kaydet'}
@@ -664,13 +665,9 @@ export default function HisIntegrationsPage() {
               onClick={() => void handleTest()}
               disabled={testing || !integration}
               style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '9px 18px', borderRadius: 10,
-                background: 'var(--color-surface-2, rgba(100,116,139,0.12))',
-                color: 'var(--color-text)', border: '1px solid var(--color-border)',
+                ...ghostButton,
+                opacity: (testing || !integration) ? 0.6 : 1,
                 cursor: (testing || !integration) ? 'not-allowed' : 'pointer',
-                fontWeight: 600, fontSize: 14, opacity: (testing || !integration) ? 0.6 : 1,
-                transition: 'opacity 200ms',
               }}
             >
               {testing ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={14} />}
@@ -680,23 +677,17 @@ export default function HisIntegrationsPage() {
         </div>
 
         {/* ── Alan Eşleştirme ── */}
-        <div style={{
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 16, padding: 24, marginBottom: 20,
-        }}>
+        <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>
-              Alan Eşleştirme
-            </h2>
+            <h2 style={{ ...sectionHeading, margin: 0 }}>Alan Eşleştirme</h2>
             <button
               onClick={addMappingRow}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 12px', borderRadius: 8,
-                background: 'none', border: '1px dashed var(--color-border)',
-                color: 'var(--color-text-muted)', cursor: 'pointer',
-                fontSize: 13,
+                background: K.SURFACE, border: `1px dashed ${K.BORDER}`,
+                color: K.TEXT_SECONDARY, cursor: 'pointer',
+                fontSize: 13, fontWeight: 500,
               }}
             >
               <Plus size={14} /> Satır Ekle
@@ -707,11 +698,11 @@ export default function HisIntegrationsPage() {
             display: 'grid', gridTemplateColumns: '1fr auto 1fr auto',
             gap: 8, alignItems: 'center',
           }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', padding: '0 4px' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: K.TEXT_MUTED, padding: '0 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               HIS ALANI
             </div>
             <div />
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', padding: '0 4px' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: K.TEXT_MUTED, padding: '0 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               LMS ALANI
             </div>
             <div />
@@ -724,19 +715,14 @@ export default function HisIntegrationsPage() {
                   placeholder="personelId"
                   style={{ fontSize: 13 }}
                 />
-                <span style={{ color: 'var(--color-text-muted)', fontSize: 16, textAlign: 'center', padding: '0 4px' }}>
+                <span style={{ color: K.TEXT_MUTED, fontSize: 16, textAlign: 'center', padding: '0 4px' }}>
                   →
                 </span>
                 <div style={{ position: 'relative' }} key={`lms-${i}`}>
                   <select
                     value={row.lmsField}
                     onChange={e => updateMappingRow(i, 'lmsField', e.target.value)}
-                    style={{
-                      width: '100%', padding: '8px 32px 8px 10px',
-                      borderRadius: 8, border: '1px solid var(--color-border)',
-                      background: 'var(--color-surface)', color: 'var(--color-text)',
-                      fontSize: 13, cursor: 'pointer', appearance: 'none',
-                    }}
+                    style={{ ...selectStyle, padding: '8px 32px 8px 10px', fontSize: 13 }}
                   >
                     {LMS_FIELDS.map(f => (
                       <option key={f.value} value={f.value}>{f.label}</option>
@@ -745,7 +731,7 @@ export default function HisIntegrationsPage() {
                   <ChevronDown size={14} style={{
                     position: 'absolute', right: 10, top: '50%',
                     transform: 'translateY(-50%)', pointerEvents: 'none',
-                    color: 'var(--color-text-muted)',
+                    color: K.TEXT_MUTED,
                   }} />
                 </div>
                 <button
@@ -753,7 +739,7 @@ export default function HisIntegrationsPage() {
                   onClick={() => removeMappingRow(i)}
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--color-text-muted)', padding: 4, borderRadius: 6,
+                    color: K.TEXT_MUTED, padding: 4, borderRadius: 6,
                     display: 'flex', alignItems: 'center',
                   }}
                 >
@@ -765,26 +751,17 @@ export default function HisIntegrationsPage() {
         </div>
 
         {/* ── Manuel Sync ── */}
-        <div style={{
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 16, padding: 24, marginBottom: 20,
-        }}>
-          <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>
-            Manuel Senkronizasyon
-          </h2>
+        <div style={cardStyle}>
+          <h2 style={sectionHeading}>Manuel Senkronizasyon</h2>
 
           <button
             onClick={() => void handleSync()}
             disabled={syncing || !integration}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '10px 20px', borderRadius: 10,
-              background: 'linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 70%, #000))',
-              color: '#fff', border: 'none',
+              ...primaryButton,
+              padding: '10px 20px',
+              opacity: (syncing || !integration) ? 0.7 : 1,
               cursor: (syncing || !integration) ? 'not-allowed' : 'pointer',
-              fontWeight: 600, fontSize: 14, opacity: (syncing || !integration) ? 0.7 : 1,
-              transition: 'opacity 200ms',
             }}
           >
             {syncing
@@ -797,28 +774,27 @@ export default function HisIntegrationsPage() {
           {syncResult && (
             <div style={{
               marginTop: 16, padding: 16, borderRadius: 10,
-              background: syncResult.success
-                ? 'rgba(16,185,129,0.08)'
-                : 'rgba(239,68,68,0.08)',
-              border: `1px solid ${syncResult.success ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              background: syncResult.success ? K.SUCCESS_BG : K.ERROR_BG,
+              border: `1px solid ${syncResult.success ? K.SUCCESS : K.ERROR}`,
               display: 'flex', gap: 20, flexWrap: 'wrap',
             }}>
               {[
-                { label: 'Toplam', value: syncResult.totalRecords },
-                { label: 'İşlendi', value: syncResult.processedRecords },
-                { label: 'Oluşturuldu', value: syncResult.created, color: 'var(--brand-500)' },
-                { label: 'Güncellendi', value: syncResult.updated, color: '#3b82f6' },
-                { label: 'Devre Dışı', value: syncResult.deactivated, color: '#f59e0b' },
-                { label: 'Hata', value: syncResult.errors.length, color: '#ef4444' },
+                { label: 'Toplam', value: syncResult.totalRecords, color: K.TEXT_PRIMARY },
+                { label: 'İşlendi', value: syncResult.processedRecords, color: K.TEXT_PRIMARY },
+                { label: 'Oluşturuldu', value: syncResult.created, color: K.SUCCESS },
+                { label: 'Güncellendi', value: syncResult.updated, color: K.INFO },
+                { label: 'Devre Dışı', value: syncResult.deactivated, color: K.WARNING },
+                { label: 'Hata', value: syncResult.errors.length, color: K.ERROR },
               ].map(item => (
                 <div key={item.label} style={{ textAlign: 'center' }}>
                   <div style={{
+                    fontFamily: K.FONT_DISPLAY,
                     fontSize: 22, fontWeight: 700,
-                    color: item.color ?? 'var(--color-text)',
+                    color: item.color,
                   }}>
                     {item.value}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                  <div style={{ fontSize: 11, color: K.TEXT_MUTED, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {item.label}
                   </div>
                 </div>
@@ -828,19 +804,13 @@ export default function HisIntegrationsPage() {
         </div>
 
         {/* ── Sync Geçmişi ── */}
-        <div style={{
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 16, padding: 24,
-        }}>
-          <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>
-            Sync Geçmişi
-          </h2>
+        <div style={{ ...cardStyle, marginBottom: 0 }}>
+          <h2 style={sectionHeading}>Sync Geçmişi</h2>
 
           {logs.length === 0 ? (
             <div style={{
               textAlign: 'center', padding: '32px 0',
-              color: 'var(--color-text-muted)', fontSize: 14,
+              color: K.TEXT_MUTED, fontSize: 14,
             }}>
               HIS entegrasyonu yapılandırıldıktan sonra senkronizasyon kayıtları burada görünecek.
             </div>
@@ -849,11 +819,12 @@ export default function HisIntegrationsPage() {
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <tr style={{ background: K.BG }}>
                       {['Tarih', 'Tür', 'Durum', 'Toplam', 'İşlendi', 'Hata'].map(h => (
                         <th key={h} style={{
-                          padding: '8px 12px', textAlign: 'left',
-                          color: 'var(--color-text-muted)', fontWeight: 600, fontSize: 12,
+                          padding: '10px 12px', textAlign: 'left',
+                          color: K.TEXT_MUTED, fontWeight: 600, fontSize: 11,
+                          textTransform: 'uppercase', letterSpacing: '0.05em',
                         }}>
                           {h}
                         </th>
@@ -866,21 +837,19 @@ export default function HisIntegrationsPage() {
                         key={log.id}
                         onClick={() => log.errorCount > 0 ? void handleViewErrors(log.id) : undefined}
                         style={{
-                          borderBottom: '1px solid var(--color-border)',
+                          borderBottom: `1px solid ${K.BORDER_LIGHT}`,
                           cursor: log.errorCount > 0 ? 'pointer' : 'default',
-                          transition: 'background 150ms',
                         }}
                         onMouseEnter={e => {
                           if (log.errorCount > 0) {
-                            (e.currentTarget as HTMLTableRowElement).style.background =
-                              'var(--color-surface-2, rgba(100,116,139,0.06))';
+                            (e.currentTarget as HTMLTableRowElement).style.background = K.SURFACE_HOVER;
                           }
                         }}
                         onMouseLeave={e => {
                           (e.currentTarget as HTMLTableRowElement).style.background = 'transparent';
                         }}
                       >
-                        <td style={{ padding: '10px 12px', color: 'var(--color-text-muted)' }}>
+                        <td style={{ padding: '10px 12px', color: K.TEXT_MUTED }}>
                           {new Date(log.startedAt).toLocaleString('tr-TR')}
                         </td>
                         <td style={{ padding: '10px 12px' }}>
@@ -889,19 +858,19 @@ export default function HisIntegrationsPage() {
                         <td style={{ padding: '10px 12px' }}>
                           <StatusBadge status={log.status} />
                         </td>
-                        <td style={{ padding: '10px 12px', color: 'var(--color-text)' }}>
+                        <td style={{ padding: '10px 12px', color: K.TEXT_PRIMARY, fontWeight: 500 }}>
                           {log.totalRecords}
                         </td>
-                        <td style={{ padding: '10px 12px', color: 'var(--color-text)' }}>
+                        <td style={{ padding: '10px 12px', color: K.TEXT_PRIMARY, fontWeight: 500 }}>
                           {log.processedRecords}
                         </td>
                         <td style={{ padding: '10px 12px' }}>
                           {log.errorCount > 0 ? (
-                            <span style={{ color: '#ef4444', fontWeight: 600 }}>
+                            <span style={{ color: K.ERROR, fontWeight: 600 }}>
                               {log.errorCount} (detay →)
                             </span>
                           ) : (
-                            <span style={{ color: 'var(--brand-500)' }}>0</span>
+                            <span style={{ color: K.SUCCESS, fontWeight: 600 }}>0</span>
                           )}
                         </td>
                       </tr>
@@ -910,7 +879,6 @@ export default function HisIntegrationsPage() {
                 </table>
               </div>
 
-              {/* Sayfalama */}
               {logsTotal > 10 && (
                 <div style={{
                   display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16,
@@ -920,16 +888,16 @@ export default function HisIntegrationsPage() {
                     disabled={logsPage <= 1}
                     style={{
                       padding: '6px 14px', borderRadius: 8,
-                      border: '1px solid var(--color-border)',
-                      background: 'none', cursor: logsPage <= 1 ? 'not-allowed' : 'pointer',
-                      color: 'var(--color-text)', opacity: logsPage <= 1 ? 0.4 : 1,
+                      border: `1px solid ${K.BORDER}`,
+                      background: K.SURFACE, cursor: logsPage <= 1 ? 'not-allowed' : 'pointer',
+                      color: K.TEXT_SECONDARY, opacity: logsPage <= 1 ? 0.4 : 1,
                     }}
                   >
                     ‹
                   </button>
                   <span style={{
                     padding: '6px 14px', fontSize: 13,
-                    color: 'var(--color-text-muted)',
+                    color: K.TEXT_MUTED,
                   }}>
                     {logsPage} / {Math.ceil(logsTotal / 10)}
                   </span>
@@ -938,10 +906,10 @@ export default function HisIntegrationsPage() {
                     disabled={logsPage >= Math.ceil(logsTotal / 10)}
                     style={{
                       padding: '6px 14px', borderRadius: 8,
-                      border: '1px solid var(--color-border)',
-                      background: 'none',
+                      border: `1px solid ${K.BORDER}`,
+                      background: K.SURFACE,
                       cursor: logsPage >= Math.ceil(logsTotal / 10) ? 'not-allowed' : 'pointer',
-                      color: 'var(--color-text)',
+                      color: K.TEXT_SECONDARY,
                       opacity: logsPage >= Math.ceil(logsTotal / 10) ? 0.4 : 1,
                     }}
                   >
@@ -962,11 +930,11 @@ export default function HisIntegrationsPage() {
             marginBottom: testModal.sampleData != null ? 16 : 0,
           }}>
             {testModal.success
-              ? <CheckCircle2 size={20} color="var(--brand-500)" />
-              : <AlertTriangle size={20} color="#ef4444" />
+              ? <CheckCircle2 size={20} color={K.SUCCESS} />
+              : <AlertTriangle size={20} color={K.ERROR} />
             }
             <span style={{
-              color: testModal.success ? 'var(--brand-500)' : '#ef4444',
+              color: testModal.success ? K.SUCCESS : K.ERROR,
               fontWeight: 600, fontSize: 15,
             }}>
               {testModal.message}
@@ -974,10 +942,11 @@ export default function HisIntegrationsPage() {
           </div>
           {testModal.sampleData != null && (
             <pre style={{
-              background: 'var(--color-surface-2, rgba(100,116,139,0.1))',
+              background: K.BG,
+              border: `1px solid ${K.BORDER_LIGHT}`,
               borderRadius: 8, padding: 14, margin: 0,
               fontSize: 12, fontFamily: 'var(--font-mono)',
-              color: 'var(--color-text)', overflowX: 'auto',
+              color: K.TEXT_PRIMARY, overflowX: 'auto',
               maxHeight: 300, overflowY: 'auto',
             }}>
               {JSON.stringify(testModal.sampleData, null, 2)}
@@ -989,7 +958,7 @@ export default function HisIntegrationsPage() {
       {/* ── Hata Detay Modalı ── */}
       {errorModal.show && errorModal.log && (
         <Modal title="Sync Hatası Detayları" onClose={() => setErrorModal({ show: false, log: null })}>
-          <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--color-text-muted)' }}>
+          <div style={{ marginBottom: 12, fontSize: 13, color: K.TEXT_MUTED }}>
             {new Date(errorModal.log.startedAt).toLocaleString('tr-TR')} •{' '}
             {errorModal.log.processedRecords}/{errorModal.log.totalRecords} kayıt işlendi
           </div>
@@ -997,13 +966,13 @@ export default function HisIntegrationsPage() {
             {(errorModal.log.errors as Array<{ externalId: string; error: string }>).map((err, i) => (
               <div key={i} style={{
                 padding: '10px 14px', borderRadius: 8,
-                background: 'rgba(239,68,68,0.08)',
-                border: '1px solid rgba(239,68,68,0.2)',
+                background: K.ERROR_BG,
+                border: `1px solid ${K.ERROR}`,
               }}>
-                <div style={{ fontWeight: 600, fontSize: 12, color: '#ef4444', marginBottom: 4 }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: K.ERROR, marginBottom: 4 }}>
                   ID: {err.externalId}
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--color-text)' }}>
+                <div style={{ fontSize: 13, color: K.TEXT_PRIMARY }}>
                   {err.error}
                 </div>
               </div>

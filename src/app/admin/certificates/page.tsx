@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Award, Download, Info } from 'lucide-react'
+import { Award, Download, Info, ChevronRight } from 'lucide-react'
 import { BlurFade } from '@/components/ui/blur-fade'
 import { useFetch, invalidateFetchCache } from '@/hooks/use-fetch'
 import { PageLoading } from '@/components/shared/page-loading'
@@ -78,52 +78,48 @@ export default function CertificatesPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</div>
+        <div className="text-sm" style={{ color: 'var(--k-error)' }}>{error}</div>
       </div>
     )
   }
 
   return (
-    <div>
+    <div className="k-page">
       <BlurFade delay={0}>
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-2xl"
-              style={{
-                background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-                boxShadow: '0 4px 14px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
-              }}
-            >
-              <Award className="h-6 w-6 text-white" />
+        <header className="k-page-header">
+          <div>
+            <div className="k-breadcrumb">
+              <span>Panel</span>
+              <ChevronRight size={12} />
+              <span data-current="true">Sertifikalar</span>
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                Sertifika Yönetimi
-              </h1>
-              <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                Personel sertifikalarını görüntüleyin ve yönetin
-              </p>
-            </div>
+            <h1 className="k-page-title">Sertifika Yönetimi</h1>
+            <p className="k-page-subtitle">
+              {stats.totalCerts > 0 ? (
+                <>
+                  <strong style={{ color: 'var(--k-text-primary)' }}>{stats.totalCerts}</strong> toplam sertifika ·{' '}
+                  <strong style={{ color: 'var(--k-text-primary)' }}>{stats.activeCerts}</strong> aktif ·{' '}
+                  <strong style={{ color: 'var(--k-warning)' }}>{stats.expiringSoon}</strong> yakında dolacak
+                </>
+              ) : 'Personel sertifikalarını görüntüleyin ve yönetin'}
+            </p>
           </div>
-          <button
-            aria-label="Sertifikaları dışa aktar"
-            disabled={isPending('all')}
-            className="flex items-center gap-2 rounded-xl h-10 px-5 text-[13px] font-semibold text-white transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
-            style={{
-              background: 'linear-gradient(135deg, var(--color-primary), var(--brand-800))',
-              boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-600) calc(0.25 * 100%), transparent)',
-            }}
-            onClick={() => downloadAll(filters)}
-          >
-            {isPending('all') ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
-            Dışa Aktar{filtersActive ? ' (Filtreli)' : ''}
-          </button>
-        </div>
+          <div className="flex items-center gap-2">
+            <button
+              aria-label="Sertifikaları dışa aktar"
+              disabled={isPending('all')}
+              className="k-btn k-btn-primary"
+              onClick={() => downloadAll(filters)}
+            >
+              {isPending('all') ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <Download size={15} />
+              )}
+              Dışa Aktar{filtersActive ? ' (Filtreli)' : ''}
+            </button>
+          </div>
+        </header>
       </BlurFade>
 
       <CertStatsBar stats={stats} filterStats={filterStats} filtersActive={filtersActive} />
@@ -142,15 +138,12 @@ export default function CertificatesPage() {
 
       <BlurFade delay={0.09}>
         {filtered.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center rounded-2xl border py-20"
-            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-          >
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl mb-4" style={{ background: 'var(--color-bg)' }}>
-              <Award className="h-7 w-7" style={{ color: 'var(--color-text-muted)' }} />
+          <div className="k-card flex flex-col items-center justify-center py-20">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl mb-4" style={{ background: 'var(--k-bg)' }}>
+              <Award className="h-7 w-7" style={{ color: 'var(--k-text-muted)' }} />
             </div>
-            <p className="text-[14px] font-semibold mb-1">Sertifika bulunamadı</p>
-            <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-[14px] font-semibold mb-1" style={{ color: 'var(--k-text-primary)' }}>Sertifika bulunamadı</p>
+            <p className="text-[12px]" style={{ color: 'var(--k-text-muted)' }}>
               {filtersActive
                 ? 'Filtrelere uygun sertifika yok'
                 : 'Personel eğitimi tamamladığında sertifika otomatik oluşturulur'}
@@ -161,7 +154,7 @@ export default function CertificatesPage() {
             {groups.length > 1 && (
               <div
                 className="flex items-center gap-2 text-[12px] mb-3 px-1"
-                style={{ color: 'var(--color-text-muted)' }}
+                style={{ color: 'var(--k-text-muted)' }}
               >
                 <Info className="h-3.5 w-3.5" />
                 <span>
@@ -181,10 +174,7 @@ export default function CertificatesPage() {
             ))}
           </div>
         ) : (
-          <div
-            className="rounded-2xl border overflow-hidden"
-            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
-          >
+          <div className="k-card overflow-hidden">
             <CertTable certificates={filtered} onSelect={setSelectedCert} />
           </div>
         )}
@@ -203,10 +193,7 @@ export default function CertificatesPage() {
       )}
 
       {groups.length > 0 && viewMode === 'grouped' && filtered.length > 0 && (
-        <p
-          className="text-center text-[11px] mt-6"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
+        <p className="text-center text-[11px] mt-2" style={{ color: 'var(--k-text-muted)' }}>
           Toplam {filtered.length} sertifika, {groups.length} eğitim grubunda
         </p>
       )}

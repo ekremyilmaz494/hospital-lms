@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { login, logout } from './helpers/auth'
 
+const LOGIN_FORM_SELECTOR = '[data-testid="login-form"][data-hydrated="true"]'
+const LOGIN_SUBMIT_SELECTOR = '[data-testid="login-submit"]'
+
 // Cookie consent banner submit'i intercept eder, baştan dismiss et
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -10,6 +13,8 @@ test.beforeEach(async ({ page }) => {
 })
 
 test.describe('Kimlik Dogrulama Akislari', () => {
+  test.describe.configure({ mode: 'serial' })
+
   test('basarili giris → dashboard yonlendirmesi', async ({ page }) => {
     await login(page, 'admin')
     await expect(page).toHaveURL(/\/admin\/dashboard/)
@@ -25,10 +30,12 @@ test.describe('Kimlik Dogrulama Akislari', () => {
     })
 
     await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector(LOGIN_FORM_SELECTOR, { timeout: 30000 })
     await page.fill('[type="email"]', 'test@example.com')
     await page.fill('[type="password"]', 'yanlis_sifre_123')
+    await expect(page.locator('[type="email"]')).toHaveValue('test@example.com')
 
-    const submitBtn = page.getByRole('button', { name: /Giriş Yap/i })
+    const submitBtn = page.locator(LOGIN_SUBMIT_SELECTOR)
     await submitBtn.waitFor({ state: 'visible', timeout: 15000 })
 
     // Race-free: response listener'ı click'ten ÖNCE subscribe et.
@@ -56,7 +63,8 @@ test.describe('Kimlik Dogrulama Akislari', () => {
     })
 
     await page.goto('/auth/login', { waitUntil: 'domcontentloaded' })
-    const submitBtn = page.getByRole('button', { name: /Giriş Yap/i })
+    await page.waitForSelector(LOGIN_FORM_SELECTOR, { timeout: 30000 })
+    const submitBtn = page.locator(LOGIN_SUBMIT_SELECTOR)
     await submitBtn.waitFor({ state: 'visible', timeout: 15000 })
     await submitBtn.click()
 

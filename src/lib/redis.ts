@@ -49,6 +49,17 @@ function resetRedis() {
   _redis = null
 }
 
+const REDIS_TIMEOUT_MS = Number(process.env.REDIS_TIMEOUT_MS ?? (process.env.NODE_ENV === 'production' ? 1500 : 500))
+
+async function withRedisTimeout<T>(promise: Promise<T>): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('redis_timeout')), REDIS_TIMEOUT_MS)
+    }),
+  ])
+}
+
 // ── In-memory fallback (dev/staging when Redis is not configured or unreachable) ──
 const memoryTimers = new Map<string, number>()
 const memoryRateLimits = new Map<string, { count: number; expiresAt: number }>()
@@ -304,7 +315,7 @@ export async function checkRateLimit(key: string, maxRequests: number, windowSec
       const pipeline = redis.pipeline()
       pipeline.set(k, 0, { nx: true, ex: windowSeconds })
       pipeline.incr(k)
-      const results = await pipeline.exec()
+      const results = await withRedisTimeout(pipeline.exec())
       const current = results[1] as number
       return current <= effectiveMax
     } catch {
@@ -333,7 +344,7 @@ export async function getRateLimitCount(key: string): Promise<number> {
   const redis = getRedis()
   if (redis) {
     try {
-      const val = await redis.get(`ratelimit:${key}`)
+      const val = await withRedisTimeout(redis.get(`ratelimit:${key}`))
       return typeof val === 'number' ? val : (parseInt(String(val ?? '0'), 10) || 0)
     } catch {
       resetRedis()
@@ -357,7 +368,7 @@ export async function incrementRateLimit(key: string, windowSeconds: number): Pr
       const pipeline = redis.pipeline()
       pipeline.set(k, 0, { nx: true, ex: windowSeconds })
       pipeline.incr(k)
-      await pipeline.exec()
+      await withRedisTimeout(pipeline.exec())
       return
     } catch {
       resetRedis()
@@ -381,7 +392,7 @@ export async function deleteRateLimit(key: string): Promise<void> {
   const redis = getRedis()
   if (redis) {
     try {
-      await redis.del(`ratelimit:${key}`)
+      await withRedisTimeout(redis.del(`ratelimit:${key}`))
     } catch {
       resetRedis()
     }

@@ -9,6 +9,20 @@ import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
+const K = {
+  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
+  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
+  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
+  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
+  INFO: '#3b82f6', INFO_BG: '#dbeafe',
+  ACCENT: '#a855f7',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
 interface Backup {
   id: string;
   type: string;
@@ -31,7 +45,7 @@ export default function BackupsPage() {
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
+    return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: K.ERROR }}>{error}</div></div>;
   }
 
   const backups = data?.backups ?? [];
@@ -57,42 +71,42 @@ export default function BackupsPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <BlurFade delay={0.05}><StatCard title="Son Yedek" value={stats.lastBackup} icon={CheckCircle} accentColor="var(--color-success)" /></BlurFade>
-        <BlurFade delay={0.1}><StatCard title="Toplam Boyut" value={stats.totalSize} icon={HardDrive} accentColor="var(--color-info)" /></BlurFade>
-        <BlurFade delay={0.15}><StatCard title="Sonraki Otomatik" value={stats.nextAuto} icon={Clock} accentColor="var(--color-accent)" /></BlurFade>
+        <BlurFade delay={0.05}><StatCard title="Son Yedek" value={stats.lastBackup} icon={CheckCircle} accentColor={K.SUCCESS} /></BlurFade>
+        <BlurFade delay={0.1}><StatCard title="Toplam Boyut" value={stats.totalSize} icon={HardDrive} accentColor={K.INFO} /></BlurFade>
+        <BlurFade delay={0.15}><StatCard title="Sonraki Otomatik" value={stats.nextAuto} icon={Clock} accentColor={K.ACCENT} /></BlurFade>
       </div>
 
       <BlurFade delay={0.2}>
-        <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+        <div className="overflow-hidden" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
           {backups.length > 0 ? (
             <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
               <thead>
-                <tr style={{ background: 'var(--color-bg)' }}>
-                  <th className="w-[30%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tarih</th>
-                  <th className="w-[15%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tür</th>
-                  <th className="w-[15%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Boyut</th>
-                  <th className="w-[20%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Durum</th>
-                  <th className="w-[20%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>İşlem</th>
+                <tr style={{ background: K.BG }}>
+                  <th className="w-[30%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Tarih</th>
+                  <th className="w-[15%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Tür</th>
+                  <th className="w-[15%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Boyut</th>
+                  <th className="w-[20%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Durum</th>
+                  <th className="w-[20%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>İşlem</th>
                 </tr>
               </thead>
               <tbody>
                 {backups.map((b) => (
-                  <tr key={b.id} className="clickable-row" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td className="px-5 py-4 font-mono font-medium">{b.date}</td>
+                  <tr key={b.id} className="clickable-row" style={{ borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
+                    <td className="px-5 py-4 font-mono font-medium" style={{ color: K.TEXT_PRIMARY }}>{b.date}</td>
                     <td className="px-5 py-4">
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: b.type === 'auto' ? 'var(--color-info-bg)' : 'var(--color-accent-light)', color: b.type === 'auto' ? 'var(--color-info)' : 'var(--color-accent)' }}>
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: b.type === 'auto' ? 'var(--color-info)' : 'var(--color-accent)' }} />
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: b.type === 'auto' ? K.INFO_BG : K.PRIMARY_LIGHT, color: b.type === 'auto' ? K.INFO : K.PRIMARY }}>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: b.type === 'auto' ? K.INFO : K.PRIMARY }} />
                         {b.type === 'auto' ? 'Otomatik' : 'Manuel'}
                       </span>
                     </td>
-                    <td className="px-5 py-4 font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>{b.size}</td>
+                    <td className="px-5 py-4 font-mono text-sm" style={{ color: K.TEXT_SECONDARY }}>{b.size}</td>
                     <td className="px-5 py-4">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--color-success)' }}>
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: K.SUCCESS_BG, color: K.SUCCESS }}>
                         <CheckCircle className="h-3.5 w-3.5" /> Tamamlandı
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <Button variant="ghost" size="sm" className="gap-1.5 rounded-lg" style={{ color: 'var(--color-primary)' }} onClick={async () => {
+                      <Button variant="ghost" size="sm" className="gap-1.5 rounded-lg" style={{ color: K.PRIMARY }} onClick={async () => {
                         toast(`${b.date} tarihli yedek indiriliyor...`, 'info');
                         try {
                           const res = await fetch(`/api/admin/backups/${b.id}/download`);
@@ -117,7 +131,7 @@ export default function BackupsPage() {
               </tbody>
             </table>
           ) : (
-            <div className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>Henüz yedekleme yapılmadı. İlk yedeği almak için 'Yedek Al' butonunu kullanın.</div>
+            <div className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Henüz yedekleme yapılmadı. İlk yedeği almak için &apos;Yedek Al&apos; butonunu kullanın.</div>
           )}
         </div>
       </BlurFade>

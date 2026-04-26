@@ -1,10 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Trash2, ChevronUp, ChevronDown, Tags } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, GripVertical, X, Save } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,10 +9,32 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { PageHeader } from '@/components/shared/page-header';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
 import { CategoryIcon, CATEGORY_ICON_NAMES } from '@/components/shared/category-icon';
+
+const K = {
+  PRIMARY: '#0d9668',
+  PRIMARY_HOVER: '#087a54',
+  PRIMARY_LIGHT: '#d1fae5',
+  SURFACE: '#ffffff',
+  SURFACE_HOVER: '#f5f5f4',
+  BG: '#fafaf9',
+  BORDER: '#c9c4be',
+  BORDER_LIGHT: '#e7e5e4',
+  TEXT_PRIMARY: '#1c1917',
+  TEXT_SECONDARY: '#44403c',
+  TEXT_MUTED: '#78716c',
+  ERROR: '#ef4444',
+  ERROR_BG: '#fee2e2',
+  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  FONT_DISPLAY: 'var(--font-display, system-ui)',
+};
+
+const ICON_COLORS = [
+  K.PRIMARY, '#dc2626', '#7c3aed', '#e11d48', '#0284c7',
+  '#f59e0b', '#0891b2', '#64748b', '#d97706', '#ec4899',
+];
 
 interface CategoryItem {
   id: string;
@@ -26,12 +45,6 @@ interface CategoryItem {
   isDefault: boolean;
 }
 
-/** Color palette for icon picker */
-const ICON_COLORS = [
-  '#ef4444', '#f59e0b', 'var(--brand-600)', '#3b82f6', '#8b5cf6',
-  '#ec4899', '#06b6d4', '#dc2626', '#64748b', 'var(--brand-500)',
-];
-
 export default function CategoriesPage() {
   const { data: categories, isLoading, refetch } = useFetch<CategoryItem[]>('/api/admin/training-categories');
   const { toast } = useToast();
@@ -39,11 +52,10 @@ export default function CategoriesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newIcon, setNewIcon] = useState('BookOpen');
-  const [newColor, setNewColor] = useState('var(--brand-600)');
+  const [newColor, setNewColor] = useState(K.PRIMARY);
   const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<CategoryItem | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const sorted = [...(categories ?? [])].sort((a, b) => a.order - b.order);
@@ -66,6 +78,7 @@ export default function CategoriesPage() {
       setModalOpen(false);
       setNewLabel('');
       setNewIcon('BookOpen');
+      setNewColor(K.PRIMARY);
       refetch();
     } catch {
       toast('Bir hata oluştu', 'error');
@@ -74,25 +87,17 @@ export default function CategoriesPage() {
     }
   }
 
-  function openDelete(cat: CategoryItem) {
-    setDeleteTarget(cat);
-    setDeleteDialogOpen(true);
-  }
-
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/admin/training-categories/${deleteTarget.id}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(`/api/admin/training-categories/${deleteTarget.id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) {
         toast(data.error ?? 'Kategori silinemedi', 'error');
         return;
       }
       toast('Kategori silindi', 'success');
-      setDeleteDialogOpen(false);
       setDeleteTarget(null);
       refetch();
     } catch {
@@ -106,7 +111,6 @@ export default function CategoriesPage() {
     const idx = sorted.findIndex(c => c.id === cat.id);
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= sorted.length) return;
-
     const swapTarget = sorted[swapIdx];
     await Promise.all([
       fetch(`/api/admin/training-categories/${cat.id}`, {
@@ -124,262 +128,517 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Kategori Yönetimi"
-        subtitle="Eğitim kategorilerini ekleyin, silin veya sıralayın"
-        badge="Eğitimler"
-        action={{
-          label: 'Yeni Kategori',
-          icon: Plus,
-          onClick: () => setModalOpen(true),
-        }}
-      />
-
-      <div
-        className="overflow-hidden rounded-2xl border"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-      >
-        {/* Header */}
-        <div
-          className="flex items-center gap-3 px-5 py-4 border-b"
-          style={{ borderColor: 'var(--color-border)', background: 'linear-gradient(135deg, var(--color-primary-light) 0%, transparent 60%)' }}
-        >
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-xl"
-            style={{ background: 'var(--color-primary-light)' }}
-          >
-            <Tags className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+    <div className="k-page">
+      {/* Header */}
+      <header className="k-page-header">
+        <div>
+          <div className="k-breadcrumb">
+            <span>Panel</span>
+            <ChevronRight size={12} />
+            <span>Ayarlar</span>
+            <ChevronRight size={12} />
+            <span data-current="true">Eğitim Kategorileri</span>
           </div>
-          <div>
-            <p className="text-sm font-bold">Kategoriler</p>
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              {sorted.length} kategori
-            </p>
-          </div>
+          <h1 className="k-page-title">Eğitim Kategorileri</h1>
+          <p className="k-page-subtitle">
+            Eğitimleri gruplandırmak için kategori oluştur, düzenle, sırala.{' '}
+            <strong style={{ color: K.TEXT_PRIMARY }}>{sorted.length}</strong> aktif kategori.
+          </p>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setModalOpen(true)}
+            className="k-btn k-btn-primary"
+          >
+            <Plus size={15} /> Yeni Kategori
+          </button>
+        </div>
+      </header>
 
-        {/* List */}
-        {isLoading ? (
-          <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-5 py-3.5 animate-pulse">
-                <div className="h-9 w-9 rounded-xl" style={{ background: 'var(--color-border)' }} />
-                <div className="h-3.5 w-32 rounded" style={{ background: 'var(--color-border)' }} />
-              </div>
-            ))}
-          </div>
-        ) : sorted.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Eğitim kategorisi oluşturmak için 'Yeni Kategori' butonunu kullanın.</p>
-          </div>
-        ) : (
-          <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
-            {sorted.map((cat, idx) => (
-              <div key={cat.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[var(--color-surface-hover)]">
-                {/* Sıra */}
-                <span
-                  className="w-6 text-center text-xs font-mono font-semibold tabular-nums"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  {idx + 1}
-                </span>
+      {/* Grid */}
+      {isLoading ? (
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="animate-pulse"
+              style={{
+                background: K.SURFACE,
+                border: `1.5px solid ${K.BORDER}`,
+                borderRadius: 14,
+                padding: 18,
+                height: 120,
+              }}
+            />
+          ))}
+        </div>
+      ) : sorted.length === 0 ? (
+        <div
+          style={{
+            background: K.SURFACE,
+            border: `1.5px solid ${K.BORDER}`,
+            borderRadius: 16,
+            padding: '64px 24px',
+            textAlign: 'center',
+            boxShadow: K.SHADOW_CARD,
+          }}
+        >
+          <p style={{ color: K.TEXT_MUTED, fontSize: 14 }}>
+            Eğitim kategorisi oluşturmak için &quot;Yeni Kategori&quot; butonunu kullanın.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+          {sorted.map((cat, idx) => (
+            <CategoryCard
+              key={cat.id}
+              cat={cat}
+              index={idx}
+              isFirst={idx === 0}
+              isLast={idx === sorted.length - 1}
+              onMove={handleMove}
+              onDelete={setDeleteTarget}
+            />
+          ))}
+        </div>
+      )}
 
-                {/* İkon — Lucide icon with colored bg */}
-                <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                  style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
-                >
-                  <CategoryIcon name={cat.icon} className="h-4.5 w-4.5" style={{ color: 'var(--color-primary)' }} />
-                </div>
-
-                {/* Label */}
-                <span className="flex-1 text-sm font-medium">{cat.label}</span>
-
-                {/* Slug */}
-                <span
-                  className="hidden sm:block rounded px-2 py-0.5 text-[10px] font-mono"
-                  style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}
-                >
-                  {cat.value}
-                </span>
-
-                {/* Sırala */}
-                <div className="flex flex-col">
-                  <button
-                    onClick={() => handleMove(cat, 'up')}
-                    disabled={idx === 0}
-                    className="rounded p-0.5 disabled:opacity-30 hover:bg-[var(--color-bg)]"
-                    aria-label="Yukarı taşı"
-                  >
-                    <ChevronUp className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-                  </button>
-                  <button
-                    onClick={() => handleMove(cat, 'down')}
-                    disabled={idx === sorted.length - 1}
-                    className="rounded p-0.5 disabled:opacity-30 hover:bg-[var(--color-bg)]"
-                    aria-label="Aşağı taşı"
-                  >
-                    <ChevronDown className="h-3.5 w-3.5" style={{ color: 'var(--color-text-muted)' }} />
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => openDelete(cat)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--color-error-bg)]"
-                  aria-label="Sil"
-                >
-                  <Trash2 className="h-3.5 w-3.5" style={{ color: 'var(--color-error)' }} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Yeni Kategori Modal ── */}
+      {/* New Category Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" style={{ background: K.SURFACE, borderColor: K.BORDER }}>
           <DialogHeader>
-            <DialogTitle>Yeni Kategori Ekle</DialogTitle>
+            <DialogTitle style={{ fontFamily: K.FONT_DISPLAY, fontSize: 18, color: K.TEXT_PRIMARY }}>
+              Yeni Kategori Ekle
+            </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
+          <div className="flex flex-col gap-5 py-2">
+            {/* Label input */}
             <div>
-              <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: K.TEXT_MUTED,
+                  marginBottom: 6,
+                }}
+              >
                 Kategori Adı
-              </Label>
-              <Input
+              </label>
+              <input
+                type="text"
                 placeholder="örn. Kardiyoloji"
                 value={newLabel}
                 onChange={e => setNewLabel(e.target.value)}
                 maxLength={30}
-                className="h-10"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
                 onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                autoFocus
+                style={{
+                  width: '100%',
+                  height: 40,
+                  padding: '0 14px',
+                  background: K.SURFACE,
+                  border: `1.5px solid ${K.BORDER}`,
+                  borderRadius: 10,
+                  fontSize: 14,
+                  color: K.TEXT_PRIMARY,
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  transition: 'border-color 160ms ease, box-shadow 160ms ease',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = K.PRIMARY;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${K.PRIMARY_LIGHT}`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = K.BORDER;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
-              <p className="mt-1 text-right text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+              <p style={{ marginTop: 6, fontSize: 11, color: K.TEXT_MUTED, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                 {newLabel.length}/30
               </p>
             </div>
 
-            {/* Icon Picker */}
+            {/* Icon picker */}
             <div>
-              <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>
-                İkon Seç
-              </Label>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: K.TEXT_MUTED,
+                  marginBottom: 8,
+                }}
+              >
+                İkon
+              </label>
               <div className="grid grid-cols-8 gap-1.5">
-                {CATEGORY_ICON_NAMES.map(iconName => (
-                  <button
-                    key={iconName}
-                    type="button"
-                    onClick={() => setNewIcon(iconName)}
-                    className="flex h-10 w-full items-center justify-center rounded-xl transition-all duration-150"
-                    style={{
-                      background: newIcon === iconName ? `color-mix(in srgb, ${newColor} 15%, transparent)` : 'var(--color-bg)',
-                      border: `2px solid ${newIcon === iconName ? newColor : 'var(--color-border)'}`,
-                      boxShadow: newIcon === iconName ? `0 2px 8px color-mix(in srgb, ${newColor} 20%, transparent)` : 'none',
-                    }}
-                    title={iconName}
-                  >
-                    <CategoryIcon
-                      name={iconName}
-                      className="h-4.5 w-4.5"
-                      style={{ color: newIcon === iconName ? newColor : 'var(--color-text-muted)' }}
-                    />
-                  </button>
-                ))}
+                {CATEGORY_ICON_NAMES.map(iconName => {
+                  const active = newIcon === iconName;
+                  return (
+                    <button
+                      key={iconName}
+                      type="button"
+                      onClick={() => setNewIcon(iconName)}
+                      title={iconName}
+                      style={{
+                        height: 40,
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 10,
+                        background: active ? `color-mix(in srgb, ${newColor} 14%, transparent)` : K.BG,
+                        border: `1.5px solid ${active ? newColor : K.BORDER_LIGHT}`,
+                        cursor: 'pointer',
+                        transition: 'all 150ms ease',
+                      }}
+                    >
+                      <CategoryIcon
+                        name={iconName}
+                        className="h-4.5 w-4.5"
+                        style={{ color: active ? newColor : K.TEXT_MUTED }}
+                      />
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Color Picker */}
+            {/* Color picker */}
             <div>
-              <Label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--color-text-secondary)' }}>
-                İkon Rengi
-              </Label>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: K.TEXT_MUTED,
+                  marginBottom: 8,
+                }}
+              >
+                Renk
+              </label>
               <div className="flex flex-wrap gap-2">
-                {ICON_COLORS.map(color => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setNewColor(color)}
-                    className="h-7 w-7 rounded-full transition-all duration-150"
-                    style={{
-                      background: color,
-                      border: `2.5px solid ${newColor === color ? 'var(--color-text-primary)' : 'transparent'}`,
-                      outline: newColor === color ? `2px solid ${color}` : 'none',
-                      outlineOffset: '2px',
-                      transform: newColor === color ? 'scale(1.15)' : 'scale(1)',
-                    }}
-                  />
-                ))}
+                {ICON_COLORS.map(color => {
+                  const active = newColor === color;
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setNewColor(color)}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 999,
+                        background: color,
+                        border: `2px solid ${active ? K.TEXT_PRIMARY : 'transparent'}`,
+                        outline: active ? `2px solid ${color}` : 'none',
+                        outlineOffset: 2,
+                        cursor: 'pointer',
+                        transform: active ? 'scale(1.1)' : 'scale(1)',
+                        transition: 'transform 200ms ease',
+                      }}
+                      aria-label={`Renk: ${color}`}
+                    />
+                  );
+                })}
               </div>
             </div>
 
             {/* Preview */}
             <div
-              className="flex items-center justify-center gap-3 rounded-xl py-3"
-              style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: 14,
+                borderRadius: 12,
+                background: K.BG,
+                border: `1.5px solid ${K.BORDER_LIGHT}`,
+              }}
             >
               <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ background: `color-mix(in srgb, ${newColor} 12%, transparent)` }}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: `color-mix(in srgb, ${newColor} 14%, transparent)`,
+                  flexShrink: 0,
+                }}
               >
                 <CategoryIcon name={newIcon} className="h-5 w-5" style={{ color: newColor }} />
               </div>
-              <div>
-                <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY }}>
                   {newLabel || 'Kategori Adı'}
-                </p>
-                <p className="text-[10px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
+                </div>
+                <div style={{ fontSize: 11, color: K.TEXT_MUTED, fontFamily: 'var(--font-mono, monospace)', marginTop: 2 }}>
                   {newIcon}
-                </p>
+                </div>
               </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setModalOpen(false); setNewLabel(''); }} disabled={saving}>
-              İptal
-            </Button>
-            <Button
+          <DialogFooter className="gap-2">
+            <button
+              onClick={() => { setModalOpen(false); setNewLabel(''); setNewIcon('BookOpen'); setNewColor(K.PRIMARY); }}
+              disabled={saving}
+              className="k-btn k-btn-ghost"
+            >
+              <X size={15} /> İptal
+            </button>
+            <button
               onClick={handleAdd}
               disabled={saving || !newLabel.trim()}
-              style={{ background: 'var(--color-primary)', color: 'white' }}
+              className="k-btn k-btn-primary"
             >
-              {saving ? 'Ekleniyor...' : 'Ekle'}
-            </Button>
+              <Save size={15} /> {saving ? 'Ekleniyor…' : 'Kategori Ekle'}
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Silme Onay Modal ── */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="max-w-sm">
+      {/* Delete Confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm" style={{ background: K.SURFACE, borderColor: K.BORDER }}>
           <DialogHeader>
-            <DialogTitle>Kategoriyi Sil</DialogTitle>
+            <DialogTitle style={{ fontFamily: K.FONT_DISPLAY, fontSize: 18, color: K.TEXT_PRIMARY }}>
+              Kategoriyi Sil
+            </DialogTitle>
           </DialogHeader>
-          <p className="text-sm py-2" style={{ color: 'var(--color-text-secondary)' }}>
-            <span className="inline-flex items-center gap-1.5 font-bold">
-              <CategoryIcon name={deleteTarget?.icon ?? 'BookOpen'} className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+          <p style={{ fontSize: 14, color: K.TEXT_SECONDARY, paddingBlock: 8, lineHeight: 1.55 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, color: K.TEXT_PRIMARY }}>
+              <CategoryIcon name={deleteTarget?.icon ?? 'BookOpen'} className="h-4 w-4" style={{ color: K.PRIMARY }} />
               {deleteTarget?.label}
-            </span>
-            {' '}kategorisini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+            </span>{' '}
+            kategorisini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
           </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+          <DialogFooter className="gap-2">
+            <button
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+              className="k-btn k-btn-ghost"
+            >
               İptal
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={handleDelete}
               disabled={deleting}
-              style={{ background: 'var(--color-error)', color: 'white' }}
+              className="k-btn"
+              style={{ background: K.ERROR, color: '#fff' }}
             >
-              {deleting ? 'Siliniyor...' : 'Sil'}
-            </Button>
+              <Trash2 size={15} /> {deleting ? 'Siliniyor…' : 'Sil'}
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ── Category Card ──
+function CategoryCard({
+  cat,
+  index,
+  isFirst,
+  isLast,
+  onMove,
+  onDelete,
+}: {
+  cat: CategoryItem;
+  index: number;
+  isFirst: boolean;
+  isLast: boolean;
+  onMove: (cat: CategoryItem, dir: 'up' | 'down') => void;
+  onDelete: (cat: CategoryItem) => void;
+}) {
+  // Renk: kategori ikonuna semantik renk dağıt (sıraya göre döngüsel)
+  const accent = ICON_COLORS[index % ICON_COLORS.length];
+
+  return (
+    <article
+      style={{
+        position: 'relative',
+        background: K.SURFACE,
+        border: `1.5px solid ${K.BORDER}`,
+        borderRadius: 14,
+        padding: 18,
+        boxShadow: K.SHADOW_CARD,
+        transition: 'border-color 200ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+      className="group"
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = accent;
+        e.currentTarget.style.transform = 'translateY(-1px)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = K.BORDER;
+        e.currentTarget.style.transform = 'translateY(0)';
+      }}
+    >
+      {/* Top row: icon + sort handle */}
+      <div className="flex items-start justify-between">
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: `color-mix(in srgb, ${accent} 14%, transparent)`,
+          }}
+        >
+          <CategoryIcon name={cat.icon} className="h-5 w-5" style={{ color: accent }} />
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            opacity: 0,
+            transition: 'opacity 160ms ease',
+          }}
+          className="group-hover:opacity-100"
+        >
+          <button
+            onClick={() => onMove(cat, 'up')}
+            disabled={isFirst}
+            aria-label="Yukarı taşı"
+            style={{
+              width: 24,
+              height: 18,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              background: 'transparent',
+              borderRadius: 4,
+              cursor: isFirst ? 'not-allowed' : 'pointer',
+              opacity: isFirst ? 0.3 : 1,
+            }}
+          >
+            <ChevronUp size={14} style={{ color: K.TEXT_MUTED }} />
+          </button>
+          <button
+            onClick={() => onMove(cat, 'down')}
+            disabled={isLast}
+            aria-label="Aşağı taşı"
+            style={{
+              width: 24,
+              height: 18,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              background: 'transparent',
+              borderRadius: 4,
+              cursor: isLast ? 'not-allowed' : 'pointer',
+              opacity: isLast ? 0.3 : 1,
+            }}
+          >
+            <ChevronDown size={14} style={{ color: K.TEXT_MUTED }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Label + slug */}
+      <div>
+        <h3
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            color: K.TEXT_PRIMARY,
+            fontFamily: K.FONT_DISPLAY,
+            letterSpacing: '-0.01em',
+            margin: 0,
+          }}
+        >
+          {cat.label}
+        </h3>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            marginTop: 4,
+            padding: '2px 7px',
+            borderRadius: 5,
+            background: K.BG,
+            border: `1px solid ${K.BORDER_LIGHT}`,
+            fontSize: 10.5,
+            color: K.TEXT_MUTED,
+            fontFamily: 'var(--font-mono, monospace)',
+          }}
+        >
+          {cat.value}
+        </div>
+      </div>
+
+      {/* Footer: order + delete */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          paddingTop: 10,
+          borderTop: `1px solid ${K.BORDER_LIGHT}`,
+        }}
+      >
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            fontSize: 11,
+            color: K.TEXT_MUTED,
+            fontFamily: 'var(--font-mono, monospace)',
+          }}
+        >
+          <GripVertical size={12} /> #{index + 1}
+        </span>
+        <button
+          onClick={() => onDelete(cat)}
+          aria-label="Sil"
+          style={{
+            width: 28,
+            height: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 'none',
+            background: 'transparent',
+            borderRadius: 6,
+            cursor: 'pointer',
+            color: K.TEXT_MUTED,
+            transition: 'background 160ms ease, color 160ms ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = K.ERROR_BG;
+            e.currentTarget.style.color = K.ERROR;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = K.TEXT_MUTED;
+          }}
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </article>
   );
 }
