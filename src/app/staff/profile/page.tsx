@@ -3,14 +3,14 @@
 /**
  * Profilim — "Clinical Editorial" redesign.
  * Notifications + Calendar + SMG ile aynı dil: cream + ink + gold + mono caps + serif display.
- * Hero identity + numaralı bölüm mimarisi (I. Bilgiler · II. Güvenlik · III. 2FA · IV. Bildirimler).
+ * Hero identity + numaralı bölüm mimarisi (I. Bilgiler · II. Güvenlik · III. 2FA).
  */
 
 import { useState, useEffect, useRef } from 'react';
 import {
   Mail, Phone, Building2, Shield, Camera, Eye, EyeOff,
   CheckCircle2, AlertTriangle, Award, BookOpen, FileText,
-  Lock, Loader2, Bell, BellOff, Briefcase,
+  Lock, Loader2, Briefcase,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
@@ -30,14 +30,6 @@ interface ProfileData {
   createdAt: string;
 }
 
-/** VAPID public key'i Uint8Array'e çevirir (PushManager.subscribe için gerekli) */
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
-}
-
 export default function ProfilePage() {
   const { toast } = useToast();
   const { fullName, initials } = useAuth();
@@ -54,9 +46,6 @@ export default function ProfilePage() {
   const [showNew, setShowNew] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
-  const [pushSupported, setPushSupported] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -65,18 +54,6 @@ export default function ProfilePage() {
       setPhone(profile.phone ?? '');
     }
   }, [profile]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    setPushSupported(true);
-    if (Notification.permission === 'granted') {
-      navigator.serviceWorker.ready
-        .then(reg => reg.pushManager.getSubscription())
-        .then(sub => { if (sub) setPushEnabled(true); })
-        .catch(() => {});
-    }
-  }, []);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -150,55 +127,6 @@ export default function ProfilePage() {
       toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
     } finally {
       setSavingPassword(false);
-    }
-  };
-
-  const handleTogglePush = async () => {
-    if (!pushSupported) return;
-    setPushLoading(true);
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      if (pushEnabled) {
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-          await fetch('/api/staff/push/unsubscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ endpoint: sub.endpoint }),
-          });
-          await sub.unsubscribe();
-        }
-        setPushEnabled(false);
-        toast('Anlık bildirimler devre dışı bırakıldı', 'success');
-      } else {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          toast('Bildirim izni verilmedi. Tarayıcı ayarlarından izin verebilirsiniz.', 'error');
-          return;
-        }
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
-        if (!vapidKey) { toast('Push bildirimleri yapılandırılmamış', 'error'); return; }
-        const sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
-        });
-        const json = sub.toJSON();
-        await fetch('/api/staff/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            endpoint: json.endpoint,
-            p256dh: json.keys?.p256dh,
-            auth: json.keys?.auth,
-          }),
-        });
-        setPushEnabled(true);
-        toast('Anlık bildirimler aktif edildi', 'success');
-      }
-    } catch {
-      toast('Bildirim ayarı değiştirilemedi', 'error');
-    } finally {
-      setPushLoading(false);
     }
   };
 
@@ -571,77 +499,6 @@ export default function ProfilePage() {
               </div>
             </Section>
 
-            {/* ───── IV. Push ───── */}
-            {pushSupported && (
-              <Section number="IV." title="Anlık bildirimler" subtitle="Yeni atamaları tarayıcından al">
-                <div
-                  className="grid items-center gap-4 p-5 sm:p-6"
-                  style={{
-                    backgroundColor: CARD_BG,
-                    border: `1px solid ${RULE}`,
-                    borderRadius: '4px',
-                    gridTemplateColumns: '44px 1fr max-content',
-                  }}
-                >
-                  <div
-                    className="flex items-center justify-center"
-                    style={{
-                      width: 44, height: 44,
-                      backgroundColor: pushEnabled ? '#eaf6ef' : 'rgba(0,0,0,0.04)',
-                      borderRadius: '2px',
-                    }}
-                  >
-                    {pushEnabled
-                      ? <Bell className="h-5 w-5" style={{ color: '#0a7a47' }} />
-                      : <BellOff className="h-5 w-5" style={{ color: INK_SOFT }} />}
-                  </div>
-                  <div>
-                    <p
-                      className="text-[14px] font-semibold tracking-[-0.01em]"
-                      style={{ color: INK, fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
-                    >
-                      {pushEnabled ? 'Bildirimler Açık' : 'Bildirimler Kapalı'}
-                    </p>
-                    <p className="mt-0.5 text-[12px]" style={{ color: INK_SOFT }}>
-                      {pushEnabled
-                        ? 'Bu cihazda anlık bildirim alıyorsun.'
-                        : 'Eğitim ve sınav bildirimlerini aç.'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleTogglePush}
-                    disabled={pushLoading}
-                    className="relative inline-flex items-center shrink-0 transition-colors"
-                    style={{
-                      width: 48, height: 28,
-                      backgroundColor: pushEnabled ? OLIVE : RULE,
-                      borderRadius: '14px',
-                      opacity: pushLoading ? 0.6 : 1,
-                    }}
-                    aria-label={pushEnabled ? 'Bildirimleri kapat' : 'Bildirimleri aç'}
-                  >
-                    <span
-                      className="inline-block transition-transform"
-                      style={{
-                        width: 22, height: 22,
-                        backgroundColor: CREAM,
-                        borderRadius: '50%',
-                        transform: pushEnabled ? 'translateX(23px)' : 'translateX(3px)',
-                      }}
-                    />
-                  </button>
-                </div>
-                {typeof window !== 'undefined' && Notification.permission === 'denied' && (
-                  <p
-                    className="mt-2 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em]"
-                    style={{ color: '#b3261e', fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-                  >
-                    <AlertTriangle className="h-3 w-3" />
-                    Tarayıcıda izin reddedilmiş. Adres çubuğundaki kilit simgesinden izin ver.
-                  </p>
-                )}
-              </Section>
-            )}
           </>
         )}
       </div>
