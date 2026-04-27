@@ -49,13 +49,19 @@ export default function AdminLayout({
   const [setupChecked, setSetupChecked] = useState(false);
   const isSetupPage = pathname?.startsWith('/admin/setup');
 
-  // Setup wizard guard: admin henüz kurulumu tamamlamadıysa /admin/setup'a yönlendir
+  // Setup wizard guard: admin henüz kurulumu tamamlamadıysa /admin/setup'a yönlendir.
+  // Setup tamamlandıysa sessionStorage'a yazılır — sonraki sayfa geçişlerinde fetch atılmaz.
   useEffect(() => {
-    // Setup sayfasında veya henüz auth yüklenmemişse kontrol gereksiz
     if (isLoading || !user || user.role !== 'admin' || isSetupPage) {
-      // requestAnimationFrame ile cascade render'ı önle
       const raf = requestAnimationFrame(() => setSetupChecked(true));
       return () => cancelAnimationFrame(raf);
+    }
+
+    // Cache hit → fetch'i atla
+    const cacheKey = `admin-setup-completed:${user.id}`;
+    if (typeof window !== 'undefined' && sessionStorage.getItem(cacheKey) === '1') {
+      setSetupChecked(true);
+      return;
     }
 
     let cancelled = false;
@@ -65,6 +71,8 @@ export default function AdminLayout({
         if (cancelled) return;
         if (data.setupCompleted === false) {
           router.replace('/admin/setup');
+        } else {
+          try { sessionStorage.setItem(cacheKey, '1'); } catch {}
         }
         setSetupChecked(true);
       })
