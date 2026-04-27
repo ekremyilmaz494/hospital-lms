@@ -6,13 +6,15 @@ dangerous_patterns=(
   "rm -rf"
   "git reset --hard"
   "git push.*--force"
+  "git push.*-f([[:space:]]|$)"
   "DROP TABLE"
   "DROP DATABASE"
   "TRUNCATE"
-  "curl.*|.*sh"
-  "wget.*|.*bash"
+  "curl[^|]*\|[[:space:]]*(ba)?sh"
+  "wget[^|]*\|[[:space:]]*(ba)?sh"
   "prisma migrate reset"
-  "prisma db push --force-reset"
+  "prisma db push.*--force-reset"
+  "pnpm.*db:push"
 )
 
 for pattern in "${dangerous_patterns[@]}"; do
