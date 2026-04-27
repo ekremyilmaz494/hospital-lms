@@ -7,6 +7,17 @@ datasource db {
   provider = "postgresql"
 }
 
+// Multi-tenant rol hiyerarşisi.
+// app_metadata.role JWT claim'i ile senkron tutulur (auth-user-factory.ts).
+// String yerine enum: typo riskini DB seviyesinde keser.
+enum UserRole {
+  super_admin
+  admin
+  staff
+
+  @@map("user_role")
+}
+
 // ── ABONELIK PLANLARI ──
 model SubscriptionPlan {
   id                     String   @id @default(uuid()) @db.Uuid
@@ -69,7 +80,7 @@ model Organization {
   oidcClientId        String?   @map("oidc_client_id") @db.VarChar(255)
   oidcClientSecret    String?   @map("oidc_client_secret") @db.Text
   ssoAutoProvision    Boolean   @default(true) @map("sso_auto_provision")
-  ssoDefaultRole      String    @default("staff") @map("sso_default_role") @db.VarChar(20)
+  ssoDefaultRole      UserRole  @default(staff) @map("sso_default_role")
   setupCompleted      Boolean   @default(false) @map("setup_completed")
   setupStep           Int       @default(0) @map("setup_step")
   language            String    @default("tr") @map("language") @db.VarChar(5)
@@ -238,7 +249,7 @@ model User {
   phoneVerifiedAt          DateTime? @map("phone_verified_at") @db.Timestamptz
   departmentId             String?   @map("department_id") @db.Uuid
   title                    String?   @db.VarChar(100)
-  role                     String    @db.VarChar(20)
+  role                     UserRole
   avatarUrl                String?   @map("avatar_url") @db.Text
   isActive                 Boolean   @default(true) @map("is_active")
   hisExternalId            String?   @map("his_external_id") @db.VarChar(100)

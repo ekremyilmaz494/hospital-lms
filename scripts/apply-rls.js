@@ -28,6 +28,9 @@ async function run() {
     'his_integrations','sync_logs',
     'kvkk_requests','push_subscriptions',
     'department_training_rules','scorm_attempts',
+    // Training Feedback (EY.FR.40)
+    'training_feedback_forms','training_feedback_categories','training_feedback_items',
+    'training_feedback_responses','training_feedback_answers',
   ];
 
   for (const t of tables) {
@@ -220,6 +223,31 @@ async function run() {
     // --- SCORM ATTEMPTS ---
     [`CREATE POLICY "admin_scorm_attempts_select" ON scorm_attempts FOR SELECT USING (attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id())))`],
     [`CREATE POLICY "staff_scorm_attempts_all" ON scorm_attempts FOR ALL USING (attempt_id IN (SELECT id FROM exam_attempts WHERE user_id = auth.uid()))`],
+
+    // --- TRAINING FEEDBACK FORMS (EY.FR.40) ---
+    // ⚠️ ÖNCEDEN user_metadata kullanıyordu (BYPASS RİSKİ) — app_metadata helper'larıyla düzeltildi
+    [`CREATE POLICY "super_admin_tfb_forms_all" ON training_feedback_forms FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_tfb_forms_all" ON training_feedback_forms FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "staff_tfb_forms_select" ON training_feedback_forms FOR SELECT USING (organization_id = public.get_user_org_id() AND is_active = true)`],
+
+    // --- TRAINING FEEDBACK CATEGORIES ---
+    [`CREATE POLICY "admin_tfb_categories_all" ON training_feedback_categories FOR ALL USING (form_id IN (SELECT id FROM training_feedback_forms WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "staff_tfb_categories_select" ON training_feedback_categories FOR SELECT USING (form_id IN (SELECT id FROM training_feedback_forms WHERE organization_id = public.get_user_org_id() AND is_active = true))`],
+
+    // --- TRAINING FEEDBACK ITEMS ---
+    [`CREATE POLICY "admin_tfb_items_all" ON training_feedback_items FOR ALL USING (category_id IN (SELECT c.id FROM training_feedback_categories c JOIN training_feedback_forms f ON c.form_id = f.id WHERE f.organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "staff_tfb_items_select" ON training_feedback_items FOR SELECT USING (category_id IN (SELECT c.id FROM training_feedback_categories c JOIN training_feedback_forms f ON c.form_id = f.id WHERE f.organization_id = public.get_user_org_id() AND f.is_active = true))`],
+
+    // --- TRAINING FEEDBACK RESPONSES ---
+    [`CREATE POLICY "super_admin_tfb_responses_all" ON training_feedback_responses FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_tfb_responses_select" ON training_feedback_responses FOR SELECT USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "staff_tfb_responses_select_own" ON training_feedback_responses FOR SELECT USING (attempt_id IN (SELECT id FROM exam_attempts WHERE user_id = auth.uid()))`],
+    [`CREATE POLICY "staff_tfb_responses_insert_own" ON training_feedback_responses FOR INSERT WITH CHECK (attempt_id IN (SELECT id FROM exam_attempts WHERE user_id = auth.uid()) AND organization_id = public.get_user_org_id())`],
+
+    // --- TRAINING FEEDBACK ANSWERS ---
+    [`CREATE POLICY "admin_tfb_answers_select" ON training_feedback_answers FOR SELECT USING (response_id IN (SELECT id FROM training_feedback_responses WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "staff_tfb_answers_select_own" ON training_feedback_answers FOR SELECT USING (response_id IN (SELECT r.id FROM training_feedback_responses r JOIN exam_attempts a ON r.attempt_id = a.id WHERE a.user_id = auth.uid()))`],
+    [`CREATE POLICY "staff_tfb_answers_insert_own" ON training_feedback_answers FOR INSERT WITH CHECK (response_id IN (SELECT r.id FROM training_feedback_responses r JOIN exam_attempts a ON r.attempt_id = a.id WHERE a.user_id = auth.uid()))`],
   ];
 
   let ok = 0, fail = 0;

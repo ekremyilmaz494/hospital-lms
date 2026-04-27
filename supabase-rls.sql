@@ -347,17 +347,22 @@ ALTER TABLE training_feedback_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE training_feedback_responses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE training_feedback_answers ENABLE ROW LEVEL SECURITY;
 
+-- ⚠️ GÜVENLİK NOTU: Aşağıdaki policy'ler ÖNCEDEN user_metadata kullanıyordu (BYPASS RİSKİ).
+-- user_metadata son kullanıcı tarafından düzenlenebilir → app_metadata'ya çevrildi.
+-- app_metadata yalnızca service_role ile yazılabilir (auth-user-factory.ts).
+-- Bkz: rls-sat-r-bazl-g-venlik-ethereal-otter.md GAP-1.
+
 -- TRAINING FEEDBACK FORMS: admin duzenler, staff sadece okur (dolduracak)
 CREATE POLICY "super_admin_tfb_forms_all" ON training_feedback_forms
-  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "admin_tfb_forms_all" ON training_feedback_forms
   FOR ALL USING (
-    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
-    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
   );
 CREATE POLICY "staff_tfb_forms_select" ON training_feedback_forms
   FOR SELECT USING (
-    organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+    organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
     AND is_active = true
   );
 
@@ -366,14 +371,14 @@ CREATE POLICY "admin_tfb_categories_all" ON training_feedback_categories
   FOR ALL USING (
     form_id IN (
       SELECT id FROM training_feedback_forms
-      WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+      WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
     )
   );
 CREATE POLICY "staff_tfb_categories_select" ON training_feedback_categories
   FOR SELECT USING (
     form_id IN (
       SELECT id FROM training_feedback_forms
-      WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+      WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
         AND is_active = true
     )
   );
@@ -384,7 +389,7 @@ CREATE POLICY "admin_tfb_items_all" ON training_feedback_items
     category_id IN (
       SELECT c.id FROM training_feedback_categories c
       JOIN training_feedback_forms f ON c.form_id = f.id
-      WHERE f.organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+      WHERE f.organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
     )
   );
 CREATE POLICY "staff_tfb_items_select" ON training_feedback_items
@@ -392,18 +397,18 @@ CREATE POLICY "staff_tfb_items_select" ON training_feedback_items
     category_id IN (
       SELECT c.id FROM training_feedback_categories c
       JOIN training_feedback_forms f ON c.form_id = f.id
-      WHERE f.organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+      WHERE f.organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
         AND f.is_active = true
     )
   );
 
 -- TRAINING FEEDBACK RESPONSES: denormalize organization_id ile direkt filtre
 CREATE POLICY "super_admin_tfb_responses_all" ON training_feedback_responses
-  FOR ALL USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'super_admin');
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "admin_tfb_responses_select" ON training_feedback_responses
   FOR SELECT USING (
-    (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
-    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
   );
 -- Staff: kendi attempt'ine ait response'u gorebilir ve ekleyebilir; guncelleme/silme yok
 CREATE POLICY "staff_tfb_responses_select_own" ON training_feedback_responses
@@ -413,7 +418,7 @@ CREATE POLICY "staff_tfb_responses_select_own" ON training_feedback_responses
 CREATE POLICY "staff_tfb_responses_insert_own" ON training_feedback_responses
   FOR INSERT WITH CHECK (
     attempt_id IN (SELECT id FROM exam_attempts WHERE user_id = auth.uid())
-    AND organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
   );
 
 -- TRAINING FEEDBACK ANSWERS: response uzerinden filtreli
@@ -421,7 +426,7 @@ CREATE POLICY "admin_tfb_answers_select" ON training_feedback_answers
   FOR SELECT USING (
     response_id IN (
       SELECT id FROM training_feedback_responses
-      WHERE organization_id = ((auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid)
+      WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
     )
   );
 CREATE POLICY "staff_tfb_answers_select_own" ON training_feedback_answers

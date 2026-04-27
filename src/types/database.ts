@@ -1,4 +1,7 @@
-export type UserRole = 'super_admin' | 'admin' | 'staff';
+// Prisma enum'u tek source-of-truth: DB seviyesinde de typo riski engellenir.
+// Bkz: prisma/schema.prisma `enum UserRole`.
+import { UserRole } from '@/generated/prisma/client';
+export { UserRole };
 
 export type SubscriptionStatus = 'trial' | 'active' | 'suspended' | 'expired' | 'cancelled';
 
