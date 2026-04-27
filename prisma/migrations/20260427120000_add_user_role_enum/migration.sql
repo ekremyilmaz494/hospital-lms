@@ -24,10 +24,14 @@ ALTER TABLE "organizations"
 ALTER TABLE "users"
   ALTER COLUMN "role" TYPE "user_role" USING "role"::"user_role";
 
--- 5) Policy'yi yeniden yarat (helper fonksiyon app_metadata'dan okur)
+-- 5) Policy'yi yeniden yarat — supabase-rls.sql konvansiyonu (inline JWT extract)
+--    `public.get_user_role()` / `public.get_user_org_id()` helper fonksiyonları
+--    migration sistemi dışında tanımlı (apply-rls.js); CI shadow DB'de yok →
+--    drift detector "function does not exist" ile patlıyordu. İnline pattern
+--    projedeki diğer 39+ policy ile birebir aynı (supabase-rls.sql:62-105).
 CREATE POLICY "admin_users_insert" ON "users"
   FOR INSERT WITH CHECK (
-    public.get_user_role() = 'admin'
-    AND organization_id = public.get_user_org_id()
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
     AND role = 'staff'::"user_role"
   );
