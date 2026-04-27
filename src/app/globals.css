@@ -188,8 +188,9 @@
   --sidebar-ring: var(--color-primary);
 
   /* ══ EDITORIAL PALETTE (staff panel — Clinical Editorial) ══
-     Light mode: cream paper, ink text, gold accent */
-  --ed-cream: #f4ead5;
+     Light mode: cream paper, ink text, gold accent.
+     Note: --ed-cream is aliased to Klinova --k-bg so staff panel matches admin chrome. */
+  --ed-cream: #fafaf9;
   --ed-ink: #0a1628;
   --ed-ink-soft: #5b6478;
   --ed-gold: #c9a961;
@@ -285,8 +286,8 @@
   --sidebar-border: var(--color-border);
 
   /* ══ EDITORIAL PALETTE — dark variant (midnight newsprint) ══
-     Flip cream↔ink, keep gold, soften rules */
-  --ed-cream: #0d1524;           /* page paper → deep ink navy */
+     Flip cream↔ink, keep gold, soften rules. Aligned with --k-bg dark. */
+  --ed-cream: #0a0a0b;           /* page paper → admin dark bg */
   --ed-ink: #f0ebe0;             /* body text → warm parchment */
   --ed-ink-soft: #9aa3b8;        /* secondary text → muted steel */
   --ed-gold: #d4b876;             /* accent → slightly warmer gold */

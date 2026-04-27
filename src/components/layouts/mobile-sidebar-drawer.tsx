@@ -17,7 +17,7 @@ import type { NavGroup } from '@/components/layouts/sidebar/sidebar-config';
  * Stays in editorial-light always, not themed by dark mode toggle. */
 const INK = '#0a1628';
 const INK_SOFT = '#5b6478';
-const CREAM = '#f4ead5';
+const CREAM = '#fafaf9';
 const RULE = '#e0d7c0';
 const GOLD = '#c9a961';
 const OLIVE = '#1a3a28';
