@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 import { withSentryConfig } from '@sentry/nextjs';
+import path from "node:path";
+
+// Parent dizinde (Desktop/deva-project) alakasız bir package.json + node_modules var.
+// Pin'lemezsek Next/Turbopack root'u oraya kaydırıp tailwindcss'i kaybediyor.
+const projectRoot = path.resolve(".");
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -73,6 +78,10 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   serverExternalPackages: ["remotion", "@remotion/cli"],
+  turbopack: {
+    root: projectRoot,
+  },
+  outputFileTracingRoot: projectRoot,
   // macOS iCloud Drive, .nosync suffix'li klasörleri senkronize etmez (Apple dokümante).
   // Dev+darwin'de distDir'i .next.nosync yapıp iCloud eviction'ı engelliyoruz.
   // Vercel (Linux + prod) ve CI koşulu geçer, klasik .next kullanılır.

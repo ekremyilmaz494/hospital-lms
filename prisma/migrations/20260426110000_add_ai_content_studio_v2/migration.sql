@@ -71,7 +71,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_created_by_id_fkey') THEN
     ALTER TABLE "ai_generations"
       ADD CONSTRAINT "ai_generations_created_by_id_fkey"
-      FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
+      FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_artifact_type_check') THEN
     ALTER TABLE "ai_generations" ADD CONSTRAINT "ai_generations_artifact_type_check"
