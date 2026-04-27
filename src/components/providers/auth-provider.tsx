@@ -39,11 +39,17 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   usePresenceTracker();
   const router = useRouter();
 
-  // DB'den guncel role/isActive verisi al (JWT stale olabilir)
+  // DB'den guncel role/isActive verisi al (JWT stale olabilir).
+  // Aynı sekmede kısa süre içinde tekrar mount olursa fetch atlanır (dev HMR + sayfa
+  // geçişleri her seferinde /api/auth/me çağırmasın diye 30s'lik cache).
   const refreshFromDB = useCallback(async () => {
     try {
+      const cacheKey = 'auth:me:lastFetch';
+      const last = typeof window !== 'undefined' ? Number(sessionStorage.getItem(cacheKey) ?? 0) : 0;
+      if (last && Date.now() - last < 30_000) return;
       const res = await fetch('/api/auth/me');
       if (res.ok) {
+        try { sessionStorage.setItem(cacheKey, String(Date.now())); } catch {}
         const data = await res.json();
         const currentUser = useAuthStore.getState().user;
         if (data.user && currentUser) {

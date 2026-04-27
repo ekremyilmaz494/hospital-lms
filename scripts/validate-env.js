@@ -237,6 +237,11 @@ if (warnings.length > 0) {
   console.log('');
 }
 
+// Vercel preview build'lerinde (PR önizleme deploy'ları) production env vars
+// Vercel UI'dan tanımlanmıyor — script'i fail ettirmek yerine warning'e indirgeyelim.
+// Production hedef deploy'larında tam zorunluluk korunur.
+const isVercelPreview = env.VERCEL_ENV === 'preview';
+
 if (errors.length === 0) {
   const ref = extractRef(supabaseUrl) ?? '?';
   console.log('\x1b[32m✅ Tüm %d kontrol geçti — production\'a deploy güvenli\x1b[0m', checks);
@@ -245,6 +250,11 @@ if (errors.length === 0) {
   if (warnings.length > 0) {
     console.log('\x1b[33m⚠  %d uyarı var — yukarıya bakın\x1b[0m', warnings.length);
   }
+  console.log('');
+  process.exit(0);
+} else if (isVercelPreview) {
+  console.log('\x1b[33m⚠ Vercel preview build — %d eksik env var warning olarak kabul edildi\x1b[0m', errors.length);
+  console.log('\x1b[33m  Preview deploy build dogrulamasi yapar; runtime icin Vercel preview env vars ayarlayin\x1b[0m');
   console.log('');
   process.exit(0);
 } else {
