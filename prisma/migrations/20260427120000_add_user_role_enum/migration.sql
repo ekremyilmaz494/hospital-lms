@@ -10,9 +10,15 @@ BEGIN
   END IF;
 END $$;
 
--- 2) admin_users_insert policy 'users.role' kolonuna depend ediyor (apply-rls.js).
+-- 2) admin_users_insert policy 'users.role' kolonuna depend ediyor.
 --    ALTER COLUMN TYPE bunu engeller → policy'yi drop, alter et, yeniden yarat.
-DROP POLICY IF EXISTS "admin_users_insert" ON "users";
+--    Supabase'de drop, CI shadow DB'de policy zaten yok (no-op).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'auth') THEN
+    EXECUTE 'DROP POLICY IF EXISTS "admin_users_insert" ON "users"';
+  END IF;
+END $$;
 
 -- 3) organizations.sso_default_role: önce default'u kaldır, tipi değiştir, default'u geri koy
 ALTER TABLE "organizations"
@@ -24,14 +30,21 @@ ALTER TABLE "organizations"
 ALTER TABLE "users"
   ALTER COLUMN "role" TYPE "user_role" USING "role"::"user_role";
 
--- 5) Policy'yi yeniden yarat — supabase-rls.sql konvansiyonu (inline JWT extract)
---    `public.get_user_role()` / `public.get_user_org_id()` helper fonksiyonları
---    migration sistemi dışında tanımlı (apply-rls.js); CI shadow DB'de yok →
---    drift detector "function does not exist" ile patlıyordu. İnline pattern
---    projedeki diğer 39+ policy ile birebir aynı (supabase-rls.sql:62-105).
-CREATE POLICY "admin_users_insert" ON "users"
-  FOR INSERT WITH CHECK (
-    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
-    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-    AND role = 'staff'::"user_role"
-  );
+-- 5) Policy'yi yeniden yarat — inline JWT extract (supabase-rls.sql konvansiyonu).
+--    `public.get_user_role()` / `get_user_org_id()` helper'ları apply-rls.js'te
+--    tanımlı, CI shadow DB'sinde yok. `auth.jwt()` de sadece Supabase'de var.
+--    DO/EXECUTE wrap compile-time auth.* parsing'i atlatır → shadow DB skip,
+--    Supabase'de gerçek policy yaratılır (add_sms_mfa pattern, satır 65 referans).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'auth') THEN
+    EXECUTE $policy$
+      CREATE POLICY "admin_users_insert" ON "users"
+        FOR INSERT WITH CHECK (
+          (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+          AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+          AND role = 'staff'::"user_role"
+        )
+    $policy$;
+  END IF;
+END $$;
