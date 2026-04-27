@@ -35,12 +35,12 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const isMobile = useMobile();
   useEffect(() => {
     const saved = localStorage.getItem('sidebar:admin:collapsed');
-    if (saved === 'false') setSidebarCollapsed(false);
+    if (saved === 'true') setSidebarCollapsed(true);
   }, []);
   const { user, isLoading, fullName, initials } = useAuth();
   const branding = useLayoutBranding();
