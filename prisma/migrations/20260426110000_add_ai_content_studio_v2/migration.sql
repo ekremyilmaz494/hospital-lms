@@ -10,32 +10,38 @@
 -- ================================================================
 
 -- ── ai_notebook_accounts: Per-org NotebookLM Google hesabı ──
+-- Prisma canonical: id default yok (@default(uuid()) client-side üretim).
 CREATE TABLE IF NOT EXISTS "ai_notebook_accounts" (
-  "id"                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "organization_id"          UUID NOT NULL UNIQUE,
+  "id"                       UUID NOT NULL,
+  "organization_id"          UUID NOT NULL,
   "storage_state_encrypted"  TEXT NOT NULL,
   "google_email"             VARCHAR(255),
   "connected_at"             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "last_verified_at"         TIMESTAMPTZ,
   "last_used_at"             TIMESTAMPTZ,
   "created_at"               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "updated_at"               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  "updated_at"               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT "ai_notebook_accounts_pkey" PRIMARY KEY ("id")
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS "ai_notebook_accounts_organization_id_key"
+  ON "ai_notebook_accounts"("organization_id");
 
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'ai_notebook_accounts_org_fk'
+    SELECT 1 FROM pg_constraint WHERE conname = 'ai_notebook_accounts_organization_id_fkey'
   ) THEN
     ALTER TABLE "ai_notebook_accounts"
-      ADD CONSTRAINT "ai_notebook_accounts_org_fk"
+      ADD CONSTRAINT "ai_notebook_accounts_organization_id_fkey"
       FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
   END IF;
 END $$;
 
 -- ── ai_generations: AI üretim geçmişi ──
 CREATE TABLE IF NOT EXISTS "ai_generations" (
-  "id"                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "id"                UUID NOT NULL,
   "organization_id"   UUID NOT NULL,
   "created_by_id"     UUID NOT NULL,
   "artifact_type"     VARCHAR(20) NOT NULL,
@@ -50,19 +56,21 @@ CREATE TABLE IF NOT EXISTS "ai_generations" (
   "mime_type"         VARCHAR(100),
   "error_message"     TEXT,
   "created_at"        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "completed_at"      TIMESTAMPTZ
+  "completed_at"      TIMESTAMPTZ,
+
+  CONSTRAINT "ai_generations_pkey" PRIMARY KEY ("id")
 );
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_org_fk') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_organization_id_fkey') THEN
     ALTER TABLE "ai_generations"
-      ADD CONSTRAINT "ai_generations_org_fk"
+      ADD CONSTRAINT "ai_generations_organization_id_fkey"
       FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_user_fk') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_created_by_id_fkey') THEN
     ALTER TABLE "ai_generations"
-      ADD CONSTRAINT "ai_generations_user_fk"
+      ADD CONSTRAINT "ai_generations_created_by_id_fkey"
       FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_artifact_type_check') THEN
