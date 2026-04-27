@@ -99,3 +99,6 @@ yarn.lock
 
 # generated PDF outputs
 /hospital-admin-rehberi.pdf
+
+# Local secrets (CloudFront private key, env backups)
+.secrets/
