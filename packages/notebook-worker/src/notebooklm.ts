@@ -48,19 +48,18 @@ export function runNotebooklm(opts: RunOptions): Promise<RunResult> {
 
     let stdout = ''
     let stderr = ''
-    let timer: NodeJS.Timeout | undefined
     let killed = false
 
     child.stdout.on('data', (d: Buffer) => { stdout += d.toString() })
     child.stderr.on('data', (d: Buffer) => { stderr += d.toString() })
 
-    timer = setTimeout(() => {
+    const timer = setTimeout(() => {
       killed = true
       child.kill('SIGKILL')
     }, timeout)
 
     child.on('close', (code) => {
-      if (timer) clearTimeout(timer)
+      clearTimeout(timer)
       resolve({
         ok: code === 0,
         stdout,
@@ -70,7 +69,7 @@ export function runNotebooklm(opts: RunOptions): Promise<RunResult> {
     })
 
     child.on('error', (err) => {
-      if (timer) clearTimeout(timer)
+      clearTimeout(timer)
       resolve({
         ok: false,
         stdout,
