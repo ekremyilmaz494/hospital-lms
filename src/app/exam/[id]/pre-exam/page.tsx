@@ -298,13 +298,13 @@ export default function PreExamPage() {
             align-items: center;
             justify-content: center;
             padding: 20px;
-            background: #faf7f2;
+            background: var(--k-bg);
           }
           .pe-confirm-card {
             width: 100%;
             max-width: 560px;
-            background: #ffffff;
-            border: 1px solid #e5e0d5;
+            background: var(--k-surface);
+            border: 1px solid var(--k-border);
             border-radius: 20px;
             overflow: hidden;
             box-shadow: 0 12px 40px rgba(10, 10, 10, 0.08);
@@ -314,8 +314,8 @@ export default function PreExamPage() {
             align-items: flex-start;
             gap: 16px;
             padding: 26px 28px 22px;
-            background: linear-gradient(135deg, #faf7f2 0%, #f4efdf 100%);
-            border-bottom: 1px solid #e5e0d5;
+            background: linear-gradient(135deg, var(--k-bg) 0%, var(--k-warning-bg) 100%);
+            border-bottom: 1px solid var(--k-border);
             position: relative;
             overflow: hidden;
           }
@@ -324,14 +324,14 @@ export default function PreExamPage() {
             position: absolute;
             left: 0; top: 0; bottom: 0;
             width: 3px;
-            background: #0a1628;
+            background: var(--k-primary);
           }
           .pe-confirm-icon {
             width: 40px;
             height: 40px;
             border-radius: 12px;
-            background: #0a1628;
-            color: #faf7f2;
+            background: var(--k-primary);
+            color: var(--k-bg);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -344,7 +344,7 @@ export default function PreExamPage() {
             font-weight: 600;
             letter-spacing: 0.14em;
             text-transform: uppercase;
-            color: #5b6478;
+            color: var(--k-text-muted);
             margin-bottom: 4px;
           }
           .pe-confirm-head h1 {
@@ -352,14 +352,14 @@ export default function PreExamPage() {
             font-size: 26px;
             font-weight: 500;
             font-variation-settings: 'opsz' 48, 'SOFT' 50;
-            color: #0a1628;
+            color: var(--k-text-primary);
             letter-spacing: -0.02em;
             line-height: 1.05;
             margin: 0;
           }
           .pe-confirm-head p {
             font-size: 13px;
-            color: #5b6478;
+            color: var(--k-text-muted);
             margin: 6px 0 0;
           }
 
@@ -376,8 +376,8 @@ export default function PreExamPage() {
             justify-content: space-between;
             gap: 10px;
             padding: 16px 20px;
-            border-top: 1px solid #e5e0d5;
-            background: #faf7f2;
+            border-top: 1px solid var(--k-border);
+            background: var(--k-bg);
           }
           .pe-btn {
             display: inline-flex;
@@ -395,11 +395,11 @@ export default function PreExamPage() {
             transition: background 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
           }
           .pe-btn:active { transform: scale(0.97); }
-          .pe-btn-ghost { background: transparent; color: #5b6478; border-color: #e5e0d5; }
-          .pe-btn-ghost:hover { background: #ffffff; color: #0a1628; border-color: #0a1628; }
-          .pe-btn-primary { background: #0a1628; color: #faf7f2; border-color: #c9a961; box-shadow: inset 0 1px 0 rgba(201, 169, 97, 0.15); }
-          .pe-btn-primary:hover { background: #1a3a28; }
-          .pe-btn-primary :global(svg) { color: #c9a961; }
+          .pe-btn-ghost { background: transparent; color: var(--k-text-muted); border-color: var(--k-border); }
+          .pe-btn-ghost:hover { background: var(--k-surface); color: var(--k-text-primary); border-color: var(--k-primary); }
+          .pe-btn-primary { background: var(--k-primary); color: var(--k-bg); border-color: var(--k-primary); box-shadow: inset 0 1px 0 rgba(255,255,255,0.15); }
+          .pe-btn-primary:hover { background: var(--k-primary-hover); border-color: var(--k-primary-hover); }
+          .pe-btn-primary :global(svg) { color: var(--k-bg); }
 
           @media (max-width: 520px) {
             .pe-confirm-head { padding: 22px 20px 18px; gap: 12px; }
@@ -423,10 +423,10 @@ export default function PreExamPage() {
         <button onClick={() => router.back()} className="pe-err-link">← Geri Dön</button>
         <style>{`
           .pe-err { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 80px 20px; gap: 10px; max-width: 420px; margin: 0 auto; min-height: 60vh; justify-content: center; }
-          .pe-err-icon { width: 56px; height: 56px; border-radius: 999px; background: #fdf5f2; color: #b3261e; display: flex; align-items: center; justify-content: center; }
-          .pe-err h2 { font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; font-size: 22px; color: #0a1628; margin: 0; }
-          .pe-err p { font-size: 13px; color: #5b6478; margin: 0; }
-          .pe-err-link { margin-top: 10px; background: none; border: none; color: #0a1628; font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; cursor: pointer; }
+          .pe-err-icon { width: 56px; height: 56px; border-radius: 999px; background: var(--k-error-bg); color: var(--k-error); display: flex; align-items: center; justify-content: center; }
+          .pe-err h2 { font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; font-size: 22px; color: var(--k-text-primary); margin: 0; }
+          .pe-err p { font-size: 13px; color: var(--k-text-muted); margin: 0; }
+          .pe-err-link { margin-top: 10px; background: none; border: none; color: var(--k-text-primary); font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; cursor: pointer; }
         `}</style>
       </div>
     );
@@ -434,7 +434,7 @@ export default function PreExamPage() {
 
   if (!examData || (examData.questions ?? []).length === 0) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: '#5b6478', fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif', fontSize: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: 'var(--k-text-muted)', fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif', fontSize: 16 }}>
         Henüz veri yok
       </div>
     );
@@ -617,7 +617,7 @@ export default function PreExamPage() {
       <style jsx>{`
         .pe-root {
           min-height: 100vh;
-          background: #faf7f2;
+          background: var(--k-bg);
           padding-bottom: 40px;
         }
 
@@ -630,7 +630,7 @@ export default function PreExamPage() {
           background: rgba(255, 255, 255, 0.88);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
-          border-bottom: 1px solid #e5e0d5;
+          border-bottom: 1px solid var(--k-border);
         }
         .pe-header-row {
           display: flex;
@@ -650,8 +650,8 @@ export default function PreExamPage() {
           align-items: center;
           padding: 4px 10px;
           border-radius: 999px;
-          background: #0a1628;
-          color: #faf7f2;
+          background: var(--k-primary);
+          color: var(--k-bg);
           font-family: var(--font-display, system-ui);
           font-size: 10px;
           font-weight: 700;
@@ -664,7 +664,7 @@ export default function PreExamPage() {
           font-size: 15px;
           font-weight: 500;
           font-variation-settings: 'opsz' 24;
-          color: #0a1628;
+          color: var(--k-text-primary);
           margin: 0;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -674,12 +674,12 @@ export default function PreExamPage() {
         .pe-counter {
           font-family: var(--font-display, system-ui);
           font-size: 11px;
-          color: #5b6478;
+          color: var(--k-text-muted);
           font-variant-numeric: tabular-nums;
           flex-shrink: 0;
         }
         .pe-counter strong {
-          color: #0a1628;
+          color: var(--k-text-primary);
           font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-weight: 500;
         }
@@ -697,25 +697,25 @@ export default function PreExamPage() {
           height: 36px;
           padding: 0 12px;
           border-radius: 999px;
-          background: #ffffff;
-          border: 1px solid #e5e0d5;
+          background: var(--k-surface);
+          border: 1px solid var(--k-border);
           font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-size: 16px;
           font-weight: 500;
           font-variation-settings: 'opsz' 28, 'SOFT' 50;
-          color: #0a1628;
+          color: var(--k-text-primary);
           font-variant-numeric: tabular-nums;
           letter-spacing: -0.02em;
           transition: background 220ms ease, color 220ms ease, border-color 220ms ease;
         }
-        .pe-timer :global(svg) { color: #5b6478; }
+        .pe-timer :global(svg) { color: var(--k-text-muted); }
         .pe-timer-crit {
-          background: #fdf5f2;
-          border-color: #e9c9c0;
-          color: #b3261e;
+          background: var(--k-error-bg);
+          border-color: var(--k-error);
+          color: var(--k-error);
           animation: pe-pulse 1.4s ease-in-out infinite;
         }
-        .pe-timer-crit :global(svg) { color: #b3261e; }
+        .pe-timer-crit :global(svg) { color: var(--k-error); }
         @keyframes pe-pulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(179, 38, 30, 0.3); }
           50% { box-shadow: 0 0 0 4px rgba(179, 38, 30, 0); }
@@ -729,7 +729,7 @@ export default function PreExamPage() {
           padding: 0 12px;
           border-radius: 999px;
           background: transparent;
-          color: #5b6478;
+          color: var(--k-text-muted);
           border: 1px solid transparent;
           font-family: var(--font-display, system-ui);
           font-size: 11px;
@@ -737,17 +737,17 @@ export default function PreExamPage() {
           cursor: pointer;
           transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
         }
-        .pe-exit:hover { background: #fdf5f2; color: #b3261e; border-color: #e9c9c0; }
+        .pe-exit:hover { background: var(--k-error-bg); color: var(--k-error); border-color: var(--k-error); }
 
         .pe-progress {
           height: 3px;
           background: transparent;
           margin: 0 -24px;
-          border-top: 1px solid #e5e0d5;
+          border-top: 1px solid var(--k-border);
         }
         .pe-progress-fill {
           height: 100%;
-          background: #0a7a47;
+          background: var(--k-primary);
           transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -765,8 +765,8 @@ export default function PreExamPage() {
         /* ── Question card ── */
         .pe-question-card {
           padding: 32px;
-          background: #ffffff;
-          border: 1px solid #e5e0d5;
+          background: var(--k-surface);
+          border: 1px solid var(--k-border);
           border-radius: 18px;
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(10, 10, 10, 0.02);
         }
@@ -776,7 +776,7 @@ export default function PreExamPage() {
           gap: 14px;
           margin-bottom: 28px;
           padding-bottom: 20px;
-          border-bottom: 1px dashed #e5e0d5;
+          border-bottom: 1px dashed var(--k-border);
         }
         .pe-q-num {
           display: inline-flex;
@@ -786,8 +786,8 @@ export default function PreExamPage() {
           width: 48px;
           height: 48px;
           border-radius: 14px;
-          background: #0a1628;
-          color: #faf7f2;
+          background: var(--k-primary);
+          color: var(--k-bg);
           font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-size: 16px;
           font-weight: 500;
@@ -800,7 +800,7 @@ export default function PreExamPage() {
           font-size: 20px;
           font-weight: 500;
           font-variation-settings: 'opsz' 42, 'SOFT' 50;
-          color: #0a1628;
+          color: var(--k-text-primary);
           letter-spacing: -0.015em;
           line-height: 1.4;
           margin: 0;
@@ -821,30 +821,30 @@ export default function PreExamPage() {
           gap: 14px;
           width: 100%;
           padding: 14px 18px;
-          background: #ffffff;
-          border: 1px solid #e5e0d5;
+          background: var(--k-surface);
+          border: 1px solid var(--k-border);
           border-radius: 12px;
           text-align: left;
           cursor: pointer;
           font-family: inherit;
           transition: border-color 160ms ease, background 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .pe-option:hover { border-color: #d9d4c4; background: #faf7f2; }
+        .pe-option:hover { border-color: var(--k-border-hover); background: var(--k-bg); }
         .pe-option-on {
-          background: #0a1628;
-          border-color: #0a1628;
+          background: var(--k-primary);
+          border-color: var(--k-primary);
         }
-        .pe-option-on:hover { background: #0a1628; border-color: #0a1628; }
-        .pe-option:focus-visible { outline: 2px solid #0a1628; outline-offset: 2px; }
+        .pe-option-on:hover { background: var(--k-primary-hover); border-color: var(--k-primary-hover); }
+        .pe-option:focus-visible { outline: 2px solid var(--k-primary); outline-offset: 2px; }
 
         .pe-option-letter {
           flex-shrink: 0;
           width: 32px;
           height: 32px;
           border-radius: 999px;
-          background: #faf7f2;
-          border: 1px solid #e5e0d5;
-          color: #5b6478;
+          background: var(--k-bg);
+          border: 1px solid var(--k-border);
+          color: var(--k-text-muted);
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -854,17 +854,17 @@ export default function PreExamPage() {
           font-variation-settings: 'opsz' 20, 'SOFT' 50;
         }
         .pe-option-letter-on {
-          background: #faf7f2;
-          color: #0a1628;
-          border-color: #faf7f2;
+          background: var(--k-bg);
+          color: var(--k-primary);
+          border-color: var(--k-bg);
         }
         .pe-option-text {
           flex: 1;
           font-size: 14px;
           line-height: 1.5;
-          color: #0a1628;
+          color: var(--k-text-primary);
         }
-        .pe-option-on .pe-option-text { color: #faf7f2; }
+        .pe-option-on .pe-option-text { color: var(--k-bg); }
 
         /* ── Actions ── */
         .pe-actions {
@@ -889,19 +889,19 @@ export default function PreExamPage() {
         }
         .pe-next:active, .pe-finish:active { transform: scale(0.97); }
         .pe-next {
-          background: #0a1628;
-          color: #faf7f2;
+          background: var(--k-primary);
+          color: var(--k-bg);
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
         }
-        .pe-next:hover { background: #1a1a1a; }
+        .pe-next:hover { background: var(--k-primary-hover); }
 
         .pe-finish-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
         .pe-finish {
-          background: #b4820b;
-          color: #faf7f2;
+          background: var(--k-warning);
+          color: var(--k-bg);
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
         }
-        .pe-finish:hover:not(:disabled) { background: #8f6709; }
+        .pe-finish:hover:not(:disabled) { background: var(--k-warning); }
         .pe-finish:disabled { opacity: 0.6; cursor: not-allowed; }
         .pe-finish-warn {
           display: inline-flex;
@@ -909,7 +909,7 @@ export default function PreExamPage() {
           gap: 6px;
           font-family: var(--font-display, system-ui);
           font-size: 11px;
-          color: #b4820b;
+          color: var(--k-warning);
           margin: 0;
         }
 
@@ -918,7 +918,7 @@ export default function PreExamPage() {
           height: 14px;
           border-radius: 50%;
           border: 2px solid rgba(255, 255, 255, 0.3);
-          border-top-color: #ffffff;
+          border-top-color: var(--k-surface);
           animation: pe-rot 700ms linear infinite;
         }
         @keyframes pe-rot { to { transform: rotate(360deg); } }
@@ -930,13 +930,13 @@ export default function PreExamPage() {
         }
         .pe-submit-err p {
           font-size: 12px;
-          color: #b3261e;
+          color: var(--k-error);
           margin: 0;
         }
         .pe-submit-err button {
           background: none;
           border: none;
-          color: #0a1628;
+          color: var(--k-text-primary);
           font-family: var(--font-display, system-ui);
           font-size: 12px;
           font-weight: 600;
@@ -947,8 +947,8 @@ export default function PreExamPage() {
         /* ── Navigator ── */
         .pe-navigator {
           padding: 22px 20px;
-          background: #ffffff;
-          border: 1px solid #e5e0d5;
+          background: var(--k-surface);
+          border: 1px solid var(--k-border);
           border-radius: 18px;
           position: sticky;
           top: 90px;
@@ -959,10 +959,10 @@ export default function PreExamPage() {
           font-size: 14px;
           font-weight: 500;
           font-variation-settings: 'opsz' 24;
-          color: #0a1628;
+          color: var(--k-text-primary);
           margin: 0 0 14px;
           padding-bottom: 10px;
-          border-bottom: 1px dashed #e5e0d5;
+          border-bottom: 1px dashed var(--k-border);
         }
 
         .pe-nav-grid {
@@ -974,9 +974,9 @@ export default function PreExamPage() {
         .pe-nav-cell {
           aspect-ratio: 1;
           border-radius: 8px;
-          background: #faf7f2;
-          border: 1px solid #e5e0d5;
-          color: #5b6478;
+          background: var(--k-bg);
+          border: 1px solid var(--k-border);
+          color: var(--k-text-muted);
           font-family: var(--font-mono, monospace);
           font-size: 11px;
           font-weight: 600;
@@ -989,26 +989,26 @@ export default function PreExamPage() {
         }
         .pe-nav-cell:disabled { cursor: not-allowed; }
         .pe-nav-answered {
-          background: #eaf6ef;
-          border-color: #c8e6d5;
-          color: #0a7a47;
+          background: var(--k-success-bg);
+          border-color: var(--k-success);
+          color: var(--k-primary);
         }
         .pe-nav-current {
-          background: #0a1628;
-          border-color: #0a1628;
-          color: #faf7f2;
+          background: var(--k-primary);
+          border-color: var(--k-primary);
+          color: var(--k-bg);
           font-weight: 700;
           box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.08);
         }
         .pe-nav-locked {
-          background: #f4efdf;
-          border-color: #e5e0d5;
-          color: #5b6478;
+          background: var(--k-warning-bg);
+          border-color: var(--k-border);
+          color: var(--k-text-muted);
         }
         .pe-nav-future {
           background: transparent;
-          border-color: #e5e0d5;
-          color: #c9a961;
+          border-color: var(--k-border);
+          color: var(--k-warning);
           opacity: 0.7;
         }
 
@@ -1026,20 +1026,20 @@ export default function PreExamPage() {
           gap: 8px;
           font-family: var(--font-display, system-ui);
           font-size: 11px;
-          color: #5b6478;
+          color: var(--k-text-muted);
           font-variant-numeric: tabular-nums;
         }
-        .pe-nav-legend strong { color: #0a1628; font-weight: 600; font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; }
+        .pe-nav-legend strong { color: var(--k-text-primary); font-weight: 600; font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; }
         .pe-nav-swatch {
           width: 12px;
           height: 12px;
           border-radius: 4px;
-          border: 1px solid #e5e0d5;
+          border: 1px solid var(--k-border);
           flex-shrink: 0;
         }
-        .pe-nav-swatch-ink { background: #0a1628; border-color: #0a1628; }
-        .pe-nav-swatch-ok { background: #eaf6ef; border-color: #c8e6d5; }
-        .pe-nav-swatch-locked { background: #f4efdf; }
+        .pe-nav-swatch-ink { background: var(--k-primary); border-color: var(--k-primary); }
+        .pe-nav-swatch-ok { background: var(--k-success-bg); border-color: var(--k-success); }
+        .pe-nav-swatch-locked { background: var(--k-warning-bg); }
         .pe-nav-swatch-future { background: transparent; }
 
         /* ── Responsive ── */
@@ -1086,9 +1086,9 @@ function Rule({
   tone?: 'ink' | 'amber' | 'err';
 }) {
   const palette = {
-    ink:   { iconBg: '#faf7f2', iconColor: '#0a1628' },
-    amber: { iconBg: '#fef6e7', iconColor: '#b4820b' },
-    err:   { iconBg: '#fdf5f2', iconColor: '#b3261e' },
+    ink:   { iconBg: 'var(--k-bg)', iconColor: 'var(--k-text-primary)' },
+    amber: { iconBg: 'var(--k-warning-bg)', iconColor: 'var(--k-warning)' },
+    err:   { iconBg: 'var(--k-error-bg)', iconColor: 'var(--k-error)' },
   }[tone];
 
   return (
@@ -1104,7 +1104,7 @@ function Rule({
           align-items: flex-start;
           gap: 14px;
           padding: 16px 28px;
-          border-bottom: 1px dashed #e5e0d5;
+          border-bottom: 1px dashed var(--k-border);
         }
         .r-root:last-child { border-bottom: none; }
         .r-icon {
@@ -1123,13 +1123,13 @@ function Rule({
           font-size: 14px;
           font-weight: 500;
           font-variation-settings: 'opsz' 24;
-          color: #0a1628;
+          color: var(--k-text-primary);
           margin: 0 0 3px;
           letter-spacing: -0.005em;
         }
         .r-body p {
           font-size: 12px;
-          color: #5b6478;
+          color: var(--k-text-muted);
           line-height: 1.55;
           margin: 0;
         }
