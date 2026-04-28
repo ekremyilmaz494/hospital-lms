@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
 import { GraduationCap, Plus, MoreHorizontal, Eye, Edit, Trash2, Calendar, Users, X, Layers, ChevronRight, BookOpen, CheckCircle2, FileEdit, Archive } from 'lucide-react';
@@ -68,6 +68,26 @@ export default function TrainingsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Training | null>(null);
   const [forceTarget, setForceTarget] = useState<{ training: Training; activeAttemptCount: number } | null>(null);
+  // Optimistic publish-status override: PATCH dönüşünü beklemeden UI hemen güncellensin.
+  const [optimisticStatus, setOptimisticStatus] = useState<Record<string, string>>({});
+
+  // Sunucudan gelen veri override'la eşleştiğinde override'ı temizle (state birikmesin).
+  useEffect(() => {
+    if (!data?.trainings) return;
+    setOptimisticStatus((prev) => {
+      const prevKeys = Object.keys(prev);
+      if (prevKeys.length === 0) return prev;
+      const next: Record<string, string> = {};
+      for (const t of data.trainings) {
+        if (prev[t.id] && prev[t.id] !== t.publishStatus) next[t.id] = prev[t.id];
+      }
+      const nextKeys = Object.keys(next);
+      if (nextKeys.length === prevKeys.length && nextKeys.every((k) => next[k] === prev[k])) {
+        return prev;
+      }
+      return next;
+    });
+  }, [data]);
 
   if (isLoading) {
     return <PageLoading />;
@@ -77,7 +97,9 @@ export default function TrainingsPage() {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--k-error)'}}>{error}</div></div>;
   }
 
-  const allTrainings = data?.trainings ?? [];
+  const allTrainings = (data?.trainings ?? []).map((t) =>
+    optimisticStatus[t.id] ? { ...t, publishStatus: optimisticStatus[t.id] } : t,
+  );
 
   const filteredTrainings = allTrainings.filter((t) => {
     if (statusFilter && t.publishStatus !== statusFilter) return false;
@@ -88,6 +110,12 @@ export default function TrainingsPage() {
   const activeFilters = [statusFilter, categoryFilter].filter(Boolean).length;
 
   const handlePublishStatus = async (training: Training, status: 'draft' | 'published' | 'archived') => {
+    // 1) Anında UI güncelle (optimistic)
+    setOptimisticStatus((prev) => ({ ...prev, [training.id]: status }));
+    const label = publishStatusConfig[status]?.label ?? status;
+    toast(`"${training.title}" ${label} olarak güncellendi`, 'success');
+
+    // 2) Sunucuya yaz, hata olursa override'ı geri al
     try {
       const res = await fetch(`/api/admin/trainings/${training.id}`, {
         method: 'PATCH',
@@ -95,10 +123,14 @@ export default function TrainingsPage() {
         body: JSON.stringify({ publishStatus: status }),
       });
       if (!res.ok) throw new Error();
-      const label = publishStatusConfig[status]?.label ?? status;
-      toast(`"${training.title}" ${label} olarak güncellendi`, 'success');
+      // refetch await edilmiyor — arka planda taze veriyle reconcile, override sonra temizlenir
       refetch();
     } catch {
+      setOptimisticStatus((prev) => {
+        const rest = { ...prev };
+        delete rest[training.id];
+        return rest;
+      });
       toast('Durum güncellenemedi', 'error');
     }
   };
