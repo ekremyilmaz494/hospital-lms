@@ -76,19 +76,29 @@ const chartTooltipStyle = { background: K.SURFACE, border: '1px solid #c9c4be', 
 export default function ReportsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [departmentId, setDepartmentId] = useState('');
+  // Draft = input'larda yazılan, Applied = API'ye gönderilen.
+  // Kullanıcı tüm filtreleri ayarlayıp "Uygula"ya basana kadar sorgu tetiklenmez.
+  const [draftFrom, setDraftFrom] = useState('');
+  const [draftTo, setDraftTo] = useState('');
+  const [draftDeptId, setDraftDeptId] = useState('');
+  const [applied, setApplied] = useState({ from: '', to: '', deptId: '' });
   const [showFilters, setShowFilters] = useState(false);
 
   const filterQuery = useMemo(() => {
     const p = new URLSearchParams();
-    if (dateFrom) p.set('from', new Date(dateFrom).toISOString());
-    if (dateTo) p.set('to', new Date(dateTo + 'T23:59:59').toISOString());
-    if (departmentId) p.set('departmentId', departmentId);
+    if (applied.from) p.set('from', new Date(applied.from).toISOString());
+    if (applied.to) p.set('to', new Date(applied.to + 'T23:59:59').toISOString());
+    if (applied.deptId) p.set('departmentId', applied.deptId);
     return p.toString() ? `?${p.toString()}` : '';
-  }, [dateFrom, dateTo, departmentId]);
-  const hasFilters = !!(dateFrom || dateTo || departmentId);
+  }, [applied]);
+  const hasFilters = !!(applied.from || applied.to || applied.deptId);
+  const draftDirty = draftFrom !== applied.from || draftTo !== applied.to || draftDeptId !== applied.deptId;
+
+  const applyFilters = () => setApplied({ from: draftFrom, to: draftTo, deptId: draftDeptId });
+  const clearFilters = () => {
+    setDraftFrom(''); setDraftTo(''); setDraftDeptId('');
+    setApplied({ from: '', to: '', deptId: '' });
+  };
 
   const { data, isLoading, error, refetch } = useFetch<ReportsData>(`/api/admin/reports${filterQuery}`);
 
@@ -98,9 +108,9 @@ export default function ReportsPage() {
     setDownloading(format);
     try {
       const params = new URLSearchParams({ format, section: activeTab });
-      if (dateFrom) params.set('from', new Date(dateFrom).toISOString());
-      if (dateTo) params.set('to', new Date(dateTo + 'T23:59:59').toISOString());
-      if (departmentId) params.set('departmentId', departmentId);
+      if (applied.from) params.set('from', new Date(applied.from).toISOString());
+      if (applied.to) params.set('to', new Date(applied.to + 'T23:59:59').toISOString());
+      if (applied.deptId) params.set('departmentId', applied.deptId);
       const res = await fetch(`/api/admin/reports/export?${params.toString()}`);
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
@@ -190,10 +200,10 @@ export default function ReportsPage() {
             <span className="k-badge k-badge-success" style={{ marginLeft: 4 }}>aktif</span>
           )}
         </button>
-        {hasFilters && (
+        {(hasFilters || draftDirty) && (
           <button
             type="button"
-            onClick={() => { setDateFrom(''); setDateTo(''); setDepartmentId(''); }}
+            onClick={clearFilters}
             className="flex items-center gap-1 text-xs"
             style={{ color: K.TEXT_MUTED }}
           >
@@ -202,15 +212,18 @@ export default function ReportsPage() {
         )}
       </div>
       {showFilters && (
-        <div className="k-card">
+        <form
+          className="k-card"
+          onSubmit={(e) => { e.preventDefault(); applyFilters(); }}
+        >
           <div className="k-card-body">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
                 <label className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>Başlangıç:</label>
                 <input
                   type="date"
-                  value={dateFrom}
-                  onChange={e => setDateFrom(e.target.value)}
+                  value={draftFrom}
+                  onChange={e => setDraftFrom(e.target.value)}
                   className="k-input"
                   style={{ fontFamily: 'var(--font-mono)' }}
                 />
@@ -219,8 +232,8 @@ export default function ReportsPage() {
                 <label className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>Bitiş:</label>
                 <input
                   type="date"
-                  value={dateTo}
-                  onChange={e => setDateTo(e.target.value)}
+                  value={draftTo}
+                  onChange={e => setDraftTo(e.target.value)}
                   className="k-input"
                   style={{ fontFamily: 'var(--font-mono)' }}
                 />
@@ -229,8 +242,8 @@ export default function ReportsPage() {
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>Departman:</label>
                   <select
-                    value={departmentId}
-                    onChange={e => setDepartmentId(e.target.value)}
+                    value={draftDeptId}
+                    onChange={e => setDraftDeptId(e.target.value)}
                     className="k-input"
                   >
                     <option value="">Tümü</option>
@@ -240,9 +253,19 @@ export default function ReportsPage() {
                   </select>
                 </div>
               )}
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="submit"
+                  className="k-btn k-btn-primary k-btn-sm"
+                  disabled={!draftDirty}
+                  title={draftDirty ? 'Filtreleri sorguya uygula' : 'Değişiklik yok'}
+                >
+                  Uygula
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </form>
       )}
 
       {hasTruncation && (
