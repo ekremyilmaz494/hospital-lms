@@ -17,9 +17,17 @@ import { DataTable } from '@/components/shared/data-table';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
-import { AssignTrainingModal } from './assign-training-modal';
-import { BulkImportDialog } from './bulk-import-dialog';
+import dynamic from 'next/dynamic';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
+
+const AssignTrainingModal = dynamic(
+  () => import('./assign-training-modal').then(m => ({ default: m.AssignTrainingModal })),
+  { ssr: false }
+);
+const BulkImportDialog = dynamic(
+  () => import('./bulk-import-dialog').then(m => ({ default: m.BulkImportDialog })),
+  { ssr: false }
+);
 
 // ── Klinova palette ──
 const K = {
