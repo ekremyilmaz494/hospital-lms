@@ -4,6 +4,7 @@ import {
   requireRole,
   jsonResponse,
   errorResponse,
+  safePagination,
 } from '@/lib/api-helpers'
 import { getUploadUrl, getStreamUrl, videoKey, documentKey, audioKey } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
@@ -26,6 +27,8 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const category = searchParams.get('category')
+  // max 500 — bu liste organizasyon-genelinde gösterilir
+  const { page, limit, skip } = safePagination(searchParams, 500)
 
   const where: Record<string, unknown> = {
     isActive: true,
@@ -36,21 +39,39 @@ export async function GET(request: Request) {
   }
   if (category) where.category = category
 
-  // İçerik listesi ve kurumun kurduğu içerik ID'lerini paralel çek
-  const [items, installs] = await Promise.all([
+  // 1. dalga: paginate liste, total, kurumun installed ID seti, ve org-genelinde
+  // KPI agregasyonları (durum/SMG toplamı). KPI'lar tüm filtre kapsamına ait,
+  // sadece sayfaya değil — frontend'in hesapladığı totalDurationMin/totalSmg/installRate
+  // doğru kalsın.
+  const [items, total, installs, totalsAgg, installedCount] = await Promise.all([
     prisma.contentLibrary.findMany({
       where,
       orderBy: [{ category: 'asc' }, { title: 'asc' }],
+      skip,
+      take: limit,
     }),
+    prisma.contentLibrary.count({ where }),
     prisma.organizationContentLibrary.findMany({
       where: { organizationId: orgId },
       select: { contentLibraryId: true },
+    }),
+    prisma.contentLibrary.aggregate({
+      where,
+      _sum: { duration: true, smgPoints: true },
+    }),
+    // Filtre kapsamındaki içeriklerden kaçı bu kuruma yüklenmiş
+    prisma.contentLibrary.count({
+      where: {
+        ...where,
+        installs: { some: { organizationId: orgId } },
+      },
     }),
   ])
 
   const installedSet = new Set(installs.map(i => i.contentLibraryId))
 
-  // thumbnailUrl DB'de S3 key olarak saklanır; stream/signed URL'e çevir
+  // Sadece görünür sayfanın thumbnail URL'lerini imzala — sayfa başına ~24-100 imza,
+  // tüm 500 öğe yerine. CloudFront imza maliyeti ve latency düşüyor.
   const resolved = await Promise.all(
     items.map(async item => {
       let thumbnailUrl = item.thumbnailUrl
@@ -73,6 +94,16 @@ export async function GET(request: Request) {
 
   return jsonResponse({
     items: resolved,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+    stats: {
+      installedCount,
+      installRate: total > 0 ? Math.round((installedCount / total) * 100) : 0,
+      totalDurationMin: totalsAgg._sum.duration ?? 0,
+      totalSmg: totalsAgg._sum.smgPoints ?? 0,
+    },
   }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }
 
@@ -125,19 +156,17 @@ export async function POST(request: Request) {
       return errorResponse('Tek seferde en fazla 20 dosya yüklenebilir', 400)
     }
 
-    const results: Array<Record<string, unknown>> = []
+    // Her dosya bağımsız: presign + DB create paralel çalıştır.
+    // allSettled ile bir dosyanın hatası diğerlerini engellemez.
+    const settled = await Promise.allSettled(
+      body.files.map(async file => {
+        if (!file.fileName || !file.contentType) {
+          return { fileName: file.fileName, error: 'fileName ve contentType gerekli' }
+        }
 
-    for (const file of body.files) {
-      if (!file.fileName || !file.contentType) {
-        results.push({ fileName: file.fileName, error: 'fileName ve contentType gerekli' })
-        continue
-      }
-
-      // S3 key tayini
-      let key: string
-      let detectedType: string
-      let detectedFileType: string
-      try {
+        let key: string
+        let detectedType: string
+        let detectedFileType: string
         if (file.contentType.startsWith('video/')) {
           key = videoKey(orgId, 'content-library', file.fileName)
           detectedType = 'video'
@@ -151,58 +180,63 @@ export async function POST(request: Request) {
           detectedType = 'pdf'
           detectedFileType = file.fileName.split('.').pop()?.toLowerCase() ?? 'pdf'
         } else {
-          results.push({ fileName: file.fileName, error: 'Desteklenmeyen dosya türü' })
-          continue
+          return { fileName: file.fileName, error: 'Desteklenmeyen dosya türü' }
         }
-      } catch (err) {
-        results.push({ fileName: file.fileName, error: (err as Error).message })
-        continue
+
+        const thumbnailKey = detectedType === 'video'
+          ? key.replace(/\.[^./]+$/, '') + '.thumb.jpg'
+          : null
+
+        // Presign çağrılarını da paralelle: video için 2 presign aynı anda gider.
+        const [uploadUrl, thumbnailUploadUrl] = await Promise.all([
+          getUploadUrl(key, file.contentType),
+          thumbnailKey ? getUploadUrl(thumbnailKey, 'image/jpeg') : Promise.resolve(null),
+        ])
+
+        const title = file.title || file.fileName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
+
+        const item = await prisma.contentLibrary.create({
+          data: {
+            title,
+            description: file.description ?? null,
+            category: file.category || 'INFECTION_CONTROL',
+            contentType: detectedType,
+            fileType: detectedFileType,
+            s3Key: key,
+            thumbnailUrl: thumbnailKey,
+            duration: file.durationSeconds ? Math.ceil(file.durationSeconds / 60) : 0,
+            difficulty: file.difficulty || 'BASIC',
+            targetRoles: file.targetRoles && file.targetRoles.length > 0 ? file.targetRoles : ['all'],
+            smgPoints: typeof file.smgPoints === 'number' ? file.smgPoints : 0,
+            isActive: true,
+            organizationId: orgId,
+            createdById: dbUser!.id,
+          },
+          select: {
+            id: true,
+            title: true,
+            contentType: true,
+            s3Key: true,
+            createdAt: true,
+          },
+        })
+
+        return {
+          ...item,
+          uploadUrl,
+          thumbnailUploadUrl,
+          fileName: file.fileName,
+        }
+      }),
+    )
+
+    const results: Array<Record<string, unknown>> = settled.map((r, idx) => {
+      if (r.status === 'fulfilled') return r.value as Record<string, unknown>
+      return {
+        fileName: body.files[idx]?.fileName,
+        error: (r.reason as Error)?.message ?? 'Bilinmeyen hata',
       }
-
-      const uploadUrl = await getUploadUrl(key, file.contentType)
-
-      let thumbnailKey: string | null = null
-      let thumbnailUploadUrl: string | null = null
-      if (detectedType === 'video') {
-        thumbnailKey = key.replace(/\.[^./]+$/, '') + '.thumb.jpg'
-        thumbnailUploadUrl = await getUploadUrl(thumbnailKey, 'image/jpeg')
-      }
-
-      const title = file.title || file.fileName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
-
-      const item = await prisma.contentLibrary.create({
-        data: {
-          title,
-          description: file.description ?? null,
-          category: file.category || 'INFECTION_CONTROL',
-          contentType: detectedType,
-          fileType: detectedFileType,
-          s3Key: key,
-          thumbnailUrl: thumbnailKey,
-          duration: file.durationSeconds ? Math.ceil(file.durationSeconds / 60) : 0,
-          difficulty: file.difficulty || 'BASIC',
-          targetRoles: file.targetRoles && file.targetRoles.length > 0 ? file.targetRoles : ['all'],
-          smgPoints: typeof file.smgPoints === 'number' ? file.smgPoints : 0,
-          isActive: true,
-          organizationId: orgId,
-          createdById: dbUser!.id,
-        },
-        select: {
-          id: true,
-          title: true,
-          contentType: true,
-          s3Key: true,
-          createdAt: true,
-        },
-      })
-
-      results.push({
-        ...item,
-        uploadUrl,
-        thumbnailUploadUrl,
-        fileName: file.fileName,
-      })
-    }
+    })
 
     logger.info(
       'content-library',

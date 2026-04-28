@@ -157,6 +157,14 @@ function LoginForm() {
       const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
       const target = isRedirectCompatible ? redirectTo : (role && ROLE_ROUTES[role]) || '/staff/dashboard';
 
+      // Setup wizard guard cache'ini önceden doldur — admin layout aynı anahtarı
+      // okuyup /api/admin/setup fetch'ini atlar (ilk login'de 1 round-trip kazanç).
+      if (role === 'admin' && data.user?.id && data.setupCompleted === true) {
+        try {
+          sessionStorage.setItem(`admin-setup-completed:${data.user.id}`, '1');
+        } catch {}
+      }
+
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {

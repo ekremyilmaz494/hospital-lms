@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   BarChart3, Download, FileText, Users, GraduationCap, Building2, AlertTriangle, Clock, Printer,
   TrendingDown, Target, Award, Filter, X, ChevronRight,
@@ -35,22 +35,32 @@ const K = {
 type StaffStatus = 'star' | 'normal' | 'risk' | 'new';
 type FailureStatus = 'failed' | 'locked';
 
-interface ReportsData {
-  overviewStats: { title: string; value: number | string; icon: string; accentColor: string; trend?: { value: number; label: string; isPositive: boolean } }[];
-  monthlyData: { month: string; tamamlanan: number; basarisiz: number }[];
-  trainingData: { name: string; atanan: number; tamamlayan: number; basarili: number; basarisiz: number; ort: number }[];
-  staffPerformance: { name: string; dept: string; completed: number; avgScore: number; status: StaffStatus; color: string }[];
-  departmentData: { dept: string; personel: number; tamamlanma: number; ortPuan: number; basarisiz: number; color: string }[];
-  failureData: { name: string; dept: string; training: string; attempts: number; maxAttempts: number; lastScore: number; status: FailureStatus; assignmentId: string }[];
-  durationData: { training: string; video: number; sinav: number }[];
-  scoreComparisonData: { training: string; fullTitle: string; preScore: number; postScore: number; improvement: number; sampleSize: number }[];
+interface OverviewStat { title: string; value: number | string; icon: string; accentColor: string; trend?: { value: number; label: string; isPositive: boolean } }
+interface OverviewData {
+  overviewStats: OverviewStat[];
+  assignmentStatusBreakdown: { total: number; passed: number; failed: number; locked: number; pending: number; in_progress: number };
   availableDepartments: { id: string; name: string }[];
-  truncated: { trainings: { shown: number; total: number } | null; staff: { shown: number; total: number } | null };
+}
+interface TrainingsData {
+  trainingData: { name: string; atanan: number; tamamlayan: number; basarili: number; basarisiz: number; ort: number }[];
+  monthlyData: { month: string; tamamlanan: number; basarisiz: number }[];
+  scoreComparisonData: { training: string; fullTitle: string; preScore: number; postScore: number; improvement: number; sampleSize: number }[];
+  durationData: { training: string; video: number; sinav: number }[];
+  truncated: { shown: number; total: number } | null;
+}
+interface StaffData {
+  staffPerformance: { name: string; dept: string; completed: number; avgScore: number; status: StaffStatus; color: string }[];
+  truncated: { shown: number; total: number } | null;
+}
+interface DepartmentsData {
+  departmentData: { dept: string; personel: number; tamamlanma: number; ortPuan: number; basarisiz: number; color: string }[];
+}
+interface FailureData {
+  failureData: { name: string; dept: string; training: string; attempts: number; maxAttempts: number; lastScore: number; status: FailureStatus; assignmentId: string }[];
 }
 
 const iconMap: Record<string, typeof Users> = { GraduationCap, Users, Target, Award };
 
-// Klinova accent color mapping for legacy backend tokens
 const accentMap: Record<string, string> = {
   'var(--color-primary)': K.PRIMARY,
   'var(--color-success)': K.SUCCESS,
@@ -61,7 +71,9 @@ const accentMap: Record<string, string> = {
 };
 const mapAccent = (c: string): string => accentMap[c] ?? c;
 
-const tabs = [
+type TabId = 'overview' | 'training' | 'staff' | 'department' | 'failure' | 'score-comparison' | 'duration';
+
+const tabs: { id: TabId; label: string; icon: typeof Users }[] = [
   { id: 'overview', label: 'Genel Özet', icon: BarChart3 },
   { id: 'training', label: 'Eğitim Bazlı', icon: GraduationCap },
   { id: 'staff', label: 'Personel', icon: Users },
@@ -73,11 +85,27 @@ const tabs = [
 
 const chartTooltipStyle = { background: K.SURFACE, border: '1px solid #c9c4be', borderRadius: '12px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' };
 
+// Tab → endpoint suffix mapping. Aynı endpoint birden fazla tab'a hizmet edebilir.
+const TAB_ENDPOINT: Record<TabId, 'trainings' | 'staff' | 'departments' | 'failure' | null> = {
+  overview: null,
+  training: 'trainings',
+  staff: 'staff',
+  department: 'departments',
+  failure: 'failure',
+  'score-comparison': 'trainings',
+  duration: 'trainings',
+};
+
+type TabCache = {
+  trainings?: TrainingsData;
+  staff?: StaffData;
+  departments?: DepartmentsData;
+  failure?: FailureData;
+};
+
 export default function ReportsPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('overview');
-  // Draft = input'larda yazılan, Applied = API'ye gönderilen.
-  // Kullanıcı tüm filtreleri ayarlayıp "Uygula"ya basana kadar sorgu tetiklenmez.
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [draftFrom, setDraftFrom] = useState('');
   const [draftTo, setDraftTo] = useState('');
   const [draftDeptId, setDraftDeptId] = useState('');
@@ -100,7 +128,58 @@ export default function ReportsPage() {
     setApplied({ from: '', to: '', deptId: '' });
   };
 
-  const { data, isLoading, error, refetch } = useFetch<ReportsData>(`/api/admin/reports${filterQuery}`);
+  // Overview — sayfa ilk açılışta tek bunu çağırır.
+  const { data: overview, isLoading: overviewLoading, error: overviewError } = useFetch<OverviewData>(`/api/admin/reports${filterQuery}`);
+
+  // Tab cache — aynı tab'a tekrar girildiğinde refetch yok.
+  // Filtre değişince cache invalidate edilir.
+  const [tabCache, setTabCache] = useState<TabCache>({});
+  const [tabLoading, setTabLoading] = useState<Record<string, boolean>>({});
+  const [tabError, setTabError] = useState<string | null>(null);
+  const filterQueryRef = useRef(filterQuery);
+
+  // Filtre değişince cache temizle
+  useEffect(() => {
+    if (filterQueryRef.current !== filterQuery) {
+      filterQueryRef.current = filterQuery;
+      setTabCache({});
+      setTabError(null);
+    }
+  }, [filterQuery]);
+
+  const fetchTab = useCallback(async (endpoint: 'trainings' | 'staff' | 'departments' | 'failure') => {
+    if (tabCache[endpoint]) return;
+    setTabLoading(prev => ({ ...prev, [endpoint]: true }));
+    setTabError(null);
+    try {
+      const res = await fetch(`/api/admin/reports/${endpoint}${filterQuery}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const json = await res.json();
+      setTabCache(prev => ({ ...prev, [endpoint]: json }));
+    } catch (err) {
+      setTabError(err instanceof Error ? err.message : 'Veri alınamadı');
+    } finally {
+      setTabLoading(prev => ({ ...prev, [endpoint]: false }));
+    }
+  }, [filterQuery, tabCache]);
+
+  // Aktif tab değişince ilgili endpoint'i lazy fetch et
+  useEffect(() => {
+    const endpoint = TAB_ENDPOINT[activeTab];
+    if (endpoint) void fetchTab(endpoint);
+  }, [activeTab, fetchTab]);
+
+  const refetchFailure = useCallback(async () => {
+    setTabCache(prev => {
+      const next = { ...prev };
+      delete next.failure;
+      return next;
+    });
+    await fetchTab('failure');
+  }, [fetchTab]);
 
   const [downloading, setDownloading] = useState<string | null>(null);
 
@@ -133,32 +212,46 @@ export default function ReportsPage() {
     }
   };
 
-  if (isLoading) {
+  if (overviewLoading) {
     return <PageLoading />;
   }
-  if (error) {
+  if (overviewError) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="k-card p-8 text-center" style={{ borderColor: K.ERROR }}>
           <p className="text-sm font-semibold" style={{ color: K.ERROR }}>Raporlar yüklenemedi</p>
-          <p className="text-xs mt-1" style={{ color: K.TEXT_MUTED }}>{error}</p>
+          <p className="text-xs mt-1" style={{ color: K.TEXT_MUTED }}>{overviewError}</p>
         </div>
       </div>
     );
   }
 
-  const overviewStats = data?.overviewStats ?? [];
-  const monthlyData = data?.monthlyData ?? [];
-  const trainingData = data?.trainingData ?? [];
-  const staffPerformance = data?.staffPerformance ?? [];
-  const departmentData = data?.departmentData ?? [];
-  const failureData = data?.failureData ?? [];
-  const durationData = data?.durationData ?? [];
-  const scoreComparisonData = data?.scoreComparisonData ?? [];
-  const availableDepartments = data?.availableDepartments ?? [];
-  const truncated = data?.truncated ?? { trainings: null, staff: null };
-  const hasTruncation = !!(truncated.trainings || truncated.staff);
+  const overviewStats = overview?.overviewStats ?? [];
+  const availableDepartments = overview?.availableDepartments ?? [];
+
+  // Tab-specific data (cache'den)
+  const trainingsBundle = tabCache.trainings;
+  const staffBundle = tabCache.staff;
+  const departmentsBundle = tabCache.departments;
+  const failureBundle = tabCache.failure;
+
+  const trainingData = trainingsBundle?.trainingData ?? [];
+  const monthlyData = trainingsBundle?.monthlyData ?? [];
+  const scoreComparisonData = trainingsBundle?.scoreComparisonData ?? [];
+  const durationData = trainingsBundle?.durationData ?? [];
+  const staffPerformance = staffBundle?.staffPerformance ?? [];
+  const departmentData = departmentsBundle?.departmentData ?? [];
+  const failureData = failureBundle?.failureData ?? [];
+
+  const trainingsTrunc = trainingsBundle?.truncated ?? null;
+  const staffTrunc = staffBundle?.truncated ?? null;
+  const hasTruncation = !!(trainingsTrunc || staffTrunc);
   const lockedCount = failureData.filter(f => f.status === 'locked').length;
+
+  const isTabLoading = (() => {
+    const ep = TAB_ENDPOINT[activeTab];
+    return ep ? !!tabLoading[ep] && !tabCache[ep] : false;
+  })();
 
   return (
     <div className="k-page">
@@ -279,8 +372,8 @@ export default function ReportsPage() {
               <div className="flex-1 text-xs">
                 <p className="font-semibold" style={{ color: K.WARNING }}>Veri kırpıldı — filtre uygulayın</p>
                 <p className="mt-0.5" style={{ color: K.TEXT_SECONDARY }}>
-                  {truncated.trainings && <>{truncated.trainings.total} eğitimden {truncated.trainings.shown} tanesi gösteriliyor. </>}
-                  {truncated.staff && <>{truncated.staff.total} personelden {truncated.staff.shown} tanesi gösteriliyor. </>}
+                  {trainingsTrunc && <>{trainingsTrunc.total} eğitimden {trainingsTrunc.shown} tanesi gösteriliyor. </>}
+                  {staffTrunc && <>{staffTrunc.total} personelden {staffTrunc.shown} tanesi gösteriliyor. </>}
                   Daha doğru sonuç için tarih aralığı veya departman filtresi uygulayın.
                 </p>
               </div>
@@ -311,6 +404,12 @@ export default function ReportsPage() {
         })}
       </div>
 
+      {tabError && (
+        <div className="k-card" style={{ borderColor: K.ERROR }}>
+          <div className="k-card-body text-xs" style={{ color: K.ERROR }}>{tabError}</div>
+        </div>
+      )}
+
       {activeTab === 'overview' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -329,81 +428,20 @@ export default function ReportsPage() {
               );
             })}
           </div>
-          {monthlyData.length > 0 && (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <BlurFade delay={0.15} className="lg:col-span-2">
-                <KChartCard title="Aylık Tamamlanma Trendi" icon={<BarChart3 size={14} />}>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                      <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                        <defs><linearGradient id="colorTamamlanan" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={K.SUCCESS} stopOpacity={0.2} /><stop offset="95%" stopColor={K.SUCCESS} stopOpacity={0} /></linearGradient></defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={K.BORDER_LIGHT} vertical={false} />
-                        <XAxis dataKey="month" tick={{ fontSize: 12, fill: K.TEXT_MUTED }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fontSize: 12, fill: K.TEXT_MUTED }} axisLine={false} tickLine={false} />
-                        <Tooltip contentStyle={chartTooltipStyle} />
-                        <Area type="monotone" dataKey="tamamlanan" name="Tamamlanan" stroke={K.SUCCESS} fill="url(#colorTamamlanan)" strokeWidth={2.5} dot={{ r: 4, fill: K.SUCCESS, strokeWidth: 2, stroke: K.SURFACE }} />
-                        <Bar dataKey="basarisiz" name="Başarısız" fill={K.ERROR} radius={[4, 4, 0, 0]} barSize={20} opacity={0.8} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </KChartCard>
-              </BlurFade>
-              <BlurFade delay={0.2}>
-                <div className="k-card h-full">
-                  <div className="k-card-body">
-                    <h3 className="text-sm font-bold mb-4">En İyi Performans</h3>
-                    <div className="space-y-3">
-                      {staffPerformance.filter(s => s.status === 'star').sort((a, b) => b.avgScore - a.avgScore).slice(0, 4).map((s, i) => (
-                        <div key={s.name} className="flex items-center gap-3">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: i === 0 ? K.WARNING : K.BORDER }}>{i + 1}</span>
-                          <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">{s.name}</p><p className="text-[11px]" style={{ color: K.TEXT_MUTED }}>{s.dept}</p></div>
-                          <span className="text-sm font-bold font-mono" style={{ color: K.SUCCESS }}>{s.avgScore}%</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="my-4 h-px" style={{ background: K.BORDER }} />
-                    <h3 className="text-sm font-bold mb-4 flex items-center gap-2"><AlertTriangle className="h-3.5 w-3.5" style={{ color: K.ERROR }} />Risk Altında</h3>
-                    <div className="space-y-3">
-                      {(() => {
-                        const riskList = staffPerformance.filter(s => s.status === 'risk').sort((a, b) => a.avgScore - b.avgScore);
-                        if (riskList.length === 0) {
-                          return <p className="text-xs" style={{ color: K.TEXT_MUTED }}>Risk altında personel yok</p>;
-                        }
-                        const visible = riskList.slice(0, 5);
-                        const remaining = riskList.length - visible.length;
-                        return <>
-                          {visible.map((s) => (
-                            <div key={s.name} className="flex items-center gap-3">
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'color-mix(in srgb, #ef4444 12%, transparent)' }}><TrendingDown className="h-3 w-3" style={{ color: K.ERROR }} /></div>
-                              <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">{s.name}</p><p className="text-[11px]" style={{ color: K.TEXT_MUTED }}>{s.dept}</p></div>
-                              <span className="text-sm font-bold font-mono" style={{ color: K.ERROR }}>{s.avgScore}%</span>
-                            </div>
-                          ))}
-                          {remaining > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab('staff')}
-                              className="w-full rounded-lg px-3 py-2 text-xs font-semibold"
-                              style={{ color: K.ERROR, background: 'color-mix(in srgb, #ef4444 10%, transparent)' }}
-                            >
-                              +{remaining} kişi daha — tümünü gör →
-                            </button>
-                          )}
-                        </>;
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </BlurFade>
+          <div className="k-card">
+            <div className="k-card-body text-xs" style={{ color: K.TEXT_MUTED }}>
+              Detaylı analiz için yukarıdaki sekmeleri kullanın. Her sekme yalnızca açıldığında yüklenir.
             </div>
-          )}
+          </div>
         </div>
       )}
 
       {activeTab === 'training' && (
         <BlurFade delay={0.05}>
           <div className="k-card overflow-hidden">
-            {trainingData.length > 0 ? (
+            {isTabLoading ? (
+              <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Yükleniyor…</p>
+            ) : trainingData.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr style={{ background: K.BG }}><th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Eğitim</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Atanan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Tamamlayan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Başarılı</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Ort. Puan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Tamamlanma</th></tr></thead>
@@ -427,13 +465,34 @@ export default function ReportsPage() {
               </div>
             ) : <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Eğitim ve sınav verileri oluştukça raporlar burada görünecek.</p>}
           </div>
+          {monthlyData.length > 0 && !isTabLoading && (
+            <BlurFade delay={0.1} className="mt-6">
+              <KChartCard title="Aylık Tamamlanma Trendi" icon={<BarChart3 size={14} />}>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                      <defs><linearGradient id="colorTamamlanan" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={K.SUCCESS} stopOpacity={0.2} /><stop offset="95%" stopColor={K.SUCCESS} stopOpacity={0} /></linearGradient></defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={K.BORDER_LIGHT} vertical={false} />
+                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: K.TEXT_MUTED }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: K.TEXT_MUTED }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={chartTooltipStyle} />
+                      <Area type="monotone" dataKey="tamamlanan" name="Tamamlanan" stroke={K.SUCCESS} fill="url(#colorTamamlanan)" strokeWidth={2.5} dot={{ r: 4, fill: K.SUCCESS, strokeWidth: 2, stroke: K.SURFACE }} />
+                      <Bar dataKey="basarisiz" name="Başarısız" fill={K.ERROR} radius={[4, 4, 0, 0]} barSize={20} opacity={0.8} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </KChartCard>
+            </BlurFade>
+          )}
         </BlurFade>
       )}
 
       {activeTab === 'staff' && (
         <BlurFade delay={0.05}>
           <div className="k-card overflow-hidden">
-            {staffPerformance.length > 0 ? (
+            {isTabLoading ? (
+              <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Yükleniyor…</p>
+            ) : staffPerformance.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr style={{ background: K.BG }}><th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Personel</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Departman</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Tamamlanan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Ort. Puan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Durum</th></tr></thead>
@@ -456,12 +515,58 @@ export default function ReportsPage() {
               </div>
             ) : <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Eğitim ve sınav verileri oluştukça raporlar burada görünecek.</p>}
           </div>
+          {!isTabLoading && staffPerformance.length > 0 && (
+            <BlurFade delay={0.1} className="mt-6">
+              <div className="k-card">
+                <div className="k-card-body">
+                  <h3 className="text-sm font-bold mb-4">En İyi Performans</h3>
+                  <div className="space-y-3">
+                    {staffPerformance.filter(s => s.status === 'star').sort((a, b) => b.avgScore - a.avgScore).slice(0, 4).map((s, i) => (
+                      <div key={s.name} className="flex items-center gap-3">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: i === 0 ? K.WARNING : K.BORDER }}>{i + 1}</span>
+                        <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">{s.name}</p><p className="text-[11px]" style={{ color: K.TEXT_MUTED }}>{s.dept}</p></div>
+                        <span className="text-sm font-bold font-mono" style={{ color: K.SUCCESS }}>{s.avgScore}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="my-4 h-px" style={{ background: K.BORDER }} />
+                  <h3 className="text-sm font-bold mb-4 flex items-center gap-2"><AlertTriangle className="h-3.5 w-3.5" style={{ color: K.ERROR }} />Risk Altında</h3>
+                  <div className="space-y-3">
+                    {(() => {
+                      const riskList = staffPerformance.filter(s => s.status === 'risk').sort((a, b) => a.avgScore - b.avgScore);
+                      if (riskList.length === 0) {
+                        return <p className="text-xs" style={{ color: K.TEXT_MUTED }}>Risk altında personel yok</p>;
+                      }
+                      const visible = riskList.slice(0, 5);
+                      const remaining = riskList.length - visible.length;
+                      return <>
+                        {visible.map((s) => (
+                          <div key={s.name} className="flex items-center gap-3">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'color-mix(in srgb, #ef4444 12%, transparent)' }}><TrendingDown className="h-3 w-3" style={{ color: K.ERROR }} /></div>
+                            <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">{s.name}</p><p className="text-[11px]" style={{ color: K.TEXT_MUTED }}>{s.dept}</p></div>
+                            <span className="text-sm font-bold font-mono" style={{ color: K.ERROR }}>{s.avgScore}%</span>
+                          </div>
+                        ))}
+                        {remaining > 0 && (
+                          <p className="text-[11px] mt-2" style={{ color: K.TEXT_MUTED }}>
+                            +{remaining} kişi daha tabloda görünüyor
+                          </p>
+                        )}
+                      </>;
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </BlurFade>
+          )}
         </BlurFade>
       )}
 
       {activeTab === 'department' && (
         <div className="space-y-6">
-          {departmentData.length > 0 ? (
+          {isTabLoading ? (
+            <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Yükleniyor…</p>
+          ) : departmentData.length > 0 ? (
             <>
               <BlurFade delay={0.05}>
                 <KChartCard title="Departman Karşılaştırması" icon={<Building2 size={14} />}>
@@ -517,7 +622,9 @@ export default function ReportsPage() {
           )}
           <BlurFade delay={0.1}>
             <div className="k-card overflow-hidden">
-              {failureData.length > 0 ? (
+              {isTabLoading ? (
+                <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Yükleniyor…</p>
+              ) : failureData.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr style={{ background: K.BG }}><th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Personel</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Departman</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Eğitim</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Deneme</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Son Puan</th><th className="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>İşlem</th></tr></thead>
@@ -541,7 +648,7 @@ export default function ReportsPage() {
                           <td className="px-4 py-4">
                             <Button size="sm" className="gap-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: K.PRIMARY }} onClick={async () => {
                               if (window.confirm(`${f.name} için "${f.training}" eğitiminde yeni deneme hakkı verilsin mi?`)) {
-                                try { const res = await fetch('/api/admin/trainings/reset-attempt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assignmentId: f.assignmentId }) }); if (!res.ok) { const d = await res.json(); throw new Error(d.error); } toast(`${f.name} için yeni deneme hakkı verildi.`, 'success'); refetch(); } catch (err) { toast(err instanceof Error ? err.message : 'İşlem başarısız', 'error'); }
+                                try { const res = await fetch('/api/admin/trainings/reset-attempt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assignmentId: f.assignmentId }) }); if (!res.ok) { const d = await res.json(); throw new Error(d.error); } toast(`${f.name} için yeni deneme hakkı verildi.`, 'success'); await refetchFailure(); } catch (err) { toast(err instanceof Error ? err.message : 'İşlem başarısız', 'error'); }
                               }
                             }}>Yeni Hak Ver</Button>
                           </td>
@@ -558,7 +665,9 @@ export default function ReportsPage() {
 
       {activeTab === 'score-comparison' && (
         <div className="space-y-6">
-          {scoreComparisonData.length > 0 ? (
+          {isTabLoading ? (
+            <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Yükleniyor…</p>
+          ) : scoreComparisonData.length > 0 ? (
             <>
               <BlurFade delay={0.05}>
                 <KChartCard title="Ön Sınav → Son Sınav Skor Karşılaştırması" icon={<TrendingUp size={14} />}>
@@ -578,7 +687,6 @@ export default function ReportsPage() {
                 </KChartCard>
               </BlurFade>
 
-              {/* Improvement table */}
               <BlurFade delay={0.1}>
                 <div className="k-card overflow-hidden">
                   <div className="k-card-head">
@@ -633,7 +741,9 @@ export default function ReportsPage() {
 
       {activeTab === 'duration' && (
         <div className="space-y-6">
-          {durationData.length > 0 ? (
+          {isTabLoading ? (
+            <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Yükleniyor…</p>
+          ) : durationData.length > 0 ? (
             <BlurFade delay={0.05}>
               <KChartCard title="Ortalama Süre Karşılaştırması (dakika)" icon={<Clock size={14} />}>
                 <div className="h-80">
