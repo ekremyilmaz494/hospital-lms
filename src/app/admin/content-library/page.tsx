@@ -749,7 +749,6 @@ function MyVideosTab() {
             <MyVideoCard
               key={item.id}
               item={item}
-              onNavigate={(trainingId) => router.push(`/admin/trainings/${trainingId}/edit`)}
             />
           ))}
         </div>
@@ -883,10 +882,9 @@ function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps)
 
 interface MyVideoCardProps {
   item: MyVideoLibraryItem
-  onNavigate: (trainingId: string) => void
 }
 
-function MyVideoCard({ item, onNavigate }: MyVideoCardProps) {
+function MyVideoCard({ item }: MyVideoCardProps) {
   const cat = CONTENT_LIBRARY_CATEGORIES[item.category as ContentLibraryCategoryKey]
   const diff = CONTENT_LIBRARY_DIFFICULTY[item.difficulty as ContentLibraryDifficulty]
   const catColor = cat?.color ?? K.PRIMARY
@@ -1017,36 +1015,33 @@ function MyVideoCard({ item, onNavigate }: MyVideoCardProps) {
           </div>
         </div>
 
-        {/* Linked training */}
+        {/* Linked training — sadece bilgi etiketi, tıklanabilir değil */}
         {primaryTraining && (
           <div className="mt-auto pt-1">
-            <button
-              onClick={() => onNavigate(primaryTraining.id)}
-              className="flex w-full items-center justify-between gap-2"
+            <span
+              className="flex w-full items-center gap-2"
+              title={
+                item.usageCount > 1
+                  ? `Atandığı eğitimler: ${primaryTraining.title} ve ${item.usageCount - 1} diğeri`
+                  : `Atandığı eğitim: ${primaryTraining.title}`
+              }
               style={{
                 padding: '10px 12px',
                 fontSize: 12,
                 fontWeight: 600,
-                textAlign: 'left',
-                color: K.TEXT_SECONDARY,
-                background: K.SURFACE,
-                border: `1.5px solid ${K.BORDER}`,
+                color: K.PRIMARY,
+                background: K.PRIMARY_LIGHT,
+                border: `1.5px solid ${K.PRIMARY}`,
                 borderRadius: 10,
-                cursor: 'pointer',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = K.PRIMARY_LIGHT; e.currentTarget.style.borderColor = K.PRIMARY; e.currentTarget.style.color = K.PRIMARY }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE; e.currentTarget.style.borderColor = K.BORDER; e.currentTarget.style.color = K.TEXT_SECONDARY }}
             >
-              <span className="flex min-w-0 items-center gap-2">
-                <GraduationCap size={13} style={{ color: K.PRIMARY, flexShrink: 0 }} />
-                <span className="truncate">
-                  {item.usageCount > 1
-                    ? `${primaryTraining.title} +${item.usageCount - 1}`
-                    : primaryTraining.title}
-                </span>
+              <GraduationCap size={13} style={{ color: K.PRIMARY, flexShrink: 0 }} />
+              <span className="truncate">
+                {item.usageCount > 1
+                  ? `${primaryTraining.title} +${item.usageCount - 1}`
+                  : primaryTraining.title}
               </span>
-              <ArrowRight size={13} style={{ flexShrink: 0 }} />
-            </button>
+            </span>
           </div>
         )}
       </div>
