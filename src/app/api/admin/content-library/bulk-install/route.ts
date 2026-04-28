@@ -82,15 +82,32 @@ export async function POST(request: Request) {
         },
       })
 
-      await tx.organizationContentLibrary.create({
-        data: {
-          organizationId:   orgId,
-          contentLibraryId: lib.id,
-          installedBy:      dbUser!.id,
-        },
-      })
-
-      void t // suppress unused warning
+      // Tekil install ile parite — s3Key varsa trainingVideo, ayrica
+      // organizationContentLibrary kayit. Ikisi de training.id'ye bagli ama
+      // birbirinden bagimsiz, paralel calistir.
+      await Promise.all([
+        lib.s3Key
+          ? tx.trainingVideo.create({
+              data: {
+                trainingId:      t.id,
+                title:           lib.title,
+                description:     lib.description ?? undefined,
+                videoUrl:        lib.s3Key,
+                videoKey:        lib.s3Key,
+                contentType:     lib.contentType ?? 'video',
+                durationSeconds: (lib.duration ?? 0) * 60,
+                sortOrder:       0,
+              },
+            })
+          : Promise.resolve(),
+        tx.organizationContentLibrary.create({
+          data: {
+            organizationId:   orgId,
+            contentLibraryId: lib.id,
+            installedBy:      dbUser!.id,
+          },
+        }),
+      ])
     }
   }, { timeout: 30000 })
 
