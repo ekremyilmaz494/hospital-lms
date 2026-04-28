@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
         organizationId: true,
         phone: true,
         phoneVerifiedAt: true,
-        organization: { select: { smsMfaEnabled: true } },
+        organization: { select: { smsMfaEnabled: true, setupCompleted: true } },
       }
     })
 
@@ -230,6 +230,9 @@ export async function POST(request: NextRequest) {
         role: role ?? 'staff',
       },
       mustChangePassword: dbUser.mustChangePassword,
+      // Admin layout setup-wizard guard'ı için: ilk login'de ekstra /api/admin/setup
+      // fetch'ini atlayabilsin. dbUser.organization.setupCompleted gerçek kaynak.
+      setupCompleted: dbUser.organization?.setupCompleted ?? null,
     })
   } catch (err) {
     logger.error('auth:login', 'Giriş işlemi sırasında beklenmeyen hata', err)
