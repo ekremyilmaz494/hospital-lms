@@ -52,6 +52,33 @@ export default function StaffDetailPage() {
   const { toast } = useToast();
   const { data: staff, isLoading, error, refetch } = useFetch<StaffDetail>(id ? `/api/admin/staff/${id}` : null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [grantTarget, setGrantTarget] = useState<{ trainingId: string; title: string } | null>(null);
+  const [grantCount, setGrantCount] = useState(1);
+  const [granting, setGranting] = useState(false);
+
+  const handleGrant = async () => {
+    if (!grantTarget || !id) return;
+    setGranting(true);
+    try {
+      const res = await fetch(`/api/admin/trainings/${grantTarget.trainingId}/assignments`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: id, additionalAttempts: grantCount }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'İşlem başarısız');
+      }
+      toast(`${grantCount} ek deneme hakkı verildi`, 'success');
+      setGrantTarget(null);
+      setGrantCount(1);
+      refetch();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
+    } finally {
+      setGranting(false);
+    }
+  };
 
   if (isLoading) return <PageLoading />;
 
@@ -385,24 +412,9 @@ export default function StaffDetailPage() {
                           <td style={{ padding: '14px 12px', borderBottom: isLast ? 'none' : `1px solid ${K.BORDER_LIGHT}`, verticalAlign: 'middle' }}>
                             {(t.status === 'failed' || t.status === 'locked') && (
                               <button
-                                onClick={async () => {
-                                  const confirmed = window.confirm(`"${t.title}" eğitimi için ${staff.name} adlı personele 1 ek deneme hakkı verilecek. Onaylıyor musunuz?`);
-                                  if (!confirmed) return;
-                                  try {
-                                    const res = await fetch(`/api/admin/trainings/${t.trainingId}/assignments`, {
-                                      method: 'PATCH',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ userId: id, additionalAttempts: 1 }),
-                                    });
-                                    if (!res.ok) {
-                                      const body = await res.json().catch(() => ({}));
-                                      throw new Error(body.error || 'İşlem başarısız');
-                                    }
-                                    toast('Ek deneme hakkı verildi', 'success');
-                                    refetch();
-                                  } catch (err) {
-                                    toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
-                                  }
+                                onClick={() => {
+                                  setGrantTarget({ trainingId: t.trainingId, title: t.title });
+                                  setGrantCount(1);
                                 }}
                                 style={{
                                   display: 'inline-flex',
@@ -507,24 +519,9 @@ export default function StaffDetailPage() {
                       </div>
                       {(t.status === 'failed' || t.status === 'locked') && (
                         <button
-                          onClick={async () => {
-                            const confirmed = window.confirm(`"${t.title}" eğitimi için ${staff.name} adlı personele 1 ek deneme hakkı verilecek. Onaylıyor musunuz?`);
-                            if (!confirmed) return;
-                            try {
-                              const res = await fetch(`/api/admin/trainings/${t.trainingId}/assignments`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ userId: id, additionalAttempts: 1 }),
-                              });
-                              if (!res.ok) {
-                                const body = await res.json().catch(() => ({}));
-                                throw new Error(body.error || 'İşlem başarısız');
-                              }
-                              toast('Ek deneme hakkı verildi', 'success');
-                              refetch();
-                            } catch (err) {
-                              toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
-                            }
+                          onClick={() => {
+                            setGrantTarget({ trainingId: t.trainingId, title: t.title });
+                            setGrantCount(1);
                           }}
                           style={{
                             display: 'inline-flex',
@@ -564,6 +561,114 @@ export default function StaffDetailPage() {
         onOpenChange={setAssignModalOpen}
         onSuccess={refetch}
       />
+
+      {grantTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !granting && setGrantTarget(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 60, padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 420, background: K.SURFACE,
+              borderRadius: 16, border: `1px solid ${K.BORDER}`,
+              boxShadow: K.SHADOW_CARD, padding: 24,
+              fontFamily: K.FONT_DISPLAY,
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: K.TEXT_PRIMARY }}>
+              Ek deneme hakkı ver
+            </h3>
+            <p style={{ marginTop: 8, fontSize: 13, color: K.TEXT_MUTED, lineHeight: 1.5 }}>
+              <strong style={{ color: K.TEXT_SECONDARY }}>{staff.name}</strong> personeline,
+              <strong style={{ color: K.TEXT_SECONDARY }}> "{grantTarget.title}"</strong> eğitimi için kaç ek deneme hakkı verilsin?
+            </p>
+
+            <div style={{ marginTop: 20 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: K.TEXT_MUTED, marginBottom: 8 }}>
+                Ek deneme sayısı
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setGrantCount((c) => Math.max(1, c - 1))}
+                  disabled={granting || grantCount <= 1}
+                  style={{
+                    width: 40, height: 40, borderRadius: 10, border: `1px solid ${K.BORDER}`,
+                    background: K.SURFACE, fontSize: 18, fontWeight: 700, cursor: 'pointer',
+                    color: K.TEXT_SECONDARY,
+                    opacity: grantCount <= 1 ? 0.4 : 1,
+                  }}
+                >−</button>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={grantCount}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (!Number.isNaN(v)) setGrantCount(Math.min(Math.max(v, 1), 10));
+                  }}
+                  disabled={granting}
+                  style={{
+                    flex: 1, height: 40, textAlign: 'center', borderRadius: 10,
+                    border: `1px solid ${K.BORDER}`, fontSize: 16, fontWeight: 700,
+                    color: K.TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setGrantCount((c) => Math.min(10, c + 1))}
+                  disabled={granting || grantCount >= 10}
+                  style={{
+                    width: 40, height: 40, borderRadius: 10, border: `1px solid ${K.BORDER}`,
+                    background: K.SURFACE, fontSize: 18, fontWeight: 700, cursor: 'pointer',
+                    color: K.TEXT_SECONDARY,
+                    opacity: grantCount >= 10 ? 0.4 : 1,
+                  }}
+                >+</button>
+              </div>
+              <p style={{ marginTop: 8, fontSize: 11, color: K.TEXT_MUTED }}>
+                En fazla 10 ek hak verilebilir.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 24, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setGrantTarget(null)}
+                disabled={granting}
+                style={{
+                  height: 38, padding: '0 16px', borderRadius: 999,
+                  border: `1px solid ${K.BORDER}`, background: K.SURFACE,
+                  fontSize: 13, fontWeight: 600, color: K.TEXT_SECONDARY, cursor: 'pointer',
+                }}
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                onClick={handleGrant}
+                disabled={granting}
+                style={{
+                  height: 38, padding: '0 18px', borderRadius: 999,
+                  background: K.PRIMARY, color: '#fff', border: `1px solid ${K.PRIMARY}`,
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  opacity: granting ? 0.6 : 1,
+                }}
+              >
+                {granting ? 'Veriliyor…' : `${grantCount} hak ver`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .sd-page { display: flex; flex-direction: column; gap: 28px; }

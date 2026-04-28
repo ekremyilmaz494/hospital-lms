@@ -6,8 +6,9 @@ import { logger } from '@/lib/logger'
 /**
  * GET /api/admin/content-library/my-videos
  *
- * Bu kurumda en az bir eğitimde kullanılmış ContentLibrary içeriklerini döndürür.
- * "Kullanım" ilişkisi Training.sourceLibraryId üzerinden kurulur.
+ * Kuruma yüklenmiş TÜM ContentLibrary item'larını döner — eğitime atanmış olsun
+ * olmasın. Her item için, varsa, kullanıldığı eğitimlerin özeti `usedInTrainings`
+ * alanında gelir; kullanılmayanlar boş dizi + usageCount=0 olarak döner.
  *
  * Sorgu parametreleri:
  *  - category: CONTENT_LIBRARY_CATEGORIES'den bir değer (opsiyonel)
@@ -24,21 +25,34 @@ export async function GET(request: Request) {
   const category = searchParams.get('category')
 
   try {
-    // 1) Bu kurumdaki eğitimlere bağlı distinct content library ID'leri
-    const linkedTrainings = await prisma.training.findMany({
-      where: {
-        organizationId: orgId,
-        sourceLibraryId: { not: null },
+    const where: Record<string, unknown> = {
+      organizationId: orgId,
+      isActive: true,
+    }
+    if (category) where.category = category
+
+    // Önce kurumun tüm yüklemelerini, sonra bu item'ları kullanan eğitimleri
+    // paralel çekiyoruz. usageMap ile O(1) eşleştirme yapıyoruz.
+    const items = await prisma.contentLibrary.findMany({
+      where,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        category: true,
+        thumbnailUrl: true,
+        duration: true,
+        smgPoints: true,
+        difficulty: true,
+        targetRoles: true,
+        isActive: true,
+        organizationId: true,
+        contentType: true,
       },
-      select: { sourceLibraryId: true },
-      distinct: ['sourceLibraryId'],
+      orderBy: [{ category: 'asc' }, { title: 'asc' }],
     })
 
-    const libraryIds = linkedTrainings
-      .map(t => t.sourceLibraryId)
-      .filter((id): id is string => id !== null)
-
-    if (libraryIds.length === 0) {
+    if (items.length === 0) {
       return jsonResponse(
         { items: [] },
         200,
@@ -46,47 +60,20 @@ export async function GET(request: Request) {
       )
     }
 
-    // 2) Kütüphane öğelerini ve kullanıldıkları eğitimlerin özetini paralel çek
-    const where: Record<string, unknown> = {
-      id: { in: libraryIds },
-      isActive: true,
-    }
-    if (category) where.category = category
+    const ids = items.map(i => i.id)
+    const trainingUsage = await prisma.training.findMany({
+      where: {
+        organizationId: orgId,
+        sourceLibraryId: { in: ids },
+      },
+      select: {
+        id: true,
+        title: true,
+        publishStatus: true,
+        sourceLibraryId: true,
+      },
+    })
 
-    const [items, trainingUsage] = await Promise.all([
-      prisma.contentLibrary.findMany({
-        where,
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          category: true,
-          thumbnailUrl: true,
-          duration: true,
-          smgPoints: true,
-          difficulty: true,
-          targetRoles: true,
-          isActive: true,
-          organizationId: true,
-          contentType: true,
-        },
-        orderBy: [{ category: 'asc' }, { title: 'asc' }],
-      }),
-      prisma.training.findMany({
-        where: {
-          organizationId: orgId,
-          sourceLibraryId: { in: libraryIds },
-        },
-        select: {
-          id: true,
-          title: true,
-          publishStatus: true,
-          sourceLibraryId: true,
-        },
-      }),
-    ])
-
-    // sourceLibraryId → eğitim listesi haritası
     const usageMap = new Map<string, Array<{ id: string; title: string; publishStatus: string }>>()
     for (const t of trainingUsage) {
       if (!t.sourceLibraryId) continue
@@ -95,7 +82,6 @@ export async function GET(request: Request) {
       usageMap.set(t.sourceLibraryId, arr)
     }
 
-    // Thumbnail S3 key ise stream URL'e çevir
     const resolved = await Promise.all(
       items.map(async item => {
         let thumbnailUrl = item.thumbnailUrl

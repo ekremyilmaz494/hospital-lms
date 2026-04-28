@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import {
@@ -731,12 +731,18 @@ function MyVideoCard({ item }: MyVideoCardProps) {
 
 // ── Platform Kütüphanesi Sekmesi ──────────────────────────────────────────
 
+const PAGE_LIMIT = 50
+
 function PlatformLibraryTab() {
   const { toast } = useToast()
-  // limit=500: API tarafına server-side pagination eklendi; bu UI henüz "load more"
-  // kontrolüne sahip değil, kütüphanenin tamamını tek seferde alabilmek için 500'e
-  // kadar yükle (500'den fazla içerik olduğunda UI sayfa kontrolü eklenmeli).
-  const { data, isLoading, error, refetch } = useFetch<PageData>('/api/admin/content-library?limit=500')
+  // Server-side pagination: initial 50 öğe, kullanıcı isteyince Daha Fazla Yükle ile devam.
+  const [items, setItems] = useState<ContentLibraryItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [stats, setStats] = useState<PageData['stats']>(undefined)
+  const [page, setPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
@@ -744,27 +750,74 @@ function PlatformLibraryTab() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ContentLibraryItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
-  if (isLoading) return <PageLoading />
-  if (error) return (
+  // Search debounce — kullanıcı yazarken her tuşta fetch atmayalım
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300)
+    return () => clearTimeout(t)
+  }, [searchQuery])
+
+  const fetchPage = useCallback(async (targetPage: number, append: boolean) => {
+    const params = new URLSearchParams()
+    params.set('page', String(targetPage))
+    params.set('limit', String(PAGE_LIMIT))
+    if (categoryFilter) params.set('category', categoryFilter)
+    if (debouncedSearch) params.set('search', debouncedSearch)
+
+    if (append) setIsLoadingMore(true)
+    else setIsLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/content-library?${params.toString()}`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+      const data = json as PageData
+      setTotal(data.total ?? 0)
+      setStats(data.stats)
+      setItems(prev => append ? [...prev, ...data.items] : data.items)
+      setPage(targetPage)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bir hata oluştu')
+    } finally {
+      if (append) setIsLoadingMore(false)
+      else setIsLoading(false)
+    }
+  }, [categoryFilter, debouncedSearch])
+
+  // Filter / search değişince sayfa 1'den yeniden yükle (replace)
+  useEffect(() => {
+    fetchPage(1, false)
+  }, [fetchPage])
+
+  const refetch = useCallback(() => {
+    fetchPage(1, false)
+  }, [fetchPage])
+
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || items.length >= total) return
+    fetchPage(page + 1, true)
+  }, [fetchPage, isLoadingMore, items.length, total, page])
+
+  // KPI'lar — tüm filtre kapsamına ait (server-side aggregation)
+  const totalLibraryCount = total
+  const installedCount = stats?.installedCount ?? items.filter(i => i.isInstalled).length
+  const installRate = stats?.installRate ?? (totalLibraryCount > 0 ? Math.round((installedCount / totalLibraryCount) * 100) : 0)
+  const totalDurationMin = stats?.totalDurationMin ?? items.reduce((s, i) => s + i.duration, 0)
+  const totalSmg = stats?.totalSmg ?? items.reduce((s, i) => s + i.smgPoints, 0)
+
+  // Kategori pill'leri ilk yüklemedeki sayılarla göster — load more sonrası tekrar
+  // saymak yerine sabit kategori dağılımını allItemsCountsRef'ten al.
+  // Basitleştirmek için: pill count'ları items.length üzerinden değil, total üzerinden tahmin etmiyoruz;
+  // yüklenmiş öğelerin lokal sayımını kullanıyoruz (gerçek toplam değil ama tutarlı).
+  const allItems = items
+
+  if (isLoading && items.length === 0) return <PageLoading />
+  if (error && items.length === 0) return (
     <div className="flex h-64 items-center justify-center" style={{ fontSize: 13, color: K.ERROR }}>
       {error}
     </div>
   )
-
-  const allItems = data?.items ?? []
-  const afterCategory = categoryFilter
-    ? allItems.filter(i => i.category === categoryFilter)
-    : allItems
-  const filtered = searchQuery
-    ? afterCategory.filter(i => i.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : afterCategory
-  // KPI'lar artık API'den geliyor — tüm filtre kapsamı için doğru, sayfaya bağlı değil
-  const totalLibraryCount = data?.total ?? allItems.length
-  const installedCount = data?.stats?.installedCount ?? allItems.filter(i => i.isInstalled).length
-  const installRate = data?.stats?.installRate ?? (totalLibraryCount > 0 ? Math.round((installedCount / totalLibraryCount) * 100) : 0)
-  const totalDurationMin = data?.stats?.totalDurationMin ?? allItems.reduce((s, i) => s + i.duration, 0)
-  const totalSmg = data?.stats?.totalSmg ?? allItems.reduce((s, i) => s + i.smgPoints, 0)
 
   const handleInstall = async (id: string) => {
     setInstallingId(id)
@@ -798,6 +851,8 @@ function PlatformLibraryTab() {
       setDeletingId(null)
     }
   }
+
+  const hasMore = items.length < total
 
   return (
     <div className="space-y-5">
@@ -913,23 +968,23 @@ function PlatformLibraryTab() {
         </div>
       </div>
 
-      {/* Category filter pills */}
+      {/* Category filter pills — server-side pagination kullanıldığı için
+          per-kategori count'ları yalnızca yüklenmiş öğeler üzerinden gösterilir;
+          "Tümü" pill'i API'den gelen toplam (total) ile etiketlenir. */}
       <div className="flex flex-wrap items-center gap-2">
         <FilterPill
           active={!categoryFilter}
           onClick={() => setCategoryFilter(null)}
-          label={`Tümü (${allItems.length})`}
+          label={`Tümü (${total})`}
         />
         {Object.entries(CONTENT_LIBRARY_CATEGORIES).map(([key, cfg]) => {
-          const count = allItems.filter(i => i.category === key).length
-          if (count === 0) return null
           const active = categoryFilter === key
           return (
             <FilterPill
               key={key}
               active={active}
               onClick={() => setCategoryFilter(active ? null : key)}
-              label={`${cfg.label} (${count})`}
+              label={cfg.label}
               color={cfg.color}
             />
           )
@@ -937,19 +992,73 @@ function PlatformLibraryTab() {
       </div>
 
       {/* Cards */}
-      {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map(item => (
-            <ContentCard
-              key={item.id}
-              item={item}
-              onInstall={handleInstall}
-              installing={installingId === item.id}
-              onDelete={setDeleteTarget}
-              deleting={deletingId === item.id}
-            />
-          ))}
-        </div>
+      {items.length > 0 ? (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {items.map(item => (
+              <ContentCard
+                key={item.id}
+                item={item}
+                onInstall={handleInstall}
+                installing={installingId === item.id}
+                onDelete={setDeleteTarget}
+                deleting={deletingId === item.id}
+              />
+            ))}
+          </div>
+
+          {/* Daha Fazla Yükle */}
+          {hasMore && (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <button
+                onClick={loadMore}
+                disabled={isLoadingMore}
+                style={{
+                  padding: '12px 24px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: isLoadingMore ? K.TEXT_MUTED : K.PRIMARY,
+                  background: K.SURFACE,
+                  border: `1.5px solid ${isLoadingMore ? K.BORDER : K.PRIMARY}`,
+                  borderRadius: 10,
+                  cursor: isLoadingMore ? 'not-allowed' : 'pointer',
+                  opacity: isLoadingMore ? 0.7 : 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                {isLoadingMore ? (
+                  <>
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 14,
+                        height: 14,
+                        border: `2px solid ${K.BORDER}`,
+                        borderTopColor: K.PRIMARY,
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        animation: 'spin 0.7s linear infinite',
+                      }}
+                    />
+                    Yükleniyor...
+                  </>
+                ) : (
+                  <>Daha fazla yükle ({items.length} / {total})</>
+                )}
+              </button>
+              <span style={{ fontSize: 11, color: K.TEXT_MUTED }}>
+                {items.length} / {total} içerik gösteriliyor
+              </span>
+            </div>
+          )}
+          {!hasMore && total > PAGE_LIMIT && (
+            <div className="flex items-center justify-center pt-2" style={{ fontSize: 11, color: K.TEXT_MUTED }}>
+              Tüm içerikler yüklendi ({total})
+            </div>
+          )}
+        </>
       ) : (
         <EmptyState
           icon={searchQuery ? Search : Library}

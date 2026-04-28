@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const category = searchParams.get('category')
   // max 500 — bu liste organizasyon-genelinde gösterilir
-  const { page, limit, skip } = safePagination(searchParams, 500)
+  const { page, limit, skip, search } = safePagination(searchParams, 500)
 
   const where: Record<string, unknown> = {
     isActive: true,
@@ -38,6 +38,10 @@ export async function GET(request: Request) {
     ],
   }
   if (category) where.category = category
+  if (search) {
+    // Title-based case-insensitive arama — DB tarafında daralt
+    where.title = { contains: search, mode: 'insensitive' }
+  }
 
   // 1. dalga: paginate liste, total, kurumun installed ID seti, ve org-genelinde
   // KPI agregasyonları (durum/SMG toplamı). KPI'lar tüm filtre kapsamına ait,
