@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Inbox, Check, X, Clock, User, GraduationCap } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -46,8 +46,11 @@ interface AttemptRequest {
   } | null;
 }
 
+const PAGE_LIMIT = 20;
+
 export default function AttemptRequestsPage() {
   const [filter, setFilter] = useState<Filter>('pending');
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
   const { data, isLoading, error, refetch } = useFetch<{
     items: AttemptRequest[];
@@ -55,7 +58,10 @@ export default function AttemptRequestsPage() {
     page: number;
     limit: number;
     totalPages: number;
-  }>(`/api/admin/attempt-requests?status=${filter}`);
+  }>(`/api/admin/attempt-requests?status=${filter}&page=${page}&limit=${PAGE_LIMIT}`);
+
+  // Filtre degistiginde 1. sayfaya don
+  useEffect(() => { setPage(1); }, [filter]);
 
   const [reviewing, setReviewing] = useState<{
     req: AttemptRequest;
@@ -303,6 +309,51 @@ export default function AttemptRequestsPage() {
             );
           })}
         </ul>
+      )}
+
+      {/* Sayfalama */}
+      {!isLoading && !error && (data?.totalPages ?? 0) > 1 && (
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginTop: 16, paddingTop: 12, borderTop: `1px solid ${K.BORDER_LIGHT}`,
+        }}>
+          <span style={{ fontSize: 13, color: K.TEXT_MUTED }}>
+            {(page - 1) * PAGE_LIMIT + 1}–{Math.min(page * PAGE_LIMIT, data?.total ?? 0)} / {data?.total ?? 0}
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              disabled={page === 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              style={{
+                padding: '6px 14px', fontSize: 13, borderRadius: 8,
+                border: `1px solid ${K.BORDER}`, background: K.SURFACE,
+                color: page === 1 ? K.TEXT_MUTED : K.TEXT_PRIMARY,
+                cursor: page === 1 ? 'not-allowed' : 'pointer',
+                transition: 'background-color 160ms ease, border-color 160ms ease',
+              }}
+            >
+              ← Önceki
+            </button>
+            <span style={{ fontSize: 13, color: K.TEXT_MUTED, alignSelf: 'center', padding: '0 6px' }}>
+              {page} / {data?.totalPages ?? 1}
+            </span>
+            <button
+              type="button"
+              disabled={page >= (data?.totalPages ?? 1)}
+              onClick={() => setPage(p => p + 1)}
+              style={{
+                padding: '6px 14px', fontSize: 13, borderRadius: 8,
+                border: `1px solid ${K.BORDER}`, background: K.SURFACE,
+                color: page >= (data?.totalPages ?? 1) ? K.TEXT_MUTED : K.TEXT_PRIMARY,
+                cursor: page >= (data?.totalPages ?? 1) ? 'not-allowed' : 'pointer',
+                transition: 'background-color 160ms ease, border-color 160ms ease',
+              }}
+            >
+              Sonraki →
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Review modal */}
