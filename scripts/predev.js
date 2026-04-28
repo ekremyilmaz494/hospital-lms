@@ -40,6 +40,27 @@ if (os.platform() === 'darwin') {
   console.log('[predev] ✓ macOS provenance + iCloud artefakt temizliği');
 }
 
+// ── 1b. Windows: .next kalıntılarını sıfırla ──
+// next.config.ts'de turbopackFileSystemCacheForDev=false ile zaten RAM-only
+// çalışıyoruz; bu blok eski/yarım .next artefaktlarını (önceki Next sürümünden,
+// crash sonrası, manuel build) temizler ki Turbopack temiz başlasın.
+if (os.platform() === 'win32') {
+  const targets = ['.next', '.next.nosync', '.next 2', '.next.nosync 2'];
+  let cleaned = 0;
+  for (const name of targets) {
+    const full = path.join(root, name);
+    if (fs.existsSync(full)) {
+      try {
+        fs.rmSync(full, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+        cleaned++;
+      } catch (err) {
+        console.warn(`[predev] ⚠ ${name} silinemedi: ${err.message?.substring(0, 60)}`);
+      }
+    }
+  }
+  if (cleaned > 0) console.log(`[predev] ✓ Windows: ${cleaned} cache klasörü temizlendi`);
+}
+
 // ── 2. Prisma generate ──
 try {
   console.log('[predev] Prisma client generate ediliyor...');

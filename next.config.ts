@@ -99,6 +99,13 @@ const nextConfig: NextConfig = {
   experimental: {
     proxyClientMaxBodySize: '512mb',
     optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion', 'date-fns', '@tanstack/react-table', '@tiptap/react', 'react-pdf'],
+    // Windows dev: Türkçe/boşluklu path + Defender real-time scan + uzun HMR oturumu
+    // Turbopack'in disk cache'inde yarım CSS chunk yazıyor → Tailwind utility'leri
+    // render edilmiyor, sayfa stilsiz kalıyor. RAM-only mod ile bu sınıf bug'ı kökten kapatıyoruz.
+    // Maliyet: ilk derleme her dev start'ta sıfırdan; HMR aynı hız.
+    ...(process.platform === 'win32' && process.env.NODE_ENV === 'development'
+      ? { turbopackFileSystemCacheForDev: false }
+      : {}),
   },
   redirects: async () => [
     {
