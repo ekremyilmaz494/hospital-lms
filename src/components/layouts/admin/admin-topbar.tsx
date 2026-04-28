@@ -143,9 +143,7 @@ export function AdminTopbar({
           gap: 14px;
           height: var(--k-topbar-h);
           padding: 0 20px;
-          background: color-mix(in srgb, var(--k-surface) 88%, transparent);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
+          background: var(--k-surface);
           border-bottom: 1px solid var(--k-border);
         }
 
