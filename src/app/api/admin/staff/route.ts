@@ -43,8 +43,8 @@ export async function GET(request: Request) {
     if (department) where.departmentId = department
     if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 
-    // Tek dalgalı Promise.all — tüm sorgular paralel
-    const [staff, total, rawDepartments, activeStaff, completedCounts, avgScores] = await Promise.all([
+    // 1. dalga — sayfa listesi + global stat'lar paralel
+    const [staff, total, rawDepartments, activeStaff, overallAvgAgg] = await Promise.all([
       prisma.user.findMany({
         where,
         include: {
@@ -61,17 +61,29 @@ export async function GET(request: Request) {
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
       prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
-      prisma.trainingAssignment.groupBy({
-        by: ['userId'],
-        where: { user: { organizationId: orgId, role: 'staff' satisfies UserRole }, status: 'passed' satisfies AssignmentStatus },
-        _count: true,
-      }),
-      prisma.examAttempt.groupBy({
-        by: ['userId'],
+      // Tüm org için tek sayı — groupBy yerine aggregate (tek satır döner, ucuz)
+      prisma.examAttempt.aggregate({
         where: { user: { organizationId: orgId, role: 'staff' satisfies UserRole }, isPassed: true },
         _avg: { postExamScore: true },
       }),
     ])
+
+    // 2. dalga — sadece bu sayfadaki userId'ler için per-user metrikler
+    const pageUserIds = staff.map(s => s.id)
+    const [completedCounts, avgScores] = pageUserIds.length > 0
+      ? await Promise.all([
+          prisma.trainingAssignment.groupBy({
+            by: ['userId'],
+            where: { userId: { in: pageUserIds }, status: 'passed' satisfies AssignmentStatus },
+            _count: true,
+          }),
+          prisma.examAttempt.groupBy({
+            by: ['userId'],
+            where: { userId: { in: pageUserIds }, isPassed: true },
+            _avg: { postExamScore: true },
+          }),
+        ])
+      : [[], []] as const
 
     const completedMap = new Map(completedCounts.map(c => [c.userId, c._count]))
     const avgScoreMap = new Map(avgScores.map(a => [a.userId, Math.round(Number(a._avg.postExamScore ?? 0))]))
@@ -84,11 +96,7 @@ export async function GET(request: Request) {
       staffCount: d._count.users,
     }))
 
-    // Overall avg score (tüm org için)
-    const allAvgScores = avgScores.map(a => Number(a._avg.postExamScore ?? 0)).filter(s => s > 0)
-    const overallAvgScore = allAvgScores.length > 0
-      ? Math.round(allAvgScores.reduce((sum, sc) => sum + sc, 0) / allAvgScores.length)
-      : 0
+    const overallAvgScore = Math.round(Number(overallAvgAgg._avg.postExamScore ?? 0))
 
     const stats = {
       totalStaff: total,
