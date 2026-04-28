@@ -6,7 +6,7 @@ vi.mock('@/lib/prisma', () => ({
     user: { findUnique: vi.fn(), create: vi.fn() },
     subscriptionPlan: { findUnique: vi.fn(), findFirst: vi.fn() },
     organizationSubscription: { create: vi.fn() },
-    auditLog: { create: vi.fn() },
+    auditLog: { create: vi.fn(), findFirst: vi.fn().mockResolvedValue(null) },
   },
 }))
 

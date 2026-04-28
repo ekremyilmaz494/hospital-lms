@@ -216,11 +216,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return jsonResponse({ phase: 'post', score: Number(attempt.postExamScore ?? score), isPassed: attempt.isPassed ?? isPassed, passingScore: attempt.training.passingScore })
   }
 
-  // Timer temizle
-  await clearExamTimer(attempt.id)
-
-  // Update assignment status
-  // assignment.maxAttempts admin "Yeni Hak Ver" ile override edilmiş olabilir
+  // Timer + assignment update: her ikisi updateMany'den bağımsız, parallel çalışabilir
   const effectiveMaxAttempts = attempt.assignment.maxAttempts ?? attempt.training.maxAttempts
   const assignmentEvent = isPassed
     ? ({ type: 'POST_EXAM_PASSED' } as const)
@@ -233,128 +229,113 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return errorResponse('Atama durumu güncellenemedi: geçersiz durum geçişi', 400)
   }
 
-  await prisma.trainingAssignment.update({
-    where: { id: attempt.assignmentId },
-    data: {
-      status: assignmentTransition.next,
-      ...(isPassed && { completedAt: new Date() }),
-    },
-  })
-
-  // Create notification
-  await prisma.notification.create({
-    data: {
-      userId: dbUser!.id,
-      organizationId: attempt.training.organizationId,
-      title: isPassed ? 'Sınavı Geçtiniz!' : 'Sınav Sonucu',
-      message: isPassed
-        ? `"${attempt.training.title}" eğitimini ${score} puanla başarıyla tamamladınız.`
-        : `"${attempt.training.title}" sınavından ${score} puan aldınız. Geçme notu: ${attempt.training.passingScore}.`,
-      type: isPassed ? 'exam_passed' : 'exam_failed',
-      relatedTrainingId: attempt.trainingId,
-    },
-  })
-
-  // Auto-generate certificate (duplicate koruması ile)
-  if (isPassed) {
-    const existingCert = await prisma.certificate.findFirst({
-      where: { attemptId: attempt.id },
-    })
-    if (!existingCert) {
-      const code = `CERT-${randomBytes(16).toString('hex').toUpperCase()}`
-      const expiresAt = attempt.training.renewalPeriodMonths
-        ? addMonths(new Date(), attempt.training.renewalPeriodMonths)
-        : null
-      await prisma.certificate.create({
-        data: {
-          userId: dbUser!.id,
-          trainingId: attempt.trainingId,
-          attemptId: attempt.id,
-          organizationId: dbUser!.organizationId,
-          certificateCode: code,
-          expiresAt,
-        },
-      })
-
-      // Sertifika bildirimi (fire-and-forget)
-      certificateIssuedEmail(
-        dbUser!.email,
-        `${dbUser!.firstName ?? ''} ${dbUser!.lastName ?? ''}`.trim(),
-        attempt.training.title,
-        code,
-      ).catch(err => logger.warn('CertEmail', 'Sertifika emaili gonderilemedi', (err as Error).message))
-    }
-  }
-
-  // Eğitim tamamlandığında otomatik SMG aktivitesi — idempotent upsert
-  if (isPassed && attempt.training.smgPoints > 0) {
-    try {
-      // Varsa organizasyonun "COURSE_COMPLETION" kategorisini bul, yoksa null.
-      // Conditional (sadece sınav geçilince), ardından upsert bu kategoriye bağımlı — paralelleştirilemez.
-      const defaultCategory = await prisma.smgCategory.findFirst({ // perf-check-disable-line
-        where: {
-          organizationId: attempt.training.organizationId,
-          code: 'COURSE_COMPLETION',
-          isActive: true,
-        },
-        select: { id: true },
-      })
-
-      const today = new Date()
-      // completionDate @db.Date; aynı gün duplicate'leri bastırmak için saat sıfırla
-      const completionDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
-
-      await prisma.smgActivity.upsert({
-        where: {
-          userId_activityType_title_completionDate: {
-            userId: dbUser!.id,
-            activityType: 'COURSE_COMPLETION',
-            title: attempt.training.title,
-            completionDate,
-          },
-        },
-        create: {
-          userId: dbUser!.id,
-          organizationId: attempt.training.organizationId,
-          activityType: 'COURSE_COMPLETION',
-          categoryId: defaultCategory?.id ?? null,
-          title: attempt.training.title,
-          provider: attempt.training.organization.name,
-          completionDate,
-          smgPoints: attempt.training.smgPoints,
-          approvalStatus: 'APPROVED',
-          approvedAt: new Date(),
-        },
-        update: {},
-      })
-    } catch (err) {
-      logger.error('SMG', 'Otomatik SMG aktivitesi oluşturulamadı', { err, attemptId: attempt.id })
-    }
-  }
+  await Promise.all([
+    clearExamTimer(attempt.id),
+    prisma.trainingAssignment.update({
+      where: { id: attempt.assignmentId },
+      data: {
+        status: assignmentTransition.next,
+        ...(isPassed && { completedAt: new Date() }),
+      },
+    }),
+  ])
 
   const tabSwitchCount = parsed.data.tabSwitchCount ?? 0
   const suspicious = tabSwitchCount >= 3
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: attempt.training.organizationId,
-    action: isPassed ? 'exam.passed' : 'exam.failed',
-    entityType: 'exam_attempt',
-    entityId: attempt.id,
-    newData: { score, isPassed, trainingId: attempt.trainingId, tabSwitchCount, suspicious },
-  })
-
-  void logActivity({
-    userId: dbUser!.id,
-    organizationId: attempt.training.organizationId,
-    action: isPassed ? 'exam_pass' : 'exam_fail',
-    resourceType: 'exam_attempt',
-    resourceId: attempt.id,
-    resourceTitle: attempt.training.title,
-    metadata: { score, passingScore: attempt.training.passingScore, attemptNumber: attempt.attemptNumber, tabSwitchCount, suspicious },
-  })
-
-  try { await invalidateDashboardCache(attempt.training.organizationId) } catch {}
+  // Non-critical: bildirim, sertifika, SMG, audit — response'u bloklamaz
+  void Promise.allSettled([
+    prisma.notification.create({
+      data: {
+        userId: dbUser!.id,
+        organizationId: attempt.training.organizationId,
+        title: isPassed ? 'Sınavı Geçtiniz!' : 'Sınav Sonucu',
+        message: isPassed
+          ? `"${attempt.training.title}" eğitimini ${score} puanla başarıyla tamamladınız.`
+          : `"${attempt.training.title}" sınavından ${score} puan aldınız. Geçme notu: ${attempt.training.passingScore}.`,
+        type: isPassed ? 'exam_passed' : 'exam_failed',
+        relatedTrainingId: attempt.trainingId,
+      },
+    }),
+    isPassed
+      ? (async () => {
+          const existingCert = await prisma.certificate.findFirst({ where: { attemptId: attempt.id } })
+          if (!existingCert) {
+            const code = `CERT-${randomBytes(16).toString('hex').toUpperCase()}`
+            const expiresAt = attempt.training.renewalPeriodMonths
+              ? addMonths(new Date(), attempt.training.renewalPeriodMonths)
+              : null
+            await prisma.certificate.create({
+              data: {
+                userId: dbUser!.id,
+                trainingId: attempt.trainingId,
+                attemptId: attempt.id,
+                organizationId: dbUser!.organizationId,
+                certificateCode: code,
+                expiresAt,
+              },
+            })
+            certificateIssuedEmail(
+              dbUser!.email,
+              `${dbUser!.firstName ?? ''} ${dbUser!.lastName ?? ''}`.trim(),
+              attempt.training.title,
+              code,
+            ).catch(err => logger.warn('CertEmail', 'Sertifika emaili gonderilemedi', (err as Error).message))
+          }
+        })()
+      : Promise.resolve(),
+    isPassed && attempt.training.smgPoints > 0
+      ? (async () => {
+          const defaultCategory = await prisma.smgCategory.findFirst({ // perf-check-disable-line
+            where: { organizationId: attempt.training.organizationId, code: 'COURSE_COMPLETION', isActive: true },
+            select: { id: true },
+          })
+          const today = new Date()
+          const completionDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
+          await prisma.smgActivity.upsert({
+            where: {
+              userId_activityType_title_completionDate: {
+                userId: dbUser!.id,
+                activityType: 'COURSE_COMPLETION',
+                title: attempt.training.title,
+                completionDate,
+              },
+            },
+            create: {
+              userId: dbUser!.id,
+              organizationId: attempt.training.organizationId,
+              activityType: 'COURSE_COMPLETION',
+              categoryId: defaultCategory?.id ?? null,
+              title: attempt.training.title,
+              provider: attempt.training.organization.name,
+              completionDate,
+              smgPoints: attempt.training.smgPoints,
+              approvalStatus: 'APPROVED',
+              approvedAt: new Date(),
+            },
+            update: {},
+          })
+        })().catch(err => logger.error('SMG', 'Otomatik SMG aktivitesi oluşturulamadı', { err, attemptId: attempt.id }))
+      : Promise.resolve(),
+    createAuditLog({
+      userId: dbUser!.id,
+      organizationId: attempt.training.organizationId,
+      action: isPassed ? 'exam.passed' : 'exam.failed',
+      entityType: 'exam_attempt',
+      entityId: attempt.id,
+      newData: { score, isPassed, trainingId: attempt.trainingId, tabSwitchCount, suspicious },
+    }),
+    logActivity({
+      userId: dbUser!.id,
+      organizationId: attempt.training.organizationId,
+      action: isPassed ? 'exam_pass' : 'exam_fail',
+      resourceType: 'exam_attempt',
+      resourceId: attempt.id,
+      resourceTitle: attempt.training.title,
+      metadata: { score, passingScore: attempt.training.passingScore, attemptNumber: attempt.attemptNumber, tabSwitchCount, suspicious },
+    }),
+    invalidateDashboardCache(attempt.training.organizationId).catch(() => {}),
+  ])
 
   // EY.FR.40 geri bildirim gerekli mi? — feedback/status ile aynı kuralı uygular.
   // Fire-and-forget: hata olursa feedbackRequired=false, akış bozulmaz.
