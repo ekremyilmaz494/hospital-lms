@@ -131,6 +131,8 @@ model Organization {
   // AI İçerik Stüdyosu (NotebookLM)
   aiNotebookAccount      AiNotebookAccount?
   aiGenerations          AiGeneration[]
+  // Ek deneme hakkı talepleri
+  attemptRequests        ExamAttemptRequest[]
 
   @@map("organizations")
 }
@@ -289,6 +291,9 @@ model User {
   trustedDevices                TrustedDevice[]
   // AI İçerik Stüdyosu — kullanıcı bazlı üretim geçmişi
   aiGenerations                 AiGeneration[]
+  // Ek deneme hakkı talepleri
+  attemptRequests               ExamAttemptRequest[]         @relation("AttemptRequester")
+  reviewedAttemptRequests       ExamAttemptRequest[]         @relation("AttemptRequestReviewer")
 
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
@@ -360,6 +365,8 @@ model Training {
   departmentRules   DepartmentTrainingRule[]
   // EY.FR.40 Eğitim Geri Bildirim
   feedbackResponses TrainingFeedbackResponse[]
+  // Ek deneme hakkı talepleri
+  attemptRequests   ExamAttemptRequest[]
 
   @@index([organizationId], map: "idx_trainings_org")
   @@index([startDate, endDate], map: "idx_trainings_dates")
@@ -499,6 +506,35 @@ model ExamAttempt {
   @@index([userId, isPassed], map: "idx_attempts_user_passed")
   @@index([organizationId], map: "idx_attempts_organization")
   @@map("exam_attempts")
+}
+
+// ── EK DENEME HAKKI TALEPLERİ ──
+// Personel sınav haklarını tükettiğinde admin'den ek hak talep eder.
+// status: pending | approved | rejected
+model ExamAttemptRequest {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  trainingId      String    @map("training_id") @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  reason          String?   @db.Text
+  status          String    @default("pending") @db.VarChar(20)
+  reviewedById    String?   @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz
+  grantedAttempts Int?      @map("granted_attempts")
+  reviewNote      String?   @map("review_note") @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  training     Training     @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  user         User         @relation("AttemptRequester", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy   User?        @relation("AttemptRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status], map: "idx_attempt_requests_org_status")
+  @@index([userId], map: "idx_attempt_requests_user")
+  @@index([trainingId], map: "idx_attempt_requests_training")
+  @@index([userId, trainingId, status], map: "idx_attempt_requests_user_training_status")
+  @@map("exam_attempt_requests")
 }
 
 // ── SINAV CEVAPLARI ──

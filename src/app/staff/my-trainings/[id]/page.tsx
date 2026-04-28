@@ -6,14 +6,16 @@
  * Dil: cream + ink + gold + serif display + mono caps + radial dot bg.
  */
 
+import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowLeft, Video, FileQuestion, CheckCircle2, Clock, Play, Target,
-  Calendar, Award, ChevronRight, Lock, AlertTriangle, RefreshCw,
+  Calendar, Award, ChevronRight, Lock, AlertTriangle, RefreshCw, Send,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
+import { useToast } from '@/components/shared/toast';
 import { calculateTrainingProgress } from '@/lib/training-progress';
 import { INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE, CARD_BG } from '@/lib/editorial-palette';
 
@@ -53,6 +55,48 @@ export default function TrainingDetailPage() {
   const apiUrl = id ? `/api/staff/my-trainings/${id}` : null;
 
   const { data: training, isLoading, error, refetch } = useFetch<TrainingDetail>(apiUrl);
+  const { toast } = useToast();
+
+  type AttemptRequest = {
+    id: string;
+    trainingId: string;
+    status: 'pending' | 'approved' | 'rejected';
+    grantedAttempts: number | null;
+    reviewNote: string | null;
+    createdAt: string;
+    reviewedAt: string | null;
+  };
+  const { data: requestData, refetch: refetchRequests } = useFetch<{ requests: AttemptRequest[] }>(
+    id ? `/api/staff/attempt-requests?trainingId=${encodeURIComponent(id)}` : null,
+  );
+  const myRequest = requestData?.requests?.[0] ?? null;
+
+  const [reasonText, setReasonText] = useState('');
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+
+  const submitAttemptRequest = async () => {
+    if (!id || reasonText.trim().length < 10) {
+      toast('Lütfen en az 10 karakterlik açıklama yazın', 'error');
+      return;
+    }
+    setSubmittingRequest(true);
+    try {
+      const res = await fetch('/api/staff/attempt-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trainingId: id, reason: reasonText.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Talep gönderilemedi');
+      toast(body.message || 'Talebiniz iletildi', 'success');
+      setReasonText('');
+      refetchRequests();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
 
   const pageShell = (children: React.ReactNode) => (
     <div
@@ -718,11 +762,90 @@ export default function TrainingDetailPage() {
               Tüm deneme hakları kullanıldı
             </h2>
             <p className="mt-1 text-[13px]" style={{ color: '#7a1d14' }}>
-              {training.maxAttempts} deneme hakkının tamamını kullandın. Ek deneme için eğitim yöneticine başvur.
+              {training.maxAttempts} deneme hakkının tamamını kullandın. Yöneticinden ek deneme hakkı talep edebilirsin.
             </p>
+
+            {/* Talep durumu / formu */}
+            <div className="mt-4 w-full" style={{ maxWidth: 520 }}>
+              {myRequest?.status === 'pending' && (
+                <div
+                  className="px-3 py-2.5 text-[12px]"
+                  style={{
+                    background: '#fef3c7', color: '#78350f',
+                    border: '1px solid #fcd34d', borderRadius: 4,
+                  }}
+                >
+                  <strong className="block mb-0.5">Talebiniz inceleniyor</strong>
+                  Yöneticinizin değerlendirmesi bekleniyor. Talep tarihi:{' '}
+                  {new Date(myRequest.createdAt).toLocaleDateString('tr-TR')}
+                </div>
+              )}
+
+              {myRequest?.status === 'rejected' && (
+                <div
+                  className="px-3 py-2.5 text-[12px]"
+                  style={{
+                    background: '#fee2e2', color: '#7a1d14',
+                    border: '1px solid #fca5a5', borderRadius: 4,
+                  }}
+                >
+                  <strong className="block mb-0.5">Önceki talebiniz reddedildi</strong>
+                  {myRequest.reviewNote && (
+                    <span className="block mt-1">Yöneticinin notu: {myRequest.reviewNote}</span>
+                  )}
+                </div>
+              )}
+
+              {(!myRequest || myRequest.status === 'rejected') && (
+                <div className="mt-2">
+                  <label
+                    className="block text-[10px] font-semibold uppercase tracking-[0.14em] mb-1.5"
+                    style={{ color: '#7a1d14', fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                  >
+                    Ek hak talebi — gerekçe
+                  </label>
+                  <textarea
+                    value={reasonText}
+                    onChange={(e) => setReasonText(e.target.value)}
+                    placeholder="Neden ek deneme hakkı istediğini kısaca açıkla (en az 10 karakter)"
+                    maxLength={1000}
+                    rows={3}
+                    disabled={submittingRequest}
+                    className="w-full px-3 py-2 text-[13px]"
+                    style={{
+                      background: CREAM, color: '#7a1d14',
+                      border: `1px solid #b3261e`, borderRadius: 2,
+                      fontFamily: 'inherit', resize: 'vertical',
+                    }}
+                  />
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px]" style={{ color: '#7a1d14', opacity: 0.7 }}>
+                      {reasonText.trim().length}/1000
+                    </span>
+                    <button
+                      type="button"
+                      onClick={submitAttemptRequest}
+                      disabled={submittingRequest || reasonText.trim().length < 10}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                      style={{
+                        background: '#b3261e', color: CREAM,
+                        border: `1px solid #b3261e`, borderRadius: 2,
+                        fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                        opacity: submittingRequest || reasonText.trim().length < 10 ? 0.5 : 1,
+                        cursor: submittingRequest || reasonText.trim().length < 10 ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <Send className="h-3 w-3" />
+                      {submittingRequest ? 'Gönderiliyor…' : 'Talep gönder'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <Link
               href="/staff/my-trainings"
-              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+              className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
               style={{
                 color: '#7a1d14', border: `1px solid #7a1d14`, borderRadius: '2px',
                 fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
