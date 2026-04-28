@@ -23,7 +23,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       where,
       include: {
         user: { select: { id: true, firstName: true, lastName: true, email: true, departmentRel: { select: { name: true } } } },
-        examAttempts: { orderBy: { attemptNumber: 'desc' } },
+        examAttempts: {
+          orderBy: { attemptNumber: 'desc' },
+          take: 3,
+          select: {
+            id: true,
+            attemptNumber: true,
+            preExamScore: true,
+            postExamScore: true,
+            isPassed: true,
+            postExamCompletedAt: true,
+            status: true,
+          },
+        },
       },
       orderBy: { assignedAt: 'desc' },
       skip,

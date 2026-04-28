@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         processedRecords: true,
         startedAt: true,
         completedAt: true,
-        // errors alanı listede gösterilmez — sadece detay sayfasında
+        errors: true,
       },
     }),
     prisma.syncLog.count({
@@ -49,17 +49,10 @@ export async function GET(request: Request) {
     }),
   ])
 
-  // Hata sayısını ekle (errors dizisinin uzunluğu)
-  const logsWithErrorCount = await Promise.all(
-    logs.map(async (log) => {
-      const full = await prisma.syncLog.findUnique({
-        where: { id: log.id },
-        select: { errors: true },
-      })
-      const errors = full?.errors as unknown[]
-      return { ...log, errorCount: Array.isArray(errors) ? errors.length : 0 }
-    })
-  )
+  const logsWithErrorCount = logs.map(({ errors, ...rest }) => ({
+    ...rest,
+    errorCount: Array.isArray(errors) ? (errors as unknown[]).length : 0,
+  }))
 
   return jsonResponse({
     logs: logsWithErrorCount,
@@ -67,5 +60,5 @@ export async function GET(request: Request) {
     page,
     limit,
     totalPages: Math.ceil(total / limit),
-  })
+  }, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
 }

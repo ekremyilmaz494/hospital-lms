@@ -1,16 +1,37 @@
 import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/server";
 import type { User } from "@/types/database";
 import { ToastProvider } from "@/components/shared/toast";
-import { SessionTimeoutProvider } from "@/components/providers/session-timeout-provider";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { DevSWCleaner } from "@/components/dev-sw-cleaner";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { CrispWidget } from "@/components/providers/crisp-widget";
 import "./globals.css";
+
+const fontDisplay = Plus_Jakarta_Sans({
+  subsets: ["latin", "latin-ext"],
+  weight: ["500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-display-loaded",
+});
+
+const fontBody = Inter({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-body-loaded",
+});
+
+const fontMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+  variable: "--font-mono-loaded",
+});
 
 export const metadata: Metadata = {
   title: "Devakent Hastanesi - Personel Eğitim Sistemi",
@@ -67,6 +88,7 @@ export default async function RootLayout({
       lang="tr"
       data-scroll-behavior="smooth"
       suppressHydrationWarning
+      className={`${fontDisplay.variable} ${fontBody.variable} ${fontMono.variable}`}
     >
       <head>
         <link rel="manifest" href="/manifest.json" />
@@ -87,17 +109,15 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider initialUser={initialUser}>
-            <SessionTimeoutProvider>
-              <ToastProvider>
-                <ErrorBoundary>
-                  {children}
-                  {process.env.NODE_ENV === 'development' && <DevSWCleaner />}
-                  <PWAInstallPrompt />
-                  <CookieConsent />
-                  <CrispWidget />
-                </ErrorBoundary>
-              </ToastProvider>
-            </SessionTimeoutProvider>
+            <ToastProvider>
+              <ErrorBoundary>
+                {children}
+                {process.env.NODE_ENV === 'development' && <DevSWCleaner />}
+                <PWAInstallPrompt />
+                <CookieConsent />
+                <CrispWidget />
+              </ErrorBoundary>
+            </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

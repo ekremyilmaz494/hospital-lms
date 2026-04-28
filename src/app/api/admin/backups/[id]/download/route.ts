@@ -5,7 +5,7 @@ import { getAuthUserStrict, requireRole, errorResponse } from '@/lib/api-helpers
 import { decryptBackup } from '@/app/api/admin/backups/route'
 import { logger } from '@/lib/logger'
 
-export async function GET( // perf-check-disable-line — dosya indirme, Cache-Control gereksiz
+export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -30,6 +30,7 @@ export async function GET( // perf-check-disable-line — dosya indirme, Cache-C
   const headers = {
     'Content-Type': 'application/json',
     'Content-Disposition': `attachment; filename="yedek-${dateStr}.json"`,
+    'Cache-Control': 'private, no-store',
   }
 
   // S3'te kayıtlı yedek — S3'ten indir + decrypt

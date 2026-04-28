@@ -170,7 +170,10 @@ const finalConfig = withPWA(nextConfig);
 // Sentry webpack wrapper dev mode'da `reactComponentAnnotation` babel transform'u
 // uzerinden her React component'e source-location enjekte eder; buyuk client
 // component'lerde (1000+ satir) her compile'da ussel yavaslamaya yol acar.
-// Prod gozlemlenebilirlik icin hâlâ production build'de tam aktif.
+// Prod build'de de her component'i sarmalamak hydrate suresini ve bundle'i sisirir;
+// SENTRY_REACT_ANNOTATION=1 ile sadece staging'de acik tutulabilir.
+const sentryAnnotationEnabled = process.env.SENTRY_REACT_ANNOTATION === '1';
+
 export default process.env.NODE_ENV === 'development'
   ? finalConfig
   : withSentryConfig(finalConfig, {
@@ -180,7 +183,7 @@ export default process.env.NODE_ENV === 'development'
       silent: !process.env.CI,
       widenClientFileUpload: true,
       tunnelRoute: '/monitoring',
-      reactComponentAnnotation: { enabled: true },
+      reactComponentAnnotation: { enabled: sentryAnnotationEnabled },
       sourcemaps: { deleteSourcemapsAfterUpload: true },
       automaticVercelMonitors: false,
       disableLogger: true,
