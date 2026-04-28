@@ -11,7 +11,7 @@ interface QuestionResult {
   isCorrect: boolean;
 }
 
-const COUNTDOWN_SECONDS = 60;
+const COUNTDOWN_SECONDS = 10;
 
 function TransitionContent() {
   const router = useRouter();

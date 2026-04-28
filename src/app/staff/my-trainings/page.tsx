@@ -80,7 +80,7 @@ function splitDate(deadline?: string): { day: string; month: string } {
 
 export default function MyTrainingsPage() {
   const { data: rawData, isLoading, error } =
-    useFetch<{ data: Training[] } | Training[]>('/api/staff/my-trainings');
+    useFetch<{ data: Training[] } | Training[]>('/api/staff/my-trainings?limit=100');
   const [activeTab, setActiveTab] = useState<'trainings' | 'exams'>('trainings');
 
   const allItems: Training[] = useMemo(

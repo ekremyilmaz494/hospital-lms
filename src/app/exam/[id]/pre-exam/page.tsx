@@ -100,7 +100,12 @@ export default function PreExamPage() {
 
         if (!cancelled) setAttemptId(attempt?.id ?? null);
 
-        const qRes = await fetch(`/api/exam/${id}/questions?phase=pre`);
+        const [qRes, timerRawRes] = await Promise.all([
+          fetch(`/api/exam/${id}/questions?phase=pre`),
+          attempt?.id
+            ? fetch(`/api/exam/${attempt.id}/timer`, { method: 'POST' })
+            : Promise.resolve(null),
+        ]);
         if (!qRes.ok) {
           const errData = await qRes.json().catch(() => ({}));
           if (!cancelled) setError(errData.error || 'Sorular yüklenemedi');
@@ -110,20 +115,15 @@ export default function PreExamPage() {
         if (!cancelled) {
           setExamData(data);
 
-          if (attempt?.id) {
-            try {
-              const timerRes = await fetch(`/api/exam/${attempt.id}/timer`, { method: 'POST' });
-              const timerData = await timerRes.json();
-              const remaining = timerData.remainingSeconds ?? data.totalTime;
-              if (remaining <= 0) {
-                if (!cancelled) setError('Sınav süresi dolmuş. Lütfen sınavı tekrar başlatın.');
-                return;
-              }
-              setTimeLeft(remaining);
-            } catch {
-              setTimeLeft(data.totalTime);
+          try {
+            const timerData = timerRawRes ? await timerRawRes.json() : null;
+            const remaining = timerData?.remainingSeconds ?? data.totalTime;
+            if (timerRawRes && remaining <= 0) {
+              if (!cancelled) setError('Sınav süresi dolmuş. Lütfen sınavı tekrar başlatın.');
+              return;
             }
-          } else {
+            setTimeLeft(remaining);
+          } catch {
             setTimeLeft(data.totalTime);
           }
 

@@ -53,6 +53,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           videoProgress: { select: { videoId: true, isCompleted: true } },
         },
         orderBy: { attemptNumber: 'desc' },
+        take: 1,
       },
     },
   })
@@ -86,6 +87,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             videoProgress: { select: { videoId: true, isCompleted: true } },
           },
           orderBy: { attemptNumber: 'desc' },
+          take: 1,
         },
       },
     })
@@ -103,7 +105,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   })
 
   const t = assignment.training
-  const latestAttempt = assignment.examAttempts[0] // highest attemptNumber (desc sort)
+  const latestAttempt = assignment.examAttempts[0] // only attempt fetched (desc take:1)
 
   // ═══ STATE DETECTION ═══
   // 4 possible states:
@@ -164,9 +166,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     (activeAttemptForVideos?.videoProgress ?? []).map(vp => [vp.videoId, vp])
   )
 
-  // Pre-exam score from first attempt
-  const firstAttempt = assignment.examAttempts[assignment.examAttempts.length - 1]
-  const preExamScore = firstAttempt?.preExamScore ? Number(firstAttempt.preExamScore) : undefined
+  // Pre-exam score: only meaningful if this is a retry (attempt > 1).
+  // Fetch the first attempt's score separately to avoid pulling all history.
+  const firstAttemptData = (latestAttempt && latestAttempt.attemptNumber > 1)
+    ? await prisma.examAttempt.findFirst({
+        where: { assignmentId: assignment.id, attemptNumber: 1 },
+        select: { preExamScore: true },
+      })
+    : latestAttempt ?? null
+  const preExamScore = firstAttemptData?.preExamScore ? Number(firstAttemptData.preExamScore) : undefined
 
   // Son deneme puanı (retry banner'da gösterilecek)
   const lastAttemptScore = latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : undefined
