@@ -524,15 +524,44 @@ export default function TrainingDetailPage() {
                                 className="overflow-hidden"
                               >
                                 <div className="px-6 pb-6 pt-2">
-                                  <div className="mx-auto rounded-xl overflow-hidden" style={{ maxWidth: '640px', background: '#000', boxShadow: '0 4px 24px rgba(0,0,0,0.4)' }}>
-                                    <video
-                                      key={videoKey}
-                                      src={v.videoUrl}
-                                      controls
-                                      className="w-full"
-                                      style={{ aspectRatio: '16/9', display: 'block' }}
-                                    />
-                                  </div>
+                                  {!v.videoUrl ? (
+                                    <div
+                                      className="mx-auto rounded-xl px-6 py-8 text-center"
+                                      style={{ maxWidth: '640px', background: K.BG, border: `1px dashed ${K.BORDER}`, color: K.TEXT_MUTED }}
+                                    >
+                                      <p className="text-sm font-medium" style={{ color: K.TEXT_PRIMARY }}>İçerik şu anda yüklenemiyor</p>
+                                      <p className="text-xs mt-1">İçerik dosyası bulunamadı veya bağlantı oluşturulamadı. Lütfen yöneticiye haber verin.</p>
+                                    </div>
+                                  ) : v.contentType === 'pdf' ? (
+                                    <div className="mx-auto rounded-xl overflow-hidden" style={{ maxWidth: '720px', background: '#fff', boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }}>
+                                      <iframe
+                                        key={videoKey}
+                                        src={v.videoUrl}
+                                        className="w-full"
+                                        style={{ aspectRatio: '4/5', display: 'block', border: 'none' }}
+                                        title={v.title}
+                                      />
+                                    </div>
+                                  ) : v.contentType === 'audio' ? (
+                                    <div className="mx-auto rounded-xl px-5 py-4" style={{ maxWidth: '640px', background: K.BG, border: `1px solid ${K.BORDER}` }}>
+                                      <audio
+                                        key={videoKey}
+                                        src={v.videoUrl}
+                                        controls
+                                        className="w-full"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="mx-auto rounded-xl overflow-hidden" style={{ maxWidth: '640px', background: '#000', boxShadow: '0 4px 24px rgba(0,0,0,0.4)' }}>
+                                      <video
+                                        key={videoKey}
+                                        src={v.videoUrl}
+                                        controls
+                                        className="w-full"
+                                        style={{ aspectRatio: '16/9', display: 'block' }}
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                               </motion.div>
                             )}

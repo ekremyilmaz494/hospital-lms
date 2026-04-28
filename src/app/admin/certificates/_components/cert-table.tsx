@@ -62,6 +62,7 @@ export function CertTable({ certificates, onSelect, showTrainingColumn = true }:
           <th className="px-4 py-3 text-left" style={headerCellStyle}>Sertifika Kodu</th>
           <th className="px-4 py-3 text-left" style={headerCellStyle}>Puan</th>
           <th className="px-4 py-3 text-left" style={headerCellStyle}>Veriliş Tarihi</th>
+          <th className="px-4 py-3 text-left" style={headerCellStyle}>Son Geçerlilik</th>
           <th className="px-4 py-3 text-left" style={headerCellStyle}>Durum</th>
           <th className="px-4 py-3 text-right" style={headerCellStyle}>İşlem</th>
         </tr>
@@ -147,6 +148,21 @@ export function CertTable({ certificates, onSelect, showTrainingColumn = true }:
                   <Calendar className="h-3 w-3" style={{ color: K.TEXT_MUTED }} />
                   <span className="font-mono text-[12px]" style={{ color: K.TEXT_SECONDARY }}>{formatDate(cert.issuedAt)}</span>
                 </div>
+              </td>
+              <td className="px-4 py-3.5">
+                {cert.expiresAt ? (
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-3 w-3" style={{ color: cert.isExpired ? K.ERROR : isExpiring ? K.WARNING : K.TEXT_MUTED }} />
+                    <span
+                      className="font-mono text-[12px]"
+                      style={{ color: cert.isExpired ? K.ERROR : isExpiring ? '#b45309' : K.TEXT_SECONDARY, fontWeight: cert.isExpired || isExpiring ? 600 : 400 }}
+                    >
+                      {formatDate(cert.expiresAt)}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-[12px]" style={{ color: K.TEXT_MUTED }}>—</span>
+                )}
               </td>
               <td className="px-4 py-3.5">
                 {cert.isRevoked ? (

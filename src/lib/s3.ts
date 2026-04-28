@@ -79,12 +79,23 @@ export async function getStreamUrl(key: string) {
 
   // CloudFront configured with signing keys → signed URL
   if (cfUrl && keyPairId && privateKey) {
-    return getCloudfrontSignedUrl({
-      url: cfUrl,
-      keyPairId,
-      privateKey: privateKey.replace(/\\n/g, '\n'),
-      dateLessThan: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-    })
+    const formattedKey = privateKey.replace(/\\n/g, '\n')
+    // PEM marker yoksa key bozuk; throw etmek yerine unsigned URL'e fallback (CloudFront public ise yine çalışır)
+    if (!formattedKey.includes('BEGIN') || !formattedKey.includes('END')) {
+      logger.warn('cf-key-invalid', 'AWS_CLOUDFRONT_PRIVATE_KEY PEM markerları içermiyor; unsigned URL kullanılıyor')
+      return cfUrl
+    }
+    try {
+      return getCloudfrontSignedUrl({
+        url: cfUrl,
+        keyPairId,
+        privateKey: formattedKey,
+        dateLessThan: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      })
+    } catch (err) {
+      logger.warn('cf-sign-failed', `CloudFront imzalama başarısız (${key}); unsigned URL'e fallback`, err)
+      return cfUrl
+    }
   }
 
   // CloudFront configured but no signing keys → direct URL (public distribution)

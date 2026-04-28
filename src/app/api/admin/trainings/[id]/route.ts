@@ -69,9 +69,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (!training) return errorResponse('Training not found', 404)
 
-  // S3 URL generation (parallel)
+  // S3 URL generation (parallel) — per-video try/catch: tek bir video sign hatası
+  // tüm Promise.all'ı çökertmesin, diğer videolar yine erişilebilir olsun.
   const streamUrls = await Promise.all(
-    training.videos.map(v => (v.videoKey ? getStreamUrl(v.videoKey) : Promise.resolve(null)))
+    training.videos.map(async (v) => {
+      if (!v.videoKey) return null
+      try {
+        return await getStreamUrl(v.videoKey)
+      } catch (err) {
+        console.error('[trainings/[id]] getStreamUrl failed', { videoId: v.id, err })
+        return null
+      }
+    }),
   )
 
   // Assignment stats from groupBy

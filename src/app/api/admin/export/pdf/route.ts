@@ -242,8 +242,9 @@ type CertListItem = {
   attempt: { postExamScore: { toString: () => string } | null; attemptNumber: number }
 }
 
-function renderCertificateListPdf(certs: CertListItem[], orgName: string, trainingId?: string): Response {
+async function renderCertificateListPdf(certs: CertListItem[], orgName: string, trainingId?: string): Promise<Response> {
   const doc = new jsPDF()
+  await applyTurkishFont(doc)
   const pageWidth = doc.internal.pageSize.getWidth()
   const now = new Date()
 

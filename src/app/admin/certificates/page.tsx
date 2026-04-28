@@ -106,7 +106,10 @@ export default function CertificatesPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              aria-label="Sertifikaları dışa aktar"
+              aria-label="Sertifikaları PDF özet listesi olarak indir"
+              title={filtersActive
+                ? 'Mevcut filtrelere uyan sertifikaların özet PDF listesini indirir'
+                : 'Tüm sertifikaların özet PDF listesini indirir'}
               disabled={isPending('all')}
               className="k-btn k-btn-primary"
               onClick={() => downloadAll(filters)}
@@ -116,7 +119,7 @@ export default function CertificatesPage() {
               ) : (
                 <Download size={15} />
               )}
-              Dışa Aktar{filtersActive ? ' (Filtreli)' : ''}
+              Liste İndir (PDF){filtersActive ? ' · Filtreli' : ''}
             </button>
           </div>
         </header>
