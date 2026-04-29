@@ -1,16 +1,11 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { inspectionReportQuerySchema } from '@/lib/validations'
 import { resolveRequiredPointsBulk } from '@/lib/smg-helpers'
 import type { UserRole } from '@/types/database'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const parsed = inspectionReportQuerySchema.safeParse({
     periodId: searchParams.get('periodId') ?? undefined,
@@ -21,7 +16,7 @@ export async function GET(request: Request) {
   })
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const orgId = dbUser!.organizationId!
+  const orgId = organizationId
   const { periodId, startDate, endDate, departmentId } = parsed.data
 
   // Dönem veya custom range
@@ -205,4 +200,4 @@ export async function GET(request: Request) {
     200,
     { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' }
   )
-}
+}, { requireOrganization: true })

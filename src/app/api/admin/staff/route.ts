@@ -1,7 +1,8 @@
 import { randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, checkWritePermission } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination, ApiError } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createUserSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
@@ -11,19 +12,13 @@ import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
 import type { UserRole } from '@/types/database'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
+  const orgId = organizationId
   const { searchParams } = new URL(request.url)
   const { page, limit, search, skip } = safePagination(searchParams)
   const department = searchParams.get('department')
   const isActive = searchParams.get('isActive')
 
-  const orgId = dbUser!.organizationId!
   const cacheKey = `cache:${orgId}:staff:${page}:${limit}:${search}:${department || ''}:${isActive || ''}`
 
   const data = await withCache(cacheKey, 120, async () => {
@@ -127,17 +122,10 @@ export async function GET(request: Request) {
     200,
     { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
   )
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const writeBlock = await checkWritePermission(dbUser!.organizationId!, 'POST')
-  if (writeBlock) return writeBlock
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
+  const orgId = organizationId
 
   // IP bazlı rate limit: 50 oluşturma / 1 saat
   const ip = request.headers.get('x-vercel-forwarded-for') || request.headers.get('x-forwarded-for') || 'unknown'
@@ -150,9 +138,9 @@ export async function POST(request: Request) {
   }
 
   const body = await parseBody(request)
-  if (!body) return errorResponse('Geçersiz istek verisi')
+  if (!body) throw new ApiError('Geçersiz istek verisi', 400)
 
-  const parsed = createUserSchema.safeParse({ ...body as object, role: 'staff', organizationId: dbUser!.organizationId! })
+  const parsed = createUserSchema.safeParse({ ...body as object, role: 'staff', organizationId: orgId })
   if (!parsed.success) {
     logger.error('Admin Staff', 'Validation failed', parsed.error.issues)
     const msg = parsed.error.issues.map(i => {
@@ -169,14 +157,12 @@ export async function POST(request: Request) {
   }
 
   // B4.2/G4.2 — Cross-tenant departman kontrolü: departmentId bu organizasyona ait olmalı
-  let resolvedDeptName: string | undefined = parsed.data.department
   if (parsed.data.departmentId) {
     const dept = await prisma.department.findFirst({
-      where: { id: parsed.data.departmentId, organizationId: dbUser!.organizationId! },
+      where: { id: parsed.data.departmentId, organizationId: orgId },
       select: { name: true },
     })
     if (!dept) return errorResponse('Geçersiz departman — bu departman organizasyonunuza ait değil', 400)
-    resolvedDeptName = dept.name
   }
 
   // Şifre opsiyonel — boş gelirse güvenli şifre üret (mail ile personele gönderilecek)
@@ -191,7 +177,7 @@ export async function POST(request: Request) {
       firstName: parsed.data.firstName,
       lastName: parsed.data.lastName,
       role: 'staff',
-      organizationId: dbUser!.organizationId!,
+      organizationId: orgId,
       phone: parsed.data.phone,
       departmentId: parsed.data.departmentId,
       title: parsed.data.title,
@@ -211,25 +197,22 @@ export async function POST(request: Request) {
 
   const user = result.dbUser
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'create',
     entityType: 'user',
     entityId: user.id,
     newData: user,
-    request,
   })
 
   revalidatePath('/admin/staff')
 
-  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
-  try { await invalidateOrgCache(dbUser!.organizationId!, 'staff') } catch {}
+  try { await invalidateDashboardCache(orgId) } catch { /* cache invalidation best-effort */ }
+  try { await invalidateOrgCache(orgId, 'staff') } catch { /* cache invalidation best-effort */ }
 
   // Hoş geldiniz maili — fire-and-forget, hesap oluşumunu bloklamaz
   try {
     const org = await prisma.organization.findUnique({
-      where: { id: dbUser!.organizationId! },
+      where: { id: orgId },
       select: { name: true },
     })
     await sendStaffWelcomeEmail({
@@ -244,4 +227,4 @@ export async function POST(request: Request) {
   }
 
   return jsonResponse(user, 201)
-}
+}, { requireOrganization: true })

@@ -1,18 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { updateSmgPeriodSchema } from '@/lib/validations'
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
@@ -21,12 +13,12 @@ export async function PATCH(
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const period = await prisma.smgPeriod.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
   })
 
   if (!period) return errorResponse('Dönem bulunamadı', 404)
 
-  const orgId = dbUser!.organizationId!
+  const orgId = organizationId
   const updateData: Record<string, unknown> = {}
   if (parsed.data.name !== undefined) updateData.name = parsed.data.name
   if (parsed.data.startDate !== undefined) updateData.startDate = new Date(parsed.data.startDate)
@@ -79,34 +71,22 @@ export async function PATCH(
     })
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'UPDATE',
     entityType: 'SmgPeriod',
     entityId: id,
     oldData: period,
     newData: updated,
-    request,
   })
 
   return jsonResponse(updated)
-}
+}, { requireOrganization: true })
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const DELETE = withAdminRoute<{ id: string }>(async ({ params, organizationId, audit }) => {
+  const { id } = params
 
   const period = await prisma.smgPeriod.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
   })
 
   if (!period) return errorResponse('Dönem bulunamadı', 404)
@@ -114,7 +94,7 @@ export async function DELETE(
   // Check if any activities are linked to this period's date range
   const linkedActivities = await prisma.smgActivity.count({
     where: {
-      organizationId: dbUser!.organizationId!,
+      organizationId,
       completionDate: {
         gte: period.startDate,
         lte: period.endDate,
@@ -131,18 +111,15 @@ export async function DELETE(
     )
   }
 
-  const deleted = await prisma.smgPeriod.deleteMany({ where: { id, organizationId: dbUser!.organizationId! } })
+  const deleted = await prisma.smgPeriod.deleteMany({ where: { id, organizationId } })
   if (deleted.count === 0) return errorResponse('Donem bulunamadi veya yetkiniz yok', 404)
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'DELETE',
     entityType: 'SmgPeriod',
     entityId: id,
     oldData: period,
-    request,
   })
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

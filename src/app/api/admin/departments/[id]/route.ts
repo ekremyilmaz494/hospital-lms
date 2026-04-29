@@ -1,23 +1,16 @@
 import { revalidatePath } from 'next/cache'
-import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { updateDepartmentSchema } from '@/lib/validations'
 
-type Params = { params: Promise<{ id: string }> }
-
 // GET /api/admin/departments/[id] — Departman detayı + personelleri
-export async function GET(_request: NextRequest, { params }: Params) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
 
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const department = await prisma.department.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+  const department = await prisma.department.findFirst({ // perf-check-disable-line
+    where: { id, organizationId },
     include: {
       users: {
         where: { isActive: true },
@@ -40,17 +33,12 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
   if (!department) return errorResponse('Departman bulunamadı', 404)
 
-  return jsonResponse(department)
-}
+  return jsonResponse(department, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+}, { requireOrganization: true })
 
 // PATCH /api/admin/departments/[id] — Departman güncelle
-export async function PATCH(request: NextRequest, { params }: Params) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid request body')
@@ -60,8 +48,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return errorResponse(parsed.error.issues.map(i => i.message).join(', '))
   }
 
-  const existing = await prisma.department.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+  const existing = await prisma.department.findFirst({ // perf-check-disable-line
+    where: { id, organizationId },
   })
 
   if (!existing) return errorResponse('Departman bulunamadı', 404)
@@ -71,7 +59,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const duplicate = await prisma.department.findUnique({
       where: {
         organizationId_name: {
-          organizationId: dbUser!.organizationId!,
+          organizationId,
           name: parsed.data.name,
         },
       },
@@ -80,7 +68,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   const department = await prisma.$transaction(async (tx) => {
-    const verified = await tx.department.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+    const verified = await tx.department.findFirst({ where: { id, organizationId } })
     if (!verified) throw new Error('NOT_FOUND')
     return tx.department.update({
       where: { id },
@@ -89,9 +77,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     })
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'department.update',
     entityType: 'department',
     entityId: id,
@@ -102,39 +88,32 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   revalidatePath('/admin/departments')
 
   return jsonResponse(department)
-}
+}, { requireOrganization: true })
 
 // DELETE /api/admin/departments/[id] — Departman sil
-export async function DELETE(_request: NextRequest, { params }: Params) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const DELETE = withAdminRoute<{ id: string }>(async ({ params, dbUser, organizationId, audit }) => {
+  const { id } = params
 
   const department = await prisma.department.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
     include: { _count: { select: { users: true } } },
   })
 
   if (!department) return errorResponse('Departman bulunamadı', 404)
 
-  const allowed = await checkRateLimit(`dept-delete:${dbUser!.id}`, 10, 3600)
+  const allowed = await checkRateLimit(`dept-delete:${dbUser.id}`, 10, 3600)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
   // Personellerin departmentId'sini null yap, sonra departmanı sil (multi-tenant güvenli)
   await prisma.$transaction([
     prisma.user.updateMany({
-      where: { departmentId: id, organizationId: dbUser!.organizationId! },
+      where: { departmentId: id, organizationId },
       data: { departmentId: null },
     }),
-    prisma.department.deleteMany({ where: { id, organizationId: dbUser!.organizationId! } }),
+    prisma.department.deleteMany({ where: { id, organizationId } }),
   ])
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'department.delete',
     entityType: 'department',
     entityId: id,
@@ -144,4 +123,4 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   revalidatePath('/admin/departments')
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

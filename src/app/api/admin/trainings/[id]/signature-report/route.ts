@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 
 function formatDate(d: Date | string | null | undefined): string {
   if (!d) return '-'
@@ -22,16 +23,11 @@ const SUCCESS_BG = [220, 252, 231] as [number, number, number]
 const WARN_BG    = [254, 243, 199] as [number, number, number]
 const ERROR_BG   = [254, 226, 226] as [number, number, number]
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
 
   const training = await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId: organizationId },
     select: {
       title: true,
       category: true,
@@ -381,4 +377,4 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       'Cache-Control': 'no-store',
     },
   })
-}
+}, { requireOrganization: true })

@@ -1,4 +1,5 @@
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { generateAccreditationReport } from '@/lib/accreditation'
 import type { StandardBody } from '@/lib/accreditation'
 import { z } from 'zod/v4'
@@ -10,13 +11,7 @@ const generateSchema = z.object({
 })
 
 /** POST /api/admin/accreditation/reports/generate */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek verisi')
 
@@ -24,8 +19,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message ?? 'Geçersiz veri')
 
   const { standardBody, periodStart, periodEnd } = parsed.data
-  const orgId = dbUser!.organizationId!
-  const userId = dbUser!.id
+  const userId = dbUser.id
 
   const start = new Date(periodStart)
   const end = new Date(periodEnd)
@@ -34,16 +28,14 @@ export async function POST(request: Request) {
 
   try {
     const report = await generateAccreditationReport({
-      organizationId: orgId,
+      organizationId,
       standardBody: standardBody as StandardBody,
       periodStart: start,
       periodEnd: end,
       generatedBy: userId,
     })
 
-    await createAuditLog({
-      userId,
-      organizationId: orgId,
+    await audit({
       action: 'accreditation_report_generated',
       entityType: 'accreditation_report',
       entityId: report.reportId,
@@ -55,4 +47,4 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : 'Rapor oluşturulamadı'
     return errorResponse(message, 500)
   }
-}
+}, { requireOrganization: true })

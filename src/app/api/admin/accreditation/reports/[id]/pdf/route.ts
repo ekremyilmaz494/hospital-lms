@@ -1,4 +1,5 @@
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { buildReportContext } from '@/lib/pdf/aggregate'
 import { buildAccreditationPDF } from '@/lib/pdf/build-report'
 
@@ -10,20 +11,10 @@ import { buildAccreditationPDF } from '@/lib/pdf/build-report'
  *
  * Tüm veri toplama `buildReportContext`, tüm render `buildAccreditationPDF` içinde.
  */
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
 
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
-  const orgId = dbUser!.organizationId!
-
-  const ctx = await buildReportContext(id, orgId)
+  const ctx = await buildReportContext(id, organizationId)
   if (!ctx) return errorResponse('Rapor bulunamadı', 404)
 
   const doc = buildAccreditationPDF(ctx)
@@ -38,4 +29,4 @@ export async function GET(
       'Cache-Control': 'private, no-store',
     },
   })
-}
+}, { requireOrganization: true })

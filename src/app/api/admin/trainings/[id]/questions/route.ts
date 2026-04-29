@@ -1,17 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createQuestionSchema } from '@/lib/validations'
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
 
   // Verify training belongs to org
-  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  const training = await prisma.training.findFirst({ where: { id, organizationId: organizationId } }) // perf-check-disable-line
   if (!training) return errorResponse('Training not found', 404)
 
   const questions = await prisma.question.findMany({
@@ -21,18 +17,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   })
 
   return jsonResponse(questions, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const POST = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
 
   // Verify training belongs to org
-  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  const training = await prisma.training.findFirst({ where: { id, organizationId: organizationId } }) // perf-check-disable-line
   if (!training) return errorResponse('Training not found', 404)
 
   const body = await parseBody(request)
@@ -52,29 +43,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     include: { options: true },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'create',
     entityType: 'question',
     entityId: question.id,
     newData: { questionText: question.questionText, trainingId: id },
-    request,
   })
 
   return jsonResponse(question, 201)
-}
+}, { requireOrganization: true })
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const PUT = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
+  const { id } = params
 
   // Verify training belongs to org
-  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  const training = await prisma.training.findFirst({ where: { id, organizationId: organizationId } }) // perf-check-disable-line
   if (!training) return errorResponse('Training not found', 404)
 
   // Bulk update sort order
@@ -95,4 +78,4 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

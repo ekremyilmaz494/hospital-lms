@@ -1,19 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withApiHandler, withAdminRoute } from '@/lib/api-handler'
 import { createSmgCategorySchema } from '@/lib/validations'
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  // Hem admin hem staff kategorileri okuyabilmeli (staff aktivite ekleme dropdown'u)
-  const roleError = requireRole(dbUser!.role, ['admin', 'staff', 'super_admin'])
-  if (roleError) return roleError
-
-  const isStaff = dbUser!.role === 'staff'
+// Hem admin hem staff kategorileri okuyabilmeli (staff aktivite ekleme dropdown'u)
+export const GET = withApiHandler(async ({ dbUser, organizationId }) => {
+  const isStaff = dbUser.role === 'staff'
   const categories = await prisma.smgCategory.findMany({
     where: {
-      organizationId: dbUser!.organizationId!,
+      organizationId,
       ...(isStaff ? { isActive: true } : {}),
     },
     orderBy: { sortOrder: 'asc' },
@@ -33,15 +28,9 @@ export async function GET() {
     200,
     { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' }
   )
-}
+}, { roles: ['admin', 'staff', 'super_admin'], requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
@@ -49,14 +38,14 @@ export async function POST(request: Request) {
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const existing = await prisma.smgCategory.findFirst({
-    where: { organizationId: dbUser!.organizationId!, code: parsed.data.code },
+    where: { organizationId, code: parsed.data.code },
     select: { id: true },
   })
   if (existing) return errorResponse('Bu kod ile bir kategori zaten mevcut', 409)
 
   const category = await prisma.smgCategory.create({
     data: {
-      organizationId: dbUser!.organizationId!,
+      organizationId,
       name: parsed.data.name,
       code: parsed.data.code,
       description: parsed.data.description,
@@ -66,15 +55,12 @@ export async function POST(request: Request) {
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'CREATE',
     entityType: 'SmgCategory',
     entityId: category.id,
     newData: category,
-    request,
   })
 
   return jsonResponse(category, 201)
-}
+}, { requireOrganization: true })

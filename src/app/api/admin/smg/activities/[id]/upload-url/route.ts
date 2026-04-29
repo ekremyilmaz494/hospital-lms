@@ -1,21 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getUploadUrl } from '@/lib/s3'
 import { logger } from '@/lib/logger'
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const POST = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
 
   const body = await parseBody<{ filename: string; contentType: string }>(request)
   if (!body || !body.filename || !body.contentType) {
@@ -27,13 +19,13 @@ export async function POST(
   }
 
   const activity = await prisma.smgActivity.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
     select: { id: true },
   })
   if (!activity) return errorResponse('Aktivite bulunamadı', 404)
 
   const safeFilename = body.filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
-  const key = `smg/${dbUser!.organizationId}/${id}/${Date.now()}-${safeFilename}`
+  const key = `smg/${organizationId}/${id}/${Date.now()}-${safeFilename}`
 
   // DB güncellemesi presigned URL üretiminden önce yapılır.
   // Böylece DB hata verirse client'a asla kullanılacak URL verilmez
@@ -50,15 +42,12 @@ export async function POST(
 
   const uploadUrl = await getUploadUrl(key, body.contentType)
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'UPDATE',
     entityType: 'SmgActivity',
     entityId: id,
     newData: { certificateUrl: key },
-    request,
   })
 
   return jsonResponse({ uploadUrl, key }, 200, { 'Cache-Control': 'no-store' })
-}
+}, { requireOrganization: true })

@@ -1,18 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { approveSmgActivitySchema } from '@/lib/validations'
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const PUT = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const { id } = params
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
@@ -21,7 +13,7 @@ export async function PUT(
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const activity = await prisma.smgActivity.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
   })
 
   if (!activity) return errorResponse('Aktivite bulunamadı', 404)
@@ -38,7 +30,7 @@ export async function PUT(
     where: { id },
     data: {
       approvalStatus: parsed.data.status,
-      approvedBy: dbUser!.id,
+      approvedBy: dbUser.id,
       approvedAt: new Date(),
       ...(parsed.data.status === 'REJECTED' && parsed.data.rejectionReason
         ? { rejectionReason: parsed.data.rejectionReason }
@@ -46,16 +38,13 @@ export async function PUT(
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: parsed.data.status === 'APPROVED' ? 'APPROVE' : 'REJECT',
     entityType: 'SmgActivity',
     entityId: id,
     oldData: { approvalStatus: activity.approvalStatus },
     newData: { approvalStatus: parsed.data.status },
-    request,
   })
 
   return jsonResponse(updated)
-}
+}, { requireOrganization: true })
