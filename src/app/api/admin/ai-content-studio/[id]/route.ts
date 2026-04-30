@@ -2,24 +2,20 @@
  * DELETE /api/admin/ai-content-studio/[id] — generation sil (DB + S3).
  */
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { deleteObject } from '@/lib/s3'
 import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const DELETE = withAdminRoute<{ id: string }>(async ({ params, dbUser, organizationId, audit }) => {
+  const { id } = params
 
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`ai-delete:${dbUser!.id}`, 30, 3600)
+  const allowed = await checkRateLimit(`ai-delete:${dbUser.id}`, 30, 3600)
   if (!allowed) return errorResponse('Çok fazla silme isteği.', 429)
 
   const gen = await prisma.aiGeneration.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
     select: { id: true, s3Key: true, sourceFiles: true, artifactType: true },
   })
   if (!gen) return errorResponse('Üretim bulunamadı.', 404)
@@ -47,9 +43,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   await prisma.aiGeneration.delete({ where: { id } })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'ai_generation_delete',
     entityType: 'ai_generation',
     entityId: id,
@@ -57,4 +51,4 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   })
 
   return jsonResponse({ ok: true })
-}
+}, { requireOrganization: true })

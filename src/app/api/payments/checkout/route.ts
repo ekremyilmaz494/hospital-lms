@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createCheckoutForm } from '@/lib/iyzico'
 import { logger } from '@/lib/logger'
 
@@ -8,38 +9,28 @@ import { logger } from '@/lib/logger'
  * Iyzico checkout form başlatır — admin abonelik ödemesi için
  * Body: { planId: string, billingCycle: 'monthly' | 'annual' }
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   const body = await parseBody<{ planId: string; billingCycle: 'monthly' | 'annual' }>(request)
   if (!body?.planId || !body?.billingCycle) {
     return errorResponse('planId ve billingCycle zorunlu')
   }
 
-  const orgId = dbUser!.organizationId!
+  const orgId = organizationId
 
-  // Plan bilgilerini al
   const plan = await prisma.subscriptionPlan.findUnique({ where: { id: body.planId } })
   if (!plan || !plan.isActive) return errorResponse('Plan bulunamadı', 404)
 
   const price = body.billingCycle === 'annual' ? plan.priceAnnual : plan.priceMonthly
   if (!price || Number(price) <= 0) return errorResponse('Bu plan için fiyat tanımlanmamış')
 
-  // Organization bilgileri
   const org = await prisma.organization.findUnique({ where: { id: orgId } })
   if (!org) return errorResponse('Organizasyon bulunamadı', 404)
 
-  // Aktif abonelik kontrolu
   const subscription = await prisma.organizationSubscription.findUnique({ where: { organizationId: orgId } })
   if (!subscription) return errorResponse('Aktif abonelik bulunamadı. Lütfen önce bir plan seçiniz.', 404)
 
   const conversationId = `SUB-${orgId.slice(0, 8)}-${Date.now()}`
 
-  // Ödeme kaydı oluştur (pending)
   const payment = await prisma.payment.create({
     data: {
       subscriptionId: subscription.id,
@@ -64,10 +55,10 @@ export async function POST(request: Request) {
       callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/callback`,
       enabledInstallments: [1, 2, 3, 6],
       buyer: {
-        id: dbUser!.id,
-        name: dbUser!.firstName,
-        surname: dbUser!.lastName,
-        email: dbUser!.email,
+        id: dbUser.id,
+        name: dbUser.firstName,
+        surname: dbUser.lastName,
+        email: dbUser.email,
         identityNumber: '11111111111',
         registrationAddress: org.address ?? 'Turkiye',
         ip: request.headers.get('x-forwarded-for') ?? '127.0.0.1',
@@ -97,14 +88,11 @@ export async function POST(request: Request) {
       ],
     })
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'payment.checkout.start',
       entityType: 'payment',
       entityId: payment.id,
       newData: { planId: plan.id, billingCycle: body.billingCycle, amount: Number(price) },
-      request,
     })
 
     return jsonResponse({
@@ -120,4 +108,4 @@ export async function POST(request: Request) {
     logger.error('Payment Checkout', 'Iyzico checkout baslatilamadi', (err as Error).message)
     return errorResponse('Ödeme formu oluşturulamadı. Lütfen tekrar deneyin.')
   }
-}
+}, { requireOrganization: true, strict: true })

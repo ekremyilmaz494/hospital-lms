@@ -1,24 +1,17 @@
 import { prisma } from '@/lib/prisma'
-import {
-  getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody,
-} from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { syncStaffFromHis, syncDepartmentsFromHis } from '@/lib/his-integration'
 import { hisSyncSchema } from '@/lib/validations'
 
 /** POST /api/admin/integrations/his/sync — Manuel senkronizasyon başlat */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId }) => {
   const body = await parseBody(request)
   const parsed = hisSyncSchema.safeParse(body ?? {})
   if (!parsed.success) return errorResponse('Geçersiz sync tipi')
 
   const integration = await prisma.hisIntegration.findFirst({
-    where: { organizationId: dbUser!.organizationId!, isActive: true },
+    where: { organizationId, isActive: true },
   })
 
   if (!integration) {
@@ -52,4 +45,4 @@ export async function POST(request: Request) {
   }
 
   return jsonResponse({ syncType, result })
-}
+}, { strict: true, requireOrganization: true })

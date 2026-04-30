@@ -1,17 +1,12 @@
-import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { prisma } from '@/lib/prisma'
 
 /**
  * PUT /api/auth/accept-terms
  * Sets termsAccepted=true and termsAcceptedAt=now() for the authenticated user.
  */
-export async function PUT() {
-  const { dbUser, error } = await getAuthUser()
-
-  if (error || !dbUser) {
-    return error ?? errorResponse('Yetkisiz erisim', 401)
-  }
-
+export const PUT = withStaffRoute(async ({ dbUser }) => {
   await prisma.user.update({
     where: { id: dbUser.id },
     data: {
@@ -21,4 +16,4 @@ export async function PUT() {
   })
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

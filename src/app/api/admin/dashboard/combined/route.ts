@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
@@ -338,16 +339,7 @@ async function fetchCerts(orgId: string) {
   return data
 }
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
-
+export const GET = withAdminRoute(async ({ organizationId: orgId }) => {
   // Her section bağımsız — biri hata verse diğerleri çalışır
   const [stats, charts, compliance, activity, certs] = await Promise.all([
     fetchStats(orgId).catch(err => { logger.error('Dashboard Combined', 'Stats hatası', err); return null }),
@@ -358,4 +350,4 @@ export async function GET() {
   ])
 
   return jsonResponse({ stats, charts, compliance, activity, certs }, 200, CACHE_HEADERS)
-}
+}, { requireOrganization: true })

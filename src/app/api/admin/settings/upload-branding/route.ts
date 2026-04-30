@@ -1,4 +1,5 @@
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { brandingKey, uploadBuffer } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 
@@ -6,17 +7,8 @@ const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'
 const MAX_LOGO_SIZE = 2 * 1024 * 1024 // 2MB
 const MAX_BANNER_SIZE = 5 * 1024 * 1024 // 5MB
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
-
-  const allowed = await checkRateLimit(`branding-upload:${dbUser!.id}`, 10, 3600)
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) => {
+  const allowed = await checkRateLimit(`branding-upload:${dbUser.id}`, 10, 3600)
   if (!allowed) return errorResponse('Çok fazla yükleme denemesi. 1 saat bekleyin.', 429)
 
   const formData = await request.formData().catch(() => null)
@@ -39,7 +31,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const key = brandingKey(orgId, type as 'logo' | 'login-banner', file.name)
+    const key = brandingKey(organizationId, type as 'logo' | 'login-banner', file.name)
     const buffer = Buffer.from(await file.arrayBuffer())
     await uploadBuffer(key, buffer, file.type)
 
@@ -55,4 +47,4 @@ export async function POST(request: Request) {
   } catch (err) {
     return errorResponse(err instanceof Error ? err.message : 'Yükleme hatası', 500)
   }
-}
+}, { requireOrganization: true, strict: true })

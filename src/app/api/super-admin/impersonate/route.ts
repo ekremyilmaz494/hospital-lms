@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, setCached } from '@/lib/redis'
 import { z } from 'zod/v4'
@@ -20,15 +21,9 @@ const impersonateSchema = z.object({
  * - The magic link expires in ~1 hour and is single-use
  * - The caller's tab remains authenticated; impersonation opens in a new tab
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   // Rate limit: max 10 impersonations per super-admin per hour
-  const rateLimitOk = await checkRateLimit(`impersonate:${dbUser!.id}`, 10, 3600)
+  const rateLimitOk = await checkRateLimit(`impersonate:${dbUser.id}`, 10, 3600)
   if (!rateLimitOk) return errorResponse('Çok fazla impersonation denemesi. Lütfen bir saat sonra tekrar deneyin.', 429)
 
   let body: { userId: string }
@@ -52,8 +47,8 @@ export async function POST(request: Request) {
   // İmpersonation bilgilerini kriptografik token ile Redis'te sakla (URL manipülasyonunu önle)
   const impersonationToken = randomUUID()
   await setCached(`impersonation:${impersonationToken}`, {
-    impersonatedBy: dbUser!.id,
-    impersonatorName: `${dbUser!.firstName} ${dbUser!.lastName}`,
+    impersonatedBy: dbUser.id,
+    impersonatorName: `${dbUser.firstName} ${dbUser.lastName}`,
     targetUserId: targetUser.id,
     createdAt: new Date().toISOString(),
   }, 3600) // 1 saat TTL — magic link ile aynı ömür
@@ -73,8 +68,7 @@ export async function POST(request: Request) {
   }
 
   // Audit log — always before returning the link
-  await createAuditLog({
-    userId: dbUser!.id,
+  await audit({
     action: 'impersonate',
     entityType: 'user',
     entityId: targetUser.id,
@@ -83,7 +77,6 @@ export async function POST(request: Request) {
       targetRole: targetUser.role,
       targetOrganizationId: targetUser.organizationId,
     },
-    request,
   })
 
   return jsonResponse({
@@ -95,4 +88,4 @@ export async function POST(request: Request) {
       role: targetUser.role,
     },
   })
-}
+})

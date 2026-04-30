@@ -1,12 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextResponse } from 'next/server'
 
-vi.mock('@/lib/api-helpers', () => ({
-  getAuthUser: vi.fn(),
-  requireRole: vi.fn(),
-  jsonResponse: vi.fn((data: unknown, status = 200) => Response.json(data, { status })),
-  errorResponse: vi.fn((msg: string, status = 400) => Response.json({ error: msg }, { status })),
-}))
+vi.mock('@/lib/api-helpers', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-helpers')>('@/lib/api-helpers')
+  return {
+    ...actual,
+    getAuthUser: vi.fn(),
+    getAuthUserStrict: vi.fn(),
+    requireRole: vi.fn(),
+    checkWritePermission: vi.fn().mockResolvedValue(null),
+    createAuditLog: vi.fn().mockResolvedValue(undefined),
+    jsonResponse: vi.fn((data: unknown, status = 200) => Response.json(data, { status })),
+    errorResponse: vi.fn((msg: string, status = 400) => Response.json({ error: msg }, { status })),
+  }
+})
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {

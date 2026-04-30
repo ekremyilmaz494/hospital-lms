@@ -1,23 +1,16 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { withCache } from '@/lib/redis'
 import { isTrainingAccessible } from '@/lib/training-helpers'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
+export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) => {
   try {
     const { searchParams } = new URL(request.url)
     const { page, limit, skip } = safePagination(searchParams)
-    const orgId = dbUser!.organizationId!
-    const userId = dbUser!.id
+    const orgId = organizationId
+    const userId = dbUser.id
     const cacheKey = `cache:${orgId}:certs:${userId}:${page}:${limit}`
 
     const data = await withCache(cacheKey, 600, async () => {
@@ -63,9 +56,9 @@ export async function GET(request: Request) {
       }
     })
 
-    return jsonResponse(data, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+    return jsonResponse(data, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
   } catch (err) {
     logger.error('Staff Certificates', 'Sertifikalar yüklenemedi', err)
     return errorResponse('Sertifikalar yüklenemedi', 503)
   }
-}
+}, { requireOrganization: true })

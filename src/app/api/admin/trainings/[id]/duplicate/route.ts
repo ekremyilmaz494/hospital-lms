@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
 /**
@@ -8,15 +9,9 @@ import { logger } from '@/lib/logger'
  * Mevcut bir eğitimi (video + sorularıyla birlikte) kopyalar.
  * Atamalar ve sınav denemeleri kopyalanmaz.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const POST = withAdminRoute<{ id: string }>(async ({ params, dbUser, organizationId, audit }) => {
+  const { id } = params
+  const orgId = organizationId
 
   try {
     // Kaynak eğitimi doğrula
@@ -49,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           complianceDeadline: source.complianceDeadline,
           regulatoryBody: source.regulatoryBody,
           renewalPeriodMonths: source.renewalPeriodMonths,
-          createdById: dbUser!.id,
+          createdById: dbUser.id,
         },
       })
 
@@ -100,14 +95,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return training
     })
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'duplicate',
       entityType: 'training',
       entityId: newTraining.id,
       newData: { sourceId: id, sourceTitle: source.title },
-      request,
     })
 
     return jsonResponse({ id: newTraining.id, title: newTraining.title }, 201)
@@ -115,4 +107,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     logger.error('Training Duplicate', 'Eğitim kopyalanamadı', err)
     return errorResponse('Eğitim kopyalanamadı', 500)
   }
-}
+}, { requireOrganization: true })

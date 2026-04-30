@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { jsPDF } from 'jspdf'
-import { NextRequest } from 'next/server'
 import { logActivity } from '@/lib/activity-logger'
 import { drawCertificatePage, type CertDrawData } from '@/lib/pdf/cert-design'
 import { applyTurkishFont } from '@/lib/pdf/helpers/font'
@@ -16,16 +16,8 @@ function formatDateTR(date: Date): string {
   })
 }
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
+  const { id } = params
 
   try {
     const certificate = await prisma.certificate.findUnique({
@@ -53,12 +45,12 @@ export async function GET(
       return errorResponse('Sertifika bulunamadı', 404)
     }
 
-    if (dbUser!.role === 'staff' && certificate.userId !== dbUser!.id) {
+    if (dbUser.role === 'staff' && certificate.userId !== dbUser.id) {
       return errorResponse('Bu sertifikaya erişim yetkiniz yok', 403)
     }
     if (
-      dbUser!.role === 'admin' &&
-      certificate.training.organizationId !== dbUser!.organizationId
+      dbUser.role === 'admin' &&
+      certificate.training.organizationId !== organizationId
     ) {
       return errorResponse('Bu sertifikaya erişim yetkiniz yok', 403)
     }
@@ -91,7 +83,7 @@ export async function GET(
     const fileName = `sertifika-${certificate.certificateCode}.pdf`
 
     void logActivity({
-      userId: dbUser!.id,
+      userId: dbUser.id,
       organizationId: certificate.user.organizationId ?? '',
       action: 'certificate_download',
       resourceType: 'certificate',
@@ -113,4 +105,4 @@ export async function GET(
     logger.error('Certificate PDF', 'PDF oluşturulamadı', err)
     return errorResponse('PDF oluşturulamadı', 500)
   }
-}
+}, { requireOrganization: true })

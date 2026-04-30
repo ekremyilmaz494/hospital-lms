@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
-import { jsonResponse, errorResponse, getAuthUser, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
 import { verifyOtp } from '@/lib/auth/sms-otp'
@@ -30,11 +31,7 @@ interface VerifyBody {
   rememberDevice?: unknown
 }
 
-export async function POST(request: Request) {
-  const { user, dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!user || !dbUser) return errorResponse('Oturum bulunamadı', 401)
-
+export const POST = withStaffRoute(async ({ request, user, dbUser }) => {
   // Rate limit — brute-force için net sınır
   const allowed = await checkRateLimit(`sms:verify:${user.id}`, VERIFY_RATE_MAX, VERIFY_RATE_WINDOW_SEC)
   if (!allowed) {
@@ -101,4 +98,4 @@ export async function POST(request: Request) {
 
   logger.info('sms:verify', 'Basarili SMS dogrulama', { userId: user.id, rememberDevice })
   return jsonResponse({ success: true, redirectTo })
-}
+}, { requireOrganization: true })

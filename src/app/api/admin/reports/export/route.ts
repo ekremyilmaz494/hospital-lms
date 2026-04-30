@@ -2,12 +2,8 @@ import ExcelJS from 'exceljs'
 import { jsPDF } from 'jspdf'
 import { autoTable } from 'jspdf-autotable'
 import { prisma } from '@/lib/prisma'
-import {
-  getAuthUser,
-  requireRole,
-  errorResponse,
-  createAuditLog,
-} from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
@@ -450,17 +446,10 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
 
 // ── Rapor handler ──
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`report-export:${dbUser!.organizationId}`, 5, 60)
+export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit }) => {
+  const allowed = await checkRateLimit(`report-export:${orgId}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla dışa aktarma isteği. Lütfen bekleyin.', 429)
 
-  const orgId = dbUser!.organizationId!
   const { searchParams } = new URL(request.url)
   const format = (searchParams.get('format') ?? 'xlsx') as 'pdf' | 'xlsx'
   const section = (searchParams.get('section') ?? 'overview') as ReportSection
@@ -850,14 +839,11 @@ export async function GET(request: Request) {
 
       const pdfBuffer = doc.output('arraybuffer')
 
-      await createAuditLog({
-        userId: dbUser!.id,
-        organizationId: orgId,
+      await audit({
         action: 'report.export',
         entityType: 'export',
         entityId: orgId,
         newData: { format: 'pdf', section },
-        request,
       })
 
       return new Response(pdfBuffer, {
@@ -1112,14 +1098,11 @@ export async function GET(request: Request) {
 
     const buffer = await wb.xlsx.writeBuffer()
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'report.export',
       entityType: 'export',
       entityId: orgId,
       newData: { format: 'xlsx', section },
-      request,
     })
 
     return new Response(buffer, {
@@ -1133,4 +1116,4 @@ export async function GET(request: Request) {
     logger.error('report-export', 'Export failed', { error: err, section })
     return errorResponse('Rapor dışa aktarma sırasında hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

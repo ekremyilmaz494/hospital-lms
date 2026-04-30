@@ -1,13 +1,8 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse } from '@/lib/api-helpers'
+import { jsonResponse } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const GET = withSuperAdminRoute(async () => {
   const [
     hospitalCount,
     userCount,
@@ -40,4 +35,4 @@ export async function GET(request: Request) {
     recentHospitals,
     monthlyGrowth: monthlyGrowth.map(r => ({ month: r.month, count: Number(r.count) })),
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
-}
+})

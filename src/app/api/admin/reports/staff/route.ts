@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import type { UserRole } from '@/types/database'
 import { resolveReportFilters, REPORTS_CACHE_HEADERS, STAFF_CAP } from '../_shared'
@@ -9,14 +10,8 @@ import { resolveReportFilters, REPORTS_CACHE_HEADERS, STAFF_CAP } from '../_shar
  * Personel performans raporu — staffPerformance.
  * "Personel" tab'ı için kullanılır.
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
+  const orgId = organizationId
 
   const resolved = await resolveReportFilters(request, orgId)
   if (resolved.error) return resolved.error
@@ -92,4 +87,4 @@ export async function GET(request: Request) {
     logger.error('Admin Reports/staff', 'Personel raporu alınamadı', err)
     return errorResponse('Personel raporu alınamadı', 503)
   }
-}
+}, { requireOrganization: true })

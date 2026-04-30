@@ -1,4 +1,5 @@
-import { jsonResponse, errorResponse, getAuthUser, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 
@@ -23,11 +24,7 @@ function normalizeTrPhone(input: string): string | null {
   return `+90${digits}`
 }
 
-export async function POST(request: Request) {
-  const { user, dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!user || !dbUser) return errorResponse('Oturum bulunamadı', 401)
-
+export const POST = withStaffRoute(async ({ request, user }) => {
   const body = await parseBody<{ phone?: unknown }>(request)
   if (!body || typeof body.phone !== 'string') {
     return errorResponse('Telefon numarası gereklidir', 400)
@@ -54,4 +51,4 @@ export async function POST(request: Request) {
 
   logger.info('auth:phone-setup', 'Telefon kaydedildi', { userId: user.id })
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

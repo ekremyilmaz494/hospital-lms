@@ -1,25 +1,22 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, getAuthUserWithWriteGuard, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, ApiError } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
+  const orgId = organizationId
+  const { id } = params
 
   // Lightweight mode for edit form — only basic fields, no training history
   const { searchParams } = new URL(request.url)
   if (searchParams.get('fields') === 'edit') {
     const staff = await prisma.user.findFirst({ // perf-check-disable-line
-      where: { id, organizationId: dbUser!.organizationId! },
+      where: { id, organizationId: orgId },
       select: {
         id: true, firstName: true, lastName: true, email: true,
         phone: true, departmentId: true, title: true, isActive: true,
@@ -30,7 +27,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     let departmentName = ''
     if (staff.departmentId) {
       const dept = await prisma.department.findFirst({ // perf-check-disable-line
-        where: { id: staff.departmentId, organizationId: dbUser!.organizationId! },
+        where: { id: staff.departmentId, organizationId: orgId },
         select: { name: true },
       })
       if (dept) departmentName = dept.name
@@ -51,7 +48,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const staff = await prisma.user.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId: orgId },
     select: {
       id: true, firstName: true, lastName: true, email: true,
       phone: true, departmentId: true, title: true, isActive: true,
@@ -74,7 +71,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   let departmentName = ''
   if (staff.departmentId) {
     const dept = await prisma.department.findFirst({ // perf-check-disable-line
-      where: { id: staff.departmentId, organizationId: dbUser!.organizationId! },
+      where: { id: staff.departmentId, organizationId: orgId },
     })
     if (dept) departmentName = dept.name
   }
@@ -126,18 +123,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   return jsonResponse(result, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUserWithWriteGuard(request)
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const orgId = organizationId
+  const { id } = params
 
   const body = await parseBody(request)
-  if (!body) return errorResponse('Geçersiz istek verisi')
+  if (!body) throw new ApiError('Geçersiz istek verisi', 400)
 
   // Explicit whitelist — only allow safe fields to be updated
   const safeUpdateSchema = z.object({
@@ -154,9 +147,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   // B4.2/G4.2 — Paralel: kullanıcı varlığı + departman doğrulaması aynı anda
   const [existing, deptCheck] = await Promise.all([
-    prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } }),
+    prisma.user.findFirst({ where: { id, organizationId: orgId } }),
     parsed.data.departmentId
-      ? prisma.department.findFirst({ where: { id: parsed.data.departmentId, organizationId: dbUser!.organizationId! } })
+      ? prisma.department.findFirst({ where: { id: parsed.data.departmentId, organizationId: orgId } })
       : Promise.resolve(null),
   ])
   if (!existing) return errorResponse('Personel bulunamadı', 404)
@@ -168,41 +161,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const staff = await prisma.user.update({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId: orgId },
     data: dataToUpdate,
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'update',
     entityType: 'user',
     entityId: id,
     oldData: existing,
     newData: staff,
-    request,
   })
 
   revalidatePath('/admin/staff')
 
-  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
-  try { await invalidateOrgCache(dbUser!.organizationId!, 'staff') } catch {}
+  try { await invalidateDashboardCache(orgId) } catch { /* best-effort */ }
+  try { await invalidateOrgCache(orgId, 'staff') } catch { /* best-effort */ }
 
   return jsonResponse(staff)
-}
+}, { requireOrganization: true })
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUserWithWriteGuard(request)
-  if (error) return error
+export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const orgId = organizationId
+  const { id } = params
 
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`staff-delete:${dbUser!.id}`, 10, 3600)
+  const allowed = await checkRateLimit(`staff-delete:${dbUser.id}`, 10, 3600)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
-  const existing = await prisma.user.findFirst({ where: { id, organizationId: dbUser!.organizationId! } }) // perf-check-disable-line
+  const existing = await prisma.user.findFirst({ where: { id, organizationId: orgId } }) // perf-check-disable-line
   if (!existing) return errorResponse('Personel bulunamadı', 404)
 
   // KVKK "unutulma hakkı" için ?purge=true — Auth kaydını da sil (geri alınamaz).
@@ -213,12 +199,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   // Soft delete: deactivate + aktif sınavları iptal et (multi-tenant güvenli)
   await prisma.$transaction([
-    prisma.user.updateMany({ where: { id, organizationId: dbUser!.organizationId! }, data: { isActive: false } }),
+    prisma.user.updateMany({ where: { id, organizationId: orgId }, data: { isActive: false } }),
     prisma.examAttempt.updateMany({
       where: {
         userId: id,
         // Multi-tenant guard: examAttempt user'ı aynı organizasyonda olmalı (CLAUDE.md)
-        user: { organizationId: dbUser!.organizationId! },
+        user: { organizationId: orgId },
         status: { in: ['pre_exam', 'watching_videos', 'post_exam'] },
       },
       data: { status: 'expired', isPassed: false, postExamCompletedAt: new Date() },
@@ -237,19 +223,16 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }
   }
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: purge ? 'purge' : 'deactivate',
     entityType: 'user',
     entityId: id,
-    request,
   })
 
   revalidatePath('/admin/staff')
 
-  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
-  try { await invalidateOrgCache(dbUser!.organizationId!, 'staff') } catch {}
+  try { await invalidateDashboardCache(orgId) } catch { /* best-effort */ }
+  try { await invalidateOrgCache(orgId, 'staff') } catch { /* best-effort */ }
 
   return jsonResponse({ success: true, purged: purge })
-}
+}, { requireOrganization: true })

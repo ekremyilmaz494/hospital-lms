@@ -1,23 +1,15 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
-
+export const GET = withAdminRoute(async ({ organizationId }) => {
   try {
     const now = new Date()
 
     const [certificates, trainingsWithoutRenewal] = await Promise.all([
       prisma.certificate.findMany({
-        where: { training: { organizationId: orgId } },
+        where: { training: { organizationId } },
         select: {
           id: true,
           certificateCode: true,
@@ -42,7 +34,7 @@ export async function GET() {
         orderBy: { issuedAt: 'desc' },
       }),
       prisma.training.findMany({
-        where: { organizationId: orgId, renewalPeriodMonths: null, isActive: true },
+        where: { organizationId, renewalPeriodMonths: null, isActive: true },
         select: { id: true, title: true },
       }),
     ])
@@ -121,15 +113,9 @@ export async function GET() {
     logger.error('Admin Certificates', 'Sertifikalar yüklenemedi', err)
     return errorResponse('Sertifikalar yüklenemedi', 503)
   }
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await request.json().catch(() => null)
   if (!body) return errorResponse('Invalid body')
 
@@ -141,8 +127,6 @@ export async function POST(request: Request) {
   if (expiresAt && new Date(expiresAt) < new Date()) {
     return errorResponse('Sertifika son kullanma tarihi geçmişte olamaz', 400)
   }
-
-  const organizationId = dbUser!.organizationId!
 
   try {
     const [targetUser, targetTraining] = await Promise.all([
@@ -178,9 +162,7 @@ export async function POST(request: Request) {
       throw e
     }
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId,
+    await audit({
       action: 'certificate.created_manual',
       entityType: 'certificate',
       entityId: cert.id,
@@ -192,4 +174,4 @@ export async function POST(request: Request) {
     logger.error('Admin Certificates', 'Sertifika oluşturulamadı', err)
     return errorResponse('Sertifika oluşturulamadı', 500)
   }
-}
+}, { requireOrganization: true })

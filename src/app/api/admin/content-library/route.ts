@@ -1,11 +1,10 @@
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser,
-  requireRole,
   jsonResponse,
   errorResponse,
   safePagination,
 } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getUploadUrl, getStreamUrl, videoKey, documentKey, audioKey } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
@@ -16,15 +15,7 @@ import { logger } from '@/lib/logger'
  * Kurumun erişebildiği aktif içerikler + isInstalled flag.
  * Platform içerikleri (organizationId = null) + kurumun kendi yüklediği içerikler.
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const category = searchParams.get('category')
   // max 500 — bu liste organizasyon-genelinde gösterilir
@@ -34,7 +25,7 @@ export async function GET(request: Request) {
     isActive: true,
     OR: [
       { organizationId: null },
-      { organizationId: orgId },
+      { organizationId: organizationId },
     ],
   }
   if (category) where.category = category
@@ -56,7 +47,7 @@ export async function GET(request: Request) {
     }),
     prisma.contentLibrary.count({ where }),
     prisma.organizationContentLibrary.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId },
       select: { contentLibraryId: true },
     }),
     prisma.contentLibrary.aggregate({
@@ -67,7 +58,7 @@ export async function GET(request: Request) {
     prisma.contentLibrary.count({
       where: {
         ...where,
-        installs: { some: { organizationId: orgId } },
+        installs: { some: { organizationId } },
       },
     }),
   ])
@@ -91,7 +82,7 @@ export async function GET(request: Request) {
         thumbnailUrl,
         targetRoles: item.targetRoles as string[],
         isInstalled: installedSet.has(item.id),
-        isOwned: item.organizationId === orgId,
+        isOwned: item.organizationId === organizationId,
       }
     }),
   )
@@ -109,7 +100,7 @@ export async function GET(request: Request) {
       totalSmg: totalsAgg._sum.smgPoints ?? 0,
     },
   }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
 
 /**
  * POST /api/admin/content-library
@@ -125,16 +116,8 @@ export async function GET(request: Request) {
  *             difficulty?, targetRoles?, smgPoints?, durationSeconds? }]
  * }
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-
-  const allowed = await checkRateLimit(`content-library-upload:${dbUser!.id}`, 30, 3600)
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) => {
+  const allowed = await checkRateLimit(`content-library-upload:${dbUser.id}`, 30, 3600)
   if (!allowed) return errorResponse('Çok fazla yükleme isteği. Lütfen bekleyin.', 429)
 
   try {
@@ -172,15 +155,15 @@ export async function POST(request: Request) {
         let detectedType: string
         let detectedFileType: string
         if (file.contentType.startsWith('video/')) {
-          key = videoKey(orgId, 'content-library', file.fileName)
+          key = videoKey(organizationId, 'content-library', file.fileName)
           detectedType = 'video'
           detectedFileType = file.fileName.split('.').pop()?.toLowerCase() ?? 'mp4'
         } else if (file.contentType.startsWith('audio/')) {
-          key = audioKey(orgId, 'content-library', file.fileName)
+          key = audioKey(organizationId, 'content-library', file.fileName)
           detectedType = 'audio'
           detectedFileType = file.fileName.split('.').pop()?.toLowerCase() ?? 'mp3'
         } else if (file.contentType === 'application/pdf' || file.contentType.includes('presentation')) {
-          key = documentKey(orgId, 'content-library', file.fileName)
+          key = documentKey(organizationId, 'content-library', file.fileName)
           detectedType = 'pdf'
           detectedFileType = file.fileName.split('.').pop()?.toLowerCase() ?? 'pdf'
         } else {
@@ -213,8 +196,8 @@ export async function POST(request: Request) {
             targetRoles: file.targetRoles && file.targetRoles.length > 0 ? file.targetRoles : ['all'],
             smgPoints: typeof file.smgPoints === 'number' ? file.smgPoints : 0,
             isActive: true,
-            organizationId: orgId,
-            createdById: dbUser!.id,
+            organizationId,
+            createdById: dbUser.id,
           },
           select: {
             id: true,
@@ -245,7 +228,7 @@ export async function POST(request: Request) {
     logger.info(
       'content-library',
       `${results.filter(r => !('error' in r)).length} içerik yüklendi`,
-      { orgId, userId: dbUser!.id },
+      { orgId: organizationId, userId: dbUser.id },
     )
 
     return jsonResponse({ results }, 201)
@@ -253,4 +236,4 @@ export async function POST(request: Request) {
     logger.error('content-library', 'İçerik yükleme hatası', err)
     return errorResponse('İçerik yüklenemedi', 500)
   }
-}
+}, { requireOrganization: true })

@@ -1,20 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
-import { NextRequest } from 'next/server'
 
 /** POST /api/admin/scorm/upload — Upload a SCORM package (.zip) */
-export async function POST(request: NextRequest) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) {
-    return errorResponse('Organizasyon bulunamadi', 403)
-  }
-
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -48,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     // Placeholder: In production, the zip would be uploaded to S3
     // and unzipped to serve SCORM content. For now, we store file info.
-    const zipUrl = `scorm-packages/${dbUser!.organizationId}/${Date.now()}-${file.name}`
+    const zipUrl = `scorm-packages/${organizationId}/${Date.now()}-${file.name}`
 
     const now = new Date()
     const endDate = new Date(now)
@@ -56,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const training = await prisma.training.create({
       data: {
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         title: title.trim(),
         description: `SCORM paketi: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`,
         category: 'scorm',
@@ -67,13 +57,11 @@ export async function POST(request: NextRequest) {
         passingScore: 70,
         maxAttempts: 3,
         examDurationMinutes: 30,
-        createdById: dbUser!.id,
+        createdById: dbUser.id,
       },
     })
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId,
+    await audit({
       action: 'scorm_upload',
       entityType: 'training',
       entityId: training.id,
@@ -83,7 +71,6 @@ export async function POST(request: NextRequest) {
         fileSize: file.size,
         zipUrl,
       },
-      request,
     })
 
     logger.info('SCORM Upload', `SCORM paketi yuklendi: ${training.title}`, {
@@ -106,4 +93,4 @@ export async function POST(request: NextRequest) {
     logger.error('SCORM Upload', 'SCORM paketi yuklenemedi', err)
     return errorResponse('SCORM paketi yuklenemedi', 500)
   }
-}
+}, { requireOrganization: true })

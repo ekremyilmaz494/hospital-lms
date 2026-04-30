@@ -1,12 +1,7 @@
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import {
-  getAuthUser,
-  requireRole,
-  jsonResponse,
-  errorResponse,
-  createAuditLog,
-} from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -32,13 +27,7 @@ const StandardSchema = z.object({
  *   - global standartlar (organizationId = NULL)
  *   - kurumun kendi oluşturduğu standartlar (organizationId = currentOrg)
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const standardBody = searchParams.get('standardBody') ?? undefined
 
@@ -48,7 +37,7 @@ export async function GET(request: Request) {
         isActive: true,
         OR: [
           { organizationId: null },
-          { organizationId: dbUser!.organizationId! },
+          { organizationId },
         ],
         ...(standardBody ? { standardBody } : {}),
       },
@@ -79,21 +68,15 @@ export async function GET(request: Request) {
     logger.error('accreditation-standards', 'GET failed', { err })
     return errorResponse('Standartlar getirilemedi', 500)
   }
-}
+}, { requireOrganization: true })
 
 /**
  * POST /api/admin/accreditation/standards
  *
  * Kuruma özel standart oluşturur. organizationId otomatik atanır.
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
+  const orgId = organizationId
 
   const allowed = await checkRateLimit(`accred-standard-write:${orgId}`, 20, 60)
   if (!allowed) return errorResponse('Çok fazla istek. Bir dakika bekleyin.', 429)
@@ -124,7 +107,7 @@ export async function POST(request: Request) {
         requiredTrainingCategories: body.requiredTrainingCategories,
         requiredCompletionRate: body.requiredCompletionRate,
         organizationId: orgId,
-        createdById: dbUser!.id,
+        createdById: dbUser.id,
       },
       select: {
         id: true,
@@ -139,14 +122,11 @@ export async function POST(request: Request) {
       },
     })
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'accreditation_standard.create',
       entityType: 'accreditation_standard',
       entityId: created.id,
       newData: created,
-      request,
     })
 
     return jsonResponse({ standard: { ...created, isCustom: true } }, 201)
@@ -154,4 +134,4 @@ export async function POST(request: Request) {
     logger.error('accreditation-standards', 'POST failed', { err, orgId })
     return errorResponse('Standart oluşturulamadı', 500)
   }
-}
+}, { requireOrganization: true })

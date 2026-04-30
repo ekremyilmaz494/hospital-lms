@@ -1,22 +1,18 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createAssignmentSchema } from '@/lib/validations'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { sendEmail, trainingAssignedEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
+  const { id } = params
 
   const { searchParams } = new URL(request.url)
   const { page, limit, skip } = safePagination(searchParams)
 
-  const where = { trainingId: id, training: { organizationId: dbUser!.organizationId! } }
+  const where = { trainingId: id, training: { organizationId: organizationId } }
 
   const [assignments, total] = await Promise.all([
     prisma.trainingAssignment.findMany({
@@ -45,15 +41,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   ])
 
   return jsonResponse({ assignments, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const { id } = params
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')
@@ -61,12 +52,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = createAssignmentSchema.safeParse({ ...body as object, trainingId: id })
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  if (!dbUser!.organizationId) return errorResponse('Organization not found', 403)
   // Arşivli eğitime yeni atama yapılamaz
   const training = await prisma.training.findFirst({
     where: {
       id,
-      organizationId: dbUser!.organizationId!,
+      organizationId: organizationId,
       isActive: true,
       publishStatus: { not: 'archived' },
     },
@@ -94,7 +84,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Create assignments for all users (skip existing)
   const existingAssignments = await prisma.trainingAssignment.findMany({
-    where: { trainingId: id, userId: { in: parsed.data.userIds }, training: { organizationId: dbUser!.organizationId! } },
+    where: { trainingId: id, userId: { in: parsed.data.userIds }, training: { organizationId: organizationId } },
     select: { userId: true },
   })
   const existingUserIds = new Set(existingAssignments.map(a => a.userId))
@@ -104,7 +94,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Org kontrolü: atanacak kullanıcılar admin'in organizasyonuna ait mi?
   const orgUsers = await prisma.user.count({
-    where: { id: { in: newUserIds }, organizationId: dbUser!.organizationId! },
+    where: { id: { in: newUserIds }, organizationId: organizationId },
   })
   if (orgUsers !== newUserIds.length) return errorResponse('Bazı kullanıcılar kurumunuza ait değil', 403)
 
@@ -114,7 +104,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       userId,
       maxAttempts: parsed.data.maxAttempts,
       originalMaxAttempts: parsed.data.maxAttempts,
-      assignedById: dbUser!.id,
+      assignedById: dbUser.id,
     })),
   })
 
@@ -122,7 +112,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await prisma.notification.createMany({
     data: newUserIds.map(userId => ({
       userId,
-      organizationId: dbUser!.organizationId!,
+      organizationId: organizationId,
       title: 'Yeni Eğitim Atandı',
       message: `"${training.title}" eğitimi size atandı.`,
       type: 'assignment',
@@ -130,22 +120,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })),
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'assign',
     entityType: 'training_assignment',
     entityId: id,
     newData: { userIds: newUserIds, count: assignments.count },
-    request,
   })
 
-  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
+  try { await invalidateDashboardCache(organizationId) } catch {}
 
   // Fire-and-forget: atanan personellere profesyonel e-posta gönder (tenant SMTP).
   // Atama commit edildikten sonra arka planda çalışır; email hatası response'u etkilemez.
-  const orgId = dbUser!.organizationId!
-  const assignedByName = [dbUser!.firstName, dbUser!.lastName].filter(Boolean).join(' ') || null
+  const orgId = organizationId
+  const assignedByName = [dbUser.firstName, dbUser.lastName].filter(Boolean).join(' ') || null
   void sendAssignmentEmails({
     organizationId: orgId,
     userIds: newUserIds,
@@ -165,7 +152,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   })
 
   return jsonResponse({ created: assignments.count, skipped: existingUserIds.size }, 201)
-}
+}, { requireOrganization: true })
 
 /** Atanan personellere eğitim bildirimi e-postası — arka planda çalışır, hata yutar. */
 async function sendAssignmentEmails(params: {
@@ -228,13 +215,8 @@ async function sendAssignmentEmails(params: {
 }
 
 /** PATCH — Yönetici: başarısız eğitimi yeniden aç + ek deneme hakkı ver */
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id: trainingId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id: trainingId } = params
 
   const body = await parseBody<{ userId: string; additionalAttempts?: number }>(request)
   if (!body?.userId) return errorResponse('userId zorunludur')
@@ -245,7 +227,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   })
 
   if (!assignment) return errorResponse('Atama bulunamadı', 404)
-  if (assignment.training.organizationId !== dbUser!.organizationId) return errorResponse('Yetkisiz erişim', 403)
+  if (assignment.training.organizationId !== organizationId) return errorResponse('Yetkisiz erişim', 403)
   if (assignment.status === 'passed') return errorResponse('Bu personel zaten başarılı olmuş')
 
   const additionalAttempts = Math.min(Math.max(body.additionalAttempts ?? 1, 1), 10)
@@ -263,7 +245,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   await prisma.notification.create({
     data: {
       userId: body.userId,
-      organizationId: dbUser!.organizationId!,
+      organizationId: organizationId,
       title: 'Eğitim Yeniden Açıldı',
       message: `"${assignment.training.title}" eğitimi için ${additionalAttempts} ek deneme hakkı verildi.`,
       type: 'assignment',
@@ -271,15 +253,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'reopen_assignment',
     entityType: 'training_assignment',
     entityId: assignment.id,
     newData: { userId: body.userId, additionalAttempts, newMaxAttempts },
-    request,
   })
 
   return jsonResponse({ success: true, newMaxAttempts })
-}
+}, { requireOrganization: true })

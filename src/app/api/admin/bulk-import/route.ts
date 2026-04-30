@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
 import { sendStaffWelcomeEmail } from '@/lib/email'
@@ -249,14 +250,8 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
 
 // ── POST: Excel yükle (preview/import) ya da JSON satır import ────────────
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
+  const orgId = organizationId
   const { searchParams } = new URL(request.url)
   const isPreview = searchParams.get('mode') === 'preview'
 
@@ -402,9 +397,7 @@ export async function POST(request: Request) {
   // (her promise zaten kendi .catch'ini içeriyor, allSettled sadece bekliyor)
   await Promise.allSettled(emailPromises)
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: orgId,
+  await audit({
     action: 'bulk_import',
     entityType: 'user',
     newData: {
@@ -413,11 +406,10 @@ export async function POST(request: Request) {
       failed,
       createdUserIds,  // ← geri alma için
     },
-    request,
   })
 
   return jsonResponse(
     { created, failed, total: rows.length, errors: importErrors.slice(0, 20), results },
     created > 0 ? 201 : 400,
   )
-}
+}, { requireOrganization: true })

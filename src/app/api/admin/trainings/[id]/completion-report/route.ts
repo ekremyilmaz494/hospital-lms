@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
@@ -42,21 +43,16 @@ const STATUS_MAP: Record<string, { label: string; bg: RGB; color: RGB }> = {
 }
 
 /** PDF Tamamlama Raporu — kurumsal kimlikli personel listesi + imza alanları */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
+  const { id } = params
 
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`report:pdf:${dbUser!.id}`, 5, 60)
+  const allowed = await checkRateLimit(`report:pdf:${dbUser.id}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla rapor isteği. Lütfen bekleyin.', 429)
 
   try {
 
   const training = await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId: organizationId },
     select: {
       title: true,
       category: true,
@@ -400,4 +396,4 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     logger.error('CompletionReportPDF', 'Rapor oluşturulamadı', err)
     return errorResponse('Rapor oluşturulurken hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

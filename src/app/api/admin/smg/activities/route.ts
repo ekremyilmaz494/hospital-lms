@@ -1,19 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status') ?? 'PENDING'
   const { page, limit } = safePagination(searchParams)
 
   const where = {
-    organizationId: dbUser!.organizationId!,
+    organizationId,
     approvalStatus: status,
   }
 
@@ -38,4 +33,4 @@ export async function GET(request: Request) {
   ])
 
   return jsonResponse({ activities, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })

@@ -1,18 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { updateSmgTargetSchema } from '@/lib/validations'
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const PUT = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
@@ -21,7 +13,7 @@ export async function PUT(
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const existing = await prisma.smgTarget.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
   })
   if (!existing) return errorResponse('Hedef bulunamadı', 404)
 
@@ -30,48 +22,33 @@ export async function PUT(
     data: { requiredPoints: parsed.data.requiredPoints },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'UPDATE',
     entityType: 'SmgTarget',
     entityId: id,
     oldData: existing,
     newData: updated,
-    request,
   })
 
   return jsonResponse(updated)
-}
+}, { requireOrganization: true })
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const DELETE = withAdminRoute<{ id: string }>(async ({ params, organizationId, audit }) => {
+  const { id } = params
 
   const existing = await prisma.smgTarget.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
   })
   if (!existing) return errorResponse('Hedef bulunamadı', 404)
 
   await prisma.smgTarget.delete({ where: { id } })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'DELETE',
     entityType: 'SmgTarget',
     entityId: id,
     oldData: existing,
-    request,
   })
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

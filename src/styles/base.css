@@ -1,0 +1,315 @@
+/* ── GLOBAL STYLES ── */
+html,
+body {
+  /* NOTE: `overflow-x: clip` yerine `hidden` kullanılırsa `position: sticky`
+     descendant elemanlarda bozulur (Chromium bug). `clip` modern tarayıcılarda
+     aynı işi yapar ama scroll context oluşturmaz. */
+  overflow-x: clip;
+  max-width: 100vw;
+}
+
+body {
+  font-family: var(--font-body), 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv11', 'ss01', 'cv01';
+  text-rendering: optimizeLegibility;
+}
+
+@layer base {
+  h1, h2, h3, h4, h5, h6,
+  .font-heading {
+    font-family: var(--font-display), 'Plus Jakarta Sans', system-ui, sans-serif;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1 {
+    font-size: clamp(1.5rem, 3vw + 0.5rem, 2.5rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    color: var(--color-text-primary);
+  }
+
+  h2 {
+    font-size: clamp(1.125rem, 1.5vw + 0.25rem, 1.75rem);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--color-text-primary);
+  }
+
+  h3 {
+    font-size: clamp(1rem, 1vw + 0.25rem, 1.25rem);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+
+  h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.005em;
+  }
+}
+
+p, span, li, td, th, label, input, textarea, select {
+  font-family: var(--font-body), 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+}
+
+/* ── DESCENDER FIX — Türkçe karakter desteği (ğ, g, y, p, ş, ç) ── */
+/* Tailwind text-* sınıfları font-size ile birlikte sıkı line-height set eder.
+   Bu kurallar descender'lar için yeterli alan sağlar. */
+:where(.text-xs) { line-height: 1.6 !important; }
+:where(.text-sm) { line-height: 1.6 !important; }
+:where(.text-lg) { line-height: 1.6 !important; }
+:where(.text-xl) { line-height: 1.5 !important; }
+:where(.text-2xl) { line-height: 1.5 !important; }
+:where(.text-3xl) { line-height: 1.4 !important; }
+:where(.text-4xl) { line-height: 1.4 !important; }
+
+/* ── PREMIUM TYPOGRAPHY UTILITIES ── */
+.text-gradient-primary {
+  background: linear-gradient(135deg, var(--color-primary) 0%, #0ea5e9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+/* ── PREMIUM INTERACTION SYSTEM ── */
+
+/* Clickable card — hover lift + glow + active press */
+.clickable-card {
+  cursor: pointer;
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.clickable-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.clickable-card:active {
+  transform: translateY(0) scale(0.985);
+  box-shadow: var(--shadow-sm);
+  transition-duration: 80ms;
+}
+
+.dark .clickable-card:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Clickable row — background shift + subtle left accent on hover */
+.clickable-row {
+  cursor: pointer;
+  position: relative;
+  transition: background 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.clickable-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-primary);
+  opacity: 0;
+  transform: scaleY(0.5);
+  transition: opacity 150ms, transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* CSS spec: ::before on <tr> creates an anonymous table-cell — kills column alignment.
+   Disable the pseudo-element accent for table rows; hover background still works. */
+tr.clickable-row::before {
+  display: none;
+}
+.clickable-row:hover {
+  background: var(--color-surface-hover);
+}
+.clickable-row:hover::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+.clickable-row:active {
+  background: rgba(var(--color-primary-rgb), 0.06);
+}
+
+/* Icon button — scale + background */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  transition: background 150ms, transform 150ms, color 150ms;
+}
+.icon-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.icon-btn:active {
+  transform: scale(0.9);
+  transition-duration: 80ms;
+}
+
+/* Nav item — smooth left border + bg */
+.nav-item {
+  position: relative;
+  transition: background 150ms, color 150ms;
+}
+.nav-item::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--color-primary);
+  opacity: 0;
+  transform: scaleY(0.3);
+  transition: opacity 200ms, transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.nav-item:hover {
+  background: rgba(var(--color-primary-rgb), 0.05);
+  color: var(--color-text-primary);
+}
+.nav-item[data-active="true"]::after,
+.nav-item:hover::after {
+  opacity: 1;
+  transform: scaleY(1);
+}
+.nav-item:active {
+  background: rgba(var(--color-primary-rgb), 0.1);
+}
+
+/* Badge/pill — subtle scale on hover */
+.interactive-badge {
+  cursor: pointer;
+  transition: transform 150ms, box-shadow 150ms, filter 150ms;
+}
+.interactive-badge:hover {
+  transform: scale(1.05);
+  filter: brightness(1.05);
+}
+.interactive-badge:active {
+  transform: scale(0.97);
+  transition-duration: 80ms;
+}
+
+/* Generic focus ring for keyboard nav (input/textarea/select kendi stilini yönetir) */
+:focus-visible:not(input):not(textarea):not(select) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+/* Ripple press effect for buttons */
+@keyframes btn-press {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+.press-effect:active {
+  animation: btn-press 200ms ease-out;
+}
+
+/* ── APP BACKGROUND ── */
+.app-bg {
+  background:
+    radial-gradient(ellipse at 0% 0%, color-mix(in srgb, var(--brand-600) calc(0.07 * 100%), transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 100%, rgba(245, 158, 11, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(37, 99, 235, 0.02) 0%, transparent 60%),
+    var(--color-bg);
+}
+
+.dark .app-bg {
+  background:
+    radial-gradient(ellipse at 10% 20%, color-mix(in srgb, var(--brand-400) calc(0.025 * 100%), transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 80%, rgba(251, 191, 36, 0.015) 0%, transparent 50%),
+    var(--color-bg);
+}
+
+/* ── DARK MODE REFINEMENTS ── */
+
+/* Skeleton pulse visibility in dark mode */
+.dark .animate-pulse {
+  --tw-pulse-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Better dark mode input/select styling */
+.dark input,
+.dark textarea,
+.dark select {
+  color-scheme: dark;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EDITORIAL STAFF PANEL — ALWAYS LIGHT
+   Staff panel uses "Clinical Editorial" design (cream + ink + gold) via
+   hardcoded JS hex constants. Dark mode refactor requires replacing
+   those with CSS variables (separate PR).
+   Until then, we force staff/* pages to stay in editorial light theme
+   regardless of user's theme preference. Auth + landing pages still
+   respect dark/light toggle.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-in {
+  opacity: 0;
+  animation: fadeInUp 0.6s var(--ease-out-expo) forwards;
+}
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+

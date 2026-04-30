@@ -6,22 +6,17 @@
  * DELETE → bağlantıyı kaldır (DB row + worker dosyası)
  */
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 import { aiAccountConnectSchema } from '@/lib/ai-content-studio/validations'
 import { uploadStorageState, deleteAccount, verifyAccount } from '@/lib/ai-content-studio/notebook-worker'
 import { checkRateLimit } from '@/lib/redis'
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ organizationId }) => {
   const account = await prisma.aiNotebookAccount.findUnique({
-    where: { organizationId: dbUser!.organizationId! },
+    where: { organizationId },
     select: {
       googleEmail: true,
       connectedAt: true,
@@ -35,16 +30,10 @@ export async function GET() {
     200,
     { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' },
   )
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`ai-account-connect:${dbUser!.id}`, 5, 3600)
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) => {
+  const allowed = await checkRateLimit(`ai-account-connect:${dbUser.id}`, 5, 3600)
   if (!allowed) return errorResponse('Çok fazla bağlama denemesi. Lütfen bir saat bekleyin.', 429)
 
   const body = await parseBody<{ storageStateJson: string }>(request)
@@ -53,14 +42,12 @@ export async function POST(request: Request) {
     return errorResponse(parsed.error.issues[0]?.message ?? 'Geçersiz storage_state.', 400)
   }
 
-  const orgId = dbUser!.organizationId!
   const encrypted = encrypt(parsed.data.storageStateJson)
 
   // Worker'a forward et — verify de yapacak
-  let verifyResult: Awaited<ReturnType<typeof uploadStorageState>>
   try {
-    verifyResult = await uploadStorageState({
-      orgId,
+    await uploadStorageState({
+      orgId: organizationId,
       storageStateJson: parsed.data.storageStateJson,
     })
   } catch (err) {
@@ -71,7 +58,7 @@ export async function POST(request: Request) {
   // Email çekmek için ayrı verify çağrısı (worker email'i ayrı endpoint'ten döndürüyor)
   let googleEmail: string | undefined
   try {
-    const status = await verifyAccount(orgId)
+    const status = await verifyAccount(organizationId)
     if (status.connected) googleEmail = status.googleEmail
   } catch {
     // verify hata verse bile DB'ye yazmaya devam et — kullanıcı sonra retry edebilir
@@ -79,9 +66,9 @@ export async function POST(request: Request) {
 
   const now = new Date()
   await prisma.aiNotebookAccount.upsert({
-    where: { organizationId: orgId },
+    where: { organizationId },
     create: {
-      organizationId: orgId,
+      organizationId,
       storageStateEncrypted: encrypted,
       googleEmail: googleEmail ?? null,
       connectedAt: now,
@@ -96,24 +83,16 @@ export async function POST(request: Request) {
   })
 
   return jsonResponse({ connected: true, googleEmail: googleEmail ?? null })
-}
+}, { requireOrganization: true })
 
-export async function DELETE() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-
+export const DELETE = withAdminRoute(async ({ organizationId }) => {
   try {
-    await deleteAccount(orgId)
+    await deleteAccount(organizationId)
   } catch (err) {
     logger.warn('AI Studio', 'Worker delete failed (continuing with DB cleanup)', { err: String(err) })
   }
 
-  await prisma.aiNotebookAccount.deleteMany({ where: { organizationId: orgId } })
+  await prisma.aiNotebookAccount.deleteMany({ where: { organizationId } })
 
   return jsonResponse({ ok: true })
-}
+}, { requireOrganization: true })

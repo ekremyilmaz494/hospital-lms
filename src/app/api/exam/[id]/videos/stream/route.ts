@@ -1,15 +1,12 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { getStreamUrl } from '@/lib/s3'
 import type { AttemptStatus } from '@/lib/exam-state-machine'
 
 /** Get signed streaming URL for a video */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id: attemptId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
+  const { id: attemptId } = params
 
   const { searchParams } = new URL(request.url)
   const videoId = searchParams.get('videoId')
@@ -17,13 +14,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   // Verify attempt belongs to user and is in video phase
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser!.id, status: 'watching_videos' satisfies AttemptStatus },
+    where: { id: attemptId, userId: dbUser.id, status: 'watching_videos' satisfies AttemptStatus },
     include: { training: { select: { organizationId: true } } },
   })
   if (!attempt) return errorResponse('Invalid attempt or not in video phase', 403)
 
   // Verify org isolation
-  if (attempt.training.organizationId !== dbUser!.organizationId) {
+  if (attempt.training.organizationId !== organizationId) {
     return errorResponse('Yetkisiz erişim', 403)
   }
 
@@ -35,4 +32,4 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const streamUrl = await getStreamUrl(video.videoKey)
 
   return jsonResponse({ streamUrl, video }, 200, { 'Cache-Control': 'private, no-store' })
-}
+}, { requireOrganization: true })

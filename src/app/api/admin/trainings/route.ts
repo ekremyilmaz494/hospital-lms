@@ -1,26 +1,21 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, checkWritePermission } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createTrainingBodySchema } from '@/lib/validations'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { withCache, invalidateOrgCache } from '@/lib/redis'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit, search, skip } = safePagination(searchParams)
   const category = searchParams.get('category')
   const isActive = searchParams.get('isActive')
   const publishStatus = searchParams.get('publishStatus') // draft | published | archived
 
-  const orgId = dbUser!.organizationId!
+  const orgId = organizationId
   const cacheKey = `cache:${orgId}:trainings:${page}:${limit}:${search}:${category || ''}:${isActive || ''}:${publishStatus || ''}`
 
   const data = await withCache(cacheKey, 120, async () => {
@@ -89,20 +84,11 @@ export async function GET(request: Request) {
   })
 
   return jsonResponse(data, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const writeBlock = await checkWritePermission(dbUser!.organizationId!, 'POST')
-  if (writeBlock) return writeBlock
-
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   // Abonelik limit kontrolu
-  const limitError = await checkSubscriptionLimit(dbUser!.organizationId!, 'training')
+  const limitError = await checkSubscriptionLimit(organizationId, 'training')
   if (limitError) return limitError
 
   const body = await parseBody(request)
@@ -133,8 +119,8 @@ export async function POST(request: Request) {
           startDate: new Date(trainingData.startDate),
           endDate: new Date(trainingData.endDate),
           complianceDeadline: trainingData.complianceDeadline ? new Date(trainingData.complianceDeadline) : null,
-          organizationId: dbUser!.organizationId!,
-          createdById: dbUser!.id,
+          organizationId: organizationId,
+          createdById: dbUser.id,
         },
       })
 
@@ -151,7 +137,7 @@ export async function POST(request: Request) {
           // Medya kütüphanesinden seçim — libraryItemId varsa bilgileri oradan çek
           if ((v as Record<string, unknown>).libraryItemId) {
             const libItem = await tx.contentLibrary.findFirst({
-              where: { id: (v as Record<string, unknown>).libraryItemId as string, organizationId: dbUser!.organizationId! },
+              where: { id: (v as Record<string, unknown>).libraryItemId as string, organizationId: organizationId },
             })
             if (libItem?.s3Key) {
               url = libItem.s3Key
@@ -209,7 +195,7 @@ export async function POST(request: Request) {
       if (selectedDepts && selectedDepts.length > 0) {
         const usersToAssign = await tx.user.findMany({
           where: {
-            organizationId: dbUser!.organizationId!,
+            organizationId: organizationId,
             isActive: true,
             departmentId: { in: selectedDepts },
           }
@@ -222,7 +208,7 @@ export async function POST(request: Request) {
             trainingId: t.id,
             userId: u.id,
             maxAttempts: trainingData.maxAttempts || 3,
-            assignedById: dbUser!.id,
+            assignedById: dbUser.id,
           }))
 
         if (assignments.length > 0) {
@@ -236,9 +222,7 @@ export async function POST(request: Request) {
       return t
     }, { timeout: 30000 })
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId!,
+    await audit({
       action: 'training.create.full',
       entityType: 'training',
       entityId: training.id,
@@ -248,11 +232,11 @@ export async function POST(request: Request) {
     revalidatePath('/staff/my-trainings')
     revalidatePath('/admin/trainings')
 
-    try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
-    try { await invalidateOrgCache(dbUser!.organizationId!, 'trainings') } catch {}
+    try { await invalidateDashboardCache(organizationId) } catch {}
+    try { await invalidateOrgCache(organizationId, 'trainings') } catch {}
 
     return jsonResponse(training, 201)
   } catch (err: unknown) {
     return errorResponse((err as Error).message || 'Eğitim kaydedilirken bir hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

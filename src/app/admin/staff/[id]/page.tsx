@@ -197,10 +197,20 @@ export default function StaffDetailPage() {
             href={`/admin/staff/${staff.id}/edit`}
             className="sd-btn"
             style={{
-              background: K.SURFACE,
-              color: K.TEXT_SECONDARY,
-              border: `1px solid ${K.BORDER}`,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              height: 42,
+              padding: '0 18px',
+              borderRadius: 999,
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: 'none',
+              background: K.PRIMARY_LIGHT,
+              color: K.PRIMARY,
+              border: `1.5px solid ${K.PRIMARY}`,
               fontFamily: K.FONT_DISPLAY,
+              whiteSpace: 'nowrap',
             }}
           >
             <Edit className="h-4 w-4" />

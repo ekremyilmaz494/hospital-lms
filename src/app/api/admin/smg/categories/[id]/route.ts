@@ -1,18 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { updateSmgCategorySchema } from '@/lib/validations'
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
@@ -21,14 +13,14 @@ export async function PATCH(
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const existing = await prisma.smgCategory.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
   })
   if (!existing) return errorResponse('Kategori bulunamadı', 404)
 
   // Kod değişiyorsa unique kontrol
   if (parsed.data.code && parsed.data.code !== existing.code) {
     const clash = await prisma.smgCategory.findFirst({
-      where: { organizationId: dbUser!.organizationId!, code: parsed.data.code, NOT: { id } },
+      where: { organizationId, code: parsed.data.code, NOT: { id } },
       select: { id: true },
     })
     if (clash) return errorResponse('Bu kod ile başka bir kategori mevcut', 409)
@@ -46,38 +38,26 @@ export async function PATCH(
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'UPDATE',
     entityType: 'SmgCategory',
     entityId: id,
     oldData: existing,
     newData: updated,
-    request,
   })
 
   return jsonResponse(updated)
-}
+}, { requireOrganization: true })
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const DELETE = withAdminRoute<{ id: string }>(async ({ params, organizationId, audit }) => {
+  const { id } = params
 
   const [existing, linkedCount] = await Promise.all([
     prisma.smgCategory.findFirst({
-      where: { id, organizationId: dbUser!.organizationId! },
+      where: { id, organizationId },
     }),
     prisma.smgActivity.count({
-      where: { categoryId: id, organizationId: dbUser!.organizationId! },
+      where: { categoryId: id, organizationId },
     }),
   ])
   if (!existing) return errorResponse('Kategori bulunamadı', 404)
@@ -91,15 +71,12 @@ export async function DELETE(
 
   await prisma.smgCategory.delete({ where: { id } })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'DELETE',
     entityType: 'SmgCategory',
     entityId: id,
     oldData: existing,
-    request,
   })
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

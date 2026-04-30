@@ -7,20 +7,16 @@
  * "completed" olunca uploadedSize'ı DB'ye yazar.
  */
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getJobStatus } from '@/lib/ai-content-studio/notebook-worker'
 import { logger } from '@/lib/logger'
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
 
   const gen = await prisma.aiGeneration.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
     select: {
       id: true,
       status: true,
@@ -44,7 +40,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   if (!gen.workerJobId) {
     // Henüz worker'a forward edilmemiş — pending state
-    return jsonResponse({ id: gen.id, status: gen.status, progress: 0 })
+    return jsonResponse(
+      { id: gen.id, status: gen.status, progress: 0 },
+      200,
+      { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' },
+    )
   }
 
   // Worker'dan durumu çek
@@ -53,7 +53,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     workerStatus = await getJobStatus(gen.workerJobId)
   } catch (err) {
     logger.warn('AI Studio', 'Worker status check failed (returning DB state)', { err: String(err), id })
-    return jsonResponse({ id: gen.id, status: gen.status, progress: 0 })
+    return jsonResponse(
+      { id: gen.id, status: gen.status, progress: 0 },
+      200,
+      { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' },
+    )
   }
 
   // Worker terminal state'e geçtiyse DB'yi güncelle
@@ -66,12 +70,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         completedAt: new Date(workerStatus.completedAt ?? Date.now()),
       },
     })
-    return jsonResponse({
-      id: gen.id,
-      status: 'completed',
-      progress: 100,
-      fileSize: workerStatus.uploadedSize,
-    })
+    return jsonResponse(
+      {
+        id: gen.id,
+        status: 'completed',
+        progress: 100,
+        fileSize: workerStatus.uploadedSize,
+      },
+      200,
+      { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' },
+    )
   }
 
   if (workerStatus.status === 'failed') {
@@ -83,16 +91,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         completedAt: new Date(),
       },
     })
-    return jsonResponse({
-      id: gen.id,
-      status: 'failed',
-      error: workerStatus.error,
-    })
+    return jsonResponse(
+      {
+        id: gen.id,
+        status: 'failed',
+        error: workerStatus.error,
+      },
+      200,
+      { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' },
+    )
   }
 
-  return jsonResponse({
-    id: gen.id,
-    status: workerStatus.status,
-    progress: workerStatus.progress ?? 0,
-  })
-}
+  return jsonResponse(
+    {
+      id: gen.id,
+      status: workerStatus.status,
+      progress: workerStatus.progress ?? 0,
+    },
+    200,
+    { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' },
+  )
+}, { requireOrganization: true })

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, checkWritePermission } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { sendEmail, escapeHtml } from '@/lib/email'
 import { logger } from '@/lib/logger'
@@ -49,21 +50,9 @@ function notificationEmailHtml(title: string, message: string, type: string, app
  * Toplu bildirim + opsiyonel e-posta gönderimi.
  * Frontend'den tek request ile çoklu alıcıya bildirim oluşturur.
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organizasyon bulunamadı', 403)
-
-  const writeBlock = await checkWritePermission(orgId, 'POST')
-  if (writeBlock) return writeBlock
-
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   // User bazlı rate limit: 100 bildirim / 1 saat
-  const allowed = await checkRateLimit(`notif-send:${dbUser!.id}`, 100, 3600)
+  const allowed = await checkRateLimit(`notif-send:${dbUser.id}`, 100, 3600)
   if (!allowed) {
     return new Response(JSON.stringify({ error: 'Çok fazla bildirim gönderdiniz. Lütfen 60 dakika sonra tekrar deneyin.' }), {
       status: 429,
@@ -85,7 +74,7 @@ export async function POST(request: Request) {
   const validUsers = await prisma.user.findMany({
     where: {
       id: { in: recipientIds },
-      organizationId: orgId,
+      organizationId,
       isActive: true,
     },
     select: { id: true, email: true, firstName: true, lastName: true },
@@ -99,7 +88,7 @@ export async function POST(request: Request) {
   const notifResult = await prisma.notification.createMany({
     data: validUsers.map(u => ({
       userId: u.id,
-      organizationId: orgId,
+      organizationId,
       title,
       message,
       type,
@@ -138,9 +127,7 @@ export async function POST(request: Request) {
   }
 
   // Audit log
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: orgId,
+  await audit({
     action: 'notification.bulk_send',
     entityType: 'notification',
     newData: {
@@ -151,11 +138,10 @@ export async function POST(request: Request) {
       emailsFailed,
       sendEmail: shouldSendEmail,
     },
-    request,
   })
 
   logger.info('NotifSend', 'Toplu bildirim gonderildi', {
-    orgId,
+    orgId: organizationId,
     recipientCount: validUsers.length,
     notificationsCreated: notifResult.count,
     emailsSent,
@@ -169,4 +155,4 @@ export async function POST(request: Request) {
     emailsFailed,
     recipientCount: validUsers.length,
   }, 201)
-}
+}, { requireOrganization: true })

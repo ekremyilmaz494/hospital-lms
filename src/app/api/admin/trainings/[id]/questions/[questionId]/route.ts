@@ -1,21 +1,17 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createQuestionSchema } from '@/lib/validations'
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; questionId: string }> }) {
-  const { id, questionId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const PATCH = withAdminRoute<{ id: string; questionId: string }>(async ({ request, params, organizationId }) => {
+  const { id, questionId } = params
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')
 
   // Verify training belongs to admin's organization
-  const training = await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+  const training = await prisma.training.findFirst({ // perf-check-disable-line
+    where: { id, organizationId: organizationId },
   })
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
@@ -48,19 +44,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   })
 
   return jsonResponse(updated)
-}
+}, { requireOrganization: true })
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string; questionId: string }> }) {
-  const { id, questionId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const DELETE = withAdminRoute<{ id: string; questionId: string }>(async ({ params, organizationId }) => {
+  const { id, questionId } = params
 
   // Verify training belongs to admin's organization
-  const training = await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+  const training = await prisma.training.findFirst({ // perf-check-disable-line
+    where: { id, organizationId: organizationId },
   })
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
@@ -74,4 +65,4 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (deleted.count === 0) return errorResponse('Soru bulunamadi veya yetkiniz yok', 404)
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

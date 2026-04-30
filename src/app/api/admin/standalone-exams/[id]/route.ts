@@ -2,31 +2,21 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import {
-  getAuthUser,
-  requireRole,
   jsonResponse,
   errorResponse,
   parseBody,
-  createAuditLog,
 } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { invalidateByPrefix } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { updateStandaloneExamSchema } from '@/lib/validations'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
 
   const [exam, attemptCount] = await Promise.all([
     prisma.training.findFirst({
-      where: { id, organizationId: dbUser!.organizationId!, examOnly: true },
+      where: { id, organizationId: organizationId, examOnly: true },
       include: {
         questions: {
           include: { options: { orderBy: { sortOrder: 'asc' } } },
@@ -121,18 +111,10 @@ export async function GET(
       })),
     })),
   }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
@@ -151,7 +133,7 @@ export async function PATCH(
   }
 
   const existing = await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId!, examOnly: true },
+    where: { id, organizationId: organizationId, examOnly: true },
   })
   if (!existing) return errorResponse('Sınav bulunamadı', 404)
 
@@ -187,7 +169,7 @@ export async function PATCH(
     const exam = await prisma.$transaction(
       async (tx) => {
         const updated = await tx.training.update({
-          where: { id, organizationId: dbUser!.organizationId! },
+          where: { id, organizationId: organizationId },
           data,
         })
 
@@ -222,15 +204,12 @@ export async function PATCH(
       { timeout: 30000 },
     )
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId!,
+    await audit({
       action: 'standalone_exam.update',
       entityType: 'training',
       entityId: id,
       oldData: existing,
       newData: exam,
-      request,
     })
 
     revalidatePath('/admin/exams')
@@ -238,8 +217,8 @@ export async function PATCH(
 
     try {
       await Promise.all([
-        invalidateByPrefix(`standalone-exams:${dbUser!.organizationId!}:`),
-        invalidateDashboardCache(dbUser!.organizationId!),
+        invalidateByPrefix(`standalone-exams:${organizationId}:`),
+        invalidateDashboardCache(organizationId),
       ])
     } catch {}
 
@@ -248,21 +227,13 @@ export async function PATCH(
     logger.error('StandaloneExamUpdate', 'Sınav güncellenirken hata', err)
     return errorResponse('Sınav güncellenirken bir hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const DELETE = withAdminRoute<{ id: string }>(async ({ params, organizationId, audit }) => {
+  const { id } = params
 
   const existing = await prisma.training.findFirst({
-    where: { id, organizationId: dbUser!.organizationId!, examOnly: true },
+    where: { id, organizationId: organizationId, examOnly: true },
   })
   if (!existing) return errorResponse('Sınav bulunamadı', 404)
 
@@ -286,21 +257,18 @@ export async function DELETE(
     prisma.question.deleteMany({ where: { trainingId: id } }),
     prisma.trainingAssignment.deleteMany({ where: { trainingId: id } }),
     prisma.training.delete({
-      where: { id, organizationId: dbUser!.organizationId! },
+      where: { id, organizationId: organizationId },
     }),
   ])
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'standalone_exam.delete',
     entityType: 'training',
     entityId: id,
     oldData: { title: existing.title },
-    request,
   })
 
   revalidatePath('/admin/exams')
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

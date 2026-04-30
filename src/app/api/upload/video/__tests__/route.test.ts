@@ -1,21 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockGetAuthUser, mockRequireRole, mockJsonResponse, mockErrorResponse } = vi.hoisted(() => ({
+const { mockGetAuthUser, mockRequireRole, authState } = vi.hoisted(() => ({
   mockGetAuthUser: vi.fn(),
   mockRequireRole: vi.fn(),
-  mockJsonResponse: vi.fn(
-    (data: unknown, status = 200) => Response.json(data, { status }),
-  ),
-  mockErrorResponse: vi.fn(
-    (msg: string, status = 400) => Response.json({ error: msg }, { status }),
-  ),
+  authState: { dbUser: null as unknown, organizationId: null as string | null },
 }))
 
 vi.mock('@/lib/api-helpers', () => ({
   getAuthUser: mockGetAuthUser,
   requireRole: mockRequireRole,
-  jsonResponse: mockJsonResponse,
-  errorResponse: mockErrorResponse,
+  jsonResponse: (data: unknown, status = 200) => Response.json(data, { status }),
+  errorResponse: (msg: string, status = 400) => Response.json({ error: msg }, { status }),
+}))
+
+// withAdminRoute'u sade bir wrapper olarak mock'la — auth pre-flight'ı test stub'ına devret
+vi.mock('@/lib/api-handler', () => ({
+  withAdminRoute: (handler: (ctx: { request: Request; dbUser: unknown; organizationId: string | null; audit: () => Promise<void> }) => Promise<Response>) => {
+    return async (request: Request) => {
+      const auth = await mockGetAuthUser()
+      if (auth.error) return auth.error
+      const roleErr = mockRequireRole(auth.dbUser?.role, ['admin', 'super_admin'])
+      if (roleErr) return roleErr
+      if (!auth.dbUser?.organizationId) {
+        return Response.json({ error: 'Bu işlem için bir kurum bağlamı gerekir' }, { status: 400 })
+      }
+      return handler({
+        request,
+        dbUser: auth.dbUser,
+        organizationId: auth.dbUser.organizationId,
+        audit: vi.fn().mockResolvedValue(undefined),
+      })
+    }
+  },
 }))
 
 vi.mock('@/lib/s3', () => ({
@@ -33,6 +49,8 @@ vi.mock('@/lib/redis', () => ({
 }))
 
 import { POST } from '../route'
+
+void authState
 
 function jsonRequest(body?: Record<string, unknown>): Request {
   return new Request('http://localhost/api/upload/video', {

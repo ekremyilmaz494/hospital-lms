@@ -1,26 +1,11 @@
 import { prisma } from '@/lib/prisma'
-import {
-  getAuthUser,
-  requireRole,
-  jsonResponse,
-  errorResponse,
-  safePagination,
-} from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
 /** GET /api/admin/attempt-requests?status=pending&page=1&limit=20&trainingId=...
  *  Kuruma ait ek hak taleplerini sayfalı listele */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) {
-    return errorResponse('Kurum bilgisi bulunamadı', 403)
-  }
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const url = new URL(request.url)
   const statusFilter = url.searchParams.get('status') ?? 'pending'
   const validStatuses = ['pending', 'approved', 'rejected', 'all']
@@ -36,7 +21,7 @@ export async function GET(request: Request) {
   const { page, limit, skip } = safePagination(url.searchParams)
 
   const where = {
-    organizationId: dbUser!.organizationId,
+    organizationId,
     ...(statusFilter !== 'all' && { status: statusFilter }),
     ...(trainingIdFilter && { trainingId: trainingIdFilter }),
   }
@@ -118,4 +103,4 @@ export async function GET(request: Request) {
     logger.error('AdminAttemptRequests', 'Talepler listelenemedi', err)
     return errorResponse('Talepler yüklenirken hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getAuthUser } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logActivity } from '@/lib/activity-logger'
 
-export async function POST() {
+export const POST = withStaffRoute(async ({ dbUser }) => {
   // Kullanıcı bilgisini signOut'tan ÖNCE al — sonra session silinir
-  const { dbUser } = await getAuthUser()
-  if (dbUser?.id && dbUser.organizationId) {
+  if (dbUser.id && dbUser.organizationId) {
     void logActivity({
       userId: dbUser.id,
       organizationId: dbUser.organizationId,
@@ -40,4 +39,4 @@ export async function POST() {
   })
 
   return response
-}
+})

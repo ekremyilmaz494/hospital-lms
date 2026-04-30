@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit, getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -7,14 +8,8 @@ import { logger } from '@/lib/logger'
  * GET /api/admin/effectiveness
  * Eğitim etkinlik analizi: pre/post sınav karşılaştırma, öğrenme kazanımı, trend
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
+  const orgId = organizationId
   const { searchParams } = new URL(request.url)
   const period = searchParams.get('period') === 'weekly' ? 'weekly' : 'monthly'
 
@@ -228,4 +223,4 @@ export async function GET(request: Request) {
     logger.error('Effectiveness', 'Etkinlik analizi alınamadı', err)
     return errorResponse('Etkinlik analizi alınamadı', 503)
   }
-}
+}, { requireOrganization: true })

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { sendEmail, overdueTrainingReminderEmail } from '@/lib/email'
 import { z } from 'zod/v4'
 import { logger } from '@/lib/logger'
@@ -17,15 +18,7 @@ const reminderSchema = z.object({
  * POST /api/admin/send-reminder
  * Gecikmiş personele manuel email + uygulama bildirimi gönderir.
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
@@ -36,7 +29,7 @@ export async function POST(request: Request) {
     // Hedef atamaları bul
     let assignments
     if (parsed.data.trainingId) {
-      const training = await prisma.training.findFirst({ where: { id: parsed.data.trainingId, organizationId: orgId } })
+      const training = await prisma.training.findFirst({ where: { id: parsed.data.trainingId, organizationId } })
       if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
       assignments = await prisma.trainingAssignment.findMany({
@@ -55,7 +48,7 @@ export async function POST(request: Request) {
       assignments = await prisma.trainingAssignment.findMany({
         where: {
           id: { in: parsed.data.assignmentIds! },
-          training: { organizationId: orgId },
+          training: { organizationId },
           status: { in: ['assigned', 'in_progress', 'failed'] },
         },
         include: {
@@ -78,7 +71,7 @@ export async function POST(request: Request) {
       const result = await prisma.notification.createMany({
         data: assignments.map(a => ({
           userId: a.user.id,
-          organizationId: orgId,
+          organizationId,
           title: 'Eğitim Hatırlatması',
           message: parsed.data.customMessage
             ? parsed.data.customMessage
@@ -123,13 +116,10 @@ export async function POST(request: Request) {
       }
     }
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'send_reminder',
       entityType: 'training_assignment',
       newData: { targetCount: assignments.length, emailsSent, notificationsSent, errors: errors.length },
-      request,
     })
 
     return jsonResponse({
@@ -142,4 +132,4 @@ export async function POST(request: Request) {
     logger.error('SendReminder', 'Hatırlatma gönderilemedi', err)
     return errorResponse('Hatırlatma gönderilemedi', 500)
   }
-}
+}, { requireOrganization: true })

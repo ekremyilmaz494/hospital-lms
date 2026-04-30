@@ -118,6 +118,10 @@ const nextConfig: NextConfig = {
       destination: '/admin/content-library',
       permanent: true,
     },
+    // Eski /marketing/* URL'leri root marketing route group'una taşındı.
+    // Eski bookmark/SEO için 301 redirect.
+    { source: '/marketing', destination: '/', permanent: true },
+    { source: '/marketing/:path*', destination: '/:path*', permanent: true },
   ],
   headers: async () => [
     {

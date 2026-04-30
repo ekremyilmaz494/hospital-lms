@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, computeAuditHash } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, computeAuditHash } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 
 /**
@@ -8,18 +9,7 @@ import { checkRateLimit } from '@/lib/redis'
  * Reads logs in batches of 1000 using cursor pagination for scalability.
  * Rate limited: 1 request per 5 minutes per organization.
  */
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const organizationId = dbUser!.organizationId
-  if (!organizationId) {
-    return errorResponse('Kurum bilgisi bulunamadi', 400)
-  }
-
+export const GET = withAdminRoute(async ({ organizationId }) => {
   // Rate limiting: 1 request per 5 minutes per org
   const rateLimited = await checkRateLimit(`audit-verify:${organizationId}`, 1, 300)
   if (rateLimited) {
@@ -115,4 +105,4 @@ export async function GET() {
     }
     return errorResponse('Dogrulama sirasinda bir hata olustu', 500)
   }
-}
+}, { requireOrganization: true })

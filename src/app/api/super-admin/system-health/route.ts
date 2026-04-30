@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, assertRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { getRedis } from '@/lib/redis'
 import { s3 } from '@/lib/s3'
@@ -117,16 +118,7 @@ async function checkSupabaseAuth(): Promise<ServiceStatus> {
   })
 }
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  try {
-    assertRole(dbUser!.role, ['super_admin'])
-  } catch {
-    return errorResponse('Forbidden', 403)
-  }
-
+export const GET = withSuperAdminRoute(async () => {
   try {
     // Tum saglik kontrollerini paralel calistir
     const [postgresql, redis, s3, smtp, supabaseAuth] = await Promise.all([
@@ -165,4 +157,4 @@ export async function GET() {
     logger.error('SystemHealth', 'Sistem saglik kontrolu basarisiz', err)
     return errorResponse('Sistem saglik kontrolu yapilamadi', 503)
   }
-}
+})

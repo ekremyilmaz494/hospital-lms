@@ -1,26 +1,21 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createSmgTargetSchema } from '@/lib/validations'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const periodId = searchParams.get('periodId')
   if (!periodId) return errorResponse('periodId parametresi zorunludur', 400)
 
   const period = await prisma.smgPeriod.findFirst({
-    where: { id: periodId, organizationId: dbUser!.organizationId! },
+    where: { id: periodId, organizationId },
     select: { id: true },
   })
   if (!period) return errorResponse('Dönem bulunamadı', 404)
 
   const targets = await prisma.smgTarget.findMany({
-    where: { periodId, organizationId: dbUser!.organizationId! },
+    where: { periodId, organizationId },
     select: {
       id: true,
       unvan: true,
@@ -39,15 +34,9 @@ export async function GET(request: Request) {
     200,
     { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' }
   )
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
@@ -57,12 +46,12 @@ export async function POST(request: Request) {
   // Dönem + kullanıcı doğrulaması paralel
   const [period, userCheck] = await Promise.all([
     prisma.smgPeriod.findFirst({
-      where: { id: parsed.data.periodId, organizationId: dbUser!.organizationId! },
+      where: { id: parsed.data.periodId, organizationId },
       select: { id: true },
     }),
     parsed.data.userId
       ? prisma.user.findFirst({
-          where: { id: parsed.data.userId, organizationId: dbUser!.organizationId! },
+          where: { id: parsed.data.userId, organizationId },
           select: { id: true },
         })
       : Promise.resolve(null),
@@ -83,7 +72,7 @@ export async function POST(request: Request) {
 
   const target = await prisma.smgTarget.create({
     data: {
-      organizationId: dbUser!.organizationId!,
+      organizationId,
       periodId: parsed.data.periodId,
       unvan: parsed.data.unvan ?? null,
       userId: parsed.data.userId ?? null,
@@ -91,15 +80,12 @@ export async function POST(request: Request) {
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'CREATE',
     entityType: 'SmgTarget',
     entityId: target.id,
     newData: target,
-    request,
   })
 
   return jsonResponse(target, 201)
-}
+}, { requireOrganization: true })

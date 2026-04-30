@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
 import { encrypt } from '@/lib/crypto'
 import { invalidateOrgTransporter } from '@/lib/email'
@@ -17,18 +18,9 @@ const smtpSchema = z.object({
 })
 
 /** GET — SMTP config (şifre DÖNDÜRÜLMEZ, sadece hasPassword) */
-export async function GET() {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
-
+export const GET = withAdminRoute(async ({ organizationId }) => {
   const org = await prisma.organization.findUnique({
-    where: { id: orgId },
+    where: { id: organizationId },
     select: {
       smtpHost: true,
       smtpPort: true,
@@ -50,24 +42,15 @@ export async function GET() {
     smtpFrom: org?.smtpFrom ?? '',
     smtpReplyTo: org?.smtpReplyTo ?? '',
     smtpEnabled: org?.smtpEnabled ?? false,
-  }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+  }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
+}, { requireOrganization: true, strict: true })
 
 /**
  * PUT — SMTP config güncelle.
  * - smtpPassword boş/undefined gelirse mevcut şifre korunur.
  * - smtpEnabled=true ancak kritik alanlar (host/user/pass) eksikse 400 döner.
  */
-export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
-
+export const PUT = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await request.json().catch(() => null)
   if (!body) return errorResponse('Invalid body')
 
@@ -77,7 +60,7 @@ export async function PUT(request: Request) {
   const data = parsed.data
 
   const existing = await prisma.organization.findUnique({
-    where: { id: orgId },
+    where: { id: organizationId },
     select: { smtpPassEncrypted: true, smtpHost: true, smtpUser: true, smtpEnabled: true },
   })
 
@@ -93,7 +76,7 @@ export async function PUT(request: Request) {
 
   try {
     const updated = await prisma.organization.update({
-      where: { id: orgId },
+      where: { id: organizationId },
       data: {
         ...(data.smtpHost !== undefined && { smtpHost: data.smtpHost || null }),
         ...(data.smtpPort !== undefined && { smtpPort: data.smtpPort ?? 587 }),
@@ -111,14 +94,12 @@ export async function PUT(request: Request) {
     })
 
     // Transporter cache'ini geçersiz kıl — yeni config hemen devreye girsin
-    invalidateOrgTransporter(orgId)
+    invalidateOrgTransporter(organizationId)
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'smtp.update',
       entityType: 'organization',
-      entityId: orgId,
+      entityId: organizationId,
       newData: {
         enabled: updated.smtpEnabled,
         host: updated.smtpHost,
@@ -126,7 +107,6 @@ export async function PUT(request: Request) {
         user: updated.smtpUser,
         passwordChanged: Boolean(data.smtpPassword),
       },
-      request,
     })
 
     return jsonResponse({
@@ -143,4 +123,4 @@ export async function PUT(request: Request) {
     logger.error('SmtpSettings', 'SMTP ayarları güncellenemedi', err)
     return errorResponse('SMTP ayarları kaydedilemedi', 500)
   }
-}
+}, { requireOrganization: true, strict: true })

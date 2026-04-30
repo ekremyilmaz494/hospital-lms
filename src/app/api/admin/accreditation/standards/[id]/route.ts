@@ -1,14 +1,8 @@
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import {
-  getAuthUser,
-  requireRole,
-  jsonResponse,
-  errorResponse,
-  createAuditLog,
-} from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, ApiError } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
-import { logger } from '@/lib/logger'
 
 const VALID_BODIES = ['JCI', 'ISO_9001', 'ISO_15189', 'TJC', 'OSHA'] as const
 const VALID_CATEGORIES = [
@@ -27,21 +21,16 @@ const UpdateSchema = z.object({
 
 /**
  * PUT /api/admin/accreditation/standards/:id
- *
- * Sadece kuruma ait standartlar düzenlenebilir. Global standartlar readonly.
+ * Sadece kuruma ait standartlar düzenlenebilir. Global standartlar (organizationId = null)
+ * readonly — super_admin için bile bu route üzerinden değil, ayrı super-admin endpoint'i kullanılmalı.
  */
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
-  const orgId = dbUser!.organizationId!
+export const PUT = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  // requireOrganization → organizationId tipi `string` (non-null garantili, wrapper 400 dönerse buraya gelinmez).
+  const orgId = organizationId
+  const { id } = params
 
   const allowed = await checkRateLimit(`accred-standard-write:${orgId}`, 20, 60)
-  if (!allowed) return errorResponse('Çok fazla istek. Bir dakika bekleyin.', 429)
+  if (!allowed) throw new ApiError('Çok fazla istek. Bir dakika bekleyin.', 429)
 
   const raw = await request.json().catch(() => null)
   const parsed = UpdateSchema.safeParse(raw)
@@ -50,111 +39,90 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
   const body = parsed.data
 
-  try {
-    const existing = await prisma.accreditationStandard.findUnique({
-      where: { id },
-      select: { id: true, organizationId: true, code: true },
-    })
-    if (!existing) return errorResponse('Standart bulunamadı', 404)
-    if (existing.organizationId !== orgId) {
-      return errorResponse('Bu standart düzenlenemez', 403)
-    }
-
-    // Code değişirse (code, org) unique çakışmasına bak
-    if (body.code !== existing.code) {
-      const dup = await prisma.accreditationStandard.findFirst({
-        where: { code: body.code, organizationId: orgId, NOT: { id } },
-        select: { id: true },
-      })
-      if (dup) return errorResponse('Bu kodla kayıtlı başka bir standart var', 409)
-    }
-
-    const updated = await prisma.accreditationStandard.update({
-      where: { id },
-      data: {
-        code: body.code,
-        title: body.title,
-        description: body.description ?? null,
-        standardBody: body.standardBody,
-        requiredTrainingCategories: body.requiredTrainingCategories,
-        requiredCompletionRate: body.requiredCompletionRate,
-      },
-      select: {
-        id: true,
-        code: true,
-        title: true,
-        description: true,
-        standardBody: true,
-        requiredTrainingCategories: true,
-        requiredCompletionRate: true,
-        organizationId: true,
-        createdAt: true,
-      },
-    })
-
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
-      action: 'accreditation_standard.update',
-      entityType: 'accreditation_standard',
-      entityId: id,
-      newData: updated,
-      request,
-    })
-
-    return jsonResponse({ standard: { ...updated, isCustom: true } })
-  } catch (err) {
-    logger.error('accreditation-standards', 'PUT failed', { err, id })
-    return errorResponse('Standart güncellenemedi', 500)
+  const existing = await prisma.accreditationStandard.findUnique({
+    where: { id },
+    select: { id: true, organizationId: true, code: true },
+  })
+  if (!existing) return errorResponse('Standart bulunamadı', 404)
+  // Global standartlar readonly — null === null tuzağına düşmemek için açık kontrol.
+  if (existing.organizationId === null) return errorResponse('Global standartlar düzenlenemez', 403)
+  if (existing.organizationId !== orgId) {
+    return errorResponse('Bu standart düzenlenemez', 403)
   }
-}
+
+  if (body.code !== existing.code) {
+    const dup = await prisma.accreditationStandard.findFirst({
+      where: { code: body.code, organizationId: orgId, NOT: { id } },
+      select: { id: true },
+    })
+    if (dup) return errorResponse('Bu kodla kayıtlı başka bir standart var', 409)
+  }
+
+  const updated = await prisma.accreditationStandard.update({
+    where: { id },
+    data: {
+      code: body.code,
+      title: body.title,
+      description: body.description ?? null,
+      standardBody: body.standardBody,
+      requiredTrainingCategories: body.requiredTrainingCategories,
+      requiredCompletionRate: body.requiredCompletionRate,
+    },
+    select: {
+      id: true,
+      code: true,
+      title: true,
+      description: true,
+      standardBody: true,
+      requiredTrainingCategories: true,
+      requiredCompletionRate: true,
+      organizationId: true,
+      createdAt: true,
+    },
+  })
+
+  await audit({
+    action: 'accreditation_standard.update',
+    entityType: 'accreditation_standard',
+    entityId: id,
+    newData: updated,
+  })
+
+  return jsonResponse({ standard: { ...updated, isCustom: true } })
+}, { requireOrganization: true })
 
 /**
  * DELETE /api/admin/accreditation/standards/:id
- *
  * Soft-delete: isActive = false. Sadece kuruma ait standartlar silinebilir.
  */
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
-  const orgId = dbUser!.organizationId!
+export const DELETE = withAdminRoute<{ id: string }>(async ({ params, organizationId, audit }) => {
+  const orgId = organizationId
+  const { id } = params
 
   const allowed = await checkRateLimit(`accred-standard-write:${orgId}`, 20, 60)
-  if (!allowed) return errorResponse('Çok fazla istek. Bir dakika bekleyin.', 429)
+  if (!allowed) throw new ApiError('Çok fazla istek. Bir dakika bekleyin.', 429)
 
-  try {
-    const existing = await prisma.accreditationStandard.findUnique({
-      where: { id },
-      select: { id: true, organizationId: true, code: true },
-    })
-    if (!existing) return errorResponse('Standart bulunamadı', 404)
-    if (existing.organizationId !== orgId) {
-      return errorResponse('Bu standart silinemez', 403)
-    }
-
-    await prisma.accreditationStandard.update({
-      where: { id },
-      data: { isActive: false },
-    })
-
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
-      action: 'accreditation_standard.delete',
-      entityType: 'accreditation_standard',
-      entityId: id,
-      oldData: existing,
-      request,
-    })
-
-    return jsonResponse({ ok: true })
-  } catch (err) {
-    logger.error('accreditation-standards', 'DELETE failed', { err, id })
-    return errorResponse('Standart silinemedi', 500)
+  const existing = await prisma.accreditationStandard.findUnique({
+    where: { id },
+    select: { id: true, organizationId: true, code: true },
+  })
+  if (!existing) return errorResponse('Standart bulunamadı', 404)
+  if (existing.organizationId === null) return errorResponse('Global standartlar silinemez', 403)
+  if (existing.organizationId !== orgId) {
+    return errorResponse('Bu standart silinemez', 403)
   }
-}
+
+  await prisma.accreditationStandard.update({
+    where: { id },
+    data: { isActive: false },
+  })
+
+  await audit({
+    action: 'accreditation_standard.delete',
+    entityType: 'accreditation_standard',
+    entityId: id,
+    oldData: existing,
+  })
+
+  return jsonResponse({ ok: true })
+}, { requireOrganization: true })

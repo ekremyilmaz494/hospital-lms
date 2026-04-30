@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { startExamTimer, resumeExamTimer, getExamTimeRemaining, isExamExpired } from '@/lib/redis'
 import { attemptStatusToExamPhase, type AttemptStatus } from '@/lib/exam-state-machine'
 import { logger } from '@/lib/logger'
@@ -24,21 +25,17 @@ async function autoCompleteExpiredAttempt(attemptId: string, userId: string) {
 }
 
 /** Start or get exam timer */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
+  const { id } = params
 
   // Search by attempt ID first, then assignmentId
   let attempt = await prisma.examAttempt.findFirst({
-    where: { id, userId: dbUser!.id, status: { in: ['pre_exam', 'post_exam'] } },
+    where: { id, userId: dbUser.id, status: { in: ['pre_exam', 'post_exam'] } },
     include: { training: { select: { examDurationMinutes: true, organizationId: true } } },
   })
   if (!attempt) {
     attempt = await prisma.examAttempt.findFirst({
-      where: { assignmentId: id, userId: dbUser!.id, status: { in: ['pre_exam', 'post_exam'] } },
+      where: { assignmentId: id, userId: dbUser.id, status: { in: ['pre_exam', 'post_exam'] } },
       include: { training: { select: { examDurationMinutes: true, organizationId: true } } },
       orderBy: { attemptNumber: 'desc' },
     })
@@ -47,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!attempt) return errorResponse('Attempt not found', 404)
 
   // Verify org isolation
-  if (attempt.training.organizationId !== dbUser!.organizationId) {
+  if (attempt.training.organizationId !== organizationId) {
     return errorResponse('Yetkisiz erişim', 403)
   }
 
@@ -70,7 +67,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (remainingMs <= 0) {
       // Süre gerçekten dolmuş → attempt'i kapat, kullanıcıya expired dön (sayfa yönlendirir)
       try {
-        await autoCompleteExpiredAttempt(attempt.id, dbUser!.id)
+        await autoCompleteExpiredAttempt(attempt.id, dbUser.id)
       } catch (err) {
         logger.error('Exam Timer', 'auto-complete failed on POST recovery', { attemptId: attempt.id, err: (err as Error).message })
       }
@@ -90,23 +87,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     expiresAt,
     expired: false,
   })
-}
+}, { requireOrganization: true })
 
 /** Check timer status */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id: attemptId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
+  const { id: attemptId } = params
 
   // Ownership + org isolation check before Redis query
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser!.id },
+    where: { id: attemptId, userId: dbUser.id },
     include: { training: { select: { organizationId: true, examDurationMinutes: true } } },
   })
   if (!attempt) return errorResponse('Attempt not found', 404)
-  if (attempt.training.organizationId !== dbUser!.organizationId) {
+  if (attempt.training.organizationId !== organizationId) {
     return errorResponse('Yetkisiz erişim', 403)
   }
 
@@ -128,7 +121,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Auto-complete if expired (only if not already completed)
   if (expired) {
     const expiredAttempts = await prisma.examAttempt.findMany({
-      where: { id: attemptId, userId: dbUser!.id, status: { in: ['pre_exam', 'post_exam'] } },
+      where: { id: attemptId, userId: dbUser.id, status: { in: ['pre_exam', 'post_exam'] } },
       select: { id: true, assignmentId: true, assignment: { select: { currentAttempt: true, maxAttempts: true } } },
     })
 
@@ -154,4 +147,4 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   return jsonResponse({ remainingSeconds: remaining ?? 0, expired }, 200, {
     'Cache-Control': 'private, no-store',
   })
-}
+}, { requireOrganization: true })

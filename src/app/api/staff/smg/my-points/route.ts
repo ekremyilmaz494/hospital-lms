@@ -1,19 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { resolveRequiredPoints } from '@/lib/smg-helpers'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin'])
-  if (roleError) return roleError
-
+export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const periodId = searchParams.get('periodId')
 
-  const orgId = dbUser!.organizationId!
-  const userId = dbUser!.id
+  const orgId = organizationId
+  const userId = dbUser.id
 
   // Dönem bul
   let period = null
@@ -88,7 +83,7 @@ export async function GET(request: Request) {
         periodId: period.id,
         organizationId: orgId,
         userId,
-        userTitle: dbUser!.title ?? null,
+        userTitle: dbUser.title ?? null,
         periodFallback: period.requiredPoints,
       })
     : 0
@@ -109,5 +104,5 @@ export async function GET(request: Request) {
     approvedActivities,
     pendingActivities,
     rejectedActivities,
-  }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
-}
+  }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+}, { requireOrganization: true })

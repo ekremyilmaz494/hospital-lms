@@ -1,20 +1,15 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createNotificationSchema } from '@/lib/validations'
 import type { UserRole } from '@/types/database'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit } = safePagination(searchParams)
 
-  const where = { organizationId: dbUser!.organizationId! }
+  const where = { organizationId }
 
   const [notifications, total] = await Promise.all([
     prisma.notification.findMany({
@@ -27,16 +22,10 @@ export async function GET(request: Request) {
     prisma.notification.count({ where }),
   ])
 
-  return jsonResponse({ notifications, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+  return jsonResponse({ notifications, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')
 
@@ -46,7 +35,7 @@ export async function POST(request: Request) {
   const notification = await prisma.notification.create({
     data: {
       ...parsed.data,
-      organizationId: dbUser!.organizationId!,
+      organizationId,
     },
   })
 
@@ -54,16 +43,10 @@ export async function POST(request: Request) {
   revalidatePath('/admin/notifications')
 
   return jsonResponse(notification, 201)
-}
+}, { requireOrganization: true })
 
 // Bulk send to all staff
-export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const PUT = withAdminRoute(async ({ request, organizationId }) => {
   const body = await parseBody<{ title: string; message: string; type: string }>(request)
   if (!body?.title || !body?.message) return errorResponse('Title and message required')
 
@@ -72,7 +55,7 @@ export async function PUT(request: Request) {
   if (body.message.length > 5000) return errorResponse('Mesaj en fazla 5000 karakter olabilir', 400)
 
   const staffUsers = await prisma.user.findMany({
-    where: { organizationId: dbUser!.organizationId!, role: 'staff' satisfies UserRole, isActive: true },
+    where: { organizationId, role: 'staff' satisfies UserRole, isActive: true },
     select: { id: true },
   })
 
@@ -88,7 +71,7 @@ export async function PUT(request: Request) {
     const result = await prisma.notification.createMany({
       data: batch.map(u => ({
         userId: u.id,
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         title: body.title,
         message: body.message,
         type: body.type ?? 'announcement',
@@ -98,4 +81,4 @@ export async function PUT(request: Request) {
   }
 
   return jsonResponse({ sent: totalSent })
-}
+}, { requireOrganization: true })

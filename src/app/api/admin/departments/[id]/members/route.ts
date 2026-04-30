@@ -1,20 +1,13 @@
-import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
 import type { UserRole } from '@/types/database'
 
-type Params = { params: Promise<{ id: string }> }
-
 // POST /api/admin/departments/[id]/members — Personel ekle/çıkar
 // body: { action: 'add' | 'remove', userIds: string[] }
-export async function POST(request: NextRequest, { params }: Params) {
-  const { id: departmentId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const { id: departmentId } = params
 
   const body = await parseBody<{ action: 'add' | 'remove'; userIds: string[] }>(request)
   if (!body || !body.action || !Array.isArray(body.userIds) || body.userIds.length === 0) {
@@ -23,7 +16,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   // Departmanın bu hastaneye ait olduğunu doğrula
   const department = await prisma.department.findFirst({
-    where: { id: departmentId, organizationId: dbUser!.organizationId! },
+    where: { id: departmentId, organizationId },
   })
 
   if (!department) return errorResponse('Departman bulunamadı', 404)
@@ -33,7 +26,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     await prisma.user.updateMany({
       where: {
         id: { in: body.userIds },
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         role: 'staff' satisfies UserRole,
       },
       data: {
@@ -43,12 +36,10 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // Departman kurallarına göre otomatik eğitim atama
     for (const uid of body.userIds) {
-      await autoAssignByDepartment(uid, departmentId, dbUser!.organizationId!, dbUser!.id)
+      await autoAssignByDepartment(uid, departmentId, organizationId, dbUser.id)
     }
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId!,
+    await audit({
       action: 'department.members.add',
       entityType: 'department',
       entityId: departmentId,
@@ -60,16 +51,14 @@ export async function POST(request: NextRequest, { params }: Params) {
       where: {
         id: { in: body.userIds },
         departmentId,
-        organizationId: dbUser!.organizationId!,
+        organizationId,
       },
       data: {
         departmentId: null,
       },
     })
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId!,
+    await audit({
       action: 'department.members.remove',
       entityType: 'department',
       entityId: departmentId,
@@ -99,4 +88,4 @@ export async function POST(request: NextRequest, { params }: Params) {
   })
 
   return jsonResponse(updated)
-}
+}, { requireOrganization: true })

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { NextResponse } from 'next/server'
 import type { UserRole } from '@/types/database'
@@ -9,15 +10,7 @@ import type { UserRole } from '@/types/database'
  * Akreditasyon/denetim hazırlık PDF raporu verisi.
  * Sağlık Bakanlığı ve JCI denetimleri için tasarlanmıştır.
  */
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-
+export const GET = withAdminRoute(async ({ organizationId: orgId }) => {
   try {
     const now = new Date()
 
@@ -140,4 +133,4 @@ export async function GET() {
     logger.error('AuditReport', 'Denetim raporu alınamadı', err)
     return errorResponse('Denetim raporu alınamadı', 503)
   }
-}
+}, { requireOrganization: true })

@@ -1,18 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
 /**
  * GET /api/super-admin/settings — Platform ayarlarını getir
  * Ayarlar henüz ayrı bir tabloda tutulmadığı için env variable'lardan okunur.
  */
-export async function GET() {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const GET = withSuperAdminRoute(async () => {
   // Platform ayarları — env'den ve DB'den toplanan bilgiler
   const orgCount = await prisma.organization.count({ where: { isActive: true } })
   const userCount = await prisma.user.count()
@@ -32,23 +27,17 @@ export async function GET() {
       totalUsers: userCount,
     },
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
-}
+})
 
 /**
  * PUT /api/super-admin/settings — Platform ayarlarını güncelle
  * Not: Gerçek env değişkenleri Vercel'den güncellenir, burada sadece DB'deki ayarlar.
  */
-export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const PUT = withSuperAdminRoute(async ({ request, dbUser }) => {
   try {
     const body = await request.json()
     logger.info('super-admin:settings', 'Platform ayarları güncellendi', {
-      userId: dbUser!.id,
+      userId: dbUser.id,
       changes: Object.keys(body),
     })
 
@@ -59,4 +48,4 @@ export async function PUT(request: Request) {
     logger.error('super-admin:settings', 'Ayar güncelleme hatası', err)
     return errorResponse('Ayarlar güncellenirken bir hata oluştu', 500)
   }
-}
+})

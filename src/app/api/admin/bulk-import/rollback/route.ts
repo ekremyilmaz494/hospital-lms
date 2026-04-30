@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
@@ -22,16 +23,10 @@ const rollbackSchema = z.object({
  *  - Batch organizasyona ait olmalı (cross-tenant koruma)
  *  - Rate limit: 5 rollback / saat
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
+  const orgId = organizationId
 
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-
-  const allowed = await checkRateLimit(`bulk-rollback:${dbUser!.id}`, 5, 3600)
+  const allowed = await checkRateLimit(`bulk-rollback:${dbUser.id}`, 5, 3600)
   if (!allowed) return errorResponse('Saatte en fazla 5 geri alma işlemi. Lütfen bekleyin.', 429)
 
   const body = await parseBody(request)
@@ -91,9 +86,7 @@ export async function POST(request: Request) {
     }
   }
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: orgId,
+  await audit({
     action: 'bulk_rollback',
     entityType: 'user',
     entityId: batchId,
@@ -104,7 +97,6 @@ export async function POST(request: Request) {
       failed,
       failedEmails: failedEmails.slice(0, 20),
     },
-    request,
   })
 
   revalidatePath('/admin/staff')
@@ -112,4 +104,4 @@ export async function POST(request: Request) {
   try { await invalidateOrgCache(orgId, 'staff') } catch {}
 
   return jsonResponse({ deleted, failed, total: users.length })
-}
+}, { requireOrganization: true })

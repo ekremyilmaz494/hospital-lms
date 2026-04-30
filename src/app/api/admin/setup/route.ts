@@ -1,20 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { setupWizardSchema } from '@/lib/validations'
 import { withCache, invalidateCache } from '@/lib/redis'
 
 /** GET /api/admin/setup — Kurulum durumunu döndür */
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-  const data = await withCache(`setup:${orgId}`, 60, async () => {
+export const GET = withAdminRoute(async ({ organizationId }) => {
+  const data = await withCache(`setup:${organizationId}`, 60, async () => {
     const org = await prisma.organization.findUnique({
-      where: { id: orgId },
+      where: { id: organizationId },
       select: { setupCompleted: true, setupStep: true },
     })
     return org ? { setupCompleted: org.setupCompleted, setupStep: org.setupStep } : null
@@ -23,16 +17,10 @@ export async function GET() {
   if (!data) return errorResponse('Kurum bulunamadı', 404)
 
   return jsonResponse(data, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
-}
+}, { requireOrganization: true })
 
 /** PUT /api/admin/setup — Kurulum adımını kaydet */
-export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const PUT = withAdminRoute(async ({ request, organizationId }) => {
   const body = await parseBody<unknown>(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi', 400)
 
@@ -42,14 +30,13 @@ export async function PUT(request: Request) {
   }
 
   const data = parsed.data
-  const orgId = dbUser!.organizationId!
 
   try {
     switch (data.step) {
       case 1: {
         // Hastane bilgilerini güncelle
         await prisma.organization.update({
-          where: { id: orgId },
+          where: { id: organizationId },
           data: {
             ...(data.name && { name: data.name }),
             ...(data.code && { code: data.code }),
@@ -67,7 +54,7 @@ export async function PUT(request: Request) {
         if (data.departments && data.departments.length > 0) {
           // Mevcut departmanları temizleme — sadece yenilerini ekle (duplicate koruması)
           const existing = await prisma.department.findMany({
-            where: { organizationId: orgId },
+            where: { organizationId },
             select: { name: true },
           })
           const existingNames = new Set(existing.map(d => d.name))
@@ -77,7 +64,7 @@ export async function PUT(request: Request) {
             await prisma.department.createMany({
               data: newDepts.map((name, idx) => ({
                 name,
-                organizationId: orgId,
+                organizationId,
                 sortOrder: idx,
               })),
             })
@@ -85,7 +72,7 @@ export async function PUT(request: Request) {
         }
 
         await prisma.organization.update({
-          where: { id: orgId },
+          where: { id: organizationId },
           data: { setupStep: 2 },
         })
         break
@@ -94,7 +81,7 @@ export async function PUT(request: Request) {
       case 3: {
         // Eğitim varsayılanlarını güncelle
         await prisma.organization.update({
-          where: { id: orgId },
+          where: { id: organizationId },
           data: {
             ...(data.defaultPassingScore !== undefined && { defaultPassingScore: data.defaultPassingScore }),
             ...(data.defaultMaxAttempts !== undefined && { defaultMaxAttempts: data.defaultMaxAttempts }),
@@ -108,7 +95,7 @@ export async function PUT(request: Request) {
       case 4: {
         // Kurulumu tamamla
         await prisma.organization.update({
-          where: { id: orgId },
+          where: { id: organizationId },
           data: {
             setupCompleted: true,
             setupStep: 4,
@@ -118,9 +105,9 @@ export async function PUT(request: Request) {
       }
     }
 
-    await invalidateCache(`setup:${orgId}`)
+    await invalidateCache(`setup:${organizationId}`)
     const updatedOrg = await prisma.organization.findUnique({
-      where: { id: orgId },
+      where: { id: organizationId },
       select: {
         id: true,
         name: true,
@@ -141,4 +128,4 @@ export async function PUT(request: Request) {
     console.error('[Setup API]', err)
     return errorResponse('Kurulum kaydedilirken bir hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

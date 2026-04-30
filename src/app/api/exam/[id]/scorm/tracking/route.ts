@@ -1,29 +1,21 @@
 import { addMonths } from 'date-fns'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
-import { NextRequest } from 'next/server'
 
 /** GET /api/exam/[id]/scorm/tracking — Get latest SCORM attempt */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id: trainingId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
+  const { id: trainingId } = params
 
   try {
     const where: Record<string, unknown> = {
       trainingId,
-      userId: dbUser!.id,
+      userId: dbUser.id,
     }
     // Org izolasyonu: super_admin haric kullanicilar sadece kendi org'larini gorebilir
-    if (dbUser!.role !== 'super_admin' && dbUser!.organizationId) {
-      where.organizationId = dbUser!.organizationId
+    if (dbUser.role !== 'super_admin') {
+      where.organizationId = organizationId
     }
 
     const attempt = await prisma.scormAttempt.findFirst({
@@ -36,19 +28,11 @@ export async function GET(
     logger.error('SCORM Tracking', 'SCORM attempt sorgulama hatasi', err)
     return errorResponse('SCORM verisi alınamadı', 500)
   }
-}
+}, { requireOrganization: true })
 
 /** POST /api/exam/[id]/scorm/tracking — Create new SCORM attempt */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id: trainingId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
+export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
+  const { id: trainingId } = params
 
   try {
     // Verify user has assignment for this training
@@ -56,7 +40,7 @@ export async function POST(
       where: {
         trainingId_userId: {
           trainingId,
-          userId: dbUser!.id,
+          userId: dbUser.id,
         },
       },
     })
@@ -67,8 +51,8 @@ export async function POST(
 
     const attempt = await prisma.scormAttempt.create({
       data: {
-        organizationId: dbUser!.organizationId!,
-        userId: dbUser!.id,
+        organizationId,
+        userId: dbUser.id,
         trainingId,
       },
     })
@@ -76,7 +60,7 @@ export async function POST(
     logger.info('SCORM Tracking', 'Yeni SCORM attempt olusturuldu', {
       attemptId: attempt.attemptId,
       trainingId,
-      userId: dbUser!.id,
+      userId: dbUser.id,
     })
 
     return jsonResponse(attempt, 201)
@@ -84,19 +68,11 @@ export async function POST(
     logger.error('SCORM Tracking', 'SCORM attempt olusturma hatasi', err)
     return errorResponse('SCORM oturumu başlatılamadı', 500)
   }
-}
+}, { requireOrganization: true })
 
 /** PATCH /api/exam/[id]/scorm/tracking — Update SCORM attempt data */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id: trainingId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
+export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const { id: trainingId } = params
 
   const body = await parseBody<{
     suspendData?: string
@@ -115,10 +91,10 @@ export async function PATCH(
     // Find latest attempt (org izolasyonlu)
     const scormWhere: Record<string, unknown> = {
       trainingId,
-      userId: dbUser!.id,
+      userId: dbUser.id,
     }
-    if (dbUser!.role !== 'super_admin' && dbUser!.organizationId) {
-      scormWhere.organizationId = dbUser!.organizationId
+    if (dbUser.role !== 'super_admin') {
+      scormWhere.organizationId = organizationId
     }
     const existing = await prisma.scormAttempt.findFirst({
       where: scormWhere,
@@ -147,7 +123,7 @@ export async function PATCH(
       const existingCert = await prisma.certificate.findFirst({
         where: {
           trainingId,
-          userId: dbUser!.id,
+          userId: dbUser.id,
         },
       })
 
@@ -155,7 +131,7 @@ export async function PATCH(
         // We need an ExamAttempt to link the certificate. Find or skip.
         const [examAttempt, training] = await Promise.all([
           prisma.examAttempt.findFirst({
-            where: { trainingId, userId: dbUser!.id },
+            where: { trainingId, userId: dbUser.id },
             orderBy: { createdAt: 'desc' },
           }),
           prisma.training.findUnique({
@@ -172,7 +148,7 @@ export async function PATCH(
 
           const cert = await prisma.certificate.create({
             data: {
-              userId: dbUser!.id,
+              userId: dbUser.id,
               trainingId,
               attemptId: examAttempt.id,
               certificateCode: certCode,
@@ -180,14 +156,11 @@ export async function PATCH(
             },
           })
 
-          await createAuditLog({
-            userId: dbUser!.id,
-            organizationId: dbUser!.organizationId,
+          await audit({
             action: 'scorm_certificate_created',
             entityType: 'certificate',
             entityId: cert.id,
             newData: { certificateCode: certCode, trainingId },
-            request,
           })
 
           logger.info('SCORM Tracking', 'SCORM sertifikasi olusturuldu', {
@@ -203,4 +176,4 @@ export async function PATCH(
     logger.error('SCORM Tracking', 'SCORM attempt guncelleme hatasi', err)
     return errorResponse('SCORM verisi güncellenemedi', 500)
   }
-}
+}, { requireOrganization: true })

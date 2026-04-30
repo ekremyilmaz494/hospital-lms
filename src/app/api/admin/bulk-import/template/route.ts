@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 
 /**
  * Toplu personel import için Excel şablonu üretir.
@@ -9,14 +9,8 @@ import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
  *
  * Şifre sütunu boş bırakılabilir — backend otomatik güvenli şifre üretir.
  */
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const GET = withAdminRoute(async ({ organizationId }) => {
+  const orgId = organizationId
 
   const departments = await prisma.department.findMany({
     where: { organizationId: orgId },
@@ -187,4 +181,4 @@ export async function GET() {
       'Cache-Control': 'private, max-age=60',
     },
   })
-}
+}, { requireOrganization: true })

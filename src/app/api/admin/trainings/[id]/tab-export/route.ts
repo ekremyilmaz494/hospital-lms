@@ -2,7 +2,8 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import ExcelJS from 'exceljs'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
@@ -81,13 +82,8 @@ interface QuestionRow {
  * Admin eğitim detay sayfasındaki tab-export (Personel Durumu / Sorular).
  * Query: ?tab=staff|questions&format=pdf|excel
  */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
+  const { id } = params
 
   const url = new URL(request.url)
   const tab = (url.searchParams.get('tab') ?? 'staff') as Tab
@@ -95,12 +91,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!['staff', 'questions'].includes(tab)) return errorResponse('Geçersiz tab', 400)
   if (!['pdf', 'excel'].includes(format)) return errorResponse('Geçersiz format', 400)
 
-  const allowed = await checkRateLimit(`report:tab:${dbUser!.id}`, 10, 60)
+  const allowed = await checkRateLimit(`report:tab:${dbUser.id}`, 10, 60)
   if (!allowed) return errorResponse('Çok fazla rapor isteği. Lütfen bekleyin.', 429)
 
   try {
     const training = await prisma.training.findFirst({
-      where: { id, organizationId: dbUser!.organizationId! },
+      where: { id, organizationId: organizationId },
       select: {
         title: true,
         category: true,
@@ -139,7 +135,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     logger.error('TabExport', 'Export oluşturulamadı', err)
     return errorResponse('Rapor oluşturulurken hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })
 
 async function loadStaffRows(trainingId: string): Promise<StaffRow[]> {
   const rows = await prisma.trainingAssignment.findMany({

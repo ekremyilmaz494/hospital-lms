@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
 /**
@@ -9,24 +10,15 @@ import { logger } from '@/lib/logger'
  * cevaplarla birlikte döner. Sadece evaluator (değerlendirmeyi yapan kişi)
  * kendi org'u içinde erişebilir — tenant izolasyonu form.organizationId ile.
  */
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin'])
-  if (roleError) return roleError
-
+export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id } = await params
 
   try {
     const evaluation = await prisma.competencyEvaluation.findFirst({
       where: {
         id,
-        evaluatorId: dbUser!.id,
-        form: { organizationId: dbUser!.organizationId! },
+        evaluatorId: dbUser.id,
+        form: { organizationId },
       },
       select: {
         id: true,
@@ -76,10 +68,10 @@ export async function GET(
     return jsonResponse(
       { evaluation, totalItems, answeredItems, progress },
       200,
-      { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' }
+      { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' }
     )
   } catch (err) {
     logger.error('staff:evaluations:[id]', 'Değerlendirme alınamadı', err)
     return errorResponse('Değerlendirme alınamadı.', 500)
   }
-}
+}, { requireOrganization: true })

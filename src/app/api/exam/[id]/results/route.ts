@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 
 /**
  * Post-exam soru bazlı sonuç dökümü — transition result ekranı için replay kaynağı.
@@ -10,18 +11,15 @@ import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
  *
  * Path `[id]` hem attemptId hem assignmentId kabul eder (submit'in aradığı gibi).
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
+  const { id } = params
 
   // attemptId veya assignmentId ile dene; her iki durumda da org + ownership zorunlu.
   let attempt = await prisma.examAttempt.findFirst({
     where: {
       id,
-      userId: dbUser!.id,
-      training: { organizationId: dbUser!.organizationId! },
+      userId: dbUser.id,
+      training: { organizationId },
     },
     select: {
       id: true,
@@ -36,9 +34,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     attempt = await prisma.examAttempt.findFirst({
       where: {
         assignmentId: id,
-        userId: dbUser!.id,
+        userId: dbUser.id,
         status: 'completed',
-        training: { organizationId: dbUser!.organizationId! },
+        training: { organizationId },
       },
       select: {
         id: true,
@@ -117,4 +115,4 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     200,
     { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
   )
-}
+}, { requireOrganization: true })

@@ -1,16 +1,11 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createPlanSchema, updatePlanSchema, createSubscriptionSchema } from '@/lib/validations'
 
 // ── Subscription Plans CRUD ──
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const GET = withSuperAdminRoute(async ({ request }) => {
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type') // plans | subscriptions
 
@@ -35,15 +30,9 @@ export async function GET(request: Request) {
     take: 100,
   })
   return jsonResponse(plans)
-}
+})
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')
 
@@ -57,19 +46,17 @@ export async function POST(request: Request) {
     const sub = await prisma.organizationSubscription.create({
       data: {
         ...parsed.data,
-        createdBy: dbUser!.id,
+        createdBy: dbUser.id,
         trialEndsAt: parsed.data.trialEndsAt ? new Date(parsed.data.trialEndsAt) : null,
         expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
       },
     })
 
-    await createAuditLog({
-      userId: dbUser!.id,
+    await audit({
       action: 'create',
       entityType: 'subscription',
       entityId: sub.id,
       newData: sub,
-      request,
     })
 
     return jsonResponse(sub, 201)
@@ -86,25 +73,17 @@ export async function POST(request: Request) {
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
+  await audit({
     action: 'create',
     entityType: 'subscription_plan',
     entityId: plan.id,
     newData: plan,
-    request,
   })
 
   return jsonResponse(plan, 201)
-}
+})
 
-export async function PATCH(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const PATCH = withSuperAdminRoute(async ({ request, audit }) => {
   const body = await parseBody<{ id: string; [key: string]: unknown }>(request)
   if (!body?.id) return errorResponse('ID required')
 
@@ -122,15 +101,13 @@ export async function PATCH(request: Request) {
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
+  await audit({
     action: 'update',
     entityType: 'subscription_plan',
     entityId: plan.id,
     oldData: oldPlan,
     newData: plan,
-    request,
   })
 
   return jsonResponse(plan)
-}
+})

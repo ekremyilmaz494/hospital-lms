@@ -1,4 +1,5 @@
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/crypto'
 import { escapeHtml } from '@/lib/email'
@@ -23,18 +24,9 @@ const testSchema = z.object({
  * Formdaki değerlerle (veya eksikse DB'dekiyle) gerçek bir test e-postası gönderir.
  * Save-öncesi test → yanlış config ile lock-out önlenir.
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
-
+export const POST = withAdminRoute(async ({ request, organizationId }) => {
   // Rate limit — aynı hastanenin test spam'ini engelle (saatte 10 test)
-  const rateOk = await checkRateLimit(`smtp-test:${orgId}`, 10, 3600)
+  const rateOk = await checkRateLimit(`smtp-test:${organizationId}`, 10, 3600)
   if (!rateOk) return errorResponse('Çok fazla test isteği. Lütfen bir saat sonra tekrar deneyin.', 429)
 
   const body = await request.json().catch(() => null)
@@ -44,7 +36,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const org = await prisma.organization.findUnique({
-    where: { id: orgId },
+    where: { id: organizationId },
     select: {
       name: true,
       smtpHost: true,
@@ -122,9 +114,9 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: true, message: 'Test e-postası başarıyla gönderildi.' })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Bilinmeyen hata'
-    logger.error('SmtpTest', `SMTP test başarısız — org=${orgId}`, err)
+    logger.error('SmtpTest', `SMTP test başarısız — org=${organizationId}`, err)
     return errorResponse(`SMTP bağlantısı başarısız: ${msg}`, 400)
   } finally {
     transporter.close()
   }
-}
+}, { requireOrganization: true, strict: true })

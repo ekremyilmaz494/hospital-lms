@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { trainingFeedbackSubmitSchema } from '@/lib/validations'
 import { checkRateLimit } from '@/lib/redis'
 import { isValidAnswer, isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
@@ -13,11 +14,7 @@ import { logger } from '@/lib/logger'
  * Idempotent: attempt için zaten response varsa 409 döner.
  * includeName=true ise userId kaydedilir (ISO belgesindeki "isteğe bağlı" isim).
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!dbUser?.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
+export const POST = withStaffRoute(async ({ request, dbUser, organizationId, audit }) => {
   // Rate limit: dakikada 10 gönderim
   const allowed = await checkRateLimit(`feedback-submit:${dbUser.id}`, 10, 60)
   if (!allowed) {
@@ -42,7 +39,7 @@ export async function POST(request: Request) {
     where: {
       id: attemptId,
       userId: dbUser.id,
-      training: { organizationId: dbUser.organizationId },
+      training: { organizationId },
     },
     select: {
       id: true,
@@ -93,7 +90,7 @@ export async function POST(request: Request) {
   // Snapshot: submit anındaki form yapısı donmuş olarak response'a yazılır,
   // admin sonradan form'u düzenlese bile detay sayfası orijinal soruyu gösterir.
   const form = await prisma.trainingFeedbackForm.findFirst({
-    where: { organizationId: dbUser.organizationId, isActive: true },
+    where: { organizationId, isActive: true },
     select: {
       id: true,
       title: true,
@@ -211,9 +208,7 @@ export async function POST(request: Request) {
       return created
     })
 
-    await createAuditLog({
-      userId: dbUser.id,
-      organizationId: attempt.training.organizationId,
+    await audit({
       action: 'feedback.submitted',
       entityType: 'training_feedback_response',
       entityId: response.id,
@@ -229,4 +224,4 @@ export async function POST(request: Request) {
     logger.error('FeedbackSubmit', 'Kayıt oluşturulamadı', { err, userId: dbUser.id, attemptId })
     return errorResponse('Geri bildirim kaydedilemedi', 500)
   }
-}
+}, { requireOrganization: true })

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
 import type { UserRole } from '@/types/database'
 
@@ -17,13 +18,7 @@ const actionPlanSchema = z.object({
  * Belirlenen kategorilerdeki aktif eğitimleri, o kategorilerde hiç
  * assignment'ı olmayan tüm personele atar (TrainingAssignment).
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek verisi')
 
@@ -31,7 +26,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message ?? 'Geçersiz veri')
 
   const { categories, dueDate } = parsed.data
-  const orgId = dbUser!.organizationId!
+  const orgId = organizationId
 
   try {
     // Paralel: ilgili eğitimler + tüm aktif personel
@@ -75,7 +70,7 @@ export async function POST(request: Request) {
           newAssignments.push({
             userId: staff.id,
             trainingId: training.id,
-            assignedBy: dbUser!.id,
+            assignedBy: dbUser.id,
             ...(dueDate ? { dueDate: new Date(dueDate) } : {}),
           })
         }
@@ -96,9 +91,7 @@ export async function POST(request: Request) {
       skipDuplicates: true,
     })
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'accreditation_action_plan_created',
       entityType: 'training_assignment',
       newData: {
@@ -116,4 +109,4 @@ export async function POST(request: Request) {
   } catch {
     return errorResponse('Aksiyon planı oluşturulamadı', 500)
   }
-}
+}, { requireOrganization: true })

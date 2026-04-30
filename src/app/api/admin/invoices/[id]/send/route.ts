@@ -1,9 +1,9 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, assertRole, errorResponse, jsonResponse, createAuditLog } from '@/lib/api-helpers'
+import { errorResponse, jsonResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { sendInvoiceEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 import { jsPDF } from 'jspdf'
-import { NextRequest } from 'next/server'
 
 /** Tarih formatla: 05.04.2026 */
 function formatDateTR(date: Date): string {
@@ -194,19 +194,8 @@ function generateInvoicePdfBuffer(invoice: {
  * Faturayi e-posta ile gonderir. PDF eki ile birlikte.
  * Fatura durumunu 'sent' olarak gunceller.
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  try {
-    assertRole(dbUser!.role, ['admin', 'super_admin'])
-  } catch {
-    return errorResponse('Bu isleme yetkiniz yok', 403)
-  }
+export const POST = withAdminRoute<{ id: string }>(async ({ params, dbUser, audit }) => {
+  const { id } = params
 
   try {
     const invoice = await prisma.invoice.findUnique({
@@ -227,7 +216,7 @@ export async function POST(
     }
 
     // Organizasyon izolasyonu
-    if (dbUser!.role === 'admin' && invoice.organizationId !== dbUser!.organizationId) {
+    if (dbUser.role === 'admin' && invoice.organizationId !== dbUser.organizationId) {
       return errorResponse('Bu faturaya erisim yetkiniz yok', 403)
     }
 
@@ -265,14 +254,11 @@ export async function POST(
       },
     })
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: invoice.organizationId,
+    await audit({
       action: 'invoice.sent',
       entityType: 'invoice',
       entityId: invoice.id,
       newData: { invoiceNumber: invoice.invoiceNumber, sentTo: recipientEmail },
-      request,
     })
 
     logger.info('Invoice Send', 'Fatura gonderildi', {
@@ -286,4 +272,4 @@ export async function POST(
     logger.error('Invoice Send', 'Fatura gonderilemedi', err)
     return errorResponse('Fatura gonderilemedi. Lutfen tekrar deneyin.', 500)
   }
-}
+})

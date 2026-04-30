@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 
 interface SignBody {
   signatureData: string
@@ -7,10 +8,8 @@ interface SignBody {
 }
 
 /** POST /api/exam/[id]/sign — Personel sınav sonucu dijital imzası */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id: attemptId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, audit }) => {
+  const { id: attemptId } = params
 
   const body = await parseBody<SignBody>(request)
   if (!body?.signatureData || !body?.signatureMethod) {
@@ -35,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Attempt'i bul — userId eşleşmeli
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser!.id },
+    where: { id: attemptId, userId: dbUser.id },
     select: { id: true, isPassed: true, signedAt: true, trainingId: true },
   })
 
@@ -55,9 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     data: { signedAt, signatureData, signatureIp, signatureMethod },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'sign',
     entityType: 'exam_attempt',
     entityId: attemptId,
@@ -65,4 +62,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   })
 
   return jsonResponse({ success: true, signedAt })
-}
+}, { requireOrganization: true })

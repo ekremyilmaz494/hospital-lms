@@ -1,4 +1,5 @@
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { uploadBuffer, videoKey, documentKey, audioKey } from '@/lib/s3'
 import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
@@ -24,14 +25,8 @@ function detectContentType(mimeType: string): 'video' | 'pdf' | 'audio' {
  * Genel içerik yükleme: video (MP4, WebM) veya PDF kabul eder.
  * Response: { key, fileName, fileSize, contentType }
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`upload:${dbUser!.id}`, 20, 3600)
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) => {
+  const allowed = await checkRateLimit(`upload:${dbUser.id}`, 20, 3600)
   if (!allowed) return errorResponse('Çok fazla yükleme işlemi. Lütfen bir saat bekleyin.', 429)
 
   try {
@@ -58,11 +53,6 @@ export async function POST(request: Request) {
       return errorResponse(`Dosya boyutu ${limitMB}MB limitini aşıyor`, 400)
     }
 
-    const organizationId = dbUser!.organizationId
-    if (!organizationId) {
-      return errorResponse('Kullanıcının organizasyon bilgisi bulunamadı', 403)
-    }
-
     const key = contentType === 'video'
       ? videoKey(organizationId, 'drafts', file.name)
       : contentType === 'audio'
@@ -77,4 +67,4 @@ export async function POST(request: Request) {
     logger.error('Content Upload', 'S3 yükleme hatası', err)
     return errorResponse('Dosya yüklenirken bir hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

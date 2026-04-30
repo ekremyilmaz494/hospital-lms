@@ -1,0 +1,17 @@
+{
+  "files.exclude": {
+    "**/.next": true,
+    "src/generated": true
+  },
+  "search.exclude": {
+    "**/.next": true,
+    "src/generated": true,
+    "**/pnpm-lock.yaml": true,
+    "**/*.lock": true
+  },
+  "files.watcherExclude": {
+    "**/.next/**": true,
+    "**/node_modules/**": true,
+    "src/generated/**": true
+  }
+}

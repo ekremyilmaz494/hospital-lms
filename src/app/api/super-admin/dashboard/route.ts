@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { getCached, setCached } from '@/lib/redis'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
@@ -8,13 +9,7 @@ import type { UserRole } from '@/types/database'
 const CACHE_KEY = 'super-admin:dashboard'
 const CACHE_TTL = 300
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const GET = withSuperAdminRoute(async () => {
   try {
     const cached = await getCached<Record<string, unknown>>(CACHE_KEY)
     if (cached) return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
@@ -204,7 +199,7 @@ export async function GET() {
     logger.error('SuperAdmin Dashboard', 'Dashboard verileri alınamadı', err)
     return errorResponse('Dashboard verileri alınamadı', 503)
   }
-}
+})
 
 function formatRelativeTime(date: Date): string {
   const diff = Date.now() - new Date(date).getTime()

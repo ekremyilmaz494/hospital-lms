@@ -1,19 +1,12 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withApiHandler } from '@/lib/api-handler'
 import { encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organizasyon bulunamadı', 403)
-
+export const GET = withApiHandler(async ({ organizationId }) => {
   const org = await prisma.organization.findUnique({
-    where: { id: orgId },
+    where: { id: organizationId },
     select: {
       ssoEnabled: true,
       ssoProvider: true,
@@ -40,17 +33,9 @@ export async function GET() {
     ssoAutoProvision: org?.ssoAutoProvision ?? true,
     ssoDefaultRole: org?.ssoDefaultRole ?? 'staff',
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
-}
+}, { roles: ['admin', 'super_admin'], strict: true, requireOrganization: true })
 
-export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organizasyon bulunamadı', 403)
-
+export const PUT = withApiHandler(async ({ request, organizationId, audit }) => {
   const body = await request.json().catch(() => null)
   if (!body) return errorResponse('Geçersiz istek verisi')
 
@@ -74,7 +59,7 @@ export async function PUT(request: Request) {
   }
 
   await prisma.organization.update({
-    where: { id: orgId },
+    where: { id: organizationId },
     data: {
       ...(ssoEnabled !== undefined && { ssoEnabled }),
       ...(ssoProvider !== undefined && { ssoProvider }),
@@ -90,14 +75,11 @@ export async function PUT(request: Request) {
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: orgId,
+  await audit({
     action: 'sso.update',
     entityType: 'organization',
-    entityId: orgId,
-    request,
+    entityId: organizationId,
   })
 
   return jsonResponse({ success: true })
-}
+}, { roles: ['admin', 'super_admin'], strict: true, requireOrganization: true })

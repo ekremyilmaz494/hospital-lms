@@ -1,23 +1,16 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 
 /** GET /api/admin/accreditation/reports?standardBody=JCI&page=1&limit=20 */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const standardBody = searchParams.get('standardBody') ?? undefined
   const { page, limit, skip } = safePagination(searchParams)
 
-  const orgId = dbUser!.organizationId!
-
   try {
     const where = {
-      organizationId: orgId,
+      organizationId,
       ...(standardBody ? { standardBody } : {}),
     }
 
@@ -48,4 +41,4 @@ export async function GET(request: Request) {
   } catch {
     return errorResponse('Raporlar getirilemedi', 500)
   }
-}
+}, { requireOrganization: true })

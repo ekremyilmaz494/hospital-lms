@@ -3,11 +3,9 @@ import { jsPDF } from 'jspdf'
 import { autoTable } from 'jspdf-autotable'
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser,
-  requireRole,
   errorResponse,
-  createAuditLog,
 } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -62,26 +60,18 @@ interface PersonRow {
   completedAt: string
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
 
   const allowed = await checkRateLimit(
-    `exam-export:${dbUser!.organizationId}`,
+    `exam-export:${organizationId}`,
     10,
     60,
   )
   if (!allowed)
     return errorResponse('Çok fazla dışa aktarma isteği. Lütfen bekleyin.', 429)
 
-  const orgId = dbUser!.organizationId!
+  const orgId = organizationId
 
   try {
     // Paralel sorgular
@@ -325,14 +315,11 @@ export async function GET(
       const pdfBuffer = doc.output('arraybuffer')
       const dateStr = new Date().toISOString().slice(0, 10)
 
-      await createAuditLog({
-        userId: dbUser!.id,
-        organizationId: orgId,
+      await audit({
         action: 'standalone_exam.export',
         entityType: 'training',
         entityId: id,
         newData: { format: 'pdf', title: exam.title },
-        request,
       })
 
       return new Response(pdfBuffer, {
@@ -476,14 +463,11 @@ export async function GET(
     const buffer = await wb.xlsx.writeBuffer()
     const dateStr = new Date().toISOString().slice(0, 10)
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'standalone_exam.export',
       entityType: 'training',
       entityId: id,
       newData: { format: 'xlsx', title: exam.title },
-      request,
     })
 
     return new Response(buffer, {
@@ -498,4 +482,4 @@ export async function GET(
     logger.error('exam-export', 'Export failed', { examId: id, error: err })
     return errorResponse('Disa aktarma sirasinda bir hata olustu', 500)
   }
-}
+}, { requireOrganization: true })

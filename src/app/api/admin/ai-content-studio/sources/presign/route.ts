@@ -6,20 +6,15 @@
  *       client S3'e direkt yükler → generation create endpoint'inde
  *       sourceFiles[] içinde s3Key ile referans verir.
  */
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getUploadUrl, aiSourceKey } from '@/lib/s3'
 import { aiSourcePresignSchema } from '@/lib/ai-content-studio/validations'
 import { checkRateLimit } from '@/lib/redis'
 import crypto from 'crypto'
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`ai-source-presign:${dbUser!.id}`, 30, 3600)
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) => {
+  const allowed = await checkRateLimit(`ai-source-presign:${dbUser.id}`, 30, 3600)
   if (!allowed) return errorResponse('Çok fazla yükleme isteği.', 429)
 
   const body = await parseBody(request)
@@ -35,7 +30,7 @@ export async function POST(request: Request) {
 
   let key: string
   try {
-    key = aiSourceKey(dbUser!.organizationId!, sessionId, parsed.data.filename)
+    key = aiSourceKey(organizationId, sessionId, parsed.data.filename)
   } catch (err) {
     return errorResponse((err as Error).message, 400)
   }
@@ -53,4 +48,4 @@ export async function POST(request: Request) {
     sessionId,
     expiresInSeconds: 1800,
   })
-}
+}, { requireOrganization: true })

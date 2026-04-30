@@ -1,22 +1,16 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, safePagination, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { startEvaluationSchema } from '@/lib/validations'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit, skip } = safePagination(searchParams)
   const subjectId = searchParams.get('subjectId')
   const formId = searchParams.get('formId')
-  const orgId = dbUser!.organizationId!
 
   const where = {
-    form: { organizationId: orgId },
+    form: { organizationId },
     ...(subjectId ? { subjectId } : {}),
     ...(formId ? { formId } : {}),
   }
@@ -38,15 +32,9 @@ export async function GET(request: Request) {
   ])
 
   return jsonResponse({ evaluations, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
@@ -54,11 +42,10 @@ export async function POST(request: Request) {
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const { formId, subjectId, managerId, peerIds, subordinateIds, includeSelf } = parsed.data
-  const orgId = dbUser!.organizationId!
 
   // Form'un bu organizasyona ait olduğunu doğrula
   const form = await prisma.competencyForm.findFirst({
-    where: { id: formId, organizationId: orgId },
+    where: { id: formId, organizationId },
   })
   if (!form) return errorResponse('Form bulunamadı', 404)
 
@@ -75,7 +62,7 @@ export async function POST(request: Request) {
   // Tüm evaluator ID'lerinin bu organizasyona ait olduğunu doğrula
   const evaluatorIds = evaluators.map(e => e.id)
   const validUsers = await prisma.user.findMany({
-    where: { id: { in: evaluatorIds }, organizationId: orgId },
+    where: { id: { in: evaluatorIds }, organizationId },
     select: { id: true },
   })
   if (validUsers.length !== evaluatorIds.length) {
@@ -106,7 +93,7 @@ export async function POST(request: Request) {
     await prisma.notification.createMany({
       data: notifTargets.map(e => ({
         userId: e.id,
-        organizationId: orgId,
+        organizationId,
         title: 'Yeni Yetkinlik Değerlendirmesi',
         message: `"${form.title}" formu kapsamında ${subject.firstName} ${subject.lastName} için değerlendirme yapmanız bekleniyor.`,
         type: 'competency_evaluation',
@@ -119,22 +106,19 @@ export async function POST(request: Request) {
   await prisma.notification.create({
     data: {
       userId: subjectId,
-      organizationId: orgId,
+      organizationId,
       title: '360° Değerlendirme Başlatıldı',
       message: `"${form.title}" formu kapsamında hakkınızda ${evaluators.length} kişilik değerlendirme süreci başlatıldı.`,
       type: 'competency_evaluation',
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: orgId,
+  await audit({
     action: 'CREATE',
     entityType: 'CompetencyEvaluation',
     entityId: subjectId,
     newData: { created: created.length, total: evaluators.length },
-    request,
   })
 
   return jsonResponse({ created: created.length, total: evaluators.length }, 201)
-}
+}, { requireOrganization: true })

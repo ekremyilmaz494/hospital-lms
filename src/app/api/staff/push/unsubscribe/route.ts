@@ -1,11 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import {
-  getAuthUser,
-  requireRole,
-  jsonResponse,
-  errorResponse,
-  parseBody,
-} from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
 
 const unsubscribeSchema = z.object({
@@ -13,13 +8,7 @@ const unsubscribeSchema = z.object({
 })
 
 /** POST /api/staff/push/unsubscribe — Web Push aboneliğini sil */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin'])
-  if (roleError) return roleError
-
+export const POST = withStaffRoute(async ({ request, dbUser }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek verisi')
 
@@ -30,10 +19,10 @@ export async function POST(request: Request) {
 
   await prisma.pushSubscription.deleteMany({
     where: {
-      userId:   dbUser!.id,
+      userId:   dbUser.id,
       endpoint: parsed.data.endpoint,
     },
   })
 
   return jsonResponse({ message: 'Bildirimler devre dışı bırakıldı' })
-}
+})

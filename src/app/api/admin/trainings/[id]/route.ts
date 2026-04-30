@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, getAuthUserWithWriteGuard, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { updateTrainingSchema } from '@/lib/validations'
@@ -24,15 +25,9 @@ const ASSIGNMENT_NON_TERMINAL_STATUSES: AssignmentStatus[] = (
   ['assigned', 'in_progress', 'passed', 'failed', 'locked'] as AssignmentStatus[]
 ).filter(s => !ASSIGNMENT_TERMINAL_STATUSES.includes(s))
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
+  const orgId = organizationId
 
   // Paralel: training + assignment istatistikleri + son 20 atama + imza/skor
   const [training, assignmentStats, recentAssignments, signedCount, avgScoreResult] = await Promise.all([
@@ -162,15 +157,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       })),
     })),
   }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUserWithWriteGuard(request)
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const { id } = params
+  const orgId = organizationId
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')
@@ -178,7 +169,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const parsed = updateTrainingSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const existing = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  const existing = await prisma.training.findFirst({ where: { id, organizationId: orgId } })
   if (!existing) return errorResponse('Training not found', 404)
 
   // B5.5 — Güncelleme sırasında bitiş tarihi geçmişte olamaz
@@ -190,40 +181,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (parsed.data.startDate) data.startDate = new Date(parsed.data.startDate)
   if (parsed.data.endDate) data.endDate = new Date(parsed.data.endDate)
 
-  const training = await prisma.training.update({ where: { id, organizationId: dbUser!.organizationId! }, data })
+  const training = await prisma.training.update({ where: { id, organizationId: orgId }, data })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'update',
     entityType: 'training',
     entityId: id,
     oldData: existing,
     newData: training,
-    request,
   })
 
   revalidatePath('/staff/my-trainings')
   revalidatePath('/admin/trainings')
 
-  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
-  try { await invalidateOrgCache(dbUser!.organizationId!, 'trainings') } catch {}
+  try { await invalidateDashboardCache(orgId) } catch {}
+  try { await invalidateOrgCache(orgId, 'trainings') } catch {}
 
   return jsonResponse(training)
-}
+}, { requireOrganization: true })
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUserWithWriteGuard(request)
-  if (error) return error
+export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const { id } = params
+  const orgId = organizationId
 
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`training-delete:${dbUser!.id}`, 30, 3600)
+  const allowed = await checkRateLimit(`training-delete:${dbUser.id}`, 30, 3600)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
-  const existing = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  const existing = await prisma.training.findFirst({ where: { id, organizationId: orgId } })
   if (!existing) return errorResponse('Training not found', 404)
 
   // B5.2/G5.2 — Devam eden sınavları kontrol et; ?force=true olmadan engelle
@@ -250,7 +234,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   // Soft delete: isActive false yap, cascade silme yerine veri korunur
   await prisma.$transaction([
-    prisma.training.update({ where: { id, organizationId: dbUser!.organizationId! }, data: { isActive: false } }),
+    prisma.training.update({ where: { id, organizationId: orgId }, data: { isActive: false } }),
     // Devam eden sınav girişimlerini iptal et (force ile onaylandı)
     // State machine ile uyumlu: EXPIRE event'inin toplu hali (non-terminal → expired)
     ...(activeAttemptCount > 0
@@ -270,21 +254,18 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }),
   ])
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'deactivate',
     entityType: 'training',
     entityId: id,
     oldData: existing,
-    request,
   })
 
   revalidatePath('/staff/my-trainings')
   revalidatePath('/admin/trainings')
 
-  try { await invalidateDashboardCache(dbUser!.organizationId!) } catch {}
-  try { await invalidateOrgCache(dbUser!.organizationId!, 'trainings') } catch {}
+  try { await invalidateDashboardCache(orgId) } catch {}
+  try { await invalidateOrgCache(orgId, 'trainings') } catch {}
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

@@ -1,4 +1,5 @@
-import { jsonResponse, errorResponse, getAuthUser } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
 import { generateAndSendOtp } from '@/lib/auth/sms-otp'
@@ -18,11 +19,7 @@ import { generateAndSendOtp } from '@/lib/auth/sms-otp'
 const RATE_WINDOW_SEC = 10 * 60
 const RATE_MAX = 3
 
-export async function POST() {
-  const { user, dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!user || !dbUser) return errorResponse('Oturum bulunamadı', 401)
-
+export const POST = withStaffRoute(async ({ user, dbUser }) => {
   // Telefon kontrolü
   if (!dbUser.phone) {
     return errorResponse('Hesabınıza telefon numarası tanımlı değil. Yöneticinizle iletişime geçin.', 400)
@@ -44,4 +41,4 @@ export async function POST() {
   // kullanıcı zaten kendi numarasını biliyor)
   const masked = dbUser.phone.slice(-4).padStart(dbUser.phone.length, '*')
   return jsonResponse({ success: true, phoneMasked: masked })
-}
+}, { requireOrganization: true })

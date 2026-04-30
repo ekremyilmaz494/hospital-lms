@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
 interface DeleteUserDataBody {
@@ -8,14 +9,7 @@ interface DeleteUserDataBody {
   organizationId?: string // Super admin için zorunlu — hedef organizasyon
 }
 
-export async function POST(request: Request) {
-  // ── Auth & role check ──
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   // ── Parse body ──
   const body = await parseBody<DeleteUserDataBody>(request)
   if (!body?.userId) {
@@ -46,14 +40,14 @@ export async function POST(request: Request) {
     // ── Tenant isolation: admin kendi org'unda, super_admin herhangi birinde değil ──
     // Super admin bile sadece belirli bir organizasyondaki kullanıcıyı silebilir
     // (yanlışlıkla cross-org silmeyi önle)
-    if (targetUser.organizationId !== dbUser!.organizationId && dbUser!.role !== 'super_admin') {
+    if (targetUser.organizationId !== organizationId && dbUser.role !== 'super_admin') {
       return errorResponse('Bu kullanıcı üzerinde işlem yetkiniz bulunmamaktadır.', 403)
     }
     // Super admin için: hedef kullanıcının organizationId'si body'den gelen org ile eşleşmeli
-    if (dbUser!.role === 'super_admin' && !body.organizationId) {
+    if (dbUser.role === 'super_admin' && !body.organizationId) {
       return errorResponse('Super admin KVKK silme işlemi için organizationId zorunludur.', 400)
     }
-    if (dbUser!.role === 'super_admin' && body.organizationId && targetUser.organizationId !== body.organizationId) {
+    if (dbUser.role === 'super_admin' && body.organizationId && targetUser.organizationId !== body.organizationId) {
       return errorResponse('Kullanıcı belirtilen organizasyona ait değil.', 403)
     }
 
@@ -111,9 +105,7 @@ export async function POST(request: Request) {
     ])
 
     // ── Audit log ──
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId,
+    await audit({
       action: 'KVKK_DATA_DELETION',
       entityType: 'User',
       entityId: userId,
@@ -124,12 +116,11 @@ export async function POST(request: Request) {
         email: anonymizedEmail,
         phone: null,
       },
-      request,
     })
 
     logger.info('kvkk', 'Kullanıcı verileri anonimleştirildi', {
       targetUserId: userId,
-      performedBy: dbUser!.id,
+      performedBy: dbUser.id,
     })
 
     return jsonResponse({
@@ -140,4 +131,4 @@ export async function POST(request: Request) {
     logger.error('kvkk', 'Veri silme işlemi sırasında hata', err)
     return errorResponse('Veri silme işlemi sırasında bir hata oluştu.', 500)
   }
-}
+}, { requireOrganization: true })

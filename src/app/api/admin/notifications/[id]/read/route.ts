@@ -1,22 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
-export async function POST(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const POST = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
 
   try {
     const notification = await prisma.notification.findFirst({
-      where: { id, organizationId: dbUser!.organizationId! },
+      where: { id, organizationId },
     })
 
     if (!notification) return errorResponse('Bildirim bulunamadı', 404)
@@ -31,4 +23,4 @@ export async function POST(
     logger.error('Admin Notifications', 'Bildirim okundu işaretleme başarısız', err)
     return errorResponse('Bildirim güncellenemedi', 500)
   }
-}
+}, { requireOrganization: true })

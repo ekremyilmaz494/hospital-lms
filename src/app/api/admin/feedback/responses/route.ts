@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, requireRole, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { calculateOverallScore, type FeedbackQuestionType } from '@/lib/feedback-helpers'
 import { logger } from '@/lib/logger'
 
@@ -14,13 +15,7 @@ import { logger } from '@/lib/logger'
  *
  * Dönüş: her response'un özet bilgisi + calculated overallScore (likert avg).
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!dbUser?.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-  const roleError = requireRole(dbUser.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, dbUser, organizationId }) => {
   const url = new URL(request.url)
   const { page, limit, skip } = safePagination(url.searchParams, 100)
   const trainingId = url.searchParams.get('trainingId') || undefined
@@ -30,7 +25,7 @@ export async function GET(request: Request) {
   const isPassed = isPassedParam === 'true' ? true : isPassedParam === 'false' ? false : undefined
 
   const where = {
-    organizationId: dbUser.organizationId,
+    organizationId,
     ...(trainingId ? { trainingId } : {}),
     ...(isPassed !== undefined ? { isPassed } : {}),
     ...(dateFrom || dateTo
@@ -110,4 +105,4 @@ export async function GET(request: Request) {
     logger.error('AdminFeedbackResponses GET', 'Listeleme hatası', { err, userId: dbUser.id })
     return errorResponse('Yanıtlar yüklenemedi', 500)
   }
-}
+}, { requireOrganization: true })

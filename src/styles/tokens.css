@@ -1,0 +1,348 @@
+:root {
+  /* ── WHITE-LABEL BRANDING (JS tarafindan dinamik override edilir) ── */
+  --brand-primary: #0F172A;
+  --brand-secondary: #3B82F6;
+
+  /* ══ BRAND PALETTE (10 ton) — Zümrüt (default) ══
+     Tüm proje yeşilinin yerine geçer. [data-color="X"] ile override edilir. */
+  --brand-50:  #ecfdf5;
+  --brand-100: #d1fae5;
+  --brand-200: #a7f3d0;
+  --brand-300: #6ee7b7;
+  --brand-400: #34d399;
+  --brand-500: #10b981;
+  --brand-600: #0d9668;
+  --brand-700: #087a54;
+  --brand-800: #065f46;
+  --brand-900: #064e3b;
+
+  /* ── AYDINLIK TEMA ── */
+  --color-primary: var(--brand-600);
+  --color-primary-hover: var(--brand-700);
+  --color-primary-light: var(--brand-100);
+  --color-primary-rgb: 13, 150, 104;
+  --color-secondary: #1e293b;
+  --color-accent: #f59e0b;
+  --color-accent-hover: #d97706;
+  --color-accent-light: #fef3c7;
+
+  --color-bg: #f1f5f9;
+  --color-bg-rgb: 241, 245, 249;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-hover: #f1f5f9;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94a3b8;
+  --color-border: #e2e8f0;
+  --color-border-hover: #cbd5e1;
+
+  --color-success: #059669;
+  --color-success-bg: #d1fae5;
+  --color-warning: #d97706;
+  --color-warning-bg: #fef3c7;
+  --color-error: #dc2626;
+  --color-error-bg: #fee2e2;
+  --color-info: #2563eb;
+  --color-info-bg: #dbeafe;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+  --space-4xl: 96px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 4px 8px rgba(15, 23, 42, 0.06), 0 2px 14px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 10px 20px rgba(15, 23, 42, 0.08), 0 4px 28px rgba(15, 23, 42, 0.12);
+  --shadow-xl: 0 20px 40px rgba(15, 23, 42, 0.1), 0 8px 52px rgba(15, 23, 42, 0.14);
+  --shadow-card-hover: 0 14px 32px color-mix(in srgb, var(--brand-600) calc(0.12 * 100%), transparent), 0 6px 20px rgba(15, 23, 42, 0.08);
+
+  --font-body: var(--font-body-loaded), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: var(--font-display-loaded), 'Plus Jakarta Sans', 'Aptos Display', 'Segoe UI', sans-serif;
+  --font-mono: var(--font-mono-loaded), 'SFMono-Regular', 'Cascadia Code', 'Liberation Mono', ui-monospace, monospace;
+  --font-editorial: Georgia, 'Times New Roman', serif;
+  --font-plus-jakarta-sans: var(--font-display);
+  --font-jetbrains-mono: var(--font-mono);
+  --font-space-grotesk: var(--font-display);
+  --font-outfit: var(--font-display);
+  --font-bricolage: var(--font-display);
+  --font-syne: var(--font-display);
+  --font-dm-sans: var(--font-body);
+
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-base: 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* shadcn/ui uyumu */
+  --background: var(--color-bg);
+  --foreground: var(--color-text-primary);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text-primary);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text-primary);
+  --primary: var(--color-primary);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-surface-hover);
+  --secondary-foreground: var(--color-text-primary);
+  --muted: var(--color-surface-hover);
+  --muted-foreground: var(--color-text-secondary);
+  --accent: var(--color-accent);
+  --accent-foreground: #ffffff;
+  --destructive: var(--color-error);
+  --destructive-foreground: #ffffff;
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-primary);
+  --radius: var(--radius-md);
+
+  --sidebar-background: var(--color-surface);
+  --sidebar-foreground: var(--color-text-primary);
+  --sidebar-primary: var(--color-primary);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--color-primary-light);
+  --sidebar-accent-foreground: var(--color-primary);
+  --sidebar-border: var(--color-border);
+  --sidebar-ring: var(--color-primary);
+
+  /* ══ EDITORIAL PALETTE (staff panel — Clinical Editorial) ══
+     Light mode: cream paper, ink text, gold accent.
+     Note: --ed-cream is aliased to Klinova --k-bg so staff panel matches admin chrome. */
+  --ed-cream: #fafaf9;
+  --ed-ink: #0a1628;
+  --ed-ink-soft: #5b6478;
+  --ed-gold: #c9a961;
+  --ed-rule: #e0d7c0;
+  --ed-olive: #1a3a28;
+  /* Alpha variants for concatenation patterns (shadow glows, gradients) */
+  --ed-gold-a10: #c9a9611a;
+  --ed-gold-a20: #c9a96133;
+  --ed-gold-a33: #c9a96155;
+
+  /* ══ KLINOVA PALETTE (admin panel — emerald/jakarta) ══
+     Prototip: klinova-admin/styles.css
+     Scope: yalnızca /admin alt ağacı (super-admin + staff panelleri editorial'de kalır) */
+  --k-primary: var(--brand-600);
+  --k-primary-hover: var(--brand-700);
+  --k-primary-light: color-mix(in srgb, var(--brand-600) 12%, white);
+  --k-accent: #f59e0b;
+  --k-accent-hover: #d97706;
+  --k-bg: #fafaf9;
+  --k-surface: #ffffff;
+  --k-surface-hover: #f5f5f4;
+  --k-border: #e7e5e4;
+  --k-border-hover: #d6d3d1;
+  --k-text-primary: #1c1917;
+  --k-text-secondary: #44403c;
+  --k-text-muted: #78716c;
+  --k-success: #10b981;
+  --k-success-bg: #d1fae5;
+  --k-warning: #f59e0b;
+  --k-warning-bg: #fef3c7;
+  --k-error: #ef4444;
+  --k-error-bg: #fee2e2;
+  --k-info: #3b82f6;
+  --k-info-bg: #dbeafe;
+  --k-radius-card: 16px;
+  --k-radius-ctrl: 10px;
+  --k-radius-pill: 999px;
+  --k-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --k-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --k-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --k-motion: cubic-bezier(0.22, 1, 0.36, 1);
+  --k-sidebar-w: 252px;
+  --k-sidebar-w-collapsed: 72px;
+  --k-topbar-h: 64px;
+}
+
+.dark {
+  /* ── KARANLIK TEMA — Premium, Linear/Vercel-inspired ── */
+  --color-primary: var(--brand-400);
+  --color-primary-hover: var(--brand-300);
+  --color-primary-light: color-mix(in srgb, var(--brand-400) 8%, transparent);
+  --color-primary-rgb: 52, 211, 153;
+  --color-accent: #fbbf24;
+  --color-accent-hover: #fcd34d;
+  --color-accent-light: rgba(251, 191, 36, 0.08);
+
+  /* Layered surfaces — 4 distinct elevation levels for depth */
+  --color-bg: #09090b;
+  --color-bg-rgb: 9, 9, 11;
+  --color-surface: #111113;
+  --color-surface-elevated: #18181b;
+  --color-surface-hover: #1c1c20;
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+  --color-border: #27272a;
+  --color-border-hover: #3f3f46;
+
+  /* Semantic status — slightly muted for dark bg, stronger bg tint */
+  --color-success: #34d399;
+  --color-success-bg: color-mix(in srgb, var(--brand-400) calc(0.12 * 100%), transparent);
+  --color-warning: #fbbf24;
+  --color-warning-bg: rgba(251, 191, 36, 0.12);
+  --color-error: #f87171;
+  --color-error-bg: rgba(248, 113, 113, 0.12);
+  --color-info: #60a5fa;
+  --color-info-bg: rgba(96, 165, 250, 0.12);
+
+  /* Shadows — subtle glow on dark, using primary tint */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-card-hover: 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px color-mix(in srgb, var(--brand-400) calc(0.08 * 100%), transparent);
+
+  /* shadcn/ui overrides for dark */
+  --sidebar-background: var(--color-surface);
+  --sidebar-foreground: var(--color-text-primary);
+  --sidebar-primary: var(--color-primary);
+  --sidebar-primary-foreground: #09090b;
+  --sidebar-accent: var(--color-primary-light);
+  --sidebar-accent-foreground: var(--color-primary);
+  --sidebar-border: var(--color-border);
+
+  /* ══ EDITORIAL PALETTE — dark variant (midnight newsprint) ══
+     Flip cream↔ink, keep gold, soften rules. Aligned with --k-bg dark. */
+  --ed-cream: #0a0a0b;           /* page paper → admin dark bg */
+  --ed-ink: #f0ebe0;             /* body text → warm parchment */
+  --ed-ink-soft: #9aa3b8;        /* secondary text → muted steel */
+  --ed-gold: #d4b876;             /* accent → slightly warmer gold */
+  --ed-rule: #1e2a42;             /* borders → subtle navy */
+  --ed-olive: #5c8a6b;            /* secondary accent → lighter olive */
+  --ed-gold-a10: #d4b8761a;
+  --ed-gold-a20: #d4b87633;
+  --ed-gold-a33: #d4b87655;
+
+  /* ══ KLINOVA PALETTE — dark variant ══ */
+  --k-primary: var(--brand-400);
+  --k-primary-hover: var(--brand-300);
+  --k-primary-light: color-mix(in srgb, var(--brand-400) 14%, transparent);
+  --k-accent: #fbbf24;
+  --k-accent-hover: #fcd34d;
+  --k-bg: #0a0a0b;
+  --k-surface: #111113;
+  --k-surface-hover: #18181b;
+  --k-border: #27272a;
+  --k-border-hover: #3f3f46;
+  --k-text-primary: #fafafa;
+  --k-text-secondary: #a1a1aa;
+  --k-text-muted: #71717a;
+  --k-success: #34d399;
+  --k-success-bg: color-mix(in srgb, var(--brand-400) 14%, transparent);
+  --k-warning: #fbbf24;
+  --k-warning-bg: rgba(251, 191, 36, 0.14);
+  --k-error: #f87171;
+  --k-error-bg: rgba(248, 113, 113, 0.14);
+  --k-info: #60a5fa;
+  --k-info-bg: rgba(96, 165, 250, 0.14);
+  --k-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --k-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --k-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* ══════════════════════════════════════════════════════
+   RENK TEMAları — tüm paleti override eder (--brand-50 → --brand-900)
+   --color-primary, --color-primary-hover vs. zaten palet referansı
+   olduğu için otomatik takip eder.
+   ══════════════════════════════════════════════════════ */
+
+/* Okyanus (Ocean Blue — sky) */
+html[data-color="ocean"] {
+  --brand-50:  #f0f9ff;
+  --brand-100: #e0f2fe;
+  --brand-200: #bae6fd;
+  --brand-300: #7dd3fc;
+  --brand-400: #38bdf8;
+  --brand-500: #0ea5e9;
+  --brand-600: #0284c7;
+  --brand-700: #0369a1;
+  --brand-800: #075985;
+  --brand-900: #0c4a6e;
+  --color-primary-rgb: 2, 132, 199;
+}
+html.dark[data-color="ocean"] {
+  --color-primary-rgb: 56, 189, 248;
+}
+
+/* Mor (Violet) */
+html[data-color="violet"] {
+  --brand-50:  #f5f3ff;
+  --brand-100: #ede9fe;
+  --brand-200: #ddd6fe;
+  --brand-300: #c4b5fd;
+  --brand-400: #a78bfa;
+  --brand-500: #8b5cf6;
+  --brand-600: #7c3aed;
+  --brand-700: #6d28d9;
+  --brand-800: #5b21b6;
+  --brand-900: #4c1d95;
+  --color-primary-rgb: 124, 58, 237;
+}
+html.dark[data-color="violet"] {
+  --color-primary-rgb: 167, 139, 250;
+}
+
+/* Gül (Rose) */
+html[data-color="rose"] {
+  --brand-50:  #fff1f2;
+  --brand-100: #ffe4e6;
+  --brand-200: #fecdd3;
+  --brand-300: #fda4af;
+  --brand-400: #fb7185;
+  --brand-500: #f43f5e;
+  --brand-600: #e11d48;
+  --brand-700: #be123c;
+  --brand-800: #9f1239;
+  --brand-900: #881337;
+  --color-primary-rgb: 225, 29, 72;
+}
+html.dark[data-color="rose"] {
+  --color-primary-rgb: 251, 113, 133;
+}
+
+/* Kehribar (Amber) */
+html[data-color="amber"] {
+  --brand-50:  #fffbeb;
+  --brand-100: #fef3c7;
+  --brand-200: #fde68a;
+  --brand-300: #fcd34d;
+  --brand-400: #fbbf24;
+  --brand-500: #f59e0b;
+  --brand-600: #d97706;
+  --brand-700: #b45309;
+  --brand-800: #92400e;
+  --brand-900: #78350f;
+  --color-primary-rgb: 180, 83, 9;
+}
+html.dark[data-color="amber"] {
+  --color-primary-rgb: 251, 191, 36;
+}
+
+@font-face {
+  font-family: 'Liberation Sans';
+  src: url('/fonts/LiberationSans-Regular.ttf') format('truetype');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Liberation Sans';
+  src: url('/fonts/LiberationSans-Bold.ttf') format('truetype');
+  font-weight: 700 900;
+  font-style: normal;
+  font-display: swap;
+}

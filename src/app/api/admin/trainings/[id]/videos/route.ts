@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getUploadUrl, videoKey, documentKey, deleteObject, checkStorageQuota } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
@@ -8,13 +9,8 @@ import { logger } from '@/lib/logger'
 // tek istek akışında en fazla 2 await çalışır. Promise.all bu bağımlı
 // sıralı işlemler için uygun değil, bağımlılık zinciri var.
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
 
   // Multi-tenant guard: trainingId'nin admin'in organizasyonuna ait olduğunu
   // nested training.organizationId ile doğrula. Aksi halde başka hastanenin
@@ -22,31 +18,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const videos = await prisma.trainingVideo.findMany({
     where: {
       trainingId: id,
-      training: { organizationId: dbUser!.organizationId! },
+      training: { organizationId: organizationId },
     },
     orderBy: { sortOrder: 'asc' },
   })
 
   return jsonResponse(videos, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
 
 /** Get presigned upload URL */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const { id } = params
 
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`upload:${dbUser!.id}`, 20, 3600)
+  const allowed = await checkRateLimit(`upload:${dbUser.id}`, 20, 3600)
   if (!allowed) return errorResponse('Çok fazla yükleme işlemi. Lütfen bir saat bekleyin.', 429)
 
-  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  const training = await prisma.training.findFirst({ where: { id, organizationId: organizationId } })
   if (!training) return errorResponse('Training not found', 404)
 
   // Storage quota kontrolu
-  const quotaError = await checkStorageQuota(dbUser!.organizationId!)
+  const quotaError = await checkStorageQuota(organizationId)
   if (quotaError) return errorResponse(quotaError, 403)
 
   const body = await parseBody<{
@@ -77,8 +68,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const key = mediaType === 'pdf'
-    ? documentKey(dbUser!.organizationId!, id, body.filename)
-    : videoKey(dbUser!.organizationId!, id, body.filename)
+    ? documentKey(organizationId, id, body.filename)
+    : videoKey(organizationId, id, body.filename)
 
   // Get upload URL first — if S3 fails, no orphan DB record
   let uploadUrl: string
@@ -103,34 +94,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'upload',
     entityType: 'training_video',
     entityId: video.id,
     newData: { title: body.title, key },
-    request,
   })
 
   return jsonResponse({ uploadUrl, video }, 201)
-}
+}, { requireOrganization: true })
 
 /** Delete video */
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
 
   const { searchParams } = new URL(request.url)
   const videoId = searchParams.get('videoId')
   if (!videoId) return errorResponse('videoId required')
 
   // Verify training belongs to admin's organization
-  const training = await prisma.training.findFirst({ where: { id, organizationId: dbUser!.organizationId! } })
+  const training = await prisma.training.findFirst({ where: { id, organizationId: organizationId } })
   if (!training) return errorResponse('Training not found', 404)
 
   const video = await prisma.trainingVideo.findFirst({
@@ -155,14 +138,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }
 
     // 3. Audit log (KVKK uyumluluğu)
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId!,
+    await audit({
       action: 'delete',
       entityType: 'training_video',
       entityId: video.id,
       oldData: { title: video.title, videoKey: video.videoKey },
-      request,
     })
 
     return jsonResponse({ success: true })
@@ -170,4 +150,4 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     logger.error('TrainingVideo:DELETE', 'Video silme hatası', err)
     return errorResponse('Video silinirken bir hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

@@ -1,4 +1,5 @@
-import { getAuthUser, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
@@ -11,19 +12,16 @@ import { logger } from '@/lib/logger'
  * Kurul 2020/404 uyarınca bu işlem giriş akışını bloklamaz —
  * kullanıcı isteğe bağlı olarak "Okudum, Anladım" der.
  */
-export async function POST() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
+export const POST = withStaffRoute(async ({ dbUser, audit }) => {
   // Idempotency kontrolünü rate limit'ten ÖNCE yap — DB zaten ack'lıysa no-op dön.
   // Aksi halde kullanıcı başarısız bir refresh/race-condition sonrası tekrar denerken
   // 429'a takılıp KVKK modalında kilitlenir (user_metadata JWT ile DB arasında desync).
-  if (dbUser!.kvkkNoticeAcknowledgedAt) {
+  if (dbUser.kvkkNoticeAcknowledgedAt) {
     // Metadata senkronizasyonu JWT ile DB arasında drift olmuş olabilir → refresh zorla
     try {
       const supabase = await createClient()
       await supabase.auth.updateUser({
-        data: { kvkk_notice_acknowledged_at: dbUser!.kvkkNoticeAcknowledgedAt.toISOString() },
+        data: { kvkk_notice_acknowledged_at: dbUser.kvkkNoticeAcknowledgedAt.toISOString() },
       })
       await supabase.auth.refreshSession()
     } catch {}
@@ -33,14 +31,14 @@ export async function POST() {
   // Spam önleme: 1 saat içinde en fazla 3 kez (sadece gerçek yeni onaylar için).
   // Dev'de atla — test sırasında "429 locked out" → KVKK modal loop'una düşülmesin.
   if (process.env.NODE_ENV === 'production') {
-    const allowed = await checkRateLimit(`kvkk-acknowledge:${dbUser!.id}`, 3, 3600)
+    const allowed = await checkRateLimit(`kvkk-acknowledge:${dbUser.id}`, 3, 3600)
     if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
   }
 
   const acknowledgedAt = new Date()
 
   await prisma.user.update({
-    where: { id: dbUser!.id },
+    where: { id: dbUser.id },
     data: { kvkkNoticeAcknowledgedAt: acknowledgedAt },
   })
 
@@ -64,14 +62,12 @@ export async function POST() {
     // DB yazıldı → akış devam etsin; sonraki login'de metadata zaten yenilenir
   }
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId ?? undefined,
+  await audit({
     action: 'KVKK_NOTICE_ACKNOWLEDGED',
     entityType: 'user',
-    entityId: dbUser!.id,
+    entityId: dbUser.id,
     newData: { kvkkNoticeAcknowledgedAt: acknowledgedAt.toISOString() },
   })
 
   return jsonResponse({ acknowledged: true })
-}
+})

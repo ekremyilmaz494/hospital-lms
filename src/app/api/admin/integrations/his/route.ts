@@ -1,23 +1,15 @@
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
-import {
-  getAuthUserStrict, requireRole, jsonResponse, errorResponse,
-  parseBody, createAuditLog,
-} from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 import { hisIntegrationSchema } from '@/lib/validations'
 
 /** GET /api/admin/integrations/his — Entegrasyon ayarlarını döndür (credentials masked) */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ organizationId }) => {
   const integration = await prisma.hisIntegration.findFirst({
-    where: { organizationId: dbUser!.organizationId! },
+    where: { organizationId },
     select: {
       id: true,
       name: true,
@@ -34,22 +26,22 @@ export async function GET(request: Request) {
     },
   })
 
-  if (!integration) return jsonResponse({ integration: null })
+  if (!integration) {
+    return jsonResponse({ integration: null }, 200, {
+      'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+    })
+  }
 
   const { webhookToken, ...rest } = integration
-  return jsonResponse({
-    integration: { ...rest, hasWebhookToken: Boolean(webhookToken) },
-  })
-}
+  return jsonResponse(
+    { integration: { ...rest, hasWebhookToken: Boolean(webhookToken) } },
+    200,
+    { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+  )
+}, { strict: true, requireOrganization: true })
 
 /** POST /api/admin/integrations/his — Entegrasyonu oluştur veya güncelle */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek verisi')
 
@@ -71,7 +63,7 @@ export async function POST(request: Request) {
   }
 
   const existing = await prisma.hisIntegration.findFirst({
-    where: { organizationId: dbUser!.organizationId! },
+    where: { organizationId },
     select: { id: true, webhookToken: true },
   })
 
@@ -90,21 +82,18 @@ export async function POST(request: Request) {
     integration = await prisma.hisIntegration.create({
       data: {
         ...rest,
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         credentials: encryptedCredentials,
         webhookToken,
       },
     })
   }
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: existing ? 'update' : 'create',
     entityType: 'HisIntegration',
     entityId: integration.id,
     newData: { ...integration, credentials: '[ENCRYPTED]' },
-    request,
   })
 
   // Dönen objeden credentials ve webhookToken'ı çıkar — ikisi de secret
@@ -114,4 +103,4 @@ export async function POST(request: Request) {
   return jsonResponse({
     integration: { ...safeIntegration, hasWebhookToken: Boolean(_token) },
   })
-}
+}, { strict: true, requireOrganization: true })

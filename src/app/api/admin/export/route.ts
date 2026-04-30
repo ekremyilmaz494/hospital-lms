@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import ExcelJS from 'exceljs'
 import type { UserRole } from '@/types/database'
@@ -8,19 +9,10 @@ const XLSX_MAX_ROWS = 5000
 const CSV_BATCH_SIZE = 500
 const CSV_MAX_ROWS = 50_000 // Streaming CSV toplam satır limiti — bellek tükenmesini önle
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit }) => {
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type') // staff | trainings | results | audit-logs
   const format = searchParams.get('format') ?? 'xlsx' // xlsx | csv
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
 
   const allowed = await checkRateLimit(`export:${orgId}`, 10, 60)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
@@ -65,9 +57,7 @@ export async function GET(request: Request) {
 
     styleHeader(ws)
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'data.export',
       entityType: 'export',
       entityId: orgId,
@@ -129,9 +119,7 @@ export async function GET(request: Request) {
 
     styleHeader(ws)
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'data.export',
       entityType: 'export',
       entityId: orgId,
@@ -152,9 +140,7 @@ export async function GET(request: Request) {
     if (format === 'csv') {
       const totalCount = await prisma.examAttempt.count({ where: { training: { organizationId: orgId } } })
 
-      await createAuditLog({
-        userId: dbUser!.id,
-        organizationId: orgId,
+      await audit({
         action: 'data.export',
         entityType: 'export',
         entityId: orgId,
@@ -256,9 +242,7 @@ export async function GET(request: Request) {
 
     styleHeader(ws)
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'data.export',
       entityType: 'export',
       entityId: orgId,
@@ -276,7 +260,7 @@ export async function GET(request: Request) {
   }
 
   return errorResponse('Invalid export type. Use: staff, trainings, results')
-}
+}, { requireOrganization: true })
 
 function styleHeader(ws: ExcelJS.Worksheet) {
   const headerRow = ws.getRow(1)

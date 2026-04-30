@@ -1,26 +1,15 @@
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUserStrict,
-  requireRole,
   jsonResponse,
   errorResponse,
   parseBody,
-  createAuditLog,
 } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { updateContentLibrarySchema } from '@/lib/validations'
 
 /** GET /api/super-admin/content-library/[id] — tekil içerik + hangi hastaneler kurdu */
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const GET = withSuperAdminRoute<{ id: string }>(async ({ params }) => {
+  const { id } = params
 
   const item = await prisma.contentLibrary.findUnique({
     where: { id },
@@ -43,20 +32,11 @@ export async function GET(
     targetRoles: item.targetRoles as string[],
     installCount: item._count.installs,
   })
-}
+})
 
 /** PUT /api/super-admin/content-library/[id] — içeriği güncelle */
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const PUT = withSuperAdminRoute<{ id: string }>(async ({ request, params, audit }) => {
+  const { id } = params
 
   const existing = await prisma.contentLibrary.findUnique({ where: { id } })
   if (!existing) return errorResponse('İçerik bulunamadı', 404)
@@ -74,15 +54,13 @@ export async function PUT(
     data: parsed.data,
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
+  await audit({
     action: 'content_library.update',
     entityType: 'content_library',
     entityId: id,
     oldData: { title: existing.title, isActive: existing.isActive },
     newData: { title: updated.title, isActive: updated.isActive },
-    request,
   })
 
   return jsonResponse({ ...updated, targetRoles: updated.targetRoles as string[] })
-}
+})

@@ -2,14 +2,12 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import {
-  getAuthUser,
-  requireRole,
   jsonResponse,
   errorResponse,
   parseBody,
-  createAuditLog,
   safePagination,
 } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createStandaloneExamSchema } from '@/lib/validations'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import { getCached, setCached, invalidateByPrefix } from '@/lib/redis'
@@ -17,13 +15,7 @@ import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import type { AttemptStatus } from '@/lib/exam-state-machine'
 import type { UserRole } from '@/types/database'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit, search, skip } = safePagination(searchParams)
   const category = searchParams.get('category')
@@ -31,7 +23,7 @@ export async function GET(request: Request) {
   const includeArchived = searchParams.get('includeArchived') === 'true'
 
   const where: Record<string, unknown> = {
-    organizationId: dbUser!.organizationId!,
+    organizationId: organizationId,
     examOnly: true,
   }
 
@@ -49,7 +41,7 @@ export async function GET(request: Request) {
   if (category) where.category = category
 
   // Redis cache: 5 dk TTL
-  const cacheKey = `standalone-exams:${dbUser!.organizationId!}:${page}:${search ?? ''}:${category ?? ''}:${includeArchived ? 'inc' : 'exc'}`
+  const cacheKey = `standalone-exams:${organizationId}:${page}:${search ?? ''}:${category ?? ''}:${includeArchived ? 'inc' : 'exc'}`
   const cached = await getCached<object>(cacheKey)
   if (cached) return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 
@@ -132,17 +124,11 @@ export async function GET(request: Request) {
     logger.error('StandaloneExams', 'Sınavlar yüklenirken hata', err)
     return errorResponse('Sınavlar yüklenirken hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   const limitError = await checkSubscriptionLimit(
-    dbUser!.organizationId!,
+    organizationId,
     'training',
   )
   if (limitError) return limitError
@@ -191,8 +177,8 @@ export async function POST(request: Request) {
             randomizeQuestions: examData.randomizeQuestions ?? false,
             randomQuestionCount: examData.randomQuestionCount ?? null,
             examOnly: true,
-            organizationId: dbUser!.organizationId!,
-            createdById: dbUser!.id,
+            organizationId: organizationId,
+            createdById: dbUser.id,
           },
         })
 
@@ -223,7 +209,7 @@ export async function POST(request: Request) {
         if (selectedDepts && selectedDepts.length > 0) {
           const usersToAssign = await tx.user.findMany({
             where: {
-              organizationId: dbUser!.organizationId!,
+              organizationId: organizationId,
               isActive: true,
               role: 'staff' satisfies UserRole,
               departmentId: { in: selectedDepts },
@@ -237,7 +223,7 @@ export async function POST(request: Request) {
               trainingId: t.id,
               userId: u.id,
               maxAttempts: examData.maxAttempts,
-              assignedById: dbUser!.id,
+              assignedById: dbUser.id,
             }))
 
           if (assignments.length > 0) {
@@ -253,14 +239,11 @@ export async function POST(request: Request) {
       { timeout: 30000 },
     )
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId!,
+    await audit({
       action: 'standalone_exam.create',
       entityType: 'training',
       entityId: exam.id,
       newData: { title: exam.title, examOnly: true, questionCount: questions.length },
-      request,
     })
 
     revalidatePath('/admin/exams')
@@ -268,9 +251,9 @@ export async function POST(request: Request) {
     // Cache invalidation — org bazlı tüm sayfaları ve rapor cache'ini temizle
     try {
       await Promise.all([
-        invalidateByPrefix(`standalone-exams:${dbUser!.organizationId!}:`),
-        invalidateByPrefix(`reports:${dbUser!.organizationId!}:`),
-        invalidateDashboardCache(dbUser!.organizationId!),
+        invalidateByPrefix(`standalone-exams:${organizationId}:`),
+        invalidateByPrefix(`reports:${organizationId}:`),
+        invalidateDashboardCache(organizationId),
       ])
     } catch {}
 
@@ -281,4 +264,4 @@ export async function POST(request: Request) {
       500,
     )
   }
-}
+}, { requireOrganization: true })

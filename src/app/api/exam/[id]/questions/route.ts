@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { getAttemptWithPhaseCheck } from '@/lib/exam-helpers'
 
 /** Seeded 32-bit PRNG (mulberry32) — deterministic, same seed → same sequence */
@@ -35,12 +36,8 @@ function shuffle<T>(arr: T[], seed: number): T[] {
   return a
 }
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
+  const { id } = params
 
   // Phase guard: verify attempt is in correct exam status
   const { searchParams } = new URL(request.url)
@@ -49,13 +46,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return errorResponse('phase parametresi zorunludur (pre veya post)', 400)
   }
   const requiredStatus = phase === 'pre' ? 'pre_exam' : 'post_exam'
-  const { attempt, error: phaseError } = await getAttemptWithPhaseCheck(id, dbUser!.id, [requiredStatus], dbUser!.organizationId!)
+  const { attempt, error: phaseError } = await getAttemptWithPhaseCheck(id, dbUser.id, [requiredStatus], organizationId)
   if (phaseError) return phaseError
 
   // id can be trainingId or assignmentId — find the training
   // Always enforce organizationId to prevent cross-tenant data access
   const assignment = await prisma.trainingAssignment.findFirst({
-    where: { id, userId: dbUser!.id, training: { organizationId: dbUser!.organizationId! } },
+    where: { id, userId: dbUser.id, training: { organizationId } },
     include: { training: true },
   })
 
@@ -65,7 +62,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!training) {
     // Verify the user actually has an assignment for this training in their org
     const assignmentByTraining = await prisma.trainingAssignment.findFirst({
-      where: { trainingId: id, userId: dbUser!.id, training: { organizationId: dbUser!.organizationId! } },
+      where: { trainingId: id, userId: dbUser.id, training: { organizationId } },
       include: { training: true },
     })
     training = assignmentByTraining?.training ?? null
@@ -136,4 +133,4 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       }
     }),
   }, 200, { 'Cache-Control': 'no-store' })
-}
+}, { requireOrganization: true })

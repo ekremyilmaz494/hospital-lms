@@ -1,25 +1,19 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logActivity } from '@/lib/activity-logger'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
 
   // B8.2/G8.2 — Parametre UUID formatında olmalı; hatalı değerler DB'ye ulaşmadan reddedilsin
   if (!UUID_REGEX.test(id)) return errorResponse('Geçersiz eğitim ID', 400)
 
   // Arşivlenmiş veya soft-delete edilmiş eğitimler erişilemez (personel direct URL ile bile açamaz).
   const trainingFilter = {
-    organizationId: dbUser!.organizationId!,
+    organizationId,
     isActive: true,
     publishStatus: { not: 'archived' },
   }
@@ -28,7 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   let assignment = await prisma.trainingAssignment.findFirst({
     where: {
       id,
-      userId: dbUser!.id,
+      userId: dbUser.id,
       training: trainingFilter,
     },
     include: {
@@ -62,7 +56,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     assignment = await prisma.trainingAssignment.findFirst({
       where: {
         trainingId: id,
-        userId: dbUser!.id,
+        userId: dbUser.id,
         training: trainingFilter,
       },
       include: {
@@ -96,8 +90,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!assignment) return errorResponse('Eğitim ataması bulunamadı', 404)
 
   void logActivity({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId ?? '',
+    userId: dbUser.id,
+    organizationId,
     action: 'course_view',
     resourceType: 'course',
     resourceId: assignment.training.id,
@@ -209,4 +203,4 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       completed: isRetryPending ? false : (videoProgressMap.get(v.id)?.isCompleted ?? false),
     })),
   }, 200, { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' })
-}
+}, { requireOrganization: true })

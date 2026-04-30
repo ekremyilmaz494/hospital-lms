@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -23,17 +24,8 @@ const submitSchema = z.object({
  * - Mevcut cevaplar silinip yenileri yazılır (idempotent re-submit desteği)
  * - Status COMPLETED'a geçirilir, completedAt set edilir
  */
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`eval-submit:${dbUser!.id}`, 10, 3600)
+export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const allowed = await checkRateLimit(`eval-submit:${dbUser.id}`, 10, 3600)
   if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin.', 429)
 
   const { id } = await params
@@ -48,8 +40,8 @@ export async function POST(
     const evaluation = await prisma.competencyEvaluation.findFirst({
       where: {
         id,
-        evaluatorId: dbUser!.id,
-        form: { organizationId: dbUser!.organizationId! },
+        evaluatorId: dbUser.id,
+        form: { organizationId },
       },
       select: {
         id: true,
@@ -120,9 +112,7 @@ export async function POST(
       })
     })
 
-    void createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId ?? undefined,
+    void audit({
       action: 'EVALUATION_COMPLETED',
       entityType: 'competency_evaluation',
       entityId: id,
@@ -134,4 +124,4 @@ export async function POST(
     logger.error('staff:evaluations:submit', 'Submit başarısız', err)
     return errorResponse('Değerlendirme kaydedilemedi.', 500)
   }
-}
+}, { requireOrganization: true })

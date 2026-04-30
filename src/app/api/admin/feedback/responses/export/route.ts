@@ -2,12 +2,8 @@ import ExcelJS from 'exceljs'
 import { jsPDF } from 'jspdf'
 import { autoTable } from 'jspdf-autotable'
 import { prisma } from '@/lib/prisma'
-import {
-  getAuthUser,
-  requireRole,
-  errorResponse,
-  createAuditLog,
-} from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { calculateOverallScore, type FeedbackQuestionType } from '@/lib/feedback-helpers'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
 import { checkRateLimit } from '@/lib/redis'
@@ -35,15 +31,8 @@ const MAX_ROWS = 10_000
  *
  * Tüm eşleşen yanıtları (pagination'sız, MAX_ROWS cap ile) döndürür.
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!dbUser?.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
-  const roleError = requireRole(dbUser.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`feedback-export:${dbUser.organizationId}`, 5, 60)
+export const GET = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
+  const allowed = await checkRateLimit(`feedback-export:${organizationId}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla dışa aktarma isteği. Lütfen bekleyin.', 429)
 
   const url = new URL(request.url)
@@ -55,7 +44,7 @@ export async function GET(request: Request) {
   const isPassed = isPassedParam === 'true' ? true : isPassedParam === 'false' ? false : undefined
 
   const where = {
-    organizationId: dbUser.organizationId,
+    organizationId,
     ...(trainingId ? { trainingId } : {}),
     ...(isPassed !== undefined ? { isPassed } : {}),
     ...(dateFrom || dateTo
@@ -73,7 +62,7 @@ export async function GET(request: Request) {
     // findMany'yi hiç tetiklemeden 413 döneriz.
     const [org, total] = await Promise.all([
       prisma.organization.findUnique({
-        where: { id: dbUser.organizationId },
+        where: { id: organizationId },
         select: { name: true },
       }),
       prisma.trainingFeedbackResponse.count({ where }),
@@ -189,14 +178,11 @@ export async function GET(request: Request) {
 
       const pdfBuffer = doc.output('arraybuffer')
 
-      await createAuditLog({
-        userId: dbUser.id,
-        organizationId: dbUser.organizationId,
+      await audit({
         action: 'feedback.export',
         entityType: 'export',
-        entityId: dbUser.organizationId,
+        entityId: organizationId,
         newData: { format: 'pdf', count: rows.length, total },
-        request,
       })
 
       return new Response(pdfBuffer, {
@@ -289,14 +275,11 @@ export async function GET(request: Request) {
 
     const buffer = await wb.xlsx.writeBuffer()
 
-    await createAuditLog({
-      userId: dbUser.id,
-      organizationId: dbUser.organizationId,
+    await audit({
       action: 'feedback.export',
       entityType: 'export',
-      entityId: dbUser.organizationId,
+      entityId: organizationId,
       newData: { format: 'xlsx', count: rows.length, total },
-      request,
     })
 
     return new Response(buffer, {
@@ -310,4 +293,4 @@ export async function GET(request: Request) {
     logger.error('AdminFeedbackResponsesExport', 'Export hatası', { err, userId: dbUser.id })
     return errorResponse('Dışa aktarma sırasında hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

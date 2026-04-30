@@ -1,23 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
 /** GET /api/admin/scorm — List SCORM trainings for the admin's org */
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) {
-    return errorResponse('Organizasyon bulunamadı', 403)
-  }
-
+export const GET = withAdminRoute(async ({ organizationId }) => {
   try {
     const trainings = await prisma.training.findMany({
       where: {
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         category: 'scorm',
       },
       select: {
@@ -39,4 +30,4 @@ export async function GET() {
     logger.error('SCORM List', 'SCORM icerikleri yuklenemedi', err)
     return errorResponse('SCORM icerikleri yuklenemedi', 503)
   }
-}
+}, { requireOrganization: true })

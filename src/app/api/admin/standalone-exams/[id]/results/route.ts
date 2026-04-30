@@ -1,24 +1,14 @@
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser,
-  requireRole,
   jsonResponse,
   errorResponse,
 } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import type { AttemptStatus } from '@/lib/exam-state-machine'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
+  const orgId = organizationId
 
   // Tüm sorgular tek Promise.all içinde paralel
   const [exam, attempts, questionStats] = await Promise.all([
@@ -189,4 +179,4 @@ export async function GET(
     questionStats: questionStatsResult,
     attempts: attemptsList,
   }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
