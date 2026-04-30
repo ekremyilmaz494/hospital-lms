@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
         organizationId: true,
         phone: true,
         phoneVerifiedAt: true,
-        organization: { select: { smsMfaEnabled: true, setupCompleted: true } },
+        organization: { select: { slug: true, smsMfaEnabled: true, setupCompleted: true } },
       }
     })
 
@@ -233,6 +233,9 @@ export async function POST(request: NextRequest) {
       // Admin layout setup-wizard guard'ı için: ilk login'de ekstra /api/admin/setup
       // fetch'ini atlayabilsin. dbUser.organization.setupCompleted gerçek kaynak.
       setupCompleted: dbUser.organization?.setupCompleted ?? null,
+      // Multi-tenant subdomain redirect için: client login başarısı sonrası
+      // https://<slug>.<base-domain>/<dashboard>'a zıplar. super_admin'de null kalır → apex'te kalır.
+      organizationSlug: dbUser.organization?.slug ?? null,
     })
   } catch (err) {
     logger.error('auth:login', 'Giriş işlemi sırasında beklenmeyen hata', err)
