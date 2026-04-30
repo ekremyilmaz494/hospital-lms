@@ -2,23 +2,24 @@
 
 import React, { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, Loader2, Clock, ArrowRight, AlertCircle, ShieldCheck, GraduationCap, BarChart3, Award } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Clock, ArrowRight, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import dynamic from 'next/dynamic';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { KvkkNoticeModal } from '@/components/shared/kvkk-notice-modal';
 
-const Particles = dynamic(() => import('@/components/ui/particles').then(m => ({ default: m.Particles })), { ssr: false });
 // MeshGradient is WebGL — must be client-only
 const MeshGradient = dynamic(
   () => import('@paper-design/shaders-react').then(m => ({ default: m.MeshGradient })),
   { ssr: false }
 );
+const LoginHeroAnimation = dynamic(
+  () => import('@/components/login/LoginHeroAnimation'),
+  { ssr: false }
+);
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
-import { useOrgBranding } from '@/hooks/use-org-branding';
 import { getRolePath } from '@/lib/route-helpers';
 
 const ROLE_ROUTES: Record<string, string> = {
@@ -67,11 +68,6 @@ const K = {
   SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
   FONT_DISPLAY: 'var(--font-display, system-ui)',
 };
-
-// Dark hero ink (admin warm-dark) — used for the left brand panel backdrop
-const HERO_INK = '#1c1917';
-const HERO_TEXT = '#fafaf9';
-const HERO_TEXT_SOFT = 'rgba(250, 250, 249, 0.66)';
 
 function LoginForm() {
   const router = useRouter();
@@ -134,9 +130,6 @@ function LoginForm() {
     })();
     return () => { cancelled = true; };
   }, [urlReason]);
-
-  const orgSlug = searchParams.get('org');
-  const { branding } = useOrgBranding(orgSlug);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,322 +288,9 @@ function LoginForm() {
         .ed-pulse { animation: ed-glow 6s ease-in-out infinite; }
       `}</style>
 
-      {/* ── LEFT — Aurora Hero (warm-dark + emerald, admin-aligned) ── */}
-      <aside
-        className="relative hidden lg:flex lg:w-1/2 flex-col overflow-hidden"
-        style={{ background: 'linear-gradient(150deg, #1c1917 0%, #292524 55%, #1c1917 100%)' }}
-      >
-        {branding?.loginBannerUrl && (
-          <div className="absolute inset-0 z-0">
-            <Image src={branding.loginBannerUrl} alt="" fill className="object-cover" unoptimized />
-            <div className="absolute inset-0" style={{ background: 'rgba(28, 25, 23, 0.85)' }} />
-          </div>
-        )}
-
-        {/* Aurora animation — emerald monochrome on warm-dark */}
-        <style>{`
-          @keyframes aurora-drift-1 {
-            0% { transform: translate(-10%, -10%) rotate(0deg); }
-            50% { transform: translate(10%, 5%) rotate(180deg); }
-            100% { transform: translate(-10%, -10%) rotate(360deg); }
-          }
-          @keyframes aurora-drift-2 {
-            0% { transform: translate(10%, 10%) rotate(0deg); }
-            50% { transform: translate(-10%, -5%) rotate(-180deg); }
-            100% { transform: translate(10%, 10%) rotate(-360deg); }
-          }
-          @keyframes aurora-pulse {
-            0%, 100% { opacity: 0.45; }
-            50% { opacity: 0.75; }
-          }
-          .aurora-1 {
-            position: absolute; top: -20%; left: -20%;
-            width: 80%; height: 80%; border-radius: 9999px;
-            background: radial-gradient(circle, #0d9668 0%, transparent 65%);
-            filter: blur(60px);
-            animation: aurora-drift-1 28s ease-in-out infinite, aurora-pulse 8s ease-in-out infinite;
-          }
-          .aurora-2 {
-            position: absolute; bottom: -25%; right: -20%;
-            width: 85%; height: 85%; border-radius: 9999px;
-            background: radial-gradient(circle, #087a54 0%, transparent 65%);
-            filter: blur(70px);
-            animation: aurora-drift-2 32s ease-in-out infinite, aurora-pulse 10s ease-in-out infinite;
-          }
-          .aurora-3 {
-            position: absolute; top: 30%; left: 30%;
-            width: 50%; height: 50%; border-radius: 9999px;
-            background: radial-gradient(circle, #10b98166 0%, transparent 70%);
-            filter: blur(50px);
-            animation: aurora-drift-1 22s ease-in-out infinite reverse;
-          }
-        `}</style>
-        <div className="aurora-1 z-0" />
-        <div className="aurora-2 z-0" />
-        <div className="aurora-3 z-0" />
-
-
-        {/* CONTENT */}
-        <div className="relative z-10 flex h-full flex-col p-12 xl:p-16">
-
-          {/* TOP — vibrant brand mark */}
-          <BlurFade delay={0.04} duration={0.3}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-11 w-11 items-center justify-center"
-                style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #087a54 100%)',
-                  borderRadius: 12,
-                  boxShadow: '0 8px 28px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255,255,255,0.25)',
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: "var(--font-editorial), Georgia, serif",
-                    fontStyle: 'italic', fontWeight: 700, fontSize: 24,
-                    color: '#ffffff', lineHeight: 1, transform: 'translateY(1px)',
-                  }}
-                >
-                  K
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span
-                  style={{
-                    fontFamily: "var(--font-editorial), Georgia, serif",
-                    fontStyle: 'italic', fontWeight: 500, fontSize: 26,
-                    color: '#ffffff', lineHeight: 1, letterSpacing: '-0.01em',
-                  }}
-                >
-                  Klinova
-                </span>
-                <span
-                  style={{
-                    fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
-                    fontSize: 10, fontWeight: 600,
-                    letterSpacing: '0.28em',
-                    background: 'linear-gradient(90deg, #6ee7b7, #a7f3d0)',
-                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text', marginTop: 3, textTransform: 'uppercase',
-                  }}
-                >
-                  Hospital Suite
-                </span>
-              </div>
-            </div>
-          </BlurFade>
-
-          {/* MIDDLE — vibrant hero */}
-          <div className="flex flex-1 flex-col justify-center py-10">
-
-            <BlurFade delay={0.06} duration={0.28}>
-              <div
-                className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 self-start"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.10)',
-                  border: '1px solid rgba(255, 255, 255, 0.22)',
-                  borderRadius: 9999,
-                  backdropFilter: 'blur(10px)',
-                }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: '9999px', background: '#34d399', boxShadow: '0 0 12px #34d399' }} />
-                <span
-                  style={{
-                    fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
-                    fontSize: 11, fontWeight: 600,
-                    letterSpacing: '0.22em',
-                    background: 'linear-gradient(90deg, #6ee7b7, #a7f3d0)',
-                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text', textTransform: 'uppercase',
-                  }}
-                >
-                  Yeni Nesil Klinik LMS
-                </span>
-              </div>
-            </BlurFade>
-
-            <BlurFade delay={0.08} duration={0.3}>
-              <h1
-                className="leading-[1] tracking-tight"
-                style={{
-                  color: '#ffffff',
-                  fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
-                  fontSize: 'clamp(2.6rem, 4.4vw, 4rem)',
-                  fontWeight: 800,
-                  letterSpacing: '-0.025em',
-                }}
-              >
-                Hastane eğitimini
-                <br />
-                <span
-                  style={{
-                    background: 'linear-gradient(110deg, #6ee7b7 0%, #34d399 40%, #34d399 75%, #a7f3d0 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    fontStyle: 'italic',
-                    fontFamily: "var(--font-editorial), Georgia, serif",
-                    fontWeight: 600,
-                  }}
-                >
-                  yeniden tanımla.
-                </span>
-              </h1>
-            </BlurFade>
-
-            <BlurFade delay={0.10} duration={0.28}>
-              <p
-                className="mt-6 max-w-md text-[15.5px] leading-[1.65]"
-                style={{
-                  color: 'rgba(241, 245, 249, 0.78)',
-                  fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
-                }}
-              >
-                Video tabanlı eğitim, otomatik sınav, sertifikasyon ve gerçek zamanlı performans
-                takibi — hepsi tek bir parlak panelde.
-              </p>
-            </BlurFade>
-
-            {/* Vibrant feature cards (3-up) */}
-            <BlurFade delay={0.13} duration={0.3}>
-              <div className="mt-10 grid grid-cols-3 gap-3 max-w-md">
-                {[
-                  { icon: GraduationCap, label: 'Video Eğitim' },
-                  { icon: Award, label: 'Sertifika' },
-                  { icon: BarChart3, label: 'Analitik' },
-                ].map((c) => (
-                  <div
-                    key={c.label}
-                    className="flex flex-col items-start p-4"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.07)',
-                      border: '1px solid rgba(255, 255, 255, 0.16)',
-                      borderRadius: 14,
-                      backdropFilter: 'blur(12px)',
-                      WebkitBackdropFilter: 'blur(12px)',
-                    }}
-                  >
-                    <div
-                      className="flex h-9 w-9 items-center justify-center mb-3"
-                      style={{
-                        background: 'linear-gradient(135deg, #10b981, #087a54)',
-                        borderRadius: 10,
-                        boxShadow: '0 8px 18px rgba(16, 185, 129, 0.4)',
-                      }}
-                    >
-                      <c.icon size={16} style={{ color: '#ffffff' }} />
-                    </div>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
-                        fontSize: 12.5, fontWeight: 600, color: '#ffffff',
-                      }}
-                    >
-                      {c.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </BlurFade>
-
-            {/* Glowing stat strip */}
-            <BlurFade delay={0.16} duration={0.3}>
-              <div
-                className="mt-12 flex items-stretch gap-px overflow-hidden max-w-md"
-                style={{
-                  background: 'linear-gradient(90deg, #10b98166, #0d966866)',
-                  borderRadius: 14,
-                  padding: 1,
-                }}
-              >
-                <div
-                  className="flex w-full"
-                  style={{
-                    background: 'rgba(15, 23, 42, 0.55)',
-                    backdropFilter: 'blur(10px)',
-                    borderRadius: 13,
-                  }}
-                >
-                  {[
-                    { value: '120+', label: 'HASTANE', accent: '#34d399' },
-                    { value: '50K+', label: 'PERSONEL', accent: '#34d399' },
-                    { value: '99.9%', label: 'UPTIME', accent: '#a7f3d0' },
-                  ].map((s, i) => (
-                    <React.Fragment key={s.label}>
-                      {i > 0 && <span style={{ width: 1, background: 'rgba(255,255,255,0.12)' }} />}
-                      <div className="flex flex-1 flex-col items-start px-5 py-4">
-                        <span
-                          style={{
-                            fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
-                            fontSize: 24, fontWeight: 800,
-                            background: `linear-gradient(135deg, ${s.accent}, #ffffff)`,
-                            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                            letterSpacing: '-0.02em', lineHeight: 1.1,
-                          }}
-                        >
-                          {s.value}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
-                            fontSize: 9.5, fontWeight: 600,
-                            letterSpacing: '0.22em',
-                            color: 'rgba(241, 245, 249, 0.65)',
-                            marginTop: 6,
-                          }}
-                        >
-                          {s.label}
-                        </span>
-                      </div>
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-            </BlurFade>
-          </div>
-
-          {/* BOTTOM — KVKK badge + footer */}
-          <BlurFade delay={0.18} duration={0.28}>
-            <div className="flex items-center gap-3 mb-4">
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1.5"
-                style={{
-                  background: 'rgba(52, 211, 153, 0.16)',
-                  border: '1px solid rgba(52, 211, 153, 0.4)',
-                  borderRadius: 9999,
-                  backdropFilter: 'blur(8px)',
-                }}
-              >
-                <ShieldCheck size={13} style={{ color: '#6ee7b7' }} />
-                <span style={{ fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)", fontSize: 11.5, fontWeight: 600, color: '#a7f3d0' }}>
-                  KVKK Uyumlu · ISO 27001
-                </span>
-              </span>
-            </div>
-            <div
-              className="flex items-center justify-between"
-              style={{
-                fontFamily: "var(--font-display, 'Plus Jakarta Sans', system-ui)",
-                fontSize: 11, fontWeight: 500,
-                letterSpacing: '0.2em',
-                color: 'rgba(241, 245, 249, 0.5)',
-                textTransform: 'uppercase',
-              }}
-            >
-              <span>© 2026 Klinova</span>
-              <span
-                style={{
-                  background: 'linear-gradient(90deg, #6ee7b7, #a7f3d0)',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                }}
-              >
-                Hospital LMS · v2.0
-              </span>
-            </div>
-          </BlurFade>
-        </div>
+      {/* ── LEFT — Login Hero Animation ── */}
+      <aside className="relative hidden lg:flex lg:w-1/2 flex-col overflow-hidden">
+        <LoginHeroAnimation />
       </aside>
 
       {/* ── RIGHT — Cream Form Panel ── */}
