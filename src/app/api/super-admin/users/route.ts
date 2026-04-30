@@ -1,16 +1,10 @@
-import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createUserSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const POST = withSuperAdminRoute(async ({ request, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')
 
@@ -41,14 +35,12 @@ export async function POST(request: Request) {
     throw err
   }
 
-  await createAuditLog({
-    userId: dbUser!.id,
+  await audit({
     action: 'create',
     entityType: 'user',
     entityId: result.dbUser.id,
     newData: { ...result.dbUser, password: undefined },
-    request,
   })
 
   return jsonResponse(result.dbUser, 201)
-}
+})

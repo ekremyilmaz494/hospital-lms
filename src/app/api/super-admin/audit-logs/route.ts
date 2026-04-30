@@ -1,13 +1,8 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse } from '@/lib/api-helpers'
+import { jsonResponse } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const GET = withSuperAdminRoute(async ({ request }) => {
   const { searchParams } = new URL(request.url)
   const page = Number(searchParams.get('page') ?? '1')
   const limit = Number(searchParams.get('limit') ?? '50')
@@ -47,4 +42,4 @@ export async function GET(request: Request) {
   })
 
   return jsonResponse({ logs: formatted, total, page, limit, totalPages: Math.ceil(total / limit) })
-}
+})

@@ -1,16 +1,11 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/redis'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`auth-health:${dbUser!.id}`, 5, 60)
+export const GET = withSuperAdminRoute(async ({ dbUser }) => {
+  const allowed = await checkRateLimit(`auth-health:${dbUser.id}`, 5, 60)
   if (!allowed) return errorResponse('Cok fazla istek. Lutfen bekleyin.', 429)
 
   const supabase = await createServiceClient()
@@ -55,4 +50,4 @@ export async function GET(request: Request) {
     ghosts,
     unconfirmed,
   }, 200, { 'Cache-Control': 'private, max-age=10' })
-}
+})

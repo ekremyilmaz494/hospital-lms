@@ -1,20 +1,15 @@
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination, getAppUrl } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination, getAppUrl } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createHospitalWithAdminSchema } from '@/lib/validations'
 import { sendHospitalWelcomeEmail } from '@/lib/email'
 import { TRAINING_CATEGORIES } from '@/lib/training-categories'
 import { slugify } from '@/lib/organization'
-import { createAuthUser, updateAuthUserOrgId, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
+import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const GET = withSuperAdminRoute(async ({ request }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit, search, skip } = safePagination(searchParams, 500)
   const status = searchParams.get('status') // active | suspended | all
@@ -44,15 +39,9 @@ export async function GET(request: Request) {
   ])
 
   return jsonResponse({ hospitals, total, page, limit, totalPages: Math.ceil(total / limit) })
-}
+})
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
-
+export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
@@ -98,7 +87,7 @@ export async function POST(request: Request) {
         ...orgData,
         slug,
         setupCompleted: false,
-        createdBy: dbUser!.id,
+        createdBy: dbUser.id,
       },
     })
 
@@ -160,8 +149,7 @@ export async function POST(request: Request) {
   }
 
   // Audit log
-  await createAuditLog({
-    userId: dbUser!.id,
+  await audit({
     action: 'create',
     entityType: 'organization',
     entityId: hospital.id,
@@ -172,7 +160,6 @@ export async function POST(request: Request) {
       planId,
       trialDays,
     },
-    request,
   })
 
   // Hoş geldiniz e-postası gönder
@@ -197,4 +184,4 @@ export async function POST(request: Request) {
     // Email başarısızsa şifreyi response'da göster (admin UI'da modal ile gösterilecek)
     ...(!emailSent ? { tempPassword } : {}),
   }, 201)
-}
+})

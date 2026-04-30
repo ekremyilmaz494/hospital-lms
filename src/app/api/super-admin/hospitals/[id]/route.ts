@@ -1,14 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { updateOrganizationSchema } from '@/lib/validations'
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
+export const GET = withSuperAdminRoute<{ id: string }>(async ({ params }) => {
+  const { id } = params
 
   const hospital = await prisma.organization.findUnique({
     where: { id },
@@ -23,15 +19,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!hospital) return errorResponse('Hospital not found', 404)
 
   return jsonResponse(hospital)
-}
+})
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
+export const PATCH = withSuperAdminRoute<{ id: string }>(async ({ request, params, audit }) => {
+  const { id } = params
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')
@@ -47,26 +38,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     data: parsed.data,
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
+  await audit({
     action: 'update',
     entityType: 'organization',
     entityId: id,
     oldData,
     newData: hospital,
-    request,
   })
 
   return jsonResponse(hospital)
-}
+})
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
+export const DELETE = withSuperAdminRoute<{ id: string }>(async ({ request, params, audit }) => {
+  const { id } = params
 
   const oldData = await prisma.organization.findUnique({ where: { id } })
   if (!oldData) return errorResponse('Hospital not found', 404)
@@ -91,15 +75,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   await prisma.organization.delete({ where: { id } })
 
-  await createAuditLog({
-    userId: dbUser!.id,
+  await audit({
     action: 'delete',
     entityType: 'organization',
     entityId: id,
     oldData,
     newData: { impact },
-    request,
   })
 
   return jsonResponse({ success: true, impact })
-}
+})

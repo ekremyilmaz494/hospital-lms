@@ -1,13 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUserStrict,
-  assertRole,
   jsonResponse,
   errorResponse,
   parseBody,
-  createAuditLog,
   ApiError,
+  createAuditLog,
 } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 import { downloadBuffer } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { decryptBackup } from '@/lib/backup-crypto'
@@ -83,13 +82,8 @@ interface RestoreRequestBody {
  *
  * Rate limited: 1 restore per hour per user.
  */
-export async function POST(request: Request) {
+export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   try {
-    // ── Auth ──
-    const { dbUser, error } = await getAuthUserStrict()
-    if (error) return error
-    assertRole(dbUser!.role, ['super_admin'])
-
     // ── Parse body ──
     const body = await parseBody<RestoreRequestBody>(request)
     if (!body || !body.backupId || typeof body.confirm !== 'boolean') {
@@ -100,7 +94,7 @@ export async function POST(request: Request) {
 
     // ── Rate limit (1 actual restore per hour) ──
     if (confirm) {
-      const allowed = await checkRateLimit(`restore:${dbUser!.id}`, 1, 3600)
+      const allowed = await checkRateLimit(`restore:${dbUser.id}`, 1, 3600)
       if (!allowed) {
         return errorResponse('Saatte yalnızca 1 geri yükleme yapılabilir. Lütfen daha sonra tekrar deneyin.', 429)
       }
@@ -166,7 +160,7 @@ export async function POST(request: Request) {
     // ── Preview mode ──
     if (!confirm) {
       await createAuditLog({
-        userId: dbUser!.id,
+        userId: dbUser.id,
         organizationId: backup.organizationId,
         action: 'restore_preview',
         entityType: 'DbBackup',
@@ -360,7 +354,7 @@ export async function POST(request: Request) {
 
     // ── Audit log ──
     await createAuditLog({
-      userId: dbUser!.id,
+      userId: dbUser.id,
       organizationId: orgId,
       action: 'restore_executed',
       entityType: 'DbBackup',
@@ -390,4 +384,4 @@ export async function POST(request: Request) {
     console.error('[Restore] Unexpected error:', err instanceof Error ? err.message : err)
     return errorResponse('Geri yükleme sırasında beklenmeyen bir hata oluştu.', 500)
   }
-}
+})

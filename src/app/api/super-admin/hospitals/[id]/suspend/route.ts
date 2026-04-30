@@ -1,13 +1,9 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, parseBody } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
+export const POST = withSuperAdminRoute<{ id: string }>(async ({ request, params, audit }) => {
+  const { id } = params
 
   const body = await parseBody<{ reason?: string }>(request)
 
@@ -20,25 +16,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
+  await audit({
     action: 'suspend',
     entityType: 'organization',
     entityId: id,
     newData: { reason: body?.reason },
-    request,
   })
 
   return jsonResponse(hospital)
-}
+})
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['super_admin'])
-  if (roleError) return roleError
+export const DELETE = withSuperAdminRoute<{ id: string }>(async ({ params, audit }) => {
+  const { id } = params
 
   const hospital = await prisma.organization.update({
     where: { id },
@@ -49,13 +38,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
+  await audit({
     action: 'unsuspend',
     entityType: 'organization',
     entityId: id,
-    request,
   })
 
   return jsonResponse(hospital)
-}
+})
