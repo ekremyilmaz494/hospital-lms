@@ -181,7 +181,22 @@ export async function updateSession(request: NextRequest) {
 
         // KVKK tamam: login/landing'de auth'luysa dashboard'a gönder (mevcut davranış)
         if (pathname === '/auth/login' || pathname === '/') {
-          return NextResponse.redirect(new URL(getDashboardUrl(role), request.url))
+          const dashboardPath = getDashboardUrl(role)
+          // Apex'te authenticated kullanıcı + org cookie varsa subdomain'e zıpla.
+          // Cookie cross-subdomain (.klinovax.com) — önceki subdomain ziyaretinde set edildi.
+          // super_admin için cookie yok → apex'te kal.
+          const orgSlugCookie = request.cookies.get('x-org-slug')?.value
+          if (
+            baseDomain &&
+            !subdomain &&
+            orgSlugCookie &&
+            role !== 'super_admin' &&
+            !baseDomain.includes('localhost')
+          ) {
+            const protocol = request.nextUrl.protocol || 'https:'
+            return NextResponse.redirect(`${protocol}//${orgSlugCookie}.${baseDomain}${dashboardPath}`)
+          }
+          return NextResponse.redirect(new URL(dashboardPath, request.url))
         }
       }
     } catch {
