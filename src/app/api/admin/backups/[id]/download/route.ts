@@ -1,25 +1,18 @@
 import { s3 } from '@/lib/s3'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { decryptBackup } from '@/app/api/admin/backups/route'
 import { logger } from '@/lib/logger'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
 
   const backup = await prisma.dbBackup.findFirst({
     where: {
       id,
-      organizationId: dbUser!.organizationId!,
+      organizationId,
       status: 'completed',
     },
   })
@@ -58,7 +51,7 @@ export async function GET(
   }
 
   // Local yedek veya S3 erişimi başarısız — DB'den yeniden oluştur
-  const orgId = dbUser!.organizationId!
+  const orgId = organizationId
   const [users, departments, trainings, assignments, attempts, examAnswers, videoProgress, notifications, certificates] = await Promise.all([
     prisma.user.findMany({ where: { organizationId: orgId } }),
     prisma.department.findMany({ where: { organizationId: orgId } }),
@@ -81,4 +74,4 @@ export async function GET(
   }
 
   return new Response(JSON.stringify(backupData, null, 2), { headers })
-}
+}, { strict: true, requireOrganization: true })

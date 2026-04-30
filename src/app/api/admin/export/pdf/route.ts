@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { jsPDF } from 'jspdf'
@@ -20,14 +21,8 @@ const LINE_HEIGHT = 7
 type CertStatus = 'all' | 'active' | 'expired' | 'revoked'
 type CertFormat = 'list' | 'bundle'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const allowed = await checkRateLimit(`pdf-export:${dbUser!.id}`, 5, 60)
+export const GET = withAdminRoute(async ({ request, dbUser, organizationId: orgId }) => {
+  const allowed = await checkRateLimit(`pdf-export:${dbUser.id}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla dışa aktarma isteği. Lütfen 1 dakika bekleyin.', 429)
 
   const { searchParams } = new URL(request.url)
@@ -38,8 +33,6 @@ export async function GET(request: Request) {
     return errorResponse(`Geçersiz rapor tipi. Geçerli değerler: ${VALID_PDF_TYPES.join(', ')}`, 400)
   }
 
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
   const org = await prisma.organization.findUnique({ where: { id: orgId } })
 
   if (type === 'certificates') {
@@ -176,7 +169,7 @@ export async function GET(request: Request) {
       'Content-Disposition': `attachment; filename=${type ?? 'rapor'}.pdf`,
     },
   })
-}
+}, { requireOrganization: true })
 
 async function generateCertificatesPdf(request: Request, orgId: string, orgName: string, orgLogoUrl: string | null): Promise<Response> {
   const { searchParams } = new URL(request.url)

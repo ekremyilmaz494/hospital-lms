@@ -1,4 +1,5 @@
-import { jsonResponse, errorResponse, getAuthUserStrict, parseBody, requireRole, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 
@@ -11,18 +12,9 @@ import { prisma } from '@/lib/prisma'
  * graceful bilgilendirmek için tarih referansı olur.
  */
 
-export async function GET() {
-  const { user, dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-  if (!user || !dbUser) return errorResponse('Oturum bulunamadı', 401)
-
-  const roleErr = requireRole(dbUser.role, ['admin', 'super_admin'])
-  if (roleErr) return roleErr
-
-  if (!dbUser.organizationId) return errorResponse('Organizasyon bulunamadı', 404)
-
+export const GET = withAdminRoute(async ({ organizationId }) => {
   const org = await prisma.organization.findUnique({
-    where: { id: dbUser.organizationId },
+    where: { id: organizationId },
     select: { smsMfaEnabled: true, smsMfaEnforcedAt: true },
   })
 
@@ -30,18 +22,9 @@ export async function GET() {
     enabled: org?.smsMfaEnabled ?? false,
     enforcedAt: org?.smsMfaEnforcedAt ?? null,
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
-}
+}, { requireOrganization: true, strict: true })
 
-export async function POST(request: Request) {
-  const { user, dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-  if (!user || !dbUser) return errorResponse('Oturum bulunamadı', 401)
-
-  const roleErr = requireRole(dbUser.role, ['admin', 'super_admin'])
-  if (roleErr) return roleErr
-
-  if (!dbUser.organizationId) return errorResponse('Organizasyon bulunamadı', 404)
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await parseBody<{ enabled?: unknown }>(request)
   if (!body || typeof body.enabled !== 'boolean') {
     return errorResponse('Geçersiz istek — enabled (boolean) gereklidir', 400)
@@ -49,7 +32,7 @@ export async function POST(request: Request) {
 
   try {
     const updated = await prisma.organization.update({
-      where: { id: dbUser.organizationId },
+      where: { id: organizationId },
       data: {
         smsMfaEnabled: body.enabled,
         // enable ediliyorsa enforcedAt'i şimdi set et, disable ediliyorsa dokunma
@@ -58,20 +41,17 @@ export async function POST(request: Request) {
       select: { smsMfaEnabled: true, smsMfaEnforcedAt: true },
     })
 
-    await createAuditLog({
-      userId: user.id,
-      organizationId: dbUser.organizationId,
+    await audit({
       action: body.enabled ? 'sms_mfa_enabled' : 'sms_mfa_disabled',
       entityType: 'organization',
-      entityId: dbUser.organizationId,
-      request,
-    }).catch(() => {})
+      entityId: organizationId,
+    })
 
-    logger.info('admin:sms-mfa', 'SMS MFA ayari guncellendi', { orgId: dbUser.organizationId, enabled: body.enabled })
+    logger.info('admin:sms-mfa', 'SMS MFA ayari guncellendi', { orgId: organizationId, enabled: body.enabled })
 
     return jsonResponse({ enabled: updated.smsMfaEnabled, enforcedAt: updated.smsMfaEnforcedAt })
   } catch (err) {
     logger.error('admin:sms-mfa', 'Guncelleme basarisiz', err)
     return errorResponse('Ayar kaydedilemedi', 500)
   }
-}
+}, { requireOrganization: true, strict: true })

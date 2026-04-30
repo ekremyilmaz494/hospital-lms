@@ -1,26 +1,17 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id: subjectId } = await params
-  const { searchParams } = new URL(_request.url)
+export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
+  const { id: subjectId } = params
+  const { searchParams } = new URL(request.url)
   const formId = searchParams.get('formId')
-  const orgId = dbUser!.organizationId!
 
   if (!formId) return errorResponse('formId gereklidir', 400)
 
   // Form doğrulama
   const form = await prisma.competencyForm.findFirst({
-    where: { id: formId, organizationId: orgId },
+    where: { id: formId, organizationId },
     include: {
       categories: {
         orderBy: { order: 'asc' },
@@ -124,4 +115,4 @@ export async function GET(
     totalCount,
     completionRate,
   }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })

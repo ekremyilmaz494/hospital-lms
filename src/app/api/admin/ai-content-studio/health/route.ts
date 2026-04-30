@@ -3,16 +3,11 @@
  *
  * UI bunu polling ile çağırır; "Klinova AI" rozeti yeşil/kırmızı gösterir.
  */
-import { getAuthUser, requireRole, jsonResponse } from '@/lib/api-helpers'
+import { jsonResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { callWorker } from '@/lib/ai-content-studio/notebook-worker'
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleErr = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleErr) return roleErr
-
+export const GET = withAdminRoute(async () => {
   try {
     const status = await callWorker<{ connected: boolean; googleEmail?: string; reason?: string }>({
       method: 'GET',
@@ -31,4 +26,4 @@ export async function GET() {
       { 'Cache-Control': 'private, max-age=10' },
     )
   }
-}
+})

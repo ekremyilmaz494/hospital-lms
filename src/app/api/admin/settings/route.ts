@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
 
 const settingsSchema = z.object({
@@ -18,18 +19,9 @@ const settingsSchema = z.object({
 })
 
 // GET /api/admin/settings — Hastane ayarlarını getir
-export async function GET() {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
-
+export const GET = withAdminRoute(async ({ organizationId }) => {
   const org = await prisma.organization.findUnique({
-    where: { id: orgId },
+    where: { id: organizationId },
     select: { name: true, logoUrl: true, email: true, phone: true, address: true, sessionTimeout: true, defaultPassingScore: true, defaultMaxAttempts: true, defaultExamDuration: true, brandColor: true, secondaryColor: true, loginBannerUrl: true, customDomain: true },
   })
 
@@ -48,19 +40,10 @@ export async function GET() {
     loginBannerUrl: org?.loginBannerUrl ?? '',
     customDomain: org?.customDomain ?? '',
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
-}
+}, { requireOrganization: true, strict: true })
 
 // PUT /api/admin/settings — Hastane ayarlarını güncelle
-export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
-
+export const PUT = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await request.json().catch(() => null)
   if (!body) return errorResponse('Invalid body')
 
@@ -69,10 +52,10 @@ export async function PUT(request: Request) {
 
   const { hospitalName, logoUrl, email, phone, address, sessionTimeout, defaultPassingScore, defaultMaxAttempts, defaultExamDuration, brandColor, secondaryColor, loginBannerUrl } = parsed.data
 
-  const oldOrg = await prisma.organization.findUnique({ where: { id: orgId } })
+  const oldOrg = await prisma.organization.findUnique({ where: { id: organizationId } })
 
   const updated = await prisma.organization.update({
-    where: { id: orgId },
+    where: { id: organizationId },
     data: {
       ...(hospitalName !== undefined && { name: hospitalName }),
       ...(logoUrl !== undefined && { logoUrl }),
@@ -89,12 +72,10 @@ export async function PUT(request: Request) {
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: orgId,
+  await audit({
     action: 'settings.update',
     entityType: 'organization',
-    entityId: orgId,
+    entityId: organizationId,
     oldData: { name: oldOrg?.name, email: oldOrg?.email, phone: oldOrg?.phone },
     newData: { name: updated.name, email: updated.email, phone: updated.phone },
   })
@@ -114,4 +95,4 @@ export async function PUT(request: Request) {
     loginBannerUrl: updated.loginBannerUrl ?? '',
     customDomain: updated.customDomain ?? '',
   })
-}
+}, { requireOrganization: true, strict: true })

@@ -1,19 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createCompetencyFormSchema } from '@/lib/validations'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit, skip, search } = safePagination(searchParams)
 
   const where = {
-    organizationId: dbUser!.organizationId!,
+    organizationId,
     ...(search ? { title: { contains: search, mode: 'insensitive' as const } } : {}),
   }
 
@@ -32,15 +27,9 @@ export async function GET(request: Request) {
   ])
 
   return jsonResponse({ forms, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
@@ -54,7 +43,7 @@ export async function POST(request: Request) {
       ...formData,
       periodStart: new Date(formData.periodStart),
       periodEnd: new Date(formData.periodEnd),
-      organizationId: dbUser!.organizationId!,
+      organizationId,
       categories: {
         create: categories.map(cat => ({
           name: cat.name,
@@ -75,15 +64,12 @@ export async function POST(request: Request) {
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'CREATE',
     entityType: 'CompetencyForm',
     entityId: form.id,
     newData: { title: form.title },
-    request,
   })
 
   return jsonResponse(form, 201)
-}
+}, { requireOrganization: true })

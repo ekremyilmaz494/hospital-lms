@@ -1,29 +1,21 @@
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser,
-  requireRole,
   jsonResponse,
   errorResponse,
   parseBody,
-  createAuditLog,
   safePagination,
 } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createQuestionBankSchema } from '@/lib/validations'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit, search, skip } = safePagination(searchParams)
   const category = searchParams.get('category')
   const difficulty = searchParams.get('difficulty')
 
   const where: Record<string, unknown> = {
-    organizationId: dbUser!.organizationId!,
+    organizationId,
   }
 
   if (search) {
@@ -64,16 +56,10 @@ export async function GET(request: Request) {
     page,
     limit,
     totalPages: Math.ceil(total / limit),
-  }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+  }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
@@ -104,7 +90,7 @@ export async function POST(request: Request) {
   const question = await prisma.questionBank.create({
     data: {
       ...questionData,
-      organizationId: dbUser!.organizationId!,
+      organizationId,
       options: {
         create: options.map((o, idx) => ({
           text: o.text,
@@ -116,15 +102,12 @@ export async function POST(request: Request) {
     include: { options: { orderBy: { order: 'asc' } } },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'question_bank.create',
     entityType: 'question_bank',
     entityId: question.id,
     newData: { text: question.text, category: question.category },
-    request,
   })
 
   return jsonResponse(question, 201)
-}
+}, { requireOrganization: true })

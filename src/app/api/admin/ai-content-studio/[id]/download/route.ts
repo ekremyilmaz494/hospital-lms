@@ -5,19 +5,15 @@
  * ile yönlendirir → tarayıcı dosyayı indirir.
  */
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getStreamUrl, getDownloadUrl } from '@/lib/s3'
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
+  const { id } = params
 
   const gen = await prisma.aiGeneration.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
     select: { id: true, status: true, s3Key: true, mimeType: true, artifactType: true },
   })
   if (!gen) return errorResponse('Üretim bulunamadı.', 404)
@@ -40,4 +36,4 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     200,
     { 'Cache-Control': 'private, no-store' },
   )
-}
+}, { requireOrganization: true })

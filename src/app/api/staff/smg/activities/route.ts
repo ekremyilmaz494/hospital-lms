@@ -1,14 +1,9 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { createSmgActivitySchema } from '@/lib/validations'
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin'])
-  if (roleError) return roleError
-
+export const POST = withStaffRoute(async ({ request, dbUser, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
@@ -19,7 +14,7 @@ export async function POST(request: Request) {
   const category = await prisma.smgCategory.findFirst({
     where: {
       id: parsed.data.categoryId,
-      organizationId: dbUser!.organizationId!,
+      organizationId,
       isActive: true,
     },
     select: { id: true, code: true, maxPointsPerActivity: true },
@@ -42,15 +37,13 @@ export async function POST(request: Request) {
       activityType: category.code,
       categoryId: category.id,
       completionDate: new Date(parsed.data.completionDate),
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId!,
+      userId: dbUser.id,
+      organizationId,
       approvalStatus: 'PENDING',
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'CREATE',
     entityType: 'SmgActivity',
     entityId: activity.id,
@@ -61,8 +54,7 @@ export async function POST(request: Request) {
       smgPoints: activity.smgPoints,
       completionDate: activity.completionDate,
     },
-    request,
   })
 
   return jsonResponse(activity, 201)
-}
+}, { requireOrganization: true })

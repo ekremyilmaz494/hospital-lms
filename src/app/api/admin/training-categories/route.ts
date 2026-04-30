@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { createTrainingCategorySchema } from '@/lib/validations'
 import { TRAINING_CATEGORIES } from '@/lib/training-categories'
 
@@ -17,15 +18,9 @@ function toSlug(label: string): string {
     .replace(/^-|-$/g, '')
 }
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ organizationId }) => {
   let categories = await prisma.trainingCategory.findMany({
-    where: { organizationId: dbUser!.organizationId! },
+    where: { organizationId },
     orderBy: { order: 'asc' },
     select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
   })
@@ -34,7 +29,7 @@ export async function GET() {
   if (categories.length === 0) {
     await prisma.trainingCategory.createMany({
       data: TRAINING_CATEGORIES.map((cat, i) => ({
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         value: cat.value,
         label: cat.label,
         icon: cat.icon,
@@ -45,22 +40,16 @@ export async function GET() {
     })
 
     categories = await prisma.trainingCategory.findMany({
-      where: { organizationId: dbUser!.organizationId! },
+      where: { organizationId },
       orderBy: { order: 'asc' },
       select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
     })
   }
 
   return jsonResponse(categories, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
-}
+}, { requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
@@ -79,7 +68,7 @@ export async function POST(request: Request) {
 
   // Unique kontrolü
   const existing = await prisma.trainingCategory.findUnique({
-    where: { organizationId_value: { organizationId: dbUser!.organizationId!, value } },
+    where: { organizationId_value: { organizationId, value } },
   })
   if (existing) {
     return errorResponse('Bu isimde bir kategori zaten mevcut', 409)
@@ -89,7 +78,7 @@ export async function POST(request: Request) {
   let nextOrder = order
   if (nextOrder === undefined) {
     const last = await prisma.trainingCategory.findFirst({
-      where: { organizationId: dbUser!.organizationId! },
+      where: { organizationId },
       orderBy: { order: 'desc' },
       select: { order: true },
     })
@@ -98,7 +87,7 @@ export async function POST(request: Request) {
 
   const category = await prisma.trainingCategory.create({
     data: {
-      organizationId: dbUser!.organizationId!,
+      organizationId,
       value,
       label,
       icon,
@@ -108,15 +97,12 @@ export async function POST(request: Request) {
     select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'training_category.create',
     entityType: 'training_category',
     entityId: category.id,
     newData: { label, icon, value },
-    request,
   })
 
   return jsonResponse(category, 201)
-}
+}, { requireOrganization: true })

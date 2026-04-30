@@ -1,17 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { calculateTrainingProgress } from '@/lib/training-progress'
 import { logger } from '@/lib/logger'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
+export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) => {
   try {
     const { searchParams } = new URL(request.url)
     const { page, limit, skip } = safePagination(searchParams)
@@ -20,9 +13,9 @@ export async function GET(request: Request) {
     // Arşivlenmiş veya soft-delete edilmiş eğitimler personel listesinde gözükmemeli;
     // aksi halde personel "asla bitiremeyeceği" eğitim görür (bkz. PDF-only edge case).
     const where: Record<string, unknown> = {
-      userId: dbUser!.id,
+      userId: dbUser.id,
       training: {
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         isActive: true,
         publishStatus: { not: 'archived' },
       },
@@ -121,4 +114,4 @@ export async function GET(request: Request) {
     logger.error('Staff MyTrainings', 'Eğitimler yüklenemedi', err)
     return errorResponse('Eğitimler yüklenemedi', 503)
   }
-}
+}, { requireOrganization: true })

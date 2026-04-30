@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import type { UserRole } from '@/types/database'
@@ -15,14 +16,8 @@ import type { UserRole } from '@/types/database'
  *   - "Gerçek uyum": totalPassed / (allStaff × totalCompulsoryTrainings) — atanmamış personeli de
  *     uyumsuz sayar. Akreditasyon denetiminde bu metrik esas alınır.
  */
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const GET = withAdminRoute(async ({ organizationId }) => {
+  const orgId = organizationId
 
   const allowed = await checkRateLimit(`compliance:${orgId}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
@@ -310,4 +305,4 @@ export async function GET() {
     logger.error('Admin Compliance', 'Uyum raporu alınamadı', err)
     return errorResponse('Uyum raporu alınamadı', 503)
   }
-}
+}, { requireOrganization: true })

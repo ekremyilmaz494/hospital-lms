@@ -1,16 +1,9 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
+export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) => {
   try {
     const { searchParams } = new URL(request.url)
     const unreadOnly = searchParams.get('unread') === 'true'
@@ -20,8 +13,8 @@ export async function GET(request: Request) {
     const SYSTEM_TYPES = ['exam_passed', 'exam_failed', 'exam_started', 'training_assigned']
 
     const where: Record<string, unknown> = {
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId,
+      userId: dbUser.id,
+      organizationId,
       type: { notIn: SYSTEM_TYPES },
     }
     if (unreadOnly) where.isRead = false
@@ -43,7 +36,7 @@ export async function GET(request: Request) {
         take: 50,
       }),
       prisma.notification.count({
-        where: { userId: dbUser!.id, organizationId: dbUser!.organizationId, isRead: false },
+        where: { userId: dbUser.id, organizationId, isRead: false },
       }),
     ])
 
@@ -52,18 +45,10 @@ export async function GET(request: Request) {
     logger.error('Staff Notifications', 'Bildirimler yüklenemedi', err)
     return errorResponse('Bildirimler yüklenemedi', 503)
   }
-}
+}, { requireOrganization: true })
 
 // Mark notifications as read
-export async function PATCH(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
+export const PATCH = withStaffRoute(async ({ request, dbUser, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
@@ -71,7 +56,7 @@ export async function PATCH(request: Request) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (!uuidRegex.test(id)) return errorResponse('Geçersiz bildirim ID', 400)
     const result = await prisma.notification.updateMany({
-      where: { id, userId: dbUser!.id, organizationId: dbUser!.organizationId },
+      where: { id, userId: dbUser.id, organizationId },
       data: { isRead: true },
     })
     if (result.count === 0) return jsonResponse({ error: 'Bildirim bulunamadı' }, 404)
@@ -80,7 +65,7 @@ export async function PATCH(request: Request) {
     // updateMany atomik olsa da, bu yaklaşım eşzamanlı yeni bildirimlerin
     // yanlışlıkla "okundu" olarak işaretlenmesini kesin olarak önler.
     const unreadIds = await prisma.notification.findMany({
-      where: { userId: dbUser!.id, organizationId: dbUser!.organizationId, isRead: false },
+      where: { userId: dbUser.id, organizationId, isRead: false },
       select: { id: true },
     })
     if (unreadIds.length > 0) {
@@ -92,4 +77,4 @@ export async function PATCH(request: Request) {
   }
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

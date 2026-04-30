@@ -1,21 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
 const CACHE_TTL = 300 // 5 dakika
 const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=180' }
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organization not found', 403)
-
+export const GET = withAdminRoute(async ({ organizationId: orgId }) => {
   const cacheKey = `dashboard:certs:${orgId}`
   const cached = await getCached<object>(cacheKey)
   if (cached) return jsonResponse(cached, 200, CACHE_HEADERS)
@@ -56,4 +48,4 @@ export async function GET() {
     logger.error('Dashboard Certs', 'Sertifika verileri alinamadi', err instanceof Error ? err.message : err)
     return errorResponse('Sertifika verileri alinamadi', 503)
   }
-}
+}, { requireOrganization: true })

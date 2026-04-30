@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, assertRole, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { jsPDF } from 'jspdf'
-import { NextRequest } from 'next/server'
 
 /** Tarih formatla: 05.04.2026 */
 function formatDateTR(date: Date): string {
@@ -24,19 +24,8 @@ function formatCurrency(amount: number, currency: string = 'TRY'): string {
  * Fatura PDF dosyasi olusturur ve dondurur.
  * jsPDF ile sunucu tarafinda PDF uretimi — Turkce karakterler icin ASCII transliterasyon kullanilir.
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  try {
-    assertRole(dbUser!.role, ['admin', 'super_admin'])
-  } catch {
-    return errorResponse('Bu isleme yetkiniz yok', 403)
-  }
+export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser }) => {
+  const { id } = params
 
   try {
     const invoice = await prisma.invoice.findUnique({
@@ -54,7 +43,7 @@ export async function GET(
     }
 
     // Organizasyon izolasyonu — admin sadece kendi faturalarini gorebilir
-    if (dbUser!.role === 'admin' && invoice.organizationId !== dbUser!.organizationId) {
+    if (dbUser.role === 'admin' && invoice.organizationId !== dbUser.organizationId) {
       return errorResponse('Bu faturaya erisim yetkiniz yok', 403)
     }
 
@@ -232,4 +221,4 @@ export async function GET(
     logger.error('Invoice PDF', 'PDF olusturulamadi', err)
     return errorResponse('Fatura PDF olusturulamadi', 500)
   }
-}
+})

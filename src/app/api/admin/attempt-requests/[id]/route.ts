@@ -1,12 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import {
-  getAuthUser,
-  requireRole,
-  jsonResponse,
-  errorResponse,
-  parseBody,
-  createAuditLog,
-} from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
@@ -24,22 +18,10 @@ const reviewSchema = z.discriminatedUnion('action', [
 ])
 
 /** PATCH /api/admin/attempt-requests/[id] — Talebi onayla veya reddet */
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const { id } = params
 
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) {
-    return errorResponse('Kurum bilgisi bulunamadı', 403)
-  }
-
-  const allowed = await checkRateLimit(`attempt-req-review:${dbUser!.id}`, 30, 60)
+  const allowed = await checkRateLimit(`attempt-req-review:${dbUser.id}`, 30, 60)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
   const body = await parseBody<unknown>(request)
@@ -65,7 +47,7 @@ export async function PATCH(
       })
 
       if (!req) throw new Error('NOT_FOUND')
-      if (req.organizationId !== dbUser!.organizationId) throw new Error('FORBIDDEN')
+      if (req.organizationId !== organizationId) throw new Error('FORBIDDEN')
       if (req.status !== 'pending') throw new Error('ALREADY_REVIEWED')
 
       if (parsed.data.action === 'approve') {
@@ -91,7 +73,7 @@ export async function PATCH(
           where: { id },
           data: {
             status: 'approved',
-            reviewedById: dbUser!.id,
+            reviewedById: dbUser.id,
             reviewedAt: new Date(),
             grantedAttempts: parsed.data.grantedAttempts,
             reviewNote: parsed.data.note ?? null,
@@ -101,7 +83,7 @@ export async function PATCH(
         await tx.notification.create({
           data: {
             userId: req.userId,
-            organizationId: dbUser!.organizationId!,
+            organizationId,
             title: 'Ek deneme talebiniz onaylandı',
             message: `"${req.training.title}" eğitimi için ${parsed.data.grantedAttempts} ek deneme hakkı verildi.`,
             type: 'assignment',
@@ -117,7 +99,7 @@ export async function PATCH(
         where: { id },
         data: {
           status: 'rejected',
-          reviewedById: dbUser!.id,
+          reviewedById: dbUser.id,
           reviewedAt: new Date(),
           reviewNote: parsed.data.note,
         },
@@ -126,7 +108,7 @@ export async function PATCH(
       await tx.notification.create({
         data: {
           userId: req.userId,
-          organizationId: dbUser!.organizationId!,
+          organizationId,
           title: 'Ek deneme talebiniz reddedildi',
           message: `"${req.training.title}" eğitimi için talebiniz reddedildi. Gerekçe: ${parsed.data.note}`,
           type: 'assignment',
@@ -137,14 +119,11 @@ export async function PATCH(
       return { action: 'rejected' as const }
     })
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId!,
+    await audit({
       action: result.action === 'approved' ? 'attempt_request_approve' : 'attempt_request_reject',
       entityType: 'exam_attempt_request',
       entityId: id,
       newData: result,
-      request,
     })
 
     return jsonResponse({ success: true, ...result })
@@ -161,4 +140,4 @@ export async function PATCH(
     logger.error('AdminAttemptRequests', 'Talep güncellenemedi', err)
     return errorResponse('İşlem sırasında hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

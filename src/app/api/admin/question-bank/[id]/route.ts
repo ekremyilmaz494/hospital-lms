@@ -1,24 +1,14 @@
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser,
-  requireRole,
   jsonResponse,
   errorResponse,
   parseBody,
-  createAuditLog,
 } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { updateQuestionBankSchema } from '@/lib/validations'
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
@@ -27,7 +17,7 @@ export async function PATCH(
   if (!parsed.success) return errorResponse(parsed.error.message, 400)
 
   const existing = await prisma.questionBank.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
   })
   if (!existing) return errorResponse('Soru bulunamadı', 404)
 
@@ -64,49 +54,35 @@ export async function PATCH(
     })
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'question_bank.update',
     entityType: 'question_bank',
     entityId: id,
     oldData: { text: existing.text },
     newData: { text: question.text },
-    request,
   })
 
   return jsonResponse(question)
-}
+}, { requireOrganization: true })
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const DELETE = withAdminRoute<{ id: string }>(async ({ params, organizationId, audit }) => {
+  const { id } = params
 
   const existing = await prisma.questionBank.findFirst({
-    where: { id, organizationId: dbUser!.organizationId! },
+    where: { id, organizationId },
   })
   if (!existing) return errorResponse('Soru bulunamadı', 404)
 
   // Cascade delete (QuestionBankOption ON DELETE CASCADE) — multi-tenant güvenli
-  const deleted = await prisma.questionBank.deleteMany({ where: { id, organizationId: dbUser!.organizationId! } })
+  const deleted = await prisma.questionBank.deleteMany({ where: { id, organizationId } })
   if (deleted.count === 0) return errorResponse('Soru bulunamadi veya yetkiniz yok', 404)
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'question_bank.delete',
     entityType: 'question_bank',
     entityId: id,
     oldData: { text: existing.text, category: existing.category },
-    request,
   })
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

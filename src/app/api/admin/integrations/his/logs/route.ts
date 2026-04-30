@@ -1,30 +1,29 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 
 /** GET /api/admin/integrations/his/logs — Sayfalı sync log listesi */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit, skip } = safePagination(searchParams)
 
   const integration = await prisma.hisIntegration.findFirst({
-    where: { organizationId: dbUser!.organizationId! },
+    where: { organizationId },
     select: { id: true },
   })
 
   if (!integration) {
-    return jsonResponse({ logs: [], total: 0, page, limit, totalPages: 0 })
+    return jsonResponse(
+      { logs: [], total: 0, page, limit, totalPages: 0 },
+      200,
+      { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' },
+    )
   }
 
   const [logs, total] = await Promise.all([
     prisma.syncLog.findMany({
       where: {
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         integrationId: integration.id,
       },
       orderBy: { startedAt: 'desc' },
@@ -43,7 +42,7 @@ export async function GET(request: Request) {
     }),
     prisma.syncLog.count({
       where: {
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         integrationId: integration.id,
       },
     }),
@@ -61,4 +60,4 @@ export async function GET(request: Request) {
     limit,
     totalPages: Math.ceil(total / limit),
   }, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
-}
+}, { strict: true, requireOrganization: true })

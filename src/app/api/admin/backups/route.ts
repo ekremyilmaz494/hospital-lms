@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, requireRole, jsonResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { uploadBuffer, backupKey } from '@/lib/s3'
 import { encryptBackup } from '@/lib/backup-crypto'
 
@@ -7,14 +8,8 @@ import { encryptBackup } from '@/lib/backup-crypto'
 // doğrudan oradan çeker — bu dosyadan re-export sadece geriye dönük uyumluluk için.
 export { decryptBackup } from '@/lib/backup-crypto'
 
-export async function GET(_request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const GET = withAdminRoute(async ({ organizationId }) => {
+  const orgId = organizationId
 
   const rawBackups = await prisma.dbBackup.findMany({
     where: { organizationId: orgId, status: 'completed' },
@@ -42,16 +37,10 @@ export async function GET(_request: Request) {
       nextAuto: 'Her gün 03:15 UTC',
     },
   }, 200, { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' })
-}
+}, { strict: true, requireOrganization: true })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => {
+  const orgId = organizationId
 
   const auditLogCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
 
@@ -115,18 +104,15 @@ export async function POST(request: Request) {
       fileUrl: uploadSuccess ? key : 'local',
       fileSizeMb: Math.round(sizeMb * 100) / 100,
       status: 'completed',
-      createdById: dbUser!.id,
+      createdById: dbUser.id,
     },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: orgId,
+  await audit({
     action: 'create',
     entityType: 'backup',
     entityId: backup.id,
-    request,
   })
 
   return jsonResponse(backup, 201)
-}
+}, { strict: true, requireOrganization: true })

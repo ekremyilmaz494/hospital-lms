@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 
 /**
@@ -7,17 +8,8 @@ import { checkRateLimit } from '@/lib/redis'
  * Sağlık Bakanlığı'na sunulabilir formatta sertifika raporu.
  * Format: JSON array — Excel/CSV dönüşümü frontend'de yapılır.
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organizasyon bulunamadı', 403)
-
-  const allowed = await checkRateLimit(`ministry-export:${dbUser!.id}`, 5, 60)
+export const GET = withAdminRoute(async ({ request, dbUser, organizationId: orgId }) => {
+  const allowed = await checkRateLimit(`ministry-export:${dbUser.id}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
 
   const { searchParams } = new URL(request.url)
@@ -114,4 +106,4 @@ export async function GET(request: Request) {
     200,
     { 'Cache-Control': 'private, no-store' }
   )
-}
+}, { requireOrganization: true })

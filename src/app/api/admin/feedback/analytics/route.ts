@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, requireRole } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { aggregateItemScores, type FeedbackQuestionType } from '@/lib/feedback-helpers'
 import { logger } from '@/lib/logger'
 
@@ -17,20 +18,14 @@ import { logger } from '@/lib/logger'
  *   - recommendationRate (yes_partial_no → Evet yüzdesi)
  *   - categories: [{ categoryId, categoryName, avgScore, itemCount, items: [{itemId, text, avg, count}] }]
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!dbUser?.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-  const roleError = requireRole(dbUser.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, dbUser, organizationId }) => {
   const url = new URL(request.url)
   const trainingId = url.searchParams.get('trainingId') || undefined
   const dateFrom = url.searchParams.get('dateFrom')
   const dateTo = url.searchParams.get('dateTo')
 
   const where = {
-    organizationId: dbUser.organizationId,
+    organizationId,
     ...(trainingId ? { trainingId } : {}),
     ...(dateFrom || dateTo
       ? {
@@ -52,7 +47,7 @@ export async function GET(request: Request) {
         _count: { _all: true },
       }),
       prisma.trainingFeedbackForm.findUnique({
-        where: { organizationId: dbUser.organizationId },
+        where: { organizationId },
         select: {
           id: true,
           categories: {
@@ -180,10 +175,10 @@ export async function GET(request: Request) {
       recommendationRate,
       categories,
     }, 200, {
-      'Cache-Control': 'private, max-age=120, stale-while-revalidate=300',
+      'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
     })
   } catch (err) {
     logger.error('FeedbackAnalytics GET', 'Analitik hatası', { err, userId: dbUser.id })
     return errorResponse('Analitik verisi alınamadı', 500)
   }
-}
+}, { requireOrganization: true })

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUserStrict, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
@@ -10,10 +11,7 @@ const createSchema = z.object({
 })
 
 /** GET /api/staff/attempt-requests?trainingId=... — Kullanıcının ek hak taleplerini listele */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
+export const GET = withStaffRoute(async ({ request, dbUser }) => {
   const url = new URL(request.url)
   const trainingId = url.searchParams.get('trainingId')
   if (trainingId && !/^[0-9a-f-]{36}$/i.test(trainingId)) {
@@ -23,7 +21,7 @@ export async function GET(request: Request) {
   try {
     const requests = await prisma.examAttemptRequest.findMany({
       where: {
-        userId: dbUser!.id,
+        userId: dbUser.id,
         ...(trainingId && { trainingId }),
       },
       orderBy: { createdAt: 'desc' },
@@ -41,24 +39,17 @@ export async function GET(request: Request) {
     })
 
     return jsonResponse({ requests }, 200, {
-      'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+      'Cache-Control': 'private, max-age=10, stale-while-revalidate=30',
     })
   } catch (err) {
     logger.error('AttemptRequests', 'Talepler listelenemedi', err)
     return errorResponse('Talepler yüklenirken hata oluştu', 500)
   }
-}
+}, { strict: true })
 
 /** POST /api/staff/attempt-requests — Ek deneme hakkı talep et */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUserStrict()
-  if (error) return error
-
-  if (!dbUser!.organizationId) {
-    return errorResponse('Kurum bilgisi bulunamadı', 403)
-  }
-
-  const allowed = await checkRateLimit(`attempt-req:${dbUser!.id}`, 5, 300)
+export const POST = withStaffRoute(async ({ request, dbUser, organizationId }) => {
+  const allowed = await checkRateLimit(`attempt-req:${dbUser.id}`, 5, 300)
   if (!allowed) return errorResponse('Çok fazla talep gönderildi. Lütfen bekleyin.', 429)
 
   const body = await parseBody<unknown>(request)
@@ -73,7 +64,7 @@ export async function POST(request: Request) {
     // Atama dogrulamasi + bekleyen talep kontrolu paralel — birbirinden bagimsiz
     const [assignment, existing] = await Promise.all([
       prisma.trainingAssignment.findFirst({
-        where: { trainingId: parsed.data.trainingId, userId: dbUser!.id },
+        where: { trainingId: parsed.data.trainingId, userId: dbUser.id },
         select: {
           id: true,
           status: true,
@@ -84,7 +75,7 @@ export async function POST(request: Request) {
       }),
       prisma.examAttemptRequest.findFirst({
         where: {
-          userId: dbUser!.id,
+          userId: dbUser.id,
           trainingId: parsed.data.trainingId,
           status: 'pending',
         },
@@ -95,7 +86,7 @@ export async function POST(request: Request) {
     if (!assignment) {
       return errorResponse('Bu eğitime atanmamışsınız', 404)
     }
-    if (assignment.training.organizationId !== dbUser!.organizationId) {
+    if (assignment.training.organizationId !== organizationId) {
       return errorResponse('Yetkisiz erişim', 403)
     }
     if (assignment.status === 'passed') {
@@ -112,8 +103,8 @@ export async function POST(request: Request) {
     const [created, admins] = await Promise.all([
       prisma.examAttemptRequest.create({
         data: {
-          userId: dbUser!.id,
-          organizationId: dbUser!.organizationId,
+          userId: dbUser.id,
+          organizationId,
           trainingId: parsed.data.trainingId,
           reason: parsed.data.reason ?? null,
           status: 'pending',
@@ -126,7 +117,7 @@ export async function POST(request: Request) {
       }),
       prisma.user.findMany({
         where: {
-          organizationId: dbUser!.organizationId,
+          organizationId,
           role: { in: ['admin', 'super_admin'] },
           isActive: true,
         },
@@ -138,9 +129,9 @@ export async function POST(request: Request) {
       await prisma.notification.createMany({
         data: admins.map((a) => ({
           userId: a.id,
-          organizationId: dbUser!.organizationId!,
+          organizationId,
           title: 'Yeni ek deneme talebi',
-          message: `${dbUser!.firstName} ${dbUser!.lastName}, "${assignment.training.title}" eğitimi için ek deneme hakkı istiyor.`,
+          message: `${dbUser.firstName} ${dbUser.lastName}, "${assignment.training.title}" eğitimi için ek deneme hakkı istiyor.`,
           type: 'assignment',
           relatedTrainingId: parsed.data.trainingId,
         })),
@@ -158,4 +149,4 @@ export async function POST(request: Request) {
     logger.error('AttemptRequests', 'Talep oluşturulamadı', err)
     return errorResponse('Talep oluşturulurken hata oluştu', 500)
   }
-}
+}, { requireOrganization: true, strict: true })

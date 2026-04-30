@@ -1,18 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
-export async function POST() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ organizationId }) => {
   try {
     const result = await prisma.notification.updateMany({
       where: {
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         isRead: false,
       },
       data: { isRead: true },
@@ -23,4 +18,4 @@ export async function POST() {
     logger.error('Admin Notifications', 'Toplu okundu işaretleme başarısız', err)
     return errorResponse('Bildirimler güncellenemedi', 500)
   }
-}
+}, { requireOrganization: true })

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, parseBody, requireRole, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { trainingFeedbackFormUpsertSchema } from '@/lib/validations'
 import { logger } from '@/lib/logger'
 
@@ -8,16 +9,10 @@ import { logger } from '@/lib/logger'
  * Organizasyonun EY.FR.40 formunu (kategoriler + itemlar ile) döner — editör için.
  * Form yoksa null döner; UI "Varsayılanı oluştur" butonu gösterir.
  */
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!dbUser?.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-  const roleError = requireRole(dbUser.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ dbUser, organizationId }) => {
   try {
     const form = await prisma.trainingFeedbackForm.findUnique({
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId },
       select: {
         id: true,
         title: true,
@@ -46,12 +41,12 @@ export async function GET() {
       },
     })
 
-    return jsonResponse({ form }, 200, { 'Cache-Control': 'private, max-age=30' })
+    return jsonResponse({ form }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   } catch (err) {
     logger.error('AdminFeedbackForm GET', 'Form çekilemedi', { err, userId: dbUser.id })
     return errorResponse('Form yüklenemedi', 500)
   }
-}
+}, { requireOrganization: true })
 
 /**
  * PUT /api/admin/feedback/form
@@ -62,13 +57,7 @@ export async function GET() {
  * bağlı kalır (Cascade silme sadece yeni cascade'den geçer). Response'lar
  * etkilenmediği için geçmiş raporlar intakt.
  */
-export async function PUT(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!dbUser?.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-  const roleError = requireRole(dbUser.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const PUT = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek')
 
@@ -84,9 +73,9 @@ export async function PUT(request: Request) {
     const result = await prisma.$transaction(async (tx) => {
       // Form upsert — sadece meta alanları
       const form = await tx.trainingFeedbackForm.upsert({
-        where: { organizationId: dbUser.organizationId! },
+        where: { organizationId },
         create: {
-          organizationId: dbUser.organizationId!,
+          organizationId,
           title: data.title,
           description: data.description ?? null,
           documentCode: data.documentCode ?? null,
@@ -191,9 +180,7 @@ export async function PUT(request: Request) {
       return form.id
     })
 
-    await createAuditLog({
-      userId: dbUser.id,
-      organizationId: dbUser.organizationId,
+    await audit({
       action: 'feedback_form.updated',
       entityType: 'training_feedback_form',
       entityId: result,
@@ -205,4 +192,4 @@ export async function PUT(request: Request) {
     logger.error('AdminFeedbackForm PUT', 'Güncelleme hatası', { err, userId: dbUser.id })
     return errorResponse('Form güncellenirken hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

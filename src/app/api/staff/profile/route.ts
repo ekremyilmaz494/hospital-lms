@@ -1,17 +1,13 @@
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
-import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logActivity } from '@/lib/activity-logger'
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
+export const GET = withStaffRoute(async ({ dbUser }) => {
   const profile = await prisma.user.findUnique({
-    where: { id: dbUser!.id },
+    where: { id: dbUser.id },
     include: {
       organization: { select: { name: true, code: true } },
       departmentRel: { select: { name: true } },
@@ -37,7 +33,7 @@ export async function GET() {
     },
     createdAt: profile.createdAt,
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
-}
+}, { requireOrganization: true })
 
 interface PatchBody {
   firstName?: string
@@ -48,13 +44,8 @@ interface PatchBody {
   newPassword?: string
 }
 
-export async function PATCH(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
-  const allowed = await checkRateLimit(`profile-update:${dbUser!.id}`, 5, 60)
+export const PATCH = withStaffRoute(async ({ request, dbUser, organizationId, audit }) => {
+  const allowed = await checkRateLimit(`profile-update:${dbUser.id}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
 
   const body = await parseBody<PatchBody>(request)
@@ -91,7 +82,7 @@ export async function PATCH(request: Request) {
   if (Object.keys(updateData).length > 0) {
     // Değişiklik öncesi mevcut değerleri kaydet (sağlık sektörü audit uyumluluğu)
     const currentProfile = await prisma.user.findUnique({
-      where: { id: dbUser!.id },
+      where: { id: dbUser.id },
       select: { firstName: true, lastName: true, phone: true, avatarUrl: true },
     })
     const oldData: Record<string, unknown> = {}
@@ -101,7 +92,7 @@ export async function PATCH(request: Request) {
 
     // DB update + Supabase metadata sync in parallel
     const dbUpdate = prisma.user.update({
-      where: { id: dbUser!.id },
+      where: { id: dbUser.id },
       data: updateData,
     })
 
@@ -117,15 +108,12 @@ export async function PATCH(request: Request) {
 
     await Promise.all([dbUpdate, supabaseSync])
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId,
+    await audit({
       action: 'profile.updated',
       entityType: 'user',
-      entityId: dbUser!.id,
+      entityId: dbUser.id,
       oldData,
       newData: updateData,
-      request,
     })
   }
 
@@ -142,7 +130,7 @@ export async function PATCH(request: Request) {
 
     // Verify current password by re-authenticating
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: dbUser!.email,
+      email: dbUser.email,
       password: body.currentPassword,
     })
     if (signInError) {
@@ -157,26 +145,23 @@ export async function PATCH(request: Request) {
       return errorResponse('Şifre güncellenemedi: ' + updateError.message)
     }
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId,
+    await audit({
       action: 'password.changed',
       entityType: 'user',
-      entityId: dbUser!.id,
-      request,
+      entityId: dbUser.id,
     })
   }
 
   if (Object.keys(updateData).length > 0) {
     void logActivity({
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId ?? '',
+      userId: dbUser.id,
+      organizationId,
       action: 'profile_update',
       resourceType: 'user',
-      resourceId: dbUser!.id,
+      resourceId: dbUser.id,
       metadata: { updatedFields: Object.keys(updateData) },
     })
   }
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

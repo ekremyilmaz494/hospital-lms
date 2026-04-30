@@ -1,23 +1,16 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import type { UserRole } from '@/types/database'
 
 /**
  * GET /api/admin/subscription
  * Hastane admini kendi abonelik durumunu ve faturalarini gorur
  */
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-
+export const GET = withAdminRoute(async ({ organizationId }) => {
   const [subscription, org, staffCount, trainingCount] = await Promise.all([
     prisma.organizationSubscription.findUnique({
-      where: { organizationId: orgId },
+      where: { organizationId },
       include: {
         plan: true,
         invoices: {
@@ -32,11 +25,11 @@ export async function GET() {
       },
     }),
     prisma.organization.findUnique({
-      where: { id: orgId },
+      where: { id: organizationId },
       select: { name: true },
     }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole } }),
-    prisma.training.count({ where: { organizationId: orgId } }),
+    prisma.user.count({ where: { organizationId, role: 'staff' satisfies UserRole } }),
+    prisma.training.count({ where: { organizationId } }),
   ])
 
   if (!subscription) {
@@ -101,4 +94,4 @@ export async function GET() {
       orderBy: { priceMonthly: 'asc' },
     }),
   }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })

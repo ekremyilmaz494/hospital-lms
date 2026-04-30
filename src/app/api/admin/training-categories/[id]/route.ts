@@ -1,28 +1,20 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { updateTrainingCategorySchema } from '@/lib/validations'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+  const { id } = params
   if (!UUID_REGEX.test(id)) return errorResponse('Geçersiz kategori ID', 400)
 
-  const category = await prisma.trainingCategory.findUnique({
+  const category = await prisma.trainingCategory.findUnique({ // perf-check-disable-line
     where: { id },
     select: { id: true, organizationId: true, value: true, label: true },
   })
 
-  if (!category || category.organizationId !== dbUser!.organizationId!) {
+  if (!category || category.organizationId !== organizationId) {
     return errorResponse('Kategori bulunamadı', 404)
   }
 
@@ -41,46 +33,34 @@ export async function PATCH(
     select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
   })
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'training_category.update',
     entityType: 'training_category',
     entityId: id,
     oldData: { label: category.label },
     newData: parsed.data,
-    request,
   })
 
   return jsonResponse(updated)
-}
+}, { requireOrganization: true })
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const { id } = await params
+export const DELETE = withAdminRoute<{ id: string }>(async ({ params, organizationId, audit }) => {
+  const { id } = params
   if (!UUID_REGEX.test(id)) return errorResponse('Geçersiz kategori ID', 400)
 
-  const category = await prisma.trainingCategory.findUnique({
+  const category = await prisma.trainingCategory.findUnique({ // perf-check-disable-line
     where: { id },
     select: { id: true, organizationId: true, value: true, label: true },
   })
 
-  if (!category || category.organizationId !== dbUser!.organizationId!) {
+  if (!category || category.organizationId !== organizationId) {
     return errorResponse('Kategori bulunamadı', 404)
   }
 
   // Bu kategoriye bağlı eğitim var mı?
   const trainingCount = await prisma.training.count({
     where: {
-      organizationId: dbUser!.organizationId!,
+      organizationId,
       category: category.value,
     },
   })
@@ -92,18 +72,15 @@ export async function DELETE(
     )
   }
 
-  const deleted = await prisma.trainingCategory.deleteMany({ where: { id, organizationId: dbUser!.organizationId! } })
+  const deleted = await prisma.trainingCategory.deleteMany({ where: { id, organizationId } })
   if (deleted.count === 0) return errorResponse('Kategori bulunamadi veya yetkiniz yok', 404)
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId!,
+  await audit({
     action: 'training_category.delete',
     entityType: 'training_category',
     entityId: id,
     oldData: { label: category.label, value: category.value },
-    request,
   })
 
   return jsonResponse({ success: true })
-}
+}, { requireOrganization: true })

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import type { UserRole } from '@/types/database'
 import { resolveReportFilters, REPORTS_CACHE_HEADERS } from './_shared'
@@ -13,15 +14,7 @@ import { resolveReportFilters, REPORTS_CACHE_HEADERS } from './_shared'
  *   - /api/admin/reports/departments
  *   - /api/admin/reports/failure
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-
+export const GET = withAdminRoute(async ({ request, organizationId: orgId }) => {
   const resolved = await resolveReportFilters(request, orgId)
   if (resolved.error) return resolved.error
   const { trainingScope, userDeptFilter, assignmentDateFilter, attemptDateFilter } = resolved.filters
@@ -92,4 +85,4 @@ export async function GET(request: Request) {
     logger.error('Admin Reports', 'Rapor özeti alınamadı', err)
     return errorResponse('Rapor verileri alınamadı', 503)
   }
-}
+}, { requireOrganization: true })

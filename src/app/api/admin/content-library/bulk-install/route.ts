@@ -1,26 +1,16 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser,
-  requireRole,
   jsonResponse,
   errorResponse,
   parseBody,
-  createAuditLog,
 } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { bulkInstallSchema } from '@/lib/validations'
 import { CONTENT_LIBRARY_CATEGORIES } from '@/lib/content-library-categories'
 
 /** POST /api/admin/content-library/bulk-install — kategori bazlı toplu kurulum */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek verisi')
 
@@ -36,7 +26,7 @@ export async function POST(request: Request) {
       where: { category, isActive: true },
     }),
     prisma.organizationContentLibrary.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId },
       select: { contentLibraryId: true },
     }),
   ])
@@ -64,7 +54,7 @@ export async function POST(request: Request) {
     for (const lib of toInstall) {
       const t = await tx.training.create({
         data: {
-          organizationId:      orgId,
+          organizationId,
           title:               lib.title,
           description:         lib.description ?? undefined,
           category:            categoryLabel,
@@ -75,7 +65,7 @@ export async function POST(request: Request) {
           startDate:           now,
           endDate:             oneYearLater,
           isCompulsory:        false,
-          createdById:         dbUser!.id,
+          createdById:         dbUser.id,
           examDurationMinutes: 30,
           passingScore:        70,
           maxAttempts:         3,
@@ -102,22 +92,19 @@ export async function POST(request: Request) {
           : Promise.resolve(),
         tx.organizationContentLibrary.create({
           data: {
-            organizationId:   orgId,
+            organizationId,
             contentLibraryId: lib.id,
-            installedBy:      dbUser!.id,
+            installedBy:      dbUser.id,
           },
         }),
       ])
     }
   }, { timeout: 30000 })
 
-  await createAuditLog({
-    userId:         dbUser!.id,
-    organizationId: orgId,
+  await audit({
     action:         'content_library.bulk_install',
     entityType:     'content_library',
     newData:        { category, installed: toInstall.length, skipped: installedSet.size },
-    request,
   })
 
   revalidatePath('/admin/trainings')
@@ -127,4 +114,4 @@ export async function POST(request: Request) {
     installed: toInstall.length,
     skipped: allInCategory.length - toInstall.length,
   }, 201)
-}
+}, { requireOrganization: true })

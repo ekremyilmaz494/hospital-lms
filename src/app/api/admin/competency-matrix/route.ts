@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit, withCache } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -7,14 +8,8 @@ import { logger } from '@/lib/logger'
  * GET /api/admin/competency-matrix
  * Personel × Eğitim matrisi — kim hangi eğitimde hangi durumda?
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
+  const orgId = organizationId
 
   const allowed = await checkRateLimit(`competency:${orgId}`, 5, 60)
   if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
@@ -128,4 +123,4 @@ export async function GET(request: Request) {
     logger.error('CompetencyMatrix', 'Matris verileri alınamadı', err)
     return errorResponse('Yetkinlik matrisi alınamadı', 503)
   }
-}
+}, { requireOrganization: true })

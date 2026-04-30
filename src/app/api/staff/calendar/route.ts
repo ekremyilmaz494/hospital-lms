@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 
 /**
@@ -23,15 +24,7 @@ function normalizeStatus(raw: string): CalendarStatus {
   return 'assigned'
 }
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
+export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) => {
   // ?month=YYYY-MM → o ayı kapsayan atamalar. Yoksa -3 / +6 ay pencere (navigasyon için).
   const { searchParams } = new URL(request.url)
   const monthParam = searchParams.get('month')
@@ -52,9 +45,9 @@ export async function GET(request: Request) {
     // my-trainings ile aynı görünürlük kuralı: arşivli / pasif eğitim gösterme.
     // Aksi halde staff tıklayamayacağı (404 dönen) eğitim görür.
     const where = {
-      userId: dbUser!.id,
+      userId: dbUser.id,
       training: {
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         isActive: true,
         publishStatus: { not: 'archived' },
         startDate: { lte: rangeEnd },
@@ -102,4 +95,4 @@ export async function GET(request: Request) {
     logger.error('Staff Calendar', 'Takvim yüklenemedi', err)
     return errorResponse('Takvim yüklenemedi', 503)
   }
-}
+}, { requireOrganization: true })

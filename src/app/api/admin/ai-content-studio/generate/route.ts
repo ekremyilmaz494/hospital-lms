@@ -9,7 +9,8 @@
  * 6. 202 + generationId döndür → client polling'e başlar
  */
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getUploadUrl, getDownloadUrl, aiArtifactKey } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
@@ -25,17 +26,9 @@ import { startGeneration } from '@/lib/ai-content-studio/notebook-worker'
 
 export const maxDuration = 60
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
-
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   // Org-bazlı rate limit (kullanıcı değil — abuse önleme)
-  const allowed = await checkRateLimit(`ai-gen:${orgId}`, AI_GEN_RATE_LIMIT_PER_HOUR, 3600)
+  const allowed = await checkRateLimit(`ai-gen:${organizationId}`, AI_GEN_RATE_LIMIT_PER_HOUR, 3600)
   if (!allowed) {
     return errorResponse('Saatlik üretim limiti aşıldı. Lütfen bir saat bekleyin.', 429)
   }
@@ -53,7 +46,7 @@ export async function POST(request: Request) {
 
   // Multi-tenant guard: yüklenen sourceFiles s3Key'i gerçekten bu org'a ait mi?
   for (const sf of data.sourceFiles) {
-    if (!sf.s3Key.startsWith(`ai-content/${orgId}/`)) {
+    if (!sf.s3Key.startsWith(`ai-content/${organizationId}/`)) {
       return errorResponse('Geçersiz kaynak dosya referansı.', 403)
     }
   }
@@ -69,8 +62,8 @@ export async function POST(request: Request) {
   // 1. AiGeneration yarat
   const gen = await prisma.aiGeneration.create({
     data: {
-      organizationId: orgId,
-      createdById: dbUser!.id,
+      organizationId,
+      createdById: dbUser.id,
       artifactType: data.artifactType,
       prompt: data.prompt ?? null,
       sourceFiles: data.sourceFiles,
@@ -82,7 +75,7 @@ export async function POST(request: Request) {
   })
 
   // 2. Output S3 key + presigned PUT URL
-  const outputKey = aiArtifactKey(orgId, gen.id, ext)
+  const outputKey = aiArtifactKey(organizationId, gen.id, ext)
   let uploadUrl: string
   try {
     uploadUrl = await getUploadUrl(outputKey, mime)
@@ -105,7 +98,7 @@ export async function POST(request: Request) {
   // 4. Worker'a forward et
   try {
     const workerResp = await startGeneration({
-      orgId,
+      orgId: organizationId,
       generationId: gen.id,
       artifactType: cliType,
       prompt: data.prompt ?? undefined,
@@ -129,14 +122,11 @@ export async function POST(request: Request) {
     })
 
     // Audit
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'ai_generation_start',
       entityType: 'ai_generation',
       entityId: gen.id,
       newData: { artifactType: data.artifactType, sourceCount: data.sourceFiles.length + data.sourceUrls.length },
-      request,
     })
 
     // (Shared mode — per-org account update kaldırıldı)
@@ -157,4 +147,4 @@ export async function POST(request: Request) {
     })
     return errorResponse('Worker servisi yanıt vermiyor. Lütfen daha sonra tekrar deneyin.', 502)
   }
-}
+}, { requireOrganization: true })

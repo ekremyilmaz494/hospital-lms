@@ -2,16 +2,11 @@
  * GET /api/admin/ai-content-studio — generation history list (paginated).
  */
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, safePagination } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { AI_GEN_STATUSES, AI_ARTIFACT_TYPES } from '@/lib/ai-content-studio/constants'
 
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const url = new URL(request.url)
   const { page, limit, skip } = safePagination(url.searchParams, 50)
   const statusParam = url.searchParams.get('status')
@@ -23,7 +18,7 @@ export async function GET(request: Request) {
     ? typeParam : undefined
 
   const where = {
-    organizationId: dbUser!.organizationId!,
+    organizationId,
     ...(status ? { status } : {}),
     ...(artifactType ? { artifactType } : {}),
   }
@@ -55,4 +50,4 @@ export async function GET(request: Request) {
     200,
     { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' },
   )
-}
+}, { requireOrganization: true })

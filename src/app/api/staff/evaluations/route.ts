@@ -1,15 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse } from '@/lib/api-helpers'
+import { jsonResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin'])
-  if (roleError) return roleError
-
-  const userId = dbUser!.id
-  const orgId = dbUser!.organizationId!
+export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
+  const userId = dbUser.id
+  const orgId = organizationId
 
   const [pending, mySubjectEvals] = await Promise.all([
     // Bekleyen: ben başkasını değerlendireceğim
@@ -41,4 +36,4 @@ export async function GET() {
   ])
 
   return jsonResponse({ pending, mySubjectEvals }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}
+}, { requireOrganization: true })

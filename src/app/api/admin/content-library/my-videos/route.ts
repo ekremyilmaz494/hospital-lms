@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse } from '@/lib/api-helpers'
+import { jsonResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getStreamUrl } from '@/lib/s3'
 import { logger } from '@/lib/logger'
 
@@ -13,20 +14,13 @@ import { logger } from '@/lib/logger'
  * Sorgu parametreleri:
  *  - category: CONTENT_LIBRARY_CATEGORIES'den bir değer (opsiyonel)
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const category = searchParams.get('category')
 
   try {
     const where: Record<string, unknown> = {
-      organizationId: orgId,
+      organizationId,
       isActive: true,
     }
     if (category) where.category = category
@@ -63,7 +57,7 @@ export async function GET(request: Request) {
     const ids = items.map(i => i.id)
     const trainingUsage = await prisma.training.findMany({
       where: {
-        organizationId: orgId,
+        organizationId,
         sourceLibraryId: { in: ids },
       },
       select: {
@@ -105,7 +99,7 @@ export async function GET(request: Request) {
           targetRoles: item.targetRoles as string[],
           isActive: item.isActive,
           contentType: item.contentType,
-          isOwned: item.organizationId === orgId,
+          isOwned: item.organizationId === organizationId,
           usedInTrainings: usedIn,
           usageCount: usedIn.length,
         }
@@ -118,7 +112,7 @@ export async function GET(request: Request) {
       { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
     )
   } catch (err) {
-    logger.error('content-library:my-videos', 'GET failed', { err, orgId })
+    logger.error('content-library:my-videos', 'GET failed', { err, orgId: organizationId })
     return jsonResponse({ error: 'İçerikler yüklenemedi' }, 500)
   }
-}
+}, { requireOrganization: true })

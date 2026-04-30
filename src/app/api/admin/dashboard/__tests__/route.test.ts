@@ -51,7 +51,7 @@ describe('GET /api/admin/dashboard/stats', () => {
       error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
     })
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/admin/dashboard/stats"))
     const data = await response.json()
 
     expect(response.status).toBe(401)
@@ -69,7 +69,7 @@ describe('GET /api/admin/dashboard/stats', () => {
       NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     )
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/admin/dashboard/stats"))
     const data = await response.json()
 
     expect(response.status).toBe(403)
@@ -101,7 +101,7 @@ describe('GET /api/admin/dashboard/stats', () => {
     // Mock compulsory trainings
     mockTrainingFindMany.mockResolvedValue([] as never)
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/admin/dashboard/stats"))
     const data = await response.json()
 
     expect(response.status).toBe(200)

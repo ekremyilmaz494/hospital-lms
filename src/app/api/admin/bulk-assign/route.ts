@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
 import { logger } from '@/lib/logger'
 import { sendEmail, trainingAssignedEmail } from '@/lib/email'
@@ -16,14 +17,8 @@ const bulkAssignSchema = z.object({
  * Birden fazla eğitimi birden fazla personele tek seferde atar.
  * Zaten atanmış kombinasyonlar sessizce atlanır.
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
+  const orgId = organizationId
 
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
@@ -79,7 +74,7 @@ export async function POST(request: Request) {
     for (const trainingId of trainingIds) {
       for (const userId of userIds) {
         if (!existingSet.has(`${trainingId}:${userId}`)) {
-          newAssignments.push({ trainingId, userId, maxAttempts, originalMaxAttempts: maxAttempts, assignedById: dbUser!.id })
+          newAssignments.push({ trainingId, userId, maxAttempts, originalMaxAttempts: maxAttempts, assignedById: dbUser.id })
         }
       }
     }
@@ -111,17 +106,14 @@ export async function POST(request: Request) {
       await tx.notification.createMany({ data: notifications })
     })
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'bulk_assign',
       entityType: 'training_assignment',
       newData: { trainingIds, userIds, created: newAssignments.length, skipped: existing.length },
-      request,
     })
 
     // Fire-and-forget: atanan her (kullanıcı × eğitim) kombinasyonu için e-posta
-    const assignedByName = [dbUser!.firstName, dbUser!.lastName].filter(Boolean).join(' ') || null
+    const assignedByName = [dbUser.firstName, dbUser.lastName].filter(Boolean).join(' ') || null
     void sendBulkAssignmentEmails({
       organizationId: orgId,
       trainings,
@@ -139,7 +131,7 @@ export async function POST(request: Request) {
     logger.error('BulkAssign', 'Toplu atama başarısız', err)
     return errorResponse('Toplu atama yapılamadı', 500)
   }
-}
+}, { requireOrganization: true })
 
 type BulkTraining = {
   id: string

@@ -1,12 +1,10 @@
 import ExcelJS from 'exceljs'
 import { prisma } from '@/lib/prisma'
 import {
-  getAuthUser,
-  requireRole,
   jsonResponse,
   errorResponse,
-  createAuditLog,
 } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 
 // Vercel Pro max: 300s. Large Excel parse + bulk insert için default 60s yetersiz.
 export const maxDuration = 300
@@ -14,13 +12,7 @@ export const maxDuration = 300
 const CORRECT_MAP: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 }
 const VALID_DIFFICULTIES = ['easy', 'medium', 'hard']
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const formData = await request.formData()
   const file = formData.get('file')
   if (!file || !(file instanceof File)) {
@@ -31,7 +23,7 @@ export async function POST(request: Request) {
     return errorResponse('Dosya boyutu 5MB sınırını aşıyor', 400)
   }
 
-  const orgId = dbUser!.organizationId!
+  const orgId = organizationId
 
   try {
     const arrayBuffer = await file.arrayBuffer()
@@ -114,13 +106,10 @@ export async function POST(request: Request) {
       { timeout: 60000 },
     )
 
-    await createAuditLog({
-      userId: dbUser!.id,
-      organizationId: orgId,
+    await audit({
       action: 'question_bank.import',
       entityType: 'question_bank',
       newData: { imported: rows.length, errors: errorCount },
-      request,
     })
 
     return jsonResponse({
@@ -128,10 +117,10 @@ export async function POST(request: Request) {
       errors: errorCount,
       total: rows.length + errorCount,
     })
-  } catch (err) {
+  } catch {
     return errorResponse(
       'Dosya işlenirken hata oluştu. Lütfen formatı kontrol edin.',
       500,
     )
   }
-}
+}, { requireOrganization: true })

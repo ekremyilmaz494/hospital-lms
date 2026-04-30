@@ -1,11 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import {
-  getAuthUser,
-  requireRole,
-  jsonResponse,
-  errorResponse,
-  parseBody,
-} from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
 
 const subscribeSchema = z.object({
@@ -15,13 +10,7 @@ const subscribeSchema = z.object({
 })
 
 /** POST /api/staff/push/subscribe — Web Push aboneliğini kaydet */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin'])
-  if (roleError) return roleError
-
+export const POST = withStaffRoute(async ({ request, dbUser }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek verisi')
 
@@ -35,10 +24,10 @@ export async function POST(request: Request) {
   // Varsa güncelle, yoksa oluştur (upsert)
   await prisma.pushSubscription.upsert({
     where: {
-      userId_endpoint: { userId: dbUser!.id, endpoint },
+      userId_endpoint: { userId: dbUser.id, endpoint },
     },
     create: {
-      userId:   dbUser!.id,
+      userId:   dbUser.id,
       endpoint,
       p256dh,
       auth,
@@ -50,4 +39,4 @@ export async function POST(request: Request) {
   })
 
   return jsonResponse({ message: 'Bildirimler aktif edildi' }, 201)
-}
+})

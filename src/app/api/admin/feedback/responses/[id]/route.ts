@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, requireRole } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { calculateOverallScore, type FeedbackQuestionType } from '@/lib/feedback-helpers'
 import { logger } from '@/lib/logger'
 
@@ -45,17 +46,12 @@ type AnswerItemSnapshot = {
   order?: number
 }
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!dbUser?.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-  const roleError = requireRole(dbUser.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
+  const { id } = params
 
   try {
     const response = await prisma.trainingFeedbackResponse.findFirst({
-      where: { id, organizationId: dbUser.organizationId },
+      where: { id, organizationId },
       select: {
         id: true,
         submittedAt: true,
@@ -179,10 +175,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           }
         : null,
     }, 200, {
-      'Cache-Control': 'private, max-age=60',
+      'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
     })
   } catch (err) {
     logger.error('AdminFeedbackResponse GET', 'Detay alınamadı', { err, userId: dbUser.id, id })
     return errorResponse('Yanıt yüklenemedi', 500)
   }
-}
+}, { requireOrganization: true })

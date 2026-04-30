@@ -4,23 +4,18 @@
  * Admin "Hesap Bağla" tıkladığında çağrılır. Yeni one-time token üretir
  * ve admin'e tek-satır kurulum komutunu döner.
  */
-import { getAuthUser, requireRole, jsonResponse, errorResponse, getAppUrl } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, getAppUrl } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { issueConnectionToken } from '@/lib/ai-content-studio/connection-tokens'
 import { checkRateLimit } from '@/lib/redis'
 
-export async function POST() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleErr = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleErr) return roleErr
-
-  const allowed = await checkRateLimit(`ai-init-conn:${dbUser!.id}`, 10, 3600)
+export const POST = withAdminRoute(async ({ dbUser, organizationId }) => {
+  const allowed = await checkRateLimit(`ai-init-conn:${dbUser.id}`, 10, 3600)
   if (!allowed) return errorResponse('Çok fazla bağlantı denemesi.', 429)
 
   const token = await issueConnectionToken({
-    orgId: dbUser!.organizationId!,
-    userId: dbUser!.id,
+    orgId: organizationId,
+    userId: dbUser.id,
   })
 
   const appUrl = getAppUrl()
@@ -39,4 +34,4 @@ export async function POST() {
     },
     pollUrl: `/api/admin/ai-content-studio/account`,
   })
-}
+}, { requireOrganization: true })

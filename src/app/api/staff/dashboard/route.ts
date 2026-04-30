@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { calculateTrainingProgress } from '@/lib/training-progress'
 import { logger } from '@/lib/logger'
 import { getCached, setCached } from '@/lib/redis'
@@ -7,28 +8,14 @@ import { getCached, setCached } from '@/lib/redis'
 const CACHE_TTL = 60
 
 // GET /api/staff/dashboard — Personel dashboard verileri
-export async function GET() {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
-
-  if (!dbUser!.organizationId) {
-    // super_admin'in organizationId'si olmayabilir — boş dashboard dön
-    return jsonResponse({
-      stats: { assigned: 0, inProgress: 0, completed: 0, failed: 0, overallProgress: 0 },
-      upcomingTrainings: [], urgentTraining: null, notifications: [], recentActivity: [],
-    }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-  }
-
-  const userId = dbUser!.id
+export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
+  const userId = dbUser.id
 
   try {
     const cacheKey = `staff:dashboard:${userId}`
     const cached = await getCached<Record<string, unknown>>(cacheKey)
     if (cached) {
-      return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+      return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
     }
 
     // 1) Assignments + attempts + notifications + recent activity — tümü paralel
@@ -39,7 +26,7 @@ export async function GET() {
         where: {
           userId,
           training: {
-            organizationId: dbUser!.organizationId!,
+            organizationId,
             isActive: true,
             publishStatus: { not: 'archived' },
           },
@@ -172,12 +159,12 @@ export async function GET() {
 
     await setCached(cacheKey, responseData, CACHE_TTL)
 
-    return jsonResponse(responseData, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+    return jsonResponse(responseData, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
   } catch (err) {
     logger.error('Staff Dashboard', 'Dashboard verileri yüklenemedi', err)
     return errorResponse('Dashboard verileri yüklenemedi', 500)
   }
-}
+}, { requireOrganization: true })
 
 function formatRelativeTime(date: Date): string {
   const diff = Date.now() - new Date(date).getTime()

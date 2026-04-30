@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 
 /**
  * GET /api/admin/content-library/ai-items
@@ -9,14 +10,7 @@ import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api
  *   type   — virgülle ayrılmış contentType (video,audio,pdf,quiz)
  *   search — title'da arama
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId!
+export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
 
   const typeParam = searchParams.get('type')
@@ -26,7 +20,7 @@ export async function GET(request: Request) {
 
   const where: Record<string, unknown> = {
     isActive: true,
-    organizationId: orgId,
+    organizationId,
     s3Key: { not: null },
   }
 
@@ -58,5 +52,9 @@ export async function GET(request: Request) {
     take: 50,
   })
 
-  return jsonResponse({ items })
-}
+  return jsonResponse(
+    { items },
+    200,
+    { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+  )
+}, { requireOrganization: true })
