@@ -91,7 +91,7 @@ export const POST = withAdminRoute<{ id: string }>(
     if (!body) throw new ApiError('Geçersiz veri', 400);
 
     const created = await prisma.foo.create({
-      data: { ...body, organizationId: organizationId! },
+      data: { ...body, organizationId },
     });
 
     await audit({
@@ -206,7 +206,7 @@ super_admin null `organizationId` ile gelirse 400 döner, route'a girmez. Bu, "g
 `scripts/perf-check.js` pre-commit hook bu kuralları kontrol eder.
 
 ### API Route
-1. **Auth:** `getAuthUser()` kullan — `supabase.auth.getUser()` **YASAK** (HTTP round-trip yapar, middleware zaten doğruluyor)
+1. **Auth:** Yeni route'larda `withApiHandler` (veya preset) ZORUNLU; eski helper'lar (`getAuthUser`, `requireRole`) yeni route'larda kullanılmaz. Wrapper içinde de `supabase.auth.getUser()` doğrudan çağrılmaz — `dbUser` context'i kullan (HTTP round-trip yok, middleware zaten doğruluyor)
 2. **Paralellik:** Bağımsız Prisma sorguları **MUTLAKA** `Promise.all` — ardışık `await prisma` **YASAK**
 3. **Select vs Include:** `include` yerine `select` — sadece gereken alanları çek. Nested `include` içinde bile `select` kullan
 4. **Cache-Control (GET'te zorunlu):**

@@ -1,4 +1,5 @@
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getUploadUrl, videoKey, checkStorageQuota } from '@/lib/s3'
 import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/redis'
@@ -16,13 +17,7 @@ const ALLOWED_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
  *
  * Request body: { fileName: string, contentType: string, fileSize: number }
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
+export const POST = withAdminRoute(async ({ request, organizationId }) => {
   // IP bazli rate limit: 10 upload / 1 saat
   const ip = request.headers.get('x-vercel-forwarded-for') || request.headers.get('x-forwarded-for') || 'unknown'
   const allowed = await checkRateLimit(`upload:ip:${ip}`, 10, 3600)
@@ -49,11 +44,6 @@ export async function POST(request: Request) {
       return errorResponse('Dosya boyutu 500MB limitini asiyor', 400)
     }
 
-    const organizationId = dbUser!.organizationId
-    if (!organizationId) {
-      return errorResponse('Kullanicinin organizasyon bilgisi bulunamadi', 403)
-    }
-
     // Storage quota kontrolu
     const quotaError = await checkStorageQuota(organizationId, fileSize ?? 0)
     if (quotaError) return errorResponse(quotaError, 403)
@@ -66,4 +56,4 @@ export async function POST(request: Request) {
     logger.error('Video Upload', 'Presigned URL olusturma hatasi', err)
     return errorResponse('Video yukleme baglantisi olusturulamadi', 500)
   }
-}
+}, { requireOrganization: true })

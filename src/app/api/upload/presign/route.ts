@@ -1,4 +1,5 @@
-import { getAuthUser, requireRole, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withAdminRoute } from '@/lib/api-handler'
 import { getUploadUrl, videoKey, documentKey, audioKey, checkStorageQuota } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 
@@ -8,17 +9,10 @@ import { checkRateLimit } from '@/lib/redis'
  * Dosya Vercel'e gönderilmez — doğrudan S3'e yüklenir.
  * Bu sayede Vercel'in 4.5MB body limitini aşar.
  */
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) => {
+  const orgId = organizationId
 
-  const roleError = requireRole(dbUser!.role, ['admin', 'super_admin'])
-  if (roleError) return roleError
-
-  const orgId = dbUser!.organizationId
-  if (!orgId) return errorResponse('Organizasyon bulunamadı', 403)
-
-  const allowed = await checkRateLimit(`presign:${dbUser!.id}`, 20, 3600)
+  const allowed = await checkRateLimit(`presign:${dbUser.id}`, 20, 3600)
   if (!allowed) return errorResponse('Çok fazla yükleme isteği. Lütfen bekleyin.', 429)
 
   try {
@@ -54,4 +48,4 @@ export async function POST(request: Request) {
     const msg = err instanceof Error ? err.message : 'Presigned URL oluşturulamadı'
     return errorResponse(msg, 400)
   }
-}
+}, { requireOrganization: true })
