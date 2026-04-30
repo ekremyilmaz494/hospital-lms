@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { extractSubdomain } from '@/lib/organization-utils'
+import { getCookieDomain } from './cookie-domain'
 
 const PUBLIC_ROUTES = [
   '/',
@@ -64,6 +65,8 @@ export async function updateSession(request: NextRequest) {
   const subdomain = baseDomain ? extractSubdomain(host, baseDomain) : null
   const existingOrgSlug = request.cookies.get('x-org-slug')?.value
 
+  const cookieDomain = getCookieDomain()
+
   if (subdomain) {
     // Subdomain tespit edildi — cookie ve header olarak downstream'e ilet
     supabaseResponse.headers.set('x-org-slug', subdomain)
@@ -72,7 +75,20 @@ export async function updateSession(request: NextRequest) {
       httpOnly: false,
       sameSite: 'lax',
       maxAge: 86400, // 1 gün
+      // Cross-subdomain paylaşım: cookie '.klinovax.com' altında set'lenir,
+      // hem apex hem her subdomain'de görünür.
+      ...(cookieDomain && { domain: cookieDomain }),
     })
+
+    // Subdomain'de landing page ziyaret edilirse direkt login'e yönlendir
+    // (devakent.klinovax.com → devakent.klinovax.com/auth/login?org=devakent)
+    // Authenticated kullanıcılar için aşağıdaki public-route guard'ı zaten dashboard'a redirect ediyor.
+    if (pathname === '/') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      url.searchParams.set('org', subdomain)
+      return NextResponse.redirect(url)
+    }
 
     // Login sayfasına gidiliyorsa ve ?org parametresi yoksa otomatik ekle
     if (pathname === '/auth/login' && !request.nextUrl.searchParams.has('org')) {
@@ -86,7 +102,13 @@ export async function updateSession(request: NextRequest) {
     const hostWithoutPort = host.split(':')[0]
     const baseWithoutPort = baseDomain.split(':')[0]
     if (hostWithoutPort === baseWithoutPort || hostWithoutPort === 'localhost') {
-      supabaseResponse.cookies.delete('x-org-slug')
+      // Domain attribute ile silmek gerekiyor — aksi takdirde browser host-only
+      // cookie var sanır, '.klinovax.com'daki shared cookie silinmez.
+      supabaseResponse.cookies.set('x-org-slug', '', {
+        path: '/',
+        maxAge: 0,
+        ...(cookieDomain && { domain: cookieDomain }),
+      })
     }
   }
 
@@ -119,9 +141,11 @@ export async function updateSession(request: NextRequest) {
           )
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) => {
-            const finalOptions = rememberMe && name.includes('-auth-token')
+            const baseOptions = rememberMe && name.includes('-auth-token')
               ? { ...options, maxAge: REMEMBER_ME_MAX_AGE }
               : options
+            // Cross-subdomain paylaşım: prod'da '.klinovax.com', dev'de undefined.
+            const finalOptions = cookieDomain ? { ...baseOptions, domain: cookieDomain } : baseOptions
             supabaseResponse.cookies.set(name, value, finalOptions)
           })
         },

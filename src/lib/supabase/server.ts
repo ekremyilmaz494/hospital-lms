@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { getCookieDomain } from './cookie-domain'
 
 /**
  * getSession() vs getUser():
@@ -28,8 +29,9 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
+            const domain = getCookieDomain()
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, domain ? { ...options, domain } : options)
             )
           } catch {
             // Called from Server Component — ignore
@@ -63,11 +65,13 @@ export async function createLoginClient(rememberMe: boolean) {
         },
         setAll(cookiesToSet) {
           try {
+            const domain = getCookieDomain()
             cookiesToSet.forEach(({ name, value, options }) => {
-              const overriddenOptions = rememberMe
+              const baseOptions = rememberMe
                 ? { ...options, maxAge: SEVEN_DAYS }
                 : { ...options, maxAge: undefined }
-              cookieStore.set(name, value, overriddenOptions)
+              const finalOptions = domain ? { ...baseOptions, domain } : baseOptions
+              cookieStore.set(name, value, finalOptions)
             })
           } catch {
             // Called from Server Component — ignore

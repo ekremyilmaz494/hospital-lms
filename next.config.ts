@@ -99,6 +99,9 @@ const nextConfig: NextConfig = {
   experimental: {
     proxyClientMaxBodySize: '512mb',
     optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion', 'date-fns', '@tanstack/react-table', '@tiptap/react', 'react-pdf'],
+    // View Transitions API — landing ↔ login arasında smooth crossfade.
+    // Desteklenmeyen tarayıcılarda (eski Safari) browser default navigation'a düşer.
+    viewTransition: true,
     // Windows dev: Türkçe/boşluklu path + Defender real-time scan + uzun HMR oturumu
     // Turbopack'in disk cache'inde yarım CSS chunk yazıyor → Tailwind utility'leri
     // render edilmiyor, sayfa stilsiz kalıyor. RAM-only mod ile bu sınıf bug'ı kökten kapatıyoruz.

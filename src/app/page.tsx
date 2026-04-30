@@ -54,7 +54,8 @@ const TestimonialsSection = dynamic(() =>
 
 export default function LandingPage() {
   return (
-    <div style={{ backgroundColor: "#f5f0e6" }}>
+    // Login sayfası ile aynı krem rengi (#fafaf9) — landing↔login geçişinde flash YOK.
+    <div style={{ backgroundColor: "#fafaf9" }}>
       <HeroSection />
       <ScrollStorySection />
       <StatsSection />

@@ -27,6 +27,32 @@ const ROLE_ROUTES: Record<string, string> = {
   staff: '/staff/dashboard',
 };
 
+/**
+ * Login başarılı olduktan sonra hangi URL'e yönleneceğini hesaplar.
+ *
+ * Multi-tenant subdomain davranışı:
+ * - super_admin (orgSlug=null) → apex'te kalır (relative path)
+ * - admin/staff → https://<slug>.<base-domain><target>'a zıplar
+ * - Zaten doğru subdomain'deyse relative path döner (gereksiz reload yok)
+ * - Dev/localhost → relative path
+ *
+ * Cross-subdomain session paylaşımı `cookie-domain.ts`'teki domain attribute
+ * sayesinde çalışır (Domain=.klinovax.com).
+ */
+function buildPostLoginUrl(targetPath: string, organizationSlug: string | null): string {
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN;
+  if (!baseDomain || !organizationSlug) return targetPath;
+  if (baseDomain.includes('localhost') || baseDomain.includes(':')) return targetPath;
+
+  if (typeof window !== 'undefined') {
+    const currentHost = window.location.hostname;
+    const expectedHost = `${organizationSlug}.${baseDomain}`;
+    if (currentHost === expectedHost) return targetPath;
+  }
+
+  return `https://${organizationSlug}.${baseDomain}${targetPath}`;
+}
+
 // Klinova emerald palette
 const K = {
   PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
@@ -155,7 +181,9 @@ function LoginForm() {
       const role = data.user?.role as string | undefined;
       const rolePrefix = getRolePath(role, 'dashboard');
       const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
-      const target = isRedirectCompatible ? redirectTo : (role && ROLE_ROUTES[role]) || '/staff/dashboard';
+      const targetPath = isRedirectCompatible ? redirectTo : (role && ROLE_ROUTES[role]) || '/staff/dashboard';
+      // super_admin için organizationSlug null → apex'te kalır
+      const target = buildPostLoginUrl(targetPath, data.organizationSlug ?? null);
 
       // Setup wizard guard cache'ini önceden doldur — admin layout aynı anahtarı
       // okuyup /api/admin/setup fetch'ini atlar (ilk login'de 1 round-trip kazanç).
@@ -326,7 +354,7 @@ function LoginForm() {
         <div className="relative z-10 flex h-full flex-col p-12 xl:p-16">
 
           {/* TOP — vibrant brand mark */}
-          <BlurFade delay={0.08} duration={0.5}>
+          <BlurFade delay={0.04} duration={0.3}>
             <div className="flex items-center gap-3">
               <div
                 className="flex h-11 w-11 items-center justify-center"
@@ -375,7 +403,7 @@ function LoginForm() {
           {/* MIDDLE — vibrant hero */}
           <div className="flex flex-1 flex-col justify-center py-10">
 
-            <BlurFade delay={0.14} duration={0.45}>
+            <BlurFade delay={0.06} duration={0.28}>
               <div
                 className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 self-start"
                 style={{
@@ -401,7 +429,7 @@ function LoginForm() {
               </div>
             </BlurFade>
 
-            <BlurFade delay={0.2} duration={0.5}>
+            <BlurFade delay={0.08} duration={0.3}>
               <h1
                 className="leading-[1] tracking-tight"
                 style={{
@@ -430,7 +458,7 @@ function LoginForm() {
               </h1>
             </BlurFade>
 
-            <BlurFade delay={0.28} duration={0.45}>
+            <BlurFade delay={0.10} duration={0.28}>
               <p
                 className="mt-6 max-w-md text-[15.5px] leading-[1.65]"
                 style={{
@@ -444,7 +472,7 @@ function LoginForm() {
             </BlurFade>
 
             {/* Vibrant feature cards (3-up) */}
-            <BlurFade delay={0.36} duration={0.5}>
+            <BlurFade delay={0.13} duration={0.3}>
               <div className="mt-10 grid grid-cols-3 gap-3 max-w-md">
                 {[
                   { icon: GraduationCap, label: 'Video Eğitim' },
@@ -486,7 +514,7 @@ function LoginForm() {
             </BlurFade>
 
             {/* Glowing stat strip */}
-            <BlurFade delay={0.44} duration={0.5}>
+            <BlurFade delay={0.16} duration={0.3}>
               <div
                 className="mt-12 flex items-stretch gap-px overflow-hidden max-w-md"
                 style={{
@@ -543,7 +571,7 @@ function LoginForm() {
           </div>
 
           {/* BOTTOM — KVKK badge + footer */}
-          <BlurFade delay={0.52} duration={0.45}>
+          <BlurFade delay={0.18} duration={0.28}>
             <div className="flex items-center gap-3 mb-4">
               <span
                 className="inline-flex items-center gap-1.5 px-3 py-1.5"
@@ -633,13 +661,13 @@ function LoginForm() {
               boxShadow: K.SHADOW_CARD,
             }}
           >
-            <BlurFade delay={0.08} duration={0.4}>
+            <BlurFade delay={0.04} duration={0.25}>
               <div className="ed-mono text-[10px] tracking-[0.32em]" style={{ color: K.PRIMARY }}>
                 № 02 · OTURUM AÇ
               </div>
             </BlurFade>
 
-            <BlurFade delay={0.12} duration={0.4}>
+            <BlurFade delay={0.06} duration={0.25}>
               <h2
                 className="ed-display mt-3 leading-[1.05] tracking-tight"
                 style={{ color: K.TEXT_PRIMARY, fontSize: '2rem', fontWeight: 700 }}
@@ -648,13 +676,13 @@ function LoginForm() {
               </h2>
             </BlurFade>
 
-            <BlurFade delay={0.16} duration={0.4}>
+            <BlurFade delay={0.08} duration={0.25}>
               <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: K.TEXT_SECONDARY }}>
                 Devam etmek için kurum hesabınızla giriş yapın.
               </p>
             </BlurFade>
 
-            <BlurFade delay={0.18} duration={0.4}>
+            <BlurFade delay={0.10} duration={0.25}>
               <div className="my-6 h-px" style={{ background: K.BORDER_LIGHT }} />
             </BlurFade>
 
@@ -682,7 +710,7 @@ function LoginForm() {
               </BlurFade>
             )}
 
-            <BlurFade delay={0.22} duration={0.4}>
+            <BlurFade delay={0.12} duration={0.25}>
               <form
                 onSubmit={handleLogin}
                 className="space-y-4"
@@ -802,7 +830,7 @@ function LoginForm() {
           </div>
 
           {/* Mobile footer */}
-          <BlurFade delay={0.3} duration={0.4}>
+          <BlurFade delay={0.14} duration={0.25}>
             <div className="mt-6 flex items-center justify-between ed-mono text-[10px] tracking-[0.25em] lg:hidden" style={{ color: K.TEXT_MUTED }}>
               <span>© 2026</span>
               <span style={{ color: K.PRIMARY }}>HOSPITAL LMS</span>
