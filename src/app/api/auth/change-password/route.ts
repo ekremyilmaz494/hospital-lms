@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod/v4'
 import { passwordChangedEmail } from '@/lib/email'
@@ -15,10 +16,7 @@ const changePasswordSchema = z.object({
   path: ['confirmPassword'],
 })
 
-export async function POST(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
+export const POST = withStaffRoute(async ({ request, dbUser }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
@@ -30,7 +28,7 @@ export async function POST(request: Request) {
   // Mevcut şifreyi doğrulamak için signInWithPassword kullan
   const supabase = await createClient()
   const { error: signInError } = await supabase.auth.signInWithPassword({
-    email: dbUser!.email,
+    email: dbUser.email,
     password: currentPassword,
   })
 
@@ -48,22 +46,22 @@ export async function POST(request: Request) {
   }
 
   // mustChangePassword bayrağını kaldır
-  if (dbUser!.mustChangePassword) {
+  if (dbUser.mustChangePassword) {
     await prisma.user.update({
-      where: { id: dbUser!.id },
+      where: { id: dbUser.id },
       data: { mustChangePassword: false },
     })
   }
 
   // Şifre değişikliği bildirimi (fire-and-forget)
-  passwordChangedEmail(dbUser!.email)
+  passwordChangedEmail(dbUser.email)
     .catch(err => logger.warn('PwdEmail', 'Sifre degistirme emaili gonderilemedi', (err as Error).message))
 
   void logActivity({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId ?? '',
+    userId: dbUser.id,
+    organizationId: dbUser.organizationId ?? '',
     action: 'password_change',
   })
 
   return jsonResponse({ message: 'Şifreniz başarıyla güncellendi' })
-}
+})
