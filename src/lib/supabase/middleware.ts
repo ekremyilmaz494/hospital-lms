@@ -74,6 +74,16 @@ export async function updateSession(request: NextRequest) {
       maxAge: 86400, // 1 gün
     })
 
+    // Subdomain'de landing page ziyaret edilirse direkt login'e yönlendir
+    // (devakent.klinovax.com → devakent.klinovax.com/auth/login?org=devakent)
+    // Authenticated kullanıcılar için aşağıdaki public-route guard'ı zaten dashboard'a redirect ediyor.
+    if (pathname === '/') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      url.searchParams.set('org', subdomain)
+      return NextResponse.redirect(url)
+    }
+
     // Login sayfasına gidiliyorsa ve ?org parametresi yoksa otomatik ekle
     if (pathname === '/auth/login' && !request.nextUrl.searchParams.has('org')) {
       const url = request.nextUrl.clone()
