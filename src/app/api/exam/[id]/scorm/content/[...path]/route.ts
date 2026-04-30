@@ -1,7 +1,7 @@
-import { getAuthUser, requireRole, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
-import { NextRequest } from 'next/server'
 import { s3 } from '@/lib/s3'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { Readable } from 'stream'
@@ -39,16 +39,8 @@ function getContentType(filePath: string): string {
 }
 
 /** GET /api/exam/[id]/scorm/content/[...path] — Serve SCORM package files */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string; path: string[] }> }
-) {
-  const { id: trainingId, path: pathSegments } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  const roleError = requireRole(dbUser!.role, ['staff', 'admin', 'super_admin'])
-  if (roleError) return roleError
+export const GET = withStaffRoute<{ id: string; path: string[] }>(async ({ params, dbUser, organizationId }) => {
+  const { id: trainingId, path: pathSegments } = params
 
   try {
     const training = await prisma.training.findUnique({
@@ -61,7 +53,7 @@ export async function GET(
     }
 
     // Org isolation
-    if (dbUser!.role !== 'super_admin' && training.organizationId !== dbUser!.organizationId) {
+    if (dbUser.role !== 'super_admin' && training.organizationId !== organizationId) {
       return errorResponse('Bu içeriği görüntüleme yetkiniz yok', 403)
     }
 
@@ -109,4 +101,4 @@ export async function GET(
     logger.error('SCORM Content', 'SCORM dosyasi sunulamadi', err)
     return errorResponse('SCORM icerigi yuklenemedi', 500)
   }
-}
+}, { requireOrganization: true })

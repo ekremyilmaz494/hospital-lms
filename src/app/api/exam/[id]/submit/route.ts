@@ -1,7 +1,8 @@
 import { randomBytes } from 'crypto'
 import { addMonths } from 'date-fns'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { submitExamSchema } from '@/lib/validations'
 import { checkRateLimit, clearExamTimer } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
@@ -20,13 +21,11 @@ import {
 
 
 /** Submit pre-exam or post-exam answers */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id: attemptId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
+  const { id: attemptId } = params
 
   // User bazlı rate limit: 20 submit / 1 saat
-  const allowed = await checkRateLimit(`exam-submit:${dbUser!.id}`, 20, 3600)
+  const allowed = await checkRateLimit(`exam-submit:${dbUser.id}`, 20, 3600)
   if (!allowed) {
     return new Response(JSON.stringify({ error: 'Çok fazla gönderim. Lütfen 60 dakika sonra tekrar deneyin.' }), {
       status: 429,
@@ -45,16 +44,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // B7.3/G7.3 — Explicit organizationId cross-check: training.organizationId === dbUser.organizationId
   let attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
-    where: { id: attemptId, userId: dbUser!.id, training: { organizationId: dbUser!.organizationId! } },
+    where: { id: attemptId, userId: dbUser.id, training: { organizationId: organizationId } },
     include: { training: { include: { organization: { select: { name: true } } } }, assignment: true },
   })
   if (!attempt) {
     attempt = await prisma.examAttempt.findFirst({
       where: {
         assignmentId: attemptId,
-        userId: dbUser!.id,
+        userId: dbUser.id,
         status: { not: 'completed' },
-        training: { organizationId: dbUser!.organizationId! },
+        training: { organizationId: organizationId },
       },
       include: { training: { include: { organization: { select: { name: true } } } }, assignment: true },
       orderBy: { attemptNumber: 'desc' },
@@ -247,7 +246,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   void Promise.allSettled([
     prisma.notification.create({
       data: {
-        userId: dbUser!.id,
+        userId: dbUser.id,
         organizationId: attempt.training.organizationId,
         title: isPassed ? 'Sınavı Geçtiniz!' : 'Sınav Sonucu',
         message: isPassed
@@ -267,17 +266,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               : null
             await prisma.certificate.create({
               data: {
-                userId: dbUser!.id,
+                userId: dbUser.id,
                 trainingId: attempt.trainingId,
                 attemptId: attempt.id,
-                organizationId: dbUser!.organizationId,
+                organizationId: organizationId,
                 certificateCode: code,
                 expiresAt,
               },
             })
             certificateIssuedEmail(
-              dbUser!.email,
-              `${dbUser!.firstName ?? ''} ${dbUser!.lastName ?? ''}`.trim(),
+              dbUser.email,
+              `${dbUser.firstName ?? ''} ${dbUser.lastName ?? ''}`.trim(),
               attempt.training.title,
               code,
             ).catch(err => logger.warn('CertEmail', 'Sertifika emaili gonderilemedi', (err as Error).message))
@@ -295,14 +294,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           await prisma.smgActivity.upsert({
             where: {
               userId_activityType_title_completionDate: {
-                userId: dbUser!.id,
+                userId: dbUser.id,
                 activityType: 'COURSE_COMPLETION',
                 title: attempt.training.title,
                 completionDate,
               },
             },
             create: {
-              userId: dbUser!.id,
+              userId: dbUser.id,
               organizationId: attempt.training.organizationId,
               activityType: 'COURSE_COMPLETION',
               categoryId: defaultCategory?.id ?? null,
@@ -318,7 +317,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         })().catch(err => logger.error('SMG', 'Otomatik SMG aktivitesi oluşturulamadı', { err, attemptId: attempt.id }))
       : Promise.resolve(),
     createAuditLog({
-      userId: dbUser!.id,
+      userId: dbUser.id,
       organizationId: attempt.training.organizationId,
       action: isPassed ? 'exam.passed' : 'exam.failed',
       entityType: 'exam_attempt',
@@ -326,7 +325,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       newData: { score, isPassed, trainingId: attempt.trainingId, tabSwitchCount, suspicious },
     }),
     logActivity({
-      userId: dbUser!.id,
+      userId: dbUser.id,
       organizationId: attempt.training.organizationId,
       action: isPassed ? 'exam_pass' : 'exam_fail',
       resourceType: 'exam_attempt',
@@ -372,4 +371,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     results: isPassed ? questionResults : undefined,
     feedbackRequired,
   })
-}
+}, { requireOrganization: true })

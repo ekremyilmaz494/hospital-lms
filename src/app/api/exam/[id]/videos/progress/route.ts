@@ -1,18 +1,15 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { updateVideoProgressSchema } from '@/lib/validations'
 import { checkRateLimit } from '@/lib/redis'
 import { attemptNextStatus, type AttemptStatus } from '@/lib/exam-state-machine'
 
 /** Update video watch progress */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id: attemptId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
+export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
+  const { id: attemptId } = params
 
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
-  const allowed = await checkRateLimit(`video-progress:${dbUser!.id}`, 60, 60)
+  const allowed = await checkRateLimit(`video-progress:${dbUser.id}`, 60, 60)
   if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
 
   const body = await parseBody<{ videoId: string; watchedSeconds: number; lastPositionSeconds: number }>(request)
@@ -25,14 +22,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // yazılması state corruption'a yol açar (bkz. exam-state-machine.ts kapsam notu:
   // DB filter literal'ları transition değil guard amacıyla kullanılır).
   const attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
-    where: { id: attemptId, userId: dbUser!.id, status: 'watching_videos' satisfies AttemptStatus },
+    where: { id: attemptId, userId: dbUser.id, status: 'watching_videos' satisfies AttemptStatus },
     include: { training: { select: { organizationId: true } } },
   })
 
   if (!attempt) return errorResponse('Invalid attempt or not in video phase', 400)
 
   // Verify org isolation
-  if (attempt.training.organizationId !== dbUser!.organizationId) {
+  if (attempt.training.organizationId !== organizationId) {
     return errorResponse('Yetkisiz erişim', 403)
   }
 
@@ -63,7 +60,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     create: {
       attemptId,
       videoId: body.videoId,
-      userId: dbUser!.id,
+      userId: dbUser.id,
       watchedSeconds: finalWatchedSeconds,
       totalSeconds: video.durationSeconds,
       lastPositionSeconds: safeLastPosition,
@@ -109,31 +106,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   return jsonResponse({ progress, allVideosCompleted: allDone })
-}
+}, { requireOrganization: true })
 
 /** Get all video progress for an attempt */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id: attemptId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
+  const { id: attemptId } = params
 
   // Verify attempt belongs to user's org
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser!.id },
+    where: { id: attemptId, userId: dbUser.id },
     include: { training: { select: { organizationId: true } } },
   })
 
-  if (!attempt || attempt.training.organizationId !== dbUser!.organizationId) {
+  if (!attempt || attempt.training.organizationId !== organizationId) {
     return errorResponse('Yetkisiz erişim', 403)
   }
 
   const progressList = await prisma.videoProgress.findMany({
-    where: { attemptId, userId: dbUser!.id },
+    where: { attemptId, userId: dbUser.id },
     include: { video: { select: { title: true, durationSeconds: true, sortOrder: true } } },
     orderBy: { video: { sortOrder: 'asc' } },
   })
 
   return jsonResponse(progressList, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
-}
+}, { requireOrganization: true })

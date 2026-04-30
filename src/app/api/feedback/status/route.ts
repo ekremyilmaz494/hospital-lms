@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
 import { logger } from '@/lib/logger'
 
@@ -8,11 +9,7 @@ import { logger } from '@/lib/logger'
  * Staff'ın bu attempt için geri bildirim gönderip göndermediğini kontrol eder.
  * UI akışı: staff eğitimi bitirince bu endpoint ile submit gerekip gerekmediğini anlar.
  */
-export async function GET(request: Request) {
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-  if (!dbUser?.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
-
+export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) => {
   const url = new URL(request.url)
   const attemptId = url.searchParams.get('attemptId')
   if (!attemptId) return errorResponse('attemptId gerekli', 400)
@@ -24,7 +21,7 @@ export async function GET(request: Request) {
         where: {
           id: attemptId,
           userId: dbUser.id,
-          training: { organizationId: dbUser.organizationId },
+          training: { organizationId },
         },
         select: {
           id: true,
@@ -38,7 +35,7 @@ export async function GET(request: Request) {
         },
       }),
       prisma.trainingFeedbackForm.findFirst({
-        where: { organizationId: dbUser.organizationId, isActive: true },
+        where: { organizationId, isActive: true },
         select: { id: true },
       }),
     ])
@@ -82,4 +79,4 @@ export async function GET(request: Request) {
     logger.error('FeedbackStatus GET', 'Durum alınamadı', { err, userId: dbUser.id, attemptId })
     return errorResponse('Durum kontrol edilirken hata oluştu', 500)
   }
-}
+}, { requireOrganization: true })

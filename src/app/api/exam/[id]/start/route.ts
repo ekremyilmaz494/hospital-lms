@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser, jsonResponse, errorResponse, createAuditLog } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withStaffRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { logActivity } from '@/lib/activity-logger'
@@ -13,19 +14,15 @@ import {
 } from '@/lib/exam-state-machine'
 
 /** Start a new exam attempt or resume existing one */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
   const startedAt = Date.now()
-  const { id: assignmentId } = await params
-  const { dbUser, error } = await getAuthUser()
-  if (error) return error
-
-  if (!dbUser!.organizationId) return errorResponse('Organizasyon bulunamadı', 403)
+  const { id: assignmentId } = params
 
   const assignment = await prisma.trainingAssignment.findFirst({
     where: {
       id: assignmentId,
-      userId: dbUser!.id,
-      training: { organizationId: dbUser!.organizationId! },
+      userId: dbUser.id,
+      training: { organizationId },
     },
     select: {
       id: true,
@@ -57,7 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // ── Zorunlu geri bildirim kilidi ──
   // Kullanıcının başka bir eğitim için bekleyen zorunlu feedback'i varsa,
   // aynı eğitime devam/retry hariç yeni başlatmayı engelle.
-  const pending = await getPendingMandatoryFeedback(dbUser!.id)
+  const pending = await getPendingMandatoryFeedback(dbUser.id)
   if (pending && pending.trainingId !== assignment.trainingId) {
     return new Response(
       JSON.stringify({
@@ -87,7 +84,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const existing = await prisma.examAttempt.findFirst({
     where: {
       assignmentId,
-      userId: dbUser!.id,
+      userId: dbUser.id,
       status: { not: 'completed' },
     },
     include: { videoProgress: true },
@@ -109,7 +106,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (!transition.ok) {
         logger.error('Exam Start', 'Promote transition reddedildi', {
           assignmentId,
-          userId: dbUser!.id,
+          userId: dbUser.id,
           currentStatus: existing.status,
           reason: transition.reason,
         })
@@ -134,7 +131,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   // Rate limit SADECE yeni attempt olusturma icin — resume islemleri haric
-  const allowed = await checkRateLimit(`exam-start:${dbUser!.id}`, 10, 3600)
+  const allowed = await checkRateLimit(`exam-start:${dbUser.id}`, 10, 3600)
   if (!allowed) {
     return new Response(JSON.stringify({ error: 'Çok fazla sınav başlangıcı. Lütfen 60 dakika sonra tekrar deneyin.' }), {
       status: 429,
@@ -154,7 +151,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const existingInTx = await tx.examAttempt.findFirst({
       where: {
         assignmentId,
-        userId: dbUser!.id,
+        userId: dbUser.id,
         status: { not: 'completed' },
       },
       include: { videoProgress: true },
@@ -223,9 +220,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const created = await tx.examAttempt.create({
       data: {
         assignmentId,
-        userId: dbUser!.id,
+        userId: dbUser.id,
         trainingId: assignment.trainingId,
-        organizationId: dbUser!.organizationId!,
+        organizationId,
         attemptNumber: newAttemptNumber,
         status: initialStatus,
         ...timestampFields,
@@ -258,8 +255,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const prismaCode = (err as { code?: string } | null)?.code
     logger.error('Exam Start', 'Sınav başlatma hatası', {
       assignmentId,
-      userId: dbUser!.id,
-      organizationId: dbUser!.organizationId,
+      userId: dbUser.id,
+      organizationId,
       errName,
       errMsg,
       prismaCode,
@@ -271,24 +268,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const totalElapsed = Date.now() - startedAt
   if (totalElapsed > 2000) {
-    logger.warn('Exam Start', `Yavaş başlatma: ${totalElapsed}ms`, { assignmentId, userId: dbUser!.id })
+    logger.warn('Exam Start', `Yavaş başlatma: ${totalElapsed}ms`, { assignmentId, userId: dbUser.id })
   }
 
   if (!attempt) return errorResponse('Maksimum deneme sayısına ulaştınız', 403)
 
-  await createAuditLog({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId,
+  await audit({
     action: 'exam.started',
     entityType: 'exam_attempt',
     entityId: attempt.id,
     newData: { trainingId: assignment.trainingId, attemptNumber: attempt.attemptNumber },
-    request,
   })
 
   void logActivity({
-    userId: dbUser!.id,
-    organizationId: dbUser!.organizationId ?? '',
+    userId: dbUser.id,
+    organizationId,
     action: 'exam_start',
     resourceType: 'exam_attempt',
     resourceId: attempt.id,
@@ -302,4 +296,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     examOnly,
     redirectTo: examOnly ? 'post-exam' : undefined,
   })
-}
+}, { requireOrganization: true })
