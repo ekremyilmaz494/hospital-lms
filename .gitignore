@@ -100,5 +100,8 @@ yarn.lock
 # generated PDF outputs
 /hospital-admin-rehberi.pdf
 
+# generated presentation outputs (demo)
+/scripts/output-*.pptx
+
 # Local secrets (CloudFront private key, env backups)
 .secrets/
