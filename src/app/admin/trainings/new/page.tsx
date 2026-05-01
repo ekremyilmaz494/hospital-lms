@@ -437,6 +437,7 @@ export default function NewTrainingPage() {
               passingScore={passingScore} setPassingScore={setPassingScore}
               addQuestion={addQuestion}
               removeQuestion={removeQuestion}
+              videos={videos}
             />
           )}
           {currentStep === 4 && (
