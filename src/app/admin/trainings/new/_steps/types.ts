@@ -37,6 +37,8 @@ export interface QuestionItem {
   points: number;
   options: string[];
   correct: number;
+  /** AI ile üretildiyse true — UI'da rozet/ikon göstermek için. */
+  aiGenerated?: boolean;
 }
 
 export interface CategoryOption {

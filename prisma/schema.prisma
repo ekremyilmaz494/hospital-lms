@@ -98,6 +98,9 @@ model Organization {
   smtpReplyTo       String? @map("smtp_reply_to") @db.VarChar(320)
   smtpEnabled       Boolean @default(false) @map("smtp_enabled")
 
+  // OpenRouter (AI soru üretimi) — org-specific custom API key (encrypted, opsiyonel)
+  openrouterApiKeyEncrypted String? @map("openrouter_api_key_encrypted") @db.Text
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
