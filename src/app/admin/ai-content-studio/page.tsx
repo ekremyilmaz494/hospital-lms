@@ -212,12 +212,33 @@ export default function AiContentStudioPage() {
           <div style={{
             background: K.SUCCESS_BG, border: `1px solid ${K.SUCCESS}`,
             borderRadius: 12, padding: '10px 14px',
-            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+            display: 'flex', flexDirection: 'column', gap: 10,
           }}>
-            <CheckCircle2 size={16} color={K.SUCCESS} />
-            <span style={{ fontSize: 13, color: K.TEXT_SECONDARY, flex: 1, minWidth: 200 }}>
-              <strong style={{ color: K.TEXT_PRIMARY }}>Klinova AI</strong> hazır — kaynaklarınızı yükleyip üretim başlatabilirsiniz.
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <CheckCircle2 size={16} color={K.SUCCESS} />
+              <span style={{ fontSize: 13, color: K.TEXT_SECONDARY, flex: 1, minWidth: 200 }}>
+                <strong style={{ color: K.TEXT_PRIMARY }}>Klinova AI</strong> hazır — kaynaklarınızı yükleyip üretim başlatabilirsiniz.
+              </span>
+              <button
+                type="button"
+                onClick={() => setSessionPanelOpen((v) => !v)}
+                style={{
+                  padding: '5px 10px', borderRadius: 6, border: `1px solid ${K.SUCCESS}`,
+                  background: 'transparent', color: K.SUCCESS, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <KeyRound size={12} />
+                Oturumu Yenile
+              </button>
+            </div>
+            {sessionPanelOpen && <SessionPanel
+              sessionJson={sessionJson}
+              setSessionJson={setSessionJson}
+              sessionSaving={sessionSaving}
+              onSave={handleSessionSave}
+              onCancel={() => { setSessionPanelOpen(false); setSessionJson('') }}
+            />}
           </div>
         )}
 
@@ -257,50 +278,13 @@ export default function AiContentStudioPage() {
               </button>
             </div>
 
-            {sessionPanelOpen && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <textarea
-                  value={sessionJson}
-                  onChange={(e) => setSessionJson(e.target.value)}
-                  placeholder={'notebooklm login komutundan çıkan storage_state.json içeriğini buraya yapıştırın...\n\nÖrnek: {"cookies":[...],"origins":[...]}'}
-                  rows={6}
-                  style={{
-                    width: '100%', padding: 12, borderRadius: 10,
-                    border: `1px solid ${K.WARNING}`, background: K.SURFACE,
-                    fontSize: 12, color: K.TEXT_PRIMARY, resize: 'vertical',
-                    fontFamily: 'JetBrains Mono, monospace', lineHeight: 1.5,
-                  }}
-                />
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={() => { setSessionPanelOpen(false); setSessionJson('') }}
-                    style={{
-                      padding: '8px 14px', borderRadius: 8, border: `1px solid ${K.BORDER}`,
-                      background: 'transparent', color: K.TEXT_SECONDARY, cursor: 'pointer',
-                      fontSize: 13, fontWeight: 600,
-                    }}
-                  >
-                    İptal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSessionSave}
-                    disabled={!sessionJson.trim() || sessionSaving}
-                    style={{
-                      padding: '8px 16px', borderRadius: 8, border: 'none',
-                      background: !sessionJson.trim() || sessionSaving ? K.BORDER : K.PRIMARY,
-                      color: K.SURFACE, cursor: !sessionJson.trim() || sessionSaving ? 'not-allowed' : 'pointer',
-                      fontSize: 13, fontWeight: 700,
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                    }}
-                  >
-                    {sessionSaving ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                    {sessionSaving ? 'Yükleniyor...' : 'Oturumu Kaydet'}
-                  </button>
-                </div>
-              </div>
-            )}
+            {sessionPanelOpen && <SessionPanel
+              sessionJson={sessionJson}
+              setSessionJson={setSessionJson}
+              sessionSaving={sessionSaving}
+              onSave={handleSessionSave}
+              onCancel={() => { setSessionPanelOpen(false); setSessionJson('') }}
+            />}
           </div>
         )}
 
@@ -418,6 +402,61 @@ export default function AiContentStudioPage() {
             onDeleted={() => historyQuery.refetch()}
           />
         </div>
+      </div>
+    </div>
+  )
+}
+
+function SessionPanel({
+  sessionJson, setSessionJson, sessionSaving, onSave, onCancel,
+}: {
+  sessionJson: string
+  setSessionJson: (v: string) => void
+  sessionSaving: boolean
+  onSave: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <textarea
+        value={sessionJson}
+        onChange={(e) => setSessionJson(e.target.value)}
+        placeholder={'notebooklm login komutundan çıkan storage_state.json içeriğini buraya yapıştırın...\n\nÖrnek: {"cookies":[...],"origins":[...]}'}
+        rows={6}
+        style={{
+          width: '100%', padding: 12, borderRadius: 10,
+          border: `1px solid ${K.BORDER}`, background: K.SURFACE,
+          fontSize: 12, color: K.TEXT_PRIMARY, resize: 'vertical',
+          fontFamily: 'JetBrains Mono, monospace', lineHeight: 1.5,
+        }}
+      />
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            padding: '8px 14px', borderRadius: 8, border: `1px solid ${K.BORDER}`,
+            background: 'transparent', color: K.TEXT_SECONDARY, cursor: 'pointer',
+            fontSize: 13, fontWeight: 600,
+          }}
+        >
+          İptal
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!sessionJson.trim() || sessionSaving}
+          style={{
+            padding: '8px 16px', borderRadius: 8, border: 'none',
+            background: !sessionJson.trim() || sessionSaving ? K.BORDER : K.PRIMARY,
+            color: K.SURFACE, cursor: !sessionJson.trim() || sessionSaving ? 'not-allowed' : 'pointer',
+            fontSize: 13, fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          {sessionSaving ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          {sessionSaving ? 'Yükleniyor...' : 'Oturumu Kaydet'}
+        </button>
       </div>
     </div>
   )
