@@ -1,0 +1,105 @@
+{
+  "trainingTitle": "Hasta Mahremiyeti ve KVKK",
+  "slides": [
+    {
+      "title": "Eğitimin Amacı ve Kapsamı",
+      "bullets": [
+        "Hasta mahremiyetinin etik, klinik ve hukuki boyutlarını açıklamak",
+        "KVKK kapsamında sağlık verisinin özel niteliğini kavratmak",
+        "Klinik, idari ve dijital alanlarda doğru uygulamaları öğretmek",
+        "Mahremiyet ihlallerini önleyerek hasta güvenini güçlendirmek"
+      ],
+      "speakerNotes": "Bu eğitim, yalnızca mevzuata uyum için değil; hasta güvenliği, kurum itibarı ve profesyonel sağlık hizmeti kültürü için hazırlanmıştır."
+    },
+    {
+      "title": "Hasta Mahremiyeti Nedir?",
+      "bullets": [
+        "Hastanın bedensel, ruhsal, sosyal ve tıbbi gizliliğinin korunmasıdır",
+        "Muayene, bakım ve tedavide özel alan hakkını kapsar",
+        "Tanı, tetkik, tedavi ve anamnez bilgileri gizli kabul edilir",
+        "Mahremiyet, hasta onuru ve güven ilişkisiyle doğrudan bağlantılıdır"
+      ],
+      "speakerNotes": "Mahremiyet sadece hastanın üzerini örtmek değildir. Bütüncül bir sorumluluktur."
+    },
+    {
+      "title": "KVKK Açısından Sağlık Verisi",
+      "bullets": [
+        "Sağlık verileri özel nitelikli kişisel veri grubundadır",
+        "T.C. kimlik, laboratuvar sonucu, epikriz ve reçete korunmalıdır",
+        "Veriye erişim yalnızca görev ve yetki kapsamında olmalıdır",
+        "Yetkisiz erişim, paylaşım veya saklama veri ihlali sayılabilir"
+      ],
+      "speakerNotes": "Çalışanlar, ihtiyaç duymadıkları hiçbir hasta kaydına bakmamalıdır."
+    },
+    {
+      "title": "Aydınlatma, Rıza ve Bilgilendirme",
+      "bullets": [
+        "Hasta, kişisel verisinin işlenme amacı hakkında bilgilendirilmelidir",
+        "Tıbbi müdahalelerde aydınlatılmış onam süreci eksiksiz yürütülmelidir",
+        "Rıza, açık, anlaşılır ve özgür iradeye dayanmalıdır",
+        "Hasta, bilgi alma ve mahremiyet talep etme hakkına sahiptir"
+      ],
+      "speakerNotes": "Sadece imza almak yeterli değildir; hasta anlayacağı şekilde bilgilendirilmelidir."
+    },
+    {
+      "title": "Klinik Alanlarda Mahremiyet Uygulamaları",
+      "bullets": [
+        "Muayene sırasında kapı, perde, paravan ve örtü kullanılmalıdır",
+        "Hasta bilgileri koridor, asansör ve bekleme alanında konuşulmamalıdır",
+        "Refakatçi veya ziyaretçi varlığı hastanın onayıyla düzenlenmelidir",
+        "Tedavi sırasında yalnızca gerekli sağlık personeli ortamda bulunmalıdır"
+      ],
+      "speakerNotes": "Özellikle acil servis ve polikliniklerde hasta yoğunluğu bahanesiyle mahremiyet göz ardı edilmemelidir."
+    },
+    {
+      "title": "Hasta Dosyası ve Evrak Güvenliği",
+      "bullets": [
+        "Hasta dosyaları, raporlar ve formlar açıkta bırakılmamalıdır",
+        "Tetkik sonuçları yalnızca yetkili kişilere teslim edilmelidir",
+        "Basılı belgeler gereksiz çoğaltılmamalı ve kontrolsüz taşınmamalıdır",
+        "İmha gereken evraklar güvenli tıbbi arşiv prosedürüne göre yok edilmelidir"
+      ],
+      "speakerNotes": "Masa üstünde kalan bir epikriz veya çöpe atılan hasta formu ciddi ihlal oluşturabilir."
+    },
+    {
+      "title": "Dijital Sistemlerde Veri Güvenliği",
+      "bullets": [
+        "Hastane bilgi sistemine kişisel kullanıcı adıyla giriş yapılmalıdır",
+        "Şifreler paylaşılmamalı, yazılı not olarak görünür tutulmamalıdır",
+        "İşlem bitince ekran kilitlenmeli veya oturum kapatılmalıdır",
+        "Hasta verileri kişisel telefon, e-posta veya belleğe aktarılmamalıdır"
+      ],
+      "speakerNotes": "Başkasının şifresiyle işlem yapmak hem kişisel sorumluluk doğurur hem de kurum güvenliğini zayıflatır."
+    },
+    {
+      "title": "Hasta Bilgisi Kimlerle Paylaşılabilir?",
+      "bullets": [
+        "Bilgi paylaşımı görev, yetki, mevzuat ve hasta rızasına dayanmalıdır",
+        "Hasta yakınına bilgi verilmeden önce kimlik ve yetki doğrulanmalıdır",
+        "Telefonla bilgi aktarımında güvenli kimlik doğrulama yapılmalıdır",
+        "Adli veya resmi talepler kurum prosedürüne göre değerlendirilmelidir"
+      ],
+      "speakerNotes": "Hasta yakını olmak, otomatik olarak tüm sağlık bilgilerine erişim hakkı vermez."
+    },
+    {
+      "title": "Sosyal Medya ve Görsel Mahremiyet",
+      "bullets": [
+        "Hasta fotoğrafı, videosu veya sesi izinsiz kaydedilmemelidir",
+        "Kimlik gizlense bile klinik görüntü paylaşımı risk oluşturabilir",
+        "Ameliyathane, servis ve acil alan görüntüleri kontrolsüz paylaşılmamalıdır",
+        "Eğitim amaçlı görsellerde yazılı izin ve anonimleştirme sağlanmalıdır"
+      ],
+      "speakerNotes": "Hastanın yüzü görünmese bile oda numarası, tarih veya klinik detaylar kimlik tespitine yol açabilir."
+    },
+    {
+      "title": "Sık Görülen İhlaller ve Doğru Yaklaşım",
+      "bullets": [
+        "Merak amacıyla hasta kaydına bakmak yetkisiz erişimdir",
+        "Koridorda tanı veya tedavi konuşmak mahremiyet ihlalidir",
+        "Yanlış kişiye sonuç vermek kişisel veri ihlali oluşturabilir",
+        "İhlal şüphesinde yönetici ve kalite birimi bilgilendirilmelidir"
+      ],
+      "speakerNotes": "İhlaller çoğu zaman alışkanlık ve dikkatsizlikle oluşur. Erken bildirim zararın büyümesini önler."
+    }
+  ]
+}
