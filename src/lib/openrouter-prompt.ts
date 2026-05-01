@@ -31,7 +31,12 @@ KRİTİK KURALLAR:
 7. Sorular birbirinin tekrarı OLMAMALI — farklı kavram, farklı sayfa/bölüm hedefle.
 8. Ton: profesyonel, hastane çalışanına yönelik. "Aşağıdakilerden hangisi", "Hangi durumda" gibi standart sınav formatı.
 
-ÇIKTI FORMATI: Sadece JSON döndür, başka açıklama YAZMA. Format:
+ÇIKTI FORMATI — KRİTİK:
+- Cevabın TAMAMEN JSON olmalı. İlk karakter "{", son karakter "}" olacak.
+- Markdown code fence (\`\`\`json) KULLANMA.
+- "İşte sorularınız:", "Below is..." gibi PROSE intro/outro EKLEME.
+- Sadece şu yapıyı döndür:
+
 {
   "questions": [
     {

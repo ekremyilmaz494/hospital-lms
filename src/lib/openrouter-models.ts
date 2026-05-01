@@ -22,11 +22,18 @@ export interface CuratedModel {
 
 export const CURATED_MODELS: readonly CuratedModel[] = [
   {
+    id: 'anthropic/claude-sonnet-4.6',
+    label: 'Claude Sonnet 4.6',
+    tier: 'premium',
+    supportsPdf: true,
+    description: 'En kaliteli sorular, PDF\'i en iyi anlayan en yeni Anthropic model. Önerilen varsayılan.',
+  },
+  {
     id: 'anthropic/claude-sonnet-4.5',
     label: 'Claude Sonnet 4.5',
     tier: 'premium',
     supportsPdf: true,
-    description: 'En kaliteli sorular, PDF\'i en iyi anlayan model. Önerilen varsayılan.',
+    description: 'Önceki nesil premium model. Hâlâ çok güçlü, dengeli fiyat-performans.',
   },
   {
     id: 'anthropic/claude-haiku-4.5',
@@ -36,13 +43,6 @@ export const CURATED_MODELS: readonly CuratedModel[] = [
     description: 'Hızlı ve ekonomik. Basit/orta zorlukta sorular için yeterli.',
   },
   {
-    id: 'openai/gpt-4o',
-    label: 'GPT-4o',
-    tier: 'dengeli',
-    supportsPdf: false,
-    description: 'OpenAI\'nin amiral modeli. PDF için sayfa görüntüsüne dönüştürme gerekir (v1\'de desteklenmiyor).',
-  },
-  {
     id: 'google/gemini-2.5-pro',
     label: 'Gemini 2.5 Pro',
     tier: 'uzun-context',
@@ -50,15 +50,15 @@ export const CURATED_MODELS: readonly CuratedModel[] = [
     description: 'Çok uzun PDF\'leri (>50 sayfa) tek seferde işler. Sağlık alanında güçlü.',
   },
   {
-    id: 'meta-llama/llama-3.3-70b-instruct',
-    label: 'Llama 3.3 70B',
-    tier: 'açık-kaynak',
+    id: 'openai/gpt-4o',
+    label: 'GPT-4o',
+    tier: 'dengeli',
     supportsPdf: false,
-    description: 'Açık kaynak alternatif. Ekonomik. Sadece metin/görsel kaynaklarla çalışır.',
+    description: 'OpenAI\'nin amiral modeli. PDF dosyalarını desteklemiyor (sadece görsel).',
   },
 ] as const;
 
-export const DEFAULT_MODEL_ID = 'anthropic/claude-sonnet-4.5';
+export const DEFAULT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
 
 export function getModel(id: string): CuratedModel | undefined {
   return CURATED_MODELS.find((m) => m.id === id);
