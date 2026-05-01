@@ -6136,3 +6136,130 @@ Property 'trainingId' is missing
 ---
 
 *Son güncelleme: 24 Nisan 2026 — Oturum 54 (Kod Hijyen Pass'i + Kırık Production Fix)*
+
+---
+
+## Oturum 55 — Production Domain + Multi-Tenant Subdomain + Premium Geçiş (30 Nisan – 1 Mayıs 2026)
+
+### Bağlam
+
+GoDaddy'den `klinovax.com` domain'i alındı (ARTIK `klinova.app` DEĞİL — X harfi var, dosya/şablon güncellemeleri gerekti). Hedef: hastaneleri multi-tenant SaaS olarak ölçeklemek için subdomain başına bir hastane (`devakent.klinovax.com`, `acibadem.klinovax.com`).
+
+**Çıkış noktasındaki UX sorunları:**
+1. `devakent.klinovax.com` → landing page'de takılıyor, login'e gitmiyor.
+2. Login `klinovax.com/auth/login?org=devakent`'te yapılıyor → başarılıysa apex'te (`klinovax.com/admin/dashboard`) kalıyor; URL bar subdomain'e zıplamıyor.
+3. Cross-subdomain session paylaşımı yok (cookie host-only).
+4. Landing → login geçişinde flash, layout shift, BlurFade staggered geç gelme → "yarım yamalak" hissi.
+
+### Adım 1 — DNS Bağlantısı (klinovax.com → Vercel)
+
+Önce GoDaddy `A @ 216.198.79.1` ile apex bağlandı, ama wildcard SSL doğrulanamadı. Sebep: **wildcard sertifika DNS-01 ACME challenge gerektirir**, bu da DNS write erişimi ister. GoDaddy DNS'te kalırken `*.klinovax.com` SSL'i provision edilemiyordu.
+
+**Çözüm**: Nameserver migration — GoDaddy → Vercel (`ns1.vercel-dns.com`, `ns2.vercel-dns.com`). 24 saatte tüm DNS Vercel paneline geçti, wildcard SSL anında provision oldu.
+
+**Açıklığa kavuşan yanlış başlangıç**: İlk öneri `CNAME * → cname.vercel-dns.com` idi — bu wildcard *route'u* sağlar ama wildcard *SSL*'i değil. Doğrudan kullanıcıya hata kabul edildi, doğrusu (nameserver migration) önerildi.
+
+**GoDaddy default `WebsiteBuilder` A kaydı**: GoDaddy registrar varsayılan olarak `WebsiteBuilder Site` A kaydı koymuş — Vercel A 216.198.79.1 ile çakışıyordu (round-robin DNS, %50 ihtimalle GoDaddy "üzgünüz, web siteniz yok" sayfası). Kullanıcı manuel sildi.
+
+### Adım 2 — Vercel Domain'leri ve Env Vars
+
+| Domain | Yönlendirme |
+|--------|-------------|
+| `klinovax.com` | PRIMARY → Production |
+| `*.klinovax.com` | Wildcard → Production |
+| `www.klinovax.com` | 307 redirect → klinovax.com |
+
+**Env vars (Production):**
+- `NEXT_PUBLIC_APP_URL=https://klinovax.com` (güncellendi)
+- `NEXT_PUBLIC_BASE_DOMAIN=klinovax.com` (yeni; subdomain detection için)
+
+### Adım 3 — Multi-Tenant Subdomain Mantığı (PR [#75](https://github.com/ekremyilmaz494/hospital-lms/pull/75))
+
+**Branch**: `feat/multi-tenant-subdomain` (önce `chore/extract-status-and-backup-helpers` üstüne yanlışlıkla başlandı, branch kirliliği fark edilince stash + temiz branch).
+
+**Değişiklikler (~190 satır, 9 dosya):**
+
+1. **Subdomain landing → login redirect** (`src/lib/supabase/middleware.ts`)
+   - `extractSubdomain(host, baseDomain)` zaten vardı; yeni: subdomain + pathname `/` ise `307 → /auth/login?org=<sub>` redirect.
+   - Apex davranışı değişmez (subdomain yok → landing normal render).
+
+2. **Cross-subdomain cookie domain** (`src/lib/supabase/cookie-domain.ts` YENİ)
+   - `getCookieDomain()`: prod'da `.klinovax.com` döner, dev/localhost'ta `undefined`.
+   - 3 yerde kullanıldı: `server.ts` (createServerClient), `client.ts` (createBrowserClient — custom serializeCookie), `middleware.ts` (Supabase setAll + x-org-slug).
+   - **Graceful migration**: Eski host-only cookie'ler Supabase'in periyodik token refresh'inde shared-domain cookie ile üzerine yazılıyor → kullanıcı zorla logout olmaz.
+
+3. **Login API → response'a `organizationSlug`** (`src/app/api/auth/login/route.ts`)
+   - DB user lookup'a `organization: { select: { slug: true } }` eklendi.
+   - Response'a `organizationSlug` alanı; super_admin için `null`.
+
+4. **Login sonrası subdomain hop** (`src/app/auth/login/page.tsx`)
+   - `buildPostLoginUrl(targetPath, orgSlug)` helper:
+     - `orgSlug` null veya zaten doğru subdomain → relative path.
+     - Aksi halde `https://<slug>.klinovax.com<dashboard>` mutlak URL.
+   - `window.location.href` ile (CLAUDE.md kuralı: login sonrası `router.push` YASAK — `onAuthStateChange` race condition'a sebep oluyor).
+
+5. **Premium landing↔login geçişi** (View Transitions API)
+   - `next.config.ts` → `experimental.viewTransition: true`.
+   - `src/styles/base.css` → `::view-transition-old(root)` + `::view-transition-new(root)` + 280ms cubic-bezier crossfade keyframes.
+   - `src/app/page.tsx` arka plan `#f5f0e6` → `#fafaf9` (login ile aynı krem) — flash bitti.
+   - `src/app/auth/login/page.tsx` BlurFade stagger 560ms → 200ms (delay 0.04→0.02s, duration 0.5→0.30s).
+   - **Browser fallback**: View Transitions API desteklenmeyen tarayıcılar (eski Safari) browser default navigation'a düşer — risksiz.
+
+**İki commit:**
+- `e2c72e9` — `feat(auth): subdomain landing page → otomatik login redirect`
+- `1261b76` — `feat: cross-subdomain session + login redirect + premium landing↔login transition`
+
+### Adım 4 — Apex Hop Fix (1 Mayıs 2026)
+
+**Bildirilen bug**: `https://klinovax.com/` ziyaret edildiğinde, **giriş yapmadan**, doğrudan `klinovax.com/admin/dashboard`'a düşüyor. URL bar subdomain'e zıplamıyor.
+
+**Sebep**: Önceki oturumdan kalan session cookie'si var → middleware authenticated kullanıcıyı `/`'den dashboard'a `NextResponse.redirect(new URL(getDashboardUrl(role), request.url))` ile yönlendiriyor. `request.url` host'u (apex) korur, sadece path değişir → subdomain'e atlamaz. Login sonrası subdomain hop'u sadece login formunda var (Adım 3.4); session-restore (eski cookie ile dönüş) bu yola girmiyor.
+
+**Çözüm** (commit `96357d7`):
+```ts
+const orgSlugCookie = request.cookies.get('x-org-slug')?.value
+if (
+  baseDomain &&
+  !subdomain &&
+  orgSlugCookie &&
+  role !== 'super_admin' &&
+  !baseDomain.includes('localhost')
+) {
+  const protocol = request.nextUrl.protocol || 'https:'
+  return NextResponse.redirect(`${protocol}//${orgSlugCookie}.${baseDomain}${dashboardPath}`)
+}
+return NextResponse.redirect(new URL(dashboardPath, request.url))
+```
+
+`x-org-slug` cookie zaten `Domain=.klinovax.com` ile set ediliyor (Adım 3.2) — apex'ten erişilebilir. super_admin'de cookie yok → apex'te kalır (kasıt).
+
+**Trade-off**: Cookie henüz set edilmemiş eski oturumlar (subdomain hiç ziyaret etmemiş) ilk apex visit'inde apex'te kalır. Bir sonraki login/subdomain ziyaretinde cookie set olur, sonraki apex visit'leri doğru hop'lar (graceful). Tam garanti için JWT'ye `app_metadata.org_slug` enjekte edilebilir — ileride.
+
+### Adım 5 — Memory + Domain Notları
+
+Memory dosyaları güncellendi (`project_domain_klinovax.md`, `project_vercel_setup.md`, `known_legal_emails.md`). Post-deploy TODO listesi:
+
+- [ ] `/kvkk`, `/privacy`, `/terms` → `klinova.app` → `klinovax.com` değişimi
+- [ ] OAuth callback URL'leri (Google/Microsoft consoles)
+- [ ] MX kayıtları (Vercel DNS panel — Google Workspace/Zoho)
+- [ ] Sentry allowed_urls güncellemesi
+- [ ] Iyzico merchant panel callback whitelist
+- [ ] Sitemap, robots.txt, canonical URL'leri
+- [ ] **Subdomain blacklist** (KRİTİK güvenlik) — `superadmin`, `admin`, `api`, `www` slug'ları rezerve edilmeli; aksi takdirde kötü niyetli müşteri `admin.klinovax.com` org slug'ı isteyip phishing kurabilir. Ayrı PR olarak müşteri öncesi yapılmalı.
+
+### Sonuç
+
+**Production domain canlı**: `klinovax.com` + wildcard `*.klinovax.com` + cross-subdomain session + premium geçiş. PR #75 (multi-tenant) ve PR #76 (login hero animation, paralel oturumdan) main'e merge edildi, Vercel auto-deploy yeşil.
+
+### Öğrenilen Pattern'ler
+
+1. **Wildcard SSL ≠ wildcard route** — Wildcard sertifika DNS-01 ACME challenge gerektirir; CNAME wildcard sadece routing sağlar. Vercel'de wildcard subdomain için **nameserver migration zorunlu**, GoDaddy DNS'te kalınamaz.
+2. **`request.url`-tabanlı redirect host'u korur** — `new URL(path, request.url)` apex'e gelen istekte apex döner. Subdomain hop için string concat (`https://${sub}.${base}${path}`) zorunlu.
+3. **Cookie graceful migration** — `Domain=.klinovax.com` attribute eklemek host-only cookie'leri zorla geçersiz kılmaz; refresh sırasında üzerine yazılır → kullanıcı kaybı yok.
+4. **JWT'de org slug eksikliği middleware'de DB sorgusunu zorlar** — `x-org-slug` cookie cross-subdomain kararı için yeterli ama tam garanti değil. İleride `app_metadata.org_slug` enjekte edilirse middleware 100% deterministik subdomain hop yapar.
+5. **View Transitions API zero-cost premium UX** — Next 16 `experimental.viewTransition: true` + 8 satır CSS = chrome'da smooth crossfade, eski Safari'de browser default. Risksiz, ergonomik.
+6. **GoDaddy default A kaydı sessiz round-robin** — Domain Connect kapatılsa bile GoDaddy "WebsiteBuilder Site" A kaydı kalır; manuel silinmediği sürece DNS resolve %50 ihtimalle GoDaddy fallback sayfasına gider. Vercel apex bağlamadan önce mutlaka kontrol edilmeli.
+
+---
+
+*Son güncelleme: 1 Mayıs 2026 — Oturum 55 (Production Domain + Multi-Tenant Subdomain + Premium Geçiş)*
