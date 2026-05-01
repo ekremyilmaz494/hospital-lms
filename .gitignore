@@ -68,18 +68,6 @@ next-env.d.ts
 /test-results
 /.playwright
 
-# AI Content Service
-ai-content-service/browser_profiles/
-ai-content-service/auth_store/*.enc
-ai-content-service/temp/
-ai-content-service/.env
-ai-content-service/_auth_b64.txt
-ai-content-service/__pycache__/
-ai-content-service/**/__pycache__/
-ai-content-service/**/*.pyc
-
-# Workspace packages — node_modules ignored, source committed
-/packages/**/node_modules/
 /packages/**/dist/
 
 # Workspace artifacts

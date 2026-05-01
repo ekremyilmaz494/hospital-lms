@@ -52,10 +52,6 @@ ALTER TABLE question_bank ENABLE ROW LEVEL SECURITY;
 ALTER TABLE question_bank_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE accreditation_standards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE accreditation_reports ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_notebooks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_notebook_sources ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_generations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_google_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE _prisma_migrations ENABLE ROW LEVEL SECURITY;
 
 -- USERS
@@ -273,70 +269,6 @@ CREATE POLICY "staff_accreditation_reports_select" ON accreditation_reports
     organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
   );
 
--- ══════════════════════════════════════════════════════════════
--- AI Modulu Tablolari
--- ══════════════════════════════════════════════════════════════
-
--- AI NOTEBOOKS
-CREATE POLICY "super_admin_ai_notebooks_all" ON ai_notebooks
-  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_ai_notebooks_all" ON ai_notebooks
-  FOR ALL USING (
-    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
-    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-  );
-CREATE POLICY "staff_ai_notebooks_select" ON ai_notebooks
-  FOR SELECT USING (
-    organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-  );
-
--- AI NOTEBOOK SOURCES
-CREATE POLICY "super_admin_ai_notebook_sources_all" ON ai_notebook_sources
-  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_ai_notebook_sources_all" ON ai_notebook_sources
-  FOR ALL USING (
-    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
-    AND notebook_id IN (
-      SELECT id FROM ai_notebooks
-      WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-    )
-  );
-CREATE POLICY "staff_ai_notebook_sources_select" ON ai_notebook_sources
-  FOR SELECT USING (
-    notebook_id IN (
-      SELECT id FROM ai_notebooks
-      WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-    )
-  );
-
--- AI GENERATIONS
-CREATE POLICY "super_admin_ai_generations_all" ON ai_generations
-  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_ai_generations_all" ON ai_generations
-  FOR ALL USING (
-    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
-    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-  );
-CREATE POLICY "staff_ai_generations_select" ON ai_generations
-  FOR SELECT USING (
-    user_id = auth.uid()
-    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-  );
-
--- AI GOOGLE CONNECTIONS
-CREATE POLICY "super_admin_ai_google_connections_all" ON ai_google_connections
-  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_ai_google_connections_all" ON ai_google_connections
-  FOR ALL USING (
-    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
-    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-  );
-CREATE POLICY "staff_ai_google_connections_own" ON ai_google_connections
-  FOR SELECT USING (
-    user_id = auth.uid()
-    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-  );
-
 -- ═══════════════════════════════════════════════════════════════
 -- EY.FR.40 EĞİTİM GERİ BİLDİRİM FORMU
 -- ═══════════════════════════════════════════════════════════════
@@ -464,45 +396,3 @@ CREATE POLICY "admin_activity_logs_select" ON activity_logs FOR SELECT USING ((S
 CREATE POLICY "staff_activity_logs_select" ON activity_logs FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "authenticated_activity_logs_insert" ON activity_logs FOR INSERT WITH CHECK (user_id = auth.uid() AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
--- ── AI İÇERİK STÜDYOSU RLS (NotebookLM) ──
--- ai_notebook_accounts: admin rolü org-scoped CRUD; super_admin global okur.
-ALTER TABLE ai_notebook_accounts ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "admin_ai_notebook_accounts_all" ON ai_notebook_accounts FOR ALL USING (
-  (SELECT auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'super_admin')
-  AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-);
-
-CREATE POLICY "super_admin_ai_notebook_accounts_all" ON ai_notebook_accounts FOR ALL USING (
-  (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin'
-);
-
--- ai_generations: admin org-scoped CRUD; super_admin global.
-ALTER TABLE ai_generations ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "admin_ai_generations_all" ON ai_generations FOR ALL USING (
-  (SELECT auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'super_admin')
-  AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-);
-
-CREATE POLICY "super_admin_ai_generations_all" ON ai_generations FOR ALL USING (
-  (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin'
-);
-
--- artifact_type / status için CHECK constraint — DB seviyesinde tip güvenliği.
--- Idempotent: re-apply güvenli (CLAUDE.md: fresh DB ve re-apply çalışmalı).
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_artifact_type_check'
-  ) THEN
-    ALTER TABLE ai_generations ADD CONSTRAINT ai_generations_artifact_type_check
-      CHECK (artifact_type IN ('audio','video','slide_deck','infographic','report','mind_map','data_table','quiz','flashcards'));
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'ai_generations_status_check'
-  ) THEN
-    ALTER TABLE ai_generations ADD CONSTRAINT ai_generations_status_check
-      CHECK (status IN ('pending','processing','completed','failed'));
-  END IF;
-END $$;
