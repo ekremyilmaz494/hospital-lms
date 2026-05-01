@@ -102,6 +102,7 @@ yarn.lock
 
 # generated presentation outputs (demo)
 /scripts/output-*.pptx
+/scripts/preview/
 
 # Local secrets (CloudFront private key, env backups)
 .secrets/
