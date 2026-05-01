@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useFetch } from '@/hooks/use-fetch'
 import { useToast } from '@/components/shared/toast'
+import { useAuthStore } from '@/store/auth-store'
 import { K } from '@/components/ai-studio/k-tokens'
 import { SourceUploader, type UploadedSource } from '@/components/ai-studio/source-uploader'
 import { ArtifactTypeGrid } from '@/components/ai-studio/artifact-type-grid'
@@ -51,6 +52,7 @@ const HISTORY_LIMIT = 20
 export default function AiContentStudioPage() {
   const { toast: showToast } = useToast()
   const [, startTransition] = useTransition()
+  const isSuperAdmin = useAuthStore((s) => s.user?.role === 'super_admin')
 
   // Klinova AI shared session sağlık durumu
   const healthQuery = useFetch<HealthResponse>('/api/admin/ai-content-studio/health')
@@ -219,20 +221,22 @@ export default function AiContentStudioPage() {
               <span style={{ fontSize: 13, color: K.TEXT_SECONDARY, flex: 1, minWidth: 200 }}>
                 <strong style={{ color: K.TEXT_PRIMARY }}>Klinova AI</strong> hazır — kaynaklarınızı yükleyip üretim başlatabilirsiniz.
               </span>
-              <button
-                type="button"
-                onClick={() => setSessionPanelOpen((v) => !v)}
-                style={{
-                  padding: '5px 10px', borderRadius: 6, border: `1px solid ${K.SUCCESS}`,
-                  background: 'transparent', color: K.SUCCESS, cursor: 'pointer',
-                  fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4,
-                }}
-              >
-                <KeyRound size={12} />
-                Oturumu Yenile
-              </button>
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setSessionPanelOpen((v) => !v)}
+                  style={{
+                    padding: '5px 10px', borderRadius: 6, border: `1px solid ${K.SUCCESS}`,
+                    background: 'transparent', color: K.SUCCESS, cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  <KeyRound size={12} />
+                  Oturumu Yenile
+                </button>
+              )}
             </div>
-            {sessionPanelOpen && <SessionPanel
+            {isSuperAdmin && sessionPanelOpen && <SessionPanel
               sessionJson={sessionJson}
               setSessionJson={setSessionJson}
               sessionSaving={sessionSaving}
@@ -263,22 +267,24 @@ export default function AiContentStudioPage() {
                   )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setSessionPanelOpen((v) => !v)}
-                style={{
-                  padding: '8px 14px', borderRadius: 8, border: `1px solid ${K.WARNING}`,
-                  background: 'transparent', color: K.WARNING, cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <KeyRound size={14} />
-                {sessionPanelOpen ? 'Kapat' : 'Oturumu Yenile'}
-              </button>
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setSessionPanelOpen((v) => !v)}
+                  style={{
+                    padding: '8px 14px', borderRadius: 8, border: `1px solid ${K.WARNING}`,
+                    background: 'transparent', color: K.WARNING, cursor: 'pointer',
+                    fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <KeyRound size={14} />
+                  {sessionPanelOpen ? 'Kapat' : 'Oturumu Yenile'}
+                </button>
+              )}
             </div>
 
-            {sessionPanelOpen && <SessionPanel
+            {isSuperAdmin && sessionPanelOpen && <SessionPanel
               sessionJson={sessionJson}
               setSessionJson={setSessionJson}
               sessionSaving={sessionSaving}
