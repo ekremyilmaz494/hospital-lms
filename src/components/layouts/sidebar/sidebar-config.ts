@@ -22,7 +22,6 @@ import {
   ClipboardList,
   Activity,
   MessageSquare,
-  Sparkles,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -78,7 +77,6 @@ export const superAdminNav: NavGroup[] = [
   {
     label: 'SİSTEM',
     items: [
-      { title: 'Klinova AI', href: '/super-admin/klinova-ai', icon: Sparkles },
       { title: 'Sistem Sağlığı', href: '/super-admin/system-health', icon: Activity },
       { title: 'Ayarlar', href: '/super-admin/settings', icon: Settings },
     ],
@@ -119,7 +117,6 @@ export const adminNav: NavGroup[] = [
         ],
       },
       { title: 'Medya Kütüphanesi', href: '/admin/content-library', icon: Library },
-      { title: 'AI İçerik Stüdyosu', href: '/admin/ai-content-studio', icon: Sparkles },
     ],
   },
   {

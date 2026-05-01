@@ -19,7 +19,6 @@ async function run() {
     // Yeni tablolar
     'payments','invoices','departments','certificates',
     'content_library','organization_content_library',
-    'ai_notebooks','ai_generations',
     'accreditation_standards','accreditation_reports',
     'competency_forms','competency_categories','competency_items',
     'competency_evaluations','competency_answers',
@@ -136,14 +135,6 @@ async function run() {
     // --- ORGANIZATION CONTENT LIBRARY (install tracking) ---
     [`CREATE POLICY "super_admin_org_content_all" ON organization_content_library FOR ALL USING (public.get_user_role() = 'super_admin')`],
     [`CREATE POLICY "admin_org_content_all" ON organization_content_library FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
-
-    // --- AI NOTEBOOKS ---
-    [`CREATE POLICY "super_admin_ai_notebooks_all" ON ai_notebooks FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_ai_notebooks_all" ON ai_notebooks FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
-
-    // --- AI GENERATIONS ---
-    [`CREATE POLICY "super_admin_ai_generations_all" ON ai_generations FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_ai_generations_all" ON ai_generations FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
 
     // --- ACCREDITATION STANDARDS ---
     [`CREATE POLICY "super_admin_accred_standards_all" ON accreditation_standards FOR ALL USING (public.get_user_role() = 'super_admin')`],

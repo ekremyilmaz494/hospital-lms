@@ -128,9 +128,6 @@ model Organization {
   // EY.FR.40 Eğitim Geri Bildirim
   feedbackForm           TrainingFeedbackForm?
   feedbackResponses      TrainingFeedbackResponse[]
-  // AI İçerik Stüdyosu (NotebookLM)
-  aiNotebookAccount      AiNotebookAccount?
-  aiGenerations          AiGeneration[]
   // Ek deneme hakkı talepleri
   attemptRequests        ExamAttemptRequest[]
 
@@ -289,8 +286,6 @@ model User {
   feedbackResponses             TrainingFeedbackResponse[]
   // SMS MFA — güvenilir cihazlar
   trustedDevices                TrustedDevice[]
-  // AI İçerik Stüdyosu — kullanıcı bazlı üretim geçmişi
-  aiGenerations                 AiGeneration[]
   // Ek deneme hakkı talepleri
   attemptRequests               ExamAttemptRequest[]         @relation("AttemptRequester")
   reviewedAttemptRequests       ExamAttemptRequest[]         @relation("AttemptRequestReviewer")
@@ -1256,63 +1251,3 @@ model TrustedDevice {
   @@map("trusted_devices")
 }
 
-// ──────────────────────────────────────────────────────────────
-// AI İÇERİK STÜDYOSU — NotebookLM Entegrasyonu
-//
-// Per-org NotebookLM Google hesabı. storage_state.json
-// (Playwright session) AES-256-GCM ile şifreli saklanır.
-// Worker servisi storage_state'i çözer ve `notebooklm` CLI'ye besler.
-// ──────────────────────────────────────────────────────────────
-model AiNotebookAccount {
-  id                    String    @id @default(uuid()) @db.Uuid
-  organizationId        String    @unique @map("organization_id") @db.Uuid
-  // notebooklm-py storage_state.json içeriği — src/lib/crypto.ts encrypt() ile
-  storageStateEncrypted String    @map("storage_state_encrypted") @db.Text
-  googleEmail           String?   @map("google_email") @db.VarChar(255)
-  connectedAt           DateTime  @default(now()) @map("connected_at") @db.Timestamptz
-  lastVerifiedAt        DateTime? @map("last_verified_at") @db.Timestamptz
-  lastUsedAt            DateTime? @map("last_used_at") @db.Timestamptz
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@map("ai_notebook_accounts")
-}
-
-// AI üretim geçmişi — her bir generation isteği bir satır.
-// status pending → processing → (completed | failed)
-model AiGeneration {
-  id             String    @id @default(uuid()) @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  createdById    String    @map("created_by_id") @db.Uuid
-  // 9 desteklenen tip — string olarak saklanır (CHECK constraint RLS SQL'de)
-  // 'audio' | 'video' | 'slide_deck' | 'infographic' | 'report' |
-  // 'mind_map' | 'data_table' | 'quiz' | 'flashcards'
-  artifactType   String    @map("artifact_type") @db.VarChar(20)
-  prompt         String?   @db.Text
-  // [{ s3Key, name, size, mimeType }] — admin yüklediği kaynaklar
-  sourceFiles    Json?     @map("source_files") @db.JsonB
-  // YouTube/web URL kaynakları (string array)
-  sourceUrls     String[]  @default([]) @map("source_urls")
-  // Tipe özel opsiyonlar: { style, length, format, language, orientation, detail, ... }
-  options        Json?     @db.JsonB
-  // pending | processing | completed | failed
-  status         String    @default("pending") @db.VarChar(20)
-  // Worker'ın iç jobId'si — status pull için
-  workerJobId    String?   @map("worker_job_id") @db.VarChar(100)
-  // S3 obj — örn. "ai-content/{orgId}/{generationId}/output.mp3"
-  s3Key          String?   @map("s3_key") @db.Text
-  fileSize       Int?      @map("file_size") @db.Integer
-  mimeType       String?   @map("mime_type") @db.VarChar(100)
-  errorMessage   String?   @map("error_message") @db.Text
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  completedAt    DateTime? @map("completed_at") @db.Timestamptz
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User         @relation(fields: [createdById], references: [id])
-
-  @@index([organizationId, status, createdAt(sort: Desc)], map: "idx_ai_gen_org_status_created")
-  @@index([organizationId, createdById, createdAt(sort: Desc)], map: "idx_ai_gen_org_user_created")
-  @@map("ai_generations")
-}
