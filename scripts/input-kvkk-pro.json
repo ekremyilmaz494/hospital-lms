@@ -1,0 +1,167 @@
+{
+  "trainingTitle": "Hasta Mahremiyeti ve KVKK",
+  "hospital": "Örnek Devlet Hastanesi",
+  "slides": [
+    {
+      "layout": "section",
+      "sectionNumber": "01",
+      "title": "Neden Bu Eğitim?",
+      "subtitle": "Mahremiyet, hasta güveni ve kurumsal itibarın temelidir.",
+      "speakerNotes": "Başlamadan önce katılımcılara eğitimin zorunlu uyum eğitimi olduğunu ve bireysel sorumluluk gerektirdiğini hatırlat."
+    },
+    {
+      "layout": "stat",
+      "title": "Boyut ve Etki",
+      "stat": {
+        "value": "%30",
+        "label": "Hasta şikayetlerinin mahremiyet ihlaline dayandığı oran",
+        "context": "Sağlık Bakanlığı 2023 verisi — Kurumların %30'unda birden fazla kayıtlı mahremiyet ihlali mevcuttur."
+      },
+      "speakerNotes": "İstatistiği somutlaştır: Küçük bir hatanın kuruma ve hastaya ne kadar büyük zarar verebileceğini örnekle anlat."
+    },
+    {
+      "layout": "content",
+      "title": "Hasta Mahremiyeti Nedir?",
+      "bullets": [
+        "Bedensel, ruhsal ve tıbbi gizliliğin korunması hakkıdır",
+        "Muayene, bakım, tedavi sırasında kişisel alana saygı gerektirir",
+        "Tanı, tetkik ve anamnez bilgileri yasal olarak gizlidir",
+        "Mahremiyet ihlali; etik, hukuki ve kurumsal sonuçlar doğurur"
+      ],
+      "speakerNotes": "Mahremiyet sadece fiziksel örtme değil; bilgi ve karar özerkliği boyutlarını da kapsar."
+    },
+    {
+      "layout": "section",
+      "sectionNumber": "02",
+      "title": "KVKK ve Sağlık Verisi",
+      "subtitle": "Kişisel Verilerin Korunması Kanunu — Sağlık çalışanlarının bilmesi gerekenler",
+      "speakerNotes": "Bu bölümde hukuki çerçeveyi pratik örneklerle destekle."
+    },
+    {
+      "layout": "content",
+      "title": "KVKK Kapsamında Sağlık Verisi",
+      "bullets": [
+        "Sağlık verileri 'özel nitelikli kişisel veri' sayılır — en yüksek koruma düzeyi",
+        "TC kimlik, lab sonucu, epikriz, reçete, psikolojik kayıt tümü kapsam içinde",
+        "Veriye erişim yalnızca göreve bağlı yetki çerçevesinde mümkün",
+        "İhlal durumunda 5 yıla kadar hapis ve idari para cezası öngörülüyor"
+      ],
+      "speakerNotes": "Ceza miktarlarını söylemek katılımcıların dikkatini çeker ama asıl vurguyu hasta hakları üzerinde tut."
+    },
+    {
+      "layout": "two-col",
+      "title": "Aydınlatma ve Rıza: Doğru mu Yanlış mı?",
+      "columns": [
+        {
+          "heading": "✅  Doğru Uygulama",
+          "bullets": [
+            "Hastayı amaca göre anlaşılır dille bilgilendir",
+            "İmzadan önce soruları yanıtla",
+            "Rıza belgesini imzalı sakla",
+            "Onay geri alınabilir, süreci belgele"
+          ]
+        },
+        {
+          "heading": "❌  Yaygın Hatalar",
+          "bullets": [
+            "Formü imzalatıp içeriği açıklamamak",
+            "Acil bahanesiyle rızayı atlamak",
+            "Aynı formu farklı prosedürler için kullanmak",
+            "Sözlü rızayla yetinip kayıt tutmamak"
+          ]
+        }
+      ],
+      "speakerNotes": "Sol sütun için klinik örnekler ver; sağ sütundaki her hatanın gerçek sonuçlarını paylaş."
+    },
+    {
+      "layout": "section",
+      "sectionNumber": "03",
+      "title": "Günlük Klinik Uygulamalar",
+      "subtitle": "Teoriden pratiğe — her birimde mahremiyet",
+      "speakerNotes": "Bu bölüm en çok itiraz alınan kısım. Dinleyicilerin 'bunu yapmak zor' itirazlarına karşı hazır ol."
+    },
+    {
+      "layout": "content",
+      "title": "Klinik Alanda Fiziksel Mahremiyet",
+      "bullets": [
+        "Muayene sırasında kapı, perde ve örtü zorunludur",
+        "Hasta bilgileri koridor, asansör ve bekleme salonunda konuşulmaz",
+        "Yalnızca ilgili sağlık personeli muayene odasında bulunur",
+        "Refakatçi/ziyaretçi varlığı önce hastadan izin alınarak düzenlenir"
+      ],
+      "speakerNotes": "Acil servis ve yoğun bakım özelinde örnekler ver — yoğunluk mahremiyet ihlalinin bahanesi olamaz."
+    },
+    {
+      "layout": "content",
+      "title": "Dijital Sistemlerde Veri Güvenliği",
+      "bullets": [
+        "HBS'ye her zaman kişisel kullanıcı adı ile giriş yapılır",
+        "Şifreler paylaşılmaz, görünür yere yapıştırılmaz",
+        "İşlem biter bitmez ekran kilitlenir veya oturum kapatılır",
+        "Hasta verisi kişisel telefon, e-posta veya USB'ye aktarılmaz"
+      ],
+      "speakerNotes": "Dijital kayıtlar kullanıcı bazında loglanır; başkasının şifresiyle yapılan işlemler kişisel sorumluluk doğurur."
+    },
+    {
+      "layout": "alert",
+      "title": "Sosyal Medya — Sıfır Tolerans",
+      "bullets": [
+        "Hasta fotoğrafı, video veya sesi izinsiz kaydedilemez — yüzü kapalı olsa da",
+        "Ameliyathane, servis, acil görüntüleri hiçbir platformda paylaşılamaz",
+        "Kimlik gizlense bile oda no, barkod veya tarih kimlik tespiti sağlayabilir",
+        "Eğitim amaçlı görsellerde yazılı izin ve anonimleştirme zorunludur"
+      ],
+      "speakerNotes": "Gerçek vakalardan derlenen örnekler paylaş — sosyal medya ihlalleri geri alınamaz."
+    },
+    {
+      "layout": "section",
+      "sectionNumber": "04",
+      "title": "Paylaşım, İhlal ve Bildirim",
+      "subtitle": "Kime, ne kadar, hangi koşulda bilgi verilebilir?",
+      "speakerNotes": "Bu bölüm pratikte en fazla sorun yaşanan alan. Telefon sorularına hazır şablonları göster."
+    },
+    {
+      "layout": "two-col",
+      "title": "Hasta Bilgisi: Paylaşılabilir mi?",
+      "columns": [
+        {
+          "heading": "Paylaşılabilir",
+          "bullets": [
+            "Tedavi ekibindeki yetkili sağlık personeli",
+            "Kimlik+yetki doğrulanmış yakını (hasta onaylı)",
+            "Mahkeme kararı veya yasal bildirim yükümlülüğü",
+            "Anonim veri — araştırma etiği onaylı"
+          ]
+        },
+        {
+          "heading": "Paylaşılamaz",
+          "bullets": [
+            "Hasta yakını sıfatıyla arayan ama kimliği belirsiz kişi",
+            "Yönetici/amir talebi — yetki ve gereklilik yoksa",
+            "Medya ve üçüncü taraflar (avukat dahil, kural var)",
+            "Merak amaçlı sorgu — görev dışı erişim"
+          ]
+        }
+      ],
+      "speakerNotes": "Telefon senaryolarını rol yaparak uygulat: 'Eşim yattı, nasıl?' sorusunu nasıl yanıtlarsın?"
+    },
+    {
+      "layout": "alert",
+      "title": "Sık Yapılan İhlaller",
+      "bullets": [
+        "Merakla başka hastanın kaydını açmak — yetkisiz erişimdir",
+        "Koridorda tanı ve tedavi konuşmak — duyulabilecek yerde yasaktır",
+        "Sonucu yanlış kişiye vermek — kişisel veri ihlali tazminat doğurur",
+        "İhlal şüphesinde sessiz kalmak — hemen yönetici ve kalite birimine bildir"
+      ],
+      "speakerNotes": "İhlal bildirimi cezalandırma değil, kurumu ve çalışanı koruma mekanizmasıdır — bu mesajı güçlendir."
+    },
+    {
+      "layout": "quote",
+      "quote": "Hasta, sadece bir vaka numarası değil; kendini güvende hissetme hakkı olan bir insan. Mahremiyet, bu güvenin temelidir.",
+      "author": "Dünya Sağlık Örgütü",
+      "role": "Hasta Hakları Rehberi — WHO, 2022",
+      "speakerNotes": "Eğitimin duygusal kapanışını bu alıntıyla yap; sınavdan önce hafızada kalıcı bir iz bırakır."
+    }
+  ]
+}
