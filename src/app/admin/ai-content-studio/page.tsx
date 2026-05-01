@@ -105,7 +105,7 @@ export default function AiContentStudioPage() {
   const canSubmit = useMemo(() => {
     if (!aiReady) return false
     if (!type) return false
-    if (sourceFiles.length === 0 && sourceUrls.length === 0 && prompt.trim().length === 0) return false
+    if (sourceFiles.length === 0 && sourceUrls.length === 0) return false
     return true
   }, [aiReady, type, sourceFiles, sourceUrls, prompt])
 

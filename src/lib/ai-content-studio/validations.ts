@@ -54,11 +54,8 @@ export const aiGenerateSchema = z
       .default('tr'),
   })
   .refine(
-    (data) =>
-      (data.prompt && data.prompt.trim().length > 0) ||
-      data.sourceFiles.length > 0 ||
-      data.sourceUrls.length > 0,
-    { message: 'En az bir kaynak (dosya/URL) veya prompt belirtilmelidir.' },
+    (data) => data.sourceFiles.length > 0 || data.sourceUrls.length > 0,
+    { message: 'En az bir kaynak dosya veya URL eklenmelidir.' },
   )
 
 /** Kaynak dosya yükleme presign isteği */
