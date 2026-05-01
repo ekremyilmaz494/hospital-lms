@@ -12,7 +12,7 @@ export const GET = withAdminRoute(async () => {
     const status = await callWorker<{ connected: boolean; googleEmail?: string; reason?: string }>({
       method: 'GET',
       path: '/api/shared/status',
-      timeoutMs: 10_000,
+      timeoutMs: 40_000,
     })
     return jsonResponse(
       { workerOk: true, ...status },

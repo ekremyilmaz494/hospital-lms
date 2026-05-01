@@ -208,6 +208,7 @@ export function SourceUploader({
             disabled={disabled}
             onChange={(e) => setUrlDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUrl() } }}
+            onBlur={() => { if (urlDraft.trim().startsWith('http')) handleAddUrl() }}
             style={{
               flex: 1, border: 'none', outline: 'none', padding: '10px 0',
               background: 'transparent', fontSize: 13, color: K.TEXT_PRIMARY,

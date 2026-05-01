@@ -39,23 +39,40 @@ app.get('/healthz', (_req, res) => {
   res.json({ ok: true, version: '0.1.0' })
 })
 
+// Shared storage_state yükle (Klinova admin bir kez çalıştırır)
+app.post('/api/shared/storage-state', async (req: Request, res: Response) => {
+  const { storageStateJson } = req.body ?? {}
+  if (typeof storageStateJson !== 'string') {
+    res.status(400).json({ error: 'storageStateJson zorunlu' })
+    return
+  }
+  try {
+    JSON.parse(storageStateJson)
+  } catch {
+    res.status(400).json({ error: 'gecersiz JSON' })
+    return
+  }
+  const home = sharedHome()
+  await fs.mkdir(home, { recursive: true })
+  await fs.writeFile(`${home}/storage_state.json`, storageStateJson, { mode: 0o600 })
+  res.json({ ok: true })
+})
+
 // Shared (Klinova ortak hesap) status — LMS bunu poll eder
+// Hızlı kontrol: sadece storage_state.json varlığını doğrula, notebooklm CLI çalıştırma
 app.get('/api/shared/status', async (_req, res) => {
   const home = sharedHome()
   try {
-    await fs.access(`${home}/storage_state.json`)
+    const raw = await fs.readFile(`${home}/storage_state.json`, 'utf8')
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed?.cookies) || parsed.cookies.length === 0) {
+      res.json({ connected: false, reason: 'storage_state.json geçersiz veya boş' })
+      return
+    }
+    res.json({ connected: true })
   } catch {
-    res.json({ connected: false, reason: 'storage_state.json yok' })
-    return
+    res.json({ connected: false, reason: 'storage_state.json bulunamadı' })
   }
-  const result = await runNotebooklm({ args: ['list', '--json'], orgHome: home, timeoutMs: 30_000 })
-  if (!result.ok) {
-    res.json({ connected: false, reason: result.stderr.slice(0, 200) })
-    return
-  }
-  const status = await runNotebooklm({ args: ['status'], orgHome: home, timeoutMs: 15_000 })
-  const emailMatch = status.stdout.match(/Authenticated as:\s*([^\s\n]+)/)
-  res.json({ connected: true, googleEmail: emailMatch?.[1] })
 })
 
 // ── /api/login/storage-state ──

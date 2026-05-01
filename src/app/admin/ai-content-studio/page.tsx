@@ -9,7 +9,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
-  Sparkles, AlertTriangle, CheckCircle2, Loader2, Zap, History,
+  Sparkles, AlertTriangle, CheckCircle2, Loader2, Zap, History, RefreshCw, KeyRound,
 } from 'lucide-react'
 import { useFetch } from '@/hooks/use-fetch'
 import { useToast } from '@/components/shared/toast'
@@ -62,6 +62,36 @@ export default function AiContentStudioPage() {
   const [type, setType] = useState<AiArtifactType | null>(null)
   const [options, setOptions] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+
+  // Oturum yenileme paneli
+  const [sessionPanelOpen, setSessionPanelOpen] = useState(false)
+  const [sessionJson, setSessionJson] = useState('')
+  const [sessionSaving, setSessionSaving] = useState(false)
+
+  const handleSessionSave = useCallback(async () => {
+    if (!sessionJson.trim()) return
+    setSessionSaving(true)
+    try {
+      const res = await fetch('/api/admin/ai-content-studio/shared-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storageStateJson: sessionJson.trim() }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        showToast(json.error ?? 'Oturum yüklenemedi', 'error')
+        return
+      }
+      showToast('Oturum başarıyla güncellendi', 'success')
+      setSessionJson('')
+      setSessionPanelOpen(false)
+      healthQuery.refetch()
+    } catch {
+      showToast('Sunucuya ulaşılamadı', 'error')
+    } finally {
+      setSessionSaving(false)
+    }
+  }, [sessionJson, showToast, healthQuery])
 
   // Aktif iş listesi (kullanıcı bu sayfada başlattıkları + history'den pending/processing olanlar)
   const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([])
@@ -195,22 +225,82 @@ export default function AiContentStudioPage() {
           <div style={{
             background: K.WARNING_BG, border: `1px solid ${K.WARNING}`,
             borderRadius: 16, padding: 20,
-            display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+            display: 'flex', flexDirection: 'column', gap: 14,
           }}>
-            <AlertTriangle size={28} color={K.WARNING} />
-            <div style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ fontWeight: 600, color: K.TEXT_PRIMARY, fontSize: 15 }}>
-                Klinova AI şu an bakımda
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <AlertTriangle size={28} color={K.WARNING} />
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div style={{ fontWeight: 600, color: K.TEXT_PRIMARY, fontSize: 15 }}>
+                  Klinova AI oturumu süresi dolmuş
+                </div>
+                <div style={{ color: K.TEXT_SECONDARY, fontSize: 13, marginTop: 4 }}>
+                  Google oturumu yenilenmesi gerekiyor. Terminalden <code style={{ background: K.BORDER_LIGHT, padding: '1px 5px', borderRadius: 4, fontSize: 12 }}>notebooklm login</code> çalıştırıp çıkan storage_state.json içeriğini aşağıya yapıştırın.
+                  {aiReason && (
+                    <span style={{ display: 'block', fontSize: 12, color: K.TEXT_MUTED, marginTop: 4 }}>
+                      Detay: {aiReason}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div style={{ color: K.TEXT_SECONDARY, fontSize: 13, marginTop: 4 }}>
-                Birkaç saat içinde aktif olacak. Sorun devam ederse Klinova destek hattına bildirin.
-                {aiReason && (
-                  <span style={{ display: 'block', fontSize: 12, color: K.TEXT_MUTED, marginTop: 4 }}>
-                    Detay: {aiReason}
-                  </span>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => setSessionPanelOpen((v) => !v)}
+                style={{
+                  padding: '8px 14px', borderRadius: 8, border: `1px solid ${K.WARNING}`,
+                  background: 'transparent', color: K.WARNING, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <KeyRound size={14} />
+                {sessionPanelOpen ? 'Kapat' : 'Oturumu Yenile'}
+              </button>
             </div>
+
+            {sessionPanelOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <textarea
+                  value={sessionJson}
+                  onChange={(e) => setSessionJson(e.target.value)}
+                  placeholder={'notebooklm login komutundan çıkan storage_state.json içeriğini buraya yapıştırın...\n\nÖrnek: {"cookies":[...],"origins":[...]}'}
+                  rows={6}
+                  style={{
+                    width: '100%', padding: 12, borderRadius: 10,
+                    border: `1px solid ${K.WARNING}`, background: K.SURFACE,
+                    fontSize: 12, color: K.TEXT_PRIMARY, resize: 'vertical',
+                    fontFamily: 'JetBrains Mono, monospace', lineHeight: 1.5,
+                  }}
+                />
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setSessionPanelOpen(false); setSessionJson('') }}
+                    style={{
+                      padding: '8px 14px', borderRadius: 8, border: `1px solid ${K.BORDER}`,
+                      background: 'transparent', color: K.TEXT_SECONDARY, cursor: 'pointer',
+                      fontSize: 13, fontWeight: 600,
+                    }}
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSessionSave}
+                    disabled={!sessionJson.trim() || sessionSaving}
+                    style={{
+                      padding: '8px 16px', borderRadius: 8, border: 'none',
+                      background: !sessionJson.trim() || sessionSaving ? K.BORDER : K.PRIMARY,
+                      color: K.SURFACE, cursor: !sessionJson.trim() || sessionSaving ? 'not-allowed' : 'pointer',
+                      fontSize: 13, fontWeight: 700,
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    {sessionSaving ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                    {sessionSaving ? 'Yükleniyor...' : 'Oturumu Kaydet'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
