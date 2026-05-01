@@ -173,11 +173,31 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
   }
 
   // JSON parse + Zod validate
+  // Anthropic/Gemini bazen response_format flag'ini ignore edip markdown fence
+  // (```json ... ```) ile sarar, ya da prose ile prefix/suffix ekler. Bu yüzden
+  // gevşek extraction: ilk { ile son } arasını al, fence'leri strip et.
+  const extractJson = (raw: string): string => {
+    let s = raw.trim();
+    // Markdown fence: ```json\n{...}\n``` veya ```\n{...}\n```
+    const fenceMatch = s.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
+    if (fenceMatch) s = fenceMatch[1].trim();
+    // İlk { ile eşleşen son } arasını al (prose intro/outro varsa kırp)
+    const firstBrace = s.indexOf('{');
+    const lastBrace = s.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      s = s.slice(firstBrace, lastBrace + 1);
+    }
+    return s;
+  };
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(rawResponse);
+    parsed = JSON.parse(extractJson(rawResponse));
   } catch {
-    logger.error('openrouter', 'response is not valid JSON', { rawResponse: rawResponse.slice(0, 500) });
+    logger.error('openrouter', 'response is not valid JSON', {
+      model: opts.model,
+      rawResponse: rawResponse.slice(0, 1000),
+    });
     throw new OpenRouterError('Model geçerli JSON döndürmedi. Farklı bir model deneyin.');
   }
 
