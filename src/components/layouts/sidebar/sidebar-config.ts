@@ -78,6 +78,7 @@ export const superAdminNav: NavGroup[] = [
   {
     label: 'SİSTEM',
     items: [
+      { title: 'Klinova AI', href: '/super-admin/klinova-ai', icon: Sparkles },
       { title: 'Sistem Sağlığı', href: '/super-admin/system-health', icon: Activity },
       { title: 'Ayarlar', href: '/super-admin/settings', icon: Settings },
     ],
