@@ -1,9 +1,30 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { createHash } from 'crypto'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createBearerClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { checkSubscriptionStatus } from '@/lib/subscription-guard'
+
+/**
+ * Mobile/native client'lar JWT'yi `Authorization: Bearer <token>` header'ı ile
+ * gönderir (cookie kullanmaz). Bu helper request'in hangi path'te gelmesi
+ * gerektiğini söyler — non-null dönerse bearer path izlenir.
+ */
+async function extractBearerToken(): Promise<string | null> {
+  try {
+    const headerStore = await headers()
+    const authHeader = headerStore.get('authorization') ?? headerStore.get('Authorization')
+    if (!authHeader) return null
+    const trimmed = authHeader.trim()
+    if (!trimmed.toLowerCase().startsWith('bearer ')) return null
+    const token = trimmed.slice(7).trim()
+    return token.length > 0 ? token : null
+  } catch {
+    // headers() Server Component dışından çağrıldığında throw eder; bu helper
+    // sadece API route'larda kullanıldığı için pratikte oluşmaz.
+    return null
+  }
+}
 
 /**
  * Returns the application base URL. Throws in production if NEXT_PUBLIC_APP_URL
@@ -63,40 +84,22 @@ export function safePagination(params: URLSearchParams, maxLimit = 100) {
 // In-memory auth cache — keyed by user ID, 30s TTL
 const authCache = new Map<string, { dbUser: NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>; orgOk: boolean; expiresAt: number }>()
 
-export async function getAuthUser() {
-  // Fast-path: auth cookie yoksa Supabase client oluşturmadan anında 401 dön.
-  // ⚠️ CRITICAL: `includes` kullan, `endsWith` DEĞİL!
-  // Supabase SSR büyük JWT'leri chunked cookie'lere böler:
-  //   sb-xxx-auth-token.0, sb-xxx-auth-token.1, ...
-  // `endsWith('-auth-token')` chunked cookie'leri KAÇIRIR → 401 döngüsü!
-  const cookieStore = await cookies()
-  const hasAuthCookie = cookieStore.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
-  if (!hasAuthCookie) {
-    return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
-  }
-
-  const supabase = await createClient()
-  const { data: { session }, error } = await supabase.auth.getSession()
-
-  if (error || !session) {
-    return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
-  }
-
-  const user = session.user
-
-  // Check in-memory cache first (0ms vs ~200-500ms DB)
+/**
+ * Validated bir auth user için DB lookup + org active check + 30s cache.
+ * Hem cookie path (web) hem bearer path (mobile) bunu çağırır.
+ */
+async function resolveDbUserWithCache(user: { id: string }) {
   const cached = authCache.get(user.id)
   if (cached && cached.expiresAt > Date.now()) {
     if (!cached.orgOk) {
-      return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
+      return { dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
     }
-    return { user, dbUser: cached.dbUser, error: null, organizationId: cached.dbUser.organizationId }
+    return { dbUser: cached.dbUser, error: null }
   }
 
   const dbUser = await prisma.user.findUnique({ where: { id: user.id } })
-
   if (!dbUser || !dbUser.isActive) {
-    return { user: null, dbUser: null, error: errorResponse('User not found or inactive', 403) }
+    return { dbUser: null, error: errorResponse('User not found or inactive', 403) }
   }
 
   // Organization active check — super_admin is exempt
@@ -119,10 +122,52 @@ export async function getAuthUser() {
   authCache.set(user.id, { dbUser, orgOk, expiresAt: Date.now() + 30_000 })
 
   if (!orgOk) {
-    return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
+    return { dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
   }
 
-  return { user, dbUser, error: null, organizationId: dbUser.organizationId }
+  return { dbUser, error: null }
+}
+
+export async function getAuthUser() {
+  // ── Mobile/native path ── Authorization: Bearer <jwt>
+  // Bearer token varsa cookie path'ini atla. getUser(token) zorunlu olarak HTTP
+  // call yapar (~150ms), ama 30s in-memory cache sayesinde sadece ilk istek
+  // bu maliyeti öder. Cookie path'i etkilenmez — web aynen çalışır.
+  const bearerToken = await extractBearerToken()
+  if (bearerToken) {
+    const supabase = await createBearerClient(bearerToken)
+    const { data: { user }, error } = await supabase.auth.getUser(bearerToken)
+    if (error || !user) {
+      return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
+    }
+    const { dbUser, error: dbErr } = await resolveDbUserWithCache(user)
+    if (dbErr) return { user: null, dbUser: null, error: dbErr }
+    return { user, dbUser: dbUser!, error: null, organizationId: dbUser!.organizationId }
+  }
+
+  // ── Cookie path (web) ──
+  // Fast-path: auth cookie yoksa Supabase client oluşturmadan anında 401 dön.
+  // ⚠️ CRITICAL: `includes` kullan, `endsWith` DEĞİL!
+  // Supabase SSR büyük JWT'leri chunked cookie'lere böler:
+  //   sb-xxx-auth-token.0, sb-xxx-auth-token.1, ...
+  // `endsWith('-auth-token')` chunked cookie'leri KAÇIRIR → 401 döngüsü!
+  const cookieStore = await cookies()
+  const hasAuthCookie = cookieStore.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+  if (!hasAuthCookie) {
+    return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
+  }
+
+  const supabase = await createClient()
+  const { data: { session }, error } = await supabase.auth.getSession()
+
+  if (error || !session) {
+    return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
+  }
+
+  const user = session.user
+  const { dbUser, error: dbErr } = await resolveDbUserWithCache(user)
+  if (dbErr) return { user: null, dbUser: null, error: dbErr }
+  return { user, dbUser: dbUser!, error: null, organizationId: dbUser!.organizationId }
 }
 
 /**
@@ -133,6 +178,36 @@ export async function getAuthUser() {
  * ~100-150ms slower than getAuthUser() but catches revoked/expired tokens.
  */
 export async function getAuthUserStrict() {
+  // ── Mobile/native path ──
+  // Bearer token zaten getUser(token) ile cryptographic validation gerektirir,
+  // bu yüzden strict mode'da ek bir HTTP call'a gerek yok — getAuthUser() ile
+  // aynı işi yapıyoruz mobile'da.
+  const bearerToken = await extractBearerToken()
+  if (bearerToken) {
+    const supabase = await createBearerClient(bearerToken)
+    const { data: { user }, error } = await supabase.auth.getUser(bearerToken)
+    if (error || !user) {
+      return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
+    }
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id } })
+    if (!dbUser || !dbUser.isActive) {
+      return { user: null, dbUser: null, error: errorResponse('User not found or inactive', 403) }
+    }
+    let orgOk = true
+    if (dbUser.role !== 'super_admin' && dbUser.organizationId) {
+      const org = await prisma.organization.findUnique({
+        where: { id: dbUser.organizationId },
+        select: { isActive: true, isSuspended: true },
+      })
+      if (!org || !org.isActive || org.isSuspended) orgOk = false
+    }
+    if (!orgOk) {
+      return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
+    }
+    return { user, dbUser, error: null, organizationId: dbUser.organizationId }
+  }
+
+  // ── Cookie path (web) ──
   const cookieStore = await cookies()
   const hasAuthCookie = cookieStore.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
   if (!hasAuthCookie) {
