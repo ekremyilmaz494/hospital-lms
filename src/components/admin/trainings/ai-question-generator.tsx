@@ -104,18 +104,37 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions }: AiQuesti
     }
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/upload/content', { method: 'POST', body: formData });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setUploadError(body.error ?? `Yükleme başarısız (${res.status}).`);
+      // Aşama 1: Vercel function'dan presigned URL al (sadece JSON, body limit yok).
+      const presignRes = await fetch('/api/upload/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type || 'application/pdf',
+        }),
+      });
+      if (!presignRes.ok) {
+        const body = (await presignRes.json().catch(() => ({}))) as { error?: string };
+        setUploadError(body.error ?? `Yükleme hazırlığı başarısız (${presignRes.status}).`);
         return;
       }
-      const data = (await res.json()) as { key: string; fileName: string; fileSize: number };
+      const presign = (await presignRes.json()) as { uploadUrl: string; key: string; fileName: string };
+
+      // Aşama 2: Browser → S3 doğrudan PUT (Vercel function bypass, body limit yok).
+      // Content-Type S3 imzasıyla birebir eşleşmeli.
+      const putRes = await fetch(presign.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/pdf' },
+        body: file,
+      });
+      if (!putRes.ok) {
+        setUploadError(`S3 yüklemesi başarısız (${putRes.status}).`);
+        return;
+      }
+
       setUploadedSources((prev) => [
         ...prev,
-        { s3Key: data.key, fileName: data.fileName, sizeBytes: data.fileSize },
+        { s3Key: presign.key, fileName: presign.fileName, sizeBytes: file.size },
       ]);
     } catch {
       setUploadError('Ağ hatası — yükleme tamamlanamadı.');
