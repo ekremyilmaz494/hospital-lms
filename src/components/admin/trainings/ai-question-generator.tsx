@@ -51,7 +51,11 @@ export default function AiQuestionGenerator({ videos, onAdd, manualQuestions }: 
     pdfSources.map((v) => v.documentKey || v.url).filter(Boolean) as string[],
   );
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
-  const [targetTotal, setTargetTotal] = useState<number>(10);
+  // Dinamik default: manuel soru sayısı + 8 (clamped 1-20). Tab ilk açıldığında
+  // hesaplanır; admin stepper ile değiştirirse onun seçimi korunur (lazy init).
+  const [targetTotal, setTargetTotal] = useState<number>(() =>
+    Math.min(20, Math.max(1, manualQuestions.length + 8)),
+  );
   const selectedModel = getModel(modelId) ?? CURATED_MODELS[0];
   const tierColor = tierStyles[selectedModel.tier] ?? tierStyles.premium;
 
