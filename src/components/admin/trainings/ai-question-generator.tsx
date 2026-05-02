@@ -11,22 +11,33 @@
  * staggered CSS entrance animasyonları.
  */
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Sparkles, FileText, CheckCircle2, Trash2, RefreshCw, AlertCircle,
+  Sparkles, CheckCircle2, Trash2, RefreshCw, AlertCircle,
   Loader2, PlusCircle, Zap, ChevronDown, FileCheck2, BookOpenCheck,
+  UploadCloud, X,
 } from 'lucide-react';
 import { CURATED_MODELS, DEFAULT_MODEL_ID, getModel } from '@/lib/openrouter-models';
-import { K, type VideoItem } from '@/app/admin/trainings/new/_steps/types';
+import { K } from '@/app/admin/trainings/new/_steps/types';
 import { useAiQuestionQueue } from '@/hooks/use-ai-question-queue';
 
 export interface AiQuestionGeneratorProps {
-  videos: VideoItem[];
   onAdd: (questions: { text: string; options: string[]; correct: number }[]) => void;
   /** Manuel sekmede admin'in yazdığı dolu sorular — AI dedup ve hedef toplam
    * hesabı için. Caller boş şablonları filtrelemiş olmalı. */
   manualQuestions: { text: string }[];
 }
+
+interface UploadedSource {
+  s3Key: string;
+  fileName: string;
+  sizeBytes: number;
+  pageCount?: number;
+}
+
+const MAX_SOURCES = 3;
+const MAX_TOTAL_SIZE_MB = 30;
+const ACCEPTED_TYPES = ['application/pdf'];
 
 // Tier rozetleri için sıkı emerald tabanlı sofistike palet — varsayılan medikal AI
 // renk kombinasyonlarından (mor/mavi gradient) kaçınıyoruz.
@@ -40,15 +51,13 @@ const tierStyles: Record<string, { dot: string; label: string; bg: string }> = {
 
 const FONT_EDITORIAL = "var(--font-editorial, Georgia, serif)";
 
-export default function AiQuestionGenerator({ videos, onAdd, manualQuestions }: AiQuestionGeneratorProps) {
-  const pdfSources = useMemo(
-    () => videos.filter((v) => v.contentType === 'pdf' || !!v.documentKey),
-    [videos],
-  );
+export default function AiQuestionGenerator({ onAdd, manualQuestions }: AiQuestionGeneratorProps) {
+  const [uploadedSources, setUploadedSources] = useState<UploadedSource[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [selectedKeys, setSelectedKeys] = useState<string[]>(() =>
-    pdfSources.map((v) => v.documentKey || v.url).filter(Boolean) as string[],
-  );
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
   const selectedModel = getModel(modelId) ?? CURATED_MODELS[0];
   const tierColor = tierStyles[selectedModel.tier] ?? tierStyles.premium;
@@ -65,6 +74,8 @@ export default function AiQuestionGenerator({ videos, onAdd, manualQuestions }: 
     [manualQuestions],
   );
 
+  const selectedKeys = useMemo(() => uploadedSources.map((s) => s.s3Key), [uploadedSources]);
+
   const queue = useAiQuestionQueue({
     sourceS3Keys: selectedKeys,
     model: modelId,
@@ -72,11 +83,51 @@ export default function AiQuestionGenerator({ videos, onAdd, manualQuestions }: 
     staticExcluded,
   });
 
-  const toggleSource = (key: string) => {
-    setSelectedKeys((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
-    );
+  const removeSource = (s3Key: string) => {
+    setUploadedSources((prev) => prev.filter((s) => s.s3Key !== s3Key));
   };
+
+  const uploadFile = useCallback(async (file: File) => {
+    setUploadError(null);
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      setUploadError(`${file.name}: sadece PDF dosyaları kabul edilir.`);
+      return;
+    }
+    if (uploadedSources.length >= MAX_SOURCES) {
+      setUploadError(`En fazla ${MAX_SOURCES} kaynak yüklenebilir.`);
+      return;
+    }
+    const totalMb = (uploadedSources.reduce((sum, s) => sum + s.sizeBytes, 0) + file.size) / (1024 * 1024);
+    if (totalMb > MAX_TOTAL_SIZE_MB) {
+      setUploadError(`Toplam dosya boyutu ${MAX_TOTAL_SIZE_MB}MB'ı aşamaz.`);
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload/content', { method: 'POST', body: formData });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setUploadError(body.error ?? `Yükleme başarısız (${res.status}).`);
+        return;
+      }
+      const data = (await res.json()) as { key: string; fileName: string; fileSize: number };
+      setUploadedSources((prev) => [
+        ...prev,
+        { s3Key: data.key, fileName: data.fileName, sizeBytes: data.fileSize },
+      ]);
+    } catch {
+      setUploadError('Ağ hatası — yükleme tamamlanamadı.');
+    } finally {
+      setUploading(false);
+    }
+  }, [uploadedSources]);
+
+  const handleFiles = useCallback((files: FileList | null) => {
+    if (!files) return;
+    Array.from(files).forEach((f) => void uploadFile(f));
+  }, [uploadFile]);
 
   const handleAdd = () => {
     if (queue.displayed.length === 0) return;
@@ -93,29 +144,6 @@ export default function AiQuestionGenerator({ videos, onAdd, manualQuestions }: 
     queue.reset();
     void queue.generate();
   };
-
-  // Boş PDF kaynak durumu — refined editorial empty state
-  if (pdfSources.length === 0) {
-    return (
-      <>
-        <Styles />
-        <div className="aiq-empty-state">
-          <div className="aiq-empty-icon">
-            <FileText strokeWidth={1.5} />
-          </div>
-          <h3>
-            <span className="aiq-empty-prefix">Önce</span>{' '}
-            <em>kaynak yükle</em>
-          </h3>
-          <p>
-            Yapay zeka soruları üretmek için bir <strong>PDF</strong> kaynağına ihtiyaç duyar.
-            <br />
-            <span className="aiq-empty-cta">→ &nbsp;<strong>İçerik</strong> adımına dön ve bir PDF yükle.</span>
-          </p>
-        </div>
-      </>
-    );
-  }
 
   const hasResults = queue.displayed.length > 0;
   const showInitialUi = !hasResults && !queue.isGenerating;
@@ -142,46 +170,95 @@ export default function AiQuestionGenerator({ videos, onAdd, manualQuestions }: 
             </p>
           </div>
 
-          {/* Adım 1 — Kaynak */}
+          {/* Adım 1 — Kaynak Yükle */}
           <section className="aiq-section">
             <header className="aiq-section-head">
               <span className="aiq-step-num">01</span>
-              <span className="aiq-step-label">Kaynak Belge</span>
-              <span className="aiq-section-count">{selectedKeys.length}/{pdfSources.length}</span>
+              <span className="aiq-step-label">Kaynak PDF</span>
+              <span className="aiq-section-count">{uploadedSources.length}/{MAX_SOURCES}</span>
             </header>
-            <ul className="aiq-source-list">
-              {pdfSources.map((v) => {
-                const key = (v.documentKey || v.url) as string;
-                const checked = selectedKeys.includes(key);
-                return (
-                  <li key={v.id}>
-                    <label className={checked ? 'aiq-source aiq-source--on' : 'aiq-source'}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleSource(key)}
-                      />
+
+            {uploadedSources.length > 0 && (
+              <ul className="aiq-source-list">
+                {uploadedSources.map((src) => (
+                  <li key={src.s3Key}>
+                    <div className="aiq-source aiq-source--on aiq-source--uploaded">
                       <span className="aiq-source-check">
-                        {checked && <CheckCircle2 size={14} strokeWidth={2.5} />}
+                        <CheckCircle2 size={14} strokeWidth={2.5} />
                       </span>
                       <span className="aiq-source-info">
-                        <span className="aiq-source-name">
-                          {v.title || v.file?.name || 'Doküman'}
-                        </span>
+                        <span className="aiq-source-name">{src.fileName}</span>
                         <span className="aiq-source-meta">
-                          {typeof v.pageCount === 'number' && (
-                            <>
-                              <BookOpenCheck size={11} strokeWidth={2} />
-                              {v.pageCount} sayfa
-                            </>
-                          )}
+                          <BookOpenCheck size={11} strokeWidth={2} />
+                          {(src.sizeBytes / 1024 / 1024).toFixed(1)} MB
                         </span>
                       </span>
-                    </label>
+                      <button
+                        type="button"
+                        className="aiq-source-remove"
+                        onClick={() => removeSource(src.s3Key)}
+                        aria-label="Kaldır"
+                        title="Bu kaynağı kaldır"
+                      >
+                        <X size={13} strokeWidth={2.5} />
+                      </button>
+                    </div>
                   </li>
-                );
-              })}
-            </ul>
+                ))}
+              </ul>
+            )}
+
+            {uploadedSources.length < MAX_SOURCES && (
+              <label
+                className={
+                  dragOver ? 'aiq-uploader aiq-uploader--drag' : 'aiq-uploader'
+                }
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  handleFiles(e.dataTransfer.files);
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  multiple
+                  onChange={(e) => {
+                    handleFiles(e.target.files);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                  style={{ display: 'none' }}
+                />
+                <div className="aiq-uploader-icon">
+                  {uploading ? (
+                    <Loader2 size={20} strokeWidth={2} className="aiq-spin-icon" />
+                  ) : (
+                    <UploadCloud size={20} strokeWidth={2} />
+                  )}
+                </div>
+                <div className="aiq-uploader-text">
+                  <span className="aiq-uploader-title">
+                    {uploading ? 'Yükleniyor…' : 'PDF sürükle veya seçmek için tıkla'}
+                  </span>
+                  <span className="aiq-uploader-hint">
+                    Maks {MAX_SOURCES} dosya · toplam {MAX_TOTAL_SIZE_MB}MB
+                  </span>
+                </div>
+              </label>
+            )}
+
+            {uploadError && (
+              <p className="aiq-source-error">
+                <AlertCircle size={11} strokeWidth={2.5} />
+                {uploadError}
+              </p>
+            )}
           </section>
 
           {/* Adım 2 — Model */}
@@ -691,6 +768,102 @@ function Styles() {
         color: var(--aiq-muted);
         letter-spacing: 0.02em;
       }
+      .aiq-source--uploaded {
+        cursor: default;
+      }
+      .aiq-source-remove {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        background: transparent;
+        border: 0;
+        border-radius: 6px;
+        color: var(--aiq-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 160ms ease, color 160ms ease;
+      }
+      .aiq-source-remove:hover {
+        background: ${K.ERROR_BG};
+        color: var(--aiq-error);
+      }
+
+      /* UPLOADER */
+      .aiq-uploader {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 14px;
+        background: var(--aiq-cream);
+        border: 1.5px dashed var(--aiq-border);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: background 160ms ease, border-color 160ms ease;
+        margin-top: 8px;
+      }
+      .aiq-uploader:hover {
+        background: var(--aiq-emerald-soft);
+        border-color: var(--aiq-emerald);
+      }
+      .aiq-uploader--drag {
+        background: var(--aiq-emerald-pale);
+        border-color: var(--aiq-emerald);
+        border-style: solid;
+      }
+      .aiq-uploader-icon {
+        flex-shrink: 0;
+        width: 38px;
+        height: 38px;
+        background: var(--aiq-surface);
+        border: 1px solid var(--aiq-border-soft);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--aiq-emerald-deep);
+      }
+      .aiq-uploader:hover .aiq-uploader-icon {
+        background: var(--aiq-surface);
+        border-color: var(--aiq-emerald);
+      }
+      .aiq-uploader--drag .aiq-uploader-icon {
+        background: var(--aiq-emerald);
+        color: white;
+        border-color: var(--aiq-emerald);
+      }
+      .aiq-uploader-text {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .aiq-uploader-title {
+        font-family: var(--aiq-display);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--aiq-ink);
+      }
+      .aiq-uploader-hint {
+        font-family: var(--aiq-display);
+        font-size: 11px;
+        color: var(--aiq-muted);
+      }
+      .aiq-spin-icon {
+        animation: aiq-spin 1s linear infinite;
+      }
+      .aiq-source-error {
+        display: flex;
+        align-items: flex-start;
+        gap: 5px;
+        margin: 10px 0 0;
+        font-family: var(--aiq-display);
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--aiq-error);
+      }
 
       /* MODEL */
       .aiq-model-select-wrap {
@@ -984,56 +1157,6 @@ function Styles() {
         font-weight: 500;
       }
 
-      .aiq-empty-state {
-        max-width: 480px;
-        margin: 40px auto;
-        padding: 48px 32px;
-        text-align: center;
-        background: var(--aiq-surface, #ffffff);
-        border: 1px dashed ${K.WARNING};
-        border-radius: 18px;
-      }
-      .aiq-empty-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 56px;
-        height: 56px;
-        background: ${K.WARNING_BG};
-        border-radius: 14px;
-        color: ${K.WARNING};
-        margin-bottom: 16px;
-      }
-      .aiq-empty-icon svg { width: 26px; height: 26px; }
-      .aiq-empty-state h3 {
-        font-family: ${K.FONT_DISPLAY};
-        font-size: 22px;
-        font-weight: 700;
-        color: ${K.TEXT_PRIMARY};
-        margin: 0 0 10px;
-        letter-spacing: -0.015em;
-      }
-      .aiq-empty-state h3 em {
-        font-family: ${FONT_EDITORIAL};
-        font-style: italic;
-        font-weight: 500;
-        color: ${K.WARNING};
-      }
-      .aiq-empty-prefix {
-        color: ${K.TEXT_SECONDARY};
-      }
-      .aiq-empty-state p {
-        font-family: ${K.FONT_DISPLAY};
-        font-size: 13.5px;
-        line-height: 1.55;
-        color: ${K.TEXT_MUTED};
-        margin: 0;
-      }
-      .aiq-empty-cta {
-        display: inline-block;
-        margin-top: 8px;
-        color: ${K.PRIMARY_HOVER};
-      }
 
       /* Loading */
       .aiq-loading {

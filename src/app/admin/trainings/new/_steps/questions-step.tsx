@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AiQuestionGenerator from '@/components/admin/trainings/ai-question-generator';
-import { K, distributePoints, minCorrectForPassing, type QuestionItem, type VideoItem } from './types';
+import { K, distributePoints, type QuestionItem } from './types';
 
 interface QuestionsStepProps {
   questions: QuestionItem[];
@@ -15,14 +15,12 @@ interface QuestionsStepProps {
   setPassingScore: (v: number) => void;
   addQuestion: () => void;
   removeQuestion: (id: number) => void;
-  videos: VideoItem[];
 }
 
 export default function QuestionsStep({
   questions, setQuestions,
   passingScore, setPassingScore,
   addQuestion, removeQuestion,
-  videos,
 }: QuestionsStepProps) {
   const handleAiAdd = (
     items: { text: string; options: string[]; correct: number }[],
@@ -68,42 +66,28 @@ export default function QuestionsStep({
       >
         <div className="flex items-center gap-1.5 mb-3">
           <Target className="h-4 w-4" style={{ color: K.PRIMARY }} />
-          <Label className="text-sm font-semibold" style={{ color: K.TEXT_PRIMARY }}>Baraj Puanı</Label>
-          <span className="text-[11px]" style={{ color: K.TEXT_MUTED }}>(100 üzerinden)</span>
+          <Label className="text-sm font-semibold" style={{ color: K.TEXT_PRIMARY }}>
+            Geçmek için en az kaç doğru?
+          </Label>
+          <span className="text-[11px]" style={{ color: K.TEXT_MUTED }}>(10 sorudan)</span>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr] sm:items-center">
+        <div className="flex items-center gap-3">
           <Input
             type="number"
-            min={0}
-            max={100}
-            value={passingScore}
-            onChange={(e) => setPassingScore(Number(e.target.value))}
-            className="h-11 text-center text-base font-bold"
+            min={1}
+            max={10}
+            step={1}
+            value={Math.max(1, Math.min(10, Math.round(passingScore / 10)))}
+            onChange={(e) => {
+              const correct = Math.max(1, Math.min(10, Number(e.target.value) || 1));
+              setPassingScore(correct * 10);
+            }}
+            className="h-11 w-24 text-center text-lg font-bold"
             style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }}
           />
-          <div
-            className="rounded-lg px-4 py-3 text-sm"
-            style={{
-              background: K.PRIMARY_LIGHT,
-              color: K.PRIMARY_HOVER,
-              border: `1.5px dashed ${K.PRIMARY}`,
-            }}
-          >
-            {questions.length > 0 && passingScore > 0 ? (
-              <>
-                Personel barajı geçmek için{' '}
-                <strong style={{ color: K.PRIMARY }}>{questions.length}</strong> sorudan en az{' '}
-                <strong style={{ color: K.PRIMARY, fontSize: '1.05em' }}>
-                  {minCorrectForPassing(passingScore, questions.length)}
-                </strong>{' '}
-                tanesini doğru cevaplamalı.
-              </>
-            ) : (
-              <span style={{ color: K.TEXT_MUTED }}>
-                Soru ekledikçe ve baraj puanı girdikçe burada kaç doğru gerektiği gösterilecek.
-              </span>
-            )}
-          </div>
+          <span className="text-sm" style={{ color: K.TEXT_MUTED }}>
+            doğru cevap = <strong style={{ color: K.PRIMARY }}>{Math.max(10, Math.min(100, passingScore))} puan</strong> baraj
+          </span>
         </div>
       </div>
 
@@ -243,7 +227,6 @@ export default function QuestionsStep({
 
         <TabsContent value="ai" className="pt-4">
           <AiQuestionGenerator
-            videos={videos}
             onAdd={handleAiAdd}
             manualQuestions={questions
               .filter((q) => q.text.trim() !== '' && q.options.some((o) => o.trim() !== ''))
