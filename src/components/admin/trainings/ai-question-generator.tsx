@@ -15,6 +15,7 @@ import { useMemo, useState } from 'react';
 import {
   Sparkles, FileText, CheckCircle2, Trash2, RefreshCw, AlertCircle,
   Loader2, PlusCircle, Zap, ChevronDown, FileCheck2, BookOpenCheck,
+  Minus, Plus,
 } from 'lucide-react';
 import { CURATED_MODELS, DEFAULT_MODEL_ID, getModel } from '@/lib/openrouter-models';
 import { K, type VideoItem } from '@/app/admin/trainings/new/_steps/types';
@@ -23,6 +24,9 @@ import { useAiQuestionQueue } from '@/hooks/use-ai-question-queue';
 export interface AiQuestionGeneratorProps {
   videos: VideoItem[];
   onAdd: (questions: { text: string; options: string[]; correct: number }[]) => void;
+  /** Manuel sekmede admin'in yazdığı dolu sorular — AI dedup ve hedef toplam
+   * hesabı için. Caller boş şablonları filtrelemiş olmalı. */
+  manualQuestions: { text: string }[];
 }
 
 // Tier rozetleri için sıkı emerald tabanlı sofistike palet — varsayılan medikal AI
@@ -37,7 +41,7 @@ const tierStyles: Record<string, { dot: string; label: string; bg: string }> = {
 
 const FONT_EDITORIAL = "var(--font-editorial, Georgia, serif)";
 
-export default function AiQuestionGenerator({ videos, onAdd }: AiQuestionGeneratorProps) {
+export default function AiQuestionGenerator({ videos, onAdd, manualQuestions }: AiQuestionGeneratorProps) {
   const pdfSources = useMemo(
     () => videos.filter((v) => v.contentType === 'pdf' || !!v.documentKey),
     [videos],
@@ -47,12 +51,24 @@ export default function AiQuestionGenerator({ videos, onAdd }: AiQuestionGenerat
     pdfSources.map((v) => v.documentKey || v.url).filter(Boolean) as string[],
   );
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
+  const [targetTotal, setTargetTotal] = useState<number>(10);
   const selectedModel = getModel(modelId) ?? CURATED_MODELS[0];
   const tierColor = tierStyles[selectedModel.tier] ?? tierStyles.premium;
+
+  const manualCount = manualQuestions.length;
+  const aiCountToGenerate = Math.max(0, targetTotal - manualCount);
+
+  // staticExcluded: manuel soruların metinleri — AI'ya "bunları tekrar etme" demek için
+  const staticExcluded = useMemo(
+    () => manualQuestions.map((q) => ({ text: q.text })),
+    [manualQuestions],
+  );
 
   const queue = useAiQuestionQueue({
     sourceS3Keys: selectedKeys,
     model: modelId,
+    displayTarget: aiCountToGenerate,
+    staticExcluded,
   });
 
   const toggleSource = (key: string) => {
@@ -121,9 +137,67 @@ export default function AiQuestionGenerator({ videos, onAdd }: AiQuestionGenerat
               üretsin.
             </h2>
             <p className="aiq-hero-sub">
-              Yüklediğin PDF&apos;ten 10 çoktan seçmeli soru. Beğenmediğini sil — yerine yenisi gelir.
+              Yüklediğin PDF&apos;ten çoktan seçmeli soru. Beğenmediğini sil — yerine yenisi gelir.
             </p>
           </div>
+
+          {/* Hedef Toplam — manuel + AI = X soru */}
+          <section className="aiq-target">
+            <header className="aiq-section-head">
+              <span className="aiq-step-num">00</span>
+              <span className="aiq-step-label">Hedef Toplam</span>
+            </header>
+            <div className="aiq-target-stepper">
+              <button
+                type="button"
+                className="aiq-target-btn"
+                onClick={() => setTargetTotal((v) => Math.max(1, v - 1))}
+                aria-label="Azalt"
+                disabled={targetTotal <= 1}
+              >
+                <Minus size={14} strokeWidth={3} />
+              </button>
+              <div className="aiq-target-value">
+                <span className="aiq-target-num">{targetTotal}</span>
+                <span className="aiq-target-unit">soru</span>
+              </div>
+              <button
+                type="button"
+                className="aiq-target-btn"
+                onClick={() => setTargetTotal((v) => Math.min(20, v + 1))}
+                aria-label="Arttır"
+                disabled={targetTotal >= 20}
+              >
+                <Plus size={14} strokeWidth={3} />
+              </button>
+            </div>
+            <div className="aiq-target-breakdown">
+              <span className="aiq-target-pill aiq-target-pill--manual">
+                <Sparkles size={10} strokeWidth={2.5} style={{ opacity: 0 }} />
+                Manuel <strong>{manualCount}</strong>
+              </span>
+              <span className="aiq-target-arrow">+</span>
+              <span className="aiq-target-pill aiq-target-pill--ai">
+                <Sparkles size={10} strokeWidth={2.5} />
+                AI <strong>{aiCountToGenerate}</strong>
+              </span>
+              <span className="aiq-target-arrow">=</span>
+              <span className="aiq-target-pill aiq-target-pill--total">
+                Toplam <strong>{targetTotal}</strong>
+              </span>
+            </div>
+            {aiCountToGenerate === 0 && manualCount > 0 && (
+              <p className="aiq-target-hint">
+                Manuel sorular hedefi karşılıyor. AI&apos;ya gerek yok.
+              </p>
+            )}
+            {manualCount > targetTotal && (
+              <p className="aiq-target-warning">
+                <AlertCircle size={11} strokeWidth={2.5} />
+                Manuel soru sayısı hedeften fazla. Hedefi yükselt veya manuel&apos;den sil.
+              </p>
+            )}
+          </section>
 
           {/* Adım 1 — Kaynak */}
           <section className="aiq-section">
@@ -213,13 +287,17 @@ export default function AiQuestionGenerator({ videos, onAdd }: AiQuestionGenerat
             <button
               type="button"
               className="aiq-cta"
-              disabled={selectedKeys.length === 0}
+              disabled={selectedKeys.length === 0 || aiCountToGenerate === 0}
               onClick={() => void queue.generate()}
             >
               <span className="aiq-cta-icon">
                 <Zap size={16} strokeWidth={2.5} />
               </span>
-              <span className="aiq-cta-label">10 Soru Üret</span>
+              <span className="aiq-cta-label">
+                {aiCountToGenerate === 0
+                  ? 'AI üretmesi gerekmez'
+                  : `${aiCountToGenerate} Soru Üret`}
+              </span>
               <span className="aiq-cta-hint">~30s</span>
             </button>
           )}
@@ -265,17 +343,23 @@ export default function AiQuestionGenerator({ videos, onAdd }: AiQuestionGenerat
             <div className="aiq-results-empty">
               <div className="aiq-results-empty-bg" />
               <div className="aiq-results-empty-content">
-                <span className="aiq-results-empty-mono">10 SORU · KAYNAK GROUNDED · ~30 SANİYE</span>
+                <span className="aiq-results-empty-mono">
+                  {aiCountToGenerate} SORU · KAYNAK GROUNDED · ~30 SANİYE
+                </span>
                 <h3>
                   Üretmeye <em>hazır</em>.
                 </h3>
+                {manualCount > 0 ? (
+                  <p>
+                    Manuel sekmedeki <strong>{manualCount}</strong> sorun korunuyor. AI <strong>{aiCountToGenerate}</strong> soru daha üretecek; toplam <em>{targetTotal}</em>&apos;e ulaşacak.
+                  </p>
+                ) : (
+                  <p>
+                    Sistem <em>{aiCountToGenerate + 5}</em> soru üretecek. {aiCountToGenerate} tanesi burada görünür, 5 tanesi yedek olarak sahne arkasında bekler.
+                  </p>
+                )}
                 <p>
-                  &ldquo;10 Soru Üret&rdquo; butonuna bastığında, sistem 15 soru üretecek.
-                  10 tanesi burada görünecek, 5 tanesi sahne arkasında bekleyecek.
-                </p>
-                <p>
-                  Bir soruyu sildiğinde — kuyruktan biri anında onun yerini alacak.
-                  Hep <em>10 soru</em>.
+                  Bir soruyu sildiğinde — kuyruktan biri anında onun yerini alır. Hep <em>{aiCountToGenerate} soru</em>.
                 </p>
               </div>
             </div>
@@ -526,6 +610,134 @@ function Styles() {
         background: var(--aiq-surface);
         border: 1px solid var(--aiq-border-soft);
         border-radius: 14px;
+      }
+
+      /* TARGET TOTAL */
+      .aiq-target {
+        padding: 16px 18px 18px;
+        background:
+          linear-gradient(180deg, var(--aiq-emerald-soft) 0%, var(--aiq-surface) 70%);
+        border: 1px solid var(--aiq-border-soft);
+        border-radius: 14px;
+      }
+      .aiq-target-stepper {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px;
+        background: var(--aiq-surface);
+        border: 1px solid var(--aiq-border);
+        border-radius: 12px;
+      }
+      .aiq-target-btn {
+        width: 34px;
+        height: 34px;
+        background: var(--aiq-cream);
+        border: 1px solid var(--aiq-border-soft);
+        border-radius: 9px;
+        color: var(--aiq-soft-ink);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+      }
+      .aiq-target-btn:hover:not(:disabled) {
+        background: var(--aiq-emerald-pale);
+        border-color: var(--aiq-emerald);
+        color: var(--aiq-emerald-deep);
+      }
+      .aiq-target-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .aiq-target-value {
+        flex: 1;
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 6px;
+      }
+      .aiq-target-num {
+        font-family: var(--aiq-editorial);
+        font-style: italic;
+        font-weight: 600;
+        font-size: 32px;
+        line-height: 1;
+        letter-spacing: -0.025em;
+        color: var(--aiq-emerald);
+      }
+      .aiq-target-unit {
+        font-family: var(--aiq-display);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: var(--aiq-muted);
+      }
+      .aiq-target-breakdown {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .aiq-target-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 9px;
+        font-family: var(--aiq-display);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        border-radius: 999px;
+        border: 1px solid transparent;
+      }
+      .aiq-target-pill strong {
+        font-family: var(--aiq-mono);
+        font-weight: 700;
+        font-size: 11.5px;
+      }
+      .aiq-target-pill--manual {
+        background: var(--aiq-cream);
+        color: var(--aiq-soft-ink);
+        border-color: var(--aiq-border-soft);
+      }
+      .aiq-target-pill--ai {
+        background: var(--aiq-emerald-soft);
+        color: var(--aiq-emerald-deep);
+        border-color: var(--aiq-emerald-pale);
+      }
+      .aiq-target-pill--ai svg {
+        color: var(--aiq-emerald);
+      }
+      .aiq-target-pill--total {
+        background: var(--aiq-ink);
+        color: var(--aiq-cream);
+      }
+      .aiq-target-arrow {
+        font-family: var(--aiq-mono);
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--aiq-muted);
+      }
+      .aiq-target-hint {
+        margin: 10px 0 0;
+        font-family: var(--aiq-display);
+        font-size: 11.5px;
+        line-height: 1.45;
+        color: var(--aiq-emerald-deep);
+        font-style: italic;
+      }
+      .aiq-target-warning {
+        margin: 10px 0 0;
+        display: flex;
+        align-items: flex-start;
+        gap: 5px;
+        font-family: var(--aiq-display);
+        font-size: 11px;
+        line-height: 1.45;
+        color: var(--aiq-warning);
       }
       .aiq-section-head {
         display: flex;

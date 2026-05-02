@@ -242,7 +242,13 @@ export default function QuestionsStep({
         </TabsContent>
 
         <TabsContent value="ai" className="pt-4">
-          <AiQuestionGenerator videos={videos} onAdd={handleAiAdd} />
+          <AiQuestionGenerator
+            videos={videos}
+            onAdd={handleAiAdd}
+            manualQuestions={questions
+              .filter((q) => q.text.trim() !== '' && q.options.some((o) => o.trim() !== ''))
+              .map((q) => ({ text: q.text }))}
+          />
         </TabsContent>
       </Tabs>
     </div>
