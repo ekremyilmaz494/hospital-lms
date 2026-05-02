@@ -107,13 +107,13 @@ export default function QuestionsStep({
         </div>
       </div>
 
-      <Tabs defaultValue="manual" className="w-full">
-        <TabsList className="w-full">
-          <TabsTrigger value="manual">
+      <Tabs defaultValue="manual" className="w-full flex-col gap-4">
+        <TabsList className="w-full h-11 p-1 bg-stone-100">
+          <TabsTrigger value="manual" className="h-9 text-sm font-semibold">
             <Pencil className="h-3.5 w-3.5" />
             Manuel
           </TabsTrigger>
-          <TabsTrigger value="ai">
+          <TabsTrigger value="ai" className="h-9 text-sm font-semibold">
             <Sparkles className="h-3.5 w-3.5" />
             Yapay Zeka ile Üret
           </TabsTrigger>
