@@ -23,6 +23,14 @@ export interface GeneratedQuestion {
 export interface UseAiQuestionQueueOptions {
   sourceS3Keys: string[];
   model: string;
+  /** Admin'in hedeflediği toplam soru sayısı (default 10). Hook bu sayı kadar
+   * `displayed` tutar; queue ise her zaman 5 yedek. Hedef 0 veya negatifse
+   * generate() error verir (UI'da disabled tutulmalı). */
+  displayTarget?: number;
+  /** Manuel olarak yazılmış soruların metinleri — AI'nın dedup için tekrar
+   * etmemesi gereken sorular. excluded listesine her çağrıda eklenir
+   * (initial generate + her replenish). */
+  staticExcluded?: { text: string }[];
 }
 
 export interface UseAiQuestionQueueReturn {
@@ -43,7 +51,7 @@ interface RawQuestion {
   correctIndex: number;
 }
 
-const DISPLAY_TARGET = 10;
+const DEFAULT_DISPLAY_TARGET = 10;
 const QUEUE_TARGET = 5;
 
 const newId = (): string => {
@@ -74,7 +82,13 @@ async function readError(res: Response): Promise<string> {
 }
 
 export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQuestionQueueReturn {
-  const { sourceS3Keys, model } = options;
+  const { sourceS3Keys, model, displayTarget = DEFAULT_DISPLAY_TARGET, staticExcluded = [] } = options;
+  // Sınırla: 0-20 arası int. 0 → generate disabled.
+  const displayTargetSafe = Math.max(0, Math.min(20, Math.floor(displayTarget)));
+
+  // Static excluded'ı ref'e koy ki async callback'ler güncel manueli görsün.
+  const staticExcludedRef = useRef<{ text: string }[]>([]);
+  staticExcludedRef.current = staticExcluded;
 
   const [displayed, setDisplayed] = useState<GeneratedQuestion[]>([]);
   const [queue, setQueue] = useState<GeneratedQuestion[]>([]);
@@ -101,6 +115,10 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
       setError('Önce en az bir kaynak (PDF) seçin.');
       return;
     }
+    if (displayTargetSafe === 0) {
+      setError('Üretilecek soru sayısı 0. Hedef toplamı manuel sorulardan büyük belirleyin.');
+      return;
+    }
     setIsGenerating(true);
     setError(null);
     try {
@@ -110,7 +128,8 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
         body: JSON.stringify({
           sourceS3Keys,
           model,
-          count: DISPLAY_TARGET + QUEUE_TARGET,
+          count: displayTargetSafe + QUEUE_TARGET,
+          excluded: staticExcludedRef.current,
         }),
       });
       if (!res.ok) {
@@ -124,19 +143,20 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
         setError('Hiç soru üretilemedi. Lütfen farklı bir kaynak veya model deneyin.');
         return;
       }
-      setDisplayed(all.slice(0, DISPLAY_TARGET));
-      setQueue(all.slice(DISPLAY_TARGET, DISPLAY_TARGET + QUEUE_TARGET));
+      setDisplayed(all.slice(0, displayTargetSafe));
+      setQueue(all.slice(displayTargetSafe, displayTargetSafe + QUEUE_TARGET));
     } catch {
       setError('Ağ hatası — lütfen tekrar deneyin.');
     } finally {
       setIsGenerating(false);
     }
-  }, [sourceS3Keys, model]);
+  }, [sourceS3Keys, model, displayTargetSafe]);
 
   const fireReplenish = useCallback(async () => {
     setReplenishCount((c) => c + 1);
     try {
       const excluded = [
+        ...staticExcludedRef.current,
         ...displayedRef.current.map((q) => ({ text: q.questionText })),
         ...queueRef.current.map((q) => ({ text: q.questionText })),
       ];
