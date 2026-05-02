@@ -412,12 +412,20 @@ export default function AiQuestionGenerator({ videos, onAdd, manualQuestions }: 
                     Beğenmediğin soruyu sil — yerine yenisi otomatik gelecek.
                   </p>
                 </div>
-                {queue.isReplenishing && (
-                  <span className="aiq-replenish-tag">
-                    <span className="aiq-pulse-dot" />
-                    Arka planda yeni soru hazırlanıyor
-                  </span>
-                )}
+                <div className="aiq-results-meta">
+                  {queue.queue.length > 0 && (
+                    <span className="aiq-buffer-tag" title="Yedek sorular sahne arkasında bekliyor">
+                      <span className="aiq-buffer-num">+{queue.queue.length}</span>
+                      <span className="aiq-buffer-label">yedek hazır</span>
+                    </span>
+                  )}
+                  {queue.isReplenishing && (
+                    <span className="aiq-replenish-tag">
+                      <span className="aiq-pulse-dot" />
+                      Yeni yedek hazırlanıyor
+                    </span>
+                  )}
+                </div>
               </div>
 
               <ol className="aiq-list">
@@ -1316,6 +1324,38 @@ function Styles() {
         font-size: 12.5px;
         color: var(--aiq-muted);
         margin: 0;
+      }
+      .aiq-results-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .aiq-buffer-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 4px 11px 4px 8px;
+        background: var(--aiq-cream);
+        border: 1px dashed var(--aiq-emerald);
+        border-radius: 999px;
+        font-family: var(--aiq-display);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--aiq-emerald-deep);
+        white-space: nowrap;
+      }
+      .aiq-buffer-num {
+        font-family: var(--aiq-mono);
+        font-weight: 700;
+        font-size: 11.5px;
+        color: var(--aiq-emerald);
+        background: var(--aiq-emerald-soft);
+        padding: 2px 7px;
+        border-radius: 5px;
+      }
+      .aiq-buffer-label {
+        letter-spacing: 0.01em;
       }
       .aiq-replenish-tag {
         display: inline-flex;
