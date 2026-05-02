@@ -236,6 +236,16 @@ export async function POST(request: NextRequest) {
       // Multi-tenant subdomain redirect için: client login başarısı sonrası
       // https://<slug>.<base-domain>/<dashboard>'a zıplar. super_admin'de null kalır → apex'te kalır.
       organizationSlug: dbUser.organization?.slug ?? null,
+      // Mobile app için: tenant'ı header'da göndereceği için ID lazım.
+      organizationId: dbUser.organizationId ?? null,
+      // Mobile app için JWT bilgileri. Web tarafı cookie'yi kullandığı için bu alanları ignore eder.
+      // Mobile, response'tan alıp expo-secure-store'a yazar; sonraki istekleri Authorization: Bearer ile yapar.
+      session: data.session ? {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at ?? null,
+        tokenType: data.session.token_type,
+      } : null,
     })
   } catch (err) {
     logger.error('auth:login', 'Giriş işlemi sırasında beklenmeyen hata', err)

@@ -80,7 +80,31 @@ export interface WithApiHandlerOptions {
   requireOrganization?: boolean
 }
 
-type RouteContext<P> = { params: Promise<P> } | undefined
+/**
+ * Next.js 16 her route için `.next/types/.../route.ts` altında validator üretiyor:
+ *   type RouteContext = { params: Promise<SegmentParams> }
+ * Eski sürümlerde `routeCtx?` optional çalışıyordu; Next 16'da context her zaman
+ * geçilir ve `| undefined` validator'a takılıyor. SegmentParams ≈
+ * Record<string, string | string[] | undefined> olduğu için default P'yi de buna
+ * uyumlu tuttuk; explicit generic'ler (örn. `<{ id: string }>`) etkilenmez.
+ */
+type DefaultParams = Record<string, string | string[] | undefined>
+type RouteContext<P extends DefaultParams = DefaultParams> = { params: Promise<P> }
+
+/**
+ * Callable interface — iki overload:
+ *   1) `(request)` — TEST'lerde 1-arg ile çağırma için (mock'lar route handler'ı doğrudan invoke eder).
+ *   2) `(request, routeCtx)` — Next 16 validator'ının gördüğü "asıl" imza.
+ *
+ * TS'de overload'lı bir function type'da `Parameters<F>` SADECE en son overload'a
+ * bakar; Next 16'nın `SecondArg<typeof POST>` çıkarımı bu yüzden `RouteContext<P>`
+ * görür ve generated validator geçer. Tests ise ilk overload'a düşer ve 1-arg
+ * çağrı tip-uyumlu olur.
+ */
+type RouteHandler<P extends DefaultParams> = {
+  (request: Request): Promise<Response>
+  (request: Request, routeCtx: RouteContext<P>): Promise<Response>
+}
 
 /**
  * Wrap a Next.js App Router route handler with centralized auth/role/writeGuard.
@@ -102,15 +126,15 @@ type AnyHandler<P> =
   | ((ctx: HandlerContext<P, string | null>) => Promise<Response>)
 
 // Type overloads — `requireOrganization: true` set'lendiğinde ctx.organizationId tipi `string`.
-export function withApiHandler<P = Record<string, string>>(
+export function withApiHandler<P extends DefaultParams = DefaultParams>(
   handler: (ctx: HandlerContext<P, string>) => Promise<Response>,
   options: WithApiHandlerOptions & { requireOrganization: true },
-): (request: Request, routeCtx?: RouteContext<P>) => Promise<Response>
-export function withApiHandler<P = Record<string, string>>(
+): RouteHandler<P>
+export function withApiHandler<P extends DefaultParams = DefaultParams>(
   handler: (ctx: HandlerContext<P, string | null>) => Promise<Response>,
   options?: WithApiHandlerOptions,
-): (request: Request, routeCtx?: RouteContext<P>) => Promise<Response>
-export function withApiHandler<P = Record<string, string>>(
+): RouteHandler<P>
+export function withApiHandler<P extends DefaultParams = DefaultParams>(
   handler: AnyHandler<P>,
   options: WithApiHandlerOptions = {},
 ) {
@@ -122,7 +146,7 @@ export function withApiHandler<P = Record<string, string>>(
     requireOrganization = false,
   } = options
 
-  return async (request: Request, routeCtx?: RouteContext<P>): Promise<Response> => {
+  return (async (request: Request, routeCtx?: RouteContext<P>): Promise<Response> => {
     try {
       const params = (routeCtx?.params ? await routeCtx.params : ({} as P))
 
@@ -193,43 +217,43 @@ export function withApiHandler<P = Record<string, string>>(
 
       return errorResponse('İşlem sırasında beklenmeyen bir hata oluştu', 500)
     }
-  }
+  }) as RouteHandler<P>
 }
 
 /** Convenience presets — 90% of routes fall into one of these buckets. */
 type PresetExtra = Omit<WithApiHandlerOptions, 'roles'>
 
-export function withAdminRoute<P = Record<string, string>>(
+export function withAdminRoute<P extends DefaultParams = DefaultParams>(
   handler: (ctx: HandlerContext<P, string>) => Promise<Response>,
   extra: PresetExtra & { requireOrganization: true },
-): (request: Request, routeCtx?: RouteContext<P>) => Promise<Response>
-export function withAdminRoute<P = Record<string, string>>(
+): RouteHandler<P>
+export function withAdminRoute<P extends DefaultParams = DefaultParams>(
   handler: (ctx: HandlerContext<P, string | null>) => Promise<Response>,
   extra?: PresetExtra,
-): (request: Request, routeCtx?: RouteContext<P>) => Promise<Response>
-export function withAdminRoute<P = Record<string, string>>(
+): RouteHandler<P>
+export function withAdminRoute<P extends DefaultParams = DefaultParams>(
   handler: AnyHandler<P>,
   extra: PresetExtra = {},
 ) {
   return withApiHandler<P>(handler as (ctx: HandlerContext<P, string | null>) => Promise<Response>, { roles: ['admin', 'super_admin'], ...extra })
 }
 
-export function withStaffRoute<P = Record<string, string>>(
+export function withStaffRoute<P extends DefaultParams = DefaultParams>(
   handler: (ctx: HandlerContext<P, string>) => Promise<Response>,
   extra: PresetExtra & { requireOrganization: true },
-): (request: Request, routeCtx?: RouteContext<P>) => Promise<Response>
-export function withStaffRoute<P = Record<string, string>>(
+): RouteHandler<P>
+export function withStaffRoute<P extends DefaultParams = DefaultParams>(
   handler: (ctx: HandlerContext<P, string | null>) => Promise<Response>,
   extra?: PresetExtra,
-): (request: Request, routeCtx?: RouteContext<P>) => Promise<Response>
-export function withStaffRoute<P = Record<string, string>>(
+): RouteHandler<P>
+export function withStaffRoute<P extends DefaultParams = DefaultParams>(
   handler: AnyHandler<P>,
   extra: PresetExtra = {},
 ) {
   return withApiHandler<P>(handler as (ctx: HandlerContext<P, string | null>) => Promise<Response>, { roles: ['staff', 'admin', 'super_admin'], ...extra })
 }
 
-export const withSuperAdminRoute = <P = Record<string, string>>(
+export const withSuperAdminRoute = <P extends DefaultParams = DefaultParams>(
   handler: (ctx: HandlerContext<P, string | null>) => Promise<Response>,
   extra: PresetExtra = {},
 ) => withApiHandler<P>(handler, { roles: ['super_admin'], strict: true, ...extra })

@@ -90,3 +90,22 @@ export async function createServiceClient() {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 }
+
+/**
+ * Mobile/Bearer-token client — `Authorization: Bearer <jwt>` header'lı
+ * istekler için. Cookie store'a dokunmaz, JWT'yi explicit olarak header'a
+ * yazar. `auth.getUser(token)` ile validate edilebilir.
+ *
+ * Web tarafı bu client'ı kullanmaz; sadece mobile (RN) request'leri.
+ */
+export async function createBearerClient(token: string) {
+  const { createClient } = await import('@supabase/supabase-js')
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    },
+  )
+}
