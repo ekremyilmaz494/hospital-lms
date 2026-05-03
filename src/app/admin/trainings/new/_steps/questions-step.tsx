@@ -15,12 +15,16 @@ interface QuestionsStepProps {
   setPassingScore: (v: number) => void;
   addQuestion: () => void;
   removeQuestion: (id: number) => void;
+  /** AI tab'ında üretilmiş ama henüz eklenmemiş soru sayısı için parent'a bildirim.
+   *  Parent buna göre "Sonraki Adım" geçişini engelleyebilir. */
+  onPendingAiChange?: (count: number) => void;
 }
 
 export default function QuestionsStep({
   questions, setQuestions,
   passingScore, setPassingScore,
   addQuestion, removeQuestion,
+  onPendingAiChange,
 }: QuestionsStepProps) {
   const handleAiAdd = (
     items: { text: string; options: string[]; correct: number }[],
@@ -228,6 +232,7 @@ export default function QuestionsStep({
         <TabsContent value="ai" className="pt-4">
           <AiQuestionGenerator
             onAdd={handleAiAdd}
+            onPendingChange={onPendingAiChange}
             manualQuestions={questions
               .filter((q) => q.text.trim() !== '' && q.options.some((o) => o.trim() !== ''))
               .map((q) => ({ text: q.text }))}

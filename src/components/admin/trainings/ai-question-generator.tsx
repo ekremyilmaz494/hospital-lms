@@ -11,7 +11,7 @@
  * staggered CSS entrance animasyonları.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Sparkles, CheckCircle2, Trash2, RefreshCw, AlertCircle,
   Loader2, PlusCircle, Zap, ChevronDown, FileCheck2, BookOpenCheck,
@@ -26,6 +26,9 @@ export interface AiQuestionGeneratorProps {
   /** Manuel sekmede admin'in yazdığı dolu sorular — AI dedup ve hedef toplam
    * hesabı için. Caller boş şablonları filtrelemiş olmalı. */
   manualQuestions: { text: string }[];
+  /** Henüz "Soruları Ekle" basılmamış ama üretilmiş soru sayısı.
+   *  Parent step navigation'ı engellemek için kullanır. */
+  onPendingChange?: (count: number) => void;
 }
 
 interface UploadedSource {
@@ -51,7 +54,7 @@ const tierStyles: Record<string, { dot: string; label: string; bg: string }> = {
 
 const FONT_EDITORIAL = "var(--font-editorial, Georgia, serif)";
 
-export default function AiQuestionGenerator({ onAdd, manualQuestions }: AiQuestionGeneratorProps) {
+export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingChange }: AiQuestionGeneratorProps) {
   const [uploadedSources, setUploadedSources] = useState<UploadedSource[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -82,6 +85,14 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions }: AiQuesti
     displayTarget: aiCountToGenerate,
     staticExcluded,
   });
+
+  // Üretilmiş ama henüz "Soruları Ekle" ile manuel listeye taşınmamış sayıyı parent'a bildir.
+  // Parent step 3 validation'ında bunu kullanarak ileri geçişi engeller.
+  // Unmount olduğunda 0 döneriz: tab değiştiğinde queue zaten kaybolur.
+  useEffect(() => {
+    onPendingChange?.(queue.displayed.length);
+    return () => onPendingChange?.(0);
+  }, [queue.displayed.length, onPendingChange]);
 
   const removeSource = (s3Key: string) => {
     setUploadedSources((prev) => prev.filter((s) => s.s3Key !== s3Key));
@@ -456,6 +467,18 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions }: AiQuesti
           {/* Results */}
           {hasResults && !queue.isGenerating && (
             <>
+              {/* Kullanıcının "Soruları Ekle" butonuna basmadan ilerlemesini önlemek için inline uyarı.
+                  Parent step 3 validation da geçişi engeller, bu görsel hatırlatma içindir. */}
+              <div className="aiq-pending-banner" role="alert">
+                <AlertCircle size={16} strokeWidth={2.5} />
+                <div className="aiq-pending-banner-text">
+                  <strong>Bu sorular henüz kaydedilmedi.</strong>
+                  <span>
+                    Eğitime eklemek için solda <em>&ldquo;Soruları Ekle ({queue.displayed.length})&rdquo;</em> butonuna bas. Aksi halde sınava dahil edilmezler.
+                  </span>
+                </div>
+              </div>
+
               <div className="aiq-results-head">
                 <div>
                   <h3 className="aiq-results-title">
@@ -1264,6 +1287,47 @@ function Styles() {
         display: flex;
         flex-direction: column;
         gap: 6px;
+      }
+
+      /* PENDING BANNER — "Soruları Ekle" basılmadan kaydedilmediğini hatırlatır */
+      .aiq-pending-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px 18px;
+        margin-bottom: 16px;
+        background: ${K.WARNING_BG};
+        border: 1px solid ${K.WARNING};
+        border-left-width: 4px;
+        border-radius: 12px;
+        animation: aiq-banner-pulse 3s ease-in-out infinite;
+      }
+      @keyframes aiq-banner-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 ${K.WARNING}00; }
+        50% { box-shadow: 0 0 0 4px ${K.WARNING}22; }
+      }
+      .aiq-pending-banner svg {
+        flex-shrink: 0;
+        color: ${K.WARNING};
+        margin-top: 1px;
+      }
+      .aiq-pending-banner-text {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        font-family: var(--aiq-display);
+        font-size: 13px;
+        line-height: 1.5;
+        color: #6b3e0a;
+      }
+      .aiq-pending-banner-text strong {
+        font-weight: 700;
+        color: #4a2906;
+      }
+      .aiq-pending-banner-text em {
+        font-family: var(--aiq-editorial);
+        font-style: italic;
+        font-weight: 600;
       }
 
       /* RESULTS HEAD */

@@ -68,6 +68,9 @@ export default function NewTrainingPage() {
     { id: 1, text: '', points: 10, options: ['', '', '', ''], correct: -1 },
   ]);
   const [passingScore, setPassingScore] = useState(70);
+  // AI tab'ında üretilmiş ama henüz "Soruları Ekle" ile manuel listeye taşınmamış soru sayısı.
+  // > 0 ise step 3 ileri geçilemez — kullanıcı kazara AI sorularını kaybetmesin.
+  const [pendingAiCount, setPendingAiCount] = useState(0);
 
   // Step 4 — Assignment
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
@@ -213,6 +216,9 @@ export default function NewTrainingPage() {
       }
     }
     if (step === 3) {
+      if (pendingAiCount > 0) {
+        return `AI sekmesinde ${pendingAiCount} adet üretilmiş soru var ama henüz eklenmedi. "Soruları Ekle (${pendingAiCount})" butonuna basın veya istemiyorsanız "Tümünü Yeniden Üret" ile temizleyin.`;
+      }
       const ps = Number(passingScore);
       if (!Number.isFinite(ps) || ps < 0 || ps > 100) return 'Baraj puanı 0 ile 100 arasında olmalıdır.';
       for (const q of questions) {
@@ -437,6 +443,7 @@ export default function NewTrainingPage() {
               passingScore={passingScore} setPassingScore={setPassingScore}
               addQuestion={addQuestion}
               removeQuestion={removeQuestion}
+              onPendingAiChange={setPendingAiCount}
             />
           )}
           {currentStep === 4 && (
