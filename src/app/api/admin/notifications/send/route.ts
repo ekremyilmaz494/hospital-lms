@@ -4,6 +4,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { sendEmail, escapeHtml } from '@/lib/email'
 import { logger } from '@/lib/logger'
+import { sendExpoPushToMany } from '@/lib/expo-push'
 import { z } from 'zod/v4'
 
 const sendNotificationSchema = z.object({
@@ -94,6 +95,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       type,
     })),
   })
+
+  // Mobil uygulamaya push fan-out (fire-and-forget; admin response'unu bloklamasın)
+  void sendExpoPushToMany(validUsers.map(u => u.id), { title, body: message })
 
   // Opsiyonel e-posta gönderimi (arka planda, batch halinde)
   let emailsSent = 0
