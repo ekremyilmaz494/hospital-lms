@@ -1,35 +1,73 @@
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createPlanSchema, updatePlanSchema, createSubscriptionSchema } from '@/lib/validations'
 
 // ── Subscription Plans CRUD ──
 
-export const GET = withSuperAdminRoute(async ({ request }) => {
-  const { searchParams } = new URL(request.url)
-  const type = searchParams.get('type') // plans | subscriptions
+const PLAN_DEFAULTS: Record<string, { icon: string; color: string; popular: boolean }> = {
+  starter:      { icon: 'Zap',   color: 'var(--color-info)',    popular: false },
+  professional: { icon: 'Star',  color: 'var(--color-accent)',  popular: true  },
+  pro:          { icon: 'Star',  color: 'var(--color-accent)',  popular: true  },
+  enterprise:   { icon: 'Crown', color: 'var(--color-primary)', popular: false },
+}
 
-  if (type === 'subscriptions') {
-    const { page, limit, skip } = safePagination(searchParams)
-    const [subscriptions, total] = await Promise.all([
-      prisma.organizationSubscription.findMany({
-        include: { organization: true, plan: true },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      prisma.organizationSubscription.count(),
-    ])
-    return jsonResponse({ subscriptions, total, page, limit })
-  }
+export const GET = withSuperAdminRoute(async () => {
+  const [rawPlans, rawSubs] = await Promise.all([
+    prisma.subscriptionPlan.findMany({
+      where: { isActive: true },
+      include: { _count: { select: { subscriptions: true } } },
+      orderBy: { priceMonthly: 'asc' },
+      take: 100,
+    }),
+    prisma.organizationSubscription.findMany({
+      include: {
+        organization: { select: { name: true, code: true } },
+        plan:         { select: { name: true, slug: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    }),
+  ])
 
-  // Planlar sayısı genellikle düşük (~10-20) ama yine de limit koy
-  const plans = await prisma.subscriptionPlan.findMany({
-    include: { _count: { select: { subscriptions: true } } },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
+  const plans = rawPlans.map(p => {
+    const defaults = PLAN_DEFAULTS[p.slug] ?? { icon: 'Zap', color: 'var(--color-info)', popular: false }
+    return {
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      description: p.description,
+      icon: defaults.icon,
+      color: defaults.color,
+      popular: defaults.popular,
+      price: {
+        monthly: p.priceMonthly ? Number(p.priceMonthly) : 0,
+        annual:  p.priceAnnual  ? Number(p.priceAnnual)  : 0,
+      },
+      limits: {
+        staff:     p.maxStaff,
+        trainings: p.maxTrainings,
+        storage:   p.maxStorageGb,
+      },
+      features: Array.isArray(p.features) ? (p.features as string[]) : [],
+      hospitals: p._count.subscriptions,
+    }
   })
-  return jsonResponse(plans)
+
+  const hospitalSubscriptions = rawSubs.map(s => ({
+    name:      s.organization.name,
+    code:      s.organization.code,
+    plan:      s.plan.name,
+    status:    s.status,
+    expiresAt: s.expiresAt
+      ? s.expiresAt.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : '-',
+    billing:   s.billingCycle === 'monthly' ? 'Aylık' : s.billingCycle === 'annual' ? 'Yıllık' : '-',
+  }))
+
+  return jsonResponse({ plans, hospitalSubscriptions }, 200, {
+    'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+  })
 })
 
 export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {

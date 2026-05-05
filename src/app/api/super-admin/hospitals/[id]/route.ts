@@ -10,7 +10,11 @@ export const GET = withSuperAdminRoute<{ id: string }>(async ({ params }) => {
     where: { id },
     include: {
       subscription: { include: { plan: true } },
-      users: { orderBy: { createdAt: 'desc' }, take: 10 },
+      users: {
+        where: { role: 'admin' },
+        select: { id: true, firstName: true, lastName: true, email: true },
+        orderBy: { createdAt: 'desc' },
+      },
       trainings: { orderBy: { createdAt: 'desc' }, take: 10 },
       _count: { select: { users: true, trainings: true, auditLogs: true } },
     },
@@ -18,7 +22,16 @@ export const GET = withSuperAdminRoute<{ id: string }>(async ({ params }) => {
 
   if (!hospital) return errorResponse('Hospital not found', 404)
 
-  return jsonResponse(hospital)
+  const { users, ...rest } = hospital
+  const admins = users.map(u => ({
+    id: u.id,
+    name: `${u.firstName} ${u.lastName}`.trim(),
+    email: u.email,
+  }))
+
+  return jsonResponse({ ...rest, admins }, 200, {
+    'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+  })
 })
 
 export const PATCH = withSuperAdminRoute<{ id: string }>(async ({ request, params, audit }) => {

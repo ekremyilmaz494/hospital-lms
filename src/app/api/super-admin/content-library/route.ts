@@ -51,6 +51,8 @@ export const GET = withSuperAdminRoute(async ({ request }) => {
     page,
     limit,
     totalPages: Math.ceil(total / limit),
+  }, 200, {
+    'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
   })
 })
 

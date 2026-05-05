@@ -57,7 +57,7 @@ export default function EditHospitalPage() {
     };
     try {
       const res = await fetch(`/api/super-admin/hospitals/${id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });

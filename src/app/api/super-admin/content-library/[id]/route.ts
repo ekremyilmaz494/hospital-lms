@@ -31,6 +31,8 @@ export const GET = withSuperAdminRoute<{ id: string }>(async ({ params }) => {
     ...item,
     targetRoles: item.targetRoles as string[],
     installCount: item._count.installs,
+  }, 200, {
+    'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
   })
 })
 
