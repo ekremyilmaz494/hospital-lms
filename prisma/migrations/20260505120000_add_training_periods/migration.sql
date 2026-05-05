@@ -79,10 +79,12 @@ ALTER TABLE "training_assignments"
     ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- 5) Composite unique migration: (training_id, user_id) → (training_id, user_id, period_id)
-ALTER TABLE "training_assignments" DROP CONSTRAINT IF EXISTS "training_assignments_training_id_user_id_key";
-
+-- NOT: Eski init migration unique'i CREATE UNIQUE INDEX ile yarattı (constraint
+-- değil), bu yüzden DROP CONSTRAINT no-op olur — DROP INDEX ile düşürmek şart.
 CREATE UNIQUE INDEX IF NOT EXISTS "training_assignments_training_id_user_id_period_id_key"
     ON "training_assignments" ("training_id", "user_id", "period_id");
+
+DROP INDEX IF EXISTS "training_assignments_training_id_user_id_key";
 
 CREATE INDEX IF NOT EXISTS "idx_assignments_period"
     ON "training_assignments" ("period_id");
