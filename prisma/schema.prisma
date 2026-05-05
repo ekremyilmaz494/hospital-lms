@@ -1308,7 +1308,7 @@ model TrustedDevice {
 // Davet edilen kişi linke tıkladığında kendi şifresini kurar ve kabul eder.
 // Plaintext token sadece URL/email'de bulunur, DB'de SHA-256 hash saklanır.
 model Invitation {
-  id              String    @id @default(uuid()) @db.Uuid
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tokenHash       String    @unique @map("token_hash") @db.VarChar(64)
   email           String    @db.VarChar(255)
   firstName       String    @map("first_name") @db.VarChar(100)
