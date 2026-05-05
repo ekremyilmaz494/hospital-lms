@@ -46,7 +46,24 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
   const parsed = createHospitalWithAdminSchema.safeParse(body)
-  if (!parsed.success) return errorResponse(parsed.error.message)
+  if (!parsed.success) {
+    const friendly = parsed.error.issues.map((i) => {
+      const field = i.path.join('.')
+      if (field === 'email' || field === 'adminEmail') {
+        return field === 'adminEmail'
+          ? 'Yönetici e-posta adresi geçersiz. Türkçe karakter (ş, ç, ğ, ü, ö, ı, İ) kullanmayın.'
+          : 'Hastane e-posta adresi geçersiz. Türkçe karakter (ş, ç, ğ, ü, ö, ı, İ) kullanmayın.'
+      }
+      if (field === 'name') return 'Hastane adı zorunludur'
+      if (field === 'code') return 'Hastane kodu zorunludur'
+      if (field === 'adminFirstName') return 'Yönetici adı zorunludur'
+      if (field === 'adminLastName') return 'Yönetici soyadı zorunludur'
+      if (field === 'adminPassword') return 'Şifre en az 8 karakter, büyük/küçük harf, rakam ve özel karakter içermelidir'
+      if (field === 'phone') return 'Geçerli bir telefon numarası girin'
+      return i.message
+    }).join(' • ')
+    return errorResponse(friendly, 400)
+  }
 
   const { adminFirstName, adminLastName, adminEmail, adminPassword, planId, trialDays, ...orgData } = parsed.data
 
@@ -86,7 +103,8 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       data: {
         ...orgData,
         slug,
-        setupCompleted: false,
+        // Setup wizard kaldırıldı — yeni hastane direkt aktif (admin login → dashboard)
+        setupCompleted: true,
         createdBy: dbUser.id,
       },
     })
@@ -148,6 +166,21 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
     throw err
   }
 
+  // Yeni hastanenin ilk admin'i = Esas Yönetici (otomatik atama).
+  // Sonradan super_admin transfer-ownership endpoint'iyle değiştirebilir.
+  try {
+    await prisma.organization.update({
+      where: { id: hospital.id },
+      data: { ownerUserId: authResult.dbUser.id },
+    })
+  } catch (err) {
+    logger.error('hospital-create', 'ownerUserId atama başarısız — manuel düzeltme gerekebilir', {
+      organizationId: hospital.id,
+      adminUserId: authResult.dbUser.id,
+      error: (err as Error).message,
+    })
+  }
+
   // Audit log
   await audit({
     action: 'create',
@@ -157,6 +190,8 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       hospitalName: orgData.name,
       hospitalCode: orgData.code,
       adminEmail,
+      adminUserId: authResult.dbUser.id,
+      ownerUserId: authResult.dbUser.id,
       planId,
       trialDays,
     },

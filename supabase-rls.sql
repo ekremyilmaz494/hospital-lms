@@ -58,6 +58,18 @@ ALTER TABLE _prisma_migrations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "super_admin_users_all" ON users FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "admin_users_select" ON users FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 CREATE POLICY "admin_users_insert" ON users FOR INSERT WITH CHECK ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid) AND role = 'staff');
+-- Esas Yönetici (org owner) yeni admin davet edebilir.
+-- Sıradan admin'ler için role='admin' insert RLS tarafından reddedilir.
+CREATE POLICY "owner_invites_admin" ON users FOR INSERT WITH CHECK (
+  (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+  AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  AND role = 'admin'
+  AND EXISTS (
+    SELECT 1 FROM organizations o
+    WHERE o.id = organization_id
+      AND o.owner_user_id = (SELECT auth.uid())
+  )
+);
 CREATE POLICY "admin_users_update" ON users FOR UPDATE USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 CREATE POLICY "staff_users_select" ON users FOR SELECT USING (id = auth.uid());
 CREATE POLICY "staff_users_update" ON users FOR UPDATE USING (id = auth.uid()) WITH CHECK (id = auth.uid());

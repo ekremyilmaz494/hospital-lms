@@ -32,6 +32,8 @@ interface MobileSidebarDrawerProps {
   userRole: string;
   userInitials: string;
   onLogout: () => void;
+  /** Mevcut kullanıcı bu org'un Esas Yöneticisi mi — ownerOnly menü öğeleri için */
+  isOwner?: boolean;
 }
 
 /**
@@ -49,8 +51,12 @@ export function MobileSidebarDrawer({
   userRole,
   userInitials,
   onLogout,
+  isOwner = false,
 }: MobileSidebarDrawerProps) {
   const pathname = usePathname();
+  const visibleGroups = navGroups
+    .map(g => ({ ...g, items: g.items.filter(it => !it.ownerOnly || isOwner) }))
+    .filter(g => g.items.length > 0);
 
   return (
     <Sheet open={open} onOpenChange={(val) => !val && onClose()}>
@@ -59,11 +65,15 @@ export function MobileSidebarDrawer({
         showCloseButton
         className="flex flex-col p-0 border-0"
         style={{
-          maxWidth: '300px',
-          width: '82vw',
+          // <320px (Galaxy Fold kapalı 280px) → minWidth 260 ile okunabilir kalır;
+          // ≥640px tablet'te maxWidth 300 ile çok geniş olmasını engeller.
+          width: 'min(82vw, 300px)',
+          minWidth: '260px',
           background: CREAM,
           borderRight: `1px solid ${INK}`,
           fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
+          // Landscape phone notch/home indicator için yan safe-area
+          paddingLeft: 'env(safe-area-inset-left)',
         }}
       >
         {/* Header — editorial masthead */}
@@ -129,7 +139,7 @@ export function MobileSidebarDrawer({
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-2">
-          {navGroups.map((group, gi) => (
+          {visibleGroups.map((group, gi) => (
             <div key={gi} className={gi > 0 ? 'mt-3 pt-3' : ''} style={gi > 0 ? { borderTop: `1px solid ${RULE}` } : undefined}>
               {group.label && (
                 <p

@@ -18,7 +18,8 @@ export async function GET() {
     }
 
     const userId = session.user.id
-    const cacheKey = `org-branding:${userId}`
+    // v2: ownerUserId + maxAdmins eklendi (2026-05-05) — eski cache invalidate
+    const cacheKey = `org-branding:v2:${userId}`
 
     // Redis cache — branding nadiren değişir (10 dk TTL)
     const cached = await getCached<object>(cacheKey)
@@ -29,6 +30,7 @@ export async function GET() {
     }
 
     // Tek sorgu: user → organization join ile
+    // ownerUserId + maxAdmins: Esas Yönetici davet UI'ı için (sidebar gating, /admin/yoneticiler)
     const dbUser = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -39,6 +41,8 @@ export async function GET() {
             logoUrl: true,
             brandColor: true,
             secondaryColor: true,
+            ownerUserId: true,
+            maxAdmins: true,
           },
         },
       },

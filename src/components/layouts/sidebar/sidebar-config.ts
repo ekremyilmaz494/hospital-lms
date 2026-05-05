@@ -22,6 +22,7 @@ import {
   ClipboardList,
   Activity,
   MessageSquare,
+  UserCog,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -31,6 +32,8 @@ export interface NavItem {
   icon: LucideIcon;
   children?: { title: string; href: string }[];
   badge?: string;
+  /** true → yalnızca Organization.ownerUserId === current user'a görünür */
+  ownerOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -168,6 +171,8 @@ export const adminNav: NavGroup[] = [
   {
     label: 'SİSTEM',
     items: [
+      // Yalnızca Esas Yönetici görür — sıradan admin'lerde gizli
+      { title: 'Yönetici Yönetimi', href: '/admin/yoneticiler', icon: UserCog, ownerOnly: true },
       {
         title: 'Ayarlar',
         href: '/admin/settings',

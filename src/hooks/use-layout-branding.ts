@@ -9,13 +9,18 @@ export interface LayoutBranding {
   orgLogoUrl: string | null
   brandColor: string
   secondaryColor: string
+  /** Esas Yönetici (org owner) user.id — null ise henüz atanmamış */
+  ownerUserId: string | null
+  /** Plan-bazlı admin limiti */
+  maxAdmins: number
 }
 
 /**
  * Authenticated kullanicilar icin organizasyon branding'ini ceker.
  * CSS custom property'leri (--brand-primary, --brand-secondary) dinamik olarak gunceller.
  */
-const CACHE_KEY = 'org-branding:v1'
+// v3: ownerUserId backfill sonrası tüm istemcileri zorla yenilemek için bump
+const CACHE_KEY = 'org-branding:v3'
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 dakika
 
 function applyBrandingVars(b: LayoutBranding) {
@@ -57,6 +62,8 @@ export function useLayoutBranding() {
           orgLogoUrl: data.logoUrl ?? null,
           brandColor: data.brandColor ?? '#0F172A',
           secondaryColor: data.secondaryColor ?? '#3B82F6',
+          ownerUserId: data.ownerUserId ?? null,
+          maxAdmins: typeof data.maxAdmins === 'number' ? data.maxAdmins : 5,
         }
         setBranding(b)
         applyBrandingVars(b)
