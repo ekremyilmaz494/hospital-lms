@@ -94,6 +94,18 @@ export const inviteAdminSchema = z.object({
   title: z.string().max(100).optional(),
 }).strict()
 
+/** Davet kabul: kullanıcı kendi şifresini kurar + KVKK onaylar */
+export const acceptInvitationSchema = z.object({
+  password: z.string()
+    .min(8, 'Şifre en az 8 karakter olmalıdır')
+    .max(128, 'Şifre en fazla 128 karakter olabilir')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      'Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir'
+    ),
+  kvkkAccepted: z.literal(true, { error: 'KVKK aydınlatma metnini onaylamanız gereklidir' }),
+}).strict()
+
 export const passwordSchema = z.string()
   .min(8, 'Şifre en az 8 karakter olmalıdır')
   .max(128, 'Şifre en fazla 128 karakter olabilir')

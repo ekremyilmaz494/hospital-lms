@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserCog, UserPlus, ShieldCheck, Mail, AlertCircle } from 'lucide-react';
+import { UserCog, UserPlus, ShieldCheck, Mail, AlertCircle, Clock, X } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -28,6 +28,21 @@ interface AdminsPayload {
   admins: AdminListItem[];
 }
 
+interface PendingInvitation {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  title: string | null;
+  expiresAt: string;
+  createdAt: string;
+}
+
+interface InvitationsPayload {
+  invitations: PendingInvitation[];
+}
+
 export default function YoneticilerPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
@@ -35,11 +50,27 @@ export default function YoneticilerPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   const { data, isLoading, refetch } = useFetch<AdminsPayload>('/api/admin/users');
+  const { data: invitesData, refetch: refetchInvites } = useFetch<InvitationsPayload>('/api/admin/invitations');
 
   const isOwner = useMemo(
     () => !!data && !!user && data.ownerUserId === user.id,
     [data, user],
   );
+
+  const handleRevokeInvite = async (inviteId: string, email: string) => {
+    if (!confirm(`${email} adresine gönderilen daveti iptal etmek istediğinizden emin misiniz?`)) return;
+    try {
+      const res = await fetch(`/api/admin/invitations/${inviteId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'İptal başarısız');
+      }
+      toast('Davet iptal edildi', 'success');
+      refetchInvites();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
+    }
+  };
 
   // Owner değilse panele yönlendir — owner-only sayfa
   if (!authLoading && user && data && data.ownerUserId !== null && data.ownerUserId !== user.id) {
@@ -53,7 +84,8 @@ export default function YoneticilerPage() {
     return <PageLoading />;
   }
 
-  const limitReached = data.activeAdminCount >= data.maxAdmins;
+  const pendingInvitations = invitesData?.invitations ?? [];
+  const limitReached = data.activeAdminCount + pendingInvitations.length >= data.maxAdmins;
 
   return (
     <div className="flex flex-col gap-6">
@@ -117,6 +149,11 @@ export default function YoneticilerPage() {
               <span className="text-2xl font-bold" style={{ color: 'var(--k-text-primary)' }}>
                 {data.activeAdminCount} / {data.maxAdmins}
               </span>
+              {pendingInvitations.length > 0 && (
+                <span className="text-xs" style={{ color: 'var(--k-text-muted)' }}>
+                  +{pendingInvitations.length} bekleyen davet
+                </span>
+              )}
             </div>
           </div>
           {limitReached && (
@@ -193,12 +230,79 @@ export default function YoneticilerPage() {
         </table>
       </div>
 
+      {/* Bekleyen davetler */}
+      {pendingInvitations.length > 0 && (
+        <div
+          className="rounded-2xl border overflow-hidden"
+          style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
+        >
+          <div
+            className="px-5 py-3 border-b flex items-center gap-2"
+            style={{ borderColor: 'var(--k-border)', background: 'var(--k-surface-muted, #fafaf9)' }}
+          >
+            <Clock className="h-4 w-4" style={{ color: 'var(--k-text-muted)' }} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--k-text-primary)' }}>
+              Bekleyen Davetler ({pendingInvitations.length})
+            </h3>
+          </div>
+          <table className="w-full">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--k-text-muted)' }}>
+                <th className="px-5 py-3">Davet Edilen</th>
+                <th className="px-5 py-3">E-posta</th>
+                <th className="px-5 py-3">Gönderim</th>
+                <th className="px-5 py-3">Süre</th>
+                {isOwner && <th className="px-5 py-3 text-right">İşlem</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {pendingInvitations.map((inv) => {
+                const expiresIn = Math.max(0, Math.ceil((new Date(inv.expiresAt).getTime() - Date.now()) / (60 * 60 * 1000)));
+                return (
+                  <tr key={inv.id} className="border-t" style={{ borderColor: 'var(--k-border)' }}>
+                    <td className="px-5 py-3">
+                      <span className="font-medium" style={{ color: 'var(--k-text-primary)' }}>
+                        {inv.firstName} {inv.lastName}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-sm flex items-center gap-1.5" style={{ color: 'var(--k-text-secondary)' }}>
+                      <Mail className="h-3.5 w-3.5" style={{ color: 'var(--k-text-muted)' }} />
+                      {inv.email}
+                    </td>
+                    <td className="px-5 py-3 text-sm" style={{ color: 'var(--k-text-muted)' }}>
+                      {new Date(inv.createdAt).toLocaleDateString('tr-TR')}
+                    </td>
+                    <td className="px-5 py-3 text-sm" style={{ color: expiresIn < 6 ? '#b91c1c' : 'var(--k-text-secondary)' }}>
+                      {expiresIn > 24 ? `${Math.floor(expiresIn / 24)} gün ${expiresIn % 24} sa` : `${expiresIn} saat`}
+                    </td>
+                    {isOwner && (
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          onClick={() => handleRevokeInvite(inv.id, inv.email)}
+                          className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md transition-colors"
+                          style={{ color: '#b91c1c', background: '#fee2e2' }}
+                          title="Daveti iptal et"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          İptal Et
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {showInviteModal && (
         <InviteAdminModal
           onClose={() => setShowInviteModal(false)}
-          onSaved={() => { refetch(); }}
+          onSaved={() => { refetch(); refetchInvites(); }}
           maxAdmins={data.maxAdmins}
-          currentCount={data.activeAdminCount}
+          currentCount={data.activeAdminCount + pendingInvitations.length}
         />
       )}
     </div>

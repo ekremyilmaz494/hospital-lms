@@ -76,28 +76,39 @@ export function PremiumModal({
 }: PremiumModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // ESC + body scroll lock
+  // onClose ref — useEffect deps'inde tutarsak parent'ın inline `onClose={() => ...}`
+  // her render'da yeni fonksiyon olur, effect her keystroke'ta tetiklenir, focus close
+  // butonuna geri sıçrar. Ref ile en güncel callback'i tutarız, deps stabil kalır.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // ESC + body scroll lock + ilk açılışta focus management
   useEffect(() => {
     if (!isOpen) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !disableEscape) onClose();
+      if (e.key === 'Escape' && !disableEscape) onCloseRef.current();
     };
     document.addEventListener('keydown', onKey);
 
-    // Focus ilk focusable elementi
-    const first = dialogRef.current?.querySelector<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    // Focus: önce form element'i (input/select/textarea), yoksa link/buton.
+    // Close butonu son sırada — kullanıcı veri girişine başlasın diye.
+    const root = dialogRef.current;
+    const formElement = root?.querySelector<HTMLElement>(
+      'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])'
     );
-    first?.focus();
+    const fallback = root?.querySelector<HTMLElement>(
+      '[href], button:not(.pm-close), [tabindex]:not([tabindex="-1"])'
+    );
+    (formElement ?? fallback)?.focus();
 
     return () => {
       document.body.style.overflow = prevOverflow;
       document.removeEventListener('keydown', onKey);
     };
-  }, [isOpen, onClose, disableEscape]);
+  }, [isOpen, disableEscape]);
 
   if (!isOpen || typeof window === 'undefined') return null;
 
