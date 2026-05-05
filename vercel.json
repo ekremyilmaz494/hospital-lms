@@ -21,6 +21,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/expo-receipts",
+      "schedule": "15 4 * * *"
+    },
+    {
       "path": "/api/cron/his-sync",
       "schedule": "0 4 * * *"
     },

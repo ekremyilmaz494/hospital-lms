@@ -8,6 +8,7 @@ import {
 } from '@/lib/email'
 import { logger } from '@/lib/logger'
 import { findActivePeriod } from '@/lib/training-periods'
+import { sendExpoPushToUser } from '@/lib/expo-push'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const REMINDER_DAYS = [3, 1] as const
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   }
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } })
   }
 
   const now = Date.now()
@@ -101,6 +102,11 @@ export async function GET(request: Request) {
           },
         })
         notificationsCreated++
+        void sendExpoPushToUser(a.user.id, {
+          title: daysLeft <= 1 ? 'Son Gün!' : 'Eğitim Hatırlatması',
+          body: `"${a.training.title}" için ${daysLeft} gün kaldı`,
+          url: `/trainings/${a.training.id}`,
+        })
       } catch { /* notification hatası cron'u durdurmasın */ }
     }
   }
@@ -154,6 +160,11 @@ export async function GET(request: Request) {
         },
       })
       notificationsCreated++
+      void sendExpoPushToUser(a.user.id, {
+        title: 'Gecikmiş Eğitim',
+        body: `"${a.training.title}" ${daysOverdue} gündür gecikmiş`,
+        url: `/trainings/${a.training.id}`,
+      })
     } catch { /* notification hatası cron'u durdurmasın */ }
   }
 
@@ -210,6 +221,11 @@ export async function GET(request: Request) {
           },
         })
         notificationsCreated++
+        void sendExpoPushToUser(cert.user.id, {
+          title: 'Sertifika Yenileme',
+          body: `"${cert.training.title}" sertifikan ${daysLeft} gün içinde dolacak`,
+          url: `/trainings/${cert.training.id}`,
+        })
       } catch { /* notification hatası cron'u durdurmasın */ }
     }
   }
@@ -279,6 +295,11 @@ export async function GET(request: Request) {
           type: 'warning',
           relatedTrainingId: cert.training.id,
         },
+      })
+      void sendExpoPushToUser(cert.user.id, {
+        title: 'Sertifika Yenileme Gerekli',
+        body: `"${cert.training.title}" sertifikan dolmuş — eğitimi tekrar tamamla`,
+        url: `/trainings/${cert.training.id}`,
       })
       renewalReassigned++
     } catch (err) {
