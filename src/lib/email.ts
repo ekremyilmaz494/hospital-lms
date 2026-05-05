@@ -20,19 +20,26 @@ export function escapeHtml(unsafe: string): string {
 }
 
 // ── AWS SES Client (singleton) ──
-// Production'da Vercel env'inde AWS_REGION + AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY var.
-// Lokal'de .env.local'den okunur. Region: eu-central-1 (Frankfurt — domain orada verified).
+// Region default: eu-central-1 (Frankfurt — klinovax.com domain orada verified).
+//
+// Credential resolution sırası (least-privilege için ayrı SES-only IAM kullanıcı):
+//   1. AWS_SES_ACCESS_KEY_ID + AWS_SES_SECRET_ACCESS_KEY (SES'e özel — önerilen)
+//   2. AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY (genel — S3/SES tek user senaryosu)
+//   3. Hiçbiri yoksa AWS SDK default chain (Vercel/EC2 IAM role)
+//
+// SES için ayrı IAM user (klinovax-ses-sender), S3 ile aynı key'i paylaşmaz —
+// birinin sızması diğer servisi etkilemesin diye.
 let sesClientInstance: SESv2Client | null = null
 function getSesClient(): SESv2Client {
   if (sesClientInstance) return sesClientInstance
-  const region = process.env.AWS_REGION ?? 'eu-central-1'
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY
+  const region = process.env.AWS_SES_REGION ?? process.env.AWS_REGION ?? 'eu-central-1'
+  const accessKeyId = process.env.AWS_SES_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID
+  const secretAccessKey = process.env.AWS_SES_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY
   sesClientInstance = new SESv2Client({
     region,
     ...(accessKeyId && secretAccessKey
       ? { credentials: { accessKeyId, secretAccessKey } }
-      : {}), // Vercel/AWS hosting'lerinde IAM role'dan otomatik düşer
+      : {}),
   })
   return sesClientInstance
 }

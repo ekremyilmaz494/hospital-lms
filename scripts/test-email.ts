@@ -50,10 +50,16 @@ async function main() {
 
   loadEnv()
 
-  if (!process.env.AWS_REGION || !process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-    console.error('❌ AWS_REGION / AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY env eksik (.env.local kontrol edin)')
+  // SES ayrı user (klinovax-ses-sender) varsa onu kullan, yoksa default'a düş
+  const sesAccessKeyId = process.env.AWS_SES_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID
+  const sesSecretAccessKey = process.env.AWS_SES_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY
+  const sesRegion = process.env.AWS_SES_REGION ?? process.env.AWS_REGION
+
+  if (!sesRegion || !sesAccessKeyId || !sesSecretAccessKey) {
+    console.error('❌ AWS region / access key / secret env eksik. .env.local\'da AWS_SES_* veya AWS_* set edin.')
     process.exit(1)
   }
+  console.log(`✓ Region: ${sesRegion}, Key ID: ${sesAccessKeyId.slice(0, 8)}... (${process.env.AWS_SES_ACCESS_KEY_ID ? 'SES-specific' : 'default'})`)
 
   // Dynamic import: env yüklendikten sonra modül init olmalı
   const { sendEmail } = await import('@/lib/email')
