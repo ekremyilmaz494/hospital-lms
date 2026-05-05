@@ -4,6 +4,7 @@ import { withStaffRoute } from '@/lib/api-handler'
 import { calculateTrainingProgress } from '@/lib/training-progress'
 import { logger } from '@/lib/logger'
 import { getCached, setCached } from '@/lib/redis'
+import { findActivePeriod, getEffectiveStartDate } from '@/lib/training-periods'
 
 const CACHE_TTL = 60
 
@@ -18,13 +19,27 @@ export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
       return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
     }
 
+    // Aktif period scope — yoksa boş dashboard döner (defansif)
+    const activePeriod = await findActivePeriod(organizationId)
+    if (!activePeriod) {
+      const empty = {
+        stats: { assigned: 0, inProgress: 0, completed: 0, failed: 0, overallProgress: 0 },
+        upcomingTrainings: [],
+        urgentTraining: null,
+        notifications: [],
+        recentActivity: [],
+      }
+      return jsonResponse(empty, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
+    }
+
     // 1) Assignments + attempts + notifications + recent activity — tümü paralel
     // Arşivlenmiş/pasif eğitimleri filtrele — my-trainings ile aynı görünürlük
     // (memory: feedback_archived_training_filter konvansiyonu).
-    const [assignments, notifications, recentAttempts] = await Promise.all([
+    const [assignments, notifications, recentAttempts, currentUser] = await Promise.all([
       prisma.trainingAssignment.findMany({
         where: {
           userId,
+          periodId: activePeriod.id,
           training: {
             organizationId,
             isActive: true,
@@ -68,17 +83,33 @@ export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
           training: { select: { title: true } },
         },
       }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { hireDate: true, createdAt: true },
+      }),
     ])
 
-    // 2) Assignment stats
-    const assigned = assignments.length
-    const inProgress = assignments.filter(a => a.status === 'in_progress').length
-    const completed = assignments.filter(a => a.status === 'passed').length
-    const failed = assignments.filter(a => a.status === 'failed').length
+    // Effective start: yıl içi gelen personel için işe başlama tarihinden say
+    const effectiveStart = currentUser
+      ? getEffectiveStartDate(
+          { hireDate: currentUser.hireDate, createdAt: currentUser.createdAt },
+          { startDate: activePeriod.startDate },
+        )
+      : activePeriod.startDate
+
+    const eligibleAssignments = assignments.filter(
+      a => new Date(a.assignedAt) >= effectiveStart,
+    )
+
+    // 2) Assignment stats — effectiveStart sonrası atamalar üzerinden
+    const assigned = eligibleAssignments.length
+    const inProgress = eligibleAssignments.filter(a => a.status === 'in_progress').length
+    const completed = eligibleAssignments.filter(a => a.status === 'passed').length
+    const failed = eligibleAssignments.filter(a => a.status === 'failed').length
     const overallProgress = assigned > 0 ? Math.round((completed / assigned) * 100) : 0
 
     // 3) Upcoming trainings — attempt verisi zaten include ile geldi
-    const upcomingTrainings = assignments
+    const upcomingTrainings = eligibleAssignments
       .filter(a => a.status === 'assigned' || a.status === 'in_progress')
       .map(a => {
         const endDate = a.training.endDate

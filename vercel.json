@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/compliance-report",
       "schedule": "0 8 1 * *"
+    },
+    {
+      "path": "/api/cron/period-rollover",
+      "schedule": "0 1 1 1 *"
     }
   ]
 }

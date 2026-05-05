@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { resolveReportFilters, REPORTS_CACHE_HEADERS, TRAINING_CAP } from '../_shared'
+import { findActivePeriod, getPeriodById, getEffectiveStartDate } from '@/lib/training-periods'
 // Cache-Control: private, max-age=30, stale-while-revalidate=60 (REPORTS_CACHE_HEADERS)
 
 /**
@@ -14,9 +15,19 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
 
   const resolved = await resolveReportFilters(request, orgId)
   if (resolved.error) return resolved.error
-  const { trainingScope, userDeptFilter, assignmentDateFilter } = resolved.filters
+  const { trainingScope, userDeptFilter, assignmentDateFilter, periodId: requestedPeriodId } = resolved.filters
 
   try {
+    // Period scope: explicit periodId varsa onu kullan, yoksa aktif period.
+    // Aktif period yoksa scope filter'ı uygulanmaz (defansif — boş rapor yerine eski davranış).
+    const targetPeriod = requestedPeriodId
+      ? await getPeriodById(requestedPeriodId, orgId).catch(() => null)
+      : await findActivePeriod(orgId)
+
+    const periodAssignmentFilter: Record<string, unknown> = targetPeriod
+      ? { periodId: targetPeriod.id }
+      : {}
+
     const [trainings, trainingCount] = await Promise.all([
       prisma.training.findMany({
         where: trainingScope,
@@ -26,11 +37,18 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
           maxAttempts: true,
           examDurationMinutes: true,
           assignments: {
-            where: { user: { ...userDeptFilter }, ...assignmentDateFilter },
+            where: {
+              user: { ...userDeptFilter },
+              ...assignmentDateFilter,
+              ...periodAssignmentFilter,
+            },
             select: {
               id: true,
               status: true,
               assignedAt: true,
+              user: {
+                select: { id: true, hireDate: true, createdAt: true },
+              },
               examAttempts: {
                 orderBy: { attemptNumber: 'desc' },
                 take: 1,
@@ -46,9 +64,25 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       prisma.training.count({ where: trainingScope }),
     ])
 
-    // Monthly trend (last 6 months)
+    // Per-user effectiveStart filtresi: hireDate > period.startDate ise atama
+    // tamamlanma sayımına dahil edilmez (yıl içi gelen personel hatalı %0 görünmesin).
+    const filterByEffectiveStart = (assignments: typeof trainings[number]['assignments']) => {
+      if (!targetPeriod) return assignments
+      return assignments.filter(a => {
+        if (!a.user) return true
+        const effective = getEffectiveStartDate(
+          { hireDate: a.user.hireDate, createdAt: a.user.createdAt },
+          { startDate: targetPeriod.startDate },
+        )
+        return new Date(a.assignedAt) >= effective
+      })
+    }
+
+    // Monthly trend (last 6 months) — effectiveStart filtresi uygulanmış
     const now = new Date()
-    const allAssignments = trainings.flatMap(t => t.assignments).map(a => ({ ...a, date: new Date(a.assignedAt) }))
+    const allAssignments = trainings
+      .flatMap(t => filterByEffectiveStart(t.assignments))
+      .map(a => ({ ...a, date: new Date(a.assignedAt) }))
     const monthlyData = []
     for (let i = 5; i >= 0; i--) {
       const start = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -63,16 +97,17 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
 
     // Per-training breakdown
     const trainingData = trainings.map(t => {
-      const scores = t.assignments
+      const eligible = filterByEffectiveStart(t.assignments)
+      const scores = eligible
         .map(a => a.examAttempts[0]?.postExamScore)
         .filter(s => s != null)
         .map(Number)
       return {
         name: t.title,
-        atanan: t.assignments.length,
-        tamamlayan: t.assignments.filter(a => a.status === 'passed').length,
-        basarili: t.assignments.filter(a => a.status === 'passed').length,
-        basarisiz: t.assignments.filter(a => a.status === 'failed').length,
+        atanan: eligible.length,
+        tamamlayan: eligible.filter(a => a.status === 'passed').length,
+        basarili: eligible.filter(a => a.status === 'passed').length,
+        basarisiz: eligible.filter(a => a.status === 'failed').length,
         ort: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
       }
     })
@@ -80,8 +115,9 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     // Pre/post score comparison
     const scoreComparisonData = trainings
       .map(t => {
-        const preScores = t.assignments.map(a => a.examAttempts[0]?.preExamScore).filter(s => s != null).map(Number)
-        const postScores = t.assignments.map(a => a.examAttempts[0]?.postExamScore).filter(s => s != null).map(Number)
+        const eligible = filterByEffectiveStart(t.assignments)
+        const preScores = eligible.map(a => a.examAttempts[0]?.preExamScore).filter(s => s != null).map(Number)
+        const postScores = eligible.map(a => a.examAttempts[0]?.postExamScore).filter(s => s != null).map(Number)
         const preScore = preScores.length > 0 ? Math.round(preScores.reduce((a, b) => a + b, 0) / preScores.length) : 0
         const postScore = postScores.length > 0 ? Math.round(postScores.reduce((a, b) => a + b, 0) / postScores.length) : 0
         return {

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { sendEmail, complianceReportEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 import type { UserRole } from '@/types/database'
+import { findActivePeriod } from '@/lib/training-periods'
 
 /** Monthly compliance report cron — runs at 08:00 UTC on the 1st of every month (11:00 Istanbul) */
 export async function GET(request: Request) {
@@ -25,9 +26,22 @@ export async function GET(request: Request) {
   })
 
   for (const org of organizations) {
+    // Aktif period yoksa bu org için compliance hesaplamayı atla
+    const activePeriod = await findActivePeriod(org.id)
+    if (!activePeriod) {
+      orgResults.push({ orgId: org.id, orgName: org.name, complianceRate: 100, warningEmails: 0 })
+      continue
+    }
+
     const trainings = await prisma.training.findMany({
       where: { organizationId: org.id, isCompulsory: true, isActive: true },
-      include: { assignments: { select: { status: true } } },
+      select: {
+        id: true,
+        assignments: {
+          where: { periodId: activePeriod.id },
+          select: { status: true },
+        },
+      },
     })
 
     const totalAssignments = trainings.reduce((sum, t) => sum + t.assignments.length, 0)

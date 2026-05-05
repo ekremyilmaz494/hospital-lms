@@ -11,6 +11,7 @@ import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
 import type { UserRole } from '@/types/database'
+import { findActivePeriod, getEffectiveStartDate } from '@/lib/training-periods'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const orgId = organizationId
@@ -38,11 +39,20 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     if (department) where.departmentId = department
     if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 
-    // 1. dalga — sayfa listesi + global stat'lar paralel
-    const [staff, total, rawDepartments, activeStaff, overallAvgAgg] = await Promise.all([
+    // 1. dalga — sayfa listesi + global stat'lar + aktif period paralel
+    const [staff, total, rawDepartments, activeStaff, overallAvgAgg, activePeriod] = await Promise.all([
       prisma.user.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          title: true,
+          departmentId: true,
+          isActive: true,
+          createdAt: true,
+          hireDate: true,
           _count: { select: { assignments: true, examAttempts: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -52,7 +62,13 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       prisma.user.count({ where }),
       prisma.department.findMany({
         where: { organizationId: orgId },
-        include: { _count: { select: { users: { where: { role: 'staff' satisfies UserRole, isActive: true } } } } },
+        select: {
+          id: true,
+          name: true,
+          color: true,
+          description: true,
+          _count: { select: { users: { where: { role: 'staff' satisfies UserRole, isActive: true } } } },
+        },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
       prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
@@ -61,26 +77,76 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
         where: { user: { organizationId: orgId, role: 'staff' satisfies UserRole }, isPassed: true },
         _avg: { postExamScore: true },
       }),
+      findActivePeriod(orgId),
     ])
 
-    // 2. dalga — sadece bu sayfadaki userId'ler için per-user metrikler
+    // 2. dalga — sadece bu sayfadaki userId'ler için per-user metrikler.
+    // Aktif period scope'u: passed atamaları period bazlı say, effectiveStart sonrası.
     const pageUserIds = staff.map(s => s.id)
-    const [completedCounts, avgScores] = pageUserIds.length > 0
+    const periodScope: Record<string, unknown> = activePeriod ? { periodId: activePeriod.id } : {}
+
+    const [completedAssignmentsRaw, avgScores, periodAssignedCounts] = pageUserIds.length > 0
       ? await Promise.all([
-          prisma.trainingAssignment.groupBy({
-            by: ['userId'],
-            where: { userId: { in: pageUserIds }, status: 'passed' satisfies AssignmentStatus },
-            _count: true,
+          // Tek tek satır çekiyoruz çünkü effectiveStart user bazlı filtreleme gerekiyor
+          prisma.trainingAssignment.findMany({
+            where: {
+              userId: { in: pageUserIds },
+              status: 'passed' satisfies AssignmentStatus,
+              ...periodScope,
+            },
+            select: { userId: true, assignedAt: true, completedAt: true },
           }),
           prisma.examAttempt.groupBy({
             by: ['userId'],
             where: { userId: { in: pageUserIds }, isPassed: true },
             _avg: { postExamScore: true },
           }),
+          // Aktif period içindeki toplam atama (assignedTrainings karşılığı)
+          activePeriod
+            ? prisma.trainingAssignment.findMany({
+                where: { userId: { in: pageUserIds }, periodId: activePeriod.id },
+                select: { userId: true, assignedAt: true },
+              })
+            : Promise.resolve([] as { userId: string; assignedAt: Date }[]),
         ])
-      : [[], []] as const
+      : [[], [], []] as const
 
-    const completedMap = new Map(completedCounts.map(c => [c.userId, c._count]))
+    // Effective start filtresi
+    const userById = new Map(staff.map(s => [s.id, s]))
+    const completedMap = new Map<string, number>()
+    if (activePeriod) {
+      for (const row of completedAssignmentsRaw) {
+        const u = userById.get(row.userId)
+        if (!u) continue
+        const eff = getEffectiveStartDate(
+          { hireDate: u.hireDate, createdAt: u.createdAt },
+          { startDate: activePeriod.startDate },
+        )
+        if (new Date(row.assignedAt) >= eff) {
+          completedMap.set(row.userId, (completedMap.get(row.userId) ?? 0) + 1)
+        }
+      }
+    } else {
+      for (const row of completedAssignmentsRaw) {
+        completedMap.set(row.userId, (completedMap.get(row.userId) ?? 0) + 1)
+      }
+    }
+
+    const assignedMap = new Map<string, number>()
+    if (activePeriod) {
+      for (const row of periodAssignedCounts) {
+        const u = userById.get(row.userId)
+        if (!u) continue
+        const eff = getEffectiveStartDate(
+          { hireDate: u.hireDate, createdAt: u.createdAt },
+          { startDate: activePeriod.startDate },
+        )
+        if (new Date(row.assignedAt) >= eff) {
+          assignedMap.set(row.userId, (assignedMap.get(row.userId) ?? 0) + 1)
+        }
+      }
+    }
+
     const avgScoreMap = new Map(avgScores.map(a => [a.userId, Math.round(Number(a._avg.postExamScore ?? 0))]))
 
     const departments = rawDepartments.map(d => ({
@@ -107,7 +173,10 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       department: departments.find(d => d.id === s.departmentId)?.name || '',
       departmentId: s.departmentId,
       title: s.title || '',
-      assignedTrainings: s._count.assignments || 0,
+      // Aktif period varsa period scope'lu sayım, yoksa toplam atama (geri uyum)
+      assignedTrainings: activePeriod
+        ? (assignedMap.get(s.id) ?? 0)
+        : (s._count.assignments || 0),
       completedTrainings: completedMap.get(s.id) ?? 0,
       avgScore: avgScoreMap.get(s.id) ?? 0,
       status: s.isActive ? 'Aktif' : 'Pasif',

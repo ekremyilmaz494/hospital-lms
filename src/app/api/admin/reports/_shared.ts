@@ -1,5 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
+import { z } from 'zod/v4'
+
+const periodIdSchema = z.string().uuid()
 
 /**
  * Tab bazlı rapor endpoint'leri için ortak yardımcılar.
@@ -16,6 +19,7 @@ export interface ReportFilters {
   dateFrom?: Date
   dateTo?: Date
   departmentId?: string
+  periodId?: string
 }
 
 export interface ResolvedFilters extends ReportFilters {
@@ -37,9 +41,14 @@ export async function resolveReportFilters(
   const fromParam = searchParams.get('from')
   const toParam = searchParams.get('to')
   const departmentId = searchParams.get('departmentId')
+  const periodIdParam = searchParams.get('periodId')
 
   const dateFrom = fromParam ? new Date(fromParam) : undefined
   const dateTo = toParam ? new Date(toParam) : undefined
+
+  // Geçersiz UUID gelirse sessizce undefined — caller aktif period'a düşer
+  const periodIdParsed = periodIdParam ? periodIdSchema.safeParse(periodIdParam) : null
+  const periodId = periodIdParsed?.success ? periodIdParsed.data : undefined
 
   let validatedDeptId: string | undefined
   if (departmentId) {
@@ -75,6 +84,7 @@ export async function resolveReportFilters(
       dateFrom,
       dateTo,
       departmentId: validatedDeptId,
+      periodId,
       assignmentDateFilter,
       attemptDateFilter,
       userDeptFilter,

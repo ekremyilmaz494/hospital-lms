@@ -396,3 +396,10 @@ CREATE POLICY "admin_activity_logs_select" ON activity_logs FOR SELECT USING ((S
 CREATE POLICY "staff_activity_logs_select" ON activity_logs FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "authenticated_activity_logs_insert" ON activity_logs FOR INSERT WITH CHECK (user_id = auth.uid() AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
+-- ── TRAINING PERIODS RLS (Yıllık Eğitim Dönemleri) ──
+ALTER TABLE training_periods ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "super_admin_periods_all" ON training_periods FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_periods_all" ON training_periods FOR ALL USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid) AND (SELECT auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'super_admin'));
+CREATE POLICY "staff_periods_select" ON training_periods FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+

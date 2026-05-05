@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { calculateTrainingProgress } from '@/lib/training-progress'
 import { logger } from '@/lib/logger'
+import { findActivePeriod } from '@/lib/training-periods'
 
 export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) => {
   try {
@@ -10,10 +11,23 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
     const { page, limit, skip } = safePagination(searchParams)
     const status = searchParams.get('status') // assigned | in_progress | passed | failed
 
+    // Aktif period yoksa staff UI'ı bozmayalım — boş liste dön.
+    const activePeriod = await findActivePeriod(organizationId)
+    if (!activePeriod) {
+      return jsonResponse({
+        data: [],
+        page,
+        limit,
+        totalCount: 0,
+        totalPages: 0,
+      }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+    }
+
     // Arşivlenmiş veya soft-delete edilmiş eğitimler personel listesinde gözükmemeli;
     // aksi halde personel "asla bitiremeyeceği" eğitim görür (bkz. PDF-only edge case).
     const where: Record<string, unknown> = {
       userId: dbUser.id,
+      periodId: activePeriod.id,
       training: {
         organizationId,
         isActive: true,

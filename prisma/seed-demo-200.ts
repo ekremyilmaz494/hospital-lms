@@ -384,21 +384,27 @@ async function main() {
         currentAttempt = 0
       }
 
-      // Upsert assignment
-      const assignment = await prisma.trainingAssignment.upsert({
-        where: { trainingId_userId: { trainingId: training.id, userId } },
-        update: { status, currentAttempt, completedAt },
-        create: {
-          trainingId: training.id,
-          userId,
-          status,
-          currentAttempt,
-          maxAttempts: training.maxAttempts,
-          assignedById: admin.id,
-          assignedAt,
-          completedAt,
-        },
+      // Upsert assignment (composite unique now includes periodId — null period for demo)
+      const existing = await prisma.trainingAssignment.findFirst({
+        where: { trainingId: training.id, userId },
       })
+      const assignment = existing
+        ? await prisma.trainingAssignment.update({
+            where: { id: existing.id },
+            data: { status, currentAttempt, completedAt },
+          })
+        : await prisma.trainingAssignment.create({
+            data: {
+              trainingId: training.id,
+              userId,
+              status,
+              currentAttempt,
+              maxAttempts: training.maxAttempts,
+              assignedById: admin.id,
+              assignedAt,
+              completedAt,
+            },
+          })
       assignmentCount++
 
       // Create exam attempt for completed and in-progress
