@@ -556,7 +556,7 @@ function StatPill({
     : { borderBottom: last ? 'none' : `1px solid ${RULE}` };
   return (
     <div
-      className="flex items-center gap-3 px-4 py-3"
+      className="flex items-center gap-2 sm:gap-3 px-2.5 sm:px-4 py-3"
       style={divider}
     >
       <div
@@ -565,9 +565,10 @@ function StatPill({
       >
         <Icon className="h-3.5 w-3.5" style={{ color: INK_SOFT }} />
       </div>
-      <div className="flex-1 flex items-baseline justify-between gap-2">
+      <div className="flex-1 min-w-0 flex items-baseline justify-between gap-2">
+        {/* Label dar mobil ekranlarda gizlenir; 360px ekranda 3 col + icon + value sığsın diye */}
         <span
-          className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+          className="hidden sm:inline text-[10px] font-semibold uppercase tracking-[0.16em] truncate"
           style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
         >
           {label}

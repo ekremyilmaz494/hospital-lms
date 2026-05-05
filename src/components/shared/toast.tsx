@@ -76,8 +76,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ toast: addToast }}>
       {children}
 
-      {/* Toast container */}
-      <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 max-w-sm" aria-live="polite">
+      {/* Toast container — mobil: tam genişlik, alt+yan safe-area; sm+: sağ alt köşe.
+          iPhone notch / home indicator ve landscape kenar safe-area'ları korunur. */}
+      <div
+        className="fixed z-[200] flex flex-col gap-2 left-3 right-3 sm:left-auto sm:right-6 sm:max-w-sm"
+        style={{
+          bottom: 'max(1rem, env(safe-area-inset-bottom))',
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)',
+        }}
+        aria-live="polite"
+      >
         <AnimatePresence>
           {toasts.map((t) => {
             const Icon = icons[t.type];

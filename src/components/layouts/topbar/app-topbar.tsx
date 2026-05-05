@@ -140,9 +140,9 @@ export function AppTopbar({
       </div>
 
       {/* ── Right: actions ── */}
-      <div className="flex items-center gap-1.5">
-        {/* Search */}
-        <div className={searchOpen ? 'relative w-56 sm:w-64' : 'relative'}>
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Search — gradual escalation: 11rem (≤640) → 14rem (sm) → 16rem (md+) */}
+        <div className={searchOpen ? 'relative w-44 sm:w-56 md:w-64' : 'relative'}>
           {searchOpen ? (
             <div className="flex items-center">
               <Search
@@ -260,7 +260,8 @@ export function AppTopbar({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-64 p-0 overflow-hidden border-0"
+            sideOffset={8}
+            className="w-[min(16rem,calc(100vw-1.5rem))] p-0 overflow-hidden border-0"
             style={{
               backgroundColor: K.SURFACE,
               background: K.SURFACE,

@@ -46,7 +46,10 @@ export function MobileBottomNav({ onMorePress, items = DEFAULT_STAFF_ITEMS }: Mo
         background: CREAM,
         borderTop: `1px solid ${INK}`,
         height: '64px',
+        // Üç eksen safe-area: alt (notch/home indicator) + landscape için yan kenarlar.
         paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
         fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
       }}
     >
