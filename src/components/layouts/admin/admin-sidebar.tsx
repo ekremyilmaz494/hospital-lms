@@ -17,6 +17,8 @@ interface AdminSidebarProps {
   userRole?: string;
   userAvatar?: string;
   userInitials?: string;
+  /** Mevcut kullanıcı bu org'un Esas Yöneticisi mi — ownerOnly menü öğeleri için */
+  isOwner?: boolean;
 }
 
 const PRIMARY = '#0d9668';
@@ -38,7 +40,12 @@ export const AdminSidebar = memo(function AdminSidebar({
   userRole = 'Admin',
   userAvatar,
   userInitials = 'KL',
+  isOwner = false,
 }: AdminSidebarProps) {
+  // ownerOnly menü öğelerini filtrele — sıradan admin'lere gizli
+  const visibleGroups = navGroups
+    .map(g => ({ ...g, items: g.items.filter(it => !it.ownerOnly || isOwner) }))
+    .filter(g => g.items.length > 0);
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
@@ -110,7 +117,7 @@ export const AdminSidebar = memo(function AdminSidebar({
         className="flex-1 overflow-y-auto overflow-x-hidden"
         style={{ padding: '14px 10px' }}
       >
-        {navGroups.map((group, gi) => (
+        {visibleGroups.map((group, gi) => (
           <div key={gi} style={{ marginBottom: 14 }}>
             {group.label && !collapsed && (
               <div

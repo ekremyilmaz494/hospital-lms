@@ -101,10 +101,16 @@ model Organization {
   // OpenRouter (AI soru üretimi) — org-specific custom API key (encrypted, opsiyonel)
   openrouterApiKeyEncrypted String? @map("openrouter_api_key_encrypted") @db.Text
 
+  // Esas Yönetici (org owner) — yalnız bu user yeni admin davet edebilir.
+  // Devir super_admin tarafından yapılır.
+  ownerUserId String? @unique @map("owner_user_id") @db.Uuid
+  maxAdmins   Int     @default(5) @map("max_admins")
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  ownerUser              User?                        @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   users                  User[]
   departments            Department[]
   trainings              Training[]
@@ -297,6 +303,8 @@ model User {
   reviewedAttemptRequests       ExamAttemptRequest[]         @relation("AttemptRequestReviewer")
   // Eğitim dönemi yönetimi
   closedPeriods                 TrainingPeriod[]             @relation("PeriodClosedBy")
+  // Esas Yönetici olduğu organizasyon (max 1)
+  ownedOrganization             Organization?                @relation("OrganizationOwner")
 
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")

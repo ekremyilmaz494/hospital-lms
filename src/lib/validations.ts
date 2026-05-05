@@ -78,9 +78,21 @@ export const createUserSchema = z.object({
   department: z.string().max(100).optional(),
   departmentId: z.string().uuid({ message: 'Geçersiz departman kimliği' }).optional(),
   title: z.string().max(100).optional(),
+  // Süper admin akışında, yaratılan user yeni org'un Esas Yöneticisi olarak işaretlenir.
+  // Org'un mevcut owner'ı varsa endpoint 409 döner (devir için ayrı endpoint).
+  setAsOwner: z.boolean().optional(),
 }).strict()
 
-export const updateUserSchema = createUserSchema.omit({ password: true, email: true }).partial()
+export const updateUserSchema = createUserSchema.omit({ password: true, email: true, setAsOwner: true }).partial()
+
+// Esas Yönetici tarafından admin davet — role hardcoded 'admin', limit DB'de kontrol edilir.
+export const inviteAdminSchema = z.object({
+  email: z.string().min(1).max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  phone: z.string().max(20).optional(),
+  title: z.string().max(100).optional(),
+}).strict()
 
 export const passwordSchema = z.string()
   .min(8, 'Şifre en az 8 karakter olmalıdır')
@@ -554,24 +566,7 @@ export const aiBulkDeleteSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(50),
 })
 
-// ── Hastane Kurulum Sihirbazı ──
-export const setupWizardSchema = z.object({
-  step: z.number().int().min(1).max(4),
-  // Step 1: Hospital info
-  name: z.string().min(2).max(255).optional(),
-  code: z.string().min(2).max(50).optional(),
-  address: z.string().max(500).optional(),
-  phone: z.string().max(20).optional(),
-  email: z.email().optional(),
-  // Step 2: Departments
-  departments: z.array(z.string().min(1).max(100)).min(1).optional(),
-  // Step 3: Training defaults
-  defaultPassingScore: z.number().int().min(1).max(100).optional(),
-  defaultMaxAttempts: z.number().int().min(1).max(10).optional(),
-  defaultExamDuration: z.number().int().min(5).max(180).optional(),
-  // Step 4: Complete
-  complete: z.boolean().optional(),
-})
+// Hastane Kurulum Sihirbazı 2026-05-05'te kaldırıldı — yeni hastaneler direkt setupCompleted=true.
 
 // ── EY.FR.40 EĞİTİM GERİ BİLDİRİM ──
 

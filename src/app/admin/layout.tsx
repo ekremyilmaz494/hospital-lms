@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AdminSidebar } from '@/components/layouts/admin/admin-sidebar';
 import { AdminTopbar } from '@/components/layouts/admin/admin-topbar';
@@ -45,43 +45,6 @@ export default function AdminLayout({
   const { user, isLoading, fullName, initials } = useAuth();
   const branding = useLayoutBranding();
   const router = useRouter();
-  const pathname = usePathname();
-  const [setupChecked, setSetupChecked] = useState(false);
-  const isSetupPage = pathname?.startsWith('/admin/setup');
-
-  // Setup wizard guard: admin henüz kurulumu tamamlamadıysa /admin/setup'a yönlendir.
-  // Setup tamamlandıysa sessionStorage'a yazılır — sonraki sayfa geçişlerinde fetch atılmaz.
-  useEffect(() => {
-    if (isLoading || !user || user.role !== 'admin' || isSetupPage) {
-      const raf = requestAnimationFrame(() => setSetupChecked(true));
-      return () => cancelAnimationFrame(raf);
-    }
-
-    // Cache hit → fetch'i atla
-    const cacheKey = `admin-setup-completed:${user.id}`;
-    if (typeof window !== 'undefined' && sessionStorage.getItem(cacheKey) === '1') {
-      setSetupChecked(true);
-      return;
-    }
-
-    let cancelled = false;
-    fetch('/api/admin/setup')
-      .then(res => res.json())
-      .then(data => {
-        if (cancelled) return;
-        if (data.setupCompleted === false) {
-          router.replace('/admin/setup');
-        } else {
-          try { sessionStorage.setItem(cacheKey, '1'); } catch {}
-        }
-        setSetupChecked(true);
-      })
-      .catch(() => {
-        if (!cancelled) setSetupChecked(true);
-      });
-
-    return () => { cancelled = true; };
-  }, [isLoading, user, isSetupPage, router]);
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -106,19 +69,19 @@ export default function AdminLayout({
     }
   }, [user, isLoading, router]);
 
-  if (isLoading || !setupChecked) {
+  if (isLoading) {
     return <LayoutSkeleton variant="admin" />;
   }
   if (!user || !['admin', 'super_admin'].includes(user.role)) {
     return null;
   }
 
-  // Setup sayfasında sidebar gösterme — setup layout kendi wrapper'ını kullanır
-  if (isSetupPage) {
-    return <>{children}</>;
-  }
-
   const displayRole = roleLabels[user.role] ?? user.role;
+  // Esas Yönetici (org owner) flag'i — branding endpoint'inden gelir.
+  // super_admin için her zaman true (impersonation ve testing için tüm menüler görünür).
+  const isOrgOwner = user.role === 'super_admin'
+    ? true
+    : !!(branding?.ownerUserId && branding.ownerUserId === user.id);
 
   const sidebarWidth = sidebarCollapsed ? 72 : 252;
 
@@ -137,6 +100,7 @@ export default function AdminLayout({
             userName={fullName}
             userRole={displayRole}
             userInitials={initials}
+            isOwner={isOrgOwner}
           />
         </div>
 
@@ -151,6 +115,7 @@ export default function AdminLayout({
           userRole={displayRole}
           userInitials={initials}
           onLogout={handleLogout}
+          isOwner={isOrgOwner}
         />
 
         <main
