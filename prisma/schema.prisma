@@ -88,14 +88,32 @@ model Organization {
   smsMfaEnabled       Boolean   @default(false) @map("sms_mfa_enabled")
   smsMfaEnforcedAt    DateTime? @map("sms_mfa_enforced_at") @db.Timestamptz
 
-  // Per-tenant SMTP (hastane kendi mail sunucusundan gönderir)
+  // Centralized email (AWS SES klinovax.com) — per-org override sadece display
+  // name + reply-to. Şifre/host yok; platform tek IP'den gönderir, deliverability
+  // tek tek hastane SMTP'lerinden çok daha iyi.
+  emailDisplayName String? @map("email_display_name") @db.VarChar(100)
+  emailReplyTo     String? @map("email_reply_to") @db.VarChar(320)
+  emailEnabled     Boolean @default(true) @map("email_enabled")
+
+  // Çok-sektörlü SaaS desteği — şu an "healthcare" ama UI/sözcük bazında değişebilir.
+  sector           String  @default("healthcare") @map("sector") @db.VarChar(50)
+
+  // Eski per-tenant SMTP — DEPRECATED (Faz B'de drop). Kod artık okumaz, UI gizlendi.
+  /// @deprecated emailDisplayName/emailReplyTo kullan
   smtpHost          String? @map("smtp_host") @db.VarChar(255)
+  /// @deprecated
   smtpPort          Int?    @default(587) @map("smtp_port")
+  /// @deprecated
   smtpSecure        Boolean @default(false) @map("smtp_secure")
+  /// @deprecated
   smtpUser          String? @map("smtp_user") @db.VarChar(255)
+  /// @deprecated
   smtpPassEncrypted String? @map("smtp_pass_encrypted") @db.Text
+  /// @deprecated emailDisplayName kullan
   smtpFrom          String? @map("smtp_from") @db.VarChar(320)
+  /// @deprecated emailReplyTo kullan
   smtpReplyTo       String? @map("smtp_reply_to") @db.VarChar(320)
+  /// @deprecated emailEnabled kullan
   smtpEnabled       Boolean @default(false) @map("smtp_enabled")
 
   // OpenRouter (AI soru üretimi) — org-specific custom API key (encrypted, opsiyonel)
@@ -142,6 +160,7 @@ model Organization {
   // Eğitim dönemleri (yıllık)
   trainingPeriods        TrainingPeriod[]
 
+  @@index([sector], map: "organization_sector_idx")
   @@map("organizations")
 }
 

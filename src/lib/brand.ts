@@ -1,19 +1,31 @@
 /**
- * Brand single-source-of-truth.
- * When the final brand name + logo arrives, edit only this file.
+ * Brand single-source-of-truth — env'den geçersiz kılınabilir.
+ * White-label / multi-sector kurulumlar için NEXT_PUBLIC_BRAND_* env'leri set edin.
  */
+const fromEnv = (key: string): string | undefined => {
+  const value = process.env[key]?.trim()
+  return value && value.length > 0 ? value : undefined
+}
+
 export const BRAND = {
-  name: "Devakent",
-  fullName: "Devakent Operasyon Platformu",
-  shortDesc: "Sağlık kurumları için operasyon platformu",
+  name: fromEnv('NEXT_PUBLIC_BRAND_NAME') ?? 'KlinoVax',
+  fullName: fromEnv('NEXT_PUBLIC_BRAND_FULL_NAME') ?? 'KlinoVax Operasyon Platformu',
+  shortDesc: fromEnv('NEXT_PUBLIC_BRAND_SHORT_DESC') ?? 'Sağlık kurumları için operasyon platformu',
   longDesc:
-    "Personel eğitiminden sertifika doğrulamaya, performans raporlamasından KVKK uyumuna — sağlık kurumlarınız için uçtan uca otomasyon.",
+    fromEnv('NEXT_PUBLIC_BRAND_LONG_DESC') ??
+    'Personel eğitiminden sertifika doğrulamaya, performans raporlamasından KVKK uyumuna — sağlık kurumlarınız için uçtan uca otomasyon.',
+  domain: fromEnv('NEXT_PUBLIC_BRAND_DOMAIN') ?? 'klinovax.com',
+  /** SES SendEmail "From" address — DKIM imzalı domain'den çıkmalı. */
+  fromAddress: fromEnv('SES_FROM_EMAIL') ?? 'noreply@klinovax.com',
+  supportEmail: fromEnv('SUPPORT_EMAIL') ?? 'destek@klinovax.com',
   contact: {
-    email: "iletisim@devakent.com",
-    phone: "+90 850 000 0000",
-    city: "Ankara, Türkiye",
+    email: fromEnv('SUPPORT_EMAIL') ?? 'iletisim@klinovax.com',
+    phone: fromEnv('NEXT_PUBLIC_BRAND_PHONE') ?? '+90 850 000 0000',
+    city: fromEnv('NEXT_PUBLIC_BRAND_CITY') ?? 'Ankara, Türkiye',
   },
   legal: {
-    copyrightYear: 2026,
+    copyrightYear: new Date().getFullYear(),
   },
-} as const;
+} as const
+
+export const brand = BRAND
