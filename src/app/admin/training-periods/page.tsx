@@ -19,7 +19,7 @@ import { useToast } from '@/components/shared/toast';
 import { PageLoading } from '@/components/shared/page-loading';
 import { KStatCard } from '@/components/admin/k-stat-card';
 import { BlurFade } from '@/components/ui/blur-fade';
-import { periodStatusLabel } from '@/lib/training-periods';
+import { periodStatusLabel } from '@/lib/training-periods-helpers';
 import type { PeriodStatus, TrainingPeriod } from '@/types/database';
 import { NewPeriodModal } from './_components/new-period-modal';
 

@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { periodStatusLabel } from '@/lib/training-periods';
+import { periodStatusLabel } from '@/lib/training-periods-helpers';
 import type { TrainingPeriod } from '@/types/database';
 
 interface PeriodSelectorProps {

@@ -98,17 +98,6 @@ ALTER TABLE "certificates"
 CREATE INDEX IF NOT EXISTS "idx_certificates_period"
     ON "certificates" ("period_id");
 
--- 7) RLS — training_periods
-ALTER TABLE "training_periods" ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "super_admin_periods_all" ON "training_periods" FOR ALL
-    USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-
-CREATE POLICY "admin_periods_all" ON "training_periods" FOR ALL
-    USING (
-        organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
-        AND (SELECT auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'super_admin')
-    );
-
-CREATE POLICY "staff_periods_select" ON "training_periods" FOR SELECT
-    USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+-- NOT: RLS politikaları `supabase-rls.sql` içinde tanımlı; migration'a dahil
+-- DEĞİL çünkü `auth.jwt()` Supabase'e özgü ve CI shadow DB'de `auth` schema yok
+-- (P3006'ya yol açar). Deploy: `node scripts/apply-rls.js` ile uygulanır.

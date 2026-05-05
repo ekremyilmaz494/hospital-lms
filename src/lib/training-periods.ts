@@ -10,7 +10,7 @@
 import { prisma } from '@/lib/prisma'
 import { ApiError } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
-import type { PeriodStatus, TrainingPeriod } from '@/types/database'
+import type { TrainingPeriod } from '@/types/database'
 
 /** Türkiye saat dilimi sabiti — period başlangıç/bitiş sınırları için. */
 const TR_TIMEZONE_OFFSET = '+03:00'
@@ -216,14 +216,9 @@ export async function rolloverIfNeeded(
   }
 }
 
-/** Period statüsü için Türkçe etiket — UI badge'leri için. */
-export function periodStatusLabel(status: PeriodStatus): string {
-  switch (status) {
-    case 'active':
-      return 'Aktif'
-    case 'upcoming':
-      return 'Yaklaşan'
-    case 'closed':
-      return 'Kapalı'
-  }
-}
+/**
+ * Period statüsü için Türkçe etiket — UI badge'leri için.
+ * Client-safe re-export `./training-periods-helpers`'tan; bu modül
+ * server-only (prisma) olduğundan UI bileşenleri helpers'tan import etmeli.
+ */
+export { periodStatusLabel } from './training-periods-helpers'
