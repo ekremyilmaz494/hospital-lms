@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { PeriodSelector } from '@/components/shared/period-selector';
 import { type ColumnDef } from '@tanstack/react-table';
 import {
   Users, Plus, Upload, MoreHorizontal, Edit,
@@ -35,13 +36,27 @@ const BulkImportDialog = dynamic(
 
 export default function StaffPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeView, setActiveView] = useState<'all' | 'departments'>('departments');
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
+  const [periodId, setPeriodId] = useState<string | null>(searchParams.get('periodId'));
+
+  // periodId değişimini URL'e yansıt
+  useEffect(() => {
+    const current = searchParams.get('periodId');
+    if (periodId === current) return;
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    if (periodId) params.set('periodId', periodId);
+    else params.delete('periodId');
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : '?', { scroll: false });
+  }, [periodId, router, searchParams]);
+
   const { data, isLoading, refetch } = useFetch<StaffPageData>(
-    `/api/admin/staff?page=${currentPage}&limit=10${selectedDept ? `&department=${selectedDept}` : ''}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`
+    `/api/admin/staff?page=${currentPage}&limit=10${selectedDept ? `&department=${selectedDept}` : ''}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}${periodId ? `&periodId=${periodId}` : ''}`
   );
 
   // Debounce search
@@ -253,6 +268,14 @@ export default function StaffPage() {
           </button>
         </div>
       </header>
+
+      {/* Eğitim Dönemi seçici */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>
+          Dönem:
+        </span>
+        <PeriodSelector value={periodId} onChange={setPeriodId} includeAll />
+      </div>
 
       {/* KPIs */}
       <section className="k-kpi-grid" aria-label="Personel istatistikleri">

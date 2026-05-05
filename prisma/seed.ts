@@ -543,20 +543,26 @@ async function main() {
       const isCompleted = si < 4
       const status = isCompleted ? 'completed' : 'assigned'
 
-      await prisma.trainingAssignment.upsert({
-        where: { trainingId_userId: { trainingId, userId } },
-        update: { status, currentAttempt: isCompleted ? 1 : 0 },
-        create: {
-          trainingId,
-          userId,
-          status,
-          currentAttempt: isCompleted ? 1 : 0,
-          maxAttempts: 3,
-          assignedById: adminAuthId,
-          assignedAt: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), // 30 gun once
-          completedAt: isCompleted ? new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000) : null,
-        },
-      })
+      const existingA = await prisma.trainingAssignment.findFirst({ where: { trainingId, userId } })
+      if (existingA) {
+        await prisma.trainingAssignment.update({
+          where: { id: existingA.id },
+          data: { status, currentAttempt: isCompleted ? 1 : 0 },
+        })
+      } else {
+        await prisma.trainingAssignment.create({
+          data: {
+            trainingId,
+            userId,
+            status,
+            currentAttempt: isCompleted ? 1 : 0,
+            maxAttempts: 3,
+            assignedById: adminAuthId,
+            assignedAt: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), // 30 gun once
+            completedAt: isCompleted ? new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000) : null,
+          },
+        })
+      }
     }
     console.log(`  Atama: ${TRAININGS[tIdx].title} — 10 personel`)
   }
@@ -565,19 +571,20 @@ async function main() {
   for (let tIdx = 2; tIdx < trainingIds.length; tIdx++) {
     const subset = staffUserIds.slice(0, 5)
     for (const userId of subset) {
-      await prisma.trainingAssignment.upsert({
-        where: { trainingId_userId: { trainingId: trainingIds[tIdx], userId } },
-        update: {},
-        create: {
-          trainingId: trainingIds[tIdx],
-          userId,
-          status: 'assigned',
-          currentAttempt: 0,
-          maxAttempts: 3,
-          assignedById: adminAuthId,
-          assignedAt: new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000),
-        },
-      })
+      const existingB = await prisma.trainingAssignment.findFirst({ where: { trainingId: trainingIds[tIdx], userId } })
+      if (!existingB) {
+        await prisma.trainingAssignment.create({
+          data: {
+            trainingId: trainingIds[tIdx],
+            userId,
+            status: 'assigned',
+            currentAttempt: 0,
+            maxAttempts: 3,
+            assignedById: adminAuthId,
+            assignedAt: new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000),
+          },
+        })
+      }
     }
     console.log(`  Atama: ${TRAININGS[tIdx].title} — 5 personel`)
   }

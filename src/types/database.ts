@@ -7,6 +7,23 @@ export type SubscriptionStatus = 'trial' | 'active' | 'suspended' | 'expired' | 
 
 export type AssignmentStatus = 'assigned' | 'in_progress' | 'passed' | 'failed' | 'locked';
 
+export type PeriodStatus = 'upcoming' | 'active' | 'closed';
+
+export interface TrainingPeriod {
+  id: string;
+  organizationId: string;
+  year: number;
+  label: string;
+  startDate: string;
+  endDate: string;
+  status: PeriodStatus;
+  isDefault: boolean;
+  closedAt: string | null;
+  closedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ExamPhase = 'pre' | 'post';
 
 export type ExamAttemptStatus = 'pre_exam' | 'watching_videos' | 'post_exam' | 'completed';

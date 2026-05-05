@@ -133,6 +133,8 @@ model Organization {
   feedbackResponses      TrainingFeedbackResponse[]
   // Ek deneme hakkı talepleri
   attemptRequests        ExamAttemptRequest[]
+  // Eğitim dönemleri (yıllık)
+  trainingPeriods        TrainingPeriod[]
 
   @@map("organizations")
 }
@@ -259,6 +261,7 @@ model User {
   mustChangePassword       Boolean   @default(false) @map("must_change_password")
   termsAccepted            Boolean   @default(false) @map("terms_accepted")
   termsAcceptedAt          DateTime? @map("terms_accepted_at") @db.Timestamptz
+  hireDate                 DateTime? @map("hire_date") @db.Timestamptz
   createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -292,6 +295,8 @@ model User {
   // Ek deneme hakkı talepleri
   attemptRequests               ExamAttemptRequest[]         @relation("AttemptRequester")
   reviewedAttemptRequests       ExamAttemptRequest[]         @relation("AttemptRequestReviewer")
+  // Eğitim dönemi yönetimi
+  closedPeriods                 TrainingPeriod[]             @relation("PeriodClosedBy")
 
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
@@ -437,6 +442,7 @@ model TrainingAssignment {
   id                  String    @id @default(uuid()) @db.Uuid
   trainingId          String    @map("training_id") @db.Uuid
   userId              String    @map("user_id") @db.Uuid
+  periodId            String?   @map("period_id") @db.Uuid
   status              String    @default("assigned") @db.VarChar(30)
   currentAttempt      Int       @default(0) @map("current_attempt")
   maxAttempts         Int       @default(3) @map("max_attempts")
@@ -445,18 +451,20 @@ model TrainingAssignment {
   assignedAt          DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
   completedAt         DateTime? @map("completed_at") @db.Timestamptz
 
-  training     Training      @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  user         User          @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
-  assignedBy   User?         @relation("AssignedByUser", fields: [assignedById], references: [id])
+  training     Training        @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  user         User            @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy   User?           @relation("AssignedByUser", fields: [assignedById], references: [id])
+  period       TrainingPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
   examAttempts ExamAttempt[]
 
-  @@unique([trainingId, userId])
+  @@unique([trainingId, userId, periodId])
   @@index([userId], map: "idx_assignments_user")
   @@index([trainingId], map: "idx_assignments_training")
   @@index([status], map: "idx_assignments_status")
   @@index([userId, status], map: "idx_assignments_user_status")
   @@index([trainingId, status], map: "idx_assignments_training_status")
   @@index([completedAt], map: "idx_assignments_completed_at")
+  @@index([periodId], map: "idx_assignments_period")
   @@map("training_assignments")
 }
 
@@ -660,16 +668,44 @@ model Certificate {
   revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
   revocationReason String?   @map("revocation_reason") @db.VarChar(500)
   organizationId   String?   @map("organization_id") @db.Uuid
+  periodId         String?   @map("period_id") @db.Uuid
 
-  user         User          @relation(fields: [userId], references: [id])
-  training     Training      @relation(fields: [trainingId], references: [id])
-  attempt      ExamAttempt   @relation(fields: [attemptId], references: [id])
-  organization Organization? @relation(fields: [organizationId], references: [id])
+  user         User            @relation(fields: [userId], references: [id])
+  training     Training        @relation(fields: [trainingId], references: [id])
+  attempt      ExamAttempt     @relation(fields: [attemptId], references: [id])
+  organization Organization?   @relation(fields: [organizationId], references: [id])
+  period       TrainingPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
 
   @@index([userId], map: "idx_certificates_user")
   @@index([trainingId], map: "idx_certificates_training")
   @@index([organizationId], map: "idx_certificates_organization")
+  @@index([periodId], map: "idx_certificates_period")
   @@map("certificates")
+}
+
+// ── EĞİTİM DÖNEMLERİ (Yıllık takvim — SKS/JCI/İSG raporlama) ──
+model TrainingPeriod {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  year           Int
+  label          String    @db.VarChar(100)
+  startDate      DateTime  @map("start_date") @db.Timestamptz
+  endDate        DateTime  @map("end_date") @db.Timestamptz
+  status         String    @default("upcoming") @db.VarChar(20)
+  isDefault      Boolean   @default(true) @map("is_default")
+  closedAt       DateTime? @map("closed_at") @db.Timestamptz
+  closedById     String?   @map("closed_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  closedBy     User?                @relation("PeriodClosedBy", fields: [closedById], references: [id])
+  assignments  TrainingAssignment[]
+  certificates Certificate[]
+
+  @@unique([organizationId, year])
+  @@index([organizationId, status], map: "idx_periods_org_status")
+  @@map("training_periods")
 }
 
 // ── KVKK BAŞVURULARI ──

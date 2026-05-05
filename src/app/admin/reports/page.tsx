@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   BarChart3, Download, FileText, Users, GraduationCap, Building2, AlertTriangle, Clock, Printer,
   TrendingDown, Target, Award, Filter, X, ChevronRight,
 } from 'lucide-react';
 import { printPage } from '@/lib/export';
+import { PeriodSelector } from '@/components/shared/period-selector';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart,
 } from 'recharts';
@@ -105,6 +107,10 @@ type TabCache = {
 
 export default function ReportsPage() {
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const periodIdParam = searchParams.get('periodId');
+  const [periodId, setPeriodId] = useState<string | null>(periodIdParam);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [draftFrom, setDraftFrom] = useState('');
   const [draftTo, setDraftTo] = useState('');
@@ -112,13 +118,25 @@ export default function ReportsPage() {
   const [applied, setApplied] = useState({ from: '', to: '', deptId: '' });
   const [showFilters, setShowFilters] = useState(false);
 
+  // URL ↔ state senkronu — periodId değişince ?periodId=xxx yansıt
+  useEffect(() => {
+    const current = searchParams.get('periodId');
+    if (periodId === current) return;
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    if (periodId) params.set('periodId', periodId);
+    else params.delete('periodId');
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : '?', { scroll: false });
+  }, [periodId, router, searchParams]);
+
   const filterQuery = useMemo(() => {
     const p = new URLSearchParams();
     if (applied.from) p.set('from', new Date(applied.from).toISOString());
     if (applied.to) p.set('to', new Date(applied.to + 'T23:59:59').toISOString());
     if (applied.deptId) p.set('departmentId', applied.deptId);
+    if (periodId) p.set('periodId', periodId);
     return p.toString() ? `?${p.toString()}` : '';
-  }, [applied]);
+  }, [applied, periodId]);
   const hasFilters = !!(applied.from || applied.to || applied.deptId);
   const draftDirty = draftFrom !== applied.from || draftTo !== applied.to || draftDeptId !== applied.deptId;
 
@@ -277,6 +295,14 @@ export default function ReportsPage() {
           </button>
         </div>
       </header>
+
+      {/* Eğitim Dönemi seçici */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>
+          Dönem:
+        </span>
+        <PeriodSelector value={periodId} onChange={setPeriodId} includeAll />
+      </div>
 
       {/* Filtre Paneli */}
       <div className="flex items-center gap-2 flex-wrap">

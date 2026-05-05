@@ -7,12 +7,20 @@ import type { ReportContext } from '../types'
 import { COLORS, FONT_SIZES, SPACING } from '../theme'
 import { tr, formatDateShort } from '../helpers/text'
 
-export function renderTrainingGaps(doc: jsPDF, ctx: ReportContext, startY: number): number {
+export function renderTrainingGaps(
+  doc: jsPDF,
+  ctx: ReportContext,
+  startY: number,
+  period?: { label: string; year: number },
+): number {
   const marginX = SPACING.pageMarginX
 
   doc.setFontSize(FONT_SIZES.sectionTitle)
   doc.setTextColor(...COLORS.textDark)
-  doc.text(tr('4. Eksik Egitim Listesi'), marginX, startY)
+  const title = period
+    ? tr(`${period.label} — Egitim Bosluklari`)
+    : tr('4. Eksik Egitim Listesi')
+  doc.text(title, marginX, startY)
 
   if (ctx.trainingGaps.length === 0) {
     doc.setFontSize(FONT_SIZES.body)

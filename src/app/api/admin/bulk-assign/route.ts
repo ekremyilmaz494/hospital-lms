@@ -5,11 +5,13 @@ import { z } from 'zod/v4'
 import { logger } from '@/lib/logger'
 import { sendEmail, trainingAssignedEmail } from '@/lib/email'
 import type { UserRole } from '@/types/database'
+import { getActivePeriod, getPeriodById } from '@/lib/training-periods'
 
 const bulkAssignSchema = z.object({
   trainingIds: z.array(z.string().uuid()).min(1, 'En az 1 eğitim seçilmeli'),
   userIds: z.array(z.string().uuid()).min(1, 'En az 1 personel seçilmeli'),
   maxAttempts: z.coerce.number().int().min(1).max(10).default(3),
+  periodId: z.string().uuid().optional(),
 })
 
 /**
@@ -26,9 +28,20 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   const parsed = bulkAssignSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message, 400)
 
-  const { trainingIds, userIds, maxAttempts } = parsed.data
+  const { trainingIds, userIds, maxAttempts, periodId: requestedPeriodId } = parsed.data
 
   try {
+    // Period resolve: requested → tenant guard ile fetch; yoksa aktif period
+    const targetPeriod = requestedPeriodId
+      ? await getPeriodById(requestedPeriodId, orgId)
+      : await getActivePeriod(orgId)
+
+    if (targetPeriod.status === 'closed') {
+      return errorResponse('Kapalı döneme atama yapılamaz', 409)
+    }
+
+    const periodId = targetPeriod.id
+
     // Eğitimler bu organizasyona ait ve aktif mi? Arşivli eğitime yeni atama yapılamaz.
     const trainings = await prisma.training.findMany({
       where: {
@@ -62,19 +75,19 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       return errorResponse('Bazı personeller kurumunuza ait değil veya aktif değil', 403)
     }
 
-    // Mevcut atamaları bul
+    // Mevcut atamaları bul (aynı period içinde)
     const existing = await prisma.trainingAssignment.findMany({
-      where: { trainingId: { in: trainingIds }, userId: { in: userIds } },
+      where: { trainingId: { in: trainingIds }, userId: { in: userIds }, periodId },
       select: { trainingId: true, userId: true },
     })
     const existingSet = new Set(existing.map(e => `${e.trainingId}:${e.userId}`))
 
     // Yeni atama kombinasyonlarını oluştur
-    const newAssignments: { trainingId: string; userId: string; maxAttempts: number; originalMaxAttempts: number; assignedById: string }[] = []
+    const newAssignments: { trainingId: string; userId: string; maxAttempts: number; originalMaxAttempts: number; assignedById: string; periodId: string }[] = []
     for (const trainingId of trainingIds) {
       for (const userId of userIds) {
         if (!existingSet.has(`${trainingId}:${userId}`)) {
-          newAssignments.push({ trainingId, userId, maxAttempts, originalMaxAttempts: maxAttempts, assignedById: dbUser.id })
+          newAssignments.push({ trainingId, userId, maxAttempts, originalMaxAttempts: maxAttempts, assignedById: dbUser.id, periodId })
         }
       }
     }

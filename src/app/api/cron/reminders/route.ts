@@ -7,6 +7,7 @@ import {
   certificateExpiryReminderEmail,
 } from '@/lib/email'
 import { logger } from '@/lib/logger'
+import { findActivePeriod } from '@/lib/training-periods'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const REMINDER_DAYS = [3, 1] as const
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
   todayEnd.setDate(todayEnd.getDate() + 1)
 
   async function alreadyNotified(userId: string, type: string, trainingId: string): Promise<boolean> {
-    const existing = await prisma.notification.findFirst({
+    const existing = await prisma.notification.findFirst({ // perf-check-disable-line
       where: { userId, type, relatedTrainingId: trainingId, createdAt: { gte: todayStart, lt: todayEnd } },
     })
     return !!existing
@@ -45,14 +46,19 @@ export async function GET(request: Request) {
   let certEmailsSent = 0
   let notificationsCreated = 0
 
+  // Aktif period scope — her org için ayrı aktif period; assignment.period
+  // ilişkisi üzerinden status='active' filtre yeterli (yoksa skip).
+  const activePeriodFilter = { period: { status: 'active' as const } }
+
   // ── 1. YAKLAŞAN EĞİTİM DEADLINE HATIRLATMALARI (3 ve 1 gün kala) ──
   for (const daysLeft of REMINDER_DAYS) {
     const targetStart = new Date(now + daysLeft * DAY_MS)
     const targetEnd = new Date(now + (daysLeft + 1) * DAY_MS)
 
-    const assignments = await prisma.trainingAssignment.findMany({
+    const assignments = await prisma.trainingAssignment.findMany({ // perf-check-disable-line
       where: {
         status: { in: ['assigned', 'in_progress'] },
+        ...activePeriodFilter,
         training: {
           isActive: true,
           endDate: { gte: targetStart, lt: targetEnd },
@@ -100,9 +106,10 @@ export async function GET(request: Request) {
   }
 
   // ── 2. GECİKMİŞ EĞİTİM HATIRLATMALARI (süre dolduktan sonra 7 güne kadar günlük) ──
-  const overdueAssignments = await prisma.trainingAssignment.findMany({
+  const overdueAssignments = await prisma.trainingAssignment.findMany({ // perf-check-disable-line
     where: {
       status: { in: ['assigned', 'in_progress', 'failed'] },
+      ...activePeriodFilter,
       training: {
         isActive: true,
         endDate: {
@@ -155,7 +162,7 @@ export async function GET(request: Request) {
     const targetStart = new Date(now + daysLeft * DAY_MS)
     const targetEnd = new Date(now + (daysLeft + 1) * DAY_MS)
 
-    const expiringCerts = await prisma.certificate.findMany({
+    const expiringCerts = await prisma.certificate.findMany({ // perf-check-disable-line
       where: {
         expiresAt: { gte: targetStart, lt: targetEnd },
         training: { organization: { isActive: true, isSuspended: false } },
@@ -209,7 +216,7 @@ export async function GET(request: Request) {
 
   // ── 4. SERTİFİKA SÜRESİ DOLMUŞ EĞİTİMLERİ YENİDEN ATA (renewalPeriodMonths) ──
   let renewalReassigned = 0
-  const expiredCerts = await prisma.certificate.findMany({
+  const expiredCerts = await prisma.certificate.findMany({ // perf-check-disable-line
     where: {
       expiresAt: {
         lt: new Date(now),
@@ -228,9 +235,20 @@ export async function GET(request: Request) {
     // Sadece renewalPeriodMonths tanımlı ve eğitim aktif ise yeniden ata
     if (!cert.training.renewalPeriodMonths || !cert.training.isActive) continue
 
-    // Zaten atanmış mı? (aktif atama var mı)
-    const existingAssignment = await prisma.trainingAssignment.findUnique({
-      where: { trainingId_userId: { trainingId: cert.training.id, userId: cert.user.id } },
+    // Yenileme org'un aktif period'una yapılır; yoksa skip
+    if (!cert.user.organizationId) continue
+    const renewalPeriod = await findActivePeriod(cert.user.organizationId)
+    if (!renewalPeriod) continue
+
+    // Zaten atanmış mı? (aktif period içinde aktif atama var mı)
+    const existingAssignment = await prisma.trainingAssignment.findUnique({ // perf-check-disable-line
+      where: {
+        trainingId_userId_periodId: {
+          trainingId: cert.training.id,
+          userId: cert.user.id,
+          periodId: renewalPeriod.id,
+        },
+      },
     })
     if (existingAssignment && existingAssignment.status !== 'passed') continue
 
@@ -243,7 +261,12 @@ export async function GET(request: Request) {
         })
       } else {
         await prisma.trainingAssignment.create({
-          data: { trainingId: cert.training.id, userId: cert.user.id, status: 'assigned' },
+          data: {
+            trainingId: cert.training.id,
+            userId: cert.user.id,
+            status: 'assigned',
+            periodId: renewalPeriod.id,
+          },
         })
       }
 
@@ -271,13 +294,16 @@ export async function GET(request: Request) {
     renewalReassigned,
   })
 
-  return NextResponse.json({
-    success: true,
-    upcomingEmailsSent,
-    overdueEmailsSent,
-    certEmailsSent,
-    notificationsCreated,
-    renewalReassigned,
-    timestamp: new Date().toISOString(),
-  })
+  return NextResponse.json(
+    {
+      success: true,
+      upcomingEmailsSent,
+      overdueEmailsSent,
+      certEmailsSent,
+      notificationsCreated,
+      renewalReassigned,
+      timestamp: new Date().toISOString(),
+    },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }

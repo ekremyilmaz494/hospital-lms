@@ -117,6 +117,7 @@ export const adminNav: NavGroup[] = [
         ],
       },
       { title: 'Medya Kütüphanesi', href: '/admin/content-library', icon: Library },
+      { title: 'Eğitim Dönemleri', href: '/admin/training-periods', icon: Calendar },
     ],
   },
   {

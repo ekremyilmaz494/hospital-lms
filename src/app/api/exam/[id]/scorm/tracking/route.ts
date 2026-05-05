@@ -35,14 +35,10 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
   const { id: trainingId } = params
 
   try {
-    // Verify user has assignment for this training
-    const assignment = await prisma.trainingAssignment.findUnique({
-      where: {
-        trainingId_userId: {
-          trainingId,
-          userId: dbUser.id,
-        },
-      },
+    // Verify user has assignment for this training (any period — SCORM legacy)
+    const assignment = await prisma.trainingAssignment.findFirst({
+      where: { trainingId, userId: dbUser.id },
+      orderBy: { assignedAt: 'desc' },
     })
 
     if (!assignment) {
