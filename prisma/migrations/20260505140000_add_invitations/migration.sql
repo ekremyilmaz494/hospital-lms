@@ -59,30 +59,25 @@ ALTER TABLE "invitations" ADD CONSTRAINT "invitations_accepted_user_id_fkey"
 -- ── RLS ──────────────────────────────────────────────────────────────────────
 -- Davet tablosu service_role + public claim endpoint kullanır.
 -- Owner'lar kendi org'larındaki bekleyen davetleri görmeli, sıradan admin görmemeli.
-ALTER TABLE "invitations" ENABLE ROW LEVEL SECURITY;
+-- `service_role`, `authenticated` rolleri ve `auth.uid()` sadece Supabase'de tanımlı —
+-- CI shadow DB'sinde `auth` schema yok, o yüzden varlığı kontrol ediliyor.
+-- Supabase dışı ortamlarda RLS bloğu skip edilir (policy'ler prod Supabase'de zaten var,
+-- migration RLS'i sadece fresh ortam kurulumunda ilk uygular).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'auth') THEN
+    EXECUTE 'ALTER TABLE "invitations" ENABLE ROW LEVEL SECURITY';
 
--- service_role bypass (default)
-DROP POLICY IF EXISTS "service_role_full_access" ON "invitations";
-CREATE POLICY "service_role_full_access" ON "invitations"
-    FOR ALL TO service_role USING (true) WITH CHECK (true);
+    -- service_role bypass (default)
+    EXECUTE 'DROP POLICY IF EXISTS "service_role_full_access" ON "invitations"';
+    EXECUTE 'CREATE POLICY "service_role_full_access" ON "invitations" FOR ALL TO service_role USING (true) WITH CHECK (true)';
 
--- Esas Yönetici (org owner) kendi org'undaki davetleri görebilir
-DROP POLICY IF EXISTS "owner_select_invitations" ON "invitations";
-CREATE POLICY "owner_select_invitations" ON "invitations"
-    FOR SELECT TO authenticated
-    USING (
-        organization_id IN (
-            SELECT id FROM organizations
-            WHERE owner_user_id = auth.uid()
-        )
-    );
+    -- Esas Yönetici (org owner) kendi org'undaki davetleri görebilir
+    EXECUTE 'DROP POLICY IF EXISTS "owner_select_invitations" ON "invitations"';
+    EXECUTE 'CREATE POLICY "owner_select_invitations" ON "invitations" FOR SELECT TO authenticated USING (organization_id IN (SELECT id FROM organizations WHERE owner_user_id = auth.uid()))';
 
--- super_admin tüm davetleri görebilir
-DROP POLICY IF EXISTS "super_admin_all_invitations" ON "invitations";
-CREATE POLICY "super_admin_all_invitations" ON "invitations"
-    FOR ALL TO authenticated
-    USING (
-        EXISTS (
-            SELECT 1 FROM users WHERE id = auth.uid() AND role = 'super_admin'
-        )
-    );
+    -- super_admin tüm davetleri görebilir
+    EXECUTE 'DROP POLICY IF EXISTS "super_admin_all_invitations" ON "invitations"';
+    EXECUTE 'CREATE POLICY "super_admin_all_invitations" ON "invitations" FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = ''super_admin''))';
+  END IF;
+END $$;
