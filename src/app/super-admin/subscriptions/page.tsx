@@ -1,15 +1,19 @@
 'use client';
 
-import { CreditCard, Plus, Check, Building2, Users, Database, Crown, Star, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { CreditCard, Plus, Check, Users, Database, Crown, Star, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/shared/page-header';
-import { useFetch } from '@/hooks/use-fetch';
+import { useFetch, invalidateFetchCache } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
+import PlanModal, { type PlanFormValue } from './_components/plan-modal';
 
 interface Plan {
+  id: string;
   name: string;
   slug: string;
+  description?: string | null;
   icon: string;
   price: { monthly: number; annual: number };
   limits: { staff: number | null; trainings: number | null; storage: number };
@@ -51,7 +55,35 @@ const planColorMap: Record<string, string> = {
 };
 
 export default function SubscriptionsPage() {
-  const { data, isLoading, error } = useFetch<SubscriptionsData>('/api/super-admin/subscriptions');
+  const { data, isLoading, error, refetch } = useFetch<SubscriptionsData>('/api/super-admin/subscriptions');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<PlanFormValue | null>(null);
+
+  const openCreate = () => {
+    setEditing(null);
+    setModalOpen(true);
+  };
+
+  const openEdit = (plan: Plan) => {
+    setEditing({
+      id: plan.id,
+      name: plan.name,
+      slug: plan.slug,
+      description: plan.description,
+      maxStaff: plan.limits?.staff ?? null,
+      maxTrainings: plan.limits?.trainings ?? null,
+      maxStorageGb: plan.limits?.storage ?? 10,
+      priceMonthly: plan.price?.monthly ?? 0,
+      priceAnnual: plan.price?.annual ?? 0,
+      features: plan.features ?? [],
+    });
+    setModalOpen(true);
+  };
+
+  const handleSaved = () => {
+    invalidateFetchCache('/api/super-admin/subscriptions');
+    refetch();
+  };
 
   if (isLoading) {
     return <PageLoading />;
@@ -69,7 +101,7 @@ export default function SubscriptionsPage() {
       <PageHeader
         title="Abonelik & Lisans Yönetimi"
         subtitle="Planları yönetin ve hastane aboneliklerini takip edin"
-        action={{ label: 'Yeni Plan', icon: Plus }}
+        action={{ label: 'Yeni Plan', icon: Plus, onClick: openCreate }}
       />
 
       {/* Plans Grid */}
@@ -150,6 +182,7 @@ export default function SubscriptionsPage() {
 
                 <Button
                   variant={plan.popular ? 'default' : 'outline'}
+                  onClick={() => openEdit(plan)}
                   className="w-full font-semibold"
                   style={plan.popular
                     ? { background: color, color: 'white', transition: 'background var(--transition-fast)' }
@@ -215,6 +248,14 @@ export default function SubscriptionsPage() {
           </div>
         )}
       </div>
+
+      {modalOpen && (
+        <PlanModal
+          initial={editing}
+          onClose={() => setModalOpen(false)}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   );
 }
