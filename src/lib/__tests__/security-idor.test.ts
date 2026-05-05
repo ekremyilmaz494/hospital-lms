@@ -12,6 +12,16 @@ vi.mock('@/lib/api-helpers', () => ({
   parseBody: vi.fn(),
   computeAuditHash: vi.fn().mockReturnValue('hash'),
   safePagination: vi.fn().mockReturnValue({ page: 1, limit: 20 }),
+  ApiError: class ApiError extends Error {
+    constructor(message: string, public status: number) {
+      super(message)
+      this.name = 'ApiError'
+    }
+    toResponse() {
+      return Response.json({ error: this.message }, { status: this.status })
+    }
+  },
+  checkWritePermission: vi.fn().mockResolvedValue(null),
 }))
 
 vi.mock('@/lib/prisma', () => ({
