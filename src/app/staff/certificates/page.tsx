@@ -238,7 +238,7 @@ export default function StaffCertificatesPage() {
         >
           <div className="flex items-end gap-4">
             <h1
-              className="text-[36px] sm:text-[48px] leading-[0.95] font-semibold tracking-[-0.025em]"
+              className="text-[26px] sm:text-[36px] md:text-[48px] leading-[0.95] font-semibold tracking-[-0.025em]"
               style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
             >
               başarı arşivi<span style={{ color: GOLD }}>.</span>
@@ -368,7 +368,9 @@ export default function StaffCertificatesPage() {
 
             <div
               className="mt-5 grid gap-4"
-              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+              // Galaxy Fold (280px) ve iPhone SE (375px) için min(280px, 100%) ile
+              // tek kolon fallback. Wide ekranlarda otomatik 320px+ tile'lar.
+              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))' }}
             >
               {certificates.map((cert, i) => (
                 <CertificateCard

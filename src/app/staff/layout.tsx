@@ -94,14 +94,14 @@ export default function StaffLayout({
           onLogout={handleLogout}
         />
 
-        {/* Ana içerik: masaüstünde sidebar durumuna göre kayar, mobilde sabit.
-            Mobile bottom padding kaldırıldı — edge tab artık 64px fixed bar yerine
-            sol kenardaki küçük bookmark ribbon, alt alan serbest. */}
+        {/* Ana içerik: masaüstünde 72px sabit rail, mobilde tam genişlik.
+            Margin'i CSS media query ile veriyoruz (Tailwind md:ml-[72px]) —
+            isMobile JS state'i ile vermek mobilde hydration sonrasına dek
+            72px boşluk gösterip layout shift yaratıyor.
+            Safe-area padding tüm viewport'larda güvenli (desktop'ta env değeri 0). */}
         <main
-          className="min-h-screen md:pb-0"
+          className="min-h-screen md:ml-[72px] pb-[env(safe-area-inset-bottom)]"
           style={{
-            marginLeft: isMobile ? 0 : 72,
-            paddingBottom: isMobile ? 'env(safe-area-inset-bottom)' : undefined,
             background: 'var(--k-bg, #fafaf9)',
           }}
         >

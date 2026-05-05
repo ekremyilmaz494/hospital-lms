@@ -135,7 +135,7 @@ export default function StaffDashboard() {
         >
           <div className="flex items-end gap-4">
             <h1
-              className="text-[36px] sm:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
+              className="text-[26px] sm:text-[36px] md:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
               style={{ fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif' }}
             >
               {greeting}, <span style={{ fontStyle: 'italic', color: OLIVE }}>{user?.firstName ?? 'Kullanıcı'}</span>

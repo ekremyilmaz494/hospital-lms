@@ -290,7 +290,7 @@ export default function StaffNotificationsPage() {
         >
           <div className="flex items-end gap-4">
             <h1
-              className="text-[36px] sm:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
+              className="text-[26px] sm:text-[36px] md:text-[44px] leading-[0.95] font-semibold tracking-[-0.025em]"
               style={{ fontFamily: FONT_DISPLAY }}
             >
               bildirim <span style={{ fontStyle: 'italic', color: OLIVE }}>merkezi</span>
@@ -574,9 +574,14 @@ export default function StaffNotificationsPage() {
         {/* ═══════════════ BULK ACTION BAR ═══════════════ */}
         {selected.size > 0 && (
           <div
-            className="fixed inset-x-0 bottom-0 z-40 px-6 pb-6 pt-3"
+            // bottom-nav (64px) ile çakışmayı önlemek için mobilde 64px yukarı kaydır.
+            // md+ ekranlarda bottom-nav gizli (md:hidden), 0'a düşer.
+            className="fixed inset-x-0 z-40 px-4 sm:px-6 pt-3 bottom-16 md:bottom-0"
             style={{
               background: `linear-gradient(to top, ${CREAM} 60%, transparent)`,
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+              paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+              paddingRight: 'max(1rem, env(safe-area-inset-right))',
             }}
           >
             <div

@@ -53,7 +53,9 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl p-5 text-sm outline-none sm:max-w-md",
+          // Mobil: w-[calc(100%-1rem)] sıkışık ekranlarda nefes verir; max-h dvh ile
+          // iOS Safari klavye açıldığında modal viewport içinde kalır, kaydırılabilir.
+          "fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl p-5 text-sm outline-none overflow-y-auto sm:w-full sm:max-w-md",
           className
         )}
         style={{
@@ -61,6 +63,7 @@ function DialogContent({
           color: 'var(--color-text-primary)',
           border: '1px solid var(--color-border)',
           boxShadow: 'var(--shadow-xl)',
+          maxHeight: 'min(90dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1rem))',
         }}
         {...props}
       >
