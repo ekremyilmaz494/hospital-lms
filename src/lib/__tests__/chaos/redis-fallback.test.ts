@@ -31,6 +31,17 @@ vi.mock('@/lib/api-helpers', () => ({
   parseBody: vi.fn(),
   computeAuditHash: vi.fn().mockReturnValue('hash'),
   safePagination: vi.fn().mockReturnValue({ page: 1, limit: 20 }),
+  ApiError: class ApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.name = 'ApiError'
+      this.status = status
+    }
+    toResponse() {
+      return Response.json({ error: this.message }, { status: this.status })
+    }
+  },
 }))
 
 vi.mock('@/lib/prisma', () => ({
