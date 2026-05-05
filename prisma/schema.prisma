@@ -1101,7 +1101,7 @@ model PushSubscription {
 // `token` cihaza özgü ve unique — birden fazla cihaz için kullanıcı başına
 // birden fazla satır olabilir (telefon + tablet vs).
 model ExpoPushToken {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId      String   @map("user_id") @db.Uuid
   token       String   @unique @db.Text
   platform    String   @db.VarChar(10) // 'ios' | 'android'
@@ -1126,7 +1126,7 @@ model ExpoPushToken {
 //
 // Cron `/api/cron/expo-receipts` günlük poll: pending + sentAt > now-25h.
 model ExpoPushTicket {
-  id           String    @id @default(uuid()) @db.Uuid
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ticketId     String    @unique @map("ticket_id") @db.Text
   userId       String    @map("user_id") @db.Uuid
   /// Gönderildiği token (DeviceNotRegistered receipt'inde cleanup için).
