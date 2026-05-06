@@ -42,7 +42,7 @@ export const GET = withSuperAdminRoute(async ({ request }) => {
     prisma.organization.count({ where }),
   ])
 
-  return jsonResponse({ hospitals, total, page, limit, totalPages: Math.ceil(total / limit) })
+  return jsonResponse({ hospitals, total, page, limit, totalPages: Math.ceil(total / limit) }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 })
 
 /**

@@ -130,7 +130,7 @@ export const GET = withSuperAdminRoute(async () => {
     return jsonResponse({
       services: [postgresql, redis, s3, supabaseAuth],
       metrics,
-    })
+    }, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=20' })
   } catch (err) {
     logger.error('SystemHealth', 'Sistem saglik kontrolu basarisiz', err)
     return errorResponse('Sistem saglik kontrolu yapilamadi', 503)

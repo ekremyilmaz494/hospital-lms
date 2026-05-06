@@ -1,12 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { type ColumnDef } from '@tanstack/react-table';
 import { GraduationCap, Plus, MoreHorizontal, Eye, Edit, Trash2, Calendar, Users, X, Layers, ChevronRight, BookOpen, CheckCircle2, FileEdit, Archive } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { DataTable } from '@/components/shared/data-table';
-import { BulkAssignModal } from '@/components/shared/bulk-assign-modal';
+
+const BulkAssignModal = dynamic(
+  () => import('@/components/shared/bulk-assign-modal').then(m => ({ default: m.BulkAssignModal })),
+  { ssr: false },
+);
 import { KStatCard } from '@/components/admin/k-stat-card';
 import Link from 'next/link';
 import { useFetch } from '@/hooks/use-fetch';

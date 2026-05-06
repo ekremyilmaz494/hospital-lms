@@ -70,17 +70,10 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
   }
 
   // Evaluations oluştur (mevcut olanları atla)
-  const created: string[] = []
-  for (const ev of evaluators) {
-    try {
-      await prisma.competencyEvaluation.create({
-        data: { formId, subjectId, evaluatorId: ev.id, evaluatorType: ev.type },
-      })
-      created.push(ev.id)
-    } catch {
-      // Zaten mevcut (unique constraint) — atla
-    }
-  }
+  const result = await prisma.competencyEvaluation.createMany({
+    data: evaluators.map(ev => ({ formId, subjectId, evaluatorId: ev.id, evaluatorType: ev.type })),
+    skipDuplicates: true,
+  })
 
   // Değerlendiricilere (kendisi hariç) bildirim gönder
   const notifTargets = evaluators.filter(e => e.id !== subjectId)
@@ -117,8 +110,8 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     action: 'CREATE',
     entityType: 'CompetencyEvaluation',
     entityId: subjectId,
-    newData: { created: created.length, total: evaluators.length },
+    newData: { created: result.count, total: evaluators.length },
   })
 
-  return jsonResponse({ created: created.length, total: evaluators.length }, 201)
+  return jsonResponse({ created: result.count, total: evaluators.length }, 201)
 }, { requireOrganization: true })

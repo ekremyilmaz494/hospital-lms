@@ -84,6 +84,19 @@ export function safePagination(params: URLSearchParams, maxLimit = 100) {
 // In-memory auth cache — keyed by user ID, 30s TTL
 const authCache = new Map<string, { dbUser: NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>; orgOk: boolean; expiresAt: number }>()
 
+/** Org active/suspended kontrolü — super_admin muaf. Askıya alınmışsa 403 Response döner, OK ise null. */
+async function checkOrgActive(dbUser: { role: string; organizationId: string | null }): Promise<Response | null> {
+  if (dbUser.role === 'super_admin' || !dbUser.organizationId) return null
+  const org = await prisma.organization.findUnique({
+    where: { id: dbUser.organizationId },
+    select: { isActive: true, isSuspended: true },
+  })
+  if (!org || !org.isActive || org.isSuspended) {
+    return errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403)
+  }
+  return null
+}
+
 /**
  * Validated bir auth user için DB lookup + org active check + 30s cache.
  * Hem cookie path (web) hem bearer path (mobile) bunu çağırır.
@@ -193,17 +206,8 @@ export async function getAuthUserStrict() {
     if (!dbUser || !dbUser.isActive) {
       return { user: null, dbUser: null, error: errorResponse('User not found or inactive', 403) }
     }
-    let orgOk = true
-    if (dbUser.role !== 'super_admin' && dbUser.organizationId) {
-      const org = await prisma.organization.findUnique({
-        where: { id: dbUser.organizationId },
-        select: { isActive: true, isSuspended: true },
-      })
-      if (!org || !org.isActive || org.isSuspended) orgOk = false
-    }
-    if (!orgOk) {
-      return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
-    }
+    const orgError = await checkOrgActive(dbUser)
+    if (orgError) return { user: null, dbUser: null, error: orgError }
     return { user, dbUser, error: null, organizationId: dbUser.organizationId }
   }
 
@@ -226,18 +230,8 @@ export async function getAuthUserStrict() {
     return { user: null, dbUser: null, error: errorResponse('User not found or inactive', 403) }
   }
 
-  let orgOk = true
-  if (dbUser.role !== 'super_admin' && dbUser.organizationId) {
-    const org = await prisma.organization.findUnique({
-      where: { id: dbUser.organizationId },
-      select: { isActive: true, isSuspended: true },
-    })
-    if (!org || !org.isActive || org.isSuspended) orgOk = false
-  }
-
-  if (!orgOk) {
-    return { user: null, dbUser: null, error: errorResponse('Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.', 403) }
-  }
+  const orgError = await checkOrgActive(dbUser)
+  if (orgError) return { user: null, dbUser: null, error: orgError }
 
   return { user, dbUser, error: null, organizationId: dbUser.organizationId }
 }

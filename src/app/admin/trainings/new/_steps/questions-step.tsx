@@ -1,12 +1,17 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { FileQuestion, Plus, Target, Trash2, CheckCircle2, Sparkles, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import AiQuestionGenerator from '@/components/admin/trainings/ai-question-generator';
 import { K, distributePoints, type QuestionItem } from './types';
+
+const AiQuestionGenerator = dynamic(
+  () => import('@/components/admin/trainings/ai-question-generator'),
+  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-xl" style={{ background: 'var(--k-surface)' }} /> },
+);
 
 interface QuestionsStepProps {
   questions: QuestionItem[];

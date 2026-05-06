@@ -10,6 +10,7 @@ import { withSuperAdminRoute } from '@/lib/api-handler'
 import { downloadBuffer } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { decryptBackup } from '@/lib/backup-crypto'
+import { logger } from '@/lib/logger'
 
 // Vercel Pro max: 300s. Restore tx timeout 120s, buna ek olarak S3 download + parse süresi var.
 export const maxDuration = 300
@@ -118,7 +119,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       rawBuffer = await downloadBuffer(backup.fileUrl)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Bilinmeyen hata'
-      console.error('[Restore] S3 download failed:', msg)
+      logger.error('Restore', 'S3 download failed', { msg })
       return errorResponse('Yedek dosyası S3\'den indirilemedi.', 500)
     }
 
@@ -137,7 +138,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       backupData = parsed
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Bilinmeyen hata'
-      console.error('[Restore] Decrypt/parse failed:', msg)
+      logger.error('Restore', 'Decrypt/parse failed', { msg })
       return errorResponse('Yedek dosyası çözülemedi veya ayrıştırılamadı (şifreleme anahtarı uyuşmuyor olabilir).', 400)
     }
 
@@ -381,7 +382,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       return err.toResponse()
     }
 
-    console.error('[Restore] Unexpected error:', err instanceof Error ? err.message : err)
+    logger.error('Restore', 'Unexpected error', err)
     return errorResponse('Geri yükleme sırasında beklenmeyen bir hata oluştu.', 500)
   }
 })
