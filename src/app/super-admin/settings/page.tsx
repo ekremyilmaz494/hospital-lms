@@ -1,11 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings, Mail, Palette, Shield, Save, Globe } from 'lucide-react';
+import { Mail, Save, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { BRAND } from '@/lib/brand';
 import { PageHeader } from '@/components/shared/page-header';
 import { useFetch } from '@/hooks/use-fetch';
@@ -16,11 +15,6 @@ interface SettingsData {
   platformUrl: string;
   defaultStorageLimit: number;
   maintenanceMode: boolean;
-  smtpHost: string;
-  smtpPort: number;
-  smtpUser: string;
-  smtpPassword: string;
-  senderName: string;
 }
 
 export default function SettingsPage() {
@@ -51,11 +45,6 @@ export default function SettingsPage() {
       platformUrl: formData.get('platformUrl'),
       defaultStorageLimit: Number(formData.get('defaultStorageLimit') ?? 10),
       maintenanceMode: isMaintenance,
-      smtpHost: formData.get('smtpHost'),
-      smtpPort: Number(formData.get('smtpPort') ?? 587),
-      smtpUser: formData.get('smtpUser'),
-      smtpPassword: formData.get('smtpPassword'),
-      senderName: formData.get('senderName'),
     };
     try {
       const res = await fetch('/api/super-admin/settings', {
@@ -129,38 +118,17 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* SMTP */}
+          {/* E-posta — info banner (per-tenant SMTP kaldırıldı, AWS SES merkezi) */}
           <div className="rounded-xl border p-6" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <div className="mb-5 flex items-center gap-3">
+            <div className="mb-3 flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: 'var(--color-accent-light)' }}>
                 <Mail className="h-5 w-5" style={{ color: 'var(--color-accent)' }} />
               </div>
-              <h3 className="text-lg font-bold">E-posta (SMTP)</h3>
+              <h3 className="text-lg font-bold">E-posta Gönderimi</h3>
             </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label style={{ color: 'var(--color-text-secondary)' }}>SMTP Host</Label>
-                  <Input name="smtpHost" defaultValue={settings?.smtpHost ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }} />
-                </div>
-                <div>
-                  <Label style={{ color: 'var(--color-text-secondary)' }}>SMTP Port</Label>
-                  <Input name="smtpPort" type="number" defaultValue={settings?.smtpPort ?? 587} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }} />
-                </div>
-              </div>
-              <div>
-                <Label style={{ color: 'var(--color-text-secondary)' }}>SMTP Kullanıcı</Label>
-                <Input name="smtpUser" defaultValue={settings?.smtpUser ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
-              </div>
-              <div>
-                <Label style={{ color: 'var(--color-text-secondary)' }}>SMTP Şifre</Label>
-                <Input name="smtpPassword" type="password" defaultValue={settings?.smtpPassword ?? ''} autoComplete="off" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
-              </div>
-              <div>
-                <Label style={{ color: 'var(--color-text-secondary)' }}>Gönderen Adı</Label>
-                <Input name="senderName" defaultValue={settings?.senderName ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
-              </div>
-            </div>
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+              E-posta gönderimi platform tarafından AWS SES üzerinden yönetilmektedir. Per-tenant SMTP konfigürasyonu artık desteklenmemektedir; gönderici adı ve yanıt adresi her hastane kendi ayarlar sayfasından düzenleyebilir.
+            </p>
           </div>
         </div>
 

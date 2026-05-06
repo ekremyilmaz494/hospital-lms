@@ -1,38 +1,13 @@
 /**
- * Per-tenant SMTP + professional training-assigned email testleri.
+ * trainingAssignedEmail template testleri + escapeHtml.
  *
- * Kapsar:
- *  - trainingAssignedEmail template: hastane adı, tüm alanlar, HTML escape, zorunlu badge
- *  - sendEmail({organizationId}): SMTP disabled ise SESSİZCE atla (B seçimi, tenant izolasyonu)
- *  - sendEmail({organizationId}): SMTP enabled ise org transporter kullan + doğru from/replyTo
- *  - sendEmail() (organizationId yok): global transporter + env fallback (invoice/super-admin akışı)
- *  - invalidateOrgTransporter: cache'den düşür + bağlantıyı kapat
+ * Per-tenant SMTP testleri kaldırıldı — SES merkezi olduğundan beri obsolete.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-
-// ── Mocks — vi.hoisted ile üst seviye referans hatasından kaçın ──
-
-const mocks = vi.hoisted(() => {
-  const sendMailMock = vi.fn().mockResolvedValue({ messageId: 'test-msg-id' })
-  const closeMock = vi.fn()
-  const createTransportMock = vi.fn(() => ({
-    sendMail: sendMailMock,
-    close: closeMock,
-  }))
-  const findUniqueMock = vi.fn()
-  return { sendMailMock, closeMock, createTransportMock, findUniqueMock }
-})
-
-const { sendMailMock, closeMock, createTransportMock, findUniqueMock } = mocks
-
-vi.mock('nodemailer', () => ({
-  default: { createTransport: mocks.createTransportMock },
-  createTransport: mocks.createTransportMock,
-}))
+import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    organization: { findUnique: mocks.findUniqueMock },
+    organization: { findUnique: vi.fn() },
   },
 }))
 
@@ -44,20 +19,7 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-vi.mock('@/lib/crypto', () => ({
-  // Test sabitliği için: "enc:xxx" prefix'iyle basit round-trip
-  encrypt: (plain: string) => `enc:${plain}`,
-  decrypt: (token: string) => {
-    if (!token.startsWith('enc:')) throw new Error('Invalid format')
-    return token.slice(4)
-  },
-}))
-
-// ── Imports (mock'lardan sonra!) ──
-
-import { sendEmail, trainingAssignedEmail, invalidateOrgTransporter, escapeHtml } from '@/lib/email'
-
-const ORG_ID = '00000000-0000-0000-0000-000000000001'
+import { trainingAssignedEmail, escapeHtml } from '@/lib/email'
 
 describe('trainingAssignedEmail template', () => {
   const base = {
@@ -69,9 +31,7 @@ describe('trainingAssignedEmail template', () => {
 
   it('hastane adı header ve footer\'da gözükmeli (tenant-aware)', () => {
     const html = trainingAssignedEmail(base)
-    // Header'da adı geçsin
     expect(html).toContain('Kızılay Eğitim Hastanesi')
-    // En az 2 kez (header + footer ribbon)
     const count = (html.match(/Kızılay Eğitim Hastanesi/g) ?? []).length
     expect(count).toBeGreaterThanOrEqual(2)
   })
@@ -117,9 +77,7 @@ describe('trainingAssignedEmail template', () => {
       staffName: '<script>alert("xss")</script>',
       trainingTitle: 'Test & <b>bold</b>',
     })
-    // Raw script tag içermemeli
     expect(html).not.toContain('<script>alert')
-    // Escape'lenmiş olmalı
     expect(html).toContain('&lt;script&gt;')
     expect(html).toContain('Test &amp; &lt;b&gt;')
   })
@@ -144,202 +102,5 @@ describe('trainingAssignedEmail template', () => {
 describe('escapeHtml', () => {
   it('tüm tehlikeli karakterleri kaçırmalı', () => {
     expect(escapeHtml('<b>a&b"c\'d</b>')).toBe('&lt;b&gt;a&amp;b&quot;c&#39;d&lt;/b&gt;')
-  })
-})
-
-// TODO: Per-tenant SMTP davranışı merkezi AWS SES'e taşındı.
-// Bu describe block'undaki testler eski nodemailer org-transporter cache pattern'ini varsayar.
-// SES için yeni mock + assertion'lar ayrı PR'da yeniden yazılmalı: src/lib/__tests__/email-ses.test.ts
-describe.skip('sendEmail — per-tenant SMTP davranışı (DEPRECATED — SES geçişi sonrası ayrı PR)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    sendMailMock.mockResolvedValue({ messageId: 'test-msg-id' })
-    // Her test arası cache'i temizle (org SMTP cache global)
-    invalidateOrgTransporter(ORG_ID)
-  })
-
-  it('SMTP disabled ise SESSİZCE atlar (false döner, sendMail çağrılmaz) — B seçimi', async () => {
-    findUniqueMock.mockResolvedValueOnce({
-      name: 'Test Hastanesi',
-      smtpEnabled: false,
-      smtpHost: 'smtp.test.com',
-      smtpUser: 'user@test.com',
-      smtpPassEncrypted: 'enc:secret',
-    })
-
-    const sent = await sendEmail({
-      organizationId: ORG_ID,
-      to: 'staff@test.com',
-      subject: 'Test',
-      html: '<p>x</p>',
-    })
-
-    expect(sent).toBe(false)
-    expect(sendMailMock).not.toHaveBeenCalled()
-  })
-
-  it('SMTP host yoksa atlar (yanlışlıkla enabled kaldıysa)', async () => {
-    findUniqueMock.mockResolvedValueOnce({
-      name: 'Test Hastanesi',
-      smtpEnabled: true,
-      smtpHost: null, // eksik
-      smtpUser: 'user@test.com',
-      smtpPassEncrypted: 'enc:secret',
-    })
-
-    const sent = await sendEmail({
-      organizationId: ORG_ID,
-      to: 'staff@test.com',
-      subject: 'Test',
-      html: '<p>x</p>',
-    })
-
-    expect(sent).toBe(false)
-    expect(sendMailMock).not.toHaveBeenCalled()
-  })
-
-  it('SMTP enabled + tüm alanlar dolu → org transporter ile gönderir', async () => {
-    findUniqueMock.mockResolvedValueOnce({
-      name: 'Kızılay Hastanesi',
-      smtpEnabled: true,
-      smtpHost: 'smtp.kizilay.com',
-      smtpPort: 587,
-      smtpSecure: false,
-      smtpUser: 'egitim@kizilay.com',
-      smtpPassEncrypted: 'enc:super-secret',
-      smtpFrom: 'Kızılay Hastanesi <egitim@kizilay.com>',
-      smtpReplyTo: 'destek@kizilay.com',
-    })
-
-    const sent = await sendEmail({
-      organizationId: ORG_ID,
-      to: 'staff@kizilay.com',
-      subject: 'Yeni eğitim atandı',
-      html: '<p>content</p>',
-    })
-
-    expect(sent).toBe(true)
-    expect(createTransportMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        host: 'smtp.kizilay.com',
-        port: 587,
-        secure: false,
-        auth: { user: 'egitim@kizilay.com', pass: 'super-secret' }, // decrypt oldu
-      }),
-    )
-    expect(sendMailMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        from: 'Kızılay Hastanesi <egitim@kizilay.com>',
-        replyTo: 'destek@kizilay.com',
-        to: 'staff@kizilay.com',
-        subject: 'Yeni eğitim atandı',
-      }),
-    )
-  })
-
-  it('smtpFrom yoksa hastane adı + user\'dan otomatik oluşturulur', async () => {
-    findUniqueMock.mockResolvedValueOnce({
-      name: 'Test Hospital',
-      smtpEnabled: true,
-      smtpHost: 'smtp.test.com',
-      smtpPort: 465,
-      smtpSecure: true,
-      smtpUser: 'noreply@test.com',
-      smtpPassEncrypted: 'enc:pass',
-      smtpFrom: null,
-      smtpReplyTo: null,
-    })
-
-    await sendEmail({ organizationId: ORG_ID, to: 'x@x.com', subject: 's', html: 'h' })
-
-    expect(sendMailMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        from: 'Test Hospital <noreply@test.com>',
-        replyTo: 'noreply@test.com', // fallback: user
-      }),
-    )
-  })
-
-  it('transporter cache — aynı org için 2 kez çağrılsa tek transporter kullanılır', async () => {
-    findUniqueMock.mockResolvedValue({
-      name: 'H',
-      smtpEnabled: true,
-      smtpHost: 'smtp.h.com',
-      smtpPort: 587,
-      smtpSecure: false,
-      smtpUser: 'u',
-      smtpPassEncrypted: 'enc:p',
-      smtpFrom: null,
-      smtpReplyTo: null,
-    })
-
-    await sendEmail({ organizationId: ORG_ID, to: 'a@a.com', subject: 's', html: 'h' })
-    await sendEmail({ organizationId: ORG_ID, to: 'b@b.com', subject: 's', html: 'h' })
-
-    // DB sadece 1 kez sorgulansın (cache hit), sendMail 2 kez
-    expect(findUniqueMock).toHaveBeenCalledTimes(1)
-    expect(sendMailMock).toHaveBeenCalledTimes(2)
-  })
-
-  it('invalidateOrgTransporter cache\'i temizler + bağlantıyı kapatır', async () => {
-    findUniqueMock.mockResolvedValue({
-      name: 'H',
-      smtpEnabled: true,
-      smtpHost: 'smtp.h.com',
-      smtpPort: 587,
-      smtpSecure: false,
-      smtpUser: 'u',
-      smtpPassEncrypted: 'enc:p',
-      smtpFrom: null,
-      smtpReplyTo: null,
-    })
-
-    await sendEmail({ organizationId: ORG_ID, to: 'a@a.com', subject: 's', html: 'h' })
-    expect(findUniqueMock).toHaveBeenCalledTimes(1)
-
-    invalidateOrgTransporter(ORG_ID)
-    expect(closeMock).toHaveBeenCalled()
-
-    // Cache temiz → DB'ye yeniden sorgu
-    await sendEmail({ organizationId: ORG_ID, to: 'b@b.com', subject: 's', html: 'h' })
-    expect(findUniqueMock).toHaveBeenCalledTimes(2)
-  })
-
-  it('bozuk şifre decrypt edilemezse atlar (return false)', async () => {
-    findUniqueMock.mockResolvedValueOnce({
-      name: 'H',
-      smtpEnabled: true,
-      smtpHost: 'smtp.h.com',
-      smtpUser: 'u',
-      smtpPassEncrypted: 'invalid-no-prefix', // decrypt fail
-    })
-
-    const sent = await sendEmail({
-      organizationId: ORG_ID,
-      to: 'a@a.com',
-      subject: 's',
-      html: 'h',
-    })
-
-    expect(sent).toBe(false)
-    expect(sendMailMock).not.toHaveBeenCalled()
-  })
-
-  it('organizationId verilmezse global SMTP kullanır (platform-owned akış)', async () => {
-    const sent = await sendEmail({
-      to: 'customer@example.com',
-      subject: 'Invoice',
-      html: '<p>i</p>',
-    })
-
-    expect(sent).toBe(true)
-    // DB'ye bakmaz — global env kullanır
-    expect(findUniqueMock).not.toHaveBeenCalled()
-    expect(sendMailMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: 'customer@example.com',
-        subject: 'Invoice',
-      }),
-    )
   })
 })

@@ -18,11 +18,6 @@ export const GET = withSuperAdminRoute(async () => {
     platformUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     defaultStorageLimit: 10,
     maintenanceMode: false,
-    smtpHost: process.env.SMTP_HOST || '',
-    smtpPort: Number(process.env.SMTP_PORT || '587'),
-    smtpUser: process.env.SMTP_USER ? '••••••••' : '',
-    smtpPassword: process.env.SMTP_PASS ? '••••••••' : '',
-    senderName: process.env.SMTP_FROM_NAME || BRAND.fullName,
     stats: {
       totalOrganizations: orgCount,
       totalUsers: userCount,

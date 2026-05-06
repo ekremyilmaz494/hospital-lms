@@ -5,7 +5,6 @@ import { logger } from '@/lib/logger'
 import { getRedis } from '@/lib/redis'
 import { s3 } from '@/lib/s3'
 import { HeadBucketCommand } from '@aws-sdk/client-s3'
-import nodemailer from 'nodemailer'
 
 interface ServiceStatus {
   name: string
@@ -78,26 +77,6 @@ async function checkS3(): Promise<ServiceStatus> {
   })
 }
 
-/** SMTP saglik kontrolu */
-async function checkSMTP(): Promise<ServiceStatus> {
-  return measureService('SMTP', async () => {
-    const host = process.env.SMTP_HOST
-    if (!host) {
-      throw new Error('SMTP_HOST yapilandirilmamis')
-    }
-    const transporter = nodemailer.createTransport({
-      host,
-      port: Number(process.env.SMTP_PORT ?? '587'),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-    await transporter.verify()
-  })
-}
-
 /** Supabase Auth saglik kontrolu */
 async function checkSupabaseAuth(): Promise<ServiceStatus> {
   return measureService('Supabase Auth', async () => {
@@ -121,11 +100,10 @@ async function checkSupabaseAuth(): Promise<ServiceStatus> {
 export const GET = withSuperAdminRoute(async () => {
   try {
     // Tum saglik kontrollerini paralel calistir
-    const [postgresql, redis, s3, smtp, supabaseAuth] = await Promise.all([
+    const [postgresql, redis, s3, supabaseAuth] = await Promise.all([
       checkPostgreSQL(),
       checkRedis(),
       checkS3(),
-      checkSMTP(),
       checkSupabaseAuth(),
     ])
 
@@ -150,7 +128,7 @@ export const GET = withSuperAdminRoute(async () => {
     }
 
     return jsonResponse({
-      services: [postgresql, redis, s3, smtp, supabaseAuth],
+      services: [postgresql, redis, s3, supabaseAuth],
       metrics,
     })
   } catch (err) {

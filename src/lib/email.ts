@@ -1,5 +1,3 @@
-import nodemailer from 'nodemailer'
-import MimeNode from 'nodemailer/lib/mime-node'
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
 import { htmlToText } from 'html-to-text'
 import { checkRateLimit } from '@/lib/redis'
@@ -7,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { BRAND } from '@/lib/brand'
 import { emailLayout, cta, alertBox, infoCard } from '@/lib/email-layout'
+import { buildRawMime } from '@/lib/email-mime'
 
 /**
  * Escapes HTML special characters to prevent HTML injection in email templates.
@@ -59,33 +58,6 @@ function formatFromHeader(displayName: string | null | undefined, address: strin
   if (!needsQuote) return `${trimmed} <${address}>`
   const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
   return `"${escaped}" <${address}>`
-}
-
-// ── Global nodemailer transporter — sadece attachment'lı sendInvoiceEmail için.
-// Genel akış SES'e taşındı; nodemailer SES SendRawEmail/MIME'a geçilince kaldırılacak.
-const globalTransporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT ?? '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  pool: true,
-  maxConnections: 5,
-  maxMessages: 100,
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 30000,
-})
-
-/**
- * @deprecated Eski per-tenant SMTP cache invalidate'iydi. SES merkezi olduğu için
- * artık no-op; geriye uyumluluk için export korunuyor (admin SMTP tab'ı kaldırılınca silinecek).
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function invalidateOrgTransporter(_organizationId: string): void {
-  // no-op
 }
 
 interface OrgEmailContext {
@@ -672,30 +644,24 @@ export async function sendInvoiceEmail(params: {
     </div>
   `
 
-  // Fatura — SES SendEmail Raw + MIME multipart (PDF attachment).
-  // MimeNode (nodemailer/lib/mime-node) RFC 2045 boundary üretimi + base64 wrapping
-  // halleder; manuel multipart yazımındaki yaygın bug'lardan kaçınır.
+  // Fatura — SES SendEmail Raw + manuel MIME multipart (PDF attachment).
+  // RFC 2045 boundary + base64 wrap'i `buildRawMime` helper'ı yapar.
   const fromAddress = process.env.SES_FROM_ADDRESS
     ?? process.env.SMTP_FROM
     ?? `${BRAND.fullName} <noreply@hastanelms.com>`
 
-  const root = new MimeNode('multipart/mixed')
-  root.setHeader([
-    { key: 'From', value: fromAddress },
-    { key: 'To', value: recipientList.join(', ') },
-    { key: 'Subject', value: `Fatura - ${invoiceNumber}` },
-  ])
-  root.createChild('text/html; charset=utf-8').setContent(html)
-  root
-    .createChild('application/pdf')
-    .setHeader([
-      { key: 'Content-Disposition', value: `attachment; filename="fatura-${invoiceNumber}.pdf"` },
-      { key: 'Content-Transfer-Encoding', value: 'base64' },
-    ])
-    .setContent(pdfBuffer)
-
-  const rawMessage: Buffer = await new Promise((resolve, reject) => {
-    root.build((err, msg) => (err ? reject(err) : resolve(msg)))
+  const rawMessage = buildRawMime({
+    from: fromAddress,
+    to: recipientList.join(', '),
+    subject: `Fatura - ${invoiceNumber}`,
+    html,
+    attachments: [
+      {
+        filename: `fatura-${invoiceNumber}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      },
+    ],
   })
 
   try {

@@ -98,24 +98,6 @@ model Organization {
   // Çok-sektörlü SaaS desteği — şu an "healthcare" ama UI/sözcük bazında değişebilir.
   sector           String  @default("healthcare") @map("sector") @db.VarChar(50)
 
-  // Eski per-tenant SMTP — DEPRECATED (Faz B'de drop). Kod artık okumaz, UI gizlendi.
-  /// @deprecated emailDisplayName/emailReplyTo kullan
-  smtpHost          String? @map("smtp_host") @db.VarChar(255)
-  /// @deprecated
-  smtpPort          Int?    @default(587) @map("smtp_port")
-  /// @deprecated
-  smtpSecure        Boolean @default(false) @map("smtp_secure")
-  /// @deprecated
-  smtpUser          String? @map("smtp_user") @db.VarChar(255)
-  /// @deprecated
-  smtpPassEncrypted String? @map("smtp_pass_encrypted") @db.Text
-  /// @deprecated emailDisplayName kullan
-  smtpFrom          String? @map("smtp_from") @db.VarChar(320)
-  /// @deprecated emailReplyTo kullan
-  smtpReplyTo       String? @map("smtp_reply_to") @db.VarChar(320)
-  /// @deprecated emailEnabled kullan
-  smtpEnabled       Boolean @default(false) @map("smtp_enabled")
-
   // OpenRouter (AI soru üretimi) — org-specific custom API key (encrypted, opsiyonel)
   openrouterApiKeyEncrypted String? @map("openrouter_api_key_encrypted") @db.Text
 
