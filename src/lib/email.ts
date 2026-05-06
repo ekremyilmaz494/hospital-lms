@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { BRAND } from '@/lib/brand'
+import { emailLayout, cta, alertBox, infoCard } from '@/lib/email-layout'
 
 /**
  * Escapes HTML special characters to prevent HTML injection in email templates.
@@ -404,27 +405,16 @@ export function forgotPasswordEmail(name: string, resetLink: string) {
 }
 
 export function welcomeEmail(name: string, email: string, resetLink: string) {
-  return `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Hoş Geldiniz!</h2>
-        <p style="color: #64748b;">Merhaba ${escapeHtml(name)},</p>
-        <p style="color: #64748b;">${BRAND.fullName} hesabınız oluşturulmuştur.</p>
-        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p style="margin: 4px 0; color: #475569;"><strong>E-posta:</strong> ${escapeHtml(email)}</p>
-        </div>
-        <p style="color: #64748b;">Hesabınıza erişim için aşağıdaki butona tıklayarak şifrenizi belirleyin:</p>
-        <a href="${escapeHtml(resetLink)}"
-           style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Şifremi Belirle
-        </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu link 24 saat içerisinde geçerliliğini yitirecektir.</p>
-      </div>
-    </div>
+  const content = `
+    <h2 style="color: #1e293b; margin-top: 0;">Hoş Geldiniz!</h2>
+    <p style="color: #64748b;">Merhaba ${escapeHtml(name)},</p>
+    <p style="color: #64748b;">${BRAND.fullName} hesabınız oluşturulmuştur.</p>
+    ${infoCard({ title: 'E-posta', body: email })}
+    <p style="color: #64748b;">Hesabınıza erişim için aşağıdaki butona tıklayarak şifrenizi belirleyin:</p>
+    ${cta(resetLink, 'Şifremi Belirle')}
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu link 24 saat içerisinde geçerliliğini yitirecektir.</p>
   `
+  return emailLayout({ content, theme: 'success', headerSubtitle: 'Hesabınız oluşturuldu', showRibbon: false })
 }
 
 /**
@@ -437,33 +427,28 @@ export async function sendHospitalWelcomeEmail(params: {
   loginUrl: string
   tempPassword: string
   adminName: string
+  /** Tenant brand rengi — header gradient için. Yoksa default tema. */
+  brandColor?: string | null
 }) {
-  const { to, organizationName, loginUrl, tempPassword, adminName } = params
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Hastane Hesabınız Oluşturuldu</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Hoş Geldiniz!</h2>
-        <p style="color: #64748b;">Merhaba ${escapeHtml(adminName)},</p>
-        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> hastanesi için yönetici hesabınız oluşturulmuştur.</p>
-        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p style="margin: 4px 0; color: #475569;"><strong>E-posta:</strong> ${escapeHtml(to)}</p>
-          <p style="margin: 4px 0; color: #475569;"><strong>Geçici Şifre:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${escapeHtml(tempPassword)}</code></p>
-        </div>
-        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
-          <p style="margin: 0; color: #92400e; font-size: 13px;"><strong>Önemli:</strong> İlk girişinizde şifrenizi değiştirmeniz gerekmektedir.</p>
-        </div>
-        <a href="${escapeHtml(loginUrl)}"
-           style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Sisteme Giriş Yap
-        </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir. Hesabınız ile ilgili sorunuz varsa sistem yöneticinize başvurunuz.</p>
-      </div>
+  const { to, organizationName, loginUrl, tempPassword, adminName, brandColor } = params
+  const content = `
+    <h2 style="color: #1e293b; margin-top: 0;">Hoş Geldiniz!</h2>
+    <p style="color: #64748b;">Merhaba ${escapeHtml(adminName)},</p>
+    <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> için yönetici hesabınız oluşturulmuştur.</p>
+    <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
+      <p style="margin: 4px 0; color: #475569;"><strong>E-posta:</strong> ${escapeHtml(to)}</p>
+      <p style="margin: 4px 0; color: #475569;"><strong>Geçici Şifre:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${escapeHtml(tempPassword)}</code></p>
     </div>
+    ${alertBox('Önemli: İlk girişinizde şifrenizi değiştirmeniz gerekmektedir.', 'warning')}
+    ${cta(loginUrl, 'Sisteme Giriş Yap')}
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir. Hesabınız ile ilgili sorunuz varsa sistem yöneticinize başvurunuz.</p>
   `
+  const html = emailLayout({
+    org: { name: organizationName, brandColor },
+    content,
+    theme: 'tenant',
+    headerSubtitle: 'Yönetici Hesabınız Oluşturuldu',
+  })
 
   await sendEmail({
     to,
@@ -552,59 +537,48 @@ export async function sendStaffWelcomeEmail(params: {
   organizationName: string
   tempPassword: string
   loginUrl: string
+  /** Tenant brand rengi — header gradient için. Yoksa default tema. */
+  brandColor?: string | null
 }) {
-  const { to, staffName, organizationName, tempPassword, loginUrl } = params
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc; padding: 24px;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 22px; letter-spacing: -0.3px;">${escapeHtml(organizationName)}</h1>
-        <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 13px;">Personel Eğitim Yönetim Sistemi</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">Hesabınız oluşturuldu</h2>
-        <p style="color: #475569; line-height: 1.6;">Sayın ${escapeHtml(staffName)},</p>
-        <p style="color: #475569; line-height: 1.6;">
-          <strong>${escapeHtml(organizationName)}</strong> personel eğitim sistemine hesabınız tanımlanmıştır.
-          Atanan eğitimleri takip etmek, sınavlara katılmak ve sertifikalarınızı görüntülemek için
-          aşağıdaki bilgilerle sisteme giriş yapabilirsiniz.
-        </p>
+  const { to, staffName, organizationName, tempPassword, loginUrl, brandColor } = params
+  const content = `
+    <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">Hesabınız oluşturuldu</h2>
+    <p style="color: #475569; line-height: 1.6;">Sayın ${escapeHtml(staffName)},</p>
+    <p style="color: #475569; line-height: 1.6;">
+      <strong>${escapeHtml(organizationName)}</strong> personel eğitim sistemine hesabınız tanımlanmıştır.
+      Atanan eğitimleri takip etmek, sınavlara katılmak ve sertifikalarınızı görüntülemek için
+      aşağıdaki bilgilerle sisteme giriş yapabilirsiniz.
+    </p>
 
-        <div style="background: #f1f5f9; padding: 18px 20px; border-radius: 10px; margin: 20px 0;">
-          <p style="margin: 0 0 8px; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Giriş Bilgileri</p>
-          <p style="margin: 6px 0; color: #0f172a; font-size: 14px;">
-            <span style="color: #64748b; display: inline-block; width: 110px;">E-posta</span>
-            <strong>${escapeHtml(to)}</strong>
-          </p>
-          <p style="margin: 6px 0; color: #0f172a; font-size: 14px;">
-            <span style="color: #64748b; display: inline-block; width: 110px;">Geçici şifre</span>
-            <code style="background: white; border: 1px solid #e2e8f0; padding: 4px 10px; border-radius: 6px; font-family: 'JetBrains Mono', Menlo, monospace; font-size: 13px; color: #0f172a;">${escapeHtml(tempPassword)}</code>
-          </p>
-        </div>
-
-        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 20px 0;">
-          <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
-            <strong>Güvenlik:</strong> İlk girişinizde şifrenizi değiştirmeniz gerekmektedir.
-            Geçici şifreyi kimseyle paylaşmayınız.
-          </p>
-        </div>
-
-        <div style="text-align: center; margin: 28px 0 8px;">
-          <a href="${escapeHtml(loginUrl)}"
-             style="display: inline-block; background: #0d9668; color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.2px;">
-            Sisteme Giriş Yap
-          </a>
-        </div>
-
-        <p style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin-top: 28px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
-          Bu e-posta sistem tarafından otomatik olarak gönderilmiştir. Hesabınızla ilgili sorularınız için
-          lütfen hastane yöneticiniz veya İnsan Kaynakları departmanı ile iletişime geçiniz.
-        </p>
-      </div>
-      <p style="color: #cbd5e1; font-size: 11px; text-align: center; margin-top: 16px;">
-        ${escapeHtml(organizationName)} · Personel Eğitim Yönetim Sistemi
+    <div style="background: #f1f5f9; padding: 18px 20px; border-radius: 10px; margin: 20px 0;">
+      <p style="margin: 0 0 8px; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Giriş Bilgileri</p>
+      <p style="margin: 6px 0; color: #0f172a; font-size: 14px;">
+        <span style="color: #64748b; display: inline-block; width: 110px;">E-posta</span>
+        <strong>${escapeHtml(to)}</strong>
+      </p>
+      <p style="margin: 6px 0; color: #0f172a; font-size: 14px;">
+        <span style="color: #64748b; display: inline-block; width: 110px;">Geçici şifre</span>
+        <code style="background: white; border: 1px solid #e2e8f0; padding: 4px 10px; border-radius: 6px; font-family: 'JetBrains Mono', Menlo, monospace; font-size: 13px; color: #0f172a;">${escapeHtml(tempPassword)}</code>
       </p>
     </div>
+
+    ${alertBox('Güvenlik: İlk girişinizde şifrenizi değiştirmeniz gerekmektedir. Geçici şifreyi kimseyle paylaşmayınız.', 'warning')}
+
+    <div style="text-align: center; margin: 28px 0 8px;">
+      ${cta(loginUrl, 'Sisteme Giriş Yap')}
+    </div>
+
+    <p style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin-top: 28px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+      Bu e-posta sistem tarafından otomatik olarak gönderilmiştir. Hesabınızla ilgili sorularınız için
+      lütfen kurum yöneticiniz veya İnsan Kaynakları departmanı ile iletişime geçiniz.
+    </p>
   `
+  const html = emailLayout({
+    org: { name: organizationName, brandColor },
+    content,
+    theme: 'tenant',
+    headerSubtitle: 'Personel Eğitim Yönetim Sistemi',
+  })
 
   await sendEmail({
     to,
