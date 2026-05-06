@@ -72,6 +72,22 @@ export async function GET(request: Request) {
     },
   })
 
+  // 3.5 Expo push ticket purge — receipt audit kısa pencere yeter:
+  //   - 30 gün eski 'ok' / 'expired' (delivery confirmed, debug penceresi geçti)
+  //   - 90 gün eski 'error' (incident root-cause penceresi)
+  const deletedExpoTicketsOk = await prisma.expoPushTicket.deleteMany({
+    where: {
+      status: { in: ['ok', 'expired'] },
+      sentAt: { lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+    },
+  })
+  const deletedExpoTicketsError = await prisma.expoPushTicket.deleteMany({
+    where: {
+      status: 'error',
+      sentAt: { lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+    },
+  })
+
   // 4. Sertifika sona erme hatırlatmaları (7 ve 30 gün kala)
   const now30 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   const now7 = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -267,6 +283,8 @@ export async function GET(request: Request) {
     deletedNotifications: deletedNotifications.count,
     staleAttemptsClosed: staleAttempts.count,
     deletedLogs: deletedLogs.count,
+    deletedExpoTicketsOk: deletedExpoTicketsOk.count,
+    deletedExpoTicketsError: deletedExpoTicketsError.count,
     deletedBackups: deletedBackups.count,
     certRemindersSent,
     overdueRemindersSent,

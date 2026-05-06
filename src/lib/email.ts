@@ -1,8 +1,10 @@
-import nodemailer, { type Transporter } from 'nodemailer'
+import nodemailer from 'nodemailer'
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
+import { htmlToText } from 'html-to-text'
 import { checkRateLimit } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
-import { decrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
+import { BRAND } from '@/lib/brand'
 
 /**
  * Escapes HTML special characters to prevent HTML injection in email templates.
@@ -17,7 +19,48 @@ export function escapeHtml(unsafe: string): string {
     .replace(/'/g, '&#39;')
 }
 
-// ── Global (platform-owned) transporter — super admin, self-registration, invoice ──
+// ── AWS SES Client (singleton) ──
+// Region default: eu-central-1 (Frankfurt — klinovax.com domain orada verified).
+//
+// Credential resolution sırası (least-privilege için ayrı SES-only IAM kullanıcı):
+//   1. AWS_SES_ACCESS_KEY_ID + AWS_SES_SECRET_ACCESS_KEY (SES'e özel — önerilen)
+//   2. AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY (genel — S3/SES tek user senaryosu)
+//   3. Hiçbiri yoksa AWS SDK default chain (Vercel/EC2 IAM role)
+//
+// SES için ayrı IAM user (klinovax-ses-sender), S3 ile aynı key'i paylaşmaz —
+// birinin sızması diğer servisi etkilemesin diye.
+let sesClientInstance: SESv2Client | null = null
+function getSesClient(): SESv2Client {
+  if (sesClientInstance) return sesClientInstance
+  const region = process.env.AWS_SES_REGION ?? process.env.AWS_REGION ?? 'eu-central-1'
+  const accessKeyId = process.env.AWS_SES_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID
+  const secretAccessKey = process.env.AWS_SES_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY
+  sesClientInstance = new SESv2Client({
+    region,
+    ...(accessKeyId && secretAccessKey
+      ? { credentials: { accessKeyId, secretAccessKey } }
+      : {}),
+  })
+  return sesClientInstance
+}
+
+/**
+ * RFC 5322 "From" header escape.
+ * Display name içinde özel karakter (`,` `<` `>` `"` `\`) varsa quoted-string yapar
+ * ve `"` `\` karakterlerini escape eder. Boş ise sadece adres döner.
+ */
+function formatFromHeader(displayName: string | null | undefined, address: string): string {
+  if (!displayName || !displayName.trim()) return address
+  const trimmed = displayName.trim()
+  // Quote gerekirse: özel karakter veya başında/sonunda boşluk varsa
+  const needsQuote = /[",<>:;@\\()[\]]/.test(trimmed) || /^\s|\s$/.test(displayName)
+  if (!needsQuote) return `${trimmed} <${address}>`
+  const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return `"${escaped}" <${address}>`
+}
+
+// ── Global nodemailer transporter — sadece attachment'lı sendInvoiceEmail için.
+// Genel akış SES'e taşındı; nodemailer SES SendRawEmail/MIME'a geçilince kaldırılacak.
 const globalTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT ?? '587'),
@@ -34,89 +77,60 @@ const globalTransporter = nodemailer.createTransport({
   socketTimeout: 30000,
 })
 
-// ── Per-org transporter cache ──
-type OrgTransport = {
-  transporter: Transporter
-  from: string
-  replyTo: string
-  cachedAt: number
-}
-const orgTransporters = new Map<string, OrgTransport>()
-const ORG_CACHE_TTL_MS = 10 * 60 * 1000 // 10 dk — settings güncellenince invalidate ediyoruz, bu sadece safety
-
-/** Settings güncellenince çağır — eski transporter bağlantısını kapat ve cache'den düş. */
-export function invalidateOrgTransporter(organizationId: string) {
-  const entry = orgTransporters.get(organizationId)
-  if (entry) {
-    try { entry.transporter.close() } catch {}
-    orgTransporters.delete(organizationId)
-  }
-}
-
 /**
- * Hastane (tenant) için SMTP transporter'ı döner.
- * smtpEnabled=false veya host yoksa null döner → çağıran email'i atlar.
+ * @deprecated Eski per-tenant SMTP cache invalidate'iydi. SES merkezi olduğu için
+ * artık no-op; geriye uyumluluk için export korunuyor (admin SMTP tab'ı kaldırılınca silinecek).
  */
-async function getOrgTransporter(organizationId: string): Promise<OrgTransport | null> {
-  const cached = orgTransporters.get(organizationId)
-  if (cached && Date.now() - cached.cachedAt < ORG_CACHE_TTL_MS) {
-    return cached
-  }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function invalidateOrgTransporter(_organizationId: string): void {
+  // no-op
+}
 
+interface OrgEmailContext {
+  displayName: string | null
+  replyTo: string | null
+  enabled: boolean
+}
+
+/** Tenant'ın email tercihlerini Prisma'dan okur. Bulunamazsa default açık + brand isim. */
+async function getOrgEmailContext(organizationId: string): Promise<OrgEmailContext> {
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
     select: {
       name: true,
-      smtpEnabled: true,
-      smtpHost: true,
-      smtpPort: true,
-      smtpSecure: true,
-      smtpUser: true,
-      smtpPassEncrypted: true,
-      smtpFrom: true,
-      smtpReplyTo: true,
+      emailDisplayName: true,
+      emailReplyTo: true,
+      emailEnabled: true,
     },
   })
-
-  if (!org?.smtpEnabled || !org.smtpHost || !org.smtpUser || !org.smtpPassEncrypted) {
-    return null
+  if (!org) return { displayName: null, replyTo: null, enabled: false }
+  return {
+    displayName: org.emailDisplayName?.trim() || org.name,
+    replyTo: org.emailReplyTo?.trim() || null,
+    enabled: org.emailEnabled,
   }
-
-  let password: string
-  try {
-    password = decrypt(org.smtpPassEncrypted)
-  } catch (err) {
-    logger.error('email', `SMTP şifresi çözülemedi — org=${organizationId}`, err)
-    return null
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: org.smtpHost,
-    port: org.smtpPort ?? 587,
-    secure: org.smtpSecure,
-    auth: { user: org.smtpUser, pass: password },
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 50,
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 30000,
-  })
-
-  const from = org.smtpFrom ?? `${org.name} <${org.smtpUser}>`
-  const replyTo = org.smtpReplyTo ?? org.smtpFrom ?? org.smtpUser
-
-  const entry: OrgTransport = { transporter, from, replyTo, cachedAt: Date.now() }
-  orgTransporters.set(organizationId, entry)
-  return entry
 }
 
 interface EmailOptions {
   to: string | string[]
   subject: string
   html: string
-  /** Belirtilirse hastanenin kendi SMTP'si kullanılır. Yoksa email atlanır (false döner). */
+  /** Plain-text alternatif. Verilmezse html-to-text ile otomatik üretilir. */
+  text?: string
+  /**
+   * Tenant kimliği. Verildiyse hastane "From" display name + reply-to override edilir.
+   * `transactional=false` ve `emailEnabled=false` ise gönderim atlanır (org opt-out).
+   */
   organizationId?: string
+  /** "From" display name override — verilirse organization.emailDisplayName yerine bu kullanılır. */
+  fromName?: string
+  /** Reply-To override. */
+  replyTo?: string
+  /**
+   * Transactional mail (şifre sıfırlama, fatura, hesap oluşturma) — emailEnabled=false
+   * olsa bile gönderilir. Default: false (notification/reminder gibi promosyonel sayılır).
+   */
+  transactional?: boolean
 }
 
 // Rate limits: max 200 emails/hour globally, max 20/hour per recipient
@@ -124,16 +138,28 @@ const EMAIL_GLOBAL_LIMIT = 200
 const EMAIL_PER_RECIPIENT_LIMIT = 20
 const EMAIL_WINDOW_SECONDS = 3600
 
+const SES_MAX_ATTEMPTS = 3
+const RETRYABLE_ERRORS = new Set(['Throttling', 'ThrottlingException', 'TooManyRequestsException', 'ServiceUnavailable'])
+
 /**
- * E-posta gönderir.
- * - `organizationId` verildiyse hastanenin kendi SMTP'si kullanılır. Hastane SMTP
- *   konfigüre etmediyse gönderim atlanır ve `false` döner (fırlatmaz).
- * - `organizationId` verilmediyse global platform SMTP'si kullanılır
- *   (super admin, self-registration, invoice gibi platform-owned akışlar).
- * @returns gönderildi mi?
+ * Merkezi SES üzerinden e-posta gönderir.
+ * - organizationId verildiyse: tenant'ın display name + reply-to override'ları uygulanır.
+ *   `emailEnabled=false` ve `transactional !== true` ise gönderim atlanır (false döner, fırlatmaz).
+ * - organizationId yoksa: platform-owned akış (super admin, self-registration), brand fullName ile gönderilir.
+ * @returns gönderildi mi (true) / opt-out atlandı mı (false). Hata fırlatabilir.
  */
-export async function sendEmail({ to, subject, html, organizationId }: EmailOptions): Promise<boolean> {
-  const recipientList = Array.isArray(to) ? to : [to]
+export async function sendEmail({
+  to,
+  subject,
+  html,
+  text,
+  organizationId,
+  fromName,
+  replyTo,
+  transactional = false,
+}: EmailOptions): Promise<boolean> {
+  const recipientList = (Array.isArray(to) ? to : [to]).filter(Boolean)
+  if (recipientList.length === 0) return false
 
   // Global hourly cap — prevents runaway cron/bulk sends
   const globalOk = await checkRateLimit('email:global', EMAIL_GLOBAL_LIMIT, EMAIL_WINDOW_SECONDS)
@@ -150,33 +176,57 @@ export async function sendEmail({ to, subject, html, organizationId }: EmailOpti
     }
   }
 
-  let transporter: Transporter
-  let from: string
-  let replyTo: string
-
+  // Tenant override + opt-out kontrolü
+  let displayName: string | null = fromName?.trim() || null
+  let effectiveReplyTo: string | null = replyTo?.trim() || null
   if (organizationId) {
-    const orgT = await getOrgTransporter(organizationId)
-    if (!orgT) {
-      // Hastane SMTP konfigüre etmemiş — sessizce atla (tenant izolasyonu)
+    const ctx = await getOrgEmailContext(organizationId)
+    if (!transactional && !ctx.enabled) {
+      // Opt-out — sessizce atla
       return false
     }
-    transporter = orgT.transporter
-    from = orgT.from
-    replyTo = orgT.replyTo
-  } else {
-    transporter = globalTransporter
-    from = process.env.SMTP_FROM ?? 'Devakent Hastanesi <noreply@hastanelms.com>'
-    replyTo = process.env.SMTP_REPLY_TO ?? process.env.SMTP_FROM ?? 'destek@hastanelms.com'
+    if (!displayName) displayName = ctx.displayName
+    if (!effectiveReplyTo) effectiveReplyTo = ctx.replyTo
   }
+  if (!displayName) displayName = BRAND.fullName
 
-  await transporter.sendMail({
-    from,
-    replyTo,
-    to: recipientList.join(', '),
-    subject,
-    html,
+  const fromHeader = formatFromHeader(displayName, BRAND.fromAddress)
+  const plainText = text ?? htmlToText(html, { wordwrap: 80, selectors: [{ selector: 'a', options: { hideLinkHrefIfSameAsText: true } }] })
+
+  const command = new SendEmailCommand({
+    FromEmailAddress: fromHeader,
+    Destination: { ToAddresses: recipientList },
+    ReplyToAddresses: effectiveReplyTo ? [effectiveReplyTo] : undefined,
+    Content: {
+      Simple: {
+        Subject: { Data: subject, Charset: 'UTF-8' },
+        Body: {
+          Html: { Data: html, Charset: 'UTF-8' },
+          Text: { Data: plainText, Charset: 'UTF-8' },
+        },
+      },
+    },
+    EmailTags: [
+      { Name: 'transactional', Value: transactional ? 'true' : 'false' },
+      ...(organizationId ? [{ Name: 'organizationId', Value: organizationId }] : []),
+    ],
   })
-  return true
+
+  // Retry: throttling/transient'da exponential backoff (300ms × 2^attempt)
+  let lastErr: unknown = null
+  for (let attempt = 0; attempt < SES_MAX_ATTEMPTS; attempt++) {
+    try {
+      await getSesClient().send(command)
+      return true
+    } catch (err) {
+      lastErr = err
+      const code = (err as { name?: string })?.name ?? ''
+      if (!RETRYABLE_ERRORS.has(code) || attempt === SES_MAX_ATTEMPTS - 1) break
+      await new Promise(resolve => setTimeout(resolve, 300 * Math.pow(2, attempt)))
+    }
+  }
+  logger.error('email', `SES gönderim başarısız (${recipientList.length} alıcı, subject="${subject}")`, lastErr)
+  throw lastErr instanceof Error ? lastErr : new Error('SES gönderim başarısız')
 }
 
 // ── Email Templates ──

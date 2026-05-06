@@ -88,14 +88,32 @@ model Organization {
   smsMfaEnabled       Boolean   @default(false) @map("sms_mfa_enabled")
   smsMfaEnforcedAt    DateTime? @map("sms_mfa_enforced_at") @db.Timestamptz
 
-  // Per-tenant SMTP (hastane kendi mail sunucusundan gönderir)
+  // Centralized email (AWS SES klinovax.com) — per-org override sadece display
+  // name + reply-to. Şifre/host yok; platform tek IP'den gönderir, deliverability
+  // tek tek hastane SMTP'lerinden çok daha iyi.
+  emailDisplayName String? @map("email_display_name") @db.VarChar(100)
+  emailReplyTo     String? @map("email_reply_to") @db.VarChar(320)
+  emailEnabled     Boolean @default(true) @map("email_enabled")
+
+  // Çok-sektörlü SaaS desteği — şu an "healthcare" ama UI/sözcük bazında değişebilir.
+  sector           String  @default("healthcare") @map("sector") @db.VarChar(50)
+
+  // Eski per-tenant SMTP — DEPRECATED (Faz B'de drop). Kod artık okumaz, UI gizlendi.
+  /// @deprecated emailDisplayName/emailReplyTo kullan
   smtpHost          String? @map("smtp_host") @db.VarChar(255)
+  /// @deprecated
   smtpPort          Int?    @default(587) @map("smtp_port")
+  /// @deprecated
   smtpSecure        Boolean @default(false) @map("smtp_secure")
+  /// @deprecated
   smtpUser          String? @map("smtp_user") @db.VarChar(255)
+  /// @deprecated
   smtpPassEncrypted String? @map("smtp_pass_encrypted") @db.Text
+  /// @deprecated emailDisplayName kullan
   smtpFrom          String? @map("smtp_from") @db.VarChar(320)
+  /// @deprecated emailReplyTo kullan
   smtpReplyTo       String? @map("smtp_reply_to") @db.VarChar(320)
+  /// @deprecated emailEnabled kullan
   smtpEnabled       Boolean @default(false) @map("smtp_enabled")
 
   // OpenRouter (AI soru üretimi) — org-specific custom API key (encrypted, opsiyonel)
@@ -144,6 +162,7 @@ model Organization {
   // Davet token kayıtları (link tabanlı yeni hesap aktivasyonu)
   invitations            Invitation[]
 
+  @@index([sector], map: "organization_sector_idx")
   @@map("organizations")
 }
 
@@ -294,6 +313,8 @@ model User {
   subjectEvaluations            CompetencyEvaluation[]       @relation("EvaluationSubject")
   evaluatorEvaluations          CompetencyEvaluation[]       @relation("EvaluationEvaluator")
   pushSubscriptions             PushSubscription[]
+  expoPushTokens                ExpoPushToken[]
+  expoPushTickets               ExpoPushTicket[]
   accreditationReports          AccreditationReport[]
   createdAccreditationStandards AccreditationStandard[]      @relation("AccreditationStandardCreator")
   // EY.FR.40 Eğitim Geri Bildirim
@@ -1077,6 +1098,58 @@ model PushSubscription {
   @@unique([userId, endpoint])
   @@index([userId], map: "idx_push_subscriptions_user")
   @@map("push_subscriptions")
+}
+
+// Expo Push Tokens — Klinovax mobil app (React Native + Expo) için.
+// Web push (PushSubscription) ile karıştırılmaz: web-push VAPID protokolü
+// kullanır; Expo push ise Expo'nun kendi sunucularına HTTP request atar.
+// `token` cihaza özgü ve unique — birden fazla cihaz için kullanıcı başına
+// birden fazla satır olabilir (telefon + tablet vs).
+model ExpoPushToken {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  token       String   @unique @db.Text
+  platform    String   @db.VarChar(10) // 'ios' | 'android'
+  deviceName  String?  @map("device_name") @db.VarChar(100)
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_expo_push_tokens_user")
+  @@map("expo_push_tokens")
+}
+
+// Push gönderimi audit + receipt tracking — Expo iki aşamalı async model
+// kullanır: send response'taki `tickets` "kabul edildi" anlamına gelir,
+// gerçek delivery 15dk-30dk sonra `getReceipts` ile öğrenilir. Receipt'te
+// dönen DeviceNotRegistered uninstall edilen cihaz demektir → token cleanup.
+//
+// Cleanup ritmi (cron/cleanup):
+//   - 30 günden eski 'ok' / 'expired' tickets silinir (delivery audit kısa pencere)
+//   - 90 günden eski 'error' tickets silinir (incident debug penceresi)
+//
+// Cron `/api/cron/expo-receipts` günlük poll: pending + sentAt > now-25h.
+model ExpoPushTicket {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId     String    @unique @map("ticket_id") @db.Text
+  userId       String    @map("user_id") @db.Uuid
+  /// Gönderildiği token (DeviceNotRegistered receipt'inde cleanup için).
+  /// FK değil — token tablodan silinmiş olabilir, yine de audit kalsın.
+  token        String    @db.Text
+  /// 'pending' = Expo kuyruğunda, 'ok' = teslim, 'error' = receipt'te hata,
+  /// 'expired' = 25h+ pending kalmış (Expo silmiş veya hiç işlemedi).
+  status       String    @default("pending") @db.VarChar(20)
+  errorCode    String?   @map("error_code") @db.VarChar(50)
+  errorDetails String?   @map("error_details") @db.Text
+  sentAt       DateTime  @default(now()) @map("sent_at") @db.Timestamptz
+  receiptAt    DateTime? @map("receipt_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, sentAt], map: "idx_expo_tickets_status_sent")
+  @@index([userId], map: "idx_expo_tickets_user")
+  @@map("expo_push_tickets")
 }
 
 // ── AKREDİTASYON STANDARTLARI ──
