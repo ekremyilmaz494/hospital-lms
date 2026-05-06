@@ -34,7 +34,6 @@ export default function NewHospitalPage() {
       adminFirstName: formData.get('adminFirstName'),
       adminLastName: formData.get('adminLastName'),
       adminEmail: formData.get('adminEmail'),
-      adminPassword: formData.get('adminPassword'),
       ...(planId && { planId }),
       trialDays: Number(formData.get('trialDays') ?? 14),
     };
@@ -49,6 +48,16 @@ export default function NewHospitalPage() {
         throw new Error(data.error || `HTTP ${res.status}`);
       }
       const created = await res.json();
+      // SMTP arızası fallback: email gitmediyse davet linkini super_admin'e göster
+      if (created.emailSent === false && created.inviteUrl) {
+        alert(
+          `Hastane oluşturuldu, ancak davet maili gönderilemedi.\n\n` +
+          `Aşağıdaki davet linkini Esas Yönetici'ye manuel iletin (72 saat geçerli):\n\n` +
+          `${created.inviteUrl}`,
+        );
+      } else {
+        alert('Hastane oluşturuldu. Esas Yönetici\'ye davet bağlantısı maille iletildi (72 saat geçerli).');
+      }
       router.push(`/super-admin/hospitals/${created.id ?? ''}`);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Bir hata oluştu');
@@ -150,9 +159,12 @@ export default function NewHospitalPage() {
                 <Label style={{ color: 'var(--color-text-secondary)' }}>E-posta *</Label>
                 <Input name="adminEmail" placeholder="admin@hastane.com" type="email" autoComplete="email" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
               </div>
-              <div>
-                <Label style={{ color: 'var(--color-text-secondary)' }}>Şifre *</Label>
-                <Input name="adminPassword" placeholder="••••••••" type="password" autoComplete="new-password" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+              <div className="rounded-lg border p-3" style={{ background: 'var(--color-info-bg, #eff6ff)', borderColor: 'var(--color-info, #3b82f6)' }}>
+                <p className="text-xs" style={{ color: 'var(--color-info, #1e40af)' }}>
+                  <strong>Bilgi:</strong> Hesap oluşturma bağlantısı bu e-posta adresine gönderilir.
+                  Esas Yönetici, bağlantıya tıklayıp kendi şifresini belirleyerek hesabını aktive eder.
+                  Bağlantı 72 saat geçerlidir.
+                </p>
               </div>
             </div>
 

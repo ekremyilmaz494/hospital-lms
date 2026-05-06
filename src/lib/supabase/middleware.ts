@@ -15,6 +15,8 @@ const PUBLIC_ROUTES = [
   '/auth/reset-password',
   '/auth/mfa-verify',
   '/auth/mfa-setup',
+  '/davet/',
+  '/api/auth/invitations/',
   '/api/health',
   '/api/docs',
   '/docs',

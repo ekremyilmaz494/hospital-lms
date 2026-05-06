@@ -75,7 +75,7 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
       onClose={() => { if (!saving) onClose(); }}
       eyebrow="Yönetici Daveti"
       title="Yeni yönetici davet et"
-      subtitle={`Hesap oluşturulur ve giriş bilgileri e-posta ile iletilir. (${currentCount + 1} / ${maxAdmins})`}
+      subtitle={`Davet bağlantısı maille gönderilir, 72 saat geçerlidir. (${currentCount + 1} / ${maxAdmins})`}
       size="md"
       disableEscape={saving}
       footer={
@@ -101,10 +101,13 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
             <UserCog className="h-6 w-6" />
           </div>
           <h4 className="text-lg font-semibold" style={{ color: 'var(--k-text-primary)' }}>
-            Yönetici daveti gönderildi
+            Davet linki gönderildi
           </h4>
           <p className="text-sm" style={{ color: 'var(--k-text-secondary)' }}>
-            Giriş bilgileri {form.email} adresine iletildi.
+            <strong>{form.email}</strong> adresine davet bağlantısı iletildi.
+          </p>
+          <p className="text-xs" style={{ color: 'var(--k-text-muted)' }}>
+            Bağlantı 72 saat içinde kullanılmalıdır. Davet edilen kişi linke tıklayıp kendi şifresini belirleyecek.
           </p>
         </div>
       ) : (

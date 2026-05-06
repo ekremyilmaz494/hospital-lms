@@ -473,6 +473,71 @@ export async function sendHospitalWelcomeEmail(params: {
 }
 
 /**
+ * Davet bağlantısı email'i — link tabanlı yeni hesap aktivasyonu (Slack/Linear pattern).
+ *
+ * Şifre asla mail'de geçmez. Davet edilen kişi 72 saat içinde linke tıklar,
+ * kendi şifresini kurar ve KVKK onayı verir; o anda hesap aktive olur.
+ *
+ * @returns sendEmail çıktısı (true = mail kuyruga alındı/gönderildi, false = SMTP yok)
+ */
+export async function sendInvitationEmail(params: {
+  to: string
+  hospitalName: string
+  inviteUrl: string
+  inviterName: string
+  recipientName: string
+  roleLabel: string
+  expiresInHours: number
+  organizationId?: string | null
+}): Promise<boolean> {
+  const { to, hospitalName, inviteUrl, inviterName, recipientName, roleLabel, expiresInHours, organizationId } = params
+  const html = `
+    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">${escapeHtml(hospitalName)}</h1>
+        <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px;">Yeni Hesap Daveti</p>
+      </div>
+      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <h2 style="color: #1e293b; margin-top: 0;">Merhaba ${escapeHtml(recipientName)},</h2>
+        <p style="color: #64748b; line-height: 1.6;">
+          <strong>${escapeHtml(inviterName)}</strong> sizi
+          <strong>${escapeHtml(hospitalName)}</strong> sistemine
+          <strong>${escapeHtml(roleLabel)}</strong> olarak davet etti.
+        </p>
+        <p style="color: #64748b; line-height: 1.6;">
+          Hesabınızı oluşturmak ve kendi şifrenizi belirlemek için aşağıdaki butona tıklayın:
+        </p>
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${escapeHtml(inviteUrl)}"
+             style="display: inline-block; background: #0d9668; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+            Hesabımı Oluştur
+          </a>
+        </div>
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
+          <p style="margin: 0; color: #92400e; font-size: 13px;">
+            <strong>Önemli:</strong> Bu davet linki <strong>${expiresInHours} saat</strong> içinde geçerliliğini yitirecektir ve yalnızca bir kez kullanılabilir.
+          </p>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 24px; line-height: 1.6;">
+          Buton çalışmazsa aşağıdaki bağlantıyı tarayıcınıza kopyalayın:<br>
+          <span style="color: #64748b; word-break: break-all;">${escapeHtml(inviteUrl)}</span>
+        </p>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">
+          Bu daveti tanımıyorsanız bu e-postayı yok sayabilirsiniz; davet kullanılmadığı sürece hiçbir hesap oluşturulmaz.
+        </p>
+      </div>
+    </div>
+  `
+
+  return sendEmail({
+    to,
+    subject: `${hospitalName} — Hesap Daveti`,
+    html,
+    organizationId: organizationId ?? undefined,
+  })
+}
+
+/**
  * Toplu personel yüklemesi (ya da tekil personel kaydı) sonrası
  * personele gönderilen "Hoş Geldiniz" e-postası.
  *

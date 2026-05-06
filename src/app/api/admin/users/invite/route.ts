@@ -1,22 +1,26 @@
-import { randomBytes } from 'crypto'
-import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody, ApiError, getAppUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { inviteAdminSchema } from '@/lib/validations'
-import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
-import { sendHospitalWelcomeEmail } from '@/lib/email'
-import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
+import { sendInvitationEmail } from '@/lib/email'
+import { checkRateLimit } from '@/lib/redis'
+import {
+  generateInvitationToken,
+  computeInvitationExpiry,
+  buildInvitationUrl,
+  INVITATION_TTL_HOURS,
+} from '@/lib/invitations'
 
 /**
  * POST /api/admin/users/invite
  *
- * Esas Yönetici (org owner) yeni admin davet eder.
+ * Esas Yönetici (org owner) yeni admin davet eder — link tabanlı (Slack/Linear pattern).
  * - Yalnız `Organization.ownerUserId === dbUser.id` olan user erişir
  * - Sıradan admin'ler 403
  * - Mevcut admin sayısı `maxAdmins`'e ulaşmışsa 409
- * - createAuthUser + sendHospitalWelcomeEmail + audit
+ * - Auth user yaratılmaz, sadece Invitation token kaydedilir + email gönderilir
+ * - Davet edilen kişi /davet/[token] linkine tıklayıp şifresini kurar
  */
 export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   const orgId = organizationId
@@ -40,12 +44,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: {
-      id: true,
-      name: true,
-      ownerUserId: true,
-      maxAdmins: true,
-    },
+    select: { id: true, name: true, ownerUserId: true, maxAdmins: true },
   })
   if (!org) throw new ApiError('Organizasyon bulunamadı', 404)
 
@@ -53,77 +52,105 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     return errorResponse('Bu işlem yalnızca Esas Yönetici tarafından yapılabilir', 403)
   }
 
-  const adminCount = await prisma.user.count({
-    where: { organizationId: orgId, role: 'admin', isActive: true },
-  })
-  if (adminCount >= org.maxAdmins) {
+  // Mevcut admin sayısı + bekleyen davet sayısı limit kontrolü
+  const [adminCount, pendingInvites, existingUser] = await Promise.all([
+    prisma.user.count({ where: { organizationId: orgId, role: 'admin', isActive: true } }),
+    prisma.invitation.count({
+      where: {
+        organizationId: orgId,
+        role: 'admin',
+        acceptedAt: null,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    }),
+    prisma.user.findUnique({ where: { email: parsed.data.email }, select: { id: true } }),
+  ])
+
+  if (existingUser) {
+    return errorResponse('Bu e-posta adresi zaten sistemde kayıtlı', 409)
+  }
+
+  if (adminCount + pendingInvites >= org.maxAdmins) {
     return errorResponse(
-      `Yönetici limiti dolu (${org.maxAdmins}). Limit yükseltmek için Klinova ile iletişime geçin.`,
+      `Yönetici limiti dolu (${org.maxAdmins}). Aktif: ${adminCount}, bekleyen davet: ${pendingInvites}. Limit yükseltmek için Klinova ile iletişime geçin.`,
       409,
     )
   }
 
-  const tempPassword = 'Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1' // secret-scanner-disable-line
-
-  let result
-  try {
-    result = await createAuthUser({
-      email: parsed.data.email,
-      password: tempPassword,
-      firstName: parsed.data.firstName,
-      lastName: parsed.data.lastName,
-      role: 'admin',
+  // Aynı email için aktif davet varsa: eski davetleri revoke et, yeni davet oluştur (resend benzeri)
+  await prisma.invitation.updateMany({
+    where: {
       organizationId: orgId,
-      phone: parsed.data.phone,
-      title: parsed.data.title,
-      mustChangePassword: true,
-    })
-  } catch (err) {
-    if (err instanceof AuthUserError) {
-      logger.error('Admin Invite', 'Auth kullanıcı oluşturulamadı', err.message)
-      return errorResponse(err.safeMessage)
-    }
-    if (err instanceof DbUserError) {
-      logger.error('Admin Invite', 'DB insert başarısız — rollback yapıldı', err.message)
-      return errorResponse(err.safeMessage)
-    }
-    throw err
-  }
-
-  const user = result.dbUser
-
-  await audit({
-    action: 'admin.invite',
-    entityType: 'user',
-    entityId: user.id,
-    newData: { ...user, invitedByOwnerId: dbUser.id },
+      email: parsed.data.email,
+      acceptedAt: null,
+      revokedAt: null,
+    },
+    data: { revokedAt: new Date() },
   })
 
-  revalidatePath('/admin/yoneticiler')
-  try { await invalidateOrgCache(orgId, 'staff') } catch { /* best-effort */ }
+  // Token üret + Invitation row oluştur
+  const { raw, hash } = generateInvitationToken()
+  const expiresAt = computeInvitationExpiry()
 
+  const invitation = await prisma.invitation.create({
+    data: {
+      tokenHash: hash,
+      email: parsed.data.email,
+      firstName: parsed.data.firstName,
+      lastName: parsed.data.lastName,
+      phone: parsed.data.phone ?? null,
+      title: parsed.data.title ?? null,
+      role: 'admin',
+      organizationId: orgId,
+      invitedByUserId: dbUser.id,
+      setAsOwner: false,
+      expiresAt,
+    },
+    select: { id: true },
+  })
+
+  await audit({
+    action: 'invitation.create',
+    entityType: 'invitation',
+    entityId: invitation.id,
+    newData: {
+      email: parsed.data.email,
+      role: 'admin',
+      expiresAt,
+    },
+  })
+
+  // Davet maili gönder
+  const inviteUrl = buildInvitationUrl(getAppUrl(), raw)
   let emailSent = true
   try {
-    await sendHospitalWelcomeEmail({
-      to: user.email,
+    emailSent = await sendInvitationEmail({
+      to: parsed.data.email,
       hospitalName: org.name,
-      loginUrl: `${getAppUrl()}/auth/login`,
-      tempPassword,
-      adminName: `${user.firstName} ${user.lastName}`,
+      inviteUrl,
+      inviterName: `${dbUser.firstName} ${dbUser.lastName}`,
+      recipientName: `${parsed.data.firstName} ${parsed.data.lastName}`,
+      roleLabel: 'Yönetici',
+      expiresInHours: INVITATION_TTL_HOURS,
+      organizationId: orgId,
     })
   } catch (err) {
     emailSent = false
-    logger.error('Admin Invite', 'Welcome email failed', {
-      email: user.email,
+    logger.error('Admin Invite', 'Davet maili gönderilemedi', {
+      email: parsed.data.email,
       error: (err as Error).message,
     })
   }
 
   return jsonResponse(
     {
-      ...user,
+      id: invitation.id,
+      email: parsed.data.email,
+      expiresAt,
       emailSent,
-      ...(emailSent ? {} : { tempPassword }),
+      // SMTP arızası fallback'i: davet eden link'i manuel paylaşabilsin
+      ...(emailSent ? {} : { inviteUrl }),
     },
     201,
   )
