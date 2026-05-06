@@ -1,11 +1,10 @@
-import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
+import * as Brevo from '@getbrevo/brevo'
 import { htmlToText } from 'html-to-text'
 import { checkRateLimit } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { BRAND } from '@/lib/brand'
 import { emailLayout, cta, alertBox, infoCard } from '@/lib/email-layout'
-import { buildRawMime } from '@/lib/email-mime'
 
 /**
  * Escapes HTML special characters to prevent HTML injection in email templates.
@@ -20,44 +19,14 @@ export function escapeHtml(unsafe: string): string {
     .replace(/'/g, '&#39;')
 }
 
-// ── AWS SES Client (singleton) ──
-// Region default: eu-central-1 (Frankfurt — klinovax.com domain orada verified).
-//
-// Credential resolution sırası (least-privilege için ayrı SES-only IAM kullanıcı):
-//   1. AWS_SES_ACCESS_KEY_ID + AWS_SES_SECRET_ACCESS_KEY (SES'e özel — önerilen)
-//   2. AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY (genel — S3/SES tek user senaryosu)
-//   3. Hiçbiri yoksa AWS SDK default chain (Vercel/EC2 IAM role)
-//
-// SES için ayrı IAM user (klinovax-ses-sender), S3 ile aynı key'i paylaşmaz —
-// birinin sızması diğer servisi etkilemesin diye.
-let sesClientInstance: SESv2Client | null = null
-function getSesClient(): SESv2Client {
-  if (sesClientInstance) return sesClientInstance
-  const region = process.env.AWS_SES_REGION ?? process.env.AWS_REGION ?? 'eu-central-1'
-  const accessKeyId = process.env.AWS_SES_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID
-  const secretAccessKey = process.env.AWS_SES_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY
-  sesClientInstance = new SESv2Client({
-    region,
-    ...(accessKeyId && secretAccessKey
-      ? { credentials: { accessKeyId, secretAccessKey } }
-      : {}),
-  })
-  return sesClientInstance
-}
-
-/**
- * RFC 5322 "From" header escape.
- * Display name içinde özel karakter (`,` `<` `>` `"` `\`) varsa quoted-string yapar
- * ve `"` `\` karakterlerini escape eder. Boş ise sadece adres döner.
- */
-function formatFromHeader(displayName: string | null | undefined, address: string): string {
-  if (!displayName || !displayName.trim()) return address
-  const trimmed = displayName.trim()
-  // Quote gerekirse: özel karakter veya başında/sonunda boşluk varsa
-  const needsQuote = /[",<>:;@\\()[\]]/.test(trimmed) || /^\s|\s$/.test(displayName)
-  if (!needsQuote) return `${trimmed} <${address}>`
-  const escaped = trimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-  return `"${escaped}" <${address}>`
+// ── Brevo Transactional Email Client (singleton) ──
+let brevoClientInstance: Brevo.BrevoClient | null = null
+function getBrevoClient(): Brevo.BrevoClient {
+  if (brevoClientInstance) return brevoClientInstance
+  const apiKey = process.env.BREVO_API_KEY
+  if (!apiKey) throw new Error('BREVO_API_KEY env var eksik')
+  brevoClientInstance = new Brevo.BrevoClient({ apiKey })
+  return brevoClientInstance
 }
 
 interface OrgEmailContext {
@@ -111,12 +80,10 @@ interface EmailOptions {
 const EMAIL_GLOBAL_LIMIT = 200
 const EMAIL_PER_RECIPIENT_LIMIT = 20
 const EMAIL_WINDOW_SECONDS = 3600
-
-const SES_MAX_ATTEMPTS = 3
-const RETRYABLE_ERRORS = new Set(['Throttling', 'ThrottlingException', 'TooManyRequestsException', 'ServiceUnavailable'])
+const MAX_ATTEMPTS = 3
 
 /**
- * Merkezi SES üzerinden e-posta gönderir.
+ * Merkezi Brevo üzerinden e-posta gönderir.
  * - organizationId verildiyse: tenant'ın display name + reply-to override'ları uygulanır.
  *   `emailEnabled=false` ve `transactional !== true` ise gönderim atlanır (false döner, fırlatmaz).
  * - organizationId yoksa: platform-owned akış (super admin, self-registration), brand fullName ile gönderilir.
@@ -156,7 +123,6 @@ export async function sendEmail({
   if (organizationId) {
     const ctx = await getOrgEmailContext(organizationId)
     if (!transactional && !ctx.enabled) {
-      // Opt-out — sessizce atla
       return false
     }
     if (!displayName) displayName = ctx.displayName
@@ -164,43 +130,34 @@ export async function sendEmail({
   }
   if (!displayName) displayName = BRAND.fullName
 
-  const fromHeader = formatFromHeader(displayName, BRAND.fromAddress)
   const plainText = text ?? htmlToText(html, { wordwrap: 80, selectors: [{ selector: 'a', options: { hideLinkHrefIfSameAsText: true } }] })
 
-  const command = new SendEmailCommand({
-    FromEmailAddress: fromHeader,
-    Destination: { ToAddresses: recipientList },
-    ReplyToAddresses: effectiveReplyTo ? [effectiveReplyTo] : undefined,
-    Content: {
-      Simple: {
-        Subject: { Data: subject, Charset: 'UTF-8' },
-        Body: {
-          Html: { Data: html, Charset: 'UTF-8' },
-          Text: { Data: plainText, Charset: 'UTF-8' },
-        },
-      },
-    },
-    EmailTags: [
-      { Name: 'transactional', Value: transactional ? 'true' : 'false' },
-      ...(organizationId ? [{ Name: 'organizationId', Value: organizationId }] : []),
-    ],
-  })
+  const emailPayload = {
+    subject,
+    htmlContent: html,
+    textContent: plainText,
+    sender: { name: displayName, email: BRAND.fromAddress },
+    to: recipientList.map(e => ({ email: e })),
+    ...(effectiveReplyTo ? { replyTo: { email: effectiveReplyTo } } : {}),
+    tags: [transactional ? 'transactional' : 'notification', ...(organizationId ? [organizationId] : [])],
+  }
 
-  // Retry: throttling/transient'da exponential backoff (300ms × 2^attempt)
+  // Retry: rate limit / sunucu hatalarında exponential backoff (300ms × 2^attempt)
   let lastErr: unknown = null
-  for (let attempt = 0; attempt < SES_MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      await getSesClient().send(command)
+      await getBrevoClient().transactionalEmails.sendTransacEmail(emailPayload)
       return true
     } catch (err) {
       lastErr = err
-      const code = (err as { name?: string })?.name ?? ''
-      if (!RETRYABLE_ERRORS.has(code) || attempt === SES_MAX_ATTEMPTS - 1) break
+      const status = (err as { statusCode?: number })?.statusCode ?? 0
+      const retryable = status === 429 || status >= 500
+      if (!retryable || attempt === MAX_ATTEMPTS - 1) break
       await new Promise(resolve => setTimeout(resolve, 300 * Math.pow(2, attempt)))
     }
   }
-  logger.error('email', `SES gönderim başarısız (${recipientList.length} alıcı, subject="${subject}")`, lastErr)
-  throw lastErr instanceof Error ? lastErr : new Error('SES gönderim başarısız')
+  logger.error('email', `Brevo gönderim başarısız (${recipientList.length} alıcı, subject="${subject}")`, lastErr)
+  throw lastErr instanceof Error ? lastErr : new Error('Brevo gönderim başarısız')
 }
 
 // ── Email Templates ──
@@ -644,34 +601,19 @@ export async function sendInvoiceEmail(params: {
     </div>
   `
 
-  // Fatura — SES SendEmail Raw + manuel MIME multipart (PDF attachment).
-  // RFC 2045 boundary + base64 wrap'i `buildRawMime` helper'ı yapar.
-  const fromAddress = process.env.SES_FROM_ADDRESS
-    ?? process.env.SMTP_FROM
-    ?? `${BRAND.fullName} <noreply@hastanelms.com>`
-
-  const rawMessage = buildRawMime({
-    from: fromAddress,
-    to: recipientList.join(', '),
-    subject: `Fatura - ${invoiceNumber}`,
-    html,
-    attachments: [
-      {
-        filename: `fatura-${invoiceNumber}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf',
-      },
-    ],
-  })
-
   try {
-    await getSesClient().send(
-      new SendEmailCommand({
-        Content: { Raw: { Data: rawMessage } },
-      }),
-    )
+    await getBrevoClient().transactionalEmails.sendTransacEmail({
+      subject: `Fatura - ${invoiceNumber}`,
+      htmlContent: html,
+      sender: { name: BRAND.fullName, email: BRAND.fromAddress },
+      to: recipientList.map(e => ({ email: e })),
+      attachment: [{
+        name: `fatura-${invoiceNumber}.pdf`,
+        content: Buffer.from(pdfBuffer).toString('base64'),
+      }],
+    })
   } catch (err) {
-    logger.error('Email', 'Invoice SES send failed', err instanceof Error ? err.message : String(err))
+    logger.error('Email', 'Invoice Brevo send failed', err instanceof Error ? err.message : String(err))
     throw err
   }
 }
