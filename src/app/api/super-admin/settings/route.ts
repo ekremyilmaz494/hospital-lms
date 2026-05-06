@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withSuperAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
+import { BRAND } from '@/lib/brand'
 
 /**
  * GET /api/super-admin/settings — Platform ayarlarını getir
@@ -13,7 +14,7 @@ export const GET = withSuperAdminRoute(async () => {
   const userCount = await prisma.user.count()
 
   return jsonResponse({
-    platformName: process.env.NEXT_PUBLIC_PLATFORM_NAME || 'Devakent Hastanesi',
+    platformName: process.env.NEXT_PUBLIC_PLATFORM_NAME || BRAND.fullName,
     platformUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     defaultStorageLimit: 10,
     maintenanceMode: false,
@@ -21,7 +22,7 @@ export const GET = withSuperAdminRoute(async () => {
     smtpPort: Number(process.env.SMTP_PORT || '587'),
     smtpUser: process.env.SMTP_USER ? '••••••••' : '',
     smtpPassword: process.env.SMTP_PASS ? '••••••••' : '',
-    senderName: process.env.SMTP_FROM_NAME || 'Devakent Hastanesi',
+    senderName: process.env.SMTP_FROM_NAME || BRAND.fullName,
     stats: {
       totalOrganizations: orgCount,
       totalUsers: userCount,

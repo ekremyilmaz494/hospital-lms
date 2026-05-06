@@ -127,7 +127,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   try {
     emailSent = await sendInvitationEmail({
       to: parsed.data.email,
-      hospitalName: org.name,
+      organizationName: org.name,
       inviteUrl,
       inviterName: `${dbUser.firstName} ${dbUser.lastName}`,
       recipientName: `${parsed.data.firstName} ${parsed.data.lastName}`,

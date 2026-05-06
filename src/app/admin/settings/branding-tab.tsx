@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Palette, Upload, Image as ImageIcon, Trash2, Globe, Eye, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { BRAND } from '@/lib/brand';
 
 /* ─── Types ─── */
 interface SettingsData {
@@ -321,7 +322,7 @@ function LoginPreview({ settings }: { settings: SettingsData }) {
                 </div>
               )}
               <span className="text-[10px] font-semibold text-white/90">
-                {hospitalName || 'Devakent Hastanesi'}
+                {hospitalName || BRAND.fullName}
               </span>
             </div>
             <p className="text-[8px] uppercase tracking-wider font-semibold" style={{ color: secondaryColor }}>

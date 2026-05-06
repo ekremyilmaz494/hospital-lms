@@ -8,6 +8,7 @@ import { drawCertificatePage as drawCertPageShared, type CertDrawData } from '@/
 import { applyTurkishFont } from '@/lib/pdf/helpers/font'
 import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
 import type { AttemptStatus } from '@/lib/exam-state-machine'
+import { BRAND } from '@/lib/brand'
 import type { UserRole } from '@/types/database'
 
 const BRAND_RGB: [number, number, number] = [13, 150, 104]
@@ -44,7 +45,7 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId: orgI
 
   doc.setFontSize(20)
   doc.setTextColor(...BRAND_RGB)
-  doc.text('Devakent Hastanesi', pageWidth / 2, 20, { align: 'center' })
+  doc.text(BRAND.fullName, pageWidth / 2, 20, { align: 'center' })
   doc.setFontSize(12)
   doc.setTextColor(100)
   doc.text(org?.name ?? '', pageWidth / 2, 28, { align: 'center' })
@@ -246,7 +247,7 @@ async function renderCertificateListPdf(certs: CertListItem[], orgName: string, 
   const drawHeader = () => {
     doc.setFontSize(18)
     doc.setTextColor(...BRAND_RGB)
-    doc.text('Devakent Hastanesi', pageWidth / 2, 18, { align: 'center' })
+    doc.text(BRAND.fullName, pageWidth / 2, 18, { align: 'center' })
     doc.setFontSize(11)
     doc.setTextColor(100)
     doc.text(orgName, pageWidth / 2, 25, { align: 'center' })

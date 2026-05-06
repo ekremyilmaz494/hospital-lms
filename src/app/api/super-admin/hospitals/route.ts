@@ -193,7 +193,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   try {
     emailSent = await sendInvitationEmail({
       to: adminEmail,
-      hospitalName: orgData.name,
+      organizationName: orgData.name,
       inviteUrl,
       inviterName: `${dbUser.firstName} ${dbUser.lastName}`,
       recipientName: `${adminFirstName} ${adminLastName}`,

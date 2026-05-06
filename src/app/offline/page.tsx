@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { WifiOff, RefreshCw } from 'lucide-react'
+import { BRAND } from '@/lib/brand'
 
 /** Kullanıcı çevrimdışıyken service worker tarafından yönlendirilen fallback sayfa */
 export default function OfflinePage() {
@@ -70,7 +71,7 @@ export default function OfflinePage() {
           H
         </div>
         <span className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-          Devakent Hastanesi
+          {BRAND.fullName}
         </span>
       </div>
     </div>

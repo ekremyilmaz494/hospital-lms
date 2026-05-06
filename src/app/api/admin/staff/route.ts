@@ -287,7 +287,7 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     await sendStaffWelcomeEmail({
       to: user.email,
       staffName: `${user.firstName} ${user.lastName}`,
-      hospitalName: org?.name ?? 'Hastane',
+      organizationName: org?.name ?? 'Hastane',
       tempPassword: effectivePassword,
       loginUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`,
     })

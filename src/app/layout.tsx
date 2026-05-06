@@ -10,6 +10,7 @@ import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { DevSWCleaner } from "@/components/dev-sw-cleaner";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { CrispWidget } from "@/components/providers/crisp-widget";
+import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
 const fontDisplay = Plus_Jakarta_Sans({
@@ -34,7 +35,7 @@ const fontMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Devakent Hastanesi - Personel Eğitim Sistemi",
+  title: `${BRAND.fullName} - Personel Eğitim Sistemi`,
   description: "Hastane personeli için eğitim ve sınav yönetim platformu",
 };
 

@@ -105,7 +105,7 @@ export const POST = withSuperAdminRoute(async ({ request, audit }) => {
     if (parsed.data.role === 'admin') {
       await sendHospitalWelcomeEmail({
         to: parsed.data.email,
-        hospitalName,
+        organizationName: hospitalName,
         loginUrl,
         tempPassword,
         adminName: fullName,
@@ -114,7 +114,7 @@ export const POST = withSuperAdminRoute(async ({ request, audit }) => {
       await sendStaffWelcomeEmail({
         to: parsed.data.email,
         staffName: fullName,
-        hospitalName,
+        organizationName: hospitalName,
         tempPassword,
         loginUrl,
       })

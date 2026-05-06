@@ -62,7 +62,7 @@ const ORG_ID = '00000000-0000-0000-0000-000000000001'
 describe('trainingAssignedEmail template', () => {
   const base = {
     staffName: 'Ayşe Yılmaz',
-    hospitalName: 'Kızılay Eğitim Hastanesi',
+    organizationName: 'Kızılay Eğitim Hastanesi',
     trainingTitle: 'El Hijyeni Eğitimi',
     endDate: '30 Nisan 2026',
   }

@@ -375,7 +375,7 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
         sendStaffWelcomeEmail({
           to: row.email,
           staffName: `${row.firstName} ${row.lastName}`,
-          hospitalName,
+          organizationName: hospitalName,
           tempPassword: pwd,
           loginUrl,
         }).catch(err => {

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ShimmerButton } from '@/components/ui/shimmer-button';
 import type { OrgBranding } from '@/hooks/use-org-branding';
+import { BRAND } from '@/lib/brand';
 
 // Klinova emerald palette
 const K = {
@@ -117,7 +118,7 @@ export default function MobileLayout({
                 className="text-[15px] block leading-tight"
                 style={{ color: '#ffffff', fontFamily: K.FONT_DISPLAY, fontWeight: 700 }}
               >
-                {branding?.name || 'Devakent Hastanesi'}
+                {branding?.name || BRAND.fullName}
               </span>
               <span
                 className="text-[10px] font-medium tracking-widest uppercase"
@@ -332,7 +333,7 @@ export default function MobileLayout({
               className="text-center text-[11px]"
               style={{ color: 'rgba(255,255,255,0.2)' }}
             >
-              &copy; 2026 Devakent Hastanesi
+              &copy; 2026 {BRAND.fullName}
             </p>
           </div>
         </div>

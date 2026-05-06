@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { ExamAuthGuard } from './exam-auth-guard';
+import { BRAND } from '@/lib/brand';
 
 export const metadata: Metadata = {
-  title: 'Sinav | Devakent Hastanesi',
+  title: `Sinav | ${BRAND.fullName}`,
   description: 'Hastane personeli egitim sinav modulu',
 };
 
