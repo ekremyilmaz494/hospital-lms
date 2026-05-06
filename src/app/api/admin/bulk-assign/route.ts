@@ -194,7 +194,7 @@ async function sendBulkAssignmentEmails(params: {
 
         const html = trainingAssignedEmail({
           staffName,
-          hospitalName: org.name,
+          organizationName: org.name,
           trainingTitle: training.title,
           trainingDescription: training.description,
           category: training.category,

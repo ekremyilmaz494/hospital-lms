@@ -203,7 +203,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   try {
     await sendHospitalWelcomeEmail({
       to: adminEmail,
-      hospitalName: orgData.name,
+      organizationName: orgData.name,
       loginUrl,
       tempPassword,
       adminName: `${adminFirstName} ${adminLastName}`,

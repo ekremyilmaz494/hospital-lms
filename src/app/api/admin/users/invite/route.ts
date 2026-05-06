@@ -106,7 +106,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   try {
     await sendHospitalWelcomeEmail({
       to: user.email,
-      hospitalName: org.name,
+      organizationName: org.name,
       loginUrl: `${getAppUrl()}/auth/login`,
       tempPassword,
       adminName: `${user.firstName} ${user.lastName}`,
