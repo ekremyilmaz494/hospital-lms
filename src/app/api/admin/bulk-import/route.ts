@@ -345,9 +345,10 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
   // Hoş geldiniz maili için hastane adı (tek sorgu, loop öncesi)
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { name: true },
+    select: { name: true, brandColor: true },
   })
   const hospitalName = org?.name ?? 'Hastane'
+  const brandColor = org?.brandColor ?? null
   const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`
   const emailPromises: Promise<void>[] = []
 
@@ -376,6 +377,7 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
           to: row.email,
           staffName: `${row.firstName} ${row.lastName}`,
           organizationName: hospitalName,
+          brandColor,
           tempPassword: pwd,
           loginUrl,
         }).catch(err => {

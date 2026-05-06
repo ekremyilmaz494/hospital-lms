@@ -282,12 +282,13 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
   try {
     const org = await prisma.organization.findUnique({
       where: { id: orgId },
-      select: { name: true },
+      select: { name: true, brandColor: true },
     })
     await sendStaffWelcomeEmail({
       to: user.email,
       staffName: `${user.firstName} ${user.lastName}`,
       organizationName: org?.name ?? 'Hastane',
+      brandColor: org?.brandColor ?? null,
       tempPassword: effectivePassword,
       loginUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`,
     })

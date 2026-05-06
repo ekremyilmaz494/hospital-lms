@@ -71,7 +71,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
       smgPoints: true,
       isCompulsory: true,
       videos: { select: { contentType: true } },
-      organization: { select: { name: true } },
+      organization: { select: { name: true, brandColor: true } },
     },
   })
   if (!training) return errorResponse('Eğitim bulunamadı veya arşivlenmiş', 404)
@@ -147,6 +147,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
       isCompulsory: training.isCompulsory,
     },
     hospitalName: training.organization.name,
+    brandColor: training.organization.brandColor,
     maxAttempts: parsed.data.maxAttempts,
     assignedByName,
   })
@@ -169,6 +170,7 @@ async function sendAssignmentEmails(params: {
     isCompulsory: boolean
   }
   hospitalName: string
+  brandColor: string | null
   maxAttempts: number
   assignedByName: string | null
 }) {
@@ -190,6 +192,7 @@ async function sendAssignmentEmails(params: {
           const html = trainingAssignedEmail({
             staffName,
             organizationName: params.hospitalName,
+            brandColor: params.brandColor,
             trainingTitle: params.training.title,
             trainingDescription: params.training.description,
             category: params.training.category,
