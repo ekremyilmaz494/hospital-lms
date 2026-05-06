@@ -94,9 +94,10 @@ export const POST = withSuperAdminRoute(async ({ request, audit }) => {
   // Hoş geldiniz e-postası — admin ve staff için ayrı template
   const org = await prisma.organization.findUnique({
     where: { id: parsed.data.organizationId },
-    select: { name: true },
+    select: { name: true, brandColor: true },
   })
   const hospitalName = org?.name ?? ''
+  const brandColor = org?.brandColor ?? null
   const loginUrl = `${getAppUrl()}/auth/login`
   const fullName = `${parsed.data.firstName} ${parsed.data.lastName}`.trim()
 
@@ -106,6 +107,7 @@ export const POST = withSuperAdminRoute(async ({ request, audit }) => {
       await sendHospitalWelcomeEmail({
         to: parsed.data.email,
         organizationName: hospitalName,
+        brandColor,
         loginUrl,
         tempPassword,
         adminName: fullName,
@@ -115,6 +117,7 @@ export const POST = withSuperAdminRoute(async ({ request, audit }) => {
         to: parsed.data.email,
         staffName: fullName,
         organizationName: hospitalName,
+        brandColor,
         tempPassword,
         loginUrl,
       })

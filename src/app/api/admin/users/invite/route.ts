@@ -44,7 +44,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { id: true, name: true, ownerUserId: true, maxAdmins: true },
+    select: { id: true, name: true, ownerUserId: true, maxAdmins: true, brandColor: true },
   })
   if (!org) throw new ApiError('Organizasyon bulunamadı', 404)
 
@@ -128,6 +128,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     emailSent = await sendInvitationEmail({
       to: parsed.data.email,
       organizationName: org.name,
+      brandColor: org.brandColor,
       inviteUrl,
       inviterName: `${dbUser.firstName} ${dbUser.lastName}`,
       recipientName: `${parsed.data.firstName} ${parsed.data.lastName}`,

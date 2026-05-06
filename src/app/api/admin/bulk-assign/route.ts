@@ -169,7 +169,7 @@ async function sendBulkAssignmentEmails(params: {
   try {
     const org = await prisma.organization.findUnique({
       where: { id: params.organizationId },
-      select: { name: true },
+      select: { name: true, brandColor: true },
     })
     if (!org) return
 
@@ -195,6 +195,7 @@ async function sendBulkAssignmentEmails(params: {
         const html = trainingAssignedEmail({
           staffName,
           organizationName: org.name,
+          brandColor: org.brandColor,
           trainingTitle: training.title,
           trainingDescription: training.description,
           category: training.category,

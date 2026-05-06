@@ -246,6 +246,8 @@ interface TrainingAssignedEmailParams {
   smgPoints?: number | null
   isCompulsory?: boolean
   assignedByName?: string | null
+  /** Tenant brand rengi — header gradient için. Yoksa default tema. */
+  brandColor?: string | null
 }
 
 /**
@@ -266,10 +268,10 @@ export function trainingAssignedEmail(params: TrainingAssignedEmailParams): stri
     smgPoints,
     isCompulsory,
     assignedByName,
+    brandColor,
   } = params
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
-  const ctaUrl = `${appUrl}/staff/my-trainings`
+  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/staff/my-trainings`
 
   const detailRow = (label: string, value: string) => `
     <tr>
@@ -290,76 +292,53 @@ export function trainingAssignedEmail(params: TrainingAssignedEmailParams): stri
     : ''
 
   const descriptionBlock = trainingDescription
-    ? `
-      <p style="color: #475569; line-height: 1.65; font-size: 14px; margin: 8px 0 20px;">
-        ${escapeHtml(trainingDescription)}
-      </p>`
+    ? `<p style="color: #475569; line-height: 1.65; font-size: 14px; margin: 8px 0 20px;">${escapeHtml(trainingDescription)}</p>`
     : ''
 
   const assignedByLine = assignedByName
     ? `<p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0;">Atayan: <strong style="color: #475569;">${escapeHtml(assignedByName)}</strong></p>`
     : ''
 
-  return `
-    <div style="font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 620px; margin: 0 auto; background: #f8fafc; padding: 32px 16px;">
-      <!-- Header -->
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 36px 32px; border-radius: 16px 16px 0 0;">
-        <p style="margin: 0 0 6px; color: rgba(255,255,255,0.72); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600;">Personel Eğitim Bildirimi</p>
-        <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px;">${escapeHtml(organizationName)}</h1>
-      </div>
+  const content = `
+    <h2 style="color: #0f172a; margin: 0 0 6px; font-size: 20px; font-weight: 700; letter-spacing: -0.2px;">
+      Yeni bir eğitim atandı${compulsoryBadge}
+    </h2>
+    <p style="color: #64748b; margin: 0 0 24px; font-size: 14px; line-height: 1.6;">
+      Sayın <strong style="color: #0f172a;">${escapeHtml(staffName)}</strong>, aşağıdaki eğitim kurumunuz tarafından size atanmıştır.
+      Süresi dolmadan tamamlamanız beklenmektedir.
+    </p>
 
-      <!-- Body -->
-      <div style="background: white; padding: 36px 32px; border: 1px solid #e2e8f0; border-top: none;">
-        <h2 style="color: #0f172a; margin: 0 0 6px; font-size: 20px; font-weight: 700; letter-spacing: -0.2px;">
-          Yeni bir eğitim atandı${compulsoryBadge}
-        </h2>
-        <p style="color: #64748b; margin: 0 0 24px; font-size: 14px; line-height: 1.6;">
-          Sayın <strong style="color: #0f172a;">${escapeHtml(staffName)}</strong>, aşağıdaki eğitim kurumunuz tarafından size atanmıştır.
-          Süresi dolmadan tamamlamanız beklenmektedir.
-        </p>
-
-        <!-- Training card -->
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 24px; margin: 0 0 24px;">
-          <h3 style="margin: 0 0 4px; color: #0f172a; font-size: 17px; font-weight: 700; line-height: 1.35;">
-            ${escapeHtml(trainingTitle)}
-          </h3>
-          ${assignedByLine}
-          ${descriptionBlock}
-          <table style="width: 100%; border-collapse: collapse; margin-top: 8px; border-top: 1px dashed #e2e8f0;">
-            ${rows.join('')}
-          </table>
-        </div>
-
-        <!-- CTA -->
-        <div style="text-align: center; margin: 28px 0 8px;">
-          <a href="${escapeHtml(ctaUrl)}"
-             style="display: inline-block; background: linear-gradient(135deg, #0d9668, #0a7d56); color: white; padding: 14px 36px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.2px; box-shadow: 0 4px 14px rgba(13,150,104,0.35);">
-            Eğitime Başla
-          </a>
-        </div>
-        <p style="text-align: center; color: #94a3b8; font-size: 12px; margin: 0 0 8px;">
-          veya bu bağlantıyı tarayıcınıza yapıştırın:<br/>
-          <span style="color: #64748b; word-break: break-all;">${escapeHtml(ctaUrl)}</span>
-        </p>
-
-        <!-- Footer note -->
-        <div style="border-top: 1px solid #f1f5f9; margin-top: 28px; padding-top: 20px;">
-          <p style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin: 0;">
-            Bu e-posta <strong>${escapeHtml(organizationName)}</strong> personel eğitim yönetim sistemi tarafından
-            otomatik olarak gönderilmiştir. Soru ve talepleriniz için kurumunuzun İnsan Kaynakları veya
-            Eğitim Koordinatörlüğü birimine başvurabilirsiniz.
-          </p>
-        </div>
-      </div>
-
-      <!-- Ribbon -->
-      <div style="background: #0f172a; padding: 14px 32px; border-radius: 0 0 16px 16px; text-align: center;">
-        <p style="margin: 0; color: rgba(255,255,255,0.55); font-size: 11px; letter-spacing: 0.3px;">
-          ${escapeHtml(organizationName)} · Personel Eğitim Yönetim Sistemi
-        </p>
-      </div>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 24px; margin: 0 0 24px;">
+      <h3 style="margin: 0 0 4px; color: #0f172a; font-size: 17px; font-weight: 700; line-height: 1.35;">
+        ${escapeHtml(trainingTitle)}
+      </h3>
+      ${assignedByLine}
+      ${descriptionBlock}
+      <table style="width: 100%; border-collapse: collapse; margin-top: 8px; border-top: 1px dashed #e2e8f0;">
+        ${rows.join('')}
+      </table>
     </div>
+
+    ${cta(ctaUrl, 'Eğitime Başla')}
+
+    <p style="text-align: center; color: #94a3b8; font-size: 12px; margin: 12px 0 8px;">
+      veya bu bağlantıyı tarayıcınıza yapıştırın:<br/>
+      <span style="color: #64748b; word-break: break-all;">${escapeHtml(ctaUrl)}</span>
+    </p>
+
+    <p style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin: 28px 0 0; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+      Bu e-posta <strong>${escapeHtml(organizationName)}</strong> personel eğitim yönetim sistemi tarafından
+      otomatik olarak gönderilmiştir. Soru ve talepleriniz için kurumunuzun İnsan Kaynakları veya
+      Eğitim Koordinatörlüğü birimine başvurabilirsiniz.
+    </p>
   `
+
+  return emailLayout({
+    org: { name: organizationName, brandColor },
+    content,
+    theme: 'tenant',
+    headerSubtitle: 'Personel Eğitim Bildirimi',
+  })
 }
 
 export function examResultEmail(staffName: string, trainingTitle: string, score: number, passed: boolean) {
@@ -475,45 +454,36 @@ export async function sendInvitationEmail(params: {
   roleLabel: string
   expiresInHours: number
   organizationId?: string | null
+  /** Tenant brand rengi — header gradient için. Yoksa default tema. */
+  brandColor?: string | null
 }): Promise<boolean> {
-  const { to, organizationName, inviteUrl, inviterName, recipientName, roleLabel, expiresInHours, organizationId } = params
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${escapeHtml(organizationName)}</h1>
-        <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px;">Yeni Hesap Daveti</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Merhaba ${escapeHtml(recipientName)},</h2>
-        <p style="color: #64748b; line-height: 1.6;">
-          <strong>${escapeHtml(inviterName)}</strong> sizi
-          <strong>${escapeHtml(organizationName)}</strong> sistemine
-          <strong>${escapeHtml(roleLabel)}</strong> olarak davet etti.
-        </p>
-        <p style="color: #64748b; line-height: 1.6;">
-          Hesabınızı oluşturmak ve kendi şifrenizi belirlemek için aşağıdaki butona tıklayın:
-        </p>
-        <div style="text-align: center; margin: 24px 0;">
-          <a href="${escapeHtml(inviteUrl)}"
-             style="display: inline-block; background: #0d9668; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
-            Hesabımı Oluştur
-          </a>
-        </div>
-        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
-          <p style="margin: 0; color: #92400e; font-size: 13px;">
-            <strong>Önemli:</strong> Bu davet linki <strong>${expiresInHours} saat</strong> içinde geçerliliğini yitirecektir ve yalnızca bir kez kullanılabilir.
-          </p>
-        </div>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 24px; line-height: 1.6;">
-          Buton çalışmazsa aşağıdaki bağlantıyı tarayıcınıza kopyalayın:<br>
-          <span style="color: #64748b; word-break: break-all;">${escapeHtml(inviteUrl)}</span>
-        </p>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">
-          Bu daveti tanımıyorsanız bu e-postayı yok sayabilirsiniz; davet kullanılmadığı sürece hiçbir hesap oluşturulmaz.
-        </p>
-      </div>
-    </div>
+  const { to, organizationName, inviteUrl, inviterName, recipientName, roleLabel, expiresInHours, organizationId, brandColor } = params
+  const content = `
+    <h2 style="color: #1e293b; margin-top: 0;">Merhaba ${escapeHtml(recipientName)},</h2>
+    <p style="color: #64748b; line-height: 1.6;">
+      <strong>${escapeHtml(inviterName)}</strong> sizi
+      <strong>${escapeHtml(organizationName)}</strong> sistemine
+      <strong>${escapeHtml(roleLabel)}</strong> olarak davet etti.
+    </p>
+    <p style="color: #64748b; line-height: 1.6;">
+      Hesabınızı oluşturmak ve kendi şifrenizi belirlemek için aşağıdaki butona tıklayın:
+    </p>
+    ${cta(inviteUrl, 'Hesabımı Oluştur')}
+    ${alertBox(`Önemli: Bu davet linki ${expiresInHours} saat içinde geçerliliğini yitirecektir ve yalnızca bir kez kullanılabilir.`, 'warning')}
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 24px; line-height: 1.6;">
+      Buton çalışmazsa aşağıdaki bağlantıyı tarayıcınıza kopyalayın:<br>
+      <span style="color: #64748b; word-break: break-all;">${escapeHtml(inviteUrl)}</span>
+    </p>
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">
+      Bu daveti tanımıyorsanız bu e-postayı yok sayabilirsiniz; davet kullanılmadığı sürece hiçbir hesap oluşturulmaz.
+    </p>
   `
+  const html = emailLayout({
+    org: { name: organizationName, brandColor },
+    content,
+    theme: 'tenant',
+    headerSubtitle: 'Yeni Hesap Daveti',
+  })
 
   return sendEmail({
     to,
@@ -744,104 +714,80 @@ export async function sendInvoiceEmail(params: {
 
 /** Deneme suresi dolmak uzere (7, 3, 1 gun kala) */
 export async function sendTrialExpiringEmail(to: string, organizationName: string, daysLeft: number) {
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #f59e0b, #92400e); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Deneme Suresi Uyarisi</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-          <p style="margin: 0; font-weight: bold; color: #92400e;">${daysLeft} gun kaldi!</p>
-        </div>
-        <h2 style="color: #1e293b; margin-top: 0;">Deneme Sureniz Dolmak Uzere</h2>
-        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> icin deneme surenizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
-        <p style="color: #64748b;">Hizmet kesintisi yasamamamak icin lutfen bir abonelik plani secin.</p>
-        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
-           style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Plan Secin
-        </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Deneme suresi doldugunda yeni egitim ve personel ekleyemezsiniz. Mevcut verileriniz silinmez.</p>
-      </div>
-    </div>
+  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/settings/subscription`
+  const content = `
+    ${alertBox(`${daysLeft} gun kaldi!`, 'warning')}
+    <h2 style="color: #1e293b; margin-top: 0;">Deneme Sureniz Dolmak Uzere</h2>
+    <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> icin deneme surenizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
+    <p style="color: #64748b;">Hizmet kesintisi yasamamamak icin lutfen bir abonelik plani secin.</p>
+    ${cta(ctaUrl, 'Plan Secin', '#f59e0b')}
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Deneme suresi doldugunda yeni egitim ve personel ekleyemezsiniz. Mevcut verileriniz silinmez.</p>
   `
+  const html = emailLayout({
+    org: { name: organizationName },
+    content,
+    theme: 'warning',
+    headerSubtitle: 'Deneme Suresi Uyarisi',
+  })
   await sendEmail({ to, subject: `${organizationName} — Deneme surenizin bitmesine ${daysLeft} gun`, html })
 }
 
 /** Deneme suresi doldu */
 export async function sendTrialExpiredEmail(to: string, organizationName: string) {
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Deneme Suresi Sona Erdi</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-          <p style="margin: 0; font-weight: bold; color: #dc2626;">Deneme suresi doldu</p>
-        </div>
-        <h2 style="color: #1e293b; margin-top: 0;">Deneme Sureniz Sona Erdi</h2>
-        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> icin ucretsiz deneme sureniz sona ermistir.</p>
-        <p style="color: #64748b;">Yeni kayit olusturma kisitlanmistir. Mevcut verilerinize erismeye devam edebilirsiniz.</p>
-        <p style="color: #64748b;">Hizmeti kesintisiz kullanmak icin lutfen bir abonelik plani satin alin.</p>
-        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
-           style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Simdi Abone Ol
-        </a>
-      </div>
-    </div>
+  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/settings/subscription`
+  const content = `
+    ${alertBox('Deneme suresi doldu', 'error')}
+    <h2 style="color: #1e293b; margin-top: 0;">Deneme Sureniz Sona Erdi</h2>
+    <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> icin ucretsiz deneme sureniz sona ermistir.</p>
+    <p style="color: #64748b;">Yeni kayit olusturma kisitlanmistir. Mevcut verilerinize erismeye devam edebilirsiniz.</p>
+    <p style="color: #64748b;">Hizmeti kesintisiz kullanmak icin lutfen bir abonelik plani satin alin.</p>
+    ${cta(ctaUrl, 'Simdi Abone Ol', '#dc2626')}
   `
+  const html = emailLayout({
+    org: { name: organizationName },
+    content,
+    theme: 'error',
+    headerSubtitle: 'Deneme Suresi Sona Erdi',
+  })
   await sendEmail({ to, subject: `${organizationName} — Deneme sureniz sona erdi`, html })
 }
 
 /** Abonelik suresi dolmak uzere (7, 3, 1 gun kala) */
 export async function sendSubscriptionExpiringEmail(to: string, organizationName: string, daysLeft: number) {
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #f59e0b, #92400e); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Yenileme Hatirlatmasi</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-          <p style="margin: 0; font-weight: bold; color: #92400e;">${daysLeft} gun kaldi!</p>
-        </div>
-        <h2 style="color: #1e293b; margin-top: 0;">Aboneliginiz Yenilenmeyi Bekliyor</h2>
-        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliginizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
-        <p style="color: #64748b;">Hizmet kesintisi yasamamamak icin lutfen aboneliginizi yenileyin.</p>
-        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
-           style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Aboneligi Yenile
-        </a>
-      </div>
-    </div>
+  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/settings/subscription`
+  const content = `
+    ${alertBox(`${daysLeft} gun kaldi!`, 'warning')}
+    <h2 style="color: #1e293b; margin-top: 0;">Aboneliginiz Yenilenmeyi Bekliyor</h2>
+    <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliginizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
+    <p style="color: #64748b;">Hizmet kesintisi yasamamamak icin lutfen aboneliginizi yenileyin.</p>
+    ${cta(ctaUrl, 'Aboneligi Yenile', '#f59e0b')}
   `
+  const html = emailLayout({
+    org: { name: organizationName },
+    content,
+    theme: 'warning',
+    headerSubtitle: 'Abonelik Yenileme Hatirlatmasi',
+  })
   await sendEmail({ to, subject: `${organizationName} — Aboneliginizin bitmesine ${daysLeft} gun`, html })
 }
 
 /** Abonelik suresi doldu */
 export async function sendSubscriptionExpiredEmail(to: string, organizationName: string) {
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Sona Erdi</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-          <p style="margin: 0; font-weight: bold; color: #dc2626;">Abonelik sona erdi</p>
-        </div>
-        <h2 style="color: #1e293b; margin-top: 0;">Aboneliginiz Sona Ermistir</h2>
-        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliginiz sona ermistir.</p>
-        <p style="color: #64748b;">Yeni kayit olusturma kisitlanmistir. Mevcut verilerinize erismeye devam edebilirsiniz.</p>
-        <p style="color: #64748b;">Hizmeti tekrar aktif hale getirmek icin lutfen aboneliginizi yenileyin.</p>
-        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
-           style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Simdi Yenile
-        </a>
-      </div>
-    </div>
+  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/settings/subscription`
+  const content = `
+    ${alertBox('Abonelik sona erdi', 'error')}
+    <h2 style="color: #1e293b; margin-top: 0;">Aboneliginiz Sona Ermistir</h2>
+    <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliginiz sona ermistir.</p>
+    <p style="color: #64748b;">Yeni kayit olusturma kisitlanmistir. Mevcut verilerinize erismeye devam edebilirsiniz.</p>
+    <p style="color: #64748b;">Hizmeti tekrar aktif hale getirmek icin lutfen aboneliginizi yenileyin.</p>
+    ${cta(ctaUrl, 'Simdi Yenile', '#dc2626')}
   `
+  const html = emailLayout({
+    org: { name: organizationName },
+    content,
+    theme: 'error',
+    headerSubtitle: 'Abonelik Sona Erdi',
+  })
   await sendEmail({ to, subject: `${organizationName} — Aboneliginiz sona erdi`, html })
 }
 
@@ -857,30 +803,16 @@ export async function sendSelfRegistrationEmail(params: {
 }) {
   const { to, adminName, organizationName } = params
   const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Hoş Geldiniz!</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Kaydınız Başarılı</h2>
-        <p style="color: #64748b;">Merhaba ${escapeHtml(adminName)},</p>
-        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> hastanesi için hesabınız başarıyla oluşturulmuştur.</p>
-        <div style="background: #f0fdf4; border-left: 4px solid #0d9668; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
-          <p style="margin: 0; color: #166534; font-size: 14px;"><strong>30 günlük ücretsiz deneme</strong> süreniz başlamıştır. Bu süre içinde tüm özellikleri kullanabilirsiniz.</p>
-        </div>
-        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
-          <p style="margin: 0; color: #92400e; font-size: 13px;"><strong>Önemli:</strong> Sisteme giriş yapabilmek için önce e-posta adresinizi doğrulamanız gerekmektedir. Lütfen gelen kutunuzu kontrol edin.</p>
-        </div>
-        <a href="${escapeHtml(loginUrl)}"
-           style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Giriş Sayfasına Git
-        </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
-      </div>
-    </div>
+  const content = `
+    <h2 style="color: #1e293b; margin-top: 0;">Kaydınız Başarılı</h2>
+    <p style="color: #64748b;">Merhaba ${escapeHtml(adminName)},</p>
+    <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> hastanesi için hesabınız başarıyla oluşturulmuştur.</p>
+    ${alertBox('30 günlük ücretsiz deneme süreniz başlamıştır. Bu süre içinde tüm özellikleri kullanabilirsiniz.', 'info')}
+    ${alertBox('Önemli: Sisteme giriş yapabilmek için önce e-posta adresinizi doğrulamanız gerekmektedir. Lütfen gelen kutunuzu kontrol edin.', 'warning')}
+    ${cta(loginUrl, 'Giriş Sayfasına Git')}
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
   `
+  const html = emailLayout({ content, theme: 'success', headerSubtitle: 'Hoş Geldiniz!' })
 
   await sendEmail({
     to,
@@ -962,22 +894,13 @@ export function overdueTrainingReminderEmail(staffName: string, trainingTitle: s
 
 /** Şifre değişikliği bildirimi */
 export async function passwordChangedEmail(email: string) {
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Güvenlik Bildirimi</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Şifre Değiştirildi</h2>
-        <p style="color: #64748b;">Hesabınızın şifresi başarıyla değiştirilmiştir.</p>
-        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
-          <p style="margin: 0; color: #92400e; font-size: 13px;"><strong>Önemli:</strong> Bu işlemi siz yapmadıysanız, lütfen derhal sistem yöneticinize başvurunuz.</p>
-        </div>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
-      </div>
-    </div>
+  const content = `
+    <h2 style="color: #1e293b; margin-top: 0;">Şifre Değiştirildi</h2>
+    <p style="color: #64748b;">Hesabınızın şifresi başarıyla değiştirilmiştir.</p>
+    ${alertBox('Önemli: Bu işlemi siz yapmadıysanız, lütfen derhal sistem yöneticinize başvurunuz.', 'warning')}
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
   `
+  const html = emailLayout({ content, theme: 'success', headerSubtitle: 'Güvenlik Bildirimi' })
   await sendEmail({ to: email, subject: `${BRAND.fullName} — Şifre Değiştirildi`, html })
 }
 
@@ -985,58 +908,34 @@ export async function passwordChangedEmail(email: string) {
  * TODO: Henüz entegre edilmedi. Yeni cihaz/IP tespiti implement edildiğinde
  * login/route.ts'de çağrılacak (son login IP karşılaştırması gerekli). */
 export async function loginAlertEmail(email: string, ipAddress: string, userAgent: string, loginTime: string) {
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Güvenlik Bildirimi</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Yeni Giriş Algılandı</h2>
-        <p style="color: #64748b;">Hesabınıza yeni bir cihazdan giriş yapılmıştır. Detaylar aşağıdadır:</p>
-        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p style="margin: 4px 0; color: #475569;"><strong>IP Adresi:</strong> ${escapeHtml(ipAddress)}</p>
-          <p style="margin: 4px 0; color: #475569;"><strong>Tarayıcı:</strong> ${escapeHtml(userAgent)}</p>
-          <p style="margin: 4px 0; color: #475569;"><strong>Giriş Zamanı:</strong> ${escapeHtml(loginTime)}</p>
-        </div>
-        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
-          <p style="margin: 0; color: #92400e; font-size: 13px;"><strong>Önemli:</strong> Bu giriş size ait değilse, lütfen derhal şifrenizi değiştirin.</p>
-        </div>
-        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/auth/forgot-password"
-           style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Şifremi Değiştir
-        </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
-      </div>
-    </div>
+  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/forgot-password`
+  const content = `
+    <h2 style="color: #1e293b; margin-top: 0;">Yeni Giriş Algılandı</h2>
+    <p style="color: #64748b;">Hesabınıza yeni bir cihazdan giriş yapılmıştır. Detaylar aşağıdadır:</p>
+    ${infoCard({ title: 'IP Adresi', body: ipAddress })}
+    ${infoCard({ title: 'Tarayıcı', body: userAgent })}
+    ${infoCard({ title: 'Giriş Zamanı', body: loginTime })}
+    ${alertBox('Önemli: Bu giriş size ait değilse, lütfen derhal şifrenizi değiştirin.', 'warning')}
+    ${cta(ctaUrl, 'Şifremi Değiştir', '#dc2626')}
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
   `
+  const html = emailLayout({ content, theme: 'warning', headerSubtitle: 'Güvenlik Bildirimi' })
   await sendEmail({ to: email, subject: `${BRAND.fullName} — Yeni Giriş Algılandı`, html })
 }
 
 /** Eğitim sertifikası hazır bildirimi */
 export async function certificateIssuedEmail(email: string, staffName: string, trainingTitle: string, certificateCode: string) {
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Sertifika Bildirimi</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Sertifikanız Hazır</h2>
-        <p style="color: #64748b;">Merhaba ${escapeHtml(staffName)},</p>
-        <p style="color: #64748b;">Tebrikler! <strong>"${escapeHtml(trainingTitle)}"</strong> eğitimini başarıyla tamamladınız. Sertifikanız indirilmeye hazırdır.</p>
-        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p style="margin: 4px 0; color: #475569;"><strong>Eğitim:</strong> ${escapeHtml(trainingTitle)}</p>
-          <p style="margin: 4px 0; color: #475569;"><strong>Sertifika Kodu:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${escapeHtml(certificateCode)}</code></p>
-        </div>
-        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/staff/certificates"
-           style="display: inline-block; background: #0d9668; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Sertifikamı İndir
-        </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
-      </div>
-    </div>
+  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/staff/certificates`
+  const content = `
+    <h2 style="color: #1e293b; margin-top: 0;">Sertifikanız Hazır</h2>
+    <p style="color: #64748b;">Merhaba ${escapeHtml(staffName)},</p>
+    <p style="color: #64748b;">Tebrikler! <strong>"${escapeHtml(trainingTitle)}"</strong> eğitimini başarıyla tamamladınız. Sertifikanız indirilmeye hazırdır.</p>
+    ${infoCard({ title: 'Eğitim', body: trainingTitle })}
+    ${infoCard({ title: 'Sertifika Kodu', body: certificateCode })}
+    ${cta(ctaUrl, 'Sertifikamı İndir')}
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
   `
+  const html = emailLayout({ content, theme: 'success', headerSubtitle: 'Sertifika Bildirimi' })
   await sendEmail({ to: email, subject: `${BRAND.fullName} — Sertifikanız Hazır`, html })
 }
 
@@ -1045,33 +944,25 @@ export async function certificateIssuedEmail(email: string, staffName: string, t
  * Bu fonksiyon daha detaylı (plan adı + bitiş tarihi). Admin panelinden
  * manuel bildirim göndermek için kullanılabilir. */
 export async function subscriptionExpiryEmail(email: string, organizationName: string, planName: string, expiryDate: string, daysRemaining: number) {
-  const urgencyColor = daysRemaining <= 3 ? '#dc2626' : '#f59e0b'
-  const urgencyBg = daysRemaining <= 3 ? '#fef2f2' : '#fffbeb'
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, ${urgencyColor}, ${daysRemaining <= 3 ? '#7f1d1d' : '#92400e'}); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Uyarısı</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <div style="background: ${urgencyBg}; border-left: 4px solid ${urgencyColor}; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-          <p style="margin: 0; font-weight: bold; color: ${urgencyColor};">${daysRemaining} gün kaldı!</p>
-        </div>
-        <h2 style="color: #1e293b; margin-top: 0;">Abonelik Süresi Dolmak Üzere</h2>
-        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliğinizin süresinin dolmasına <strong>${daysRemaining} gün</strong> kalmıştır.</p>
-        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p style="margin: 4px 0; color: #475569;"><strong>Plan:</strong> ${escapeHtml(planName)}</p>
-          <p style="margin: 4px 0; color: #475569;"><strong>Bitiş Tarihi:</strong> ${escapeHtml(expiryDate)}</p>
-        </div>
-        <p style="color: #64748b;">Hizmet kesintisi yaşamamak için lütfen aboneliğinizi yenileyin.</p>
-        <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
-           style="display: inline-block; background: ${urgencyColor}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
-          Aboneliği Yenile
-        </a>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
-      </div>
-    </div>
+  const isCritical = daysRemaining <= 3
+  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/settings/subscription`
+  const ctaColor = isCritical ? '#dc2626' : '#f59e0b'
+  const content = `
+    ${alertBox(`${daysRemaining} gün kaldı!`, isCritical ? 'error' : 'warning')}
+    <h2 style="color: #1e293b; margin-top: 0;">Abonelik Süresi Dolmak Üzere</h2>
+    <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliğinizin süresinin dolmasına <strong>${daysRemaining} gün</strong> kalmıştır.</p>
+    ${infoCard({ title: 'Plan', body: planName })}
+    ${infoCard({ title: 'Bitiş Tarihi', body: expiryDate })}
+    <p style="color: #64748b;">Hizmet kesintisi yaşamamak için lütfen aboneliğinizi yenileyin.</p>
+    ${cta(ctaUrl, 'Aboneliği Yenile', ctaColor)}
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
   `
+  const html = emailLayout({
+    org: { name: organizationName },
+    content,
+    theme: isCritical ? 'error' : 'warning',
+    headerSubtitle: 'Abonelik Uyarısı',
+  })
   await sendEmail({ to: email, subject: `${organizationName} — Abonelik Süresi Dolmak Üzere (${daysRemaining} gün)`, html })
 }
 
@@ -1082,24 +973,15 @@ export async function kvkkResponseEmail(email: string, requestType: 'access' | '
     delete: 'Veri Silme Talebi',
     rectification: 'Veri Düzeltme Talebi',
   }
-  const requestLabel = requestTypeLabels[requestType] ?? escapeHtml(requestType)
-  const html = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">KVKK Bilgilendirme</p>
-      </div>
-      <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #1e293b; margin-top: 0;">KVKK Talep Yanıtı</h2>
-        <p style="color: #64748b;">6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında ilettiğiniz talep işleme alınmıştır.</p>
-        <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p style="margin: 4px 0; color: #475569;"><strong>Talep Türü:</strong> ${escapeHtml(requestLabel)}</p>
-          <p style="margin: 4px 0; color: #475569;"><strong>Durum:</strong> ${escapeHtml(status)}</p>
-        </div>
-        <p style="color: #64748b;">Talebiniz ile ilgili detaylı bilgi almak için sistem yöneticinize başvurabilirsiniz.</p>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta 6698 sayılı KVKK kapsamında otomatik olarak gönderilmiştir.</p>
-      </div>
-    </div>
+  const requestLabel = requestTypeLabels[requestType] ?? requestType
+  const content = `
+    <h2 style="color: #1e293b; margin-top: 0;">KVKK Talep Yanıtı</h2>
+    <p style="color: #64748b;">6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında ilettiğiniz talep işleme alınmıştır.</p>
+    ${infoCard({ title: 'Talep Türü', body: requestLabel })}
+    ${infoCard({ title: 'Durum', body: status })}
+    <p style="color: #64748b;">Talebiniz ile ilgili detaylı bilgi almak için sistem yöneticinize başvurabilirsiniz.</p>
+    <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta 6698 sayılı KVKK kapsamında otomatik olarak gönderilmiştir.</p>
   `
+  const html = emailLayout({ content, theme: 'success', headerSubtitle: 'KVKK Bilgilendirme', showRibbon: false })
   await sendEmail({ to: email, subject: `${BRAND.fullName} — KVKK Talep Yanıtı`, html })
 }
