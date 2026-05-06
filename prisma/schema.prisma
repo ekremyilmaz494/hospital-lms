@@ -245,6 +245,7 @@ model Department {
   organization  Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   users         User[]
   trainingRules DepartmentTrainingRule[]
+  invitations   Invitation[]
 
   @@unique([organizationId, name])
   @@index([organizationId], map: "idx_departments_org")
@@ -1372,6 +1373,7 @@ model Invitation {
   title           String?   @db.VarChar(100)
   role            String    @db.VarChar(20)
   organizationId  String    @map("organization_id") @db.Uuid
+  departmentId    String?   @map("department_id") @db.Uuid
   invitedByUserId String?   @map("invited_by_user_id") @db.Uuid
   setAsOwner      Boolean   @default(false) @map("set_as_owner")
   expiresAt       DateTime  @map("expires_at") @db.Timestamptz
@@ -1382,6 +1384,7 @@ model Invitation {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department   Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   invitedBy    User?        @relation("InvitationsInvitedBy", fields: [invitedByUserId], references: [id], onDelete: SetNull)
   acceptedUser User?        @relation("InvitationsAcceptedBy", fields: [acceptedUserId], references: [id], onDelete: SetNull)
 

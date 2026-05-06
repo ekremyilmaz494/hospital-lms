@@ -49,14 +49,21 @@ export function AcceptInvitationForm({ token, email, organizationName }: Props) 
         body: JSON.stringify({ password, kvkkAccepted: true }),
       })
 
+      const body = await res.json().catch(() => ({})) as {
+        error?: string
+        redirectTo?: string
+      }
+
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
         throw new Error(body.error || `Hata (HTTP ${res.status})`)
       }
 
       setSuccess(true)
+      // Login ekranına git, başarılı kabul sonrası kullanıcı şifresiyle giriş yapsın.
+      // (Davet akışında auth session otomatik kurulmadığı için login zorunlu adım.)
+      const next = body.redirectTo ? `&next=${encodeURIComponent(body.redirectTo)}` : ''
       setTimeout(() => {
-        router.replace(`/auth/login?email=${encodeURIComponent(email)}`)
+        router.replace(`/auth/login?email=${encodeURIComponent(email)}${next}`)
       }, 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu')

@@ -10,24 +10,36 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
     const { searchParams } = new URL(request.url)
     const { page, limit, skip } = safePagination(searchParams)
     const status = searchParams.get('status') // assigned | in_progress | passed | failed
+    const periodIdParam = searchParams.get('periodId')
 
-    // Aktif period yoksa staff UI'ı bozmayalım — boş liste dön.
-    const activePeriod = await findActivePeriod(organizationId)
-    if (!activePeriod) {
-      return jsonResponse({
-        data: [],
-        page,
-        limit,
-        totalCount: 0,
-        totalPages: 0,
-      }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+    // periodId param varsa o dönemi kullan; yoksa aktif döneme düş.
+    let periodId: string
+    if (periodIdParam) {
+      const period = await prisma.trainingPeriod.findFirst({
+        where: { id: periodIdParam, organizationId },
+        select: { id: true },
+      })
+      if (!period) {
+        return jsonResponse({
+          data: [], page, limit, totalCount: 0, totalPages: 0,
+        }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+      }
+      periodId = period.id
+    } else {
+      const activePeriod = await findActivePeriod(organizationId)
+      if (!activePeriod) {
+        return jsonResponse({
+          data: [], page, limit, totalCount: 0, totalPages: 0,
+        }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+      }
+      periodId = activePeriod.id
     }
 
     // Arşivlenmiş veya soft-delete edilmiş eğitimler personel listesinde gözükmemeli;
     // aksi halde personel "asla bitiremeyeceği" eğitim görür (bkz. PDF-only edge case).
     const where: Record<string, unknown> = {
       userId: dbUser.id,
-      periodId: activePeriod.id,
+      periodId,
       training: {
         organizationId,
         isActive: true,

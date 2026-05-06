@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
+import { sendPushToMany } from '@/lib/web-push'
+import { logger } from '@/lib/logger'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -47,6 +49,41 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
       oldData: { certificateCode: cert.certificateCode },
       newData: { revokedAt: updated.revokedAt, revocationReason: reason.trim() },
     })
+
+    // Personeli bilgilendir — in-app + push (best-effort)
+    try {
+      const [, subs] = await Promise.all([
+        prisma.notification.create({
+          data: {
+            userId: cert.userId,
+            organizationId,
+            title: 'Sertifika iptal edildi',
+            message: `"${cert.training.title}" eğitimine ait sertifikanız iptal edildi. Sebep: ${reason.trim()}`,
+            type: 'warning',
+            relatedTrainingId: cert.trainingId,
+          },
+        }),
+        prisma.pushSubscription.findMany({
+          where: { userId: cert.userId },
+          select: { endpoint: true, p256dh: true, auth: true },
+        }),
+      ])
+
+      if (subs.length > 0) {
+        const { expiredEndpoints } = await sendPushToMany(subs, {
+          title: 'Sertifika iptal edildi',
+          body: `"${cert.training.title}" sertifikanız iptal edildi.`,
+          url: '/staff/certificates',
+        })
+        if (expiredEndpoints.length > 0) {
+          await prisma.pushSubscription.deleteMany({
+            where: { endpoint: { in: expiredEndpoints } },
+          })
+        }
+      }
+    } catch (notifyErr) {
+      logger.error('Certificate revoke notify', 'Bildirim gönderilemedi', { err: notifyErr, certificateId: id })
+    }
 
     return jsonResponse({ success: true, message: 'Sertifika iptal edildi' })
   }

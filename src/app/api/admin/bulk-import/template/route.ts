@@ -8,7 +8,9 @@ import { BRAND } from '@/lib/brand'
  * - Sayfa 1 "Personel": başlıklar + 2 örnek satır + departman dropdown
  * - Sayfa 2 "Departmanlar": geçerli departman adları (referans)
  *
- * Şifre sütunu boş bırakılabilir — backend otomatik güvenli şifre üretir.
+ * Şifre sütunu YOK — varsayılan olarak her personele DAVET LİNKİ gönderilir.
+ * Eski "şifre belirle" akışı için admin manuel "Şifre" sütunu ekleyebilir;
+ * backend `şifre / sifre / parola / password / pwd / pass` başlıklarını tanır.
  */
 export const GET = withAdminRoute(async ({ organizationId }) => {
   const orgId = organizationId
@@ -137,10 +139,16 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     'ZORUNLU ALANLAR: Ad, Soyad, E-posta',
     'OPSİYONEL ALANLAR: Telefon, Departman, Unvan',
     '',
-    'ŞIFRE (otomatik):',
-    '  • Şifre sütunu YOKTUR — sistem her personel için güvenli şifre üretir.',
-    '  • Geçici şifre, personelin e-posta adresine otomatik olarak gönderilir.',
-    '  • Personel ilk girişinde şifresini değiştirmek zorundadır.',
+    'ŞIFRE / DAVET LİNKİ (önerilen davranış):',
+    '  • Bu şablonda "Şifre" sütunu YOKTUR — varsayılan olarak her personele DAVET LİNKİ gönderilir.',
+    '  • Personel maildeki linke tıklar, kendi şifresini kurar (e-posta doğrulaması yapılır).',
+    '  • Davet linki 30 gün geçerlidir; kullanılmazsa admin yeniden gönderebilir.',
+    '',
+    'ŞIFRE BELİRLEME (acil/offline durumlar için):',
+    '  • Şablona elle "Şifre" başlığı ekleyip her satıra şifre yazarsanız:',
+    '    sistem hesabı anında açar, geçici şifreyi maille iletir.',
+    '  • Personel ilk girişte şifresini değiştirmek zorundadır.',
+    '  • Şifre boş bırakılan satırlar yine davet linki akışına düşer (mixed batch).',
     '',
     'E-POSTA:',
     '  • Benzersiz olmalı, daha önce sistemde kayıtlı olmamalı.',

@@ -499,6 +499,32 @@ export default function ProfilePage() {
               </div>
             </Section>
 
+            <Section number="04" title="Veri Şeffaflığı" subtitle="KVKK — İşlem Kaydı">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-[14px] font-medium" style={{ color: INK }}>
+                    İşlem Geçmişim
+                  </p>
+                  <p className="mt-0.5 text-[12px]" style={{ color: INK_SOFT }}>
+                    Hesabınızda gerçekleşen oturum, profil güncelleme ve indirme işlemlerinin kaydı.
+                  </p>
+                </div>
+                <a
+                  href="/staff/profile/activity"
+                  className="inline-flex items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                  style={{
+                    color: CREAM,
+                    backgroundColor: INK,
+                    borderRadius: '2px',
+                    fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                  }}
+                >
+                  Görüntüle
+                  <span style={{ color: GOLD }}>→</span>
+                </a>
+              </div>
+            </Section>
+
           </>
         )}
       </div>

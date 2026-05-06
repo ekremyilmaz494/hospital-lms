@@ -14,6 +14,7 @@ import { MobileSidebarDrawer } from '@/components/layouts/mobile-sidebar-drawer'
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
+import { OfflineQueueProvider } from '@/components/providers/offline-queue-provider';
 
 export default function StaffLayout({
   children,
@@ -61,6 +62,7 @@ export default function StaffLayout({
   if (!user) return null;
 
   return (
+    <OfflineQueueProvider>
     <TooltipProvider>
       <div
         className="min-h-screen"
@@ -119,5 +121,6 @@ export default function StaffLayout({
 
       </div>
     </TooltipProvider>
+    </OfflineQueueProvider>
   );
 }

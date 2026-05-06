@@ -50,39 +50,75 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   if (!log) return errorResponse('Yükleme kaydı bulunamadı veya başka organizasyona ait', 404)
 
-  const data = log.newData as { createdUserIds?: string[] } | null
+  const data = log.newData as { createdUserIds?: string[]; createdInvitationIds?: string[] } | null
   const userIds = data?.createdUserIds ?? []
+  const invitationIds = data?.createdInvitationIds ?? []
 
-  if (userIds.length === 0) {
-    return errorResponse('Bu kayıt geri alınamaz (eski kayıt, kullanıcı ID bilgisi yok)', 400)
+  if (userIds.length === 0 && invitationIds.length === 0) {
+    return errorResponse('Bu kayıt geri alınamaz (eski kayıt, kullanıcı/davet ID bilgisi yok)', 400)
   }
 
   // Güvenlik: sadece bu organizasyondaki + audit log'da listelenen kullanıcılar
-  const users = await prisma.user.findMany({
-    where: { id: { in: userIds }, organizationId: orgId },
-    select: { id: true, email: true },
-  })
+  const users = userIds.length > 0
+    ? await prisma.user.findMany({
+        where: { id: { in: userIds }, organizationId: orgId },
+        select: { id: true, email: true },
+      })
+    : []
 
-  if (users.length === 0) {
-    return errorResponse('Bu yüklemedeki kullanıcılar zaten silinmiş', 400)
+  // Davet kayıtları — bu org'a ait + henüz kabul edilmemiş olanlar
+  const pendingInvitations = invitationIds.length > 0
+    ? await prisma.invitation.findMany({
+        where: {
+          id: { in: invitationIds },
+          organizationId: orgId,
+          acceptedAt: null,
+          revokedAt: null,
+        },
+        select: { id: true, email: true },
+      })
+    : []
+
+  if (users.length === 0 && pendingInvitations.length === 0) {
+    return errorResponse('Bu yüklemedeki kullanıcılar/davetler zaten silinmiş veya kabul edilmiş', 400)
   }
 
   const supabase = await createServiceClient()
   let deleted = 0
+  let revoked = 0
   let failed = 0
   const failedEmails: string[] = []
 
+  // 1. Direct mode kullanıcıları sil (Auth + DB)
   for (const user of users) {
     try {
-      // 1. Supabase Auth'tan sil (kullanıcı bir daha giremez)
       await supabase.auth.admin.deleteUser(user.id)
-      // 2. DB'den sil (cascade ilişkileri schema'ya göre)
       await prisma.user.delete({ where: { id: user.id } })
       deleted++
     } catch (err) {
       failed++
       failedEmails.push(user.email)
       logger.error('bulk-rollback', `Silme başarısız: ${user.email}`, err instanceof Error ? err.message : err)
+    }
+  }
+
+  // 2. Invite mode bekleyen davetleri revoke et (link 410 dönecek)
+  if (pendingInvitations.length > 0) {
+    try {
+      const result = await prisma.invitation.updateMany({
+        where: {
+          id: { in: pendingInvitations.map(i => i.id) },
+          acceptedAt: null,
+          revokedAt: null,
+        },
+        data: { revokedAt: new Date() },
+      })
+      revoked = result.count
+    } catch (err) {
+      // Davet revoke başarısız → toplu sayım failed'a düşmesin, ayrı raporla
+      logger.error('bulk-rollback', 'Davet revoke başarısız', err instanceof Error ? err.message : err)
+      failed += pendingInvitations.length
+      failedEmails.push(...pendingInvitations.map(i => i.email))
     }
   }
 
@@ -94,6 +130,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       originalBatchId: batchId,
       originalDate: log.createdAt,
       deleted,
+      revoked,
       failed,
       failedEmails: failedEmails.slice(0, 20),
     },
@@ -103,5 +140,10 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   try { await invalidateDashboardCache(orgId) } catch {}
   try { await invalidateOrgCache(orgId, 'staff') } catch {}
 
-  return jsonResponse({ deleted, failed, total: users.length })
+  return jsonResponse({
+    deleted,
+    revoked,
+    failed,
+    total: users.length + pendingInvitations.length,
+  })
 }, { requireOrganization: true })

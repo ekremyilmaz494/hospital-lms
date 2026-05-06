@@ -1,17 +1,23 @@
 import { randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, parseBody, safePagination, ApiError } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination, ApiError, getAppUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
-import { createUserSchema } from '@/lib/validations'
+import { createStaffSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
-import { sendStaffWelcomeEmail } from '@/lib/email'
+import { sendStaffWelcomeEmail, sendInvitationEmail } from '@/lib/email'
 import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
 import type { UserRole } from '@/types/database'
 import { findActivePeriod, getEffectiveStartDate } from '@/lib/training-periods'
+import {
+  generateInvitationToken,
+  computeInvitationExpiry,
+  buildInvitationUrl,
+  STAFF_INVITATION_TTL_HOURS,
+} from '@/lib/invitations'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const orgId = organizationId
@@ -193,7 +199,7 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   )
 }, { requireOrganization: true })
 
-export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   const orgId = organizationId
 
   // IP bazlı rate limit: 50 oluşturma / 1 saat
@@ -209,7 +215,13 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
   const body = await parseBody(request)
   if (!body) throw new ApiError('Geçersiz istek verisi', 400)
 
-  const parsed = createUserSchema.safeParse({ ...body as object, role: 'staff', organizationId: orgId })
+  // mode default 'invite' — eski client'lar password gönderiyorsa otomatik 'direct'a düşürülür.
+  const rawBody = body as Record<string, unknown>
+  if (!rawBody.mode) {
+    rawBody.mode = typeof rawBody.password === 'string' && rawBody.password.length > 0 ? 'direct' : 'invite'
+  }
+
+  const parsed = createStaffSchema.safeParse(rawBody)
   if (!parsed.success) {
     logger.error('Admin Staff', 'Validation failed', parsed.error.issues)
     const msg = parsed.error.issues.map(i => {
@@ -219,37 +231,129 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       if (field === 'firstName') return 'Ad zorunludur'
       if (field === 'lastName') return 'Soyad zorunludur'
       if (field === 'departmentId') return 'Geçersiz departman seçimi'
-      if (field === 'organizationId') return 'Organizasyon hatası — lütfen tekrar giriş yapın'
       return i.message
     }).join(', ')
     return errorResponse(msg)
   }
 
+  const data = parsed.data
+
   // B4.2/G4.2 — Cross-tenant departman kontrolü: departmentId bu organizasyona ait olmalı
-  if (parsed.data.departmentId) {
+  if (data.departmentId) {
     const dept = await prisma.department.findFirst({
-      where: { id: parsed.data.departmentId, organizationId: orgId },
+      where: { id: data.departmentId, organizationId: orgId },
       select: { name: true },
     })
     if (!dept) return errorResponse('Geçersiz departman — bu departman organizasyonunuza ait değil', 400)
   }
 
-  // Şifre opsiyonel — boş gelirse güvenli şifre üret (mail ile personele gönderilecek)
-  const effectivePassword = parsed.data.password ||
+  // Aynı email zaten sistemde mi (her iki mode için de kontrol)
+  const existingUser = await prisma.user.findUnique({
+    where: { email: data.email },
+    select: { id: true },
+  })
+  if (existingUser) {
+    return errorResponse('Bu e-posta adresi zaten sistemde kayıtlı', 409)
+  }
+
+  // ── INVITE MODE — davet linki gönder, hesap kabul anında oluşur ────────────
+  if (data.mode === 'invite') {
+    // Aynı email için aktif davet varsa: eskiyi revoke et, yenisini oluştur
+    await prisma.invitation.updateMany({
+      where: {
+        organizationId: orgId,
+        email: data.email,
+        acceptedAt: null,
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date() },
+    })
+
+    const { raw, hash } = generateInvitationToken()
+    const expiresAt = computeInvitationExpiry(STAFF_INVITATION_TTL_HOURS)
+
+    const invitation = await prisma.invitation.create({
+      data: {
+        tokenHash: hash,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone ?? null,
+        title: data.title ?? null,
+        role: 'staff',
+        organizationId: orgId,
+        departmentId: data.departmentId ?? null,
+        invitedByUserId: dbUser.id,
+        setAsOwner: false,
+        expiresAt,
+      },
+      select: { id: true },
+    })
+
+    await audit({
+      action: 'invitation.create',
+      entityType: 'invitation',
+      entityId: invitation.id,
+      newData: { email: data.email, role: 'staff', expiresAt },
+    })
+
+    const inviteUrl = buildInvitationUrl(getAppUrl(), raw)
+    let emailSent = true
+    try {
+      const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { name: true, brandColor: true },
+      })
+      emailSent = await sendInvitationEmail({
+        to: data.email,
+        organizationName: org?.name ?? 'Hastane',
+        brandColor: org?.brandColor ?? null,
+        inviteUrl,
+        inviterName: `${dbUser.firstName} ${dbUser.lastName}`,
+        recipientName: `${data.firstName} ${data.lastName}`,
+        roleLabel: 'Personel',
+        expiresInHours: STAFF_INVITATION_TTL_HOURS,
+        organizationId: orgId,
+      })
+    } catch (err) {
+      emailSent = false
+      logger.error('Admin Staff', 'Davet maili gönderilemedi', {
+        email: data.email,
+        error: err instanceof Error ? err.message : err,
+      })
+    }
+
+    return jsonResponse(
+      {
+        mode: 'invite',
+        invitationId: invitation.id,
+        email: data.email,
+        expiresAt,
+        emailSent,
+        // SES sandbox / mail arızası fallback'i: admin link'i manuel paylaşabilsin
+        ...(emailSent ? {} : { inviteUrl }),
+      },
+      201,
+    )
+  }
+
+  // ── DIRECT MODE — şifreyle anında hesap oluştur (legacy + acil fallback) ───
+  // Şifre opsiyonel — boş gelirse güvenli şifre üret
+  const effectivePassword = data.password ||
     ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1')
 
   let result
   try {
     result = await createAuthUser({
-      email: parsed.data.email,
+      email: data.email,
       password: effectivePassword,
-      firstName: parsed.data.firstName,
-      lastName: parsed.data.lastName,
+      firstName: data.firstName,
+      lastName: data.lastName,
       role: 'staff',
       organizationId: orgId,
-      phone: parsed.data.phone,
-      departmentId: parsed.data.departmentId,
-      title: parsed.data.title,
+      phone: data.phone,
+      departmentId: data.departmentId,
+      title: data.title,
       mustChangePassword: true,
     })
   } catch (err) {
@@ -278,7 +382,9 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
   try { await invalidateDashboardCache(orgId) } catch { /* cache invalidation best-effort */ }
   try { await invalidateOrgCache(orgId, 'staff') } catch { /* cache invalidation best-effort */ }
 
-  // Hoş geldiniz maili — fire-and-forget, hesap oluşumunu bloklamaz
+  // Hoş geldiniz maili — fire-and-forget, hesap oluşumunu bloklamaz.
+  // sendStaffWelcomeEmail değer döndürmez; throw atarsa false set ediyoruz.
+  let welcomeEmailSent = true
   try {
     const org = await prisma.organization.findUnique({
       where: { id: orgId },
@@ -290,11 +396,21 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       organizationName: org?.name ?? 'Hastane',
       brandColor: org?.brandColor ?? null,
       tempPassword: effectivePassword,
-      loginUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`,
+      loginUrl: `${getAppUrl()}/auth/login`,
     })
   } catch (err) {
+    welcomeEmailSent = false
     logger.warn('Admin Staff', `Hoş geldiniz maili gönderilemedi: ${user.email}`, err instanceof Error ? err.message : err)
   }
 
-  return jsonResponse(user, 201)
+  return jsonResponse(
+    {
+      ...user,
+      mode: 'direct',
+      emailSent: welcomeEmailSent,
+      // Mail çalışmadıysa admin geçici şifreyi manuel paylaşabilsin
+      ...(welcomeEmailSent ? {} : { tempPassword: effectivePassword }),
+    },
+    201,
+  )
 }, { requireOrganization: true })
