@@ -71,3 +71,15 @@ export function buildInvitationUrl(baseUrl: string, rawToken: string): string {
 
 export const INVITATION_MAX_ATTEMPT_COUNT = MAX_ATTEMPT_COUNT
 export const INVITATION_TTL_HOURS = DEFAULT_TTL_HOURS
+
+/**
+ * Yönetici (admin) daveti için varsayılan TTL — 72 saat (3 gün).
+ * Yönetici daveti yetki açısından hassas, kısa süre tutuyoruz.
+ */
+export const ADMIN_INVITATION_TTL_HOURS = 72
+
+/**
+ * Personel (staff) daveti için varsayılan TTL — 30 gün.
+ * Hastane personeli mail kutusunu seyrek açabilir; admin için resend her zaman mümkün.
+ */
+export const STAFF_INVITATION_TTL_HOURS = 720

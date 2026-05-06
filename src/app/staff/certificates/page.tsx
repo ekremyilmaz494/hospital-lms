@@ -213,6 +213,25 @@ export default function StaffCertificatesPage() {
     }
   };
 
+  const handleDownloadTranscript = async () => {
+    try {
+      const res = await fetch('/api/staff/transcript/pdf');
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'egitim-transkripti.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast('Transkript indirildi', 'success');
+    } catch {
+      toast('Transkript oluşturulamadı', 'error');
+    }
+  };
+
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code).then(() => toast('Sertifika kodu kopyalandı', 'success'));
   };
@@ -258,12 +277,27 @@ export default function StaffCertificatesPage() {
           </div>
         </header>
 
-        <p
-          className="mt-3 text-[12px] uppercase tracking-[0.16em]"
-          style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-        >
-          Tamamladığın eğitimlerin resmi belgeleri · PDF olarak indirilebilir
-        </p>
+        <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
+          <p
+            className="text-[12px] uppercase tracking-[0.16em]"
+            style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+          >
+            Tamamladığın eğitimlerin resmi belgeleri · PDF olarak indirilebilir
+          </p>
+          {certificates.length > 0 && (
+            <button
+              onClick={handleDownloadTranscript}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-[0.12em]"
+              style={{
+                background: INK,
+                color: '#fff',
+                fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+              }}
+            >
+              Transkript İndir
+            </button>
+          )}
+        </div>
 
         {isLoading ? (
           <CertificatesSkeleton />

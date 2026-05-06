@@ -200,12 +200,15 @@ export const staffNav: NavGroup[] = [
       { title: 'SMG Puanlarım', href: '/staff/smg', icon: Star },
       { title: 'Takvim', href: '/staff/calendar', icon: Calendar },
       { title: 'Bildirimler', href: '/staff/notifications', icon: Bell },
+      { title: 'Geri Bildirimler', href: '/staff/feedback', icon: MessageSquare },
     ],
   },
   {
     label: 'HESABIM',
     items: [
       { title: 'Profilim', href: '/staff/profile', icon: UserCircle },
+      { title: 'Değerlendirmeler', href: '/staff/evaluations', icon: ClipboardCheck },
+      { title: 'Yetkinlik Sonuçlarım', href: '/staff/competency', icon: TrendingUp },
     ],
   },
 ];

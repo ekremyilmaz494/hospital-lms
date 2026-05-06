@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Upload, Download, CheckCircle2, AlertCircle, Loader2, FileText, RefreshCw } from 'lucide-react';
+import { Upload, Download, CheckCircle2, AlertCircle, Loader2, FileText, RefreshCw, Mail, KeyRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { BRAND } from '@/lib/brand';
 import { useToast } from '@/components/shared/toast';
@@ -57,10 +57,12 @@ interface PreviewResult {
 
 interface ImportResult {
   created: number;
+  createdDirect?: number;
+  createdInvite?: number;
   failed: number;
   total: number;
   errors: string[];
-  results: Array<{ email: string; name: string; status: 'created' | 'failed'; tempPassword?: string; error?: string }>;
+  results: Array<{ email: string; name: string; status: 'created' | 'invited' | 'failed'; tempPassword?: string; inviteUrl?: string; error?: string }>;
 }
 
 interface Department {
@@ -429,6 +431,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                     <th>Telefon</th>
                     <th>Departman</th>
                     <th>Unvan</th>
+                    <th>Mod</th>
                     <th>Durum</th>
                   </tr>
                 </thead>
@@ -436,6 +439,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                   {editedRows.map((row, idx) => {
                     const err = errorByRowIndex.get(row.rowIndex);
                     const isError = !!err;
+                    const isInvite = !row.password.trim();
                     return (
                       <tr key={idx} className={isError ? 'bid-row-err' : ''}>
                         <td className="bid-rowidx">{row.rowIndex}</td>
@@ -454,6 +458,19 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                           </select>
                         </td>
                         <td><CellInput value={row.title} onChange={(v) => updateRow(idx, { title: v })} /></td>
+                        <td>
+                          {isInvite ? (
+                            <span className="bid-mode bid-mode-inv" title="Davet linki gönderilecek; personel kendi şifresini kuracak">
+                              <Mail className="h-3 w-3" />
+                              Davet
+                            </span>
+                          ) : (
+                            <span className="bid-mode bid-mode-pwd" title="Excel'deki şifreyle hesap doğrudan oluşturulacak">
+                              <KeyRound className="h-3 w-3" />
+                              Şifre
+                            </span>
+                          )}
+                        </td>
                         <td>
                           {isError ? (
                             <span className="bid-status-err" title={err}>
@@ -490,8 +507,8 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
       {stage === 'importing' && (
         <div className="bid-status">
           <Loader2 className="bid-spin" />
-          <h4>Personeller oluşturuluyor…</h4>
-          <p>Her satır için kullanıcı hesabı, departman ataması ve hoşgeldin e-postası hazırlanıyor. Birkaç saniye sürebilir.</p>
+          <h4>Personeller işleniyor…</h4>
+          <p>Şifresi olmayan satırlara davet linki, şifresi olanlara hesap + hoş geldin e-postası gönderiliyor. Birkaç saniye sürebilir.</p>
         </div>
       )}
 
@@ -502,14 +519,19 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
               <CheckCircle2 className="h-7 w-7" />
             </div>
             <h3>
-              <em>{importResult.created}</em> personel eklendi
+              <em>{importResult.created}</em> personel işlendi
               {importResult.failed > 0 && <span className="bid-done-failed"> · {importResult.failed} başarısız</span>}
             </h3>
-            <p>Yeni kullanıcılar giriş bilgilerini e-posta ile aldı.</p>
+            <p>
+              {importResult.createdInvite && importResult.createdInvite > 0
+                ? `${importResult.createdInvite} kişiye davet linki gönderildi. ${importResult.createdDirect ? `${importResult.createdDirect} kişiye geçici şifre maille iletildi.` : ''}`
+                : 'Yeni kullanıcılar giriş bilgilerini e-posta ile aldı.'}
+            </p>
           </div>
 
           <div className="bid-stats">
-            <StatTile label="Başarılı" value={importResult.created} tone="ok" icon={<CheckCircle2 className="h-3.5 w-3.5" />} />
+            <StatTile label="Davet" value={importResult.createdInvite ?? 0} tone="ok" icon={<Mail className="h-3.5 w-3.5" />} />
+            <StatTile label="Şifreyle" value={importResult.createdDirect ?? 0} tone="ok" icon={<KeyRound className="h-3.5 w-3.5" />} />
             <StatTile label="Başarısız" value={importResult.failed} tone="err" icon={<AlertCircle className="h-3.5 w-3.5" />} />
           </div>
 
@@ -667,7 +689,33 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           grid-template-columns: repeat(3, 1fr);
           gap: 10px;
         }
-        .bid-done .bid-stats { grid-template-columns: repeat(2, 1fr); }
+        .bid-done .bid-stats { grid-template-columns: repeat(3, 1fr); }
+
+        /* Mod badge — preview tablosunda satır per satır mod gösterimi */
+        .bid-mode {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px 8px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+          font-family: var(--font-display, system-ui);
+          white-space: nowrap;
+        }
+        .bid-mode :global(svg) { flex-shrink: 0; }
+        .bid-mode-inv {
+          background: #d1fae5;
+          color: #047857;
+          border: 1px solid #a7f3d0;
+        }
+        .bid-mode-pwd {
+          background: #fef3c7;
+          color: #92400e;
+          border: 1px solid #fcd34d;
+        }
 
         .bid-warn {
           display: flex;

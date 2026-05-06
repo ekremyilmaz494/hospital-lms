@@ -37,6 +37,14 @@ const fontMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: `${BRAND.fullName} - Personel Eğitim Sistemi`,
   description: "Hastane personeli için eğitim ve sınav yönetim platformu",
+  icons: {
+    apple: '/apple-touch-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: BRAND.name,
+  },
 };
 
 export const viewport: Viewport = {

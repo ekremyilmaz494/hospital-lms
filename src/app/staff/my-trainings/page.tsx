@@ -78,10 +78,21 @@ function splitDate(deadline?: string): { day: string; month: string } {
 
 /* ─── Page ─── */
 
+interface Period { id: string; label: string; year: number; status: string; isDefault: boolean; }
+
 export default function MyTrainingsPage() {
-  const { data: rawData, isLoading, error } =
-    useFetch<{ data: Training[] } | Training[]>('/api/staff/my-trainings?limit=100');
   const [activeTab, setActiveTab] = useState<'trainings' | 'exams'>('trainings');
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>('');
+
+  const { data: periodsData } = useFetch<{ periods: Period[] }>('/api/staff/training-periods');
+  const periods = periodsData?.periods ?? [];
+
+  const apiUrl = selectedPeriodId
+    ? `/api/staff/my-trainings?limit=100&periodId=${selectedPeriodId}`
+    : '/api/staff/my-trainings?limit=100';
+
+  const { data: rawData, isLoading, error } =
+    useFetch<{ data: Training[] } | Training[]>(apiUrl);
 
   const allItems: Training[] = useMemo(
     () => (Array.isArray(rawData) ? rawData : (rawData as { data: Training[] })?.data ?? []),
@@ -141,19 +152,39 @@ export default function MyTrainingsPage() {
             </h1>
           </div>
 
-          {segmented.urgentCount > 0 && (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
-              style={{
-                color: '#b3261e',
-                backgroundColor: '#fdf5f2',
-                fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
-              }}
-            >
-              <Flame className="h-3 w-3" />
-              {segmented.urgentCount} acil görev
-            </span>
-          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            {periods.length > 1 && (
+              <select
+                value={selectedPeriodId}
+                onChange={e => setSelectedPeriodId(e.target.value)}
+                className="text-[11px] font-semibold uppercase tracking-[0.12em] rounded-sm px-2 py-1 border"
+                style={{
+                  color: INK,
+                  borderColor: INK,
+                  backgroundColor: CREAM,
+                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                }}
+              >
+                <option value="">Aktif Dönem</option>
+                {periods.map(p => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+            )}
+            {segmented.urgentCount > 0 && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
+                style={{
+                  color: '#b3261e',
+                  backgroundColor: '#fdf5f2',
+                  fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                }}
+              >
+                <Flame className="h-3 w-3" />
+                {segmented.urgentCount} acil görev
+              </span>
+            )}
+          </div>
         </header>
 
         <p

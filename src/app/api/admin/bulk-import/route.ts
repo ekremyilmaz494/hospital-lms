@@ -1,10 +1,16 @@
-import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, getAppUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
-import { sendStaffWelcomeEmail } from '@/lib/email'
+import { sendStaffWelcomeEmail, sendInvitationEmail } from '@/lib/email'
+import { checkRateLimit } from '@/lib/redis'
+import {
+  generateInvitationToken,
+  computeInvitationExpiry,
+  buildInvitationUrl,
+  STAFF_INVITATION_TTL_HOURS,
+} from '@/lib/invitations'
 import ExcelJS from 'exceljs'
 
 // ── Header Alias Map ──────────────────────────────────────────────────────
@@ -250,10 +256,22 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
 
 // ── POST: Excel yükle (preview/import) ya da JSON satır import ────────────
 
-export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   const orgId = organizationId
   const { searchParams } = new URL(request.url)
   const isPreview = searchParams.get('mode') === 'preview'
+
+  // Org bazlı rate limit (preview ve gerçek import için ayrı, sadece import bypass'la kullanmasın)
+  // Tek admin tek IP'den 100+ personel davet edebilmeli — IP'ye değil org'a kilitliyoruz.
+  if (!isPreview) {
+    const allowed = await checkRateLimit(`bulk-import:org:${orgId}`, 500, 3600)
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Saatte en fazla 500 personel yüklenebilir. Lütfen biraz sonra tekrar deneyin.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
+      })
+    }
+  }
 
   const contentType = request.headers.get('content-type') || ''
   let rows: ParsedRow[] = []
@@ -332,28 +350,107 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     })
   }
 
-  // ── Gerçek import ───────────────────────────────────────────────────────
-  let created = 0
+  // ── Gerçek import (mixed mode: şifre boş → davet linki, dolu → direkt hesap) ─
+  let createdDirect = 0      // direkt hesap (şifre belirlendi)
+  let createdInvite = 0      // davet linki gönderildi
   let failed = 0
   const importErrors: string[] = rowResults
     .filter(r => r.status === 'error')
     .map(r => `Satır ${r.rowIndex} (${r.email}): ${r.reason}`)
 
-  const results: { email: string; name: string; status: 'created' | 'failed'; tempPassword?: string; error?: string }[] = []
+  type ResultMode = 'created' | 'invited' | 'failed'
+  const results: { email: string; name: string; status: ResultMode; tempPassword?: string; inviteUrl?: string; error?: string }[] = []
   const createdUserIds: string[] = []
+  const createdInvitationIds: string[] = []
 
-  // Hoş geldiniz maili için hastane adı (tek sorgu, loop öncesi)
+  // Hoş geldiniz/davet maili için hastane bilgileri (tek sorgu, loop öncesi)
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
     select: { name: true, brandColor: true },
   })
   const hospitalName = org?.name ?? 'Hastane'
   const brandColor = org?.brandColor ?? null
-  const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`
+  const appUrl = getAppUrl()
+  const loginUrl = `${appUrl}/auth/login`
+  const inviterName = `${dbUser.firstName} ${dbUser.lastName}`
   const emailPromises: Promise<void>[] = []
 
   for (const row of validRows) {
-    const pwd = row.password || ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1')
+    const useInviteFlow = !row.password.trim()
+
+    if (useInviteFlow) {
+      // ── INVITE MODE — davet linki, kullanıcı kendi şifresini kuracak ──
+      try {
+        // Aynı email için aktif davet varsa eskiyi revoke et
+        await prisma.invitation.updateMany({
+          where: {
+            organizationId: orgId,
+            email: row.email,
+            acceptedAt: null,
+            revokedAt: null,
+          },
+          data: { revokedAt: new Date() },
+        })
+
+        const { raw, hash } = generateInvitationToken()
+        const expiresAt = computeInvitationExpiry(STAFF_INVITATION_TTL_HOURS)
+
+        const invitation = await prisma.invitation.create({
+          data: {
+            tokenHash: hash,
+            email: row.email,
+            firstName: row.firstName,
+            lastName: row.lastName,
+            phone: row.phone || null,
+            title: row.title || null,
+            role: 'staff',
+            organizationId: orgId,
+            departmentId: row.deptId ?? null,
+            invitedByUserId: dbUser.id,
+            setAsOwner: false,
+            expiresAt,
+          },
+          select: { id: true },
+        })
+        createdInvitationIds.push(invitation.id)
+        createdInvite++
+
+        const inviteUrl = buildInvitationUrl(appUrl, raw)
+        results.push({
+          email: row.email,
+          name: `${row.firstName} ${row.lastName}`,
+          status: 'invited',
+          inviteUrl,
+        })
+
+        // Davet maili — fire-and-forget
+        emailPromises.push(
+          sendInvitationEmail({
+            to: row.email,
+            organizationName: hospitalName,
+            brandColor,
+            inviteUrl,
+            inviterName,
+            recipientName: `${row.firstName} ${row.lastName}`,
+            roleLabel: 'Personel',
+            expiresInHours: STAFF_INVITATION_TTL_HOURS,
+            organizationId: orgId,
+          }).then(() => undefined).catch(err => {
+            logger.warn('bulk-import', `Davet maili gönderilemedi: ${row.email}`, err instanceof Error ? err.message : err)
+          }),
+        )
+      } catch (err) {
+        failed++
+        const errMsg = err instanceof Error ? err.message : 'Davet oluşturulamadı'
+        importErrors.push(`${row.email}: ${errMsg}`)
+        results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'failed', error: errMsg })
+        logger.error('Bulk Import', `Invite failed for ${row.email}`, err instanceof Error ? err.message : err)
+      }
+      continue
+    }
+
+    // ── DIRECT MODE — şifre Excel'de belirtildi, hesap anında açılır ──
+    const pwd = row.password
     try {
       const { dbUser: newUser } = await createAuthUser({
         email: row.email,
@@ -368,10 +465,9 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
         mustChangePassword: true,
       })
       createdUserIds.push(newUser.id)
-      created++
+      createdDirect++
       results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'created', tempPassword: pwd })
 
-      // Hoş geldiniz maili — fire-and-forget. Mail hatası hesap oluşumunu bozmaz.
       emailPromises.push(
         sendStaffWelcomeEmail({
           to: row.email,
@@ -380,7 +476,7 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
           brandColor,
           tempPassword: pwd,
           loginUrl,
-        }).catch(err => {
+        }).then(() => undefined).catch(err => {
           logger.warn('bulk-import', `Hoş geldiniz maili gönderilemedi: ${row.email}`, err instanceof Error ? err.message : err)
         }),
       )
@@ -396,8 +492,9 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
   }
 
   // Tüm mail gönderimlerini bekle — serverless fonksiyon kesilmeden tamamlansın
-  // (her promise zaten kendi .catch'ini içeriyor, allSettled sadece bekliyor)
   await Promise.allSettled(emailPromises)
+
+  const created = createdDirect + createdInvite
 
   await audit({
     action: 'bulk_import',
@@ -405,13 +502,24 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     newData: {
       totalRows: rows.length,
       created,
+      createdDirect,
+      createdInvite,
       failed,
-      createdUserIds,  // ← geri alma için
+      createdUserIds,         // ← direct mode rollback için
+      createdInvitationIds,   // ← invite mode rollback için
     },
   })
 
   return jsonResponse(
-    { created, failed, total: rows.length, errors: importErrors.slice(0, 20), results },
+    {
+      created,
+      createdDirect,
+      createdInvite,
+      failed,
+      total: rows.length,
+      errors: importErrors.slice(0, 20),
+      results,
+    },
     created > 0 ? 201 : 400,
   )
 }, { requireOrganization: true })

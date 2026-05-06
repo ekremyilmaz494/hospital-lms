@@ -117,6 +117,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       title: true,
       role: true,
       organizationId: true,
+      departmentId: true,
       setAsOwner: true,
       expiresAt: true,
       acceptedAt: true,
@@ -186,6 +187,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       organizationId: invitation.organizationId,
       phone: invitation.phone ?? undefined,
       title: invitation.title ?? undefined,
+      departmentId: invitation.departmentId ?? null,
       mustChangePassword: false,
       isActive: true,
     })
@@ -249,8 +251,14 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }).catch(err => logger.error('invitations.accept', 'Audit log başarısız', err)),
   ])
 
+  // Rol-bazlı yönlendirme — accept-form login'e değil direkt panele gitsin.
+  // Login akışı middleware tarafında zaten Supabase session'ını kuracak.
+  const redirectTo = invitation.role === 'staff' ? '/staff' : '/admin'
+
   return jsonResponse({
     success: true,
     email: newUser.email,
+    role: invitation.role,
+    redirectTo,
   }, 201)
 }

@@ -94,6 +94,33 @@ export const inviteAdminSchema = z.object({
   title: z.string().max(100).optional(),
 }).strict()
 
+// Personel oluşturma — iki mod desteklenir:
+//  - mode 'invite' (varsayılan): Davet linki gönderilir, kullanıcı kendi şifresini kurar
+//  - mode 'direct': Admin şifre belirler/sistem üretir, hesap anında oluşur
+const baseStaffFields = {
+  email: z.string().min(1).max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
+  firstName: z.string().min(1, 'Ad zorunludur').max(100),
+  lastName: z.string().min(1, 'Soyad zorunludur').max(100),
+  phone: z.string().max(20).optional(),
+  departmentId: z.string().uuid({ message: 'Geçersiz departman kimliği' }).optional(),
+  title: z.string().max(100).optional(),
+}
+
+export const createStaffSchema = z.discriminatedUnion('mode', [
+  z.object({
+    mode: z.literal('invite'),
+    ...baseStaffFields,
+  }).strict(),
+  z.object({
+    mode: z.literal('direct'),
+    ...baseStaffFields,
+    password: z.string().min(8).max(128).regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
+      'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir'
+    ).optional(),
+  }).strict(),
+])
+
 /** Davet kabul: kullanıcı kendi şifresini kurar + KVKK onaylar */
 export const acceptInvitationSchema = z.object({
   password: z.string()

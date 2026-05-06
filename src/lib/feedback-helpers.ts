@@ -91,6 +91,68 @@ export async function getPendingMandatoryFeedback(userId: string): Promise<{
   return null
 }
 
+export type PendingFeedbackItem = {
+  trainingId: string
+  trainingTitle: string
+  attemptId: string
+  isMandatory: boolean
+  postExamCompletedAt: Date | null
+}
+
+/**
+ * Bekleyen TÜM geri bildirimleri (zorunlu + opsiyonel) döner — staff/feedback
+ * sayfasında listelemek için. `getPendingMandatoryFeedback` ile aynı tetikleme
+ * kuralını kullanır; tek fark: `feedbackMandatory` filtresi YOK, çünkü kullanıcı
+ * opsiyonel formu da görmek isteyebilir.
+ *
+ * EY.FR.40 form per organization tek (`organizationId @unique`); form yoksa
+ * doldurulacak hiçbir şey yok demektir → çağıran taraf form varlığını kontrol
+ * eder. Bu helper sadece attempt-bazlı bekleyen kayıtları toplar.
+ */
+export async function getAllPendingFeedback(userId: string): Promise<PendingFeedbackItem[]> {
+  const [attempts, submittedRows] = await Promise.all([
+    prisma.examAttempt.findMany({
+      where: { userId, status: 'completed' },
+      select: {
+        id: true,
+        status: true,
+        isPassed: true,
+        attemptNumber: true,
+        trainingId: true,
+        postExamCompletedAt: true,
+        training: { select: { title: true, feedbackMandatory: true } },
+        assignment: { select: { originalMaxAttempts: true } },
+      },
+      orderBy: { postExamCompletedAt: 'desc' },
+    }),
+    prisma.trainingFeedbackResponse.findMany({
+      where: { attempt: { userId } },
+      select: { trainingId: true },
+    }),
+  ])
+
+  if (attempts.length === 0) return []
+
+  const submittedTrainingIds = new Set(submittedRows.map(r => r.trainingId))
+
+  const seenTrainingIds = new Set<string>()
+  const result: PendingFeedbackItem[] = []
+  for (const a of attempts) {
+    if (submittedTrainingIds.has(a.trainingId)) continue
+    if (seenTrainingIds.has(a.trainingId)) continue
+    if (!isAttemptFeedbackTriggered(a, a.assignment.originalMaxAttempts)) continue
+    seenTrainingIds.add(a.trainingId)
+    result.push({
+      trainingId: a.trainingId,
+      trainingTitle: a.training.title,
+      attemptId: a.id,
+      isMandatory: a.training.feedbackMandatory,
+      postExamCompletedAt: a.postExamCompletedAt,
+    })
+  }
+  return result
+}
+
 /**
  * Soru tipine göre bir cevabın geçerli olup olmadığını kontrol eder.
  * Server-side input validation ile birlikte kullanılır.
