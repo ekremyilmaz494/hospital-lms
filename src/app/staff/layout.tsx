@@ -61,12 +61,15 @@ export default function StaffLayout({
   if (isLoading) return <LayoutSkeleton variant="staff" />;
   if (!user) return null;
 
+  // Editorial sistemde staff zemini cream paper. Diğer paneller (admin/super-admin)
+  // kendi layout'larında stone neutrals kullanıyor — buradaki değişiklik onları etkilemez.
   return (
     <OfflineQueueProvider>
     <TooltipProvider>
       <div
         className="min-h-screen"
-        style={{ background: 'var(--k-bg, #fafaf9)' }}
+        style={{ background: 'var(--ed-cream, #f4ead5)' }}
+        data-surface="editorial"
       >
         {/* Sidebar: sadece md ve üzerinde göster */}
         <div className="hidden md:block">
@@ -104,7 +107,7 @@ export default function StaffLayout({
         <main
           className="min-h-screen md:ml-[72px] pb-[env(safe-area-inset-bottom)]"
           style={{
-            background: 'var(--k-bg, #fafaf9)',
+            background: 'var(--ed-cream, #f4ead5)',
           }}
         >
           <ImpersonationBanner />

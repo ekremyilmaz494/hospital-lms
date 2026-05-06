@@ -245,10 +245,10 @@ export default function PostExamPage() {
         <button onClick={() => router.push('/staff/my-trainings')} className="pe-err-link">← Eğitimlerime Dön</button>
         <style>{`
           .pe-err { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; gap: 10px; max-width: 420px; margin: 0 auto; }
-          .pe-err-icon { width: 56px; height: 56px; border-radius: 999px; background: var(--k-error-bg); color: var(--k-error); display: flex; align-items: center; justify-content: center; }
-          .pe-err h2 { font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; font-size: 22px; color: var(--k-text-primary); margin: 0; }
-          .pe-err p { font-size: 13px; color: var(--k-text-muted); margin: 0; }
-          .pe-err-link { margin-top: 10px; background: none; border: none; color: var(--k-text-primary); font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; cursor: pointer; }
+          .pe-err-icon { width: 56px; height: 56px; border-radius: 4px; background: var(--k-error-bg); color: var(--k-error); display: flex; align-items: center; justify-content: center; }
+          .pe-err h2 { font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; font-size: 22px; color: var(--ed-ink); margin: 0; }
+          .pe-err p { font-size: 13px; color: var(--ed-ink-soft); margin: 0; }
+          .pe-err-link { margin-top: 10px; background: none; border: none; color: var(--ed-ink); font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; cursor: pointer; }
         `}</style>
       </div>
     );
@@ -256,7 +256,7 @@ export default function PostExamPage() {
 
   if (!examData || (examData.questions ?? []).length === 0) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: 'var(--k-text-muted)', fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif', fontSize: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: 'var(--ed-ink-soft)', fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif', fontSize: 16 }}>
         Henüz veri yok
       </div>
     );
@@ -431,7 +431,7 @@ export default function PostExamPage() {
       </div>
 
       <style jsx>{`
-        .pe-root { min-height: 100vh; background: var(--k-bg); padding-bottom: 40px; }
+        .pe-root { min-height: 100vh; background: var(--ed-cream); padding-bottom: 40px; }
 
         .pe-warn-banner {
           position: sticky;
@@ -439,7 +439,7 @@ export default function PostExamPage() {
           z-index: 60;
           padding: 8px 16px;
           background: var(--k-error);
-          color: var(--k-bg);
+          color: var(--ed-cream);
           font-family: var(--font-display, system-ui);
           font-size: 12px;
           font-weight: 600;
@@ -453,7 +453,7 @@ export default function PostExamPage() {
           padding: 14px 24px 0;
           background: rgba(255, 255, 255, 0.88);
           backdrop-filter: blur(12px);
-          border-bottom: 1px solid var(--k-border);
+          border-bottom: 1px solid var(--ed-rule);
         }
         .pe-header-row {
           display: flex;
@@ -472,9 +472,9 @@ export default function PostExamPage() {
           display: inline-flex;
           align-items: center;
           padding: 4px 10px;
-          border-radius: 999px;
-          background: var(--k-primary);
-          color: var(--k-bg);
+          border-radius: 4px;
+          background: var(--ed-ink);
+          color: var(--ed-cream);
           font-family: var(--font-display, system-ui);
           font-size: 10px;
           font-weight: 700;
@@ -482,13 +482,13 @@ export default function PostExamPage() {
           text-transform: uppercase;
           flex-shrink: 0;
         }
-        .pe-phase-chip-ok { background: var(--k-primary); }
+        .pe-phase-chip-ok { background: var(--ed-ink); }
         .pe-training {
           font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-size: 15px;
           font-weight: 500;
           font-variation-settings: 'opsz' 24;
-          color: var(--k-text-primary);
+          color: var(--ed-ink);
           margin: 0;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -498,12 +498,12 @@ export default function PostExamPage() {
         .pe-counter {
           font-family: var(--font-display, system-ui);
           font-size: 11px;
-          color: var(--k-text-muted);
+          color: var(--ed-ink-soft);
           font-variant-numeric: tabular-nums;
           flex-shrink: 0;
         }
         .pe-counter strong {
-          color: var(--k-text-primary);
+          color: var(--ed-ink);
           font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-weight: 500;
         }
@@ -520,19 +520,19 @@ export default function PostExamPage() {
           gap: 6px;
           height: 36px;
           padding: 0 12px;
-          border-radius: 999px;
-          background: var(--k-surface);
-          border: 1px solid var(--k-border);
+          border-radius: 4px;
+          background: #ffffff;
+          border: 1px solid var(--ed-rule);
           font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-size: 16px;
           font-weight: 500;
           font-variation-settings: 'opsz' 28, 'SOFT' 50;
-          color: var(--k-text-primary);
+          color: var(--ed-ink);
           font-variant-numeric: tabular-nums;
           letter-spacing: -0.02em;
           transition: background 220ms ease, color 220ms ease, border-color 220ms ease;
         }
-        .pe-timer :global(svg) { color: var(--k-text-muted); }
+        .pe-timer :global(svg) { color: var(--ed-ink-soft); }
         .pe-timer-crit {
           background: var(--k-error-bg);
           border-color: var(--k-error);
@@ -551,9 +551,9 @@ export default function PostExamPage() {
           gap: 5px;
           height: 36px;
           padding: 0 12px;
-          border-radius: 999px;
+          border-radius: 4px;
           background: transparent;
-          color: var(--k-text-muted);
+          color: var(--ed-ink-soft);
           border: 1px solid transparent;
           font-family: var(--font-display, system-ui);
           font-size: 11px;
@@ -567,11 +567,11 @@ export default function PostExamPage() {
           height: 3px;
           background: transparent;
           margin: 0 -24px;
-          border-top: 1px solid var(--k-border);
+          border-top: 1px solid var(--ed-rule);
         }
         .pe-progress-fill {
           height: 100%;
-          background: var(--k-primary);
+          background: var(--ed-ink);
           transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -587,9 +587,9 @@ export default function PostExamPage() {
 
         .pe-question-card {
           padding: 32px;
-          background: var(--k-surface);
-          border: 1px solid var(--k-border);
-          border-radius: 18px;
+          background: #ffffff;
+          border: 1px solid var(--ed-rule);
+          border-radius: 4px;
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(10, 10, 10, 0.02);
         }
         .pe-q-head {
@@ -598,7 +598,7 @@ export default function PostExamPage() {
           gap: 14px;
           margin-bottom: 28px;
           padding-bottom: 20px;
-          border-bottom: 1px dashed var(--k-border);
+          border-bottom: 1px dashed var(--ed-rule);
         }
         .pe-q-num {
           display: inline-flex;
@@ -607,9 +607,9 @@ export default function PostExamPage() {
           flex-shrink: 0;
           width: 48px;
           height: 48px;
-          border-radius: 14px;
-          background: var(--k-primary);
-          color: var(--k-bg);
+          border-radius: 4px;
+          background: var(--ed-ink);
+          color: var(--ed-cream);
           font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-size: 16px;
           font-weight: 500;
@@ -622,7 +622,7 @@ export default function PostExamPage() {
           font-size: 20px;
           font-weight: 500;
           font-variation-settings: 'opsz' 42, 'SOFT' 50;
-          color: var(--k-text-primary);
+          color: var(--ed-ink);
           letter-spacing: -0.015em;
           line-height: 1.4;
           margin: 0;
@@ -643,30 +643,30 @@ export default function PostExamPage() {
           gap: 14px;
           width: 100%;
           padding: 14px 18px;
-          background: var(--k-surface);
-          border: 1px solid var(--k-border);
-          border-radius: 12px;
+          background: #ffffff;
+          border: 1px solid var(--ed-rule);
+          border-radius: 4px;
           text-align: left;
           cursor: pointer;
           font-family: inherit;
           transition: border-color 160ms ease, background 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .pe-option:hover { border-color: var(--k-border-hover); background: var(--k-bg); }
+        .pe-option:hover { border-color: var(--k-border-hover); background: var(--ed-cream); }
         .pe-option-on {
-          background: var(--k-primary);
-          border-color: var(--k-primary);
+          background: var(--ed-ink);
+          border-color: var(--ed-ink);
         }
-        .pe-option-on:hover { background: var(--k-primary-hover); border-color: var(--k-primary-hover); }
-        .pe-option:focus-visible { outline: 2px solid var(--k-primary); outline-offset: 2px; }
+        .pe-option-on:hover { background: var(--ed-olive); border-color: var(--ed-olive); }
+        .pe-option:focus-visible { outline: 2px solid var(--ed-ink); outline-offset: 2px; }
 
         .pe-option-letter {
           flex-shrink: 0;
           width: 32px;
           height: 32px;
-          border-radius: 999px;
-          background: var(--k-bg);
-          border: 1px solid var(--k-border);
-          color: var(--k-text-muted);
+          border-radius: 4px;
+          background: var(--ed-cream);
+          border: 1px solid var(--ed-rule);
+          color: var(--ed-ink-soft);
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -675,17 +675,17 @@ export default function PostExamPage() {
           font-weight: 500;
         }
         .pe-option-letter-on {
-          background: var(--k-bg);
-          color: var(--k-primary);
-          border-color: var(--k-bg);
+          background: var(--ed-cream);
+          color: var(--ed-ink);
+          border-color: var(--ed-cream);
         }
         .pe-option-text {
           flex: 1;
           font-size: 14px;
           line-height: 1.5;
-          color: var(--k-text-primary);
+          color: var(--ed-ink);
         }
-        .pe-option-on .pe-option-text { color: var(--k-bg); }
+        .pe-option-on .pe-option-text { color: var(--ed-cream); }
 
         .pe-actions {
           display: flex;
@@ -699,7 +699,7 @@ export default function PostExamPage() {
           gap: 8px;
           height: 48px;
           padding: 0 22px;
-          border-radius: 999px;
+          border-radius: 4px;
           font-family: var(--font-display, system-ui);
           font-size: 14px;
           font-weight: 600;
@@ -709,19 +709,19 @@ export default function PostExamPage() {
         }
         .pe-next:active, .pe-finish:active { transform: scale(0.97); }
         .pe-next {
-          background: var(--k-primary);
-          color: var(--k-bg);
+          background: var(--ed-ink);
+          color: var(--ed-cream);
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
         }
-        .pe-next:hover { background: var(--k-primary-hover); }
+        .pe-next:hover { background: var(--ed-olive); }
 
         .pe-finish-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
         .pe-finish-ok {
-          background: var(--k-primary);
-          color: var(--k-bg);
+          background: var(--ed-ink);
+          color: var(--ed-cream);
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
         }
-        .pe-finish-ok:hover:not(:disabled) { background: var(--k-primary-hover); }
+        .pe-finish-ok:hover:not(:disabled) { background: var(--ed-olive); }
         .pe-finish:disabled { opacity: 0.6; cursor: not-allowed; }
         .pe-finish-warn {
           display: inline-flex;
@@ -746,7 +746,7 @@ export default function PostExamPage() {
         .pe-submit-err button {
           background: none;
           border: none;
-          color: var(--k-text-primary);
+          color: var(--ed-ink);
           font-family: var(--font-display, system-ui);
           font-size: 12px;
           font-weight: 600;
@@ -759,16 +759,16 @@ export default function PostExamPage() {
           height: 14px;
           border-radius: 50%;
           border: 2px solid rgba(255, 255, 255, 0.3);
-          border-top-color: var(--k-surface);
+          border-top-color: #ffffff;
           animation: pe-rot 700ms linear infinite;
         }
         @keyframes pe-rot { to { transform: rotate(360deg); } }
 
         .pe-navigator {
           padding: 22px 20px;
-          background: var(--k-surface);
-          border: 1px solid var(--k-border);
-          border-radius: 18px;
+          background: #ffffff;
+          border: 1px solid var(--ed-rule);
+          border-radius: 4px;
           position: sticky;
           top: 90px;
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
@@ -778,10 +778,10 @@ export default function PostExamPage() {
           font-size: 14px;
           font-weight: 500;
           font-variation-settings: 'opsz' 24;
-          color: var(--k-text-primary);
+          color: var(--ed-ink);
           margin: 0 0 14px;
           padding-bottom: 10px;
-          border-bottom: 1px dashed var(--k-border);
+          border-bottom: 1px dashed var(--ed-rule);
         }
 
         .pe-nav-grid {
@@ -793,9 +793,9 @@ export default function PostExamPage() {
         .pe-nav-cell {
           aspect-ratio: 1;
           border-radius: 8px;
-          background: var(--k-bg);
-          border: 1px solid var(--k-border);
-          color: var(--k-text-muted);
+          background: var(--ed-cream);
+          border: 1px solid var(--ed-rule);
+          color: var(--ed-ink-soft);
           font-family: var(--font-mono, monospace);
           font-size: 11px;
           font-weight: 600;
@@ -807,16 +807,16 @@ export default function PostExamPage() {
           transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
         }
         .pe-nav-cell:disabled { cursor: not-allowed; }
-        .pe-nav-answered { background: var(--k-success-bg); border-color: var(--k-success); color: var(--k-primary); }
+        .pe-nav-answered { background: var(--k-success-bg); border-color: var(--k-success); color: var(--ed-ink); }
         .pe-nav-current {
-          background: var(--k-primary);
-          border-color: var(--k-primary);
-          color: var(--k-bg);
+          background: var(--ed-ink);
+          border-color: var(--ed-ink);
+          color: var(--ed-cream);
           font-weight: 700;
           box-shadow: 0 0 0 3px rgba(10, 122, 71, 0.12);
         }
-        .pe-nav-locked { background: var(--k-warning-bg); border-color: var(--k-border); color: var(--k-text-muted); }
-        .pe-nav-future { background: transparent; border-color: var(--k-border); color: var(--k-warning); opacity: 0.7; }
+        .pe-nav-locked { background: var(--k-warning-bg); border-color: var(--ed-rule); color: var(--ed-ink-soft); }
+        .pe-nav-future { background: transparent; border-color: var(--ed-rule); color: var(--k-warning); opacity: 0.7; }
 
         .pe-nav-legend {
           list-style: none;
@@ -832,18 +832,18 @@ export default function PostExamPage() {
           gap: 8px;
           font-family: var(--font-display, system-ui);
           font-size: 11px;
-          color: var(--k-text-muted);
+          color: var(--ed-ink-soft);
           font-variant-numeric: tabular-nums;
         }
-        .pe-nav-legend strong { color: var(--k-text-primary); font-weight: 600; font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; }
+        .pe-nav-legend strong { color: var(--ed-ink); font-weight: 600; font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; }
         .pe-nav-swatch {
           width: 12px;
           height: 12px;
           border-radius: 4px;
-          border: 1px solid var(--k-border);
+          border: 1px solid var(--ed-rule);
           flex-shrink: 0;
         }
-        .pe-nav-swatch-ink { background: var(--k-primary); border-color: var(--k-primary); }
+        .pe-nav-swatch-ink { background: var(--ed-ink); border-color: var(--ed-ink); }
         .pe-nav-swatch-ok { background: var(--k-success-bg); border-color: var(--k-success); }
         .pe-nav-swatch-locked { background: var(--k-warning-bg); }
         .pe-nav-swatch-future { background: transparent; }
