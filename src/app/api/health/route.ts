@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     // Public response: minimal — avoids leaking service topology
     return NextResponse.json(
       { status: 'ok', timestamp: new Date().toISOString() },
-      { status: 200 },
+      { status: 200, headers: { 'Cache-Control': 'no-store' } },
     )
   }
 
@@ -26,7 +26,6 @@ export async function GET(request: Request) {
     redis: false,
     auth: false,
     s3: false,
-    smtp: false,
   }
 
   // ── DB check ──
@@ -72,22 +71,6 @@ export async function GET(request: Request) {
     }
   } catch { /* S3 check failed */ }
 
-  // ── SMTP check (actual connection verify) ──
-  try {
-    if (process.env.SMTP_HOST && process.env.SMTP_USER) {
-      const nodemailer = await import('nodemailer')
-      const transporter = nodemailer.default.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT ?? '587'),
-        secure: false,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-        connectionTimeout: 5000,
-      })
-      await transporter.verify()
-      services.smtp = true
-    }
-  } catch { /* SMTP check failed */ }
-
   // ── Config ref kontrolü ──
   const expectedRef = 'pkkkyyajfmusurcoovwt'
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
@@ -120,6 +103,6 @@ export async function GET(request: Request) {
       timestamp: new Date().toISOString(),
       version: APP_VERSION,
     },
-    { status: status === 'down' ? 503 : 200 },
+    { status: status === 'down' ? 503 : 200, headers: { 'Cache-Control': 'no-store' } },
   )
 }
