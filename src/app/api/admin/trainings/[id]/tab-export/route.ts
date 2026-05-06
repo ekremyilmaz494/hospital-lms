@@ -7,6 +7,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
+import { BRAND } from '@/lib/brand'
 
 function formatDate(d: Date | string | null | undefined): string {
   if (!d) return '—'
@@ -110,7 +111,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, dbUs
     })
     if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
-    const orgName = training.organization?.name ?? 'Devakent Hastanesi'
+    const orgName = training.organization?.name ?? BRAND.fullName
 
     const docRef = id.slice(0, 8).toUpperCase()
 

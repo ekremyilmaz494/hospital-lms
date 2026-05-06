@@ -8,6 +8,7 @@ import {
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import { BRAND } from '@/lib/brand'
 
 function styleHeader(ws: ExcelJS.Worksheet) {
   const headerRow = ws.getRow(1)
@@ -333,7 +334,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
 
     // ── Excel Export ──
     const wb = new ExcelJS.Workbook()
-    wb.creator = 'Devakent Hastanesi'
+    wb.creator = BRAND.fullName
     wb.created = new Date()
 
     // Sheet 1: Özet

@@ -3,6 +3,7 @@ import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { jsPDF } from 'jspdf'
+import { BRAND } from '@/lib/brand'
 
 /** Tarih formatla: 05.04.2026 */
 function formatDateTR(date: Date): string {
@@ -85,7 +86,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser }) => 
     doc.setFontSize(9)
     doc.setTextColor(30, 41, 59)
     y += 7
-    doc.text('Devakent Hastanesi', leftMargin, y)
+    doc.text(BRAND.fullName, leftMargin, y)
     y += 5
     doc.text('Saglik Egitim Teknolojileri A.S.', leftMargin, y)
     y += 5

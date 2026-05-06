@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable'
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { BRAND } from '@/lib/brand'
 
 function formatDate(d: Date | string | null | undefined): string {
   if (!d) return '-'
@@ -90,7 +91,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
   doc.text('H', 20, 26, { align: 'center' })
 
   // ── HEADER TEXT ────────────────────────────────────────────────────
-  const orgName = training.organization?.name ?? 'Devakent Hastanesi'
+  const orgName = training.organization?.name ?? BRAND.fullName
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)

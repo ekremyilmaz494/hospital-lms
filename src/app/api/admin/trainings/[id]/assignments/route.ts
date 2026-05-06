@@ -189,7 +189,7 @@ async function sendAssignmentEmails(params: {
           const staffName = [r.firstName, r.lastName].filter(Boolean).join(' ') || r.email
           const html = trainingAssignedEmail({
             staffName,
-            hospitalName: params.hospitalName,
+            organizationName: params.hospitalName,
             trainingTitle: params.training.title,
             trainingDescription: params.training.description,
             category: params.training.category,

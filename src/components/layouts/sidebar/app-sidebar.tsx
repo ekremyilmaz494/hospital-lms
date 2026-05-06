@@ -8,6 +8,7 @@
 
 import { useState, useCallback, memo, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { BRAND } from '@/lib/brand';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { ChevronDown, HelpCircle, LogOut, X } from 'lucide-react';
@@ -90,7 +91,7 @@ interface AppSidebarProps {
 export const AppSidebar = memo(function AppSidebar({
   navGroups,
   onToggleCollapse,
-  orgName = 'Devakent Hastanesi',
+  orgName = BRAND.fullName,
   orgCode,
   orgLogoUrl,
   userName = 'Kullanıcı',

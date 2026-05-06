@@ -4,6 +4,7 @@ import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import { BRAND } from '@/lib/brand'
 
 function formatDate(d: Date | string | null | undefined): string {
   if (!d) return '-'
@@ -94,7 +95,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
 
   if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
-  const orgName = training.organization?.name ?? 'Devakent Hastanesi'
+  const orgName = training.organization?.name ?? BRAND.fullName
   const wb = new ExcelJS.Workbook()
   wb.creator = orgName
   wb.company = orgName

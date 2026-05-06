@@ -233,7 +233,7 @@ export async function sendEmail({
 
 interface TrainingAssignedEmailParams {
   staffName: string
-  hospitalName: string
+  organizationName: string
   trainingTitle: string
   trainingDescription?: string | null
   category?: string | null
@@ -253,7 +253,7 @@ interface TrainingAssignedEmailParams {
 export function trainingAssignedEmail(params: TrainingAssignedEmailParams): string {
   const {
     staffName,
-    hospitalName,
+    organizationName,
     trainingTitle,
     trainingDescription,
     category,
@@ -303,7 +303,7 @@ export function trainingAssignedEmail(params: TrainingAssignedEmailParams): stri
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 36px 32px; border-radius: 16px 16px 0 0;">
         <p style="margin: 0 0 6px; color: rgba(255,255,255,0.72); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600;">Personel Eğitim Bildirimi</p>
-        <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px;">${escapeHtml(hospitalName)}</h1>
+        <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px;">${escapeHtml(organizationName)}</h1>
       </div>
 
       <!-- Body -->
@@ -343,7 +343,7 @@ export function trainingAssignedEmail(params: TrainingAssignedEmailParams): stri
         <!-- Footer note -->
         <div style="border-top: 1px solid #f1f5f9; margin-top: 28px; padding-top: 20px;">
           <p style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin: 0;">
-            Bu e-posta <strong>${escapeHtml(hospitalName)}</strong> personel eğitim yönetim sistemi tarafından
+            Bu e-posta <strong>${escapeHtml(organizationName)}</strong> personel eğitim yönetim sistemi tarafından
             otomatik olarak gönderilmiştir. Soru ve talepleriniz için kurumunuzun İnsan Kaynakları veya
             Eğitim Koordinatörlüğü birimine başvurabilirsiniz.
           </p>
@@ -353,7 +353,7 @@ export function trainingAssignedEmail(params: TrainingAssignedEmailParams): stri
       <!-- Ribbon -->
       <div style="background: #0f172a; padding: 14px 32px; border-radius: 0 0 16px 16px; text-align: center;">
         <p style="margin: 0; color: rgba(255,255,255,0.55); font-size: 11px; letter-spacing: 0.3px;">
-          ${escapeHtml(hospitalName)} · Personel Eğitim Yönetim Sistemi
+          ${escapeHtml(organizationName)} · Personel Eğitim Yönetim Sistemi
         </p>
       </div>
     </div>
@@ -364,7 +364,7 @@ export function examResultEmail(staffName: string, trainingTitle: string, score:
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <h2 style="color: #1e293b; margin-top: 0;">Sınav Sonucu</h2>
@@ -387,7 +387,7 @@ export function forgotPasswordEmail(name: string, resetLink: string) {
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <h2 style="color: #1e293b; margin-top: 0;">Şifre Sıfırlama</h2>
@@ -407,12 +407,12 @@ export function welcomeEmail(name: string, email: string, resetLink: string) {
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <h2 style="color: #1e293b; margin-top: 0;">Hoş Geldiniz!</h2>
         <p style="color: #64748b;">Merhaba ${escapeHtml(name)},</p>
-        <p style="color: #64748b;">Devakent Hastanesi hesabınız oluşturulmuştur.</p>
+        <p style="color: #64748b;">${BRAND.fullName} hesabınız oluşturulmuştur.</p>
         <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
           <p style="margin: 4px 0; color: #475569;"><strong>E-posta:</strong> ${escapeHtml(email)}</p>
         </div>
@@ -433,22 +433,22 @@ export function welcomeEmail(name: string, email: string, resetLink: string) {
  */
 export async function sendHospitalWelcomeEmail(params: {
   to: string
-  hospitalName: string
+  organizationName: string
   loginUrl: string
   tempPassword: string
   adminName: string
 }) {
-  const { to, hospitalName, loginUrl, tempPassword, adminName } = params
+  const { to, organizationName, loginUrl, tempPassword, adminName } = params
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Hastane Hesabınız Oluşturuldu</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <h2 style="color: #1e293b; margin-top: 0;">Hoş Geldiniz!</h2>
         <p style="color: #64748b;">Merhaba ${escapeHtml(adminName)},</p>
-        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> hastanesi için yönetici hesabınız oluşturulmuştur.</p>
+        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> hastanesi için yönetici hesabınız oluşturulmuştur.</p>
         <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
           <p style="margin: 4px 0; color: #475569;"><strong>E-posta:</strong> ${escapeHtml(to)}</p>
           <p style="margin: 4px 0; color: #475569;"><strong>Geçici Şifre:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${escapeHtml(tempPassword)}</code></p>
@@ -467,7 +467,7 @@ export async function sendHospitalWelcomeEmail(params: {
 
   await sendEmail({
     to,
-    subject: 'Devakent Hastanesi Hesabınız Oluşturuldu',
+    subject: `${organizationName} Hesabınız Oluşturuldu`,
     html,
   })
 }
@@ -482,7 +482,7 @@ export async function sendHospitalWelcomeEmail(params: {
  */
 export async function sendInvitationEmail(params: {
   to: string
-  hospitalName: string
+  organizationName: string
   inviteUrl: string
   inviterName: string
   recipientName: string
@@ -490,18 +490,18 @@ export async function sendInvitationEmail(params: {
   expiresInHours: number
   organizationId?: string | null
 }): Promise<boolean> {
-  const { to, hospitalName, inviteUrl, inviterName, recipientName, roleLabel, expiresInHours, organizationId } = params
+  const { to, organizationName, inviteUrl, inviterName, recipientName, roleLabel, expiresInHours, organizationId } = params
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">${escapeHtml(hospitalName)}</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${escapeHtml(organizationName)}</h1>
         <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px;">Yeni Hesap Daveti</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <h2 style="color: #1e293b; margin-top: 0;">Merhaba ${escapeHtml(recipientName)},</h2>
         <p style="color: #64748b; line-height: 1.6;">
           <strong>${escapeHtml(inviterName)}</strong> sizi
-          <strong>${escapeHtml(hospitalName)}</strong> sistemine
+          <strong>${escapeHtml(organizationName)}</strong> sistemine
           <strong>${escapeHtml(roleLabel)}</strong> olarak davet etti.
         </p>
         <p style="color: #64748b; line-height: 1.6;">
@@ -531,7 +531,7 @@ export async function sendInvitationEmail(params: {
 
   return sendEmail({
     to,
-    subject: `${hospitalName} — Hesap Daveti`,
+    subject: `${organizationName} — Hesap Daveti`,
     html,
     organizationId: organizationId ?? undefined,
   })
@@ -549,22 +549,22 @@ export async function sendInvitationEmail(params: {
 export async function sendStaffWelcomeEmail(params: {
   to: string
   staffName: string
-  hospitalName: string
+  organizationName: string
   tempPassword: string
   loginUrl: string
 }) {
-  const { to, staffName, hospitalName, tempPassword, loginUrl } = params
+  const { to, staffName, organizationName, tempPassword, loginUrl } = params
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc; padding: 24px;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 22px; letter-spacing: -0.3px;">${escapeHtml(hospitalName)}</h1>
+        <h1 style="color: white; margin: 0; font-size: 22px; letter-spacing: -0.3px;">${escapeHtml(organizationName)}</h1>
         <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 13px;">Personel Eğitim Yönetim Sistemi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">Hesabınız oluşturuldu</h2>
         <p style="color: #475569; line-height: 1.6;">Sayın ${escapeHtml(staffName)},</p>
         <p style="color: #475569; line-height: 1.6;">
-          <strong>${escapeHtml(hospitalName)}</strong> personel eğitim sistemine hesabınız tanımlanmıştır.
+          <strong>${escapeHtml(organizationName)}</strong> personel eğitim sistemine hesabınız tanımlanmıştır.
           Atanan eğitimleri takip etmek, sınavlara katılmak ve sertifikalarınızı görüntülemek için
           aşağıdaki bilgilerle sisteme giriş yapabilirsiniz.
         </p>
@@ -601,14 +601,14 @@ export async function sendStaffWelcomeEmail(params: {
         </p>
       </div>
       <p style="color: #cbd5e1; font-size: 11px; text-align: center; margin-top: 16px;">
-        ${escapeHtml(hospitalName)} · Personel Eğitim Yönetim Sistemi
+        ${escapeHtml(organizationName)} · Personel Eğitim Yönetim Sistemi
       </p>
     </div>
   `
 
   await sendEmail({
     to,
-    subject: `${hospitalName} · Hesabınız oluşturuldu`,
+    subject: `${organizationName} · Hesabınız oluşturuldu`,
     html,
   })
 }
@@ -621,7 +621,7 @@ export function upcomingTrainingReminderEmail(staffName: string, trainingTitle: 
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, ${urgencyColor}, ${daysLeft <= 1 ? '#7f1d1d' : '#92400e'}); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Eğitim Deadline Hatırlatması</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -652,7 +652,7 @@ export function certificateExpiryReminderEmail(staffName: string, trainingTitle:
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, ${urgencyColor}, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Sertifika Yenileme Hatırlatması</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -710,7 +710,7 @@ export async function sendInvoiceEmail(params: {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Fatura Bildirimi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -729,7 +729,7 @@ export async function sendInvoiceEmail(params: {
 
   // Fatura platform-owned akış — global SMTP kullanılır.
   await globalTransporter.sendMail({
-    from: process.env.SMTP_FROM ?? 'Devakent Hastanesi <noreply@hastanelms.com>',
+    from: process.env.SMTP_FROM ?? `${BRAND.fullName} <noreply@hastanelms.com>`,
     to: recipientList.join(', '),
     subject: `Fatura - ${invoiceNumber}`,
     html,
@@ -746,11 +746,11 @@ export async function sendInvoiceEmail(params: {
 // ── Abonelik / Trial E-posta Şablonları ──
 
 /** Deneme suresi dolmak uzere (7, 3, 1 gun kala) */
-export async function sendTrialExpiringEmail(to: string, hospitalName: string, daysLeft: number) {
+export async function sendTrialExpiringEmail(to: string, organizationName: string, daysLeft: number) {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #f59e0b, #92400e); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Deneme Suresi Uyarisi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -758,7 +758,7 @@ export async function sendTrialExpiringEmail(to: string, hospitalName: string, d
           <p style="margin: 0; font-weight: bold; color: #92400e;">${daysLeft} gun kaldi!</p>
         </div>
         <h2 style="color: #1e293b; margin-top: 0;">Deneme Sureniz Dolmak Uzere</h2>
-        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> icin deneme surenizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
+        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> icin deneme surenizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
         <p style="color: #64748b;">Hizmet kesintisi yasamamamak icin lutfen bir abonelik plani secin.</p>
         <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
            style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
@@ -768,15 +768,15 @@ export async function sendTrialExpiringEmail(to: string, hospitalName: string, d
       </div>
     </div>
   `
-  await sendEmail({ to, subject: `Devakent Hastanesi — Deneme surenizin bitmesine ${daysLeft} gun`, html })
+  await sendEmail({ to, subject: `${organizationName} — Deneme surenizin bitmesine ${daysLeft} gun`, html })
 }
 
 /** Deneme suresi doldu */
-export async function sendTrialExpiredEmail(to: string, hospitalName: string) {
+export async function sendTrialExpiredEmail(to: string, organizationName: string) {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Deneme Suresi Sona Erdi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -784,7 +784,7 @@ export async function sendTrialExpiredEmail(to: string, hospitalName: string) {
           <p style="margin: 0; font-weight: bold; color: #dc2626;">Deneme suresi doldu</p>
         </div>
         <h2 style="color: #1e293b; margin-top: 0;">Deneme Sureniz Sona Erdi</h2>
-        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> icin ucretsiz deneme sureniz sona ermistir.</p>
+        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> icin ucretsiz deneme sureniz sona ermistir.</p>
         <p style="color: #64748b;">Yeni kayit olusturma kisitlanmistir. Mevcut verilerinize erismeye devam edebilirsiniz.</p>
         <p style="color: #64748b;">Hizmeti kesintisiz kullanmak icin lutfen bir abonelik plani satin alin.</p>
         <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
@@ -794,15 +794,15 @@ export async function sendTrialExpiredEmail(to: string, hospitalName: string) {
       </div>
     </div>
   `
-  await sendEmail({ to, subject: 'Devakent Hastanesi — Deneme sureniz sona erdi', html })
+  await sendEmail({ to, subject: `${organizationName} — Deneme sureniz sona erdi`, html })
 }
 
 /** Abonelik suresi dolmak uzere (7, 3, 1 gun kala) */
-export async function sendSubscriptionExpiringEmail(to: string, hospitalName: string, daysLeft: number) {
+export async function sendSubscriptionExpiringEmail(to: string, organizationName: string, daysLeft: number) {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #f59e0b, #92400e); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Yenileme Hatirlatmasi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -810,7 +810,7 @@ export async function sendSubscriptionExpiringEmail(to: string, hospitalName: st
           <p style="margin: 0; font-weight: bold; color: #92400e;">${daysLeft} gun kaldi!</p>
         </div>
         <h2 style="color: #1e293b; margin-top: 0;">Aboneliginiz Yenilenmeyi Bekliyor</h2>
-        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> aboneliginizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
+        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliginizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
         <p style="color: #64748b;">Hizmet kesintisi yasamamamak icin lutfen aboneliginizi yenileyin.</p>
         <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
            style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 16px;">
@@ -819,15 +819,15 @@ export async function sendSubscriptionExpiringEmail(to: string, hospitalName: st
       </div>
     </div>
   `
-  await sendEmail({ to, subject: `Devakent Hastanesi — Aboneliginizin bitmesine ${daysLeft} gun`, html })
+  await sendEmail({ to, subject: `${organizationName} — Aboneliginizin bitmesine ${daysLeft} gun`, html })
 }
 
 /** Abonelik suresi doldu */
-export async function sendSubscriptionExpiredEmail(to: string, hospitalName: string) {
+export async function sendSubscriptionExpiredEmail(to: string, organizationName: string) {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Sona Erdi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -835,7 +835,7 @@ export async function sendSubscriptionExpiredEmail(to: string, hospitalName: str
           <p style="margin: 0; font-weight: bold; color: #dc2626;">Abonelik sona erdi</p>
         </div>
         <h2 style="color: #1e293b; margin-top: 0;">Aboneliginiz Sona Ermistir</h2>
-        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> aboneliginiz sona ermistir.</p>
+        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliginiz sona ermistir.</p>
         <p style="color: #64748b;">Yeni kayit olusturma kisitlanmistir. Mevcut verilerinize erismeye devam edebilirsiniz.</p>
         <p style="color: #64748b;">Hizmeti tekrar aktif hale getirmek icin lutfen aboneliginizi yenileyin.</p>
         <a href="${escapeHtml(process.env.NEXT_PUBLIC_APP_URL ?? '')}/admin/settings/subscription"
@@ -845,7 +845,7 @@ export async function sendSubscriptionExpiredEmail(to: string, hospitalName: str
       </div>
     </div>
   `
-  await sendEmail({ to, subject: 'Devakent Hastanesi — Aboneliginiz sona erdi', html })
+  await sendEmail({ to, subject: `${organizationName} — Aboneliginiz sona erdi`, html })
 }
 
 /**
@@ -856,20 +856,20 @@ export async function sendSubscriptionExpiredEmail(to: string, hospitalName: str
 export async function sendSelfRegistrationEmail(params: {
   to: string
   adminName: string
-  hospitalName: string
+  organizationName: string
 }) {
-  const { to, adminName, hospitalName } = params
+  const { to, adminName, organizationName } = params
   const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Hoş Geldiniz!</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
         <h2 style="color: #1e293b; margin-top: 0;">Kaydınız Başarılı</h2>
         <p style="color: #64748b;">Merhaba ${escapeHtml(adminName)},</p>
-        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> hastanesi için hesabınız başarıyla oluşturulmuştur.</p>
+        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> hastanesi için hesabınız başarıyla oluşturulmuştur.</p>
         <div style="background: #f0fdf4; border-left: 4px solid #0d9668; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;">
           <p style="margin: 0; color: #166534; font-size: 14px;"><strong>30 günlük ücretsiz deneme</strong> süreniz başlamıştır. Bu süre içinde tüm özellikleri kullanabilirsiniz.</p>
         </div>
@@ -887,7 +887,7 @@ export async function sendSelfRegistrationEmail(params: {
 
   await sendEmail({
     to,
-    subject: 'Devakent Hastanesi — Kaydınız Başarılı',
+    subject: `${organizationName} — Kaydınız Başarılı`,
     html,
   })
 }
@@ -906,7 +906,7 @@ export function complianceReportEmail(orgName: string, score: number, criticalCo
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: ${headerGradient}; padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Aylik Uyum Raporu</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -942,7 +942,7 @@ export function overdueTrainingReminderEmail(staffName: string, trainingTitle: s
   return `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Gecikmiş Eğitim Uyarısı</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -968,7 +968,7 @@ export async function passwordChangedEmail(email: string) {
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Güvenlik Bildirimi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -981,7 +981,7 @@ export async function passwordChangedEmail(email: string) {
       </div>
     </div>
   `
-  await sendEmail({ to: email, subject: 'Devakent Hastanesi — Şifre Değiştirildi', html })
+  await sendEmail({ to: email, subject: `${BRAND.fullName} — Şifre Değiştirildi`, html })
 }
 
 /** Yeni giriş algılandığında güvenlik uyarısı
@@ -991,7 +991,7 @@ export async function loginAlertEmail(email: string, ipAddress: string, userAgen
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Güvenlik Bildirimi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -1013,7 +1013,7 @@ export async function loginAlertEmail(email: string, ipAddress: string, userAgen
       </div>
     </div>
   `
-  await sendEmail({ to: email, subject: 'Devakent Hastanesi — Yeni Giriş Algılandı', html })
+  await sendEmail({ to: email, subject: `${BRAND.fullName} — Yeni Giriş Algılandı`, html })
 }
 
 /** Eğitim sertifikası hazır bildirimi */
@@ -1021,7 +1021,7 @@ export async function certificateIssuedEmail(email: string, staffName: string, t
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Sertifika Bildirimi</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -1040,20 +1040,20 @@ export async function certificateIssuedEmail(email: string, staffName: string, t
       </div>
     </div>
   `
-  await sendEmail({ to: email, subject: 'Devakent Hastanesi — Sertifikanız Hazır', html })
+  await sendEmail({ to: email, subject: `${BRAND.fullName} — Sertifikanız Hazır`, html })
 }
 
 /** Abonelik süresi dolmak üzere uyarısı (plan detayları ile)
  * NOT: cron/subscription-reminders sendSubscriptionExpiringEmail kullanıyor.
  * Bu fonksiyon daha detaylı (plan adı + bitiş tarihi). Admin panelinden
  * manuel bildirim göndermek için kullanılabilir. */
-export async function subscriptionExpiryEmail(email: string, hospitalName: string, planName: string, expiryDate: string, daysRemaining: number) {
+export async function subscriptionExpiryEmail(email: string, organizationName: string, planName: string, expiryDate: string, daysRemaining: number) {
   const urgencyColor = daysRemaining <= 3 ? '#dc2626' : '#f59e0b'
   const urgencyBg = daysRemaining <= 3 ? '#fef2f2' : '#fffbeb'
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, ${urgencyColor}, ${daysRemaining <= 3 ? '#7f1d1d' : '#92400e'}); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Abonelik Uyarısı</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -1061,7 +1061,7 @@ export async function subscriptionExpiryEmail(email: string, hospitalName: strin
           <p style="margin: 0; font-weight: bold; color: ${urgencyColor};">${daysRemaining} gün kaldı!</p>
         </div>
         <h2 style="color: #1e293b; margin-top: 0;">Abonelik Süresi Dolmak Üzere</h2>
-        <p style="color: #64748b;"><strong>${escapeHtml(hospitalName)}</strong> aboneliğinizin süresinin dolmasına <strong>${daysRemaining} gün</strong> kalmıştır.</p>
+        <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliğinizin süresinin dolmasına <strong>${daysRemaining} gün</strong> kalmıştır.</p>
         <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
           <p style="margin: 4px 0; color: #475569;"><strong>Plan:</strong> ${escapeHtml(planName)}</p>
           <p style="margin: 4px 0; color: #475569;"><strong>Bitiş Tarihi:</strong> ${escapeHtml(expiryDate)}</p>
@@ -1075,7 +1075,7 @@ export async function subscriptionExpiryEmail(email: string, hospitalName: strin
       </div>
     </div>
   `
-  await sendEmail({ to: email, subject: `Devakent Hastanesi — Abonelik Süresi Dolmak Üzere (${daysRemaining} gün)`, html })
+  await sendEmail({ to: email, subject: `${organizationName} — Abonelik Süresi Dolmak Üzere (${daysRemaining} gün)`, html })
 }
 
 /** KVKK veri talebi yanıt bildirimi */
@@ -1089,7 +1089,7 @@ export async function kvkkResponseEmail(email: string, requestType: 'access' | '
   const html = `
     <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #0d9668, #0f4a35); padding: 32px; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 24px;">Devakent Hastanesi</h1>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${BRAND.fullName}</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">KVKK Bilgilendirme</p>
       </div>
       <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
@@ -1104,5 +1104,5 @@ export async function kvkkResponseEmail(email: string, requestType: 'access' | '
       </div>
     </div>
   `
-  await sendEmail({ to: email, subject: 'Devakent Hastanesi — KVKK Talep Yanıtı', html })
+  await sendEmail({ to: email, subject: `${BRAND.fullName} — KVKK Talep Yanıtı`, html })
 }

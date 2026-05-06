@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       await sendSelfRegistrationEmail({
         to: email,
         adminName: `${firstName} ${lastName}`,
-        hospitalName,
+        organizationName: hospitalName,
       })
     } catch (err) {
       emailSent = false
