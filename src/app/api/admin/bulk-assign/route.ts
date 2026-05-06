@@ -127,13 +127,13 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
     // Fire-and-forget: atanan her (kullanıcı × eğitim) kombinasyonu için e-posta
     const assignedByName = [dbUser.firstName, dbUser.lastName].filter(Boolean).join(' ') || null
-    void sendBulkAssignmentEmails({
+    sendBulkAssignmentEmails({
       organizationId: orgId,
       trainings,
       newAssignments,
       maxAttempts,
       assignedByName,
-    })
+    }).catch((err) => logger.error('BulkAssign', 'Toplu atama e-postası gönderilemedi', err))
 
     return jsonResponse({
       created: newAssignments.length,

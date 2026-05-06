@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, computeAuditHash } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 
 /**
  * GET /api/admin/audit-logs/verify
@@ -100,9 +101,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       'Cache-Control': 'private, no-store',
     })
   } catch (err) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[AuditVerify] Chain verification failed:', err)
-    }
+    logger.error('AuditVerify', 'Chain verification failed', err)
     return errorResponse('Dogrulama sirasinda bir hata olustu', 500)
   }
 }, { requireOrganization: true })
