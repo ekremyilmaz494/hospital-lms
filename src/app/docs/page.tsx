@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
+import { BRAND } from '@/lib/brand'
 
 export const metadata: Metadata = {
-  title: 'API Dokumantasyonu — Devakent Hastanesi',
-  description: 'Devakent Hastanesi REST API interaktif dokumantasyonu (OpenAPI / Swagger UI)',
+  title: `API Dokumantasyonu — ${BRAND.fullName}`,
+  description: `${BRAND.fullName} REST API interaktif dokumantasyonu (OpenAPI / Swagger UI)`,
 }
 
 /**
@@ -134,7 +135,7 @@ export default function ApiDocsPage() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>API Dokumantasyonu — Devakent Hastanesi</title>
+        <title>API Dokumantasyonu — {BRAND.fullName}</title>
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.18.2/swagger-ui.css"
@@ -148,7 +149,7 @@ export default function ApiDocsPage() {
       <body>
         <div className="docs-header">
           <h1>
-            Devakent Hastanesi API
+            {BRAND.fullName} API
             <span className="badge">v1.0.0</span>
           </h1>
           <p>Hastane Personel Egitim ve Sinav Yonetim Sistemi — REST API Dokumantasyonu</p>

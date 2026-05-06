@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { passwordSchema } from '@/lib/validations';
+import { BRAND } from '@/lib/brand';
 import { Eye, EyeOff, Lock, Loader2, CheckCircle, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -98,7 +99,7 @@ export default function ResetPasswordPage() {
             >
               H
             </div>
-            <span className="text-xl font-bold font-heading">Devakent Hastanesi</span>
+            <span className="text-xl font-bold font-heading">{BRAND.fullName}</span>
           </div>
         </BlurFade>
 
@@ -234,7 +235,7 @@ export default function ResetPasswordPage() {
             <BlurFade delay={0.4}>
               <div className="mt-10 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
                 <p className="text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  &copy; 2026 Devakent Hastanesi. Tüm hakları saklıdır.
+                  &copy; 2026 {BRAND.fullName}. Tüm hakları saklıdır.
                 </p>
               </div>
             </BlurFade>
