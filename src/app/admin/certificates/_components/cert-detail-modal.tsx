@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Award, Copy, Download, Ban, RotateCcw, AlertTriangle, Archive } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { BRAND } from '@/lib/brand'
 import { useToast } from '@/components/shared/toast'
 import type { Certificate } from '../_types'
 
@@ -119,7 +120,7 @@ export function CertDetailModal({ cert, onClose, onMutated, onDownload, isPdfPen
             >
               Tamamlama Sertifikası
             </h2>
-            <p className="text-[13px] mt-1" style={{ color: K.TEXT_SECONDARY }}>Devakent Hastanesi Eğitim Programı</p>
+            <p className="text-[13px] mt-1" style={{ color: K.TEXT_SECONDARY }}>{BRAND.fullName} Eğitim Programı</p>
           </div>
         </div>
 

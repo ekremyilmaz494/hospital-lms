@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { BRAND } from '@/lib/brand';
 import { PageHeader } from '@/components/shared/page-header';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -102,7 +103,7 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Platform Adı</Label>
-                <Input name="platformName" defaultValue={settings?.platformName ?? 'Devakent Hastanesi'} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                <Input name="platformName" defaultValue={settings?.platformName ?? BRAND.fullName} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
               </div>
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Platform URL</Label>

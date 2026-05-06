@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs'
 import { prisma } from '@/lib/prisma'
 import { withAdminRoute } from '@/lib/api-handler'
+import { BRAND } from '@/lib/brand'
 
 /**
  * Toplu personel import için Excel şablonu üretir.
@@ -20,7 +21,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   const deptNames = departments.map(d => d.name)
 
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Devakent Hastanesi LMS'
+  wb.creator = `${BRAND.fullName} LMS`
   wb.created = new Date()
 
   // ── Sayfa 1: Personel ─────────────────────────────────────────────

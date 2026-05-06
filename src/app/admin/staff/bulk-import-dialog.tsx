@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Upload, Download, CheckCircle2, AlertCircle, Loader2, FileText, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { BRAND } from '@/lib/brand';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton, type PremiumModalStep } from '@/components/shared/premium-modal';
 
@@ -202,7 +203,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
 
     const ExcelJS = (await import('exceljs')).default;
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'Devakent Hastanesi LMS';
+    wb.creator = `${BRAND.fullName} LMS`;
     const sheet = wb.addWorksheet('Yüklenmeyen Personeller');
 
     sheet.columns = [

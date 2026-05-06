@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { BRAND } from '@/lib/brand';
 import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
 import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
 import { superAdminNav } from '@/components/layouts/sidebar/sidebar-config';
@@ -48,7 +49,7 @@ export default function SuperAdminLayout({
           navGroups={superAdminNav}
           collapsed={sidebarCollapsed}
           onToggleCollapse={toggleSidebar}
-          orgName="Devakent Hastanesi"
+          orgName={BRAND.fullName}
           userName={fullName}
           userRole="Platform Yöneticisi"
           userInitials={initials}

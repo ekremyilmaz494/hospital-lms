@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { INK, INK_SOFT, CREAM, RULE, GOLD, CARD_BG } from '@/lib/editorial-palette';
+import { BRAND } from '@/lib/brand';
 
 const trainingSteps: {
   step: string; title: string; desc: string; icon: LucideIcon;
@@ -132,7 +133,7 @@ export default function HelpPage() {
               className="text-[10px] font-semibold uppercase tracking-[0.16em]"
               style={{ color: INK_SOFT, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
             >
-              Devakent Hastanesi · Platform
+              {BRAND.fullName} · Platform
             </span>
           </div>
         </header>
