@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import MimeNode from 'nodemailer/lib/mime-node'
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
 import { htmlToText } from 'html-to-text'
 import { checkRateLimit } from '@/lib/redis'
@@ -701,20 +702,42 @@ export async function sendInvoiceEmail(params: {
     </div>
   `
 
-  // Fatura platform-owned akış — global SMTP kullanılır.
-  await globalTransporter.sendMail({
-    from: process.env.SMTP_FROM ?? `${BRAND.fullName} <noreply@hastanelms.com>`,
-    to: recipientList.join(', '),
-    subject: `Fatura - ${invoiceNumber}`,
-    html,
-    attachments: [
-      {
-        filename: `fatura-${invoiceNumber}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf',
-      },
-    ],
+  // Fatura — SES SendEmail Raw + MIME multipart (PDF attachment).
+  // MimeNode (nodemailer/lib/mime-node) RFC 2045 boundary üretimi + base64 wrapping
+  // halleder; manuel multipart yazımındaki yaygın bug'lardan kaçınır.
+  const fromAddress = process.env.SES_FROM_ADDRESS
+    ?? process.env.SMTP_FROM
+    ?? `${BRAND.fullName} <noreply@hastanelms.com>`
+
+  const root = new MimeNode('multipart/mixed')
+  root.setHeader([
+    { key: 'From', value: fromAddress },
+    { key: 'To', value: recipientList.join(', ') },
+    { key: 'Subject', value: `Fatura - ${invoiceNumber}` },
+  ])
+  root.createChild('text/html; charset=utf-8').setContent(html)
+  root
+    .createChild('application/pdf')
+    .setHeader([
+      { key: 'Content-Disposition', value: `attachment; filename="fatura-${invoiceNumber}.pdf"` },
+      { key: 'Content-Transfer-Encoding', value: 'base64' },
+    ])
+    .setContent(pdfBuffer)
+
+  const rawMessage: Buffer = await new Promise((resolve, reject) => {
+    root.build((err, msg) => (err ? reject(err) : resolve(msg)))
   })
+
+  try {
+    await getSesClient().send(
+      new SendEmailCommand({
+        Content: { Raw: { Data: rawMessage } },
+      }),
+    )
+  } catch (err) {
+    logger.error('Email', 'Invoice SES send failed', err instanceof Error ? err.message : String(err))
+    throw err
+  }
 }
 
 // ── Abonelik / Trial E-posta Şablonları ──
