@@ -5,12 +5,12 @@ import { BRAND } from '@/lib/brand'
 
 /**
  * Toplu personel import için Excel şablonu üretir.
- * - Sayfa 1 "Personel": başlıklar + 2 örnek satır + departman dropdown
+ * - Sayfa 1 "Personel": başlıklar + 4 örnek satır + departman dropdown
  * - Sayfa 2 "Departmanlar": geçerli departman adları (referans)
  *
- * Şifre sütunu YOK — varsayılan olarak her personele DAVET LİNKİ gönderilir.
- * Eski "şifre belirle" akışı için admin manuel "Şifre" sütunu ekleyebilir;
- * backend `şifre / sifre / parola / password / pwd / pass` başlıklarını tanır.
+ * Şifre sütunu var ama OPSİYONEL — boş bırakılan satırlara davet linki gider
+ * (önerilen), dolu olan satırlarda hesap doğrudan açılır + maille iletilir.
+ * Backend `şifre / sifre / parola / password / pwd / pass` başlıklarını tanır.
  */
 export const GET = withAdminRoute(async ({ organizationId }) => {
   const orgId = organizationId
@@ -29,11 +29,15 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   // ── Sayfa 1: Personel ─────────────────────────────────────────────
   const sheet = wb.addWorksheet('Personel')
 
+  // Sütun sırası: kimlik bilgileri → e-posta → ŞİFRE (mode tetikleyici) → iletişim → org alanları.
+  // Şifre, mode'u belirleyen alan olduğu için E-posta'nın hemen sağında — admin bakarken
+  // "burayı boş bırakırsam davet, dolu yazarsam direct hesap" mantığı görsel olarak kümelensin.
   sheet.columns = [
     { header: 'Ad',           key: 'ad',       width: 18 },
     { header: 'Soyad',        key: 'soyad',    width: 18 },
     { header: 'TC Kimlik No', key: 'tc',       width: 16 },
     { header: 'E-posta',      key: 'email',    width: 32 },
+    { header: 'Şifre',        key: 'sifre',    width: 18 },
     { header: 'Telefon',      key: 'telefon',  width: 16 },
     { header: 'Departman',    key: 'departman', width: 20 },
     { header: 'Unvan',        key: 'unvan',    width: 22 },
@@ -52,11 +56,14 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
 
   // Örnek satırlar — farklı senaryoları göstersin.
   // TC Kimlik No'lar VALİD (Mod10/11 checksum'ı geçer) — sahte ama doğru formatta.
+  // Şifre dolu olan ilk 2 satır → direct mode (hesap anında açılır, geçici şifre maille gider).
+  // Şifre boş olan son 2 satır → invite mode (davet linki gider, personel kendi şifresini kurar).
   const exampleRows = [
     {
       ad: 'Ayşe', soyad: 'Yılmaz',
       tc: '10000000146',
       email: 'ayse.yilmaz@hastane.com',
+      sifre: 'Geçici1234!',
       telefon: '05551234567',
       departman: deptNames[0] || 'Acil Servis',
       unvan: 'Hemşire',
@@ -65,6 +72,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       ad: 'Mehmet', soyad: 'Demir',
       tc: '11111111110',
       email: 'mehmet.demir@hastane.com',
+      sifre: 'Klinov2026!',
       telefon: '05559876543',
       departman: deptNames[1] || deptNames[0] || 'Dahiliye',
       unvan: 'Doktor',
@@ -73,7 +81,8 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       ad: 'Fatma', soyad: 'Kaya',
       tc: '12345678950',
       email: 'fatma.kaya@hastane.com',
-      telefon: '', // telefon opsiyonel
+      sifre: '', // şifre boş → davet linki gider
+      telefon: '',
       departman: deptNames[2] || deptNames[0] || 'Yoğun Bakım',
       unvan: 'Başhemşire',
     },
@@ -81,6 +90,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       ad: 'Ali', soyad: 'Çelik',
       tc: '', // TC opsiyonel — sadece direct (şifreli) modda zorunlu
       email: 'ali.celik@hastane.com',
+      sifre: '',
       telefon: '05321112233',
       departman: '',
       unvan: '',
@@ -98,15 +108,15 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   const separatorRow = sheet.getRow(exampleRows.length + 2)
   separatorRow.getCell(1).value = '↓ Örnek satırları silip kendi personelinizi buraya girin ↓'
   separatorRow.getCell(1).font = { bold: true, color: { argb: 'FF0D9668' }, size: 10 }
-  sheet.mergeCells(`A${exampleRows.length + 2}:G${exampleRows.length + 2}`)
+  sheet.mergeCells(`A${exampleRows.length + 2}:H${exampleRows.length + 2}`)
   separatorRow.alignment = { horizontal: 'center' }
 
-  // Departman için dropdown doğrulaması — F sütunu (TC eklendiği için bir sağa kaydı)
+  // Departman için dropdown doğrulaması — G sütunu (Şifre eklendiği için bir sağa kaydı)
   if (deptNames.length > 0) {
     const separatorIdx = exampleRows.length + 2
     for (let r = 2; r <= 500; r++) {
       if (r === separatorIdx) continue
-      sheet.getCell(`F${r}`).dataValidation = {
+      sheet.getCell(`G${r}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: [`Departmanlar!$A$2:$A$${deptNames.length + 1}`],
@@ -147,24 +157,25 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     '',
     'ZORUNLU ALANLAR: Ad, Soyad, E-posta',
     'KOŞULLU ZORUNLU: TC Kimlik No (Şifre belirlediğiniz satırlarda zorunlu — resmi denetim için)',
-    'OPSİYONEL ALANLAR: TC (davet modunda), Telefon, Departman, Unvan',
+    'OPSİYONEL ALANLAR: TC (davet modunda), Şifre, Telefon, Departman, Unvan',
+    '',
+    'ŞİFRE — İKİ MOD VAR (her satır bağımsız):',
+    '  • ŞİFRE BOŞ → DAVET LİNKİ gönderilir (önerilen)',
+    '      ↳ Personel mailden linke tıklar, kendi şifresini kurar.',
+    '      ↳ E-posta doğrulaması yapılır, daha güvenli.',
+    '      ↳ Davet linki 30 gün geçerli.',
+    '  • ŞİFRE DOLU → HESAP ANINDA AÇILIR (acil/offline durumlar için)',
+    '      ↳ Geçici şifre maille personele iletilir.',
+    '      ↳ Personel ilk girişte şifresini değiştirmek zorundadır.',
+    '      ↳ Şifre en az 8 karakter olmalı.',
+    '  • Aynı dosyada iki modu karıştırabilirsiniz (mixed batch).',
     '',
     'TC KİMLİK NO:',
     '  • 11 haneli, NVİ algoritmasıyla doğrulanır (sahte numaralar reddedilir).',
     '  • DB\'de AES-256-GCM ile şifrelenir, HMAC-SHA256 ile hash\'lenir (KVKK uyumlu).',
     '  • Aynı TC bu kurumda tekrar kullanılamaz; farklı kurumlarda olabilir.',
-    '  • Direct mode (şifreli kayıt) için ZORUNLU — denetimde sertifika eşleşmesi için.',
-    '',
-    'ŞIFRE / DAVET LİNKİ (önerilen davranış):',
-    '  • Bu şablonda "Şifre" sütunu YOKTUR — varsayılan olarak her personele DAVET LİNKİ gönderilir.',
-    '  • Personel maildeki linke tıklar, kendi şifresini kurar (e-posta doğrulaması yapılır).',
-    '  • Davet linki 30 gün geçerlidir; kullanılmazsa admin yeniden gönderebilir.',
-    '',
-    'ŞIFRE BELİRLEME (acil/offline durumlar için):',
-    '  • Şablona elle "Şifre" başlığı ekleyip her satıra şifre yazarsanız:',
-    '    sistem hesabı anında açar, geçici şifreyi maille iletir.',
-    '  • Personel ilk girişte şifresini değiştirmek zorundadır.',
-    '  • Şifre boş bırakılan satırlar yine davet linki akışına düşer (mixed batch).',
+    '  • Direct mode (şifre dolu) için ZORUNLU — denetimde sertifika eşleşmesi için.',
+    '  • Davet modunda opsiyonel — personel daveti kabul ederken TC istenir.',
     '',
     'E-POSTA:',
     '  • Benzersiz olmalı, daha önce sistemde kayıtlı olmamalı.',
@@ -186,6 +197,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     '',
     'İPUÇLARI:',
     '  • İlk 4 satır (italik, gri) ÖRNEKLERDİR — silip kendi verilerinizi yazın.',
+    '  • İlk 2 örnekte şifre dolu (direct mode), son 2\'sinde boş (davet mode) — farkı görmek için.',
     '  • 500 satıra kadar yükleyebilirsiniz.',
     '  • Yüklemeden önce "Önizleme" ekranında hataları inline düzeltebilirsiniz.',
     '  • Yükleme sonrası /admin/staff/imports sayfasından geri alabilirsiniz.',

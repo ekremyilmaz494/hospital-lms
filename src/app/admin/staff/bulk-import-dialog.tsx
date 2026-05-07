@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Upload, Download, CheckCircle2, AlertCircle, Loader2, FileText, RefreshCw, Mail, KeyRound } from 'lucide-react';
+import { Upload, Download, CheckCircle2, AlertCircle, Loader2, FileText, RefreshCw, Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { BRAND } from '@/lib/brand';
 import { useToast } from '@/components/shared/toast';
@@ -387,7 +387,13 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
             </div>
             <div className="bid-template-body">
               <h5>Şablon ile başla</h5>
-              <p>Başlıklar esnek: <em>Ad/İsim</em>, <em>Soyad</em>, <em>E-posta/Email/Mail</em>, <em>Departman/Bölüm</em> — hepsi tanınır.</p>
+              <p>Başlıklar esnek: <em>Ad/İsim</em>, <em>Soyad</em>, <em>E-posta/Email/Mail</em>, <em>Şifre</em>, <em>Departman/Bölüm</em> — hepsi tanınır.</p>
+              <p className="bid-template-mode">
+                <Mail className="h-3 w-3" />
+                <strong>Şifre boşsa</strong> davet linki gider.
+                <KeyRound className="h-3 w-3" />
+                <strong>Şifre doluysa</strong> hesap anında açılır.
+              </p>
               <button type="button" onClick={downloadTemplate} className="bid-template-btn">
                 <Download className="h-3.5 w-3.5" />
                 Şablonu indir (.xlsx)
@@ -431,6 +437,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                   <col style={{ minWidth: 120 }} />
                   <col style={{ minWidth: 140 }} />
                   <col style={{ minWidth: 220 }} />
+                  <col style={{ minWidth: 170 }} />
                   <col style={{ minWidth: 130 }} />
                   <col style={{ minWidth: 160 }} />
                   <col style={{ minWidth: 140 }} />
@@ -444,6 +451,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                     <th>Soyad *</th>
                     <th>TC Kimlik</th>
                     <th>E-posta *</th>
+                    <th title="Boş bırakılırsa davet linki gönderilir; doluysa hesap anında açılır">Şifre</th>
                     <th>Telefon</th>
                     <th>Departman</th>
                     <th>Unvan</th>
@@ -468,6 +476,12 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                           />
                         </td>
                         <td><CellInput value={row.email} onChange={(v) => updateRow(idx, { email: v.toLowerCase() })} /></td>
+                        <td>
+                          <PasswordCellInput
+                            value={row.password}
+                            onChange={(v) => updateRow(idx, { password: v })}
+                          />
+                        </td>
                         <td><CellInput value={row.phone} onChange={(v) => updateRow(idx, { phone: v })} /></td>
                         <td>
                           <select
@@ -653,8 +667,22 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           color: #1c1917;
           margin: 0 0 6px;
         }
-        .bid-template p { font-size: 12px; color: #78716c; line-height: 1.55; margin: 0 0 12px; }
+        .bid-template p { font-size: 12px; color: #78716c; line-height: 1.55; margin: 0 0 10px; }
         .bid-template em { font-style: normal; color: #1c1917; font-weight: 600; }
+        .bid-template-mode {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 6px;
+          padding: 10px 12px;
+          margin: 0 0 12px !important;
+          border-radius: 8px;
+          background: #ffffff;
+          border: 1px solid #e7e5e4;
+          line-height: 1.5 !important;
+        }
+        .bid-template-mode :global(svg) { color: #0d9668; flex-shrink: 0; }
+        .bid-template-mode strong { color: #1c1917; font-weight: 600; }
         .bid-template-btn {
           display: inline-flex;
           align-items: center;
@@ -929,6 +957,63 @@ function CellInput({ value, onChange }: { value: string; onChange: (v: string) =
       className="h-9 text-sm px-2.5"
       style={{ background: K.SURFACE, borderColor: K.BORDER_LIGHT }}
     />
+  );
+}
+
+/**
+ * Şifre hücresi — type="password" varsayılan, göz ikonu ile göster/gizle.
+ * Boş bırakılırsa satır invite mode'a düşer (Mod sütunu otomatik DAVET gösterir);
+ * doluysa direct mode (ŞİFRE) — backend `validateRows` 8+ karakter kontrol eder.
+ */
+function PasswordCellInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [reveal, setReveal] = useState(false);
+  return (
+    <div className="bid-pwd-wrap">
+      <Input
+        type={reveal ? 'text' : 'password'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Boş = Davet"
+        className="h-9 text-sm pl-2.5 pr-8"
+        autoComplete="new-password"
+        spellCheck={false}
+        style={{ background: K.SURFACE, borderColor: K.BORDER_LIGHT }}
+      />
+      <button
+        type="button"
+        className="bid-pwd-eye"
+        aria-label={reveal ? 'Şifreyi gizle' : 'Şifreyi göster'}
+        onClick={() => setReveal(r => !r)}
+        tabIndex={-1}
+      >
+        {reveal ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </button>
+      <style jsx>{`
+        .bid-pwd-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+        .bid-pwd-eye {
+          position: absolute;
+          right: 4px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 26px;
+          height: 26px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: none;
+          background: transparent;
+          color: ${K.TEXT_MUTED};
+          cursor: pointer;
+          border-radius: 6px;
+          padding: 0;
+        }
+        .bid-pwd-eye:hover { color: ${K.PRIMARY}; background: ${K.PRIMARY_LIGHT}; }
+      `}</style>
+    </div>
   );
 }
 
