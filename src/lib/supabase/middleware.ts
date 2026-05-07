@@ -235,6 +235,15 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
+    // ── Şifre değiştirme zorunluluğu guard ──
+    // Login endpoint'i mustChangePassword=true olan kullanıcılara 'hlms-must-change-pw=1'
+    // cookie'si set eder. Bu cookie varsa kullanıcı şifresini değiştirmeden hiçbir
+    // protected route'a giremez. Change-password API cookie'yi siler.
+    const mustChangePw = request.cookies.get('hlms-must-change-pw')?.value === '1'
+    if (mustChangePw && !pathname.startsWith('/auth/change-password') && !pathname.startsWith('/auth/logout')) {
+      return NextResponse.redirect(new URL('/auth/change-password?reason=first-login', request.url))
+    }
+
     // ── SMS MFA pending guard ──
     // Login endpoint'i SMS MFA gerektiren orgların user'larına 'hlms-sms-pending=1'
     // cookie'si set eder. Bu cookie varsa kullanıcı SMS'i tamamlamadan hiçbir

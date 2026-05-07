@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/ap
 import { withAdminRoute } from '@/lib/api-handler'
 import { createAssignmentSchema } from '@/lib/validations'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
+import { getActivePeriod } from '@/lib/training-periods'
 import { sendEmail, trainingAssignedEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 
@@ -82,9 +83,11 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Bu eğitim atanamaz: en az bir video veya ses içeriği eklenmelidir.', 400)
   }
 
-  // Create assignments for all users (skip existing)
+  const activePeriod = await getActivePeriod(organizationId)
+
+  // Create assignments for all users (skip existing in current period)
   const existingAssignments = await prisma.trainingAssignment.findMany({
-    where: { trainingId: id, userId: { in: parsed.data.userIds }, training: { organizationId: organizationId } },
+    where: { trainingId: id, userId: { in: parsed.data.userIds }, periodId: activePeriod.id, training: { organizationId: organizationId } },
     select: { userId: true },
   })
   const existingUserIds = new Set(existingAssignments.map(a => a.userId))
@@ -102,6 +105,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
     data: newUserIds.map(userId => ({
       trainingId: id,
       userId,
+      periodId: activePeriod.id,
       maxAttempts: parsed.data.maxAttempts,
       originalMaxAttempts: parsed.data.maxAttempts,
       assignedById: dbUser.id,

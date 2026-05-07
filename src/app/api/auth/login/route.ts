@@ -20,6 +20,8 @@ import { hashTcKimlik } from '@/lib/tc-crypto'
 const SMS_PENDING_COOKIE = 'hlms-sms-pending'
 const SMS_PENDING_TTL = 15 * 60 // 15 dk — SMS doğrulama için makul süre
 
+const MUST_CHANGE_PW_COOKIE = 'hlms-must-change-pw'
+
 /**
  * "Bu cihazda oturumumu açık tut (7 gün)" sentinel cookie.
  * Supabase token'ını her refresh'te middleware bu cookie'yi okuyup auth
@@ -284,6 +286,25 @@ export async function POST(request: NextRequest) {
     } else {
       // Önceki login'den kalan sentinel varsa temizle
       cookieStore.set(REMEMBER_ME_COOKIE, '', {
+        path: '/',
+        expires: new Date(0),
+        httpOnly: true,
+        sameSite: 'lax',
+      })
+    }
+
+    // Şifre değiştirme zorunluluğu — middleware bu cookie'yi görünce /auth/change-password'a zorlar
+    if (dbUser.mustChangePassword) {
+      cookieStore.set(MUST_CHANGE_PW_COOKIE, '1', {
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 30 * 24 * 60 * 60,
+      })
+    } else {
+      // Önceki oturumdan kalan cookie varsa temizle
+      cookieStore.set(MUST_CHANGE_PW_COOKIE, '', {
         path: '/',
         expires: new Date(0),
         httpOnly: true,

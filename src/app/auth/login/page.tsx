@@ -229,18 +229,20 @@ function LoginForm() {
         return;
       }
 
-      if (data.mustChangePassword) {
-        router.push('/auth/change-password?reason=first-login');
-        return;
-      }
-
       const role = data.user?.role as string | undefined;
-      const rolePrefix = getRolePath(role, 'dashboard');
-      const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
-      const targetPath = isRedirectCompatible ? redirectTo : (role && ROLE_ROUTES[role]) || '/staff/dashboard';
-      // Server zaten cross-subdomain ise tam URL hesapladı (apex → subdomain).
-      // Subdomain login'de data.redirectTo null → buildPostLoginUrl same-domain path döner.
-      const target = data.redirectTo ?? buildPostLoginUrl(targetPath, data.organizationSlug ?? null);
+      // mustChangePassword: KVKK onayı da henüz yapılmamışsa önce KVKK modali açılır,
+      // pendingRedirect = change-password → KVKK sonrası doğru yere gider.
+      let target: string;
+      if (data.mustChangePassword) {
+        target = '/auth/change-password?reason=first-login';
+      } else {
+        const rolePrefix = getRolePath(role, 'dashboard');
+        const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
+        const targetPath = isRedirectCompatible ? redirectTo : (role && ROLE_ROUTES[role]) || '/staff/dashboard';
+        // Server zaten cross-subdomain ise tam URL hesapladı (apex → subdomain).
+        // Subdomain login'de data.redirectTo null → buildPostLoginUrl same-domain path döner.
+        target = data.redirectTo ?? buildPostLoginUrl(targetPath, data.organizationSlug ?? null);
+      }
 
       // Setup wizard guard cache'ini önceden doldur — admin layout aynı anahtarı
       // okuyup /api/admin/setup fetch'ini atlar (ilk login'de 1 round-trip kazanç).

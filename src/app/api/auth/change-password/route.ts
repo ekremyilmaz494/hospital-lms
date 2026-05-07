@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import { z } from 'zod/v4'
 import { passwordChangedEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
@@ -48,13 +49,20 @@ export const POST = withStaffRoute(async ({ request, dbUser }) => {
     return errorResponse('Şifre güncellenemedi. Lütfen tekrar deneyin.', 500)
   }
 
-  // mustChangePassword bayrağını kaldır
+  // mustChangePassword bayrağını ve zorunlu cookie'yi kaldır
   if (dbUser.mustChangePassword) {
     await prisma.user.update({
       where: { id: dbUser.id },
       data: { mustChangePassword: false },
     })
   }
+  const cookieStore = await cookies()
+  cookieStore.set('hlms-must-change-pw', '', {
+    path: '/',
+    expires: new Date(0),
+    httpOnly: true,
+    sameSite: 'lax',
+  })
 
   // Şifre değişikliği bildirimi (fire-and-forget)
   passwordChangedEmail(dbUser.email)
