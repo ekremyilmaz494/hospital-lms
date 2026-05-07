@@ -345,7 +345,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
       eyebrow="Toplu İşlem"
       title="Personel Yüklemesi"
       subtitle={subtitle}
-      size="xl"
+      size="2xl"
       steps={steps}
       activeStep={activeStepId}
       disableEscape={stage === 'uploading' || stage === 'importing'}
@@ -425,9 +425,21 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           <div className="bid-table-wrap">
             <div className="bid-table-scroll">
               <table className="bid-table">
+                <colgroup>
+                  <col style={{ width: 44 }} />
+                  <col style={{ minWidth: 120 }} />
+                  <col style={{ minWidth: 120 }} />
+                  <col style={{ minWidth: 140 }} />
+                  <col style={{ minWidth: 220 }} />
+                  <col style={{ minWidth: 130 }} />
+                  <col style={{ minWidth: 160 }} />
+                  <col style={{ minWidth: 140 }} />
+                  <col style={{ minWidth: 96 }} />
+                  <col style={{ minWidth: 200 }} />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th style={{ width: 44 }}>#</th>
+                    <th>#</th>
                     <th>Ad *</th>
                     <th>Soyad *</th>
                     <th>TC Kimlik</th>
@@ -705,10 +717,10 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         .bid-mode {
           display: inline-flex;
           align-items: center;
-          gap: 4px;
-          padding: 3px 8px;
+          gap: 5px;
+          padding: 4px 10px;
           border-radius: 999px;
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.02em;
           text-transform: uppercase;
@@ -750,14 +762,19 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         }
         .bid-table-scroll {
           overflow: auto;
-          max-height: 380px;
+          max-height: 460px;
         }
-        .bid-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .bid-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13px;
+          table-layout: auto;
+        }
         .bid-table thead th {
           position: sticky;
           top: 0;
           background: #fafaf9;
-          padding: 10px 10px;
+          padding: 12px 12px;
           text-align: left;
           font-family: var(--font-display, system-ui);
           font-size: 11px;
@@ -770,23 +787,27 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         }
         .bid-table tbody tr { border-top: 1px solid #e7e5e4; }
         .bid-table tbody tr.bid-row-err { background: #fee2e2; }
-        .bid-table td { padding: 4px 6px; vertical-align: middle; }
+        .bid-table td {
+          padding: 6px 10px;
+          vertical-align: middle;
+          font-variant-numeric: tabular-nums;
+        }
         .bid-rowidx {
           font-family: var(--font-mono, monospace);
-          font-size: 10px;
+          font-size: 11px;
           color: #78716c;
-          padding-left: 10px;
+          padding-left: 12px;
           font-variant-numeric: tabular-nums;
         }
 
         .bid-sel {
           width: 100%;
-          height: 32px;
+          height: 36px;
           border-radius: 8px;
           border: 1.5px solid #e7e5e4;
           background: #ffffff;
-          padding: 0 6px;
-          font-size: 12px;
+          padding: 0 8px;
+          font-size: 13px;
           color: #1c1917;
           font-family: inherit;
         }
@@ -797,12 +818,11 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
           display: inline-flex;
           align-items: center;
           gap: 4px;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 600;
-          white-space: nowrap;
-          max-width: 180px;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          line-height: 1.35;
+          white-space: normal;
+          word-break: break-word;
         }
         .bid-status-ok { color: #0d9668; }
         .bid-status-err { color: #b91c1c; }
@@ -906,7 +926,7 @@ function CellInput({ value, onChange }: { value: string; onChange: (v: string) =
     <Input
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-8 text-xs px-2"
+      className="h-9 text-sm px-2.5"
       style={{ background: K.SURFACE, borderColor: K.BORDER_LIGHT }}
     />
   );

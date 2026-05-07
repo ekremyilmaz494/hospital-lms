@@ -49,7 +49,7 @@ interface PremiumModalProps {
   children: ReactNode;
   footer?: ReactNode;
   /** Modal genişlik preset'i */
-  size?: 'md' | 'lg' | 'xl';
+  size?: 'md' | 'lg' | 'xl' | '2xl';
   /** ESC ile kapama engellenirse (örn. loading durumunda) */
   disableEscape?: boolean;
 }
@@ -58,6 +58,9 @@ const SIZE_MAP = {
   md: 'max-w-2xl',
   lg: 'max-w-3xl',
   xl: 'max-w-5xl',
+  // 2xl: bulk import gibi 8+ sütunlu tablolar için. 1440px monitörde rahat sığar,
+  // 1280px'de %95 viewport — sol panel + tablo iki sütunlu layout'a yetiyor.
+  '2xl': 'max-w-[1400px]',
 } as const;
 
 export function PremiumModal({
