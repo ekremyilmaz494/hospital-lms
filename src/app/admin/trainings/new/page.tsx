@@ -145,13 +145,29 @@ export default function NewTrainingPage() {
           }, 500);
           toast(isPdf ? 'Doküman yüklendi' : isAudio ? 'Ses dosyası yüklendi' : 'Video yüklendi', 'success');
         } else {
-          toast('Dosya yüklenemedi', 'error');
+          // S3 hata gövdesi XML formatında — özet kullanıcıya anlaşılır olsun
+          const respSnippet = (xhr.responseText || '').slice(0, 200);
+          console.error('[upload] S3 PUT failed', { status: xhr.status, statusText: xhr.statusText, response: respSnippet });
+          toast(`Dosya yüklenemedi (HTTP ${xhr.status}). Yetki/CORS hatası olabilir.`, 'error');
           setVideos(prev => prev.map(v => v.id === itemId ? { ...v, url: '', file: undefined } : v));
           setUploadProgress(prev => { const n = { ...prev }; delete n[itemId]; return n; });
         }
       };
       xhr.onerror = () => {
-        toast('Dosya yüklenemedi — bağlantı hatası', 'error');
+        // status=0 + onerror = CORS preflight/network engeli. Üretimde S3 bucket'ın
+        // CORS policy'si klinovax.com origin'ini PUT için kabul etmiyor olabilir.
+        console.error('[upload] S3 PUT network/CORS error', {
+          uploadUrl: uploadUrl.split('?')[0],
+          contentType: file.type,
+          size: file.size,
+        });
+        toast('Dosya yüklenemedi — S3 CORS yetkisi reddedildi olabilir. Yöneticiyle iletişime geçin.', 'error');
+        setVideos(prev => prev.map(v => v.id === itemId ? { ...v, url: '', file: undefined } : v));
+        setUploadProgress(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+      };
+      xhr.ontimeout = () => {
+        console.error('[upload] S3 PUT timeout', { size: file.size });
+        toast('Dosya yüklenemedi — bağlantı zaman aşımına uğradı.', 'error');
         setVideos(prev => prev.map(v => v.id === itemId ? { ...v, url: '', file: undefined } : v));
         setUploadProgress(prev => { const n = { ...prev }; delete n[itemId]; return n; });
       };
