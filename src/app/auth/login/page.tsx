@@ -3,7 +3,7 @@
 import React, { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, Loader2, Clock, ArrowRight, AlertCircle, IdCard, Mail } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Clock, ArrowRight, AlertCircle, Building2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import dynamic from 'next/dynamic';
 import { BlurFade } from '@/components/ui/blur-fade';
@@ -81,12 +81,13 @@ function LoginForm() {
   const initialError = urlReason === 'kvkk-rejected' && urlMsg ? urlMsg : '';
 
   const [showPassword, setShowPassword] = useState(false);
-  // Login modu: TC + şifre veya Email + şifre. Subdomain'de TC default,
-  // apex'te (super_admin) email default — orgSlug olmadan TC çalışmaz.
-  const [loginMode, setLoginMode] = useState<'tc' | 'email'>('email');
-  const [tcKimlik, setTcKimlik] = useState('');
+  // Tek alan UX: kullanıcı email veya 11 haneli TC girer, sistem otomatik tip tespiti yapar.
+  // Subdomain'de orgSlug auto-set olur (TC çakışması daralır), apex'te null
+  // — TC birden fazla aktif org'da varsa server orgPickRequired döner.
+  const [identifier, setIdentifier] = useState('');
   const [orgSlug, setOrgSlug] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
+  const [orgPickList, setOrgPickList] = useState<{ slug: string; name: string }[] | null>(null);
+  const [pickedOrg, setPickedOrg] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
@@ -101,16 +102,14 @@ function LoginForm() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  // Subdomain'den orgSlug çıkar — TC ile login için zorunlu.
-  // "devakent.klinovax.com" → "devakent" / apex veya localhost → null (TC sekmesi disable).
+  // Subdomain'den orgSlug çıkar — TC çakışması bu org'a daraltılır.
+  // Apex'te orgSlug null kalır, server gerekirse orgPickRequired döner.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN;
     const host = window.location.hostname;
     if (!baseDomain || host === baseDomain || host.includes('localhost') || /^\d+\.\d+\.\d+\.\d+$/.test(host)) {
-      // Apex / localhost / IP → orgSlug yok, TC sekmesi disable kalır.
       setOrgSlug(null);
-      setLoginMode('email');
       return;
     }
     const suffix = '.' + baseDomain;
@@ -118,7 +117,6 @@ function LoginForm() {
       const slug = host.slice(0, -suffix.length);
       if (slug && slug !== 'www') {
         setOrgSlug(slug);
-        setLoginMode('tc'); // Subdomain'de personel girişi default TC
       }
     }
   }, []);
@@ -165,26 +163,34 @@ function LoginForm() {
     e.preventDefault();
     setError('');
 
-    // TC modunda client-side checksum ön kontrolü — ağ trafiğini boşa harcamamak için.
-    // Server zaten zod refine ile aynı kontrolü yapar (defense in depth).
-    if (loginMode === 'tc') {
-      const tcNorm = normalizeTcKimlik(tcKimlik);
-      if (!isValidTcKimlik(tcNorm)) {
-        setError('Geçersiz TC Kimlik No.');
-        return;
-      }
-      if (!orgSlug) {
-        setError('TC ile giriş için kurumunuzun web adresinden giriş yapın.');
-        return;
-      }
+    const trimmed = identifier.trim();
+    const looksLikeTc = /^\d{11}$/.test(trimmed);
+    const looksLikeEmail = trimmed.includes('@');
+
+    if (!trimmed) {
+      setError('E-posta veya TC Kimlik No girin.');
+      return;
+    }
+    if (!looksLikeTc && !looksLikeEmail) {
+      setError('Geçerli bir e-posta veya 11 haneli TC Kimlik No girin.');
+      return;
+    }
+    // TC için client-side checksum ön kontrolü — ağ trafiğini boşa harcamamak için.
+    if (looksLikeTc && !isValidTcKimlik(normalizeTcKimlik(trimmed))) {
+      setError('Geçersiz TC Kimlik No.');
+      return;
     }
 
     setLoading(true);
 
     try {
-      const payload = loginMode === 'tc'
-        ? { tcKimlik: normalizeTcKimlik(tcKimlik), password, rememberMe, orgSlug }
-        : { email, password, rememberMe };
+      const payload = {
+        identifier: looksLikeTc ? normalizeTcKimlik(trimmed) : trimmed,
+        password,
+        rememberMe,
+        // pickedOrg: kullanıcı dropdown'dan hastanesini seçti; orgSlug: subdomain auto-detect
+        orgSlug: pickedOrg ?? orgSlug ?? undefined,
+      };
 
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -200,8 +206,15 @@ function LoginForm() {
       }
 
       if (!res.ok) {
-        const fallback = loginMode === 'tc' ? 'TC Kimlik No veya şifre hatalı.' : 'E-posta veya şifre hatalı.';
+        const fallback = looksLikeTc ? 'TC Kimlik No veya şifre hatalı.' : 'E-posta veya şifre hatalı.';
         setError(data.error ?? fallback);
+        setLoading(false);
+        return;
+      }
+
+      // TC çakışması: aynı TC birden fazla aktif hastanede → kullanıcı seçim yapmalı
+      if (data.orgPickRequired) {
+        setOrgPickList(data.orgs);
         setLoading(false);
         return;
       }
@@ -225,8 +238,9 @@ function LoginForm() {
       const rolePrefix = getRolePath(role, 'dashboard');
       const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
       const targetPath = isRedirectCompatible ? redirectTo : (role && ROLE_ROUTES[role]) || '/staff/dashboard';
-      // super_admin için organizationSlug null → apex'te kalır
-      const target = buildPostLoginUrl(targetPath, data.organizationSlug ?? null);
+      // Server zaten cross-subdomain ise tam URL hesapladı (apex → subdomain).
+      // Subdomain login'de data.redirectTo null → buildPostLoginUrl same-domain path döner.
+      const target = data.redirectTo ?? buildPostLoginUrl(targetPath, data.organizationSlug ?? null);
 
       // Setup wizard guard cache'ini önceden doldur — admin layout aynı anahtarı
       // okuyup /api/admin/setup fetch'ini atlar (ilk login'de 1 round-trip kazanç).
@@ -451,74 +465,56 @@ function LoginForm() {
                 data-testid="login-form"
                 data-hydrated={hydrated ? 'true' : 'false'}
               >
-                {/* Login mode tabs — orgSlug yoksa TC sekmesi disable (apex/localhost) */}
-                {orgSlug && (
-                  <div className="flex gap-1 p-1 rounded-lg" style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}` }}>
-                    <button
-                      type="button"
-                      onClick={() => { setLoginMode('tc'); setError(''); }}
-                      className="flex-1 inline-flex items-center justify-center gap-2 h-9 rounded-md text-[12px] font-semibold transition-colors"
-                      style={{
-                        background: loginMode === 'tc' ? K.SURFACE : 'transparent',
-                        color: loginMode === 'tc' ? K.PRIMARY : K.TEXT_MUTED,
-                        boxShadow: loginMode === 'tc' ? '0 1px 2px rgba(15,23,42,0.06)' : 'none',
-                      }}
-                      data-testid="login-tab-tc"
-                    >
-                      <IdCard className="h-3.5 w-3.5" />
-                      TC ile Giriş
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setLoginMode('email'); setError(''); }}
-                      className="flex-1 inline-flex items-center justify-center gap-2 h-9 rounded-md text-[12px] font-semibold transition-colors"
-                      style={{
-                        background: loginMode === 'email' ? K.SURFACE : 'transparent',
-                        color: loginMode === 'email' ? K.PRIMARY : K.TEXT_MUTED,
-                        boxShadow: loginMode === 'email' ? '0 1px 2px rgba(15,23,42,0.06)' : 'none',
-                      }}
-                      data-testid="login-tab-email"
-                    >
-                      <Mail className="h-3.5 w-3.5" />
-                      E-posta ile Giriş
-                    </button>
-                  </div>
-                )}
+                {/* Tek alan: e-posta veya 11 haneli TC. Server otomatik tip tespiti yapar. */}
+                <div>
+                  <label className="ed-mono text-[10px] tracking-[0.28em] mb-2 block" style={{ color: K.TEXT_PRIMARY }}>
+                    E-POSTA VEYA TC KİMLİK NO
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="ornek@hastane.com veya 11 haneli TC"
+                    value={identifier}
+                    onChange={(e) => {
+                      // Sayı + nokta + @ + harf izinli — TC yazılırken sayıya kısıtlama yok,
+                      // kullanıcı ister TC ister email yazsın aynı kutuda devam etsin.
+                      setIdentifier(e.target.value);
+                      // Org pick dropdown gösteriliyorsa identifier değişince temizle
+                      if (orgPickList) { setOrgPickList(null); setPickedOrg(null); }
+                    }}
+                    autoComplete="username"
+                    className="ed-input"
+                    required
+                    data-testid="login-identifier-input"
+                  />
+                </div>
 
-                {/* TC veya Email — moda göre değişen alan */}
-                {loginMode === 'tc' ? (
-                  <div>
-                    <label className="ed-mono text-[10px] tracking-[0.28em] mb-2 block" style={{ color: K.TEXT_PRIMARY }}>
-                      TC KİMLİK NO
-                    </label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={11}
-                      placeholder="11 haneli TC Kimlik No"
-                      value={tcKimlik}
-                      onChange={(e) => setTcKimlik(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                      autoComplete="username"
-                      className="ed-input"
-                      style={{ fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
-                      required
-                      data-testid="login-tc-input"
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <label className="ed-mono text-[10px] tracking-[0.28em] mb-2 block" style={{ color: K.TEXT_PRIMARY }}>
-                      E-POSTA
-                    </label>
-                    <Input
-                      type="email"
-                      placeholder="ornek@hastane.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
-                      className="ed-input"
-                      required
-                    />
+                {/* Çakışma çözücü: aynı TC birden fazla aktif hastanede kayıtlı — hangi hastane? */}
+                {orgPickList && orgPickList.length > 0 && (
+                  <div className="rounded-lg p-3" style={{ background: K.WARNING_BG, border: `1px solid ${K.WARNING}` }}>
+                    <div className="flex items-start gap-2 mb-3">
+                      <Building2 className="h-4 w-4 shrink-0 mt-0.5" style={{ color: K.WARNING }} />
+                      <div className="text-[12px] leading-relaxed" style={{ color: K.TEXT_PRIMARY }}>
+                        <strong>Bu TC birden fazla hastanede kayıtlı.</strong> Hangi hastaneye giriş yapmak istiyorsunuz?
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {orgPickList.map((o) => (
+                        <button
+                          key={o.slug}
+                          type="button"
+                          onClick={() => { setPickedOrg(o.slug); setError(''); }}
+                          className="w-full text-left px-3 py-2 rounded-md transition-colors"
+                          style={{
+                            background: pickedOrg === o.slug ? K.PRIMARY : K.SURFACE,
+                            color: pickedOrg === o.slug ? '#fff' : K.TEXT_PRIMARY,
+                            border: `1px solid ${pickedOrg === o.slug ? K.PRIMARY : K.BORDER_LIGHT}`,
+                          }}
+                          data-testid={`login-org-pick-${o.slug}`}
+                        >
+                          {o.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 

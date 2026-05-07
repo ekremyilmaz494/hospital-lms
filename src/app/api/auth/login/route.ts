@@ -50,51 +50,81 @@ const ALERT_THRESHOLD = 5
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as {
+      // Yeni: tek alan — kullanıcı email veya TC girer, sistem otomatik anlar
+      identifier?: string
+      // Backward-compat: eski clientlardan email/tcKimlik gelirse kabul et
       email?: string
+      tcKimlik?: string
       password?: string
       rememberMe?: boolean
-      // TC ile login: tcKimlik + orgSlug (subdomain'den frontend tarafından okunur)
-      tcKimlik?: string
+      // Subdomain'de orgSlug var → TC lookup tek org'a scope'lanır.
+      // Apex'te orgSlug yoksa TC tüm aktif org'larda aranır.
       orgSlug?: string
     }
-    const { email, password, rememberMe = false, tcKimlik, orgSlug } = body
+    const { password, rememberMe = false, orgSlug } = body
+    const rawIdentifier = (body.identifier ?? body.email ?? body.tcKimlik ?? '').trim()
 
     if (!password) {
       return errorResponse('Şifre gereklidir.', 400)
     }
+    if (!rawIdentifier) {
+      return errorResponse('E-posta veya TC Kimlik No gereklidir.', 400)
+    }
 
-    // TC akışı: TC + orgSlug → tcHash ile DB'de personeli bul → email'i çıkar
-    // KVKK: TC plaintext sadece bu request'in lifetime'ı boyunca yaşar; hash'lenir, atılır.
+    // Tip tespiti: 11 haneli sayı → TC, '@' içeriyorsa → email, başka format → reddet
+    const looksLikeTc = /^\d{11}$/.test(rawIdentifier)
+    const looksLikeEmail = rawIdentifier.includes('@')
+
+    if (!looksLikeTc && !looksLikeEmail) {
+      return errorResponse('Geçerli bir e-posta veya 11 haneli TC Kimlik No girin.', 400)
+    }
+
+    // KVKK: TC plaintext sadece bu request lifetime'ı içinde; hash'lenir, atılır.
     let normalizedEmail: string
-    if (tcKimlik) {
-      const tc = normalizeTcKimlik(tcKimlik)
+    if (looksLikeTc) {
+      const tc = normalizeTcKimlik(rawIdentifier)
       if (!isValidTcKimlik(tc)) {
-        // Geçersiz TC → varlık leak yapma; "TC veya şifre hatalı" jenerik mesaj
         return errorResponse('TC Kimlik No veya şifre hatalı.', 401)
-      }
-      if (!orgSlug) {
-        return errorResponse('Hastane bilgisi belirlenemedi. Lütfen kurumunuzun web adresinden giriş yapın.', 400)
       }
 
       const tcHash = hashTcKimlik(tc)
-      const found = await prisma.user.findFirst({
+      // Subdomain'de orgSlug → tek org'a scope. Apex'te → tüm aktif org'lar.
+      const matches = await prisma.user.findMany({
         where: {
           tcHash,
           isActive: true,
-          organization: { slug: orgSlug, isActive: true },
+          organization: orgSlug
+            ? { slug: orgSlug, isActive: true }
+            : { isActive: true },
         },
-        select: { email: true },
+        select: {
+          email: true,
+          organization: { select: { slug: true, name: true } },
+        },
+        take: 5,
       })
 
-      if (!found) {
+      if (matches.length === 0) {
         return errorResponse('TC Kimlik No veya şifre hatalı.', 401)
       }
-      normalizedEmail = found.email.trim().toLowerCase()
-    } else {
-      if (!email) {
-        return errorResponse('E-posta veya TC Kimlik No gereklidir.', 400)
+
+      // Aynı TC birden fazla aktif org'da → kullanıcı seçim yapmalı.
+      // 200 + orgPickRequired flag (401 değil — şifre denemesi sayılmasın).
+      if (matches.length > 1) {
+        return jsonResponse({
+          orgPickRequired: true,
+          orgs: matches
+            .filter((m): m is typeof m & { organization: NonNullable<typeof m.organization> } => m.organization !== null)
+            .map(m => ({
+              slug: m.organization.slug,
+              name: m.organization.name,
+            })),
+        })
       }
-      normalizedEmail = email.trim().toLowerCase()
+
+      normalizedEmail = matches[0].email.trim().toLowerCase()
+    } else {
+      normalizedEmail = rawIdentifier.toLowerCase()
     }
 
     const ip = getTrustedIp(request)
@@ -156,7 +186,7 @@ export async function POST(request: NextRequest) {
       }
 
       return errorResponse(
-        tcKimlik ? 'TC Kimlik No veya şifre hatalı.' : 'E-posta veya şifre hatalı.',
+        looksLikeTc ? 'TC Kimlik No veya şifre hatalı.' : 'E-posta veya şifre hatalı.',
         401,
       )
     }
@@ -270,6 +300,27 @@ export async function POST(request: NextRequest) {
       ipAddress: ip,
     })
 
+    // Multi-tenant cross-subdomain redirect:
+    // - Apex'ten login olan kullanıcı → kendi org'unun subdomain'ine atılır.
+    // - Subdomain'den login olan kullanıcı → aynı domain'de kalır (redirectTo null).
+    // - super_admin → her durumda apex'te /super-admin/dashboard.
+    // Frontend `window.location.href = redirectTo ?? <samepath>` ile zıplar.
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? ''
+    const useSubdomain = baseDomain && !baseDomain.includes('localhost') && !baseDomain.includes(':')
+    const requestHost = request.headers.get('host') ?? ''
+    const onApex = requestHost === baseDomain || requestHost === `www.${baseDomain}`
+
+    let redirectTo: string | null = null
+    if (useSubdomain && onApex && dbUser.organization?.slug && role !== 'super_admin') {
+      const proto = request.headers.get('x-forwarded-proto') ?? 'https'
+      const dashboardPath = role === 'admin'
+        ? '/admin/dashboard'
+        : role === 'staff'
+          ? '/staff/dashboard'
+          : '/auth/login'
+      redirectTo = `${proto}://${dbUser.organization.slug}.${baseDomain}${dashboardPath}`
+    }
+
     return jsonResponse({
       user: {
         id: data.user?.id,
@@ -280,8 +331,9 @@ export async function POST(request: NextRequest) {
       // Admin layout setup-wizard guard'ı için: ilk login'de ekstra /api/admin/setup
       // fetch'ini atlayabilsin. dbUser.organization.setupCompleted gerçek kaynak.
       setupCompleted: dbUser.organization?.setupCompleted ?? null,
-      // Multi-tenant subdomain redirect için: client login başarısı sonrası
-      // https://<slug>.<base-domain>/<dashboard>'a zıplar. super_admin'de null kalır → apex'te kalır.
+      // Multi-tenant subdomain redirect için: apex login → subdomain dashboard'a zıpla.
+      // Subdomain login → null, frontend role-based same-domain push yapar.
+      redirectTo,
       organizationSlug: dbUser.organization?.slug ?? null,
       // Mobile app için: tenant'ı header'da göndereceği için ID lazım.
       organizationId: dbUser.organizationId ?? null,
