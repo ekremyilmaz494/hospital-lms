@@ -107,7 +107,7 @@ export function NotificationBell({
         sideOffset={8}
         className="w-[340px] p-0"
         style={{
-          backgroundColor: CREAM,
+          backgroundColor: 'var(--ed-cream, #fafaf9)',
           border: `1px solid ${INK}`,
           borderRadius: 0,
           boxShadow: '0 12px 32px rgba(10, 22, 40, 0.12)',

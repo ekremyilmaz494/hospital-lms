@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen items-center justify-center p-8">
+    <div className="flex min-h-dvh items-center justify-center p-8">
       <div className="text-center">
         <h1
           className="text-7xl font-bold mb-4"

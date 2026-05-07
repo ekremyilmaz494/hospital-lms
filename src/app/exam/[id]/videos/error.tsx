@@ -11,7 +11,7 @@ export default function ExamVideosError({
   reset: () => void;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center p-8" style={{ background: 'var(--color-bg)' }}>
+    <div className="flex min-h-dvh items-center justify-center p-8" style={{ background: 'var(--color-bg)' }}>
       <div
         className="w-full max-w-md rounded-2xl border p-8 text-center"
         style={{

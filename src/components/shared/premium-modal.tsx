@@ -488,6 +488,7 @@ export function PremiumModal({
         .pm-footer {
           flex-shrink: 0;
           padding: 18px 28px;
+          padding-bottom: max(18px, env(safe-area-inset-bottom));
           border-top: 1px solid #ebe7df;
           background: linear-gradient(180deg, #fafaf7 0%, #f5f2e9 100%);
         }

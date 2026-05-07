@@ -234,7 +234,11 @@ export function KvkkNoticeModal({
         {/* Footer */}
         <div
           className="px-6 py-4 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0"
-          style={{ background: CREAM, borderTop: `1px solid ${RULE}` }}
+          style={{
+            background: CREAM,
+            borderTop: `1px solid ${RULE}`,
+            paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+          }}
         >
           <button
             type="button"
@@ -242,7 +246,7 @@ export function KvkkNoticeModal({
             disabled={loading || rejecting}
             className="kvkk-mono inline-flex items-center justify-center gap-2 px-5 text-[11px] tracking-[0.24em] transition-colors disabled:opacity-60 disabled:cursor-not-allowed hover:enabled:bg-white"
             style={{
-              height: 42,
+              minHeight: 44,
               background: 'transparent',
               color: INK,
               border: `1.5px solid ${RULE}`,
@@ -264,7 +268,7 @@ export function KvkkNoticeModal({
             disabled={!accepted || loading || rejecting}
             className="group kvkk-mono relative inline-flex items-center justify-center gap-3 px-7 text-[12px] tracking-[0.28em] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              height: 42,
+              minHeight: 44,
               background: INK,
               color: '#fafaf9',
               border: `1.5px solid ${INK}`,

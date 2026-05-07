@@ -105,6 +105,18 @@ export default function VideoPlayerPage() {
   const [duration, setDuration] = useState(0);
   const [videoError, setVideoError] = useState(false);
   const lastAllowedTime = useRef(0);
+  const [orientationHintDismissed, setOrientationHintDismissed] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const dismissed = sessionStorage.getItem('vd-orientation-hint-dismissed') === '1';
+    setOrientationHintDismissed(dismissed);
+  }, []);
+
+  const dismissOrientationHint = useCallback(() => {
+    setOrientationHintDismissed(true);
+    try { sessionStorage.setItem('vd-orientation-hint-dismissed', '1'); } catch {}
+  }, []);
 
   const changeVideo = useCallback((idx: number) => {
     setCurrentVideoIdx(idx);
@@ -270,11 +282,7 @@ export default function VideoPlayerPage() {
   }, [isPlaying, currentVideo?.id, currentTime, id, isReview, currentVideo]);
 
   useEffect(() => {
-    const handleVisibility = () => {
-      if (!document.hidden) return;
-      // Sekme gizlendi: önce video'yu durdur, sonra pozisyonu hemen flush et.
-      // Eskiden sadece pause vardı → mobilde app arka plana atılıp killed olursa
-      // 15 sn'lik heartbeat'e kadar olan ilerleme kayboluyordu.
+    const flushPosition = () => {
       if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
       if (isReview || !currentVideo || currentTime <= 0) return;
       const payload = JSON.stringify({
@@ -285,8 +293,20 @@ export default function VideoPlayerPage() {
       const blob = new Blob([payload], { type: 'application/json' });
       navigator.sendBeacon(`/api/exam/${id}/videos`, blob);
     };
+    const handleVisibility = () => {
+      if (!document.hidden) return;
+      // Sekme gizlendi: önce video'yu durdur, sonra pozisyonu hemen flush et.
+      flushPosition();
+    };
+    // iOS Safari `pagehide` arka plana atılmada visibilitychange'den önce/yerine
+    // tetiklenebilir; bfcache uyumlu redundant flush noktası.
+    const handlePageHide = () => flushPosition();
     document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', handlePageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
   }, [currentVideo, currentTime, id, isReview]);
 
   useEffect(() => {
@@ -392,6 +412,19 @@ export default function VideoPlayerPage() {
       {heartbeatErrors >= 3 && (
         <div className="vd-heartbeat-err">
           Bağlantı sorunu: İlerlemen kaydedilemeyebilir. İnternet bağlantını kontrol et.
+        </div>
+      )}
+      {!orientationHintDismissed && (
+        <div className="vd-orient-hint" role="status">
+          <span className="vd-orient-hint-text">Daha iyi deneyim için telefonu yatay tutun.</span>
+          <button
+            type="button"
+            onClick={dismissOrientationHint}
+            className="vd-orient-hint-close"
+            aria-label="Bildirimi kapat"
+          >
+            ×
+          </button>
         </div>
       )}
 

@@ -66,3 +66,20 @@ export const TONE_TOKENS = {
 export const FONT_DISPLAY = 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif';
 export const FONT_BODY = 'var(--font-inter), Inter, system-ui, sans-serif';
 export const FONT_MONO = 'var(--font-jetbrains-mono), ui-monospace, monospace';
+
+/* ── Tipografi clamp token tablosu ──────────────────────
+ * Mobil → masaüstü smooth scale. Editorial primitive'ler ve sayfa-seviyesi
+ * başlıklar buradan tüketmeli — sabit `font-size: 17px` yerine `FONT_SIZE.h3`.
+ *
+ * Min değer 375px iPhone SE'de okunaklılığı, max değer ≥1280px masaüstünde
+ * dergi-hiyerarşisini korur. Body 16px tabanı iOS otomatik zoom riskini de azaltır.
+ */
+export const FONT_SIZE = {
+  h1:      'clamp(1.5rem, 3vw + 0.5rem, 2.5rem)',     // 24 → 40
+  h2:      'clamp(1.125rem, 1.5vw + 0.25rem, 1.75rem)', // 18 → 28
+  h3:      'clamp(1rem, 1vw + 0.25rem, 1.25rem)',      // 16 → 20
+  h4:      'clamp(0.9375rem, 0.5vw + 0.5rem, 1.0625rem)', // 15 → 17
+  body:    'clamp(0.9375rem, 0.25vw + 0.5rem, 1rem)',  // 15 → 16
+  caption: 'clamp(0.75rem, 0.15vw + 0.5rem, 0.8125rem)', // 12 → 13
+  metric:  'clamp(1.5rem, 2vw + 0.75rem, 2.25rem)',    // 24 → 36 (KPI)
+} as const;

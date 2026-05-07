@@ -36,7 +36,7 @@ function PopoverContent({
       >
         <PopoverPrimitive.Popup
           data-slot="popover-content"
-          className={cn("z-50 flex w-72 flex-col gap-2.5 rounded-xl p-3 text-sm outline-hidden", className)}
+          className={cn("z-50 flex w-72 max-w-[calc(100vw-1rem)] flex-col gap-2.5 rounded-xl p-3 text-sm outline-hidden", className)}
           style={{
             background: 'var(--color-surface)',
             color: 'var(--color-text-primary)',

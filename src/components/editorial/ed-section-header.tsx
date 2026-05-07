@@ -6,7 +6,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
 import {
-  FONT_DISPLAY, FONT_MONO, GOLD, INK, INK_SOFT, RULE,
+  FONT_DISPLAY, FONT_MONO, FONT_SIZE, GOLD, INK, INK_SOFT, RULE,
 } from '@/lib/editorial-palette';
 
 interface EdSectionHeaderProps {
@@ -52,8 +52,8 @@ export function EdSectionHeader({
       )}
       <div>
         <h2
-          className="text-[18px] sm:text-[20px] leading-tight font-semibold tracking-[-0.02em]"
-          style={{ fontFamily: FONT_DISPLAY, color: INK }}
+          className="leading-tight font-semibold tracking-[-0.02em]"
+          style={{ fontFamily: FONT_DISPLAY, color: INK, fontSize: FONT_SIZE.h3 }}
         >
           {title}
         </h2>

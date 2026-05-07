@@ -67,7 +67,7 @@ export default function StaffLayout({
     <OfflineQueueProvider>
     <TooltipProvider>
       <div
-        className="min-h-screen"
+        className="min-h-dvh"
         style={{ background: 'var(--ed-cream, #f4ead5)' }}
         data-surface="editorial"
       >
@@ -105,7 +105,7 @@ export default function StaffLayout({
             72px boşluk gösterip layout shift yaratıyor.
             Safe-area padding tüm viewport'larda güvenli (desktop'ta env değeri 0). */}
         <main
-          className="min-h-screen md:ml-[72px] pb-[env(safe-area-inset-bottom)]"
+          className="min-h-dvh md:ml-[72px] pb-[env(safe-area-inset-bottom)]"
           style={{
             background: 'var(--ed-cream, #f4ead5)',
           }}

@@ -199,7 +199,7 @@ function FeedbackContent() {
         </div>
         <style jsx>{`
           .fb-done {
-            min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -541,7 +541,7 @@ function FeedbackContent() {
 
       <style jsx>{`
         .fb-root {
-          min-height: 100vh;
+          min-height: 100dvh;
           background: var(--k-bg);
           position: relative;
         }

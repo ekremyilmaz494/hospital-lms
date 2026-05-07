@@ -280,7 +280,7 @@ export default function StaffNotificationsPage() {
   return (
     <div
       className="-mx-4 -my-4 md:-mx-8 md:-my-8"
-      style={{ backgroundColor: CREAM, minHeight: 'calc(100vh - 64px)' }}
+      style={{ backgroundColor: CREAM, minHeight: 'calc(100dvh - 64px)' }}
     >
       <div className="px-6 pt-6 pb-24 sm:px-10 lg:px-16">
         {/* ═══════════════ MASTHEAD ═══════════════ */}
@@ -909,7 +909,7 @@ function EditorialError({ message, onRetry }: { message: string; onRetry: () => 
   return (
     <div
       className="-mx-4 -my-4 md:-mx-8 md:-my-8"
-      style={{ backgroundColor: CREAM, minHeight: 'calc(100vh - 64px)' }}
+      style={{ backgroundColor: CREAM, minHeight: 'calc(100dvh - 64px)' }}
     >
       <div className="px-6 pt-10 pb-24 sm:px-10 lg:px-16">
         <div
@@ -955,7 +955,7 @@ function EditorialSkeleton() {
   return (
     <div
       className="-mx-4 -my-4 md:-mx-8 md:-my-8"
-      style={{ backgroundColor: CREAM, minHeight: 'calc(100vh - 64px)' }}
+      style={{ backgroundColor: CREAM, minHeight: 'calc(100dvh - 64px)' }}
     >
       <div className="animate-pulse px-6 pt-6 sm:px-10 lg:px-16">
         <div className="h-4 border-y py-2" style={{ borderColor: INK }} />

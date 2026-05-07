@@ -84,6 +84,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           bottom: 'max(1rem, env(safe-area-inset-bottom))',
           paddingLeft: 'env(safe-area-inset-left)',
           paddingRight: 'env(safe-area-inset-right)',
+          transition: 'bottom 200ms ease-out, padding 200ms ease-out',
         }}
         aria-live="polite"
       >

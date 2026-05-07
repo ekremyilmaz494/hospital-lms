@@ -217,7 +217,7 @@ export default function CalendarPage() {
   return (
     <div
       className="-mx-4 -my-4 md:-mx-8 md:-my-8"
-      style={{ backgroundColor: CREAM, minHeight: 'calc(100vh - 64px)' }}
+      style={{ backgroundColor: CREAM, minHeight: 'calc(100dvh - 64px)' }}
     >
       <div className="px-4 pt-4 pb-24 sm:px-10 lg:px-16">
         {/* ═══════════════ COMPACT MASTHEAD — single row ═══════════════ */}
@@ -402,6 +402,11 @@ function MonthView({
 }) {
   return (
     <div>
+      {/* Mobil: ufak ekranlarda (≤340px) grid 7 sütun sıkışırsa yatay kaydırma
+          fallback'i — `min-w-[336px]` 7×48px hücreyi garanti eder. 375px+ phones
+          için doğrudan grid spans full width. */}
+      <div className="-mx-1 overflow-x-auto sm:mx-0 sm:overflow-visible">
+      <div className="min-w-[336px] sm:min-w-0">
       <div className="grid grid-cols-7 border-b pb-3" style={{ borderColor: INK }}>
         {DAYS_TR.map(d => (
           <div
@@ -442,6 +447,8 @@ function MonthView({
             />
           );
         })}
+      </div>
+      </div>
       </div>
 
       <div
@@ -1193,7 +1200,7 @@ function CalendarSkeleton() {
   return (
     <div
       className="-mx-4 -my-4 md:-mx-8 md:-my-8"
-      style={{ backgroundColor: CREAM, minHeight: 'calc(100vh - 64px)' }}
+      style={{ backgroundColor: CREAM, minHeight: 'calc(100dvh - 64px)' }}
     >
       <div className="animate-pulse px-6 pt-6 sm:px-10 lg:px-16">
         <div className="h-4 border-y py-2" style={{ borderColor: INK }} />
@@ -1213,7 +1220,7 @@ function CalendarError({ message }: { message: string }) {
   return (
     <div
       className="-mx-4 -my-4 md:-mx-8 md:-my-8"
-      style={{ backgroundColor: CREAM, minHeight: 'calc(100vh - 64px)' }}
+      style={{ backgroundColor: CREAM, minHeight: 'calc(100dvh - 64px)' }}
     >
       <div className="px-6 pt-10 pb-24 sm:px-10 lg:px-16">
         <div

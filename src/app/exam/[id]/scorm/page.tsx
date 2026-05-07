@@ -297,7 +297,7 @@ export default function ScormPlayerPage() {
 
       <style jsx>{`
         .sc-player {
-          min-height: 100vh;
+          min-height: 100dvh;
           display: flex;
           flex-direction: column;
           background: #faf7f2;
@@ -428,7 +428,7 @@ function sharedStyles() {
   return (
     <style jsx>{`
       .sc-center {
-        min-height: 100vh;
+        min-height: 100dvh;
         display: flex;
         align-items: center;
         justify-content: center;

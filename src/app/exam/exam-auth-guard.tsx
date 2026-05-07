@@ -18,7 +18,7 @@ export function ExamAuthGuard({ children }: { children: React.ReactNode }) {
   if (isLoading) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center"
+        className="min-h-dvh flex items-center justify-center"
         style={{ background: 'var(--color-bg)' }}
       >
         <div
@@ -31,7 +31,7 @@ export function ExamAuthGuard({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
+    <div className="min-h-dvh" style={{ background: 'var(--color-bg)' }}>
       {children}
     </div>
   );

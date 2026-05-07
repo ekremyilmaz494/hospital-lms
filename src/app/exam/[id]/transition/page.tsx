@@ -292,7 +292,7 @@ function TransitionContent() {
 
         <style jsx>{`
           .tr-result {
-            min-height: 100vh;
+            min-height: 100dvh;
             padding: 32px 20px 60px;
             background: var(--k-bg);
             position: relative;
@@ -781,7 +781,7 @@ function TransitionContent() {
 
       <style jsx>{`
         .tr-count {
-          min-height: 100vh;
+          min-height: 100dvh;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -953,7 +953,7 @@ function TransitionContent() {
 export default function TransitionPage() {
   return (
     <Suspense fallback={
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--k-bg)', color: 'var(--k-text-muted)', fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif', fontSize: 16 }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--k-bg)', color: 'var(--k-text-muted)', fontFamily: 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif', fontSize: 16 }}>
         Yükleniyor…
       </div>
     }>

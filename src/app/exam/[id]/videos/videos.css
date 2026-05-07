@@ -1,10 +1,41 @@
 /* Video player page styles — extracted from style-jsx for dev compile speed.
    Class prefixes vd- and vi- are page-scoped by convention. */
 
-.vd-root { min-height: 100vh; background: var(--k-bg); }
+.vd-root { min-height: 100dvh; background: var(--k-bg); }
 .vd-spin-wrap { display: flex; align-items: center; justify-content: center; min-height: 240px; }
 .vd-spin { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--k-border); border-top-color: var(--k-text-primary); animation: vd-rot 700ms linear infinite; }
 @keyframes vd-rot { to { transform: rotate(360deg); } }
+
+/* ── Orientation hint banner (mobil + portrait) ── */
+.vd-orient-hint { display: none; }
+@media (max-width: 640px) and (orientation: portrait) {
+  .vd-orient-hint {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 12px 0;
+    padding: 10px 12px;
+    background: var(--k-surface, #fafaf9);
+    border-left: 3px solid var(--k-primary, #0d9668);
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--k-text-primary);
+  }
+  .vd-orient-hint-text { flex: 1; }
+  .vd-orient-hint-close {
+    flex-shrink: 0;
+    min-width: 32px;
+    min-height: 32px;
+    border: 0;
+    background: transparent;
+    color: var(--k-text-muted);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .vd-orient-hint-close:hover { color: var(--k-text-primary); }
+}
 
 /* ── Heartbeat error banner ── */
 .vd-heartbeat-err {
@@ -314,6 +345,7 @@
 .vd-notes {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 10px;
   padding-top: 8px;
@@ -322,6 +354,10 @@
   font-size: 10px;
   color: rgba(250, 250, 247, 0.5);
   font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+  /* Mobilde "1.0× · İleri sarma kapalı" kuralı her zaman okunsun. */
+  .vd-notes { font-size: 11px; color: rgba(250, 250, 247, 0.7); }
 }
 .vd-notes svg { color: rgba(250, 250, 247, 0.4); }
 .vd-notes-sep { color: rgba(250, 250, 247, 0.3); }
@@ -333,8 +369,8 @@
   border-radius: 16px;
   overflow: hidden;
 }
-.vd-pdf-wrap-full { height: calc(100vh - 140px); }
-.vd-pdf-wrap-mixed { height: calc(100vh - 200px); min-height: 480px; }
+.vd-pdf-wrap-full { height: calc(100dvh - 140px); }
+.vd-pdf-wrap-mixed { height: calc(100dvh - 200px); min-height: 480px; }
 .vd-audio-wrap {
   padding: 24px;
   background: var(--k-surface);
@@ -352,7 +388,7 @@
   border: 1px solid var(--k-border);
   border-radius: 16px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  max-height: calc(100vh - 120px);
+  max-height: calc(100dvh - 120px);
   display: flex;
   flex-direction: column;
 }

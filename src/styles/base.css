@@ -6,6 +6,9 @@ body {
      aynı işi yapar ama scroll context oluşturmaz. */
   overflow-x: clip;
   max-width: 100vw;
+  /* iOS Safari rotate sonrası tipografi büyümesi engeli. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -16,6 +19,27 @@ body {
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'cv11', 'ss01', 'cv01';
   text-rendering: optimizeLegibility;
+}
+
+/* iOS Safari, font-size < 16px form alanlarına focus'ta otomatik zoom yapar.
+   Bu kural odaklanılan input/textarea/select için minimum 16px garanti eder
+   (visual scale gerekirse component katmanında transform ile ayarlanır). */
+@media (max-width: 640px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select {
+    font-size: max(16px, 1rem);
+  }
+}
+
+/* Safe-area destek utility'leri — modal footer, sticky CTA, tab-bar vb.
+   Tailwind 4 inline arbitrary `pb-[env(safe-area-inset-bottom)]` çalışıyor
+   ama bu yardımcılar tutarlı 1rem + safe-area padding sağlar. */
+.pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+.pt-safe { padding-top: max(1rem, env(safe-area-inset-top)); }
+.px-safe {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
 }
 
 @layer base {
