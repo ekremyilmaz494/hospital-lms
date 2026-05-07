@@ -79,6 +79,8 @@ next-env.d.ts
 .claude/command-log.txt
 tmp/
 /tmp/
+# Geçici smoke test fixture'ları (örn. scripts/smoke-*.mjs üretimleri)
+/tmp-*
 hospital-lms-next/
 
 # Lock files — pnpm tek kaynak (CLAUDE.md). Vercel ve dev ortamının aynı lock'u kullanması için npm/yarn lock'ları commit edilmez.
