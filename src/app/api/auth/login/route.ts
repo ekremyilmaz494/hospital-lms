@@ -57,11 +57,13 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.trim().toLowerCase()
     const ip = getTrustedIp(request)
 
-    // ── Rate limiting (sadece başarısız girişler sayılır) + Supabase client PARALEL ──
-    const [ipCount, emailCount, supabase] = await Promise.all([
+    // ── Supabase client önce oluştur — cookies() async context'i Promise.all içinde
+    // kaybolursa session cookie'leri response'a yazılmaz (Next.js 15+ AsyncLocalStorage bug).
+    const supabase = await createLoginClient(rememberMe)
+    // ── Rate limiting: Supabase client'tan bağımsız, paralel çalışabilir ──
+    const [ipCount, emailCount] = await Promise.all([
       getRateLimitCount(`login-ip:${ip}`),
       getRateLimitCount(`login:${normalizedEmail}`),
-      createLoginClient(rememberMe),
     ])
     if (ipCount >= 100) {
       logger.warn('auth:login', 'IP rate limit aşıldı', { ip })
