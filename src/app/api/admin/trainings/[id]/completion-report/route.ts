@@ -6,6 +6,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
+import { fetchLogoAsDataUrl, mimeToPdfFormat } from '@/lib/pdf/helpers/logo'
 import { BRAND } from '@/lib/brand'
 
 function formatDate(d: Date | string | null | undefined): string {
@@ -62,7 +63,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
       endDate: true,
       regulatoryBody: true,
       isCompulsory: true,
-      organization: { select: { name: true } },
+      organization: { select: { name: true, logoUrl: true } },
       assignments: {
         select: {
           status: true,
@@ -101,92 +102,164 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
   const W = doc.internal.pageSize.getWidth()
   const H = doc.internal.pageSize.getHeight()
   const orgName = training.organization?.name ?? BRAND.fullName
+  const logoDataUrl = await fetchLogoAsDataUrl(training.organization?.logoUrl)
 
   // ── HEADER ──────────────────────────────────────────────
-  // Main band
+  // Restrained executive layout:
+  //   • Single deep-green panel (no triangle gimmick)
+  //   • Hairline gold accent at very top + thin lighter-green underline at bottom
+  //   • Real logo (if set) on white tile, monogram fallback
+  //   • Eyebrow + title hierarchy on left, vertical metadata stack on right
+  const HDR_H = 44
+
+  // Top hairline accent (gold) — premium signal, single thin rule
+  doc.setFillColor(245, 158, 11)
+  doc.rect(0, 0, W, 1, 'F')
+
+  // Main panel — deep, slightly darker than PRIMARY for sophistication
+  doc.setFillColor(...PRIMARY_DK)
+  doc.rect(0, 1, W, HDR_H - 1, 'F')
+
+  // Bottom thin underline in lighter primary (separation, no double-stripe)
   doc.setFillColor(...PRIMARY)
-  doc.rect(0, 0, W, 50, 'F')
+  doc.rect(0, HDR_H, W, 0.6, 'F')
 
-  // Subtle diagonal accent on right edge (darker shade of primary for depth)
-  doc.setFillColor(10, 122, 85)
-  doc.triangle(W - 60, 0, W, 0, W, 30, 'F')
-
-  // Bottom accent stripes (thin double line for premium feel)
-  doc.setFillColor(...PRIMARY_DK)
-  doc.rect(0, 46, W, 2.5, 'F')
-  doc.setFillColor(245, 158, 11) // accent amber
-  doc.rect(0, 48.5, W, 1.5, 'F')
-
-  // Logo: outer white disc + inner dark disc with initial
+  // ── Logo / monogram tile (white card, single restrained shape) ──
+  const tileX = 12
+  const tileY = 8
+  const tileSize = 28
   doc.setFillColor(...WHITE)
-  doc.circle(21, 24, 11, 'F')
-  doc.setFillColor(...PRIMARY_DK)
-  doc.circle(21, 24, 9, 'F')
-  doc.setTextColor(...WHITE)
-  doc.setFont(TURKISH_FONT_FAMILY, 'bold')
-  doc.setFontSize(14)
-  doc.text(orgName.charAt(0).toUpperCase(), 21, 27.8, { align: 'center' })
+  doc.roundedRect(tileX, tileY, tileSize, tileSize, 2, 2, 'F')
 
-  // Vertical separator after logo
+  let logoRendered = false
+  if (logoDataUrl) {
+    try {
+      const fmt = mimeToPdfFormat(logoDataUrl)
+      const pad = 3
+      doc.addImage(
+        logoDataUrl,
+        fmt,
+        tileX + pad,
+        tileY + pad,
+        tileSize - pad * 2,
+        tileSize - pad * 2,
+        undefined,
+        'FAST'
+      )
+      logoRendered = true
+    } catch {
+      // ignore — fall through to monogram
+    }
+  }
+  if (!logoRendered) {
+    doc.setTextColor(...PRIMARY_DK)
+    doc.setFont(TURKISH_FONT_FAMILY, 'bold')
+    doc.setFontSize(18)
+    doc.text(orgName.charAt(0).toUpperCase(), tileX + tileSize / 2, tileY + tileSize / 2 + 2.8, {
+      align: 'center',
+    })
+  }
+
+  // ── Hairline vertical divider between logo and title ──
   doc.setDrawColor(255, 255, 255)
-  doc.setLineWidth(0.3)
-  doc.line(37, 14, 37, 36)
+  // jsPDF's GState API isn't exposed in our jspdf typings; emulate transparency via mid-tone draw color
+  doc.setLineWidth(0.2)
+  doc.setDrawColor(120, 180, 150)
+  doc.line(tileX + tileSize + 6, tileY + 2, tileX + tileSize + 6, tileY + tileSize - 2)
 
-  // Organization name — small caps uppercase
-  doc.setTextColor(200, 240, 220)
-  doc.setFont(TURKISH_FONT_FAMILY, 'normal')
-  doc.setFontSize(8)
-  doc.text(orgName.toUpperCase(), 41, 16)
+  // ── Eyebrow (small uppercase report kind) ──
+  const textX = tileX + tileSize + 11
+  doc.setTextColor(245, 200, 120) // soft gold for hierarchy
+  doc.setFont(TURKISH_FONT_FAMILY, 'bold')
+  doc.setFontSize(7)
+  doc.setCharSpace(0.6)
+  doc.text('EĞİTİM TAMAMLAMA RAPORU', textX, tileY + 4.5)
+  doc.setCharSpace(0)
 
-  // Training title — bold, hero
+  // ── Training title — hero ──
   doc.setTextColor(...WHITE)
   doc.setFont(TURKISH_FONT_FAMILY, 'bold')
   doc.setFontSize(15)
-  const titleLines = doc.splitTextToSize(training.title, W - 110)
-  doc.text(titleLines, 41, 24)
+  // reserve right column for metadata block (~62mm)
+  const titleLines = doc.splitTextToSize(training.title, W - textX - 64) as string[]
+  const visibleTitle = titleLines.slice(0, 2)
+  doc.text(visibleTitle, textX, tileY + 11)
 
-  // Subtitle pill badge
-  const pillY = 24 + titleLines.length * 5.5 + 1
-  const pillLabel = 'EĞİTİM TAMAMLAMA RAPORU'
-  doc.setFontSize(7.5)
-  doc.setFont(TURKISH_FONT_FAMILY, 'bold')
-  const pillW = doc.getTextWidth(pillLabel) + 8
-  doc.setFillColor(6, 95, 70)
-  doc.roundedRect(41, pillY, pillW, 5.5, 2.75, 2.75, 'F')
-  doc.setTextColor(200, 240, 220)
-  doc.text(pillLabel, 41 + pillW / 2, pillY + 3.8, { align: 'center' })
+  // ── Organization name (subtle, under title) ──
+  const orgY = tileY + 11 + visibleTitle.length * 5.6 + 1
+  doc.setFont(TURKISH_FONT_FAMILY, 'normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(195, 230, 215)
+  doc.text(orgName, textX, orgY)
 
-  // Top-right metadata block
+  // ── Optional "Zorunlu Eğitim" tag — outline style, less garish ──
+  if (training.isCompulsory) {
+    const tagLabel = 'ZORUNLU EĞİTİM'
+    doc.setFont(TURKISH_FONT_FAMILY, 'bold')
+    doc.setFontSize(6.8)
+    const tagPad = 3.2
+    const tagW = doc.getTextWidth(tagLabel) + tagPad * 2
+    const tagX = textX
+    const tagY = orgY + 2.5
+    doc.setDrawColor(245, 200, 120)
+    doc.setLineWidth(0.3)
+    doc.setFillColor(...PRIMARY_DK)
+    doc.roundedRect(tagX, tagY, tagW, 5.2, 2.6, 2.6, 'D')
+    doc.setTextColor(245, 200, 120)
+    doc.text(tagLabel, tagX + tagW / 2, tagY + 3.5, { align: 'center' })
+  }
+
+  // ── Right-side metadata stack (clean grid, generous size) ──
+  const metaRight = W - 12
   const docRef = id.slice(0, 8).toUpperCase()
-  doc.setTextColor(200, 240, 220)
-  doc.setFont(TURKISH_FONT_FAMILY, 'normal')
-  doc.setFontSize(6.8)
-  doc.text('BELGE NO', W - 10, 10.5, { align: 'right' })
-  doc.setFont(TURKISH_FONT_FAMILY, 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(...WHITE)
-  doc.text(`#${docRef}`, W - 10, 14.5, { align: 'right' })
+  const metaLabelColor: RGB = [160, 210, 190]
 
+  // BELGE NO
   doc.setFont(TURKISH_FONT_FAMILY, 'normal')
   doc.setFontSize(6.8)
-  doc.setTextColor(200, 240, 220)
-  doc.text('OLUŞTURULMA', W - 10, 21, { align: 'right' })
+  doc.setTextColor(...metaLabelColor)
+  doc.setCharSpace(0.5)
+  doc.text('BELGE NO', metaRight, tileY + 3.8, { align: 'right' })
+  doc.setCharSpace(0)
+  doc.setFont(TURKISH_FONT_FAMILY, 'bold')
+  doc.setFontSize(10.5)
+  doc.setTextColor(...WHITE)
+  doc.text(`#${docRef}`, metaRight, tileY + 9, { align: 'right' })
+
+  // Hairline divider between metadata rows
+  doc.setDrawColor(80, 130, 110)
+  doc.setLineWidth(0.2)
+  doc.line(metaRight - 36, tileY + 11.5, metaRight, tileY + 11.5)
+
+  // OLUŞTURULMA TARİHİ
+  doc.setFont(TURKISH_FONT_FAMILY, 'normal')
+  doc.setFontSize(6.8)
+  doc.setTextColor(...metaLabelColor)
+  doc.setCharSpace(0.5)
+  doc.text('OLUŞTURULMA TARİHİ', metaRight, tileY + 16, { align: 'right' })
+  doc.setCharSpace(0)
+  doc.setFont(TURKISH_FONT_FAMILY, 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(...WHITE)
+  doc.text(formatDateLong(new Date()), metaRight, tileY + 21, { align: 'right' })
+
+  // KURUM (hospital — short version on right)
+  doc.setDrawColor(80, 130, 110)
+  doc.line(metaRight - 36, tileY + 23.5, metaRight, tileY + 23.5)
+  doc.setFont(TURKISH_FONT_FAMILY, 'normal')
+  doc.setFontSize(6.8)
+  doc.setTextColor(...metaLabelColor)
+  doc.setCharSpace(0.5)
+  doc.text('DÜZENLEYEN', metaRight, tileY + 28, { align: 'right' })
+  doc.setCharSpace(0)
   doc.setFont(TURKISH_FONT_FAMILY, 'bold')
   doc.setFontSize(8.5)
   doc.setTextColor(...WHITE)
-  doc.text(formatDateLong(new Date()), W - 10, 25, { align: 'right' })
-
-  if (training.isCompulsory) {
-    doc.setFillColor(245, 158, 11)
-    doc.roundedRect(W - 44, 29, 34, 6.5, 3.25, 3.25, 'F')
-    doc.setTextColor(...WHITE)
-    doc.setFontSize(7)
-    doc.setFont(TURKISH_FONT_FAMILY, 'bold')
-    doc.text('★ ZORUNLU EĞİTİM', W - 27, 33.3, { align: 'center' })
-  }
+  const orgRight = doc.splitTextToSize(orgName, 60)[0] as string
+  doc.text(orgRight, metaRight, tileY + 33, { align: 'right' })
 
   // ── INFO BAND ───────────────────────────────────────────
-  const infoY = 54
+  const infoY = 48
   doc.setFillColor(...SURFACE)
   doc.rect(0, infoY, W, 16, 'F')
   doc.setDrawColor(...BORDER)
