@@ -1051,6 +1051,9 @@ function CredentialsResult({
   const successRows = result.results.filter(r => r.status === 'created' && r.tempPassword);
   const pdfReadyRows = successRows.filter(r => r.tcKimlik);
   const noTcCount = successRows.length - pdfReadyRows.length;
+  // Welcome mail sadece gerçek email girilmiş satırlara gider; bu sayım hero metninde kullanılır.
+  const emailedCount = successRows.filter(r => !!r.email).length;
+  const noEmailCount = successRows.length - emailedCount;
 
   const copyPassword = async (idx: number, password: string) => {
     try {
@@ -1116,8 +1119,10 @@ function CredentialsResult({
           {result.failed > 0 && <span className="bid-done-failed"> · {result.failed} başarısız</span>}
         </h3>
         <p>
-          Her personele hoş geldin e-postası + geçici şifre gönderildi.
-          İlk girişte şifrelerini değiştirmek zorundalar.
+          {emailedCount > 0 && noEmailCount === 0 && 'Her personele hoş geldin e-postası + geçici şifre gönderildi.'}
+          {emailedCount > 0 && noEmailCount > 0 && `${emailedCount} kişiye e-posta gönderildi, ${noEmailCount} kişi e-posta vermediği için şifresini PDF'ten elden teslim edin.`}
+          {emailedCount === 0 && noEmailCount > 0 && 'E-posta verilmediği için hoş geldin maili atılmadı; şifreleri PDF\'ten elden teslim edin.'}
+          {' '}İlk girişte şifrelerini değiştirmek zorundalar.
         </p>
       </div>
 
@@ -1222,6 +1227,98 @@ function CredentialsResult({
       )}
 
       <style jsx>{`
+        /* styled-jsx component-scoped — bu component ayrı bir fonksiyon olduğu için
+           parent'taki .bid-done/.bid-stats CSS'i propagate olmuyor. Burada tekrar tanımlanır. */
+        .bid-done { display: flex; flex-direction: column; gap: 18px; }
+        .bid-done-hero {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          padding: 12px 20px 0;
+          gap: 10px;
+        }
+        .bid-done-icon {
+          width: 60px;
+          height: 60px;
+          border-radius: 999px;
+          background: ${K.PRIMARY};
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: ${K.SHADOW_CARD};
+        }
+        .bid-done h3 {
+          font-family: ${K.FONT_DISPLAY};
+          font-size: 22px;
+          font-weight: 700;
+          color: ${K.TEXT_PRIMARY};
+          margin: 0;
+          letter-spacing: -0.01em;
+        }
+        .bid-done h3 em {
+          font-style: normal;
+          color: ${K.PRIMARY};
+          font-variant-numeric: tabular-nums;
+        }
+        .bid-done-failed {
+          font-style: normal;
+          color: ${K.ERROR_TEXT};
+          font-size: 16px;
+          font-weight: 600;
+        }
+        .bid-done-hero p {
+          font-size: 13px;
+          color: ${K.TEXT_MUTED};
+          line-height: 1.55;
+          margin: 0;
+          max-width: 520px;
+        }
+
+        .bid-stats {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+        }
+        @media (max-width: 640px) {
+          .bid-stats { grid-template-columns: 1fr; }
+        }
+
+        .bid-err-card {
+          display: flex;
+          gap: 14px;
+          padding: 18px;
+          border-radius: 14px;
+          background: ${K.ERROR_BG};
+          border: 1.5px solid #fecaca;
+        }
+        .bid-err-card :global(svg) { flex-shrink: 0; color: ${K.ERROR_TEXT}; margin-top: 2px; }
+        .bid-err-card h5 {
+          font-family: ${K.FONT_DISPLAY};
+          font-size: 14px;
+          font-weight: 700;
+          color: ${K.ERROR_TEXT};
+          margin: 0 0 4px;
+        }
+        .bid-err-card p { font-size: 12px; color: ${K.TEXT_SECONDARY}; margin: 0 0 10px; line-height: 1.5; }
+        .bid-err-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 12px;
+          border-radius: 8px;
+          background: #ef4444;
+          color: #fff;
+          border: none;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: ${K.FONT_DISPLAY};
+          transition: background 160ms ease;
+        }
+        .bid-err-btn:hover { background: ${K.ERROR_TEXT}; }
+
         .bid-pdf-card {
           display: flex;
           align-items: center;
