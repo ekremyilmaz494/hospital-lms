@@ -8,8 +8,10 @@ import { BRAND } from '@/lib/brand'
  * - Sayfa 1 "Personel": başlıklar + 4 örnek satır + departman dropdown
  * - Sayfa 2 "Departmanlar": geçerli departman adları (referans)
  *
- * Şifre sütunu var ama OPSİYONEL — boş bırakılan satırlara davet linki gider
- * (önerilen), dolu olan satırlarda hesap doğrudan açılır + maille iletilir.
+ * Şifre sütunu OPSİYONEL — admin doluysa o şifreyle, boşsa sistem güvenli geçici
+ * şifre üretir. Tüm hesaplar mustChangePassword=true ile açılır (ilk girişte
+ * personel şifresini değiştirmek zorundadır). Yükleme sonrası tüm geçici şifreler
+ * tek bir PDF'de toplanıp yazıcıdan basılabilir.
  * Backend `şifre / sifre / parola / password / pwd / pass` başlıklarını tanır.
  */
 export const GET = withAdminRoute(async ({ organizationId }) => {
@@ -56,8 +58,9 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
 
   // Örnek satırlar — farklı senaryoları göstersin.
   // TC Kimlik No'lar VALİD (Mod10/11 checksum'ı geçer) — sahte ama doğru formatta.
-  // Şifre dolu olan ilk 2 satır → direct mode (hesap anında açılır, geçici şifre maille gider).
-  // Şifre boş olan son 2 satır → invite mode (davet linki gider, personel kendi şifresini kurar).
+  // Şifre dolu satırlar → admin'in seçtiği şifre kullanılır.
+  // Şifre boş satırlar → sistem güvenli geçici şifre üretir (Pass-XXXXXXXX-!1 formatı).
+  // Tüm satırlarda mustChangePassword=true — personel ilk girişte şifresini değiştirmek zorunda.
   const exampleRows = [
     {
       ad: 'Ayşe', soyad: 'Yılmaz',
@@ -156,26 +159,26 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     'TOPLU PERSONEL YÜKLEME — KULLANIM KILAVUZU',
     '',
     'ZORUNLU ALANLAR: Ad, Soyad, E-posta',
-    'KOŞULLU ZORUNLU: TC Kimlik No (Şifre belirlediğiniz satırlarda zorunlu — resmi denetim için)',
-    'OPSİYONEL ALANLAR: TC (davet modunda), Şifre, Telefon, Departman, Unvan',
+    'OPSİYONEL ALANLAR: TC Kimlik No, Şifre, Telefon, Departman, Unvan',
     '',
-    'ŞİFRE — İKİ MOD VAR (her satır bağımsız):',
-    '  • ŞİFRE BOŞ → DAVET LİNKİ gönderilir (önerilen)',
-    '      ↳ Personel mailden linke tıklar, kendi şifresini kurar.',
-    '      ↳ E-posta doğrulaması yapılır, daha güvenli.',
-    '      ↳ Davet linki 30 gün geçerli.',
-    '  • ŞİFRE DOLU → HESAP ANINDA AÇILIR (acil/offline durumlar için)',
-    '      ↳ Geçici şifre maille personele iletilir.',
-    '      ↳ Personel ilk girişte şifresini değiştirmek zorundadır.',
-    '      ↳ Şifre en az 8 karakter olmalı.',
-    '  • Aynı dosyada iki modu karıştırabilirsiniz (mixed batch).',
+    'ŞİFRE NASIL ÇALIŞIR:',
+    '  • Şifre alanı BOŞ bırakılırsa → sistem güvenli bir geçici şifre üretir.',
+    '  • Şifre alanı DOLU yazılırsa → o şifre kullanılır (en az 8 karakter).',
+    '  • Her iki durumda da hesap anında açılır + hoş geldin maili gönderilir.',
+    '  • Personel ilk girişte şifresini değiştirmek ZORUNDADIR (mustChangePassword=true).',
+    '',
+    'YÜKLEME SONRASI PDF:',
+    '  • Yükleme bitince ekranda tüm geçici şifrelerin listesi açılır.',
+    '  • "Giriş Bilgileri PDF\'i İndir" butonu ile tek bir PDF indirebilirsiniz.',
+    '  • PDF: Ad Soyad / TC / Geçici Şifre / Departman tablosu + KVKK uyarısı.',
+    '  • Yazıcıdan basıp personele elden teslim edin.',
+    '  • PDF\'e dahil olmak için TC Kimlik No SATIRDA DOLU olmalı (resmi denetim için).',
     '',
     'TC KİMLİK NO:',
     '  • 11 haneli, NVİ algoritmasıyla doğrulanır (sahte numaralar reddedilir).',
     '  • DB\'de AES-256-GCM ile şifrelenir, HMAC-SHA256 ile hash\'lenir (KVKK uyumlu).',
     '  • Aynı TC bu kurumda tekrar kullanılamaz; farklı kurumlarda olabilir.',
-    '  • Direct mode (şifre dolu) için ZORUNLU — denetimde sertifika eşleşmesi için.',
-    '  • Davet modunda opsiyonel — personel daveti kabul ederken TC istenir.',
+    '  • Boş bırakılabilir, ama PDF\'e dahil edilmek + sertifikalarda eşleşmek için doldurmanızı öneririz.',
     '',
     'E-POSTA:',
     '  • Benzersiz olmalı, daha önce sistemde kayıtlı olmamalı.',
@@ -197,7 +200,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     '',
     'İPUÇLARI:',
     '  • İlk 4 satır (italik, gri) ÖRNEKLERDİR — silip kendi verilerinizi yazın.',
-    '  • İlk 2 örnekte şifre dolu (direct mode), son 2\'sinde boş (davet mode) — farkı görmek için.',
+    '  • İlk 2 örnekte şifre elle yazılmış, son 2\'sinde boş — boş olanlar için sistem üretir.',
     '  • 500 satıra kadar yükleyebilirsiniz.',
     '  • Yüklemeden önce "Önizleme" ekranında hataları inline düzeltebilirsiniz.',
     '  • Yükleme sonrası /admin/staff/imports sayfasından geri alabilirsiniz.',

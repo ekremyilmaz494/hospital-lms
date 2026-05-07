@@ -1,4 +1,3 @@
-import { randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody, safePagination, ApiError, getAppUrl } from '@/lib/api-helpers'
@@ -8,6 +7,7 @@ import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-fact
 import { hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
 import { logger } from '@/lib/logger'
 import { sendStaffWelcomeEmail, sendInvitationEmail } from '@/lib/email'
+import { generateTempPassword } from '@/lib/passwords'
 import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
@@ -352,9 +352,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   }
 
   // ── DIRECT MODE — şifreyle anında hesap oluştur (legacy + acil fallback) ───
-  // Şifre opsiyonel — boş gelirse güvenli şifre üret
-  const effectivePassword = data.password ||
-    ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1')
+  // Şifre opsiyonel — boş gelirse merkezi helper ile güvenli şifre üret
+  const effectivePassword = data.password || generateTempPassword()
 
   let result
   try {

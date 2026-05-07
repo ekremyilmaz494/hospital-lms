@@ -3,14 +3,9 @@ import { jsonResponse, errorResponse, getAppUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
-import { sendStaffWelcomeEmail, sendInvitationEmail } from '@/lib/email'
+import { sendStaffWelcomeEmail } from '@/lib/email'
 import { checkRateLimit } from '@/lib/redis'
-import {
-  generateInvitationToken,
-  computeInvitationExpiry,
-  buildInvitationUrl,
-  STAFF_INVITATION_TTL_HOURS,
-} from '@/lib/invitations'
+import { generateTempPassword } from '@/lib/passwords'
 import ExcelJS from 'exceljs'
 import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc'
 import { hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
@@ -268,8 +263,9 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
       continue
     }
 
-    // TC validation — direct mode (şifre dolu) için zorunlu, invite mode için opsiyonel
-    const useDirectMode = !!row.password.trim()
+    // TC validation — opsiyonel; girildiyse checksum + duplicate kontrolü.
+    // TC'siz satırlar için hesap yine açılır (auto-password) ama PDF'e dahil edilmez
+    // (PDF resmi denetim belgesi → TC eşleşmesi şart). Bu trade-off frontend'de uyarılır.
     if (row.tcKimlik) {
       if (!isValidTcKimlik(row.tcKimlik)) {
         rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)' })
@@ -289,13 +285,6 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
         rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Bu TC Kimlik No bu kurumda zaten kayıtlı' })
         continue
       }
-    } else if (useDirectMode) {
-      // Şifre belirlenmiş ama TC eksik — direct mode'da TC zorunlu
-      rowResults.push({
-        rowIndex: row.rowIndex, email: row.email, status: 'error',
-        reason: 'TC Kimlik No zorunludur (şifre belirlenmiş satırlarda resmi denetim için)',
-      })
-      continue
     }
 
     rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'ok' })
@@ -402,20 +391,35 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     })
   }
 
-  // ── Gerçek import (mixed mode: şifre boş → davet linki, dolu → direkt hesap) ─
-  let createdDirect = 0      // direkt hesap (şifre belirlendi)
-  let createdInvite = 0      // davet linki gönderildi
+  // ── Gerçek import — TÜM SATIRLAR DIRECT MODE ─────────────────────────────
+  // Şifre dolu satırlarda admin'in seçtiği kullanılır; boş satırlarda
+  // generateTempPassword() ile güvenli bir geçici şifre üretilir.
+  // Hepsinde mustChangePassword=true → personel ilk girişte değiştirmek zorunda.
+  // Davet linki akışı bu route'tan kaldırıldı — admin "personeli ekle" derken
+  // tek tip "hesap aç + bilgileri PDF olarak ver" davranışı bekliyor (KVKK +
+  // resmi denetim ergonomisi).
+  let created = 0
   let failed = 0
   const importErrors: string[] = rowResults
     .filter(r => r.status === 'error')
     .map(r => `Satır ${r.rowIndex} (${r.email}): ${r.reason}`)
 
-  type ResultMode = 'created' | 'invited' | 'failed'
-  const results: { email: string; name: string; status: ResultMode; tempPassword?: string; inviteUrl?: string; error?: string }[] = []
+  // Frontend "Giriş Bilgileri PDF'i indir" için zengin sonuç döndürüyoruz.
+  // tcKimlik admin'e geri verilir (PDF üretirken cookie auth dışında ayrıca
+  // gönderilmez — KVKK: response sadece request'i atan admin'e gider).
+  const results: {
+    email: string
+    name: string
+    status: 'created' | 'failed'
+    tempPassword?: string
+    tcKimlik?: string
+    department?: string | null
+    title?: string | null
+    error?: string
+  }[] = []
   const createdUserIds: string[] = []
-  const createdInvitationIds: string[] = []
 
-  // Hoş geldiniz/davet maili için hastane bilgileri (tek sorgu, loop öncesi)
+  // Hoş geldiniz maili için hastane bilgileri (tek sorgu, loop öncesi)
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
     select: { name: true, brandColor: true },
@@ -424,89 +428,29 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   const brandColor = org?.brandColor ?? null
   const appUrl = getAppUrl()
   const loginUrl = `${appUrl}/auth/login`
-  const inviterName = `${dbUser.firstName} ${dbUser.lastName}`
   const emailPromises: Promise<void>[] = []
 
+  // Departman ID → name çözümlemesi (PDF + sonuç tablosu için, tek sorgu)
+  const distinctDeptIds = Array.from(new Set(validRows.map(r => r.deptId).filter((id): id is string => !!id)))
+  const deptNameMap = distinctDeptIds.length > 0
+    ? Object.fromEntries(
+        (await prisma.department.findMany({
+          where: { id: { in: distinctDeptIds }, organizationId: orgId },
+          select: { id: true, name: true },
+        })).map(d => [d.id, d.name]),
+      )
+    : {}
+
   for (const row of validRows) {
-    const useInviteFlow = !row.password.trim()
+    // Şifre opsiyonel — admin Excel'e yazdıysa o, yoksa otomatik üret.
+    // Her iki durumda da generateTempPassword formatına uyumlu uzunluk/komplekslik olduğunu
+    // varsaymıyoruz; admin'in girdiği değer Supabase Auth tarafından doğrulanır (en az 8).
+    const tempPassword = row.password.trim() || generateTempPassword()
 
-    if (useInviteFlow) {
-      // ── INVITE MODE — davet linki, kullanıcı kendi şifresini kuracak ──
-      try {
-        // Aynı email için aktif davet varsa eskiyi revoke et
-        await prisma.invitation.updateMany({
-          where: {
-            organizationId: orgId,
-            email: row.email,
-            acceptedAt: null,
-            revokedAt: null,
-          },
-          data: { revokedAt: new Date() },
-        })
-
-        const { raw, hash } = generateInvitationToken()
-        const expiresAt = computeInvitationExpiry(STAFF_INVITATION_TTL_HOURS)
-
-        const invitation = await prisma.invitation.create({
-          data: {
-            tokenHash: hash,
-            email: row.email,
-            firstName: row.firstName,
-            lastName: row.lastName,
-            phone: row.phone || null,
-            title: row.title || null,
-            role: 'staff',
-            organizationId: orgId,
-            departmentId: row.deptId ?? null,
-            invitedByUserId: dbUser.id,
-            setAsOwner: false,
-            expiresAt,
-          },
-          select: { id: true },
-        })
-        createdInvitationIds.push(invitation.id)
-        createdInvite++
-
-        const inviteUrl = buildInvitationUrl(appUrl, raw)
-        results.push({
-          email: row.email,
-          name: `${row.firstName} ${row.lastName}`,
-          status: 'invited',
-          inviteUrl,
-        })
-
-        // Davet maili — fire-and-forget
-        emailPromises.push(
-          sendInvitationEmail({
-            to: row.email,
-            organizationName: hospitalName,
-            brandColor,
-            inviteUrl,
-            inviterName,
-            recipientName: `${row.firstName} ${row.lastName}`,
-            roleLabel: 'Personel',
-            expiresInHours: STAFF_INVITATION_TTL_HOURS,
-            organizationId: orgId,
-          }).then(() => undefined).catch(err => {
-            logger.warn('bulk-import', `Davet maili gönderilemedi: ${row.email}`, err instanceof Error ? err.message : err)
-          }),
-        )
-      } catch (err) {
-        failed++
-        const errMsg = err instanceof Error ? err.message : 'Davet oluşturulamadı'
-        importErrors.push(`${row.email}: ${errMsg}`)
-        results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'failed', error: errMsg })
-        logger.error('Bulk Import', `Invite failed for ${row.email}`, err instanceof Error ? err.message : err)
-      }
-      continue
-    }
-
-    // ── DIRECT MODE — şifre Excel'de belirtildi, hesap anında açılır ──
-    const pwd = row.password
     try {
       const { dbUser: newUser } = await createAuthUser({
         email: row.email,
-        password: pwd,
+        password: tempPassword,
         firstName: row.firstName,
         lastName: row.lastName,
         role: 'staff',
@@ -520,8 +464,16 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         tcAddedByUserId: dbUser.id,
       })
       createdUserIds.push(newUser.id)
-      createdDirect++
-      results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'created', tempPassword: pwd })
+      created++
+      results.push({
+        email: row.email,
+        name: `${row.firstName} ${row.lastName}`,
+        status: 'created',
+        tempPassword,
+        tcKimlik: row.tcKimlik || undefined,
+        department: row.deptId ? (deptNameMap[row.deptId] ?? null) : null,
+        title: row.title || null,
+      })
 
       emailPromises.push(
         sendStaffWelcomeEmail({
@@ -529,7 +481,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
           staffName: `${row.firstName} ${row.lastName}`,
           organizationName: hospitalName,
           brandColor,
-          tempPassword: pwd,
+          tempPassword,
           loginUrl,
         }).then(() => undefined).catch(err => {
           logger.warn('bulk-import', `Hoş geldiniz maili gönderilemedi: ${row.email}`, err instanceof Error ? err.message : err)
@@ -549,8 +501,6 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   // Tüm mail gönderimlerini bekle — serverless fonksiyon kesilmeden tamamlansın
   await Promise.allSettled(emailPromises)
 
-  const created = createdDirect + createdInvite
-
   // KVKK audit — TC plaintext yazılmaz; sadece hash prefix'leri (korelasyon için)
   const tcRefs = validRows
     .filter(r => r.tcKimlik && isValidTcKimlik(r.tcKimlik))
@@ -562,11 +512,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     newData: {
       totalRows: rows.length,
       created,
-      createdDirect,
-      createdInvite,
       failed,
-      createdUserIds,         // ← direct mode rollback için
-      createdInvitationIds,   // ← invite mode rollback için
+      createdUserIds,         // ← rollback için
       tcRefCount: tcRefs.length,
       tcRefs,                 // ← KVKK denetiminde "kaç TC işlendi" kanıtı
     },
@@ -575,8 +522,6 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   return jsonResponse(
     {
       created,
-      createdDirect,
-      createdInvite,
       failed,
       total: rows.length,
       errors: importErrors.slice(0, 20),

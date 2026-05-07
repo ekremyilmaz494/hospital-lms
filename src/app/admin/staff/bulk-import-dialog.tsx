@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Upload, Download, CheckCircle2, AlertCircle, Loader2, FileText, RefreshCw, Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Upload, Download, CheckCircle2, AlertCircle, Loader2, FileText, RefreshCw, KeyRound, Eye, EyeOff, FileDown, Copy, CheckCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { BRAND } from '@/lib/brand';
 import { useToast } from '@/components/shared/toast';
@@ -58,14 +58,23 @@ interface PreviewResult {
   unknownHeaders?: string[];
 }
 
+interface ImportRowResult {
+  email: string;
+  name: string;
+  status: 'created' | 'failed';
+  tempPassword?: string;
+  tcKimlik?: string;
+  department?: string | null;
+  title?: string | null;
+  error?: string;
+}
+
 interface ImportResult {
   created: number;
-  createdDirect?: number;
-  createdInvite?: number;
   failed: number;
   total: number;
   errors: string[];
-  results: Array<{ email: string; name: string; status: 'created' | 'invited' | 'failed'; tempPassword?: string; inviteUrl?: string; error?: string }>;
+  results: ImportRowResult[];
 }
 
 interface Department {
@@ -281,11 +290,11 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
   ];
 
   const subtitle = (() => {
-    if (stage === 'idle') return 'Excel şablonu ile toplu personel yükle.';
+    if (stage === 'idle') return 'Excel\'le hesapları aç, şifreleri PDF olarak teslim et.';
     if (stage === 'uploading') return 'Dosya doğrulanıyor…';
     if (stage === 'preview') return `${preview?.total ?? 0} satır okundu — düzenleyip onayla.`;
-    if (stage === 'importing') return 'Kayıtlar oluşturuluyor…';
-    return 'Yükleme tamamlandı.';
+    if (stage === 'importing') return 'Hesaplar açılıyor, hoş geldin maili gönderiliyor…';
+    return 'Hesaplar açıldı — şifreler aşağıda.';
   })();
 
   const footer = (() => {
@@ -389,10 +398,10 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
               <h5>Şablon ile başla</h5>
               <p>Başlıklar esnek: <em>Ad/İsim</em>, <em>Soyad</em>, <em>E-posta/Email/Mail</em>, <em>Şifre</em>, <em>Departman/Bölüm</em> — hepsi tanınır.</p>
               <p className="bid-template-mode">
-                <Mail className="h-3 w-3" />
-                <strong>Şifre boşsa</strong> davet linki gider.
                 <KeyRound className="h-3 w-3" />
-                <strong>Şifre doluysa</strong> hesap anında açılır.
+                <strong>Şifre boşsa</strong> sistem güvenli geçici şifre üretir.
+                <FileDown className="h-3 w-3" />
+                Yükleme sonrası tüm şifreler <strong>PDF olarak</strong> indirilebilir.
               </p>
               <button type="button" onClick={downloadTemplate} className="bid-template-btn">
                 <Download className="h-3.5 w-3.5" />
@@ -441,7 +450,6 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                   <col style={{ minWidth: 130 }} />
                   <col style={{ minWidth: 160 }} />
                   <col style={{ minWidth: 140 }} />
-                  <col style={{ minWidth: 96 }} />
                   <col style={{ minWidth: 200 }} />
                 </colgroup>
                 <thead>
@@ -451,11 +459,10 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                     <th>Soyad *</th>
                     <th>TC Kimlik</th>
                     <th>E-posta *</th>
-                    <th title="Boş bırakılırsa davet linki gönderilir; doluysa hesap anında açılır">Şifre</th>
+                    <th title="Boş bırakırsanız sistem güvenli geçici şifre üretir">Şifre</th>
                     <th>Telefon</th>
                     <th>Departman</th>
                     <th>Unvan</th>
-                    <th>Mod</th>
                     <th>Durum</th>
                   </tr>
                 </thead>
@@ -463,7 +470,6 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                   {editedRows.map((row, idx) => {
                     const err = errorByRowIndex.get(row.rowIndex);
                     const isError = !!err;
-                    const isInvite = !row.password.trim();
                     return (
                       <tr key={idx} className={isError ? 'bid-row-err' : ''}>
                         <td className="bid-rowidx">{row.rowIndex}</td>
@@ -494,19 +500,6 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                           </select>
                         </td>
                         <td><CellInput value={row.title} onChange={(v) => updateRow(idx, { title: v })} /></td>
-                        <td>
-                          {isInvite ? (
-                            <span className="bid-mode bid-mode-inv" title="Davet linki gönderilecek; personel kendi şifresini kuracak">
-                              <Mail className="h-3 w-3" />
-                              Davet
-                            </span>
-                          ) : (
-                            <span className="bid-mode bid-mode-pwd" title="Excel'deki şifreyle hesap doğrudan oluşturulacak">
-                              <KeyRound className="h-3 w-3" />
-                              Şifre
-                            </span>
-                          )}
-                        </td>
                         <td>
                           {isError ? (
                             <span className="bid-status-err" title={err}>
@@ -544,47 +537,15 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         <div className="bid-status">
           <Loader2 className="bid-spin" />
           <h4>Personeller işleniyor…</h4>
-          <p>Şifresi olmayan satırlara davet linki, şifresi olanlara hesap + hoş geldin e-postası gönderiliyor. Birkaç saniye sürebilir.</p>
+          <p>Hesaplar açılıyor; her satıra geçici şifre üretilip hoş geldin e-postası gönderiliyor. Birkaç saniye sürebilir.</p>
         </div>
       )}
 
       {stage === 'done' && importResult && (
-        <div className="bid-done">
-          <div className="bid-done-hero">
-            <div className="bid-done-icon">
-              <CheckCircle2 className="h-7 w-7" />
-            </div>
-            <h3>
-              <em>{importResult.created}</em> personel işlendi
-              {importResult.failed > 0 && <span className="bid-done-failed"> · {importResult.failed} başarısız</span>}
-            </h3>
-            <p>
-              {importResult.createdInvite && importResult.createdInvite > 0
-                ? `${importResult.createdInvite} kişiye davet linki gönderildi. ${importResult.createdDirect ? `${importResult.createdDirect} kişiye geçici şifre maille iletildi.` : ''}`
-                : 'Yeni kullanıcılar giriş bilgilerini e-posta ile aldı.'}
-            </p>
-          </div>
-
-          <div className="bid-stats">
-            <StatTile label="Davet" value={importResult.createdInvite ?? 0} tone="ok" icon={<Mail className="h-3.5 w-3.5" />} />
-            <StatTile label="Şifreyle" value={importResult.createdDirect ?? 0} tone="ok" icon={<KeyRound className="h-3.5 w-3.5" />} />
-            <StatTile label="Başarısız" value={importResult.failed} tone="err" icon={<AlertCircle className="h-3.5 w-3.5" />} />
-          </div>
-
-          {importResult.failed > 0 && (
-            <div className="bid-err-card">
-              <AlertCircle className="h-5 w-5" />
-              <div>
-                <h5>{importResult.failed} satır yüklenemedi</h5>
-                <p>Hatanın sebebini ve düzeltme önerilerini içeren Excel raporunu indir:</p>
-                <button type="button" onClick={downloadErrorReport} className="bid-err-btn">
-                  <Download className="h-3.5 w-3.5" />
-                  Hata Raporu İndir (Excel)
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <CredentialsResult
+          result={importResult}
+          onDownloadErrorReport={downloadErrorReport}
+        />
       )}
 
       <style jsx>{`
@@ -973,7 +934,7 @@ function PasswordCellInput({ value, onChange }: { value: string; onChange: (v: s
         type={reveal ? 'text' : 'password'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Boş = Davet"
+        placeholder="Boş = otomatik"
         className="h-9 text-sm pl-2.5 pr-8"
         autoComplete="new-password"
         spellCheck={false}
@@ -1056,6 +1017,335 @@ function StatTile({ label, value, tone, icon }: { label: string; value: number; 
           letter-spacing: -0.02em;
           font-variant-numeric: tabular-nums;
         }
+      `}</style>
+    </div>
+  );
+}
+
+/**
+ * Yükleme sonrası başarılı kayıtların listesini gösterir, geçici şifreyi
+ * kopyalama + hepsini PDF olarak indirme aksiyonlarını sunar.
+ *
+ * KVKK / güvenlik:
+ *   - Şifreler DB'de plaintext durmaz; bu ekran sadece response.results'ten gelir
+ *     (admin'in oturumu içi). Modal kapanınca state kaybolur, "tekrar göster" yok.
+ *   - PDF endpoint (/api/admin/staff/credentials-pdf) TC zorunlu olarak schema'da
+ *     refine eder → TC'siz satırlar PDF'e gönderilmeden filtrelenir, kullanıcıya
+ *     bilgilendirme banner'ı çıkar.
+ */
+function CredentialsResult({
+  result,
+  onDownloadErrorReport,
+}: {
+  result: ImportResult;
+  onDownloadErrorReport: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const successRows = result.results.filter(r => r.status === 'created' && r.tempPassword);
+  const pdfReadyRows = successRows.filter(r => r.tcKimlik); // PDF için TC zorunlu
+  const noTcCount = successRows.length - pdfReadyRows.length;
+
+  const copyPassword = async (idx: number, password: string) => {
+    try {
+      await navigator.clipboard.writeText(password);
+      setCopiedIdx(idx);
+      setTimeout(() => setCopiedIdx(c => (c === idx ? null : c)), 1800);
+    } catch {
+      toast('Şifre kopyalanamadı', 'error');
+    }
+  };
+
+  const downloadPdf = async () => {
+    if (pdfReadyRows.length === 0) {
+      toast('PDF için TC bilgisi olan en az bir satır gerekir', 'warning');
+      return;
+    }
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch('/api/admin/staff/credentials-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: pdfReadyRows.map(r => ({
+            fullName: r.name,
+            tcKimlik: r.tcKimlik!,
+            email: r.email,
+            tempPassword: r.tempPassword!,
+            department: r.department ?? null,
+            title: r.title ?? null,
+          })),
+          maskMode: 'full',
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || 'PDF üretilemedi');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `personel-giris-bilgileri-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast(`${pdfReadyRows.length} kayıtlı PDF indirildi`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'PDF üretilemedi', 'error');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  return (
+    <div className="bid-done">
+      <div className="bid-done-hero">
+        <div className="bid-done-icon">
+          <CheckCircle2 className="h-7 w-7" />
+        </div>
+        <h3>
+          <em>{result.created}</em> personel hesabı açıldı
+          {result.failed > 0 && <span className="bid-done-failed"> · {result.failed} başarısız</span>}
+        </h3>
+        <p>
+          Her personele hoş geldin e-postası + geçici şifre gönderildi.
+          İlk girişte şifrelerini değiştirmek zorundalar.
+        </p>
+      </div>
+
+      <div className="bid-stats">
+        <StatTile label="Hesap açıldı" value={result.created} tone="ok" icon={<KeyRound className="h-3.5 w-3.5" />} />
+        <StatTile label="PDF'e hazır" value={pdfReadyRows.length} tone="ok" icon={<FileDown className="h-3.5 w-3.5" />} />
+        <StatTile label="Başarısız" value={result.failed} tone="err" icon={<AlertCircle className="h-3.5 w-3.5" />} />
+      </div>
+
+      {pdfReadyRows.length > 0 && (
+        <div className="bid-pdf-card">
+          <div className="bid-pdf-info">
+            <FileDown className="h-5 w-5" />
+            <div>
+              <h5>Resmi giriş belgesi</h5>
+              <p>
+                <strong>{pdfReadyRows.length} personelin</strong> giriş bilgileri
+                (Ad Soyad, TC, geçici şifre, departman) tek bir PDF olarak indirilebilir.
+                Yazıcıdan basıp elden teslim edin — KVKK uyarısı belgenin altında basılır.
+                {noTcCount > 0 && (
+                  <span className="bid-pdf-warn"> · TC bilgisi eksik {noTcCount} kayıt PDF dışında.</span>
+                )}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={downloadPdf}
+            disabled={downloadingPdf}
+            className="bid-pdf-btn"
+          >
+            {downloadingPdf ? <Loader2 className="bid-spin h-3.5 w-3.5" /> : <FileDown className="h-3.5 w-3.5" />}
+            {downloadingPdf ? 'Hazırlanıyor…' : 'Giriş Bilgileri PDF\'i İndir'}
+          </button>
+        </div>
+      )}
+
+      {successRows.length > 0 && (
+        <div className="bid-cred-table-wrap">
+          <div className="bid-cred-table-header">
+            <span>Yeni hesaplar — geçici şifreler</span>
+            <small>Modal kapatıldıktan sonra şifreler kaybolur, şimdi yedekleyin.</small>
+          </div>
+          <div className="bid-cred-scroll">
+            <table className="bid-cred-table">
+              <colgroup>
+                <col style={{ minWidth: 160 }} />
+                <col style={{ minWidth: 200 }} />
+                <col style={{ minWidth: 180 }} />
+                <col style={{ minWidth: 90 }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Ad Soyad</th>
+                  <th>E-posta</th>
+                  <th>Geçici Şifre</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {successRows.map((r, idx) => (
+                  <tr key={idx}>
+                    <td>{r.name}</td>
+                    <td className="bid-cred-email">{r.email}</td>
+                    <td className="bid-cred-pwd">{r.tempPassword}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => copyPassword(idx, r.tempPassword!)}
+                        className="bid-cred-copy"
+                        aria-label="Şifreyi kopyala"
+                      >
+                        {copiedIdx === idx
+                          ? <CheckCheck className="h-3.5 w-3.5" />
+                          : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {result.failed > 0 && (
+        <div className="bid-err-card">
+          <AlertCircle className="h-5 w-5" />
+          <div>
+            <h5>{result.failed} satır yüklenemedi</h5>
+            <p>Hatanın sebebini ve düzeltme önerilerini içeren Excel raporunu indir:</p>
+            <button type="button" onClick={onDownloadErrorReport} className="bid-err-btn">
+              <Download className="h-3.5 w-3.5" />
+              Hata Raporu İndir (Excel)
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .bid-pdf-card {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 16px 18px;
+          border-radius: 14px;
+          background: #ecfdf5;
+          border: 1.5px solid ${K.PRIMARY};
+        }
+        .bid-pdf-info {
+          display: flex;
+          gap: 12px;
+          flex: 1;
+          min-width: 0;
+        }
+        .bid-pdf-info :global(svg) { color: ${K.PRIMARY}; flex-shrink: 0; margin-top: 2px; }
+        .bid-pdf-card h5 {
+          font-family: ${K.FONT_DISPLAY};
+          font-size: 14px;
+          font-weight: 700;
+          color: ${K.TEXT_PRIMARY};
+          margin: 0 0 4px;
+        }
+        .bid-pdf-card p {
+          font-size: 12px;
+          color: ${K.TEXT_SECONDARY};
+          margin: 0;
+          line-height: 1.5;
+        }
+        .bid-pdf-card strong { color: ${K.PRIMARY}; font-weight: 700; }
+        .bid-pdf-warn { color: #b45309; font-weight: 600; }
+        .bid-pdf-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 10px 16px;
+          border-radius: 10px;
+          background: ${K.PRIMARY};
+          color: #ffffff;
+          border: none;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: ${K.FONT_DISPLAY};
+          flex-shrink: 0;
+          white-space: nowrap;
+          transition: background 160ms ease;
+        }
+        .bid-pdf-btn:hover:not(:disabled) { background: ${K.PRIMARY_HOVER}; }
+        .bid-pdf-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .bid-cred-table-wrap {
+          border: 1.5px solid ${K.BORDER_LIGHT};
+          border-radius: 14px;
+          overflow: hidden;
+          background: ${K.SURFACE};
+          box-shadow: ${K.SHADOW_CARD};
+        }
+        .bid-cred-table-header {
+          padding: 12px 16px;
+          background: ${K.BG};
+          border-bottom: 1px solid ${K.BORDER_LIGHT};
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .bid-cred-table-header span {
+          font-family: ${K.FONT_DISPLAY};
+          font-size: 13px;
+          font-weight: 700;
+          color: ${K.TEXT_PRIMARY};
+        }
+        .bid-cred-table-header small {
+          font-size: 11px;
+          color: ${K.TEXT_MUTED};
+        }
+        .bid-cred-scroll {
+          overflow: auto;
+          max-height: 260px;
+        }
+        .bid-cred-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+        .bid-cred-table thead th {
+          position: sticky;
+          top: 0;
+          background: ${K.SURFACE};
+          padding: 10px 14px;
+          text-align: left;
+          font-family: ${K.FONT_DISPLAY};
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: ${K.TEXT_MUTED};
+          border-bottom: 1px solid ${K.BORDER_LIGHT};
+        }
+        .bid-cred-table tbody tr { border-top: 1px solid ${K.BORDER_LIGHT}; }
+        .bid-cred-table tbody tr:hover { background: ${K.BG}; }
+        .bid-cred-table td {
+          padding: 10px 14px;
+          color: ${K.TEXT_PRIMARY};
+          vertical-align: middle;
+        }
+        .bid-cred-email {
+          color: ${K.TEXT_SECONDARY};
+          word-break: break-all;
+        }
+        .bid-cred-pwd {
+          font-family: var(--font-mono, ui-monospace, monospace);
+          font-weight: 600;
+          color: ${K.PRIMARY};
+          letter-spacing: 0.04em;
+        }
+        .bid-cred-copy {
+          width: 28px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1.5px solid ${K.BORDER_LIGHT};
+          background: ${K.SURFACE};
+          color: ${K.TEXT_MUTED};
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 160ms ease;
+        }
+        .bid-cred-copy:hover { color: ${K.PRIMARY}; border-color: ${K.PRIMARY}; }
       `}</style>
     </div>
   );
