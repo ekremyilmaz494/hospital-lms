@@ -158,6 +158,15 @@ export async function updateSession(request: NextRequest) {
   // ── Public route'lar: getSession() = local JWT parse, HTTP yok ──
   // Sadece authenticated kullanıcıyı login sayfasından dashboard'a yönlendirmek için kullanılır.
   if (isPublicRoute(pathname)) {
+    // Fast-path: auth cookie yoksa → session de yok → getSession() çağrısı gereksiz.
+    // Bu sayede unauthenticated kullanıcılar login/landing sayfasına anında ulaşır,
+    // 2500ms timeout'u beklemek zorunda kalmaz.
+    const hasAuthCookie = request.cookies.getAll().some(
+      (c) => c.name.startsWith('sb-') && c.name.includes('-auth-token')
+    )
+    if (!hasAuthCookie) {
+      return supabaseResponse
+    }
     try {
       const sessionResult = await withTimeout(supabase.auth.getSession(), 2500)
       const sessionUser = sessionResult?.data?.session?.user
