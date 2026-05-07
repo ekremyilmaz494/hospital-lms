@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { LoginTransitionLink } from "@/components/landing/login-transition-link";
 import {
   ChevronRight,
   ArrowRight,
@@ -241,13 +242,12 @@ export function HeroSection() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <Link
-              prefetch={false} href="/auth/login"
-              className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105"
+            <LoginTransitionLink
+              className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105 cursor-pointer"
               style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
             >
               Giriş Yap <ChevronRight className="w-4 h-4" />
-            </Link>
+            </LoginTransitionLink>
 
             {/* Mobile hamburger */}
             <button
@@ -289,14 +289,12 @@ export function HeroSection() {
                 </a>
               ))}
               <div className="border-t mt-2 pt-3" style={{ borderColor: "rgba(0,0,0,0.05)" }}>
-                <Link
-                  prefetch={false} href="/auth/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="block text-sm font-black text-center py-2.5 rounded-xl uppercase tracking-wide"
+                <LoginTransitionLink
+                  className="block text-sm font-black text-center py-2.5 rounded-xl uppercase tracking-wide cursor-pointer"
                   style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
                 >
                   Giriş Yap
-                </Link>
+                </LoginTransitionLink>
               </div>
             </motion.div>
           )}
@@ -343,9 +341,8 @@ export function HeroSection() {
           </p>
 
           <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8 sm:mb-12">
-            <Link
-              prefetch={false} href="/auth/login"
-              className="inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105 shadow-lg"
+            <LoginTransitionLink
+              className="inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105 shadow-lg cursor-pointer"
               style={{
                 backgroundColor: "#f59e0b",
                 color: "#1a3a28",
@@ -353,10 +350,9 @@ export function HeroSection() {
               }}
             >
               Eğitimlere Başla <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              prefetch={false} href="/auth/login"
-              className="inline-flex items-center gap-2 text-sm font-semibold transition-opacity hover:opacity-60"
+            </LoginTransitionLink>
+            <LoginTransitionLink
+              className="inline-flex items-center gap-2 text-sm font-semibold transition-opacity hover:opacity-60 cursor-pointer"
               style={{ color: "#1a3a28" }}
             >
               <div
@@ -366,7 +362,7 @@ export function HeroSection() {
                 <Play className="w-3 h-3 ml-0.5" />
               </div>
               Demo İzle
-            </Link>
+            </LoginTransitionLink>
           </div>
 
           {/* Social proof */}

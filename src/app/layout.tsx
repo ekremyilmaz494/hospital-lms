@@ -10,6 +10,7 @@ import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { DevSWCleaner } from "@/components/dev-sw-cleaner";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { CrispWidget } from "@/components/providers/crisp-widget";
+import { PageTransitionOverlay } from "@/components/providers/page-transition-overlay";
 import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
@@ -121,6 +122,7 @@ export default async function RootLayout({
             <ToastProvider>
               <ErrorBoundary>
                 {children}
+                <PageTransitionOverlay />
                 {process.env.NODE_ENV === 'development' && <DevSWCleaner />}
                 <PWAInstallPrompt />
                 <CookieConsent />
