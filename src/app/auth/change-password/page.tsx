@@ -1,14 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export default function ChangePasswordPage() {
-  const router = useRouter();
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -51,10 +49,13 @@ export default function ChangePasswordPage() {
       }
 
       setSuccess(true);
-      // 2 saniye sonra dashboard'a yönlendir
+      // Hard reload — SPA nav + middleware redirect zinciri yerine tek round-trip.
+      // Memory: "Login sonrası navigasyon: window.location.href kullan, router.push YASAK".
+      // Aynı kural mustChangePassword sonrası da geçerli — JWT/cookie yenilenir.
+      // 600ms: kullanıcı success animasyonunu görür, sonra hızlıca redirect.
       setTimeout(() => {
-        router.push('/');
-      }, 2000);
+        window.location.href = '/';
+      }, 600);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
