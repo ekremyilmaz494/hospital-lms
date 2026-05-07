@@ -10,6 +10,7 @@
 import { prisma } from '@/lib/prisma'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { encryptTcKimlik, hashTcKimlik } from '@/lib/tc-crypto'
 
 // ── Hata siniflari ──────────────────────────────────────────────
 
@@ -50,6 +51,8 @@ export class DbUserError extends Error {
       const targets = prismaErr.meta?.target ?? []
       if (targets.some(t => t.includes('email'))) {
         this.safeMessage = 'Bu e-posta adresi ile kayıtlı bir personel zaten mevcut'
+      } else if (targets.some(t => t.includes('tc_hash') || t.includes('tcHash'))) {
+        this.safeMessage = 'Bu TC Kimlik No ile kayıtlı bir personel bu kurumda zaten mevcut'
       } else {
         this.safeMessage = 'Bu bilgilerle kayıtlı bir personel zaten mevcut'
       }
@@ -79,6 +82,14 @@ interface OrgUserParams extends BaseParams {
   hisExternalId?: string
   isActive?: boolean
   mustChangePassword?: boolean
+  /**
+   * Ham TC Kimlik No (11 hane). Verilirse `tcEncrypted` (AES-256-GCM) +
+   * `tcHash` (HMAC-SHA256) olarak DB'ye yazılır. Validation çağırandan
+   * beklenir (örn. createStaffSchema).
+   */
+  tcKimlik?: string
+  /** TC'yi ekleyen admin'in user.id'si — KVKK audit için */
+  tcAddedByUserId?: string
 }
 
 interface SuperAdminParams extends BaseParams {
@@ -142,6 +153,16 @@ export async function createAuthUser(params: CreateAuthUserParams): Promise<Crea
   const authUserId = authData.user.id
 
   // 2. Prisma DB user olustur
+  // TC Kimlik No verilmişse şifrele + hash al — KVKK gereği plaintext yazılmaz
+  const tcFields = isOrgUser(params) && params.tcKimlik
+    ? {
+        tcEncrypted: encryptTcKimlik(params.tcKimlik),
+        tcHash: hashTcKimlik(params.tcKimlik),
+        tcAddedAt: new Date(),
+        tcAddedBy: params.tcAddedByUserId ?? null,
+      }
+    : {}
+
   try {
     const dbUser = await prisma.user.create({
       data: {
@@ -159,6 +180,7 @@ export async function createAuthUser(params: CreateAuthUserParams): Promise<Crea
           isActive: params.isActive,
           mustChangePassword: params.mustChangePassword,
         }),
+        ...tcFields,
       },
       select: {
         id: true,

@@ -68,7 +68,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
     // KVKK Tam Anonimleştirme — tüm ilişkili tablolardaki PII temizlenir
     await prisma.$transaction([
-      // 1. Ana kullanıcı tablosu
+      // 1. Ana kullanıcı tablosu — TC dahil tüm PII anonimleştirilir
+      // KVKK m.7: Talep üzerine kişisel veri SİLİNMELİ (yok edilmeli/anonimleştirilmeli)
       prisma.user.update({
         where: { id: userId },
         data: {
@@ -78,6 +79,12 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
           phone: null,
           avatarUrl: null,
           isActive: false,
+          // TC alanları — şifreli ciphertext ve hash de NULL'lanır
+          tcEncrypted: null,
+          tcHash: null,
+          tcAddedAt: null,
+          tcAddedBy: null,
+          hisExternalId: null,
         },
       }),
       // 2. Audit log — oldData/newData içindeki PII'yı temizle

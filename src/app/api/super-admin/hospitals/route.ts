@@ -1,8 +1,9 @@
+import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody, safePagination, getAppUrl } from '@/lib/api-helpers'
 import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createHospitalWithAdminSchema } from '@/lib/validations'
-import { sendInvitationEmail } from '@/lib/email'
+import { sendInvitationEmail, sendStaffWelcomeEmail } from '@/lib/email'
 import { TRAINING_CATEGORIES } from '@/lib/training-categories'
 import { slugify } from '@/lib/organization'
 import { logger } from '@/lib/logger'
@@ -12,6 +13,8 @@ import {
   buildInvitationUrl,
   INVITATION_TTL_HOURS,
 } from '@/lib/invitations'
+import { encryptTcKimlik, hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
+import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 
 export const GET = withSuperAdminRoute(async ({ request }) => {
   const { searchParams } = new URL(request.url)
@@ -80,8 +83,10 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
     return errorResponse(friendly, 400)
   }
 
-  // adminPassword artık kullanılmıyor (link tabanlı davet) — schema'da optional, sessizce yok say
-  const { adminFirstName, adminLastName, adminEmail, planId, trialDays, ...orgData } = parsed.data
+  // İki mod desteklenir:
+  //   'invite' (default) → davet linki, esas yönetici email'den şifresini kurar
+  //   'direct'           → otomatik şifre, super admin elden teslim eder
+  const { mode, adminFirstName, adminLastName, adminEmail, adminTcKimlik, adminPassword, planId, trialDays, ...orgData } = parsed.data
 
   // Hastane kodu benzersiz mi?
   const existing = await prisma.organization.findUnique({ where: { code: orgData.code } })
@@ -151,7 +156,90 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
     return org
   })
 
-  // 2) Invitation token oluştur (setAsOwner=true)
+  // ── DIRECT MODE — Esas Yönetici hesabını anında aç, geçici şifre üret ─────
+  if (mode === 'direct') {
+    const effectivePassword = adminPassword ||
+      ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1')
+
+    let result
+    try {
+      result = await createAuthUser({
+        email: adminEmail,
+        password: effectivePassword,
+        firstName: adminFirstName,
+        lastName: adminLastName,
+        role: 'admin',
+        organizationId: hospital.id,
+        mustChangePassword: true,
+        tcKimlik: adminTcKimlik,
+        tcAddedByUserId: dbUser.id,
+      })
+    } catch (err) {
+      // Hospital yarattık ama owner User yaratamadık — manuel müdahale gerek
+      logger.error('hospital-create', 'Esas Yönetici User yaratılamadı (hospital orphan kaldı)', {
+        hospitalId: hospital.id,
+        adminEmail,
+        error: err instanceof Error ? err.message : err,
+      })
+      if (err instanceof AuthUserError || err instanceof DbUserError) {
+        return errorResponse(`Hastane oluşturuldu fakat yönetici hesabı açılamadı: ${err.safeMessage}`, 500)
+      }
+      throw err
+    }
+
+    const ownerUser = result.dbUser
+
+    // Esas Yönetici (org owner) işaretle — Organization.ownerUserId set et
+    await prisma.organization.update({
+      where: { id: hospital.id },
+      data: { ownerUserId: ownerUser.id },
+    })
+
+    await audit({
+      action: 'create',
+      entityType: 'organization',
+      entityId: hospital.id,
+      newData: {
+        hospitalName: orgData.name,
+        hospitalCode: orgData.code,
+        adminEmail,
+        ownerUserId: ownerUser.id,
+        mode: 'direct',
+        planId,
+        trialDays,
+        ownerTcAuditRef: tcAuditRef(adminTcKimlik),
+      },
+    })
+
+    // Hoş geldiniz maili — best effort
+    let welcomeEmailSent = true
+    try {
+      await sendStaffWelcomeEmail({
+        to: ownerUser.email,
+        staffName: `${ownerUser.firstName} ${ownerUser.lastName}`,
+        organizationName: orgData.name,
+        brandColor: null, // brand henüz set edilmedi (yeni hastane)
+        tempPassword: effectivePassword,
+        loginUrl: `${getAppUrl()}/auth/login`,
+      })
+    } catch (err) {
+      welcomeEmailSent = false
+      logger.warn('hospital-create', `Hoş geldiniz maili gönderilemedi: ${ownerUser.email}`, err instanceof Error ? err.message : err)
+    }
+
+    return jsonResponse({
+      ...hospital,
+      ownerUserId: ownerUser.id,
+      mode: 'direct',
+      emailSent: welcomeEmailSent,
+      // Geçici şifre — super admin elden teslim için her durumda dön
+      tempPassword: effectivePassword,
+      // TC echo — frontend PDF üretimi için
+      adminTcKimlik,
+    }, 201)
+  }
+
+  // ── INVITE MODE — Davet linki gönder, esas yönetici email'den şifresini kurar ──
   const { raw, hash } = generateInvitationToken()
   const expiresAt = computeInvitationExpiry()
 
@@ -168,11 +256,12 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       invitedByUserId: dbUser.id,
       setAsOwner: true,
       expiresAt,
+      tcEncrypted: encryptTcKimlik(adminTcKimlik),
+      tcHash: hashTcKimlik(adminTcKimlik),
     },
     select: { id: true },
   })
 
-  // Audit log
   await audit({
     action: 'create',
     entityType: 'organization',
@@ -182,12 +271,13 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       hospitalCode: orgData.code,
       adminEmail,
       invitationId: invitation.id,
+      mode: 'invite',
       planId,
       trialDays,
+      ownerTcAuditRef: tcAuditRef(adminTcKimlik),
     },
   })
 
-  // 3) Davet maili gönder
   const inviteUrl = buildInvitationUrl(getAppUrl(), raw)
   let emailSent = true
   try {
@@ -199,7 +289,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       recipientName: `${adminFirstName} ${adminLastName}`,
       roleLabel: 'Esas Yönetici',
       expiresInHours: INVITATION_TTL_HOURS,
-      organizationId: null, // global SMTP — hastane henüz SMTP konfigüre etmedi
+      organizationId: null,
     })
   } catch (emailErr) {
     emailSent = false
@@ -211,10 +301,10 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
 
   return jsonResponse({
     ...hospital,
+    mode: 'invite',
     invitationId: invitation.id,
     invitationExpiresAt: expiresAt,
     emailSent,
-    // SMTP fallback: link'i super_admin manuel paylaşabilsin
     ...(emailSent ? {} : { inviteUrl }),
   }, 201)
 })

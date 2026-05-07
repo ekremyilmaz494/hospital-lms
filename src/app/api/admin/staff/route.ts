@@ -5,6 +5,7 @@ import { jsonResponse, errorResponse, parseBody, safePagination, ApiError, getAp
 import { withAdminRoute } from '@/lib/api-handler'
 import { createStaffSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
+import { hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
 import { logger } from '@/lib/logger'
 import { sendStaffWelcomeEmail, sendInvitationEmail } from '@/lib/email'
 import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
@@ -256,6 +257,19 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     return errorResponse('Bu e-posta adresi zaten sistemde kayıtlı', 409)
   }
 
+  // TC Kimlik No duplicate kontrolü — composite (org + tcHash) unique
+  // Aynı TC farklı org'da olabilir (doktor 2 hastanede), o yüzden orgId scope'lu arıyoruz.
+  if (data.tcKimlik) {
+    const tcHash = hashTcKimlik(data.tcKimlik)
+    const existingTc = await prisma.user.findFirst({
+      where: { organizationId: orgId, tcHash },
+      select: { id: true },
+    })
+    if (existingTc) {
+      return errorResponse('Bu TC Kimlik No ile kayıtlı bir personel bu kurumda zaten mevcut', 409)
+    }
+  }
+
   // ── INVITE MODE — davet linki gönder, hesap kabul anında oluşur ────────────
   if (data.mode === 'invite') {
     // Aynı email için aktif davet varsa: eskiyi revoke et, yenisini oluştur
@@ -355,6 +369,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       departmentId: data.departmentId,
       title: data.title,
       mustChangePassword: true,
+      // KVKK: ham TC sadece bu noktaya kadar; createAuthUser içinde encrypt + hash'lenir
+      tcKimlik: data.tcKimlik,
+      tcAddedByUserId: dbUser.id,
     })
   } catch (err) {
     if (err instanceof AuthUserError) {
@@ -374,7 +391,11 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     action: 'create',
     entityType: 'user',
     entityId: user.id,
-    newData: user,
+    newData: {
+      ...user,
+      // KVKK: plaintext TC audit log'a ASLA yazılmaz; sadece hash prefix referansı
+      ...(data.tcKimlik ? { tcAuditRef: tcAuditRef(data.tcKimlik) } : {}),
+    },
   })
 
   revalidatePath('/admin/staff')
@@ -408,8 +429,13 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       ...user,
       mode: 'direct',
       emailSent: welcomeEmailSent,
-      // Mail çalışmadıysa admin geçici şifreyi manuel paylaşabilsin
-      ...(welcomeEmailSent ? {} : { tempPassword: effectivePassword }),
+      // Geçici şifre — yeni eklenen personellere PDF basabilmek için response'ta
+      // her zaman dön (mail gitse bile admin yazıcıdan basıp dağıtmak isteyebilir).
+      // Frontend bunu PDF üretiminde kullanır; DB'de plaintext tutulmuyor.
+      tempPassword: effectivePassword,
+      // TC admin az önce form'da girmişti; PDF üretimi kolaysın diye echo'lanıyor.
+      // KVKK: response sadece şu an oluşturmayı yapan admin'e gider (cookie auth).
+      ...(data.tcKimlik ? { tcKimlik: data.tcKimlik } : {}),
     },
     201,
   )

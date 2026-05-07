@@ -32,6 +32,9 @@ interface ParsedRow {
   password: string;
   phone: string;
   title: string;
+  // TC Kimlik No — direct (şifreli) modda zorunlu, invite modda opsiyonel.
+  // Sadece bu request'in lifetime'ında plaintext; server tarafında AES-GCM şifreli kaydedilir.
+  tcKimlik: string;
   deptId?: string;
   deptName: string;
   deptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty';
@@ -427,6 +430,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                     <th style={{ width: 44 }}>#</th>
                     <th>Ad *</th>
                     <th>Soyad *</th>
+                    <th>TC Kimlik</th>
                     <th>E-posta *</th>
                     <th>Telefon</th>
                     <th>Departman</th>
@@ -445,6 +449,12 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                         <td className="bid-rowidx">{row.rowIndex}</td>
                         <td><CellInput value={row.firstName} onChange={(v) => updateRow(idx, { firstName: v })} /></td>
                         <td><CellInput value={row.lastName} onChange={(v) => updateRow(idx, { lastName: v })} /></td>
+                        <td>
+                          <CellInput
+                            value={row.tcKimlik || ''}
+                            onChange={(v) => updateRow(idx, { tcKimlik: v.replace(/\D/g, '').slice(0, 11) })}
+                          />
+                        </td>
                         <td><CellInput value={row.email} onChange={(v) => updateRow(idx, { email: v.toLowerCase() })} /></td>
                         <td><CellInput value={row.phone} onChange={(v) => updateRow(idx, { phone: v })} /></td>
                         <td>

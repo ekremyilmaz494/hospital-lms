@@ -8,6 +8,8 @@ import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity-logger'
 import { isDeviceTrusted } from '@/lib/auth/trusted-device'
+import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc'
+import { hashTcKimlik } from '@/lib/tc-crypto'
 
 /**
  * "SMS MFA pending" sentinel cookie.
@@ -47,14 +49,54 @@ const ALERT_THRESHOLD = 5
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { email?: string; password?: string; rememberMe?: boolean }
-    const { email, password, rememberMe = false } = body
+    const body = await request.json() as {
+      email?: string
+      password?: string
+      rememberMe?: boolean
+      // TC ile login: tcKimlik + orgSlug (subdomain'den frontend tarafından okunur)
+      tcKimlik?: string
+      orgSlug?: string
+    }
+    const { email, password, rememberMe = false, tcKimlik, orgSlug } = body
 
-    if (!email || !password) {
-      return errorResponse('E-posta ve şifre gereklidir.', 400)
+    if (!password) {
+      return errorResponse('Şifre gereklidir.', 400)
     }
 
-    const normalizedEmail = email.trim().toLowerCase()
+    // TC akışı: TC + orgSlug → tcHash ile DB'de personeli bul → email'i çıkar
+    // KVKK: TC plaintext sadece bu request'in lifetime'ı boyunca yaşar; hash'lenir, atılır.
+    let normalizedEmail: string
+    if (tcKimlik) {
+      const tc = normalizeTcKimlik(tcKimlik)
+      if (!isValidTcKimlik(tc)) {
+        // Geçersiz TC → varlık leak yapma; "TC veya şifre hatalı" jenerik mesaj
+        return errorResponse('TC Kimlik No veya şifre hatalı.', 401)
+      }
+      if (!orgSlug) {
+        return errorResponse('Hastane bilgisi belirlenemedi. Lütfen kurumunuzun web adresinden giriş yapın.', 400)
+      }
+
+      const tcHash = hashTcKimlik(tc)
+      const found = await prisma.user.findFirst({
+        where: {
+          tcHash,
+          isActive: true,
+          organization: { slug: orgSlug, isActive: true },
+        },
+        select: { email: true },
+      })
+
+      if (!found) {
+        return errorResponse('TC Kimlik No veya şifre hatalı.', 401)
+      }
+      normalizedEmail = found.email.trim().toLowerCase()
+    } else {
+      if (!email) {
+        return errorResponse('E-posta veya TC Kimlik No gereklidir.', 400)
+      }
+      normalizedEmail = email.trim().toLowerCase()
+    }
+
     const ip = getTrustedIp(request)
 
     // ── Supabase client önce oluştur — cookies() async context'i Promise.all içinde
@@ -113,7 +155,10 @@ export async function POST(request: NextRequest) {
         })()
       }
 
-      return errorResponse('E-posta veya şifre hatalı.', 401)
+      return errorResponse(
+        tcKimlik ? 'TC Kimlik No veya şifre hatalı.' : 'E-posta veya şifre hatalı.',
+        401,
+      )
     }
 
     // ── Orphan user detection + active check ──

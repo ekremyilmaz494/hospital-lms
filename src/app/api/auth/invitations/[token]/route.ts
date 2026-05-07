@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { hashInvitationToken, getInvitationClaimError } from '@/lib/invitations'
 import { acceptInvitationSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
+import { decryptTcKimlik } from '@/lib/tc-crypto'
 
 /**
  * Public davet endpoint'i — auth gerektirmez.
@@ -123,6 +124,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       acceptedAt: true,
       revokedAt: true,
       attemptCount: true,
+      // Davet anında alınan TC (encrypted) — kabul edildiğinde User'a kopyalanır
+      tcEncrypted: true,
+      invitedByUserId: true,
     },
   })
 
@@ -175,6 +179,19 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }
   }
 
+  // Davet anında alınan TC'yi (varsa) çöz → createAuthUser yeniden encrypt + hash atar.
+  // KVKK: plaintext TC sadece bu request'in lifetime'ı içinde memory'de yaşar.
+  // Decrypt başarısız olursa (örn. ENCRYPTION_KEY rotation sonrası) TC'siz devam eder;
+  // davet edilen kişi profilinden sonra ekleyebilir.
+  let plainTcFromInvitation: string | undefined
+  if (invitation.tcEncrypted) {
+    try {
+      plainTcFromInvitation = decryptTcKimlik(invitation.tcEncrypted)
+    } catch (err) {
+      logger.warn('invitations.accept', 'Davet TC decrypt başarısız — TC olmadan devam', err instanceof Error ? err.message : err)
+    }
+  }
+
   // createAuthUser ile auth + db user oluştur
   let result
   try {
@@ -190,6 +207,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       departmentId: invitation.departmentId ?? null,
       mustChangePassword: false,
       isActive: true,
+      // TC (davetten gelir) — createAuthUser encrypt + hash atar, User'a yazar
+      tcKimlik: plainTcFromInvitation,
+      tcAddedByUserId: invitation.invitedByUserId ?? undefined,
     })
   } catch (err) {
     // User oluşturulamadı — kilidi aç (kullanıcı yeniden deneyebilsin)

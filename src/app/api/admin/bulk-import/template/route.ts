@@ -30,12 +30,13 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   const sheet = wb.addWorksheet('Personel')
 
   sheet.columns = [
-    { header: 'Ad',        key: 'ad',       width: 18 },
-    { header: 'Soyad',     key: 'soyad',    width: 18 },
-    { header: 'E-posta',   key: 'email',    width: 32 },
-    { header: 'Telefon',   key: 'telefon',  width: 16 },
-    { header: 'Departman', key: 'departman', width: 20 },
-    { header: 'Unvan',     key: 'unvan',    width: 22 },
+    { header: 'Ad',           key: 'ad',       width: 18 },
+    { header: 'Soyad',        key: 'soyad',    width: 18 },
+    { header: 'TC Kimlik No', key: 'tc',       width: 16 },
+    { header: 'E-posta',      key: 'email',    width: 32 },
+    { header: 'Telefon',      key: 'telefon',  width: 16 },
+    { header: 'Departman',    key: 'departman', width: 20 },
+    { header: 'Unvan',        key: 'unvan',    width: 22 },
   ]
 
   // Başlık satırı stili
@@ -49,11 +50,12 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   headerRow.height = 28
   headerRow.alignment = { vertical: 'middle', horizontal: 'left' }
 
-  // Örnek satırlar
-  // Örnek satırlar — farklı senaryoları göstersin
+  // Örnek satırlar — farklı senaryoları göstersin.
+  // TC Kimlik No'lar VALİD (Mod10/11 checksum'ı geçer) — sahte ama doğru formatta.
   const exampleRows = [
     {
       ad: 'Ayşe', soyad: 'Yılmaz',
+      tc: '10000000146',
       email: 'ayse.yilmaz@hastane.com',
       telefon: '05551234567',
       departman: deptNames[0] || 'Acil Servis',
@@ -61,6 +63,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     },
     {
       ad: 'Mehmet', soyad: 'Demir',
+      tc: '11111111110',
       email: 'mehmet.demir@hastane.com',
       telefon: '05559876543',
       departman: deptNames[1] || deptNames[0] || 'Dahiliye',
@@ -68,16 +71,18 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     },
     {
       ad: 'Fatma', soyad: 'Kaya',
+      tc: '12345678950',
       email: 'fatma.kaya@hastane.com',
-      telefon: '', // telefon opsiyonel, boş bırakılabilir
+      telefon: '', // telefon opsiyonel
       departman: deptNames[2] || deptNames[0] || 'Yoğun Bakım',
       unvan: 'Başhemşire',
     },
     {
       ad: 'Ali', soyad: 'Çelik',
+      tc: '', // TC opsiyonel — sadece direct (şifreli) modda zorunlu
       email: 'ali.celik@hastane.com',
       telefon: '05321112233',
-      departman: '', // departman opsiyonel (atama sonradan yapılabilir)
+      departman: '',
       unvan: '',
     },
   ]
@@ -89,20 +94,19 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     row.font = { italic: true, color: { argb: 'FF64748B' } }
   }
 
-  // Örneklerin altına 10 boş satır + ince ayırıcı (kullanıcı direkt buraya yazmaya başlasın)
+  // Örneklerin altına ayırıcı (kullanıcı direkt buraya yazmaya başlasın)
   const separatorRow = sheet.getRow(exampleRows.length + 2)
   separatorRow.getCell(1).value = '↓ Örnek satırları silip kendi personelinizi buraya girin ↓'
   separatorRow.getCell(1).font = { bold: true, color: { argb: 'FF0D9668' }, size: 10 }
-  sheet.mergeCells(`A${exampleRows.length + 2}:F${exampleRows.length + 2}`)
+  sheet.mergeCells(`A${exampleRows.length + 2}:G${exampleRows.length + 2}`)
   separatorRow.alignment = { horizontal: 'center' }
 
-  // Departman için dropdown doğrulaması — E sütunu (şifre kaldırıldıktan sonra)
-  // Örnek satırları (2-5) + ayırıcı SONRASI (7-500) — ayırıcı satırını (6) atla
+  // Departman için dropdown doğrulaması — F sütunu (TC eklendiği için bir sağa kaydı)
   if (deptNames.length > 0) {
-    const separatorIdx = exampleRows.length + 2 // 6
+    const separatorIdx = exampleRows.length + 2
     for (let r = 2; r <= 500; r++) {
       if (r === separatorIdx) continue
-      sheet.getCell(`E${r}`).dataValidation = {
+      sheet.getCell(`F${r}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: [`Departmanlar!$A$2:$A$${deptNames.length + 1}`],
@@ -111,6 +115,11 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
         error: 'Lütfen Departmanlar sayfasındaki listeden seçin',
       }
     }
+  }
+
+  // TC sütunu (C) — text formatı (öndeki 0 kaybolmasın diye)
+  for (let r = 2; r <= 500; r++) {
+    sheet.getCell(`C${r}`).numFmt = '@'
   }
 
   // Başlık satırını dondur
@@ -137,7 +146,14 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     'TOPLU PERSONEL YÜKLEME — KULLANIM KILAVUZU',
     '',
     'ZORUNLU ALANLAR: Ad, Soyad, E-posta',
-    'OPSİYONEL ALANLAR: Telefon, Departman, Unvan',
+    'KOŞULLU ZORUNLU: TC Kimlik No (Şifre belirlediğiniz satırlarda zorunlu — resmi denetim için)',
+    'OPSİYONEL ALANLAR: TC (davet modunda), Telefon, Departman, Unvan',
+    '',
+    'TC KİMLİK NO:',
+    '  • 11 haneli, NVİ algoritmasıyla doğrulanır (sahte numaralar reddedilir).',
+    '  • DB\'de AES-256-GCM ile şifrelenir, HMAC-SHA256 ile hash\'lenir (KVKK uyumlu).',
+    '  • Aynı TC bu kurumda tekrar kullanılamaz; farklı kurumlarda olabilir.',
+    '  • Direct mode (şifreli kayıt) için ZORUNLU — denetimde sertifika eşleşmesi için.',
     '',
     'ŞIFRE / DAVET LİNKİ (önerilen davranış):',
     '  • Bu şablonda "Şifre" sütunu YOKTUR — varsayılan olarak her personele DAVET LİNKİ gönderilir.',

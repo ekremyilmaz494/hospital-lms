@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, UserPlus, Mail, KeyRound, Copy, CheckCheck } from 'lucide-react';
+import { Save, UserPlus, Mail, KeyRound, Copy, CheckCheck, FileDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
 import { Field } from './field';
+import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc';
 import type { Department } from '../_types';
 
 type Mode = 'invite' | 'direct';
@@ -16,6 +17,12 @@ interface SuccessState {
   emailSent: boolean;
   inviteUrl?: string;
   tempPassword?: string;
+  // TC ile direkt mod sonucunda PDF üretebilmek için saklanır.
+  // Sadece bu admin'in oturumu içinde, modal açık kaldığı sürece tutulur.
+  tcKimlik?: string;
+  fullName?: string;
+  department?: string;
+  title?: string;
 }
 
 export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () => void; departments: Department[]; onSaved: () => void }) {
@@ -23,9 +30,10 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<SuccessState | null>(null);
   const [mode, setMode] = useState<Mode>('invite');
-  const [form, setForm] = useState({ ad: '', soyad: '', email: '', sifre: '', telefon: '', departman: '', unvan: '' });
+  const [form, setForm] = useState({ ad: '', soyad: '', email: '', sifre: '', telefon: '', departman: '', unvan: '', tc: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [copied, setCopied] = useState<'link' | 'pwd' | null>(null);
+  const [copied, setCopied] = useState<'link' | 'pwd' | 'tc' | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -41,6 +49,16 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
     if (mode === 'direct' && form.sifre.trim() && form.sifre.length < 8) e.sifre = 'Şifre en az 8 karakter olmalıdır';
     if (form.telefon && !/^0\d{10}$/.test(form.telefon.replace(/\s/g, ''))) e.telefon = 'Geçerli telefon formatı: 05XX XXX XX XX';
     if (!form.departman) e.departman = 'Departman seçiniz';
+
+    // TC: direkt modda zorunlu (resmi denetim eşleşmesi için), invite modda opsiyonel.
+    // Boş bırakılırsa atlanır; girildiyse 11 hane + checksum doğrulanır.
+    const tcNorm = normalizeTcKimlik(form.tc);
+    if (mode === 'direct' && !tcNorm) {
+      e.tc = 'TC Kimlik No zorunludur (resmi sertifika eşleşmesi için)';
+    } else if (tcNorm && !isValidTcKimlik(tcNorm)) {
+      e.tc = 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)';
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -49,6 +67,7 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
     if (!validate()) return;
     setSaving(true);
     try {
+      const tcNorm = normalizeTcKimlik(form.tc);
       const payload: Record<string, unknown> = {
         mode,
         firstName: form.ad,
@@ -57,6 +76,8 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
         phone: form.telefon || undefined,
         departmentId: form.departman || undefined,
         title: form.unvan || undefined,
+        // TC sadece doluysa gönderilir; server checksum'ı zod refine ile yeniden doğrular.
+        ...(tcNorm ? { tcKimlik: tcNorm } : {}),
       };
       if (mode === 'direct' && form.sifre.trim()) payload.password = form.sifre.trim();
 
@@ -70,8 +91,11 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
         emailSent?: boolean;
         inviteUrl?: string;
         tempPassword?: string;
+        tcKimlik?: string;
       };
       if (!res.ok) throw new Error(body.error || 'Kayıt başarısız');
+
+      const deptName = departments.find(d => d.id === form.departman)?.name;
 
       setSuccess({
         mode,
@@ -79,10 +103,16 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
         emailSent: body.emailSent !== false,
         inviteUrl: body.inviteUrl,
         tempPassword: body.tempPassword,
+        tcKimlik: body.tcKimlik ?? (tcNorm || undefined),
+        fullName: `${form.ad} ${form.soyad}`.trim(),
+        department: deptName,
+        title: form.unvan || undefined,
       });
 
-      // Mail başarıyla gittiyse otomatik kapat; fallback varsa admin link/şifreyi kopyalasın
-      if (body.emailSent !== false) {
+      // TC ile direkt kayıtta admin'in PDF'i indirebilmesi için modal açık kalır
+      // (otomatik kapanma sadece davet+mail başarılı durumunda).
+      const hasTcPdf = mode === 'direct' && !!tcNorm && !!body.tempPassword;
+      if (body.emailSent !== false && !hasTcPdf) {
         closeTimerRef.current = setTimeout(() => { onSaved(); onClose(); }, 2000);
       } else {
         onSaved();
@@ -94,7 +124,7 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
     }
   };
 
-  const copyToClipboard = async (text: string, kind: 'link' | 'pwd') => {
+  const copyToClipboard = async (text: string, kind: 'link' | 'pwd' | 'tc') => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(kind);
@@ -102,6 +132,54 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
       toast('Panoya kopyalandı', 'success');
     } catch {
       toast('Kopyalama başarısız', 'error');
+    }
+  };
+
+  /**
+   * Server'dan kimlik bilgileri PDF'i indirir — TC + geçici şifre + KVKK uyarı kutusu.
+   * KVKK gereği PDF gizli bilgi içerir; admin yazıcıdan basıp personele elden teslim
+   * etmeli, sonra kâğıdı imha etmelidir (PDF'in altındaki uyarı kutusu hatırlatır).
+   */
+  const downloadCredentialsPdf = async () => {
+    if (!success?.tcKimlik || !success?.tempPassword || !success?.fullName) {
+      toast('PDF için gerekli bilgi eksik', 'error');
+      return;
+    }
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch('/api/admin/staff/credentials-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [{
+            fullName: success.fullName,
+            tcKimlik: success.tcKimlik,
+            email: success.email,
+            tempPassword: success.tempPassword,
+            department: success.department ?? null,
+            title: success.title ?? null,
+          }],
+          maskMode: 'full',
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error || 'PDF üretilemedi');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `personel-giris-${success.fullName.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast('PDF indirildi — yazıcıdan basıp personele elden teslim edin', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'PDF üretilemedi', 'error');
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -203,6 +281,52 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
               </p>
             </div>
           )}
+
+          {/* TC ile direkt kayıt: PDF indirme paneli — yazıcıdan basıp personele elden teslim için.
+              KVKK: PDF altında "imha edin" uyarısı var. Admin oturumu açık olduğu sürece üretilebilir. */}
+          {success.mode === 'direct' && success.tcKimlik && success.tempPassword && (
+            <div className="rounded-lg p-3 border-2" style={{ background: '#ecfdf5', borderColor: 'var(--k-primary, #0d9668)' }}>
+              <div className="flex items-center gap-2 mb-2 text-xs font-semibold" style={{ color: 'var(--k-primary, #0d9668)' }}>
+                <FileDown className="h-3.5 w-3.5" /> Resmi Giriş Belgesi
+              </div>
+              <p className="text-[12px] mb-3" style={{ color: 'var(--k-text-secondary)' }}>
+                Personelin TC, geçici şifre ve giriş bilgilerini içeren PDF belgesini yazıcıdan basıp <strong>elden teslim edebilirsiniz</strong>.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={downloadCredentialsPdf}
+                  disabled={downloadingPdf}
+                  className="h-9 px-3 rounded text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60"
+                  style={{ background: 'var(--k-primary, #0d9668)', color: '#fff' }}
+                >
+                  <FileDown className="h-3.5 w-3.5" />
+                  {downloadingPdf ? 'PDF üretiliyor…' : 'PDF Olarak İndir'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(success.tcKimlik!, 'tc')}
+                  className="h-9 px-3 rounded text-xs font-semibold inline-flex items-center gap-1.5 border"
+                  style={{ background: '#fff', color: 'var(--k-text-primary)', borderColor: 'var(--k-border)' }}
+                >
+                  {copied === 'tc' ? <CheckCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  TC: {success.tcKimlik}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(success.tempPassword!, 'pwd')}
+                  className="h-9 px-3 rounded text-xs font-semibold inline-flex items-center gap-1.5 border"
+                  style={{ background: '#fff', color: 'var(--k-text-primary)', borderColor: 'var(--k-border)' }}
+                >
+                  {copied === 'pwd' ? <CheckCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  Şifre: {success.tempPassword}
+                </button>
+              </div>
+              <p className="text-[11px] mt-2 italic" style={{ color: 'var(--k-text-muted)' }}>
+                KVKK: Bu belge gizli bilgi içerir. Personele elden teslim sonrası kâğıdı güvenli şekilde imha edin.
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -274,6 +398,27 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
               <Input placeholder="örn. Hemşire" className="h-10" value={form.unvan} onChange={(e) => setForm(f => ({ ...f, unvan: e.target.value }))} style={fieldStyle('unvan')} />
             </Field>
           </div>
+
+          {/* TC Kimlik No — direct modda zorunlu (resmi denetim için), invite modda opsiyonel.
+              KVKK: değer DB'ye AES-256-GCM ile şifreli, lookup için HMAC-SHA256 hash'li yazılır.
+              Plaintext sadece form gönderim anında network'te yer alır (HTTPS). */}
+          <Field
+            label={mode === 'direct' ? 'TC Kimlik No *' : 'TC Kimlik No'}
+            error={errors.tc}
+            hint={!errors.tc ? (mode === 'direct'
+              ? 'Resmi denetim ve sertifika eşleşmesi için zorunlu. AES-256-GCM ile şifreli saklanır.'
+              : 'Opsiyonel — personel daveti kabul ettiğinde TC zaten istenebilir.') : undefined}
+          >
+            <Input
+              placeholder="11 haneli TC Kimlik No"
+              inputMode="numeric"
+              maxLength={11}
+              className="h-10"
+              value={form.tc}
+              onChange={(e) => setForm(f => ({ ...f, tc: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
+              style={{ ...fieldStyle('tc'), fontFamily: 'var(--font-mono)' }}
+            />
+          </Field>
         </div>
       )}
     </PremiumModal>

@@ -267,6 +267,12 @@ model User {
   avatarUrl                String?   @map("avatar_url") @db.Text
   isActive                 Boolean   @default(true) @map("is_active")
   hisExternalId            String?   @map("his_external_id") @db.VarChar(100)
+  // TC Kimlik No — KVKK gereği AES-256-GCM ile şifrelenmiş + HMAC-SHA256 ile hash'lenmiş.
+  // tcEncrypted: ciphertext (görüntüleme için decrypt). tcHash: deterministic, lookup için.
+  tcEncrypted              String?   @map("tc_encrypted") @db.Text
+  tcHash                   String?   @map("tc_hash") @db.VarChar(64)
+  tcAddedAt                DateTime? @map("tc_added_at") @db.Timestamptz
+  tcAddedBy                String?   @map("tc_added_by") @db.Uuid
   kvkkNoticeAcknowledgedAt DateTime? @map("kvkk_notice_acknowledged_at") @db.Timestamptz
   mustChangePassword       Boolean   @default(false) @map("must_change_password")
   termsAccepted            Boolean   @default(false) @map("terms_accepted")
@@ -323,6 +329,11 @@ model User {
   @@index([organizationId, isActive], map: "idx_users_org_active")
   @@index([organizationId, departmentId], map: "idx_users_org_department")
   @@index([organizationId, role], map: "idx_users_org_role")
+  // TC ile login lookup (subdomain → orgId → tcHash) için composite unique.
+  // Aynı TC farklı kurumlarda olabilir (doktor 2 hastanede çalışabilir),
+  // o yüzden global unique değil, organizationId+tcHash composite unique.
+  @@unique([organizationId, tcHash], name: "user_org_tc_unique", map: "idx_users_org_tc_unique")
+  @@index([tcHash], map: "idx_users_tc_hash")
   @@map("users")
 }
 
@@ -1376,6 +1387,11 @@ model Invitation {
   departmentId    String?   @map("department_id") @db.Uuid
   invitedByUserId String?   @map("invited_by_user_id") @db.Uuid
   setAsOwner      Boolean   @default(false) @map("set_as_owner")
+  // TC Kimlik No — davet anında alınır, kabul edildiğinde User tablosuna kopyalanır.
+  // KVKK: AES-256-GCM ciphertext + HMAC-SHA256 hash. Plaintext sadece davet sırasında
+  // network'te yer alır, sonra atılır. ENCRYPTION_KEY ile şifrelenir.
+  tcEncrypted     String?   @map("tc_encrypted") @db.Text
+  tcHash          String?   @map("tc_hash") @db.VarChar(64)
   expiresAt       DateTime  @map("expires_at") @db.Timestamptz
   acceptedAt      DateTime? @map("accepted_at") @db.Timestamptz
   acceptedUserId  String?   @map("accepted_user_id") @db.Uuid

@@ -12,6 +12,8 @@ import {
   STAFF_INVITATION_TTL_HOURS,
 } from '@/lib/invitations'
 import ExcelJS from 'exceljs'
+import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc'
+import { hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
 
 // ── Header Alias Map ──────────────────────────────────────────────────────
 // Kullanıcı şablonu değiştirebilir veya kendi dosyasını yükleyebilir.
@@ -24,6 +26,9 @@ const HEADER_ALIASES: Record<string, string[]> = {
   phone:     ['telefon', 'tel', 'phone', 'gsm', 'cep', 'mobile', 'cep telefonu'],
   department:['departman', 'bölüm', 'bolum', 'birim', 'department', 'dept', 'department name'],
   title:     ['unvan', 'ünvan', 'görev', 'gorev', 'title', 'position', 'job title', 'rol'],
+  // TC Kimlik No — KVKK gereği AES-GCM ile şifreli, HMAC ile hash'li saklanır.
+  // Resmi sertifika eşleşmesi için zorunlu (denetim kanıtı).
+  tcKimlik:  ['tc', 'tckn', 'tc kimlik no', 'tc kimlik', 'tc no', 'kimlik no', 'kimlik numarası', 'national id', 'tckimlik'],
 }
 
 /** Normalize edilmiş header'ı kanonik alana eşler — bulunmazsa null */
@@ -107,6 +112,8 @@ interface ParsedRow {
   password: string
   phone: string
   title: string
+  // Ham TC (sadece bu request'in lifetime'ında plaintext); validateRows checksum'ı doğrular.
+  tcKimlik: string
   deptId?: string
   deptName: string
   deptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty'
@@ -184,6 +191,7 @@ async function parseImportFile(
       password: r.password || '',
       phone: r.phone || '',
       title: r.title || '',
+      tcKimlik: normalizeTcKimlik(r.tcKimlik || ''),
       deptId,
       deptName,
       deptMatch: !deptInput ? 'empty' : match.type,
@@ -202,6 +210,7 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
   const rowResults: RowResult[] = []
   const validRows: ParsedRow[] = []
   const seenEmails = new Map<string, number>()
+  const seenTcHashes = new Map<string, number>()
 
   const emailList = rows.map(r => r.email).filter(Boolean)
   const existingUsers = await prisma.user.findMany({
@@ -209,6 +218,18 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
     select: { email: true },
   })
   const existingEmailSet = new Set(existingUsers.map(u => u.email.toLowerCase()))
+
+  // Mevcut TC hash setini tek sorguda topla — duplicate kontrolü için
+  const tcHashList = rows
+    .filter(r => r.tcKimlik && isValidTcKimlik(r.tcKimlik))
+    .map(r => hashTcKimlik(r.tcKimlik))
+  const existingTc = tcHashList.length > 0
+    ? await prisma.user.findMany({
+        where: { tcHash: { in: tcHashList }, organizationId: orgId },
+        select: { tcHash: true },
+      })
+    : []
+  const existingTcSet = new Set(existingTc.map(u => u.tcHash).filter((h): h is string => !!h))
 
   for (const row of rows) {
     if (!row.firstName || !row.lastName || !row.email) {
@@ -244,6 +265,36 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
 
     if (existingEmailSet.has(row.email)) {
       rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Bu e-posta zaten sistemde kayıtlı' })
+      continue
+    }
+
+    // TC validation — direct mode (şifre dolu) için zorunlu, invite mode için opsiyonel
+    const useDirectMode = !!row.password.trim()
+    if (row.tcKimlik) {
+      if (!isValidTcKimlik(row.tcKimlik)) {
+        rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)' })
+        continue
+      }
+      const tcHash = hashTcKimlik(row.tcKimlik)
+      if (seenTcHashes.has(tcHash)) {
+        rowResults.push({
+          rowIndex: row.rowIndex, email: row.email, status: 'error',
+          reason: `Dosya içinde tekrarlayan TC (ilk satır: ${seenTcHashes.get(tcHash)})`,
+        })
+        continue
+      }
+      seenTcHashes.set(tcHash, row.rowIndex)
+
+      if (existingTcSet.has(tcHash)) {
+        rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Bu TC Kimlik No bu kurumda zaten kayıtlı' })
+        continue
+      }
+    } else if (useDirectMode) {
+      // Şifre belirlenmiş ama TC eksik — direct mode'da TC zorunlu
+      rowResults.push({
+        rowIndex: row.rowIndex, email: row.email, status: 'error',
+        reason: 'TC Kimlik No zorunludur (şifre belirlenmiş satırlarda resmi denetim için)',
+      })
       continue
     }
 
@@ -304,6 +355,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       password: r.password || '',
       phone: (r.phone || '').trim(),
       title: (r.title || '').trim(),
+      tcKimlik: normalizeTcKimlik(r.tcKimlik || ''),
       deptId: r.deptId && validDeptIds.has(r.deptId) ? r.deptId : undefined,
       deptName: r.deptName || '',
       deptMatch: r.deptId && validDeptIds.has(r.deptId) ? 'exact' : (r.deptName ? 'none' : 'empty'),
@@ -463,6 +515,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         departmentId: row.deptId,
         title: row.title || undefined,
         mustChangePassword: true,
+        // KVKK: ham TC sadece createAuthUser içinde encrypt + hash'lenir, sonra atılır
+        tcKimlik: row.tcKimlik || undefined,
+        tcAddedByUserId: dbUser.id,
       })
       createdUserIds.push(newUser.id)
       createdDirect++
@@ -496,6 +551,11 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   const created = createdDirect + createdInvite
 
+  // KVKK audit — TC plaintext yazılmaz; sadece hash prefix'leri (korelasyon için)
+  const tcRefs = validRows
+    .filter(r => r.tcKimlik && isValidTcKimlik(r.tcKimlik))
+    .map(r => tcAuditRef(r.tcKimlik))
+
   await audit({
     action: 'bulk_import',
     entityType: 'user',
@@ -507,6 +567,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       failed,
       createdUserIds,         // ← direct mode rollback için
       createdInvitationIds,   // ← invite mode rollback için
+      tcRefCount: tcRefs.length,
+      tcRefs,                 // ← KVKK denetiminde "kaç TC işlendi" kanıtı
     },
   })
 

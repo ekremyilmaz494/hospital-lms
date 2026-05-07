@@ -1,4 +1,5 @@
 import { z } from 'zod/v4'
+import { isValidTcKimlik, normalizeTcKimlik } from './tc'
 
 // ── Self-Service Kayıt ──
 export const selfRegisterSchema = z.object({
@@ -33,12 +34,30 @@ export const createOrganizationSchema = z.object({
   trialDays: z.number().int().min(0).max(365).default(14),
 })
 
-/** Super Admin hastane + admin hesabı oluşturma */
+/** Super Admin hastane + admin hesabı oluşturma — iki mod desteklenir.
+ *
+ *  mode: 'invite' (default) → davet linki gönderilir, esas yönetici email'den
+ *        kendi şifresini kurar (Slack/Linear pattern, mevcut akış)
+ *  mode: 'direct' → sistem otomatik şifre üretir, super admin elden teslim eder
+ *        Esas yönetici TC + şifre ile login olur, ilk girişte şifresini değiştirir
+ *
+ * `mode` set edilmezse 'invite' olarak default'lanır (geri uyumluluk).
+ */
 export const createHospitalWithAdminSchema = createOrganizationSchema.extend({
+  mode: z.enum(['invite', 'direct']).default('invite'),
   adminFirstName: z.string().min(1, 'Admin adı zorunludur').max(100),
   adminLastName: z.string().min(1, 'Admin soyadı zorunludur').max(100),
   adminEmail: z.string().min(1).max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
+  // Direct mode'da admin şifre belirleyebilir; boş gelirse server üretir.
+  // Invite mode'da yok sayılır.
   adminPassword: z.string().min(8, 'Şifre en az 8 karakter olmalıdır').max(128).optional(),
+  // Esas Yönetici TC Kimlik No — ZORUNLU her iki modda.
+  adminTcKimlik: z
+    .string()
+    .min(1, 'Esas Yönetici TC Kimlik No zorunludur')
+    .max(20)
+    .transform(val => normalizeTcKimlik(val))
+    .refine(val => isValidTcKimlik(val), { message: 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)' }),
 })
 
 export const updateOrganizationSchema = createOrganizationSchema.partial().extend({
@@ -86,17 +105,57 @@ export const createUserSchema = z.object({
 export const updateUserSchema = createUserSchema.omit({ password: true, email: true, setAsOwner: true }).partial()
 
 // Esas Yönetici tarafından admin davet — role hardcoded 'admin', limit DB'de kontrol edilir.
-export const inviteAdminSchema = z.object({
+// TC Kimlik No: ZORUNLU — yöneticilerin de denetimde TC ile eşleşmesi gerek.
+// İki mod desteklenir:
+//   - 'invite' (Slack/Linear pattern): davet linki email'le gider, kullanıcı şifresini kurar
+//   - 'direct': sistem geçici şifre üretir (veya admin belirler), admin manuel paylaşır
+const baseAdminInviteFields = {
   email: z.string().min(1).max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   phone: z.string().max(20).optional(),
   title: z.string().max(100).optional(),
-}).strict()
+  tcKimlik: z
+    .string()
+    .min(1, 'TC Kimlik No zorunludur')
+    .max(20)
+    .transform(val => normalizeTcKimlik(val))
+    .refine(val => isValidTcKimlik(val), { message: 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)' }),
+}
+
+export const inviteAdminSchema = z.discriminatedUnion('mode', [
+  z.object({
+    mode: z.literal('invite'),
+    ...baseAdminInviteFields,
+  }).strict(),
+  z.object({
+    mode: z.literal('direct'),
+    ...baseAdminInviteFields,
+    // Şifre opsiyonel — boş gelirse server güvenli şifre üretip response'ta döner
+    password: z.string().min(8).max(128).regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
+      'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir',
+    ).optional(),
+  }).strict(),
+])
 
 // Personel oluşturma — iki mod desteklenir:
 //  - mode 'invite' (varsayılan): Davet linki gönderilir, kullanıcı kendi şifresini kurar
 //  - mode 'direct': Admin şifre belirler/sistem üretir, hesap anında oluşur
+/**
+ * Zod refine — TC checksum doğrulaması.
+ * Boş/undefined geçerli (TC opsiyonel); doluysa Mod10/Mod11 algoritmasıyla doğrulanır.
+ * `transform` ile normalize edilir → API tarafı sadece rakam görür.
+ */
+const tcKimlikField = z
+  .string()
+  .max(20, 'TC en fazla 20 karakter olabilir') // boşluklu girişler için tolerans
+  .optional()
+  .transform(val => (val ? normalizeTcKimlik(val) : val))
+  .refine(val => !val || isValidTcKimlik(val), {
+    message: 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)',
+  })
+
 const baseStaffFields = {
   email: z.string().min(1).max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
   firstName: z.string().min(1, 'Ad zorunludur').max(100),
@@ -104,6 +163,7 @@ const baseStaffFields = {
   phone: z.string().max(20).optional(),
   departmentId: z.string().uuid({ message: 'Geçersiz departman kimliği' }).optional(),
   title: z.string().max(100).optional(),
+  tcKimlik: tcKimlikField,
 }
 
 export const createStaffSchema = z.discriminatedUnion('mode', [

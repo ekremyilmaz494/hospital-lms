@@ -3,11 +3,12 @@
 import React, { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, Loader2, Clock, ArrowRight, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Clock, ArrowRight, AlertCircle, IdCard, Mail } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import dynamic from 'next/dynamic';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { KvkkNoticeModal } from '@/components/shared/kvkk-notice-modal';
+import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc';
 
 // MeshGradient is WebGL — must be client-only
 const MeshGradient = dynamic(
@@ -80,6 +81,11 @@ function LoginForm() {
   const initialError = urlReason === 'kvkk-rejected' && urlMsg ? urlMsg : '';
 
   const [showPassword, setShowPassword] = useState(false);
+  // Login modu: TC + şifre veya Email + şifre. Subdomain'de TC default,
+  // apex'te (super_admin) email default — orgSlug olmadan TC çalışmaz.
+  const [loginMode, setLoginMode] = useState<'tc' | 'email'>('email');
+  const [tcKimlik, setTcKimlik] = useState('');
+  const [orgSlug, setOrgSlug] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(initialError);
@@ -93,6 +99,28 @@ function LoginForm() {
   useEffect(() => {
     const frame = requestAnimationFrame(() => setHydrated(true));
     return () => cancelAnimationFrame(frame);
+  }, []);
+
+  // Subdomain'den orgSlug çıkar — TC ile login için zorunlu.
+  // "devakent.klinovax.com" → "devakent" / apex veya localhost → null (TC sekmesi disable).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN;
+    const host = window.location.hostname;
+    if (!baseDomain || host === baseDomain || host.includes('localhost') || /^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+      // Apex / localhost / IP → orgSlug yok, TC sekmesi disable kalır.
+      setOrgSlug(null);
+      setLoginMode('email');
+      return;
+    }
+    const suffix = '.' + baseDomain;
+    if (host.endsWith(suffix)) {
+      const slug = host.slice(0, -suffix.length);
+      if (slug && slug !== 'www') {
+        setOrgSlug(slug);
+        setLoginMode('tc'); // Subdomain'de personel girişi default TC
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -136,13 +164,32 @@ function LoginForm() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // TC modunda client-side checksum ön kontrolü — ağ trafiğini boşa harcamamak için.
+    // Server zaten zod refine ile aynı kontrolü yapar (defense in depth).
+    if (loginMode === 'tc') {
+      const tcNorm = normalizeTcKimlik(tcKimlik);
+      if (!isValidTcKimlik(tcNorm)) {
+        setError('Geçersiz TC Kimlik No.');
+        return;
+      }
+      if (!orgSlug) {
+        setError('TC ile giriş için kurumunuzun web adresinden giriş yapın.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
+      const payload = loginMode === 'tc'
+        ? { tcKimlik: normalizeTcKimlik(tcKimlik), password, rememberMe, orgSlug }
+        : { email, password, rememberMe };
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, rememberMe }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
 
@@ -153,7 +200,8 @@ function LoginForm() {
       }
 
       if (!res.ok) {
-        setError(data.error ?? 'E-posta veya şifre hatalı.');
+        const fallback = loginMode === 'tc' ? 'TC Kimlik No veya şifre hatalı.' : 'E-posta veya şifre hatalı.';
+        setError(data.error ?? fallback);
         setLoading(false);
         return;
       }
@@ -403,21 +451,76 @@ function LoginForm() {
                 data-testid="login-form"
                 data-hydrated={hydrated ? 'true' : 'false'}
               >
-                {/* Email */}
-                <div>
-                  <label className="ed-mono text-[10px] tracking-[0.28em] mb-2 block" style={{ color: K.TEXT_PRIMARY }}>
-                    E-POSTA
-                  </label>
-                  <Input
-                    type="email"
-                    placeholder="ornek@hastane.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    className="ed-input"
-                    required
-                  />
-                </div>
+                {/* Login mode tabs — orgSlug yoksa TC sekmesi disable (apex/localhost) */}
+                {orgSlug && (
+                  <div className="flex gap-1 p-1 rounded-lg" style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}` }}>
+                    <button
+                      type="button"
+                      onClick={() => { setLoginMode('tc'); setError(''); }}
+                      className="flex-1 inline-flex items-center justify-center gap-2 h-9 rounded-md text-[12px] font-semibold transition-colors"
+                      style={{
+                        background: loginMode === 'tc' ? K.SURFACE : 'transparent',
+                        color: loginMode === 'tc' ? K.PRIMARY : K.TEXT_MUTED,
+                        boxShadow: loginMode === 'tc' ? '0 1px 2px rgba(15,23,42,0.06)' : 'none',
+                      }}
+                      data-testid="login-tab-tc"
+                    >
+                      <IdCard className="h-3.5 w-3.5" />
+                      TC ile Giriş
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setLoginMode('email'); setError(''); }}
+                      className="flex-1 inline-flex items-center justify-center gap-2 h-9 rounded-md text-[12px] font-semibold transition-colors"
+                      style={{
+                        background: loginMode === 'email' ? K.SURFACE : 'transparent',
+                        color: loginMode === 'email' ? K.PRIMARY : K.TEXT_MUTED,
+                        boxShadow: loginMode === 'email' ? '0 1px 2px rgba(15,23,42,0.06)' : 'none',
+                      }}
+                      data-testid="login-tab-email"
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      E-posta ile Giriş
+                    </button>
+                  </div>
+                )}
+
+                {/* TC veya Email — moda göre değişen alan */}
+                {loginMode === 'tc' ? (
+                  <div>
+                    <label className="ed-mono text-[10px] tracking-[0.28em] mb-2 block" style={{ color: K.TEXT_PRIMARY }}>
+                      TC KİMLİK NO
+                    </label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={11}
+                      placeholder="11 haneli TC Kimlik No"
+                      value={tcKimlik}
+                      onChange={(e) => setTcKimlik(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                      autoComplete="username"
+                      className="ed-input"
+                      style={{ fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+                      required
+                      data-testid="login-tc-input"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="ed-mono text-[10px] tracking-[0.28em] mb-2 block" style={{ color: K.TEXT_PRIMARY }}>
+                      E-POSTA
+                    </label>
+                    <Input
+                      type="email"
+                      placeholder="ornek@hastane.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                      className="ed-input"
+                      required
+                    />
+                  </div>
+                )}
 
                 {/* Password */}
                 <div>
