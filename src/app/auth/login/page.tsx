@@ -330,8 +330,13 @@ function LoginForm() {
         .ed-input:focus { border-color: ${K.PRIMARY}; background: ${K.SURFACE}; box-shadow: 0 0 0 3px ${K.PRIMARY_LIGHT}; }
         .ed-input::placeholder { color: ${K.TEXT_MUTED}; opacity: 0.7; }
         .ed-checkbox {
+          -webkit-appearance: none;
+          -moz-appearance: none;
           appearance: none;
+          box-sizing: border-box;
           width: 14px; height: 14px;
+          min-width: 14px; min-height: 14px;
+          max-width: 14px; max-height: 14px;
           border: 1.5px solid ${K.BORDER};
           background: ${K.SURFACE};
           cursor: pointer;
@@ -339,6 +344,8 @@ function LoginForm() {
           flex-shrink: 0;
           border-radius: 3px;
           transition: background-color 160ms ease, border-color 160ms ease;
+          margin: 0;
+          padding: 0;
         }
         .ed-checkbox:checked { background: ${K.PRIMARY}; border-color: ${K.PRIMARY}; }
         .ed-checkbox:checked::after {

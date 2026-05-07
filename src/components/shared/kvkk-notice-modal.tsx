@@ -193,10 +193,16 @@ export function KvkkNoticeModal({
                 e.stopPropagation()
                 setAccepted((v) => !v)
               }}
-              className="w-3 h-3 shrink-0 mt-1 flex items-center justify-center transition-colors duration-200"
+              className="shrink-0 mt-0.5 flex items-center justify-center transition-colors duration-200"
               style={{
+                width: 14,
+                height: 14,
+                minWidth: 14,
+                minHeight: 14,
                 background: accepted ? INK : CREAM,
                 border: accepted ? `1px solid ${INK}` : `1px solid ${RULE}`,
+                boxSizing: 'border-box',
+                padding: 0,
               }}
             >
               {accepted && (
