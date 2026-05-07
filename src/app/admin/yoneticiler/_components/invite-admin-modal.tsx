@@ -41,7 +41,7 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
   }, []);
 
-  const validate = () => {
+  const validate = (): { ok: boolean; errors: Record<string, string> } => {
     const e: Record<string, string> = {};
     if (!form.ad.trim()) e.ad = 'Ad zorunludur';
     if (!form.soyad.trim()) e.soyad = 'Soyad zorunludur';
@@ -58,11 +58,26 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
     }
 
     setErrors(e);
-    return Object.keys(e).length === 0;
+    return { ok: Object.keys(e).length === 0, errors: e };
   };
 
   const handleSave = async () => {
-    if (!validate()) return;
+    const { ok, errors: errs } = validate();
+    if (!ok) {
+      // Buton sessizce çalışmıyor sanılmasın → ilk hatayı toast olarak göster
+      // ve hatalı alanı focus + scroll-into-view yap.
+      const firstField = Object.keys(errs)[0];
+      const firstMsg = errs[firstField] ?? 'Lütfen zorunlu alanları doldurun';
+      toast(firstMsg, 'error');
+      setTimeout(() => {
+        const input = document.querySelector(`[data-field="${firstField}"]`) as HTMLInputElement | null;
+        if (input) {
+          input.focus();
+          input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
+      return;
+    }
     setSaving(true);
     try {
       const tcNorm = normalizeTcKimlik(form.tc);
@@ -303,29 +318,29 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FieldRow label="Ad *" error={errors.ad}>
-              <Input placeholder="Yönetici adı" className="h-10" value={form.ad}
+              <Input data-field="ad" placeholder="Yönetici adı" className="h-10" value={form.ad}
                      onChange={(e) => setForm(f => ({ ...f, ad: e.target.value }))}
                      style={fieldStyle('ad')} />
             </FieldRow>
             <FieldRow label="Soyad *" error={errors.soyad}>
-              <Input placeholder="Yönetici soyadı" className="h-10" value={form.soyad}
+              <Input data-field="soyad" placeholder="Yönetici soyadı" className="h-10" value={form.soyad}
                      onChange={(e) => setForm(f => ({ ...f, soyad: e.target.value }))}
                      style={fieldStyle('soyad')} />
             </FieldRow>
           </div>
           <FieldRow label="E-posta *" error={errors.email}>
-            <Input type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email}
+            <Input data-field="email" type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email}
                    onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
                    style={fieldStyle('email')} />
           </FieldRow>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FieldRow label="Telefon" error={errors.telefon}>
-              <Input placeholder="05XX XXX XX XX" className="h-10" value={form.telefon}
+              <Input data-field="telefon" placeholder="05XX XXX XX XX" className="h-10" value={form.telefon}
                      onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))}
                      style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
             </FieldRow>
             <FieldRow label="Unvan">
-              <Input placeholder="örn. Eğitim Müdürü" className="h-10" value={form.unvan}
+              <Input data-field="unvan" placeholder="örn. Eğitim Müdürü" className="h-10" value={form.unvan}
                      onChange={(e) => setForm(f => ({ ...f, unvan: e.target.value }))}
                      style={fieldStyle('unvan')} />
             </FieldRow>
@@ -333,6 +348,7 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
 
           <FieldRow label="TC Kimlik No *" error={errors.tc}>
             <Input
+              data-field="tc"
               placeholder="11 haneli TC Kimlik No"
               inputMode="numeric"
               maxLength={11}
@@ -350,6 +366,7 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
           {mode === 'direct' && (
             <FieldRow label="Şifre" error={errors.sifre}>
               <Input
+                data-field="sifre"
                 type="text"
                 placeholder="Boş bırakın — sistem üretir"
                 className="h-10"
