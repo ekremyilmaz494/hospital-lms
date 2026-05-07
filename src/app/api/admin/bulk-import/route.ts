@@ -207,11 +207,15 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
   const seenEmails = new Map<string, number>()
   const seenTcHashes = new Map<string, number>()
 
+  // Email opsiyonel — sadece doluları DB'de duplicate kontrolüne sok.
+  // Sentetik adres üretimi import loop'unda; preview aşamasında o satır email'siz görünür.
   const emailList = rows.map(r => r.email).filter(Boolean)
-  const existingUsers = await prisma.user.findMany({
-    where: { email: { in: emailList }, organizationId: orgId },
-    select: { email: true },
-  })
+  const existingUsers = emailList.length > 0
+    ? await prisma.user.findMany({
+        where: { email: { in: emailList }, organizationId: orgId },
+        select: { email: true },
+      })
+    : []
   const existingEmailSet = new Set(existingUsers.map(u => u.email.toLowerCase()))
 
   // Mevcut TC hash setini tek sorguda topla — duplicate kontrolü için
@@ -227,11 +231,13 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
   const existingTcSet = new Set(existingTc.map(u => u.tcHash).filter((h): h is string => !!h))
 
   for (const row of rows) {
-    if (!row.firstName || !row.lastName || !row.email) {
-      rowResults.push({ rowIndex: row.rowIndex, email: row.email || '—', status: 'error', reason: 'Ad, Soyad veya E-posta eksik' })
+    if (!row.firstName || !row.lastName) {
+      rowResults.push({ rowIndex: row.rowIndex, email: row.email || '—', status: 'error', reason: 'Ad veya Soyad eksik' })
       continue
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
+    // E-posta opsiyonel — boş bırakılırsa sentetik adres üretilir + welcome mail atlanır.
+    // Doluysa format ve duplicate kontrolü yapılır.
+    if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
       rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Geçersiz e-posta formatı' })
       continue
     }
@@ -249,18 +255,21 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
       })
       continue
     }
-    if (seenEmails.has(row.email)) {
-      rowResults.push({
-        rowIndex: row.rowIndex, email: row.email, status: 'error',
-        reason: `Dosya içinde tekrarlayan e-posta (ilk satır: ${seenEmails.get(row.email)})`,
-      })
-      continue
-    }
-    seenEmails.set(row.email, row.rowIndex)
+    // Email duplicate kontrolü — sadece dolu satırlarda anlamlı.
+    if (row.email) {
+      if (seenEmails.has(row.email)) {
+        rowResults.push({
+          rowIndex: row.rowIndex, email: row.email, status: 'error',
+          reason: `Dosya içinde tekrarlayan e-posta (ilk satır: ${seenEmails.get(row.email)})`,
+        })
+        continue
+      }
+      seenEmails.set(row.email, row.rowIndex)
 
-    if (existingEmailSet.has(row.email)) {
-      rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Bu e-posta zaten sistemde kayıtlı' })
-      continue
+      if (existingEmailSet.has(row.email)) {
+        rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Bu e-posta zaten sistemde kayıtlı' })
+        continue
+      }
     }
 
     // TC validation — ZORUNLU her satırda.
@@ -452,9 +461,19 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     // varsaymıyoruz; admin'in girdiği değer Supabase Auth tarafından doğrulanır (en az 8).
     const tempPassword = row.password.trim() || generateTempPassword()
 
+    // Email opsiyonel — boşsa Supabase Auth için sentetik adres üret.
+    // .invalid TLD (RFC 6761) DNS'te asla resolve etmez → yanlışlıkla mail gönderimi sonuçsuz kalır.
+    // Sentetik adres tcHash bazlı → idempotent, aynı TC için aynı adres üretilir; ama TC zaten
+    // org-içi unique olduğu için Supabase'in email-unique kuralı kırılmaz.
+    // Personel TC + şifre ile login olur; sentetik email asla görmez.
+    const hasRealEmail = !!row.email
+    const effectiveEmail = hasRealEmail
+      ? row.email
+      : `staff-${hashTcKimlik(row.tcKimlik).slice(0, 12)}@klinovax.invalid`
+
     try {
       const { dbUser: newUser } = await createAuthUser({
-        email: row.email,
+        email: effectiveEmail,
         password: tempPassword,
         firstName: row.firstName,
         lastName: row.lastName,
@@ -471,7 +490,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       createdUserIds.push(newUser.id)
       created++
       results.push({
-        email: row.email,
+        // Frontend'de sentetik adres tabloda gösterilmesin diye sadece gerçek email döner
+        email: hasRealEmail ? row.email : '',
         name: `${row.firstName} ${row.lastName}`,
         status: 'created',
         tempPassword,
@@ -480,26 +500,30 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         title: row.title || null,
       })
 
-      emailPromises.push(
-        sendStaffWelcomeEmail({
-          to: row.email,
-          staffName: `${row.firstName} ${row.lastName}`,
-          organizationName: hospitalName,
-          brandColor,
-          tempPassword,
-          loginUrl,
-        }).then(() => undefined).catch(err => {
-          logger.warn('bulk-import', `Hoş geldiniz maili gönderilemedi: ${row.email}`, err instanceof Error ? err.message : err)
-        }),
-      )
+      // Welcome mail SADECE gerçek email girilmiş satırlara gider; sentetik adres atlanır.
+      if (hasRealEmail) {
+        emailPromises.push(
+          sendStaffWelcomeEmail({
+            to: row.email,
+            staffName: `${row.firstName} ${row.lastName}`,
+            organizationName: hospitalName,
+            brandColor,
+            tempPassword,
+            loginUrl,
+          }).then(() => undefined).catch(err => {
+            logger.warn('bulk-import', `Hoş geldiniz maili gönderilemedi: ${row.email}`, err instanceof Error ? err.message : err)
+          }),
+        )
+      }
     } catch (err) {
       failed++
       const errMsg = err instanceof AuthUserError || err instanceof DbUserError
         ? err.safeMessage
         : 'Beklenmeyen hata'
-      importErrors.push(`${row.email}: ${errMsg}`)
-      results.push({ email: row.email, name: `${row.firstName} ${row.lastName}`, status: 'failed', error: errMsg })
-      logger.error('Bulk Import', `Failed for ${row.email}`, err instanceof Error ? err.message : err)
+      const errorTag = row.email || `(TC ile, satır ${row.rowIndex})`
+      importErrors.push(`${errorTag}: ${errMsg}`)
+      results.push({ email: row.email || '', name: `${row.firstName} ${row.lastName}`, status: 'failed', error: errMsg })
+      logger.error('Bulk Import', `Failed for ${errorTag}`, err instanceof Error ? err.message : err)
     }
   }
 

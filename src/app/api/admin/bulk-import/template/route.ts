@@ -37,7 +37,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     { header: 'Ad *',           key: 'ad',       width: 18 },
     { header: 'Soyad *',        key: 'soyad',    width: 18 },
     { header: 'TC Kimlik No *', key: 'tc',       width: 18 },
-    { header: 'E-posta *',      key: 'email',    width: 32 },
+    { header: 'E-posta',        key: 'email',    width: 32 },
     { header: 'Şifre',          key: 'sifre',    width: 18 },
     { header: 'Telefon',        key: 'telefon',  width: 16 },
     { header: 'Departman',      key: 'departman', width: 20 },
@@ -91,7 +91,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     {
       ad: 'Ali', soyad: 'Çelik',
       tc: '99999999990', // sahte ama Mod10/11 checksum'ı geçer
-      email: 'ali.celik@hastane.com',
+      email: '', // E-posta opsiyonel — boşsa welcome mail atılmaz; personel TC + şifreyle giriş yapar
       sifre: '',
       telefon: '05321112233',
       departman: '',
@@ -157,8 +157,8 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   const help = [
     'TOPLU PERSONEL YÜKLEME — KULLANIM KILAVUZU',
     '',
-    'ZORUNLU ALANLAR: Ad, Soyad, TC Kimlik No, E-posta',
-    'OPSİYONEL ALANLAR: Şifre, Telefon, Departman, Unvan',
+    'ZORUNLU ALANLAR: Ad, Soyad, TC Kimlik No',
+    'OPSİYONEL ALANLAR: E-posta, Şifre, Telefon, Departman, Unvan',
     '',
     'ŞİFRE NASIL ÇALIŞIR:',
     '  • Şifre alanı BOŞ bırakılırsa → sistem güvenli bir geçici şifre üretir.',
@@ -178,8 +178,10 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     '  • Aynı TC bu kurumda tekrar kullanılamaz; farklı kurumlarda olabilir.',
     '  • Resmi denetimde sertifika ↔ personel eşleşmesi için zorunlu — boş bırakılan satır reddedilir.',
     '',
-    'E-POSTA:',
-    '  • Benzersiz olmalı, daha önce sistemde kayıtlı olmamalı.',
+    'E-POSTA (opsiyonel):',
+    '  • Doluysa: hoş geldin maili (geçici şifre ile birlikte) gönderilir, personel email + şifre veya TC + şifre ile giriş yapabilir.',
+    '  • Boşsa: hoş geldin maili atılmaz, personel sadece TC + şifre ile giriş yapar (PDF\'i admin elden teslim eder).',
+    '  • Doluysa benzersiz olmalı, daha önce sistemde kayıtlı olmamalı.',
     '  • Türkçe karakter (ş, ç, ğ, ü, ö, ı) KULLANMAYIN. Excel otomatik link yaparsa sistem temizler.',
     '',
     'DEPARTMAN:',

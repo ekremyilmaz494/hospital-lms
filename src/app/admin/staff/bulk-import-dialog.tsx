@@ -398,9 +398,10 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
               <h5>Şablon ile başla</h5>
               <p>Başlıklar esnek: <em>Ad/İsim</em>, <em>Soyad</em>, <em>TC Kimlik</em>, <em>E-posta/Email/Mail</em>, <em>Şifre</em>, <em>Departman/Bölüm</em> — hepsi tanınır.</p>
               <p className="bid-template-mode">
-                <strong>Zorunlu:</strong> Ad, Soyad, TC, E-posta.
+                <strong>Zorunlu:</strong> Ad, Soyad, TC.
+                <strong>E-posta opsiyonel</strong> — boşsa personel TC + şifreyle giriş yapar.
                 <KeyRound className="h-3 w-3" />
-                <strong>Şifre boşsa</strong> sistem güvenli geçici şifre üretir.
+                <strong>Şifre boşsa</strong> sistem üretir.
                 <FileDown className="h-3 w-3" />
                 Yükleme sonrası tüm şifreler <strong>PDF olarak</strong> indirilebilir.
               </p>
@@ -459,7 +460,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                     <th>Ad *</th>
                     <th>Soyad *</th>
                     <th title="Resmi denetim ve sertifika eşleşmesi için zorunlu">TC Kimlik *</th>
-                    <th>E-posta *</th>
+                    <th title="Boşsa hoş geldin maili atılmaz; personel TC + şifreyle giriş yapar">E-posta</th>
                     <th title="Boş bırakırsanız sistem güvenli geçici şifre üretir">Şifre</th>
                     <th>Telefon</th>
                     <th>Departman</th>
@@ -1180,7 +1181,11 @@ function CredentialsResult({
                 {successRows.map((r, idx) => (
                   <tr key={idx}>
                     <td>{r.name}</td>
-                    <td className="bid-cred-email">{r.email}</td>
+                    <td className="bid-cred-email">
+                      {r.email
+                        ? r.email
+                        : <span className="bid-cred-noemail">— TC ile giriş —</span>}
+                    </td>
                     <td className="bid-cred-pwd">{r.tempPassword}</td>
                     <td>
                       <button
@@ -1328,6 +1333,11 @@ function CredentialsResult({
         .bid-cred-email {
           color: ${K.TEXT_SECONDARY};
           word-break: break-all;
+        }
+        .bid-cred-noemail {
+          font-style: italic;
+          color: ${K.TEXT_MUTED};
+          font-size: 11px;
         }
         .bid-cred-pwd {
           font-family: var(--font-mono, ui-monospace, monospace);
