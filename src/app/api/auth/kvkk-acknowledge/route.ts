@@ -13,6 +13,8 @@ import { logger } from '@/lib/logger'
  * kullanıcı isteğe bağlı olarak "Okudum, Anladım" der.
  */
 export const POST = withStaffRoute(async ({ dbUser, audit }) => {
+  // writeGuard: false aşağıdaki options'da set edilir — KVKK ack consent kaydıdır,
+  // abonelik durumundan bağımsız her zaman erişilebilir olmalı.
   // Idempotency kontrolünü rate limit'ten ÖNCE yap — DB zaten ack'lıysa no-op dön.
   // Aksi halde kullanıcı başarısız bir refresh/race-condition sonrası tekrar denerken
   // 429'a takılıp KVKK modalında kilitlenir (user_metadata JWT ile DB arasında desync).
@@ -70,4 +72,4 @@ export const POST = withStaffRoute(async ({ dbUser, audit }) => {
   })
 
   return jsonResponse({ acknowledged: true })
-})
+}, { writeGuard: false })

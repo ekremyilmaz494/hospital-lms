@@ -16,6 +16,9 @@ const changePasswordSchema = z.object({
   path: ['confirmPassword'],
 })
 
+// writeGuard: false aşağıda — şifre değiştirme güvenlik aksiyonudur, abonelik durumu beklemez.
+// Yeni hastane esas yöneticisi mustChangePassword=true ile geldiğinde bile çalışmalı,
+// aksi halde subscription cache stale ise kullanıcı paneline giremez.
 export const POST = withStaffRoute(async ({ request, dbUser }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
@@ -64,4 +67,4 @@ export const POST = withStaffRoute(async ({ request, dbUser }) => {
   })
 
   return jsonResponse({ message: 'Şifreniz başarıyla güncellendi' })
-})
+}, { writeGuard: false })
