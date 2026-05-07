@@ -242,7 +242,7 @@ export function HeroSection() {
 
           <div className="flex items-center gap-2">
             <Link
-              href="/auth/login"
+              prefetch={false} href="/auth/login"
               className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105"
               style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
             >
@@ -290,7 +290,7 @@ export function HeroSection() {
               ))}
               <div className="border-t mt-2 pt-3" style={{ borderColor: "rgba(0,0,0,0.05)" }}>
                 <Link
-                  href="/auth/login"
+                  prefetch={false} href="/auth/login"
                   onClick={() => setMobileOpen(false)}
                   className="block text-sm font-black text-center py-2.5 rounded-xl uppercase tracking-wide"
                   style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
@@ -344,7 +344,7 @@ export function HeroSection() {
 
           <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8 sm:mb-12">
             <Link
-              href="/auth/login"
+              prefetch={false} href="/auth/login"
               className="inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105 shadow-lg"
               style={{
                 backgroundColor: "#f59e0b",
@@ -355,7 +355,7 @@ export function HeroSection() {
               Eğitimlere Başla <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              href="/auth/login"
+              prefetch={false} href="/auth/login"
               className="inline-flex items-center gap-2 text-sm font-semibold transition-opacity hover:opacity-60"
               style={{ color: "#1a3a28" }}
             >

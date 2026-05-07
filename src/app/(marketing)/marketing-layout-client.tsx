@@ -86,7 +86,7 @@ function MarketingHeader() {
           {/* Desktop CTAs */}
           <div className="hidden lg:flex items-center gap-2.5">
             <Link
-              href="/auth/login"
+              prefetch={false} href="/auth/login"
               className="text-[13px] font-medium px-4 py-2 rounded-xl transition-colors hover:bg-black/[0.03]"
               style={{ color: "#475569" }}
             >
@@ -145,7 +145,7 @@ function MarketingHeader() {
               ))}
               <div className="border-t mt-2 pt-3 space-y-2" style={{ borderColor: "rgba(0,0,0,0.05)" }}>
                 <Link
-                  href="/auth/login"
+                  prefetch={false} href="/auth/login"
                   onClick={() => setMobileOpen(false)}
                   className="block text-sm font-medium py-2.5 text-center rounded-xl border"
                   style={{ color: "#334155", borderColor: "rgba(0,0,0,0.08)" }}

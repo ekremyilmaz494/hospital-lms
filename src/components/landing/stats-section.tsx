@@ -50,7 +50,7 @@ export function StatsSection() {
             </h2>
           </div>
           <Link
-            href="/auth/login"
+            prefetch={false} href="/auth/login"
             className="hidden md:flex items-center gap-1 text-sm font-semibold transition-opacity hover:opacity-60"
             style={{ color: "#0d9668" }}
           >
@@ -107,7 +107,7 @@ export function StatsSection() {
                   </div>
                 </div>
                 <Link
-                  href="/auth/login"
+                  prefetch={false} href="/auth/login"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-transform hover:scale-105 w-full sm:w-auto justify-center"
                   style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
                 >
@@ -173,7 +173,7 @@ export function StatsSection() {
                   </div>
                 </div>
                 <Link
-                  href="/auth/login"
+                  prefetch={false} href="/auth/login"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-transform hover:scale-105 w-full sm:w-auto justify-center"
                   style={{ backgroundColor: "#f59e0b", color: "#1a3a28" }}
                 >

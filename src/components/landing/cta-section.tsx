@@ -115,7 +115,7 @@ export function CtaSection() {
           </ul>
 
           <Link
-            href="/auth/login"
+            prefetch={false} href="/auth/login"
             className="inline-flex items-center gap-2 w-fit px-7 py-3.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105"
             style={{
               backgroundColor: "#f59e0b",

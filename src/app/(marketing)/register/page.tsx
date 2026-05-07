@@ -264,7 +264,7 @@ export default function RegisterPage() {
               </ul>
             </div>
             <Link
-              href="/auth/login"
+              prefetch={false} href="/auth/login"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-transform hover:scale-105"
               style={{ backgroundColor: '#0d9668' }}
             >
@@ -612,7 +612,7 @@ export default function RegisterPage() {
             <div className="mt-6 pt-6 text-center text-sm" style={{ borderTop: '1px solid var(--color-border)' }}>
               <p style={{ color: 'var(--color-text-secondary)' }}>
                 Zaten hesabiniz var mi?{' '}
-                <Link href="/auth/login" className="font-semibold" style={{ color: '#0d9668' }}>
+                <Link prefetch={false} href="/auth/login" className="font-semibold" style={{ color: '#0d9668' }}>
                   Giris Yapin
                 </Link>
               </p>

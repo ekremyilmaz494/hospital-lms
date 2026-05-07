@@ -445,7 +445,7 @@ export function FeaturedTrainingsSection() {
 
                   <div className="mt-auto flex flex-wrap items-center justify-between gap-4">
                     <Link
-                      href="/auth/login"
+                      prefetch={false} href="/auth/login"
                       className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full text-xs font-black tracking-[0.12em] uppercase transition-transform hover:scale-105"
                       style={{
                         backgroundColor: "#f59e0b",
@@ -551,7 +551,7 @@ export function FeaturedTrainingsSection() {
                             <ProgressBar value={t.progress} />
                           </div>
                           <Link
-                            href="/auth/login"
+                            prefetch={false} href="/auth/login"
                             aria-label={`${t.title} eğitimine başla`}
                             className="w-11 h-11 flex-shrink-0 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
                             style={{

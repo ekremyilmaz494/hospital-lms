@@ -28,7 +28,7 @@ export default function NotFound() {
               <Home className="h-4 w-4" /> Ana Sayfa
             </Button>
           </Link>
-          <Link href="/auth/login">
+          <Link prefetch={false} href="/auth/login">
             <Button variant="outline" className="gap-2" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
               <ArrowLeft className="h-4 w-4" /> Giri&#351; Yap
             </Button>
