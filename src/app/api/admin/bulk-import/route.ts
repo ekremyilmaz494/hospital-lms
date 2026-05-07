@@ -263,28 +263,33 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
       continue
     }
 
-    // TC validation — opsiyonel; girildiyse checksum + duplicate kontrolü.
-    // TC'siz satırlar için hesap yine açılır (auto-password) ama PDF'e dahil edilmez
-    // (PDF resmi denetim belgesi → TC eşleşmesi şart). Bu trade-off frontend'de uyarılır.
-    if (row.tcKimlik) {
-      if (!isValidTcKimlik(row.tcKimlik)) {
-        rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)' })
-        continue
-      }
-      const tcHash = hashTcKimlik(row.tcKimlik)
-      if (seenTcHashes.has(tcHash)) {
-        rowResults.push({
-          rowIndex: row.rowIndex, email: row.email, status: 'error',
-          reason: `Dosya içinde tekrarlayan TC (ilk satır: ${seenTcHashes.get(tcHash)})`,
-        })
-        continue
-      }
-      seenTcHashes.set(tcHash, row.rowIndex)
+    // TC validation — ZORUNLU her satırda.
+    // Resmi denetimde sertifika ↔ personel eşleşmesi için TC olmazsa olmaz;
+    // ayrıca PDF endpoint zaten TC'yi schema-zorunlu kılıyor → tutarlı arayüz.
+    if (!row.tcKimlik) {
+      rowResults.push({
+        rowIndex: row.rowIndex, email: row.email, status: 'error',
+        reason: 'TC Kimlik No zorunludur',
+      })
+      continue
+    }
+    if (!isValidTcKimlik(row.tcKimlik)) {
+      rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)' })
+      continue
+    }
+    const tcHash = hashTcKimlik(row.tcKimlik)
+    if (seenTcHashes.has(tcHash)) {
+      rowResults.push({
+        rowIndex: row.rowIndex, email: row.email, status: 'error',
+        reason: `Dosya içinde tekrarlayan TC (ilk satır: ${seenTcHashes.get(tcHash)})`,
+      })
+      continue
+    }
+    seenTcHashes.set(tcHash, row.rowIndex)
 
-      if (existingTcSet.has(tcHash)) {
-        rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Bu TC Kimlik No bu kurumda zaten kayıtlı' })
-        continue
-      }
+    if (existingTcSet.has(tcHash)) {
+      rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Bu TC Kimlik No bu kurumda zaten kayıtlı' })
+      continue
     }
 
     rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'ok' })

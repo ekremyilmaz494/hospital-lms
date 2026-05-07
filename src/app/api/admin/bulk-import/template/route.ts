@@ -31,18 +31,17 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   // ── Sayfa 1: Personel ─────────────────────────────────────────────
   const sheet = wb.addWorksheet('Personel')
 
-  // Sütun sırası: kimlik bilgileri → e-posta → ŞİFRE (mode tetikleyici) → iletişim → org alanları.
-  // Şifre, mode'u belirleyen alan olduğu için E-posta'nın hemen sağında — admin bakarken
-  // "burayı boş bırakırsam davet, dolu yazarsam direct hesap" mantığı görsel olarak kümelensin.
+  // Sütun sırası: kimlik bilgileri → e-posta → ŞİFRE (opsiyonel) → iletişim → org alanları.
+  // Zorunlu alanlar header'da "*" ile işaretlenir — kullanıcı Excel'i açtığı an görsün.
   sheet.columns = [
-    { header: 'Ad',           key: 'ad',       width: 18 },
-    { header: 'Soyad',        key: 'soyad',    width: 18 },
-    { header: 'TC Kimlik No', key: 'tc',       width: 16 },
-    { header: 'E-posta',      key: 'email',    width: 32 },
-    { header: 'Şifre',        key: 'sifre',    width: 18 },
-    { header: 'Telefon',      key: 'telefon',  width: 16 },
-    { header: 'Departman',    key: 'departman', width: 20 },
-    { header: 'Unvan',        key: 'unvan',    width: 22 },
+    { header: 'Ad *',           key: 'ad',       width: 18 },
+    { header: 'Soyad *',        key: 'soyad',    width: 18 },
+    { header: 'TC Kimlik No *', key: 'tc',       width: 18 },
+    { header: 'E-posta *',      key: 'email',    width: 32 },
+    { header: 'Şifre',          key: 'sifre',    width: 18 },
+    { header: 'Telefon',        key: 'telefon',  width: 16 },
+    { header: 'Departman',      key: 'departman', width: 20 },
+    { header: 'Unvan',          key: 'unvan',    width: 22 },
   ]
 
   // Başlık satırı stili
@@ -91,7 +90,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     },
     {
       ad: 'Ali', soyad: 'Çelik',
-      tc: '', // TC opsiyonel — sadece direct (şifreli) modda zorunlu
+      tc: '99999999990', // sahte ama Mod10/11 checksum'ı geçer
       email: 'ali.celik@hastane.com',
       sifre: '',
       telefon: '05321112233',
@@ -158,8 +157,8 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   const help = [
     'TOPLU PERSONEL YÜKLEME — KULLANIM KILAVUZU',
     '',
-    'ZORUNLU ALANLAR: Ad, Soyad, E-posta',
-    'OPSİYONEL ALANLAR: TC Kimlik No, Şifre, Telefon, Departman, Unvan',
+    'ZORUNLU ALANLAR: Ad, Soyad, TC Kimlik No, E-posta',
+    'OPSİYONEL ALANLAR: Şifre, Telefon, Departman, Unvan',
     '',
     'ŞİFRE NASIL ÇALIŞIR:',
     '  • Şifre alanı BOŞ bırakılırsa → sistem güvenli bir geçici şifre üretir.',
@@ -172,13 +171,12 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     '  • "Giriş Bilgileri PDF\'i İndir" butonu ile tek bir PDF indirebilirsiniz.',
     '  • PDF: Ad Soyad / TC / Geçici Şifre / Departman tablosu + KVKK uyarısı.',
     '  • Yazıcıdan basıp personele elden teslim edin.',
-    '  • PDF\'e dahil olmak için TC Kimlik No SATIRDA DOLU olmalı (resmi denetim için).',
     '',
-    'TC KİMLİK NO:',
+    'TC KİMLİK NO (zorunlu):',
     '  • 11 haneli, NVİ algoritmasıyla doğrulanır (sahte numaralar reddedilir).',
     '  • DB\'de AES-256-GCM ile şifrelenir, HMAC-SHA256 ile hash\'lenir (KVKK uyumlu).',
     '  • Aynı TC bu kurumda tekrar kullanılamaz; farklı kurumlarda olabilir.',
-    '  • Boş bırakılabilir, ama PDF\'e dahil edilmek + sertifikalarda eşleşmek için doldurmanızı öneririz.',
+    '  • Resmi denetimde sertifika ↔ personel eşleşmesi için zorunlu — boş bırakılan satır reddedilir.',
     '',
     'E-POSTA:',
     '  • Benzersiz olmalı, daha önce sistemde kayıtlı olmamalı.',

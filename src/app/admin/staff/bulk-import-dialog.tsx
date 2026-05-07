@@ -396,8 +396,9 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
             </div>
             <div className="bid-template-body">
               <h5>Şablon ile başla</h5>
-              <p>Başlıklar esnek: <em>Ad/İsim</em>, <em>Soyad</em>, <em>E-posta/Email/Mail</em>, <em>Şifre</em>, <em>Departman/Bölüm</em> — hepsi tanınır.</p>
+              <p>Başlıklar esnek: <em>Ad/İsim</em>, <em>Soyad</em>, <em>TC Kimlik</em>, <em>E-posta/Email/Mail</em>, <em>Şifre</em>, <em>Departman/Bölüm</em> — hepsi tanınır.</p>
               <p className="bid-template-mode">
+                <strong>Zorunlu:</strong> Ad, Soyad, TC, E-posta.
                 <KeyRound className="h-3 w-3" />
                 <strong>Şifre boşsa</strong> sistem güvenli geçici şifre üretir.
                 <FileDown className="h-3 w-3" />
@@ -457,7 +458,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                     <th>#</th>
                     <th>Ad *</th>
                     <th>Soyad *</th>
-                    <th>TC Kimlik</th>
+                    <th title="Resmi denetim ve sertifika eşleşmesi için zorunlu">TC Kimlik *</th>
                     <th>E-posta *</th>
                     <th title="Boş bırakırsanız sistem güvenli geçici şifre üretir">Şifre</th>
                     <th>Telefon</th>
@@ -1044,8 +1045,10 @@ function CredentialsResult({
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
+  // TC artık import sırasında zorunlu kılındı; aşağıdaki TC filtresi defensive.
+  // Bir gün eski bulk_import audit kayıtları üzerinden replay olursa kırılmasın diye duruyor.
   const successRows = result.results.filter(r => r.status === 'created' && r.tempPassword);
-  const pdfReadyRows = successRows.filter(r => r.tcKimlik); // PDF için TC zorunlu
+  const pdfReadyRows = successRows.filter(r => r.tcKimlik);
   const noTcCount = successRows.length - pdfReadyRows.length;
 
   const copyPassword = async (idx: number, password: string) => {
