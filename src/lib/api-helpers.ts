@@ -4,7 +4,6 @@ import { createHash } from 'crypto'
 import { createClient, createBearerClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { checkSubscriptionStatus } from '@/lib/subscription-guard'
-import { logger } from '@/lib/logger'
 
 /**
  * Mobile/native client'lar JWT'yi `Authorization: Bearer <token>` header'ı ile
@@ -166,9 +165,7 @@ export async function getAuthUser() {
   //   sb-xxx-auth-token.0, sb-xxx-auth-token.1, ...
   // `endsWith('-auth-token')` chunked cookie'leri KAÇIRIR → 401 döngüsü!
   const cookieStore = await cookies()
-  const allCookieNames = cookieStore.getAll().map(c => c.name)
-  logger.info('getAuthUser', 'cookie-check', { total: allCookieNames.length, names: allCookieNames })
-  const hasAuthCookie = allCookieNames.some(c => c.startsWith('sb-') && c.includes('-auth-token'))
+  const hasAuthCookie = cookieStore.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
   if (!hasAuthCookie) {
     return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
   }

@@ -86,6 +86,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
+  const [kvkkBearerToken, setKvkkBearerToken] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [webglSupported, setWebglSupported] = useState(false);
 
@@ -123,6 +124,7 @@ function LoginForm() {
           return;
         }
 
+        if (session.access_token) setKvkkBearerToken(session.access_token);
         setPendingRedirect(target);
       } catch {
         // Session okunamadı — form olduğu gibi kalır
@@ -211,6 +213,9 @@ function LoginForm() {
 
       const kvkkAcknowledged = session?.user?.user_metadata?.kvkk_notice_acknowledged_at ?? null;
       if (!kvkkAcknowledged) {
+        // Cookie'ler okunamıyorsa Bearer token fallback: login API'nin döndürdüğü
+        // accessToken'ı KVKK endpoint için sakla (getAuthUser Bearer path'i destekliyor).
+        if (data.session?.accessToken) setKvkkBearerToken(data.session.accessToken);
         setPendingRedirect(target);
         setLoading(false);
         return;
@@ -226,6 +231,7 @@ function LoginForm() {
   if (pendingRedirect) {
     return (
       <KvkkNoticeModal
+        bearerToken={kvkkBearerToken}
         onAcknowledge={() => { window.location.href = pendingRedirect; }}
         onReject={async () => {
           try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}

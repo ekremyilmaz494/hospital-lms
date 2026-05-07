@@ -29,9 +29,11 @@ const INK_SOFT = '#78716c'   // --k-text-muted (warm gray)
 export function KvkkNoticeModal({
   onAcknowledge,
   onReject,
+  bearerToken,
 }: {
   onAcknowledge?: () => void
   onReject?: () => void | Promise<void>
+  bearerToken?: string | null
 }) {
   const [open, setOpen] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -45,7 +47,9 @@ export function KvkkNoticeModal({
     setLoading(true)
     setApiError(null)
     try {
-      const res = await fetch('/api/auth/kvkk-acknowledge', { method: 'POST' })
+      const reqHeaders: Record<string, string> = {}
+      if (bearerToken) reqHeaders['Authorization'] = `Bearer ${bearerToken}`
+      const res = await fetch('/api/auth/kvkk-acknowledge', { method: 'POST', headers: reqHeaders })
       if (!res.ok) {
         // 429 veya diğer hata: modal açık kalsın, mesaj göster → kullanıcı tekrar
         // denesin. Önceden sessizce onAcknowledge() çağırıyorduk, navigasyon oluyor
