@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
 import type { UserRole } from '@/types/database'
+import { findActivePeriod } from '@/lib/training-periods'
 
 const actionPlanSchema = z.object({
   standardBody: z.enum(['JCI', 'ISO_9001', 'ISO_15189', 'TJC', 'OSHA']),
@@ -29,8 +30,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   const orgId = organizationId
 
   try {
-    // Paralel: ilgili eğitimler + tüm aktif personel
-    const [trainings, allStaff] = await Promise.all([
+    // Paralel: ilgili eğitimler + tüm aktif personel + aktif dönem
+    const [trainings, allStaff, activePeriod] = await Promise.all([
       prisma.training.findMany({
         where: {
           organizationId: orgId,
@@ -43,6 +44,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
         select: { id: true },
       }),
+      findActivePeriod(orgId),
     ])
 
     if (trainings.length === 0) {
@@ -85,6 +87,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     const result = await prisma.trainingAssignment.createMany({
       data: newAssignments.map(a => ({
         ...a,
+        ...(activePeriod && { periodId: activePeriod.id }),
         status: 'assigned',
         assignedAt: new Date(),
       })),

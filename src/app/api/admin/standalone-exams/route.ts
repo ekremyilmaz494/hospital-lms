@@ -14,6 +14,7 @@ import { getCached, setCached, invalidateByPrefix } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import type { AttemptStatus } from '@/lib/exam-state-machine'
 import type { UserRole } from '@/types/database'
+import { findActivePeriod } from '@/lib/training-periods'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
@@ -159,6 +160,12 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   const { questions, selectedDepts, excludedStaff, ...examData } = parsed.data
 
+  let activePeriodId: string | null = null
+  if (selectedDepts && selectedDepts.length > 0) {
+    const period = await findActivePeriod(organizationId)
+    activePeriodId = period?.id ?? null
+  }
+
   try {
     const exam = await prisma.$transaction(
       async (tx) => {
@@ -222,7 +229,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
             .map((u) => ({
               trainingId: t.id,
               userId: u.id,
+              ...(activePeriodId && { periodId: activePeriodId }),
               maxAttempts: examData.maxAttempts,
+              originalMaxAttempts: examData.maxAttempts,
               assignedById: dbUser.id,
             }))
 
