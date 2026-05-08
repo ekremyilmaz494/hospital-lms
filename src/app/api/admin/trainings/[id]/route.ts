@@ -29,7 +29,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
   const { id } = params
   const orgId = organizationId
 
-  // Paralel: training + assignment istatistikleri + son 20 atama + imza/skor
+  // Paralel: training + assignment istatistikleri + tüm atamalar + imza/skor
   const [training, assignmentStats, recentAssignments, signedCount, avgScoreResult] = await Promise.all([
     prisma.training.findFirst({
       where: { id, organizationId: orgId },
@@ -51,7 +51,8 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
         examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1 },
       },
       orderBy: { assignedAt: 'desc' },
-      take: 20,
+      // Tüm atamalar gönderilir; frontend tarafında arama kutusu ile filtreleniyor.
+      // 5000+ atamaya ulaşan org'larda sayfalama eklenir.
     }),
     prisma.examAttempt.count({
       where: { assignment: { trainingId: id }, signedAt: { not: null } },
