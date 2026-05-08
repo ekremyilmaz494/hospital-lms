@@ -74,6 +74,7 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
           name: true,
           color: true,
           description: true,
+          parentId: true,
           _count: { select: { users: { where: { role: 'staff' satisfies UserRole, isActive: true } } } },
         },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
@@ -162,6 +163,7 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       color: d.color,
       description: d.description || '',
       staffCount: d._count.users,
+      parentId: d.parentId ?? null,
     }))
 
     const overallAvgScore = Math.round(Number(overallAvgAgg._avg.postExamScore ?? 0))

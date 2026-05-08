@@ -23,6 +23,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     name: d.name,
     description: d.description,
     color: d.color,
+    parentId: d.parentId,
     count: d._count.users,
     _count: d._count,
     users: d.users.map(u => ({
@@ -54,7 +55,7 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     return errorResponse(parsed.error.issues.map(i => i.message).join(', '))
   }
 
-  const { name, description, color, sortOrder } = parsed.data
+  const { name, description, color, sortOrder, parentId } = parsed.data
 
   // Aynı isimde departman var mı kontrol et
   const existing = await prisma.department.findUnique({
@@ -70,6 +71,20 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     return errorResponse('Bu isimde bir departman zaten mevcut', 409)
   }
 
+  // Max 2 seviye kuralı: parent kendisi child ise yeni departman 3. seviyede olur — yasak.
+  if (parentId) {
+    const parent = await prisma.department.findFirst({
+      where: { id: parentId, organizationId },
+      select: { id: true, parentId: true },
+    })
+    if (!parent) {
+      return errorResponse('Üst departman bulunamadı', 404)
+    }
+    if (parent.parentId) {
+      return errorResponse('Alt departmanın altına yeni departman eklenemez (max 2 seviye)', 400)
+    }
+  }
+
   const department = await prisma.department.create({
     data: {
       organizationId,
@@ -77,6 +92,7 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       description: description || null,
       color: color || '#0d9668',
       sortOrder: sortOrder ?? 0,
+      parentId: parentId ?? null,
     },
     include: {
       _count: { select: { users: true } },
@@ -87,7 +103,7 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     action: 'department.create',
     entityType: 'department',
     entityId: department.id,
-    newData: { name, color },
+    newData: { name, color, parentId: parentId ?? null },
   })
 
   revalidatePath('/admin/departments')
