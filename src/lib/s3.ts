@@ -80,10 +80,10 @@ export async function getStreamUrl(key: string) {
   // CloudFront configured with signing keys → signed URL
   if (cfUrl && keyPairId && privateKey) {
     const formattedKey = privateKey.replace(/\\n/g, '\n')
-    // PEM marker yoksa key bozuk; throw etmek yerine unsigned URL'e fallback (CloudFront public ise yine çalışır)
+    // PEM marker yoksa key bozuk; S3 presigned URL'e fallback (CloudFront private dist'i için unsigned URL 403 döner)
     if (!formattedKey.includes('BEGIN') || !formattedKey.includes('END')) {
-      logger.warn('cf-key-invalid', 'AWS_CLOUDFRONT_PRIVATE_KEY PEM markerları içermiyor; unsigned URL kullanılıyor')
-      return cfUrl
+      logger.warn('cf-key-invalid', 'AWS_CLOUDFRONT_PRIVATE_KEY PEM markerları içermiyor; S3 presigned URL kullanılıyor')
+      return getDownloadUrl(key)
     }
     try {
       return getCloudfrontSignedUrl({
@@ -93,14 +93,16 @@ export async function getStreamUrl(key: string) {
         dateLessThan: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
       })
     } catch (err) {
-      logger.warn('cf-sign-failed', `CloudFront imzalama başarısız (${key}); unsigned URL'e fallback`, err)
-      return cfUrl
+      logger.warn('cf-sign-failed', `CloudFront imzalama başarısız (${key}); S3 presigned URL'e fallback`, err)
+      return getDownloadUrl(key)
     }
   }
 
-  // CloudFront configured but no signing keys → direct URL (public distribution)
+  // CloudFront domain configured but signing keys eksik (lokal dev senaryosu) → S3 presigned URL.
+  // CloudFront private distribution'da unsigned URL 403 döner; S3 presigned güvenli ve çalışır.
+  // (Public CloudFront distribution kullanılıyorsa env'de keyPairId/privateKey hiç tanımlanmaz.)
   if (cfUrl) {
-    return cfUrl
+    return getDownloadUrl(key)
   }
 
   // No CloudFront at all → S3 presigned download URL

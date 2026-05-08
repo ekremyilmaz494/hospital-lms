@@ -400,11 +400,10 @@ export default function TrainingDetailPage() {
                             {/* Deneme */}
                             <p className="text-sm font-semibold text-center" style={{ fontFamily: 'var(--font-mono)', color: K.TEXT_SECONDARY }}>{s.attempt}/{training.maxAttempts}</p>
                             {/* İlerleme */}
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center">
                               <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: K.BORDER_LIGHT }}>
                                 <div className="h-full rounded-full" style={{ width: `${s.progress}%`, background: s.progress === 0 ? K.TEXT_MUTED : s.progress === 100 ? K.SUCCESS : K.INFO }} />
                               </div>
-                              <span className="text-xs font-semibold shrink-0" style={{ fontFamily: 'var(--font-mono)', color: s.progress === 100 ? K.SUCCESS : s.progress > 0 ? K.INFO : K.TEXT_MUTED }}>{s.progress}%</span>
                             </div>
                             {/* Ön Sınav */}
                             <p className="text-sm font-semibold text-center" style={{ fontFamily: 'var(--font-mono)', color: s.preScore !== null ? K.TEXT_SECONDARY : K.TEXT_MUTED }}>{s.preScore !== null ? `${s.preScore}%` : '—'}</p>
