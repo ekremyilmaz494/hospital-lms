@@ -166,6 +166,45 @@ for (const file of pageFiles) {
   }
 }
 
+// ═══════════════════════════════════════════════
+// Rule 7: Mutation routes affecting cached entities must invalidate cache
+// (Geçmişteki tuzak: departman mutasyonu staff cache'ini invalidate etmiyordu →
+// kullanıcı yeni departmanı 120 saniye boyunca göremedi.)
+// ═══════════════════════════════════════════════
+const MUTATION_HANDLER_RE = /export\s+const\s+(POST|PATCH|PUT|DELETE)\s*=/;
+const PRISMA_WRITE_RE = /prisma\.[a-zA-Z]+\.(create|update|delete|upsert|createMany|updateMany|deleteMany)\s*\(/;
+const INVALIDATE_RE = /invalidateOrgCache\s*\(|invalidateDashboardCache\s*\(|invalidateCache\s*\(/;
+// Bu yorumla bir route bilinçli olarak invalidation'sız bırakılabilir
+const NO_CACHE_OVERRIDE_RE = /\/\/\s*perf-check:\s*no-cache-invalidation/;
+
+for (const file of apiFiles) {
+  try {
+    if (!fs.existsSync(file)) continue;
+    const content = fs.readFileSync(file, 'utf-8');
+    const fileShort = file.replace(/\\/g, '/').replace(/.*src\//, 'src/');
+
+    const isMutationRoute = MUTATION_HANDLER_RE.test(content);
+    const hasPrismaWrite = PRISMA_WRITE_RE.test(content);
+    const hasInvalidation = INVALIDATE_RE.test(content);
+    const hasOverride = NO_CACHE_OVERRIDE_RE.test(content);
+
+    if (isMutationRoute && hasPrismaWrite && !hasInvalidation && !hasOverride) {
+      issues.push({
+        level: 'warn',
+        file: fileShort,
+        line: 1,
+        rule: 'missing-cache-invalidation',
+        msg: 'Mutasyon route\'u prisma write yapıyor ama invalidateOrgCache çağrısı yok. ' +
+             'Bu route\'un etkilediği entity cache\'lenmiş ise stale veri riski var. ' +
+             'Gerekiyorsa invalidateOrgCache(orgId, "<entity>") ekle, gereksizse ' +
+             '`// perf-check: no-cache-invalidation — <sebep>` yorumu yaz.',
+      });
+    }
+  } catch (err) {
+    console.error(`Failed to read ${file}: ${err.message}`);
+  }
+}
+
 // ── Report ──
 const errors = issues.filter(i => i.level === 'error');
 const warns = issues.filter(i => i.level === 'warn');

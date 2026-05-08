@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
 import type { Staff } from '../_types';
+import { isSyntheticEmail } from '@/lib/synthetic-email';
 
 export function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
   deptId: string; deptName: string; allStaff: Staff[]; onClose: () => void; onSaved: () => void;
@@ -120,7 +121,7 @@ export function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate" style={{ color: 'var(--k-text-primary)' }}>{s.name}</p>
                   <p className="text-xs truncate" style={{ color: 'var(--k-text-muted)' }}>
-                    {s.email}{s.department ? ` · ${s.department}` : ' · Departmansız'}
+                    {isSyntheticEmail(s.email) ? 'TC ile kayıtlı' : s.email}{s.department ? ` · ${s.department}` : ' · Departmansız'}
                   </p>
                 </div>
                 <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"

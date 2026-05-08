@@ -13,6 +13,7 @@ import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
 import { K } from '../_lib/palette';
 import type { Staff } from '../_types';
+import { isSyntheticEmail } from '@/lib/synthetic-email';
 
 const AssignTrainingModal = dynamic(
   () => import('../assign-training-modal').then(m => ({ default: m.AssignTrainingModal })),
@@ -82,13 +83,15 @@ export function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: ()
           >
             <GraduationCap className="h-4 w-4" /> Eğitim Ata
           </DropdownMenuItem>
-          <DropdownMenuItem
-            className="gap-2"
-            onClick={() => { window.location.href = `mailto:${staff.email}`; }}
-            style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
-          >
-            <Mail className="h-4 w-4" /> E-posta Gönder
-          </DropdownMenuItem>
+          {!isSyntheticEmail(staff.email) && (
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => { window.location.href = `mailto:${staff.email}`; }}
+              style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+            >
+              <Mail className="h-4 w-4" /> E-posta Gönder
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator style={{ background: K.BORDER_LIGHT, margin: '4px 0' }} />
           <DropdownMenuItem
             className="gap-2"
@@ -112,7 +115,7 @@ export function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: ()
         onClose={() => !deleting && setConfirmDelete(false)}
         eyebrow="Tehlikeli İşlem"
         title="Personeli sil"
-        subtitle={`${staff.name} (${staff.email}) için bir seçim yap.`}
+        subtitle={`${staff.name}${isSyntheticEmail(staff.email) ? '' : ` (${staff.email})`} için bir seçim yap.`}
         size="md"
         disableEscape={deleting}
         footer={

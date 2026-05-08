@@ -14,7 +14,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { DataTable } from '@/components/shared/data-table';
-import { useFetch } from '@/hooks/use-fetch';
+import { useFetch, invalidateFetchCache } from '@/hooks/use-fetch';
+import { isSyntheticEmail } from '@/lib/synthetic-email';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 import dynamic from 'next/dynamic';
@@ -58,6 +59,11 @@ export default function StaffPage() {
   const { data, isLoading, refetch } = useFetch<StaffPageData>(
     `/api/admin/staff?page=${currentPage}&limit=10${selectedDept ? `&department=${selectedDept}` : ''}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}${periodId ? `&periodId=${periodId}` : ''}`
   );
+  // Mutasyon sonrası: in-memory cache + HTTP cache her ikisini de bypass'la
+  const refreshDepartments = useCallback(() => {
+    invalidateFetchCache('/api/admin/staff');
+    refetch();
+  }, [refetch]);
 
   // Debounce search
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,17 +81,38 @@ export default function StaffPage() {
   const [showAssignStaff, setShowAssignStaff] = useState(false);
   const [isSavingDept, setIsSavingDept] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
+  const [newDeptAltName, setNewDeptAltName] = useState('');
   const [newDeptColor, setNewDeptColor] = useState(DEPARTMENT_COLORS[0]);
-  const [newDeptParentId, setNewDeptParentId] = useState<string>('');
   const [editingDept, setEditingDept] = useState<{ id: string; name: string; color: string; parentId: string | null } | null>(null);
   const [editDeptSaving, setEditDeptSaving] = useState(false);
   const [deletingDeptId, setDeletingDeptId] = useState<string | null>(null);
+
+  // Alt departman ekleme state'i — parent context'i kart menüsünden gelir
+  const [subDeptParent, setSubDeptParent] = useState<{ id: string; name: string; color: string } | null>(null);
+  const [subDeptName, setSubDeptName] = useState('');
+  const [subDeptColor, setSubDeptColor] = useState(DEPARTMENT_COLORS[0]);
+  const [isSavingSubDept, setIsSavingSubDept] = useState(false);
 
   const allStaff = useMemo(() => data?.staff ?? [], [data]);
   const allDepartments = useMemo(() => data?.departments ?? [], [data]);
 
   const departmentMap = useMemo(
     () => new Map(allDepartments.map(d => [d.id, d])),
+    [allDepartments]
+  );
+  // parentId → alt departman listesi (tek pass, O(n))
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, typeof allDepartments>();
+    for (const d of allDepartments) {
+      if (!d.parentId) continue;
+      const list = map.get(d.parentId);
+      if (list) list.push(d);
+      else map.set(d.parentId, [d]);
+    }
+    return map;
+  }, [allDepartments]);
+  const rootDepartments = useMemo(
+    () => allDepartments.filter(d => !d.parentId),
     [allDepartments]
   );
   const staffByDeptMap = useMemo(() => {
@@ -114,7 +141,7 @@ export default function StaffPage() {
             </div>
             <div className="k-person-meta">
               <p className="k-person-name">{row.getValue('name')}</p>
-              <p className="k-person-email">{row.original.email}</p>
+              <p className="k-person-email">{isSyntheticEmail(row.original.email) ? '—' : row.original.email}</p>
             </div>
           </div>
         );
@@ -314,8 +341,9 @@ export default function StaffPage() {
       {/* Department grid */}
       {activeView === 'departments' && !selectedDept && (
         <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
-          {allDepartments.map(dept => {
+          {rootDepartments.map(dept => {
             const deptColor = semanticDeptColor(dept.name) ?? dept.color;
+            const children = childrenByParent.get(dept.id) ?? [];
             return (
             <article
               key={dept.id}
@@ -366,6 +394,18 @@ export default function StaffPage() {
                     >
                       <UserPlus className="h-4 w-4" /> Personel Ekle
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSubDeptParent({ id: dept.id, name: dept.name, color: deptColor });
+                        setSubDeptName('');
+                        setSubDeptColor(deptColor);
+                      }}
+                      style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+                    >
+                      <Plus className="h-4 w-4" /> Alt Departman Ekle
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator style={{ background: K.BORDER_LIGHT, margin: '4px 0' }} />
                     <DropdownMenuItem
                       className="gap-2"
@@ -382,7 +422,7 @@ export default function StaffPage() {
                           if (!res.ok) throw new Error(resData.error || 'Departman silinemedi');
                           toast('Departman silindi', 'success');
                           if (selectedDept === dept.id) setSelectedDept(null);
-                          refetch();
+                          refreshDepartments();
                         } catch (err) {
                           toast(err instanceof Error ? err.message : 'Departman silinemedi', 'error');
                         } finally {
@@ -400,9 +440,31 @@ export default function StaffPage() {
                 {dept.name}
               </h3>
               {dept.description && (
-                <p className="text-xs line-clamp-2 mb-4" style={{ color: 'var(--k-text-muted)' }}>
+                <p className="text-xs line-clamp-2 mb-3" style={{ color: 'var(--k-text-muted)' }}>
                   {dept.description}
                 </p>
+              )}
+
+              {children.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-3" aria-label="Alt departmanlar">
+                  {children.map(child => {
+                    const childColor = semanticDeptColor(child.name) ?? child.color;
+                    return (
+                      <button
+                        key={child.id}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setSelectedDept(child.id); setCurrentPage(1); setSearchQuery(''); }}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium transition-all hover:scale-[1.03]"
+                        style={{ background: `${childColor}1a`, color: childColor, border: `1px solid ${childColor}33` }}
+                        title={`${child.staffCount} personel`}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: childColor }} />
+                        {child.name}
+                        <span className="tabular-nums opacity-70">{child.staffCount}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
 
               <div className="flex items-center gap-2.5 pt-3 border-t" style={{ borderColor: 'var(--k-border)' }}>
@@ -462,20 +524,17 @@ export default function StaffPage() {
                   style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
                 />
               </Field>
-              <Field label="Üst Departman (opsiyonel)">
-                <select
-                  value={newDeptParentId}
-                  onChange={(e) => setNewDeptParentId(e.target.value)}
-                  className="k-input h-10 w-full"
+              <Field label="Alt Departman (opsiyonel)">
+                <Input
+                  placeholder="Örn: Endokrinoloji"
+                  value={newDeptAltName}
+                  onChange={(e) => setNewDeptAltName(e.target.value)}
+                  className="h-10"
                   style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
-                >
-                  <option value="">Bağımsız (üst seviye)</option>
-                  {allDepartments
-                    .filter(d => !d.parentId) // sadece kök departmanlar parent olabilir (max 2 seviye)
-                    .map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                </select>
+                />
+                <p className="text-[11px] mt-1" style={{ color: 'var(--k-text-muted)' }}>
+                  Doldurursanız, yukarıdaki departmanın altına bu isimde bir alt departman da oluşturulur.
+                </p>
               </Field>
               <Field label="Renk">
                 <div className="flex flex-wrap gap-2">
@@ -506,22 +565,52 @@ export default function StaffPage() {
                 onClick={async () => {
                   setIsSavingDept(true);
                   try {
-                    const res = await fetch('/api/admin/departments', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        name: newDeptName.trim(),
-                        color: newDeptColor,
-                        parentId: newDeptParentId || null,
-                      }),
-                    });
-                    const resData = await res.json().catch(() => ({}));
-                    if (!res.ok) throw new Error(resData.error || 'Departman oluşturulamadı');
-                    toast(`"${newDeptName.trim()}" departmanı oluşturuldu`, 'success');
+                    const parentName = newDeptName.trim();
+                    const altName = newDeptAltName.trim();
+
+                    // 1) Parent: aynı isimli kök departman varsa onu kullan, yoksa oluştur
+                    let parentId: string;
+                    const existingParent = rootDepartments.find(
+                      d => d.name.localeCompare(parentName, 'tr', { sensitivity: 'base' }) === 0
+                    );
+                    if (existingParent) {
+                      parentId = existingParent.id;
+                      if (!altName) {
+                        toast(`"${parentName}" zaten mevcut. Altına eklemek için Alt Departman alanını doldurun.`, 'error');
+                        return;
+                      }
+                    } else {
+                      const res = await fetch('/api/admin/departments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: parentName, color: newDeptColor }),
+                      });
+                      const resData = await res.json().catch(() => ({}));
+                      if (!res.ok) throw new Error(resData.error || 'Departman oluşturulamadı');
+                      parentId = resData.id;
+                    }
+
+                    // 2) Alt departman doldurulmuşsa onu da oluştur
+                    if (altName) {
+                      const resChild = await fetch('/api/admin/departments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: altName, color: newDeptColor, parentId }),
+                      });
+                      const childData = await resChild.json().catch(() => ({}));
+                      if (!resChild.ok) throw new Error(childData.error || 'Alt departman oluşturulamadı');
+                    }
+
+                    toast(
+                      altName
+                        ? `"${parentName}" altına "${altName}" eklendi`
+                        : `"${parentName}" departmanı oluşturuldu`,
+                      'success',
+                    );
                     setShowAddDept(false);
                     setNewDeptName('');
-                    setNewDeptParentId('');
-                    refetch();
+                    setNewDeptAltName('');
+                    refreshDepartments();
                   } catch (err) {
                     toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
                   } finally {
@@ -588,7 +677,7 @@ export default function StaffPage() {
                     if (!res.ok) throw new Error(resData.error || 'Departman silinemedi');
                     toast('Departman silindi', 'success');
                     setSelectedDept(null);
-                    refetch();
+                    refreshDepartments();
                   } catch (err) {
                     toast(err instanceof Error ? err.message : 'Departman silinemedi', 'error');
                   } finally {
@@ -671,7 +760,7 @@ export default function StaffPage() {
                       if (!res.ok) throw new Error(resData.error || 'Güncellenemedi');
                       toast('Departman güncellendi', 'success');
                       setEditingDept(null);
-                      refetch();
+                      refreshDepartments();
                     } catch (err) {
                       toast(err instanceof Error ? err.message : 'Departman güncellenemedi', 'error');
                     } finally {
@@ -696,18 +785,18 @@ export default function StaffPage() {
                 style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
               />
             </Field>
-            <Field label="Üst Departman (opsiyonel)">
+            <Field label="Alt Departman (opsiyonel)">
               <select
                 value={editingDept.parentId ?? ''}
                 onChange={(e) => setEditingDept({ ...editingDept, parentId: e.target.value || null })}
                 className="k-input h-10 w-full"
                 style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
               >
-                <option value="">Bağımsız (üst seviye)</option>
+                <option value="">Hayır — kök departman</option>
                 {allDepartments
                   .filter(d => d.id !== editingDept.id && !d.parentId)
                   .map(d => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                    <option key={d.id} value={d.id}>Evet — {d.name} altına</option>
                   ))}
               </select>
             </Field>
@@ -749,6 +838,111 @@ export default function StaffPage() {
                 </span>
               </div>
             </div>
+          </div>
+        )}
+      </PremiumModal>
+
+      {/* Alt Departman Ekle Modal */}
+      <PremiumModal
+        isOpen={!!subDeptParent}
+        onClose={() => { if (!isSavingSubDept) setSubDeptParent(null); }}
+        eyebrow={subDeptParent ? `${subDeptParent.name} altına` : 'Alt Departman'}
+        title="Alt departman ekle"
+        subtitle={subDeptParent ? `Bu departman, "${subDeptParent.name}" altında listelenir.` : undefined}
+        size="md"
+        disableEscape={isSavingSubDept}
+        footer={
+          <PremiumModalFooter
+            actions={
+              <>
+                <PremiumButton variant="ghost" onClick={() => setSubDeptParent(null)} disabled={isSavingSubDept}>İptal</PremiumButton>
+                <PremiumButton
+                  disabled={!subDeptName.trim()}
+                  loading={isSavingSubDept}
+                  icon={<Plus className="h-4 w-4" />}
+                  onClick={async () => {
+                    if (!subDeptParent) return;
+                    setIsSavingSubDept(true);
+                    try {
+                      const res = await fetch('/api/admin/departments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: subDeptName.trim(),
+                          color: subDeptColor,
+                          parentId: subDeptParent.id,
+                        }),
+                      });
+                      const resData = await res.json().catch(() => ({}));
+                      if (!res.ok) throw new Error(resData.error || 'Alt departman oluşturulamadı');
+                      toast(`"${subDeptName.trim()}" alt departmanı oluşturuldu`, 'success');
+                      setSubDeptParent(null);
+                      setSubDeptName('');
+                      refreshDepartments();
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
+                    } finally {
+                      setIsSavingSubDept(false);
+                    }
+                  }}
+                >
+                  {isSavingSubDept ? 'Oluşturuluyor' : 'Oluştur'}
+                </PremiumButton>
+              </>
+            }
+          />
+        }
+      >
+        {subDeptParent && (
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center gap-3 p-3 rounded-xl"
+                 style={{ background: `${subDeptParent.color}0c`, border: `1px solid ${subDeptParent.color}33` }}>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center"
+                   style={{ background: `${subDeptParent.color}20`, color: subDeptParent.color }}>
+                <Building2 size={16} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>
+                  Üst Departman
+                </span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--k-text-primary)' }}>
+                  {subDeptParent.name}
+                </span>
+              </div>
+            </div>
+            <Field label="Alt Departman Adı">
+              <Input
+                placeholder="Örn: Endokrinoloji"
+                value={subDeptName}
+                onChange={(e) => setSubDeptName(e.target.value)}
+                autoFocus
+                className="h-10"
+                style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
+              />
+            </Field>
+            <Field label="Renk">
+              <div className="flex flex-wrap gap-2.5">
+                {DEPARTMENT_COLORS.map(c => {
+                  const active = subDeptColor === c;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setSubDeptColor(c)}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold transition-transform hover:scale-110"
+                      style={{
+                        background: c,
+                        outline: active ? `2px solid var(--k-text-primary)` : 'none',
+                        outlineOffset: 2,
+                      }}
+                      aria-label={`Renk: ${c}`}
+                    >
+                      {active && '✓'}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
           </div>
         )}
       </PremiumModal>

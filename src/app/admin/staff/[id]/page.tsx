@@ -7,6 +7,7 @@ import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Bui
 import { AssignTrainingModal } from '../assign-training-modal';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useFetch } from '@/hooks/use-fetch';
+import { isSyntheticEmail } from '@/lib/synthetic-email';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
@@ -99,7 +100,7 @@ export default function StaffDetailPage() {
   }
 
   const profileInfo = [
-    { icon: Mail,      label: 'E-posta',   value: staff.email,      mono: false },
+    { icon: Mail,      label: 'E-posta',   value: isSyntheticEmail(staff.email) ? '—' : staff.email, mono: false },
     { icon: Phone,     label: 'Telefon',   value: staff.phone,      mono: true  },
     { icon: Building2, label: 'Departman', value: staff.department, mono: false },
     { icon: Briefcase, label: 'Unvan',     value: staff.title,      mono: false },

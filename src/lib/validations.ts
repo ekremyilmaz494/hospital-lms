@@ -160,12 +160,17 @@ const tcKimlikField = z
   })
 
 const baseStaffFields = {
-  email: z.string().min(1).max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
+  // E-posta opsiyonel — boşsa backend sentetik adres üretir (src/lib/synthetic-email.ts).
+  email: z.string().max(254)
+    .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin')
+    .optional()
+    .or(z.literal('')),
   firstName: z.string().min(1, 'Ad zorunludur').max(100),
   lastName: z.string().min(1, 'Soyad zorunludur').max(100),
   phone: z.string().max(20).optional(),
-  departmentId: z.string().uuid({ message: 'Geçersiz departman kimliği' }).optional(),
-  title: z.string().max(100).optional(),
+  // Departman zorunlu — alt veya kök departmanın id'si gönderilir.
+  departmentId: z.string().uuid({ message: 'Departman zorunludur' }),
+  title: z.string().min(1, 'Unvan zorunludur').max(100),
   tcKimlik: tcKimlikField,
 }
 

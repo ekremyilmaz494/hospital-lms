@@ -26,6 +26,8 @@
     "seed:smg": "tsx scripts/seed-smg-categories.ts",
     "prepare": "husky",
     "validate:env": "node scripts/validate-env.js",
+    "env:pull": "pnpm dlx vercel env pull .env.local --environment=development --yes",
+    "env:pull:prod": "pnpm dlx vercel env pull .env.local --environment=production --yes",
     "predeploy": "node scripts/validate-env.js",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",

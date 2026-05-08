@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createDepartmentSchema } from '@/lib/validations'
+import { invalidateOrgCache } from '@/lib/redis'
 
 // GET /api/admin/departments — Departman listesi
 export const GET = withAdminRoute(async ({ organizationId }) => {
@@ -105,6 +106,9 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     entityId: department.id,
     newData: { name, color, parentId: parentId ?? null },
   })
+
+  // Staff API cevabı departman listesini içerdiği için aynı cache anahtarlarını temizle
+  await invalidateOrgCache(organizationId, 'staff').catch(() => { /* best-effort */ })
 
   revalidatePath('/admin/departments')
 

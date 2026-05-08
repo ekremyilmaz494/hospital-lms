@@ -39,6 +39,11 @@ interface ParsedRow {
   deptName: string;
   deptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty';
   deptCandidates?: Array<{ id: string; name: string }>;
+  // Alt departman (opsiyonel)
+  subDeptId?: string;
+  subDeptName: string;
+  subDeptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty' | 'mismatch';
+  subDeptCandidates?: Array<{ id: string; name: string }>;
 }
 
 interface RowResult {
@@ -80,6 +85,7 @@ interface ImportResult {
 interface Department {
   id: string;
   name: string;
+  parentId?: string | null;
 }
 
 export function BulkImportDialog({ open, onClose, onImported }: { open: boolean; onClose: () => void; onImported: () => void }) {
@@ -205,10 +211,26 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         const dept = departments.find(d => d.id === patch.deptId);
         next[idx].deptName = dept?.name || '';
         next[idx].deptMatch = patch.deptId ? 'exact' : 'empty';
+        // Üst departman değişince alt departman geçersiz olabilir → temizle
+        const sub = next[idx].subDeptId ? departments.find(d => d.id === next[idx].subDeptId) : undefined;
+        if (sub && sub.parentId !== patch.deptId) {
+          next[idx].subDeptId = undefined;
+          next[idx].subDeptName = '';
+          next[idx].subDeptMatch = 'empty';
+        }
+      }
+      if ('subDeptId' in patch) {
+        const sub = departments.find(d => d.id === patch.subDeptId);
+        next[idx].subDeptName = sub?.name || '';
+        next[idx].subDeptMatch = patch.subDeptId ? 'exact' : 'empty';
       }
       return next;
     });
   };
+
+  // Bir parent altındaki alt departmanları getir (Map ile O(n) bir kez hesaplandığı için ucuz)
+  const childrenOf = (parentId?: string): Department[] =>
+    parentId ? departments.filter(d => d.parentId === parentId) : [];
 
   const downloadErrorReport = async () => {
     if (!importResult) return;
@@ -238,6 +260,9 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
       if (e.includes('zaten kayıtlı') || e.includes('zaten mevcut')) return 'Bu e-posta zaten sistemde var. Personeller listesinde kontrol edin veya farklı e-posta kullanın.';
       if (e.includes('geçersiz e-posta') || e.includes('türkçe karakter') || e.includes('invalid')) return 'E-posta adresini kontrol edin. "ali@hastane.com" gibi Türkçe karakter içermeyen bir format olmalı.';
       if (e.includes('şifre')) return 'Şifre en az 8 karakter; büyük harf, küçük harf, rakam ve özel karakter içermeli. Boş bırakırsanız sistem üretir.';
+      if (e.includes('alt departman') && e.includes('altında değil')) return 'Yazdığınız alt departman, seçilen üst departmanın altında değil. "Alt Departmanlar" sayfasındaki "Üst > Alt" kombinasyonlarını kontrol edin.';
+      if (e.includes('alt departman bulunamadı')) return 'Bu alt departman sistemde yok. /admin/staff sayfasından oluşturun veya Excel\'de doğru adı yazın.';
+      if (e.includes('departman zorunludur') || e.includes('departman bulunamadı')) return 'Departman alanı zorunlu. /admin/staff sayfasından bir kök departman oluşturun ve Excel\'de tam adını yazın.';
       if (e.includes('departman')) return 'Bu departman sistemde yok. /admin/staff sayfasından oluşturun ve Excel\'de tam adını yazın.';
       return 'Excel dosyasında bu satırı düzeltip tekrar yükleyin.';
     };
@@ -463,8 +488,9 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                     <th title="Boşsa hoş geldin maili atılmaz; personel TC + şifreyle giriş yapar">E-posta</th>
                     <th title="Boş bırakırsanız sistem güvenli geçici şifre üretir">Şifre</th>
                     <th>Telefon</th>
-                    <th>Departman</th>
-                    <th>Unvan</th>
+                    <th>Departman *</th>
+                    <th>Alt Departman</th>
+                    <th>Unvan *</th>
                     <th>Durum</th>
                   </tr>
                 </thead>
@@ -495,11 +521,31 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                           <select
                             value={row.deptId || ''}
                             onChange={(e) => updateRow(idx, { deptId: e.target.value || undefined })}
-                            className={`bid-sel ${row.deptMatch === 'ambiguous' || row.deptMatch === 'none' ? 'bid-sel-err' : ''}`}
+                            className={`bid-sel ${row.deptMatch === 'ambiguous' || row.deptMatch === 'none' || row.deptMatch === 'empty' ? 'bid-sel-err' : ''}`}
                           >
                             <option value="">— {row.deptName || 'Seçin'}</option>
-                            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            {departments.filter(d => !d.parentId).map(d => (
+                              <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
                           </select>
+                        </td>
+                        <td>
+                          {(() => {
+                            const subs = childrenOf(row.deptId);
+                            if (subs.length === 0) {
+                              return <span className="text-xs text-muted-foreground">—</span>;
+                            }
+                            return (
+                              <select
+                                value={row.subDeptId || ''}
+                                onChange={(e) => updateRow(idx, { subDeptId: e.target.value || undefined })}
+                                className={`bid-sel ${row.subDeptMatch === 'ambiguous' || row.subDeptMatch === 'none' || row.subDeptMatch === 'mismatch' ? 'bid-sel-err' : ''}`}
+                              >
+                                <option value="">— (opsiyonel)</option>
+                                {subs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                              </select>
+                            );
+                          })()}
                         </td>
                         <td><CellInput value={row.title} onChange={(v) => updateRow(idx, { title: v })} /></td>
                         <td>

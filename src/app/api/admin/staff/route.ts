@@ -5,6 +5,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { createStaffSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
+import { generateSyntheticEmail, isSyntheticEmail } from '@/lib/synthetic-email'
 import { logger } from '@/lib/logger'
 import { sendStaffWelcomeEmail, sendInvitationEmail } from '@/lib/email'
 import { generateTempPassword } from '@/lib/passwords'
@@ -219,9 +220,12 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   if (!body) throw new ApiError('Geçersiz istek verisi', 400)
 
   // mode default 'invite' — eski client'lar password gönderiyorsa otomatik 'direct'a düşürülür.
+  // E-posta yoksa invite mümkün değil (davet maili gönderilemez) → 'direct' moda zorla.
   const rawBody = body as Record<string, unknown>
   if (!rawBody.mode) {
-    rawBody.mode = typeof rawBody.password === 'string' && rawBody.password.length > 0 ? 'direct' : 'invite'
+    const hasEmail = typeof rawBody.email === 'string' && rawBody.email.trim().length > 0
+    const hasPassword = typeof rawBody.password === 'string' && rawBody.password.length > 0
+    rawBody.mode = (!hasEmail || hasPassword) ? 'direct' : 'invite'
   }
 
   const parsed = createStaffSchema.safeParse(rawBody)
@@ -241,22 +245,42 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   const data = parsed.data
 
-  // B4.2/G4.2 — Cross-tenant departman kontrolü: departmentId bu organizasyona ait olmalı
-  if (data.departmentId) {
-    const dept = await prisma.department.findFirst({
-      where: { id: data.departmentId, organizationId: orgId },
-      select: { name: true },
-    })
-    if (!dept) return errorResponse('Geçersiz departman — bu departman organizasyonunuza ait değil', 400)
+  // E-posta opsiyonel; boşsa TC hash'inden sentetik adres üret (UI'da gizlenir).
+  // Invite modu için gerçek e-posta zorunlu — yoksa erken hata.
+  let resolvedEmail: string
+  const trimmedEmail = data.email?.trim()
+  if (trimmedEmail) {
+    resolvedEmail = trimmedEmail.toLowerCase()
+  } else {
+    if (data.mode === 'invite') {
+      return errorResponse('Davet göndermek için e-posta adresi gereklidir', 400)
+    }
+    if (!data.tcKimlik) {
+      return errorResponse('E-posta yoksa TC Kimlik No zorunludur', 400)
+    }
+    resolvedEmail = generateSyntheticEmail(hashTcKimlik(data.tcKimlik))
   }
+
+  // B4.2/G4.2 — Cross-tenant departman kontrolü: departmentId bu organizasyona ait olmalı
+  // departmentId artık zorunlu (Zod), ama yine de tenant doğrulaması yap
+  const dept = await prisma.department.findFirst({
+    where: { id: data.departmentId, organizationId: orgId },
+    select: { name: true },
+  })
+  if (!dept) return errorResponse('Geçersiz departman — bu departman organizasyonunuza ait değil', 400)
 
   // Aynı email zaten sistemde mi (her iki mode için de kontrol)
   const existingUser = await prisma.user.findUnique({
-    where: { email: data.email },
+    where: { email: resolvedEmail },
     select: { id: true },
   })
   if (existingUser) {
-    return errorResponse('Bu e-posta adresi zaten sistemde kayıtlı', 409)
+    return errorResponse(
+      isSyntheticEmail(resolvedEmail)
+        ? 'Bu TC Kimlik No ile zaten kayıtlı bir personel var'
+        : 'Bu e-posta adresi zaten sistemde kayıtlı',
+      409,
+    )
   }
 
   // TC Kimlik No duplicate kontrolü — composite (org + tcHash) unique
@@ -278,7 +302,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     await prisma.invitation.updateMany({
       where: {
         organizationId: orgId,
-        email: data.email,
+        email: resolvedEmail,
         acceptedAt: null,
         revokedAt: null,
       },
@@ -291,14 +315,14 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     const invitation = await prisma.invitation.create({
       data: {
         tokenHash: hash,
-        email: data.email,
+        email: resolvedEmail,
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone ?? null,
         title: data.title ?? null,
         role: 'staff',
         organizationId: orgId,
-        departmentId: data.departmentId ?? null,
+        departmentId: data.departmentId,
         invitedByUserId: dbUser.id,
         setAsOwner: false,
         expiresAt,
@@ -310,7 +334,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       action: 'invitation.create',
       entityType: 'invitation',
       entityId: invitation.id,
-      newData: { email: data.email, role: 'staff', expiresAt },
+      newData: { email: resolvedEmail, role: 'staff', expiresAt },
     })
 
     const inviteUrl = buildInvitationUrl(getAppUrl(), raw)
@@ -321,7 +345,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         select: { name: true, brandColor: true },
       })
       emailSent = await sendInvitationEmail({
-        to: data.email,
+        to: resolvedEmail,
         organizationName: org?.name ?? 'Hastane',
         brandColor: org?.brandColor ?? null,
         inviteUrl,
@@ -334,7 +358,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     } catch (err) {
       emailSent = false
       logger.error('Admin Staff', 'Davet maili gönderilemedi', {
-        email: data.email,
+        email: resolvedEmail,
         error: err instanceof Error ? err.message : err,
       })
     }
@@ -343,7 +367,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       {
         mode: 'invite',
         invitationId: invitation.id,
-        email: data.email,
+        email: resolvedEmail,
         expiresAt,
         emailSent,
         // SES sandbox / mail arızası fallback'i: admin link'i manuel paylaşabilsin
@@ -360,7 +384,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   let result
   try {
     result = await createAuthUser({
-      email: data.email,
+      email: resolvedEmail,
       password: effectivePassword,
       firstName: data.firstName,
       lastName: data.lastName,
@@ -405,24 +429,26 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   try { await invalidateOrgCache(orgId, 'staff') } catch { /* cache invalidation best-effort */ }
 
   // Hoş geldiniz maili — fire-and-forget, hesap oluşumunu bloklamaz.
-  // sendStaffWelcomeEmail değer döndürmez; throw atarsa false set ediyoruz.
-  let welcomeEmailSent = true
-  try {
-    const org = await prisma.organization.findUnique({
-      where: { id: orgId },
-      select: { name: true, brandColor: true },
-    })
-    await sendStaffWelcomeEmail({
-      to: user.email,
-      staffName: `${user.firstName} ${user.lastName}`,
-      organizationName: org?.name ?? 'Hastane',
-      brandColor: org?.brandColor ?? null,
-      tempPassword: effectivePassword,
-      loginUrl: `${getAppUrl()}/auth/login`,
-    })
-  } catch (err) {
-    welcomeEmailSent = false
-    logger.warn('Admin Staff', `Hoş geldiniz maili gönderilemedi: ${user.email}`, err instanceof Error ? err.message : err)
+  // Sentetik adresler için mail gönderilmez (gerçek inbox değil).
+  let welcomeEmailSent = false
+  if (!isSyntheticEmail(user.email)) {
+    try {
+      const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { name: true, brandColor: true },
+      })
+      await sendStaffWelcomeEmail({
+        to: user.email,
+        staffName: `${user.firstName} ${user.lastName}`,
+        organizationName: org?.name ?? 'Hastane',
+        brandColor: org?.brandColor ?? null,
+        tempPassword: effectivePassword,
+        loginUrl: `${getAppUrl()}/auth/login`,
+      })
+      welcomeEmailSent = true
+    } catch (err) {
+      logger.warn('Admin Staff', `Hoş geldiniz maili gönderilemedi: ${user.email}`, err instanceof Error ? err.message : err)
+    }
   }
 
   return jsonResponse(

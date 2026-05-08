@@ -83,6 +83,64 @@ export function BulkAssignModal({
   const [loading, setLoading] = useState(false);
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
 
+  // ─── Mevcut atamalar: "trainingId:userId" anahtarları ───
+  const [existingPairs, setExistingPairs] = useState<Set<string>>(new Set());
+  const [existingLoading, setExistingLoading] = useState(false);
+  const [existingFetchedFor, setExistingFetchedFor] = useState<string>('');
+
+  // Personel adımına geçildiğinde (veya seçili eğitimler değiştiğinde) mevcut atamaları çek
+  useEffect(() => {
+    if (step !== 'staff') return;
+    if (selectedTrainings.size === 0) return;
+
+    const ids = Array.from(selectedTrainings).sort();
+    const key = ids.join(',');
+    if (key === existingFetchedFor) return;
+
+    let cancelled = false;
+    setExistingLoading(true);
+    console.log('[bulk-assign] fetching existing for trainings:', key);
+    fetch(`/api/admin/bulk-assign/existing?trainingIds=${encodeURIComponent(key)}`)
+      .then(r => {
+        console.log('[bulk-assign] existing response status:', r.status);
+        return r.ok ? r.json() : null;
+      })
+      .then((data: { assignments?: { trainingId: string; userId: string }[] } | null) => {
+        if (cancelled) return;
+        console.log('[bulk-assign] existing assignments count:', data?.assignments?.length ?? 0, data);
+        const next = new Set<string>();
+        for (const a of data?.assignments ?? []) next.add(`${a.trainingId}:${a.userId}`);
+        setExistingPairs(next);
+        setExistingFetchedFor(key);
+      })
+      .catch((err) => { console.error('[bulk-assign] existing fetch error:', err); })
+      .finally(() => { if (!cancelled) setExistingLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [step, selectedTrainings, existingFetchedFor]);
+
+  // Bir personel TÜM seçili eğitimlere zaten atanmışsa bloke
+  const isStaffBlocked = (userId: string) => {
+    if (selectedTrainings.size === 0) return false;
+    for (const tId of selectedTrainings) {
+      if (!existingPairs.has(`${tId}:${userId}`)) return false;
+    }
+    return true;
+  };
+
+  // Eğitim seçimi değişip mevcut atamalar yenilenince, artık bloke olan personeli seçimden düşür
+  useEffect(() => {
+    if (existingPairs.size === 0) return;
+    setSelectedStaff(prev => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of prev) {
+        if (isStaffBlocked(id)) { next.delete(id); changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [existingPairs, selectedTrainings]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const filteredTrainings = useMemo(
     () => trainings.filter(t => t.title.toLowerCase().includes(trainingSearch.toLowerCase())),
     [trainings, trainingSearch]
@@ -114,14 +172,18 @@ export function BulkAssignModal({
     return next;
   });
 
-  const toggleStaff = (id: string) => setSelectedStaff(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const toggleStaff = (id: string) => {
+    if (isStaffBlocked(id)) return; // zaten tüm seçili eğitimlere atanmış — engelle
+    setSelectedStaff(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const toggleDept = (dept: string) => {
-    const deptStaff = deptGroups[dept] ?? [];
+    const deptStaff = (deptGroups[dept] ?? []).filter(s => !isStaffBlocked(s.id));
+    if (deptStaff.length === 0) return;
     const allSelected = deptStaff.every(s => selectedStaff.has(s.id));
     setSelectedStaff(prev => {
       const next = new Set(prev);
@@ -494,6 +556,28 @@ export function BulkAssignModal({
           {/* ─────── STEP 2: PERSONEL ─────── */}
           {step === 'staff' && (
             <div key="staff" style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 360 }}>
+              {(existingLoading || existingPairs.size > 0) && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 12px',
+                  background: K.INFO_BG,
+                  border: `1.5px solid ${K.INFO}`,
+                  borderRadius: 10,
+                  fontFamily: FONT_DISPLAY,
+                  fontSize: 12.5,
+                  color: K.TEXT_PRIMARY,
+                  lineHeight: 1.5,
+                }}>
+                  <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={1.8} style={{ color: K.INFO }} />
+                  <span>
+                    {existingLoading
+                      ? 'Mevcut atamalar kontrol ediliyor…'
+                      : 'Seçili eğitim(ler)e zaten atanmış personeller işaretlenip seçim dışı bırakıldı.'}
+                  </span>
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{
                   flex: 1,
@@ -553,10 +637,13 @@ export function BulkAssignModal({
               ) : (
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {Object.entries(deptGroups).map(([dept, members]) => {
-                    const allSelected = members.every(s => selectedStaff.has(s.id));
-                    const someSelected = members.some(s => selectedStaff.has(s.id));
-                    const selectedCount = members.filter(s => selectedStaff.has(s.id)).length;
+                    const selectableMembers = members.filter(s => !isStaffBlocked(s.id));
+                    const blockedCount = members.length - selectableMembers.length;
+                    const allSelected = selectableMembers.length > 0 && selectableMembers.every(s => selectedStaff.has(s.id));
+                    const someSelected = selectableMembers.some(s => selectedStaff.has(s.id));
+                    const selectedCount = selectableMembers.filter(s => selectedStaff.has(s.id)).length;
                     const isExpanded = expandedDepts.has(dept);
+                    const allBlocked = selectableMembers.length === 0;
                     return (
                       <li key={dept}>
                         <div style={{
@@ -572,16 +659,18 @@ export function BulkAssignModal({
                             role="checkbox"
                             aria-checked={allSelected ? true : someSelected ? 'mixed' : false}
                             onClick={() => toggleDept(dept)}
+                            disabled={allBlocked}
                             aria-label={`${dept} departmanının tümünü seç`}
                             style={{
                               margin: '14px 0 14px 14px',
-                              cursor: 'pointer',
+                              cursor: allBlocked ? 'not-allowed' : 'pointer',
                               background: 'transparent',
                               border: 'none',
                               padding: 0,
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
+                              opacity: allBlocked ? 0.4 : 1,
                             }}
                           >
                             <CheckBox selected={allSelected} mixed={someSelected && !allSelected} />
@@ -614,6 +703,24 @@ export function BulkAssignModal({
                               fontWeight: 600,
                               color: K.TEXT_PRIMARY,
                             }}>{dept}</span>
+                            {blockedCount > 0 && (
+                              <span
+                                title={`${blockedCount} personel bu eğitim(ler)e zaten atanmış`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '2px 8px',
+                                  borderRadius: 999,
+                                  background: K.WARNING_BG,
+                                  color: '#92400e',
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  fontVariantNumeric: 'tabular-nums',
+                                }}
+                              >
+                                {blockedCount} atanmış
+                              </span>
+                            )}
                             <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -627,7 +734,7 @@ export function BulkAssignModal({
                             }}>
                               {selectedCount.toString().padStart(2, '0')}
                               <span style={{ margin: '0 3px', opacity: 0.6 }}>/</span>
-                              {members.length.toString().padStart(2, '0')}
+                              {selectableMembers.length.toString().padStart(2, '0')}
                             </span>
                             {isExpanded
                               ? <ChevronUp className="h-4 w-4" strokeWidth={1.5} />
@@ -646,13 +753,17 @@ export function BulkAssignModal({
                           }}>
                             {members.map(s => {
                               const sel = selectedStaff.has(s.id);
+                              const blocked = isStaffBlocked(s.id);
                               return (
                                 <li key={s.id}>
                                   <button
                                     type="button"
                                     role="checkbox"
                                     aria-checked={sel}
+                                    aria-disabled={blocked}
+                                    disabled={blocked}
                                     onClick={() => toggleStaff(s.id)}
+                                    title={blocked ? 'Bu personel seçili eğitim(ler)e zaten atanmış' : undefined}
                                     style={{
                                       display: 'flex',
                                       alignItems: 'center',
@@ -662,24 +773,40 @@ export function BulkAssignModal({
                                       background: sel ? K.PRIMARY_LIGHT : 'transparent',
                                       border: `1.5px solid ${sel ? K.PRIMARY : 'transparent'}`,
                                       borderRadius: 10,
-                                      cursor: 'pointer',
+                                      cursor: blocked ? 'not-allowed' : 'pointer',
                                       textAlign: 'left',
                                       fontFamily: FONT_DISPLAY,
                                       fontSize: 13,
-                                      color: K.TEXT_PRIMARY,
+                                      color: blocked ? K.TEXT_MUTED : K.TEXT_PRIMARY,
+                                      opacity: blocked ? 0.55 : 1,
+                                      textDecoration: blocked ? 'line-through' : 'none',
                                       transition: 'background 140ms ease, border-color 140ms ease',
                                     }}
                                     onMouseEnter={(e) => {
-                                      if (sel) return;
+                                      if (sel || blocked) return;
                                       e.currentTarget.style.background = K.SURFACE_HOVER;
                                     }}
                                     onMouseLeave={(e) => {
-                                      if (sel) return;
+                                      if (sel || blocked) return;
                                       e.currentTarget.style.background = 'transparent';
                                     }}
                                   >
                                     <CheckBox selected={sel} small />
-                                    <span>{s.name}</span>
+                                    <span style={{ flex: 1 }}>{s.name}</span>
+                                    {blocked && (
+                                      <span style={{
+                                        fontSize: 10.5,
+                                        fontWeight: 600,
+                                        padding: '2px 8px',
+                                        borderRadius: 999,
+                                        background: K.WARNING_BG,
+                                        color: '#92400e',
+                                        textDecoration: 'none',
+                                        letterSpacing: '0.02em',
+                                      }}>
+                                        Zaten atanmış
+                                      </span>
+                                    )}
                                   </button>
                                 </li>
                               );

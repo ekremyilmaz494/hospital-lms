@@ -96,3 +96,4 @@ yarn.lock
 # Test seed scripti çıktıları (TC + parola içerir, asla commit etme)
 tmp-test-users-credentials.txt
 tmp-seed-log.txt
+.env*.local

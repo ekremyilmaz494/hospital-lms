@@ -9,6 +9,7 @@ import { generateTempPassword } from '@/lib/passwords'
 import ExcelJS from 'exceljs'
 import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc'
 import { hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
+import { generateSyntheticEmail } from '@/lib/synthetic-email'
 
 // ── Header Alias Map ──────────────────────────────────────────────────────
 // Kullanıcı şablonu değiştirebilir veya kendi dosyasını yükleyebilir.
@@ -20,6 +21,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
   password:  ['şifre', 'sifre', 'parola', 'password', 'pwd', 'pass'],
   phone:     ['telefon', 'tel', 'phone', 'gsm', 'cep', 'mobile', 'cep telefonu'],
   department:['departman', 'bölüm', 'bolum', 'birim', 'department', 'dept', 'department name'],
+  subDepartment: ['alt departman', 'altdepartman', 'alt birim', 'altbirim', 'sub department', 'subdepartment', 'sub-department', 'alt bolum', 'alt bölüm'],
   title:     ['unvan', 'ünvan', 'görev', 'gorev', 'title', 'position', 'job title', 'rol'],
   // TC Kimlik No — KVKK gereği AES-GCM ile şifreli, HMAC ile hash'li saklanır.
   // Resmi sertifika eşleşmesi için zorunlu (denetim kanıtı).
@@ -109,10 +111,16 @@ interface ParsedRow {
   title: string
   // Ham TC (sadece bu request'in lifetime'ında plaintext); validateRows checksum'ı doğrular.
   tcKimlik: string
+  // Üst departman (zorunlu)
   deptId?: string
   deptName: string
   deptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty'
   deptCandidates?: Array<{ id: string; name: string }>
+  // Alt departman (opsiyonel) — boşsa personel deptId'ye atanır, doluysa subDeptId'ye atanır
+  subDeptId?: string
+  subDeptName: string
+  subDeptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty' | 'mismatch'
+  subDeptCandidates?: Array<{ id: string; name: string }>
 }
 
 async function parseImportFile(
@@ -165,18 +173,50 @@ async function parseImportFile(
 
   const departments = await prisma.department.findMany({
     where: { organizationId: orgId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, parentId: true },
   })
+  const rootDepts = departments.filter(d => !d.parentId)
 
   const rows: ParsedRow[] = rawRows.map((r, i) => {
     const deptInput = r.department || ''
-    let match: DeptMatch = { type: 'none' }
-    if (deptInput) match = matchDepartment(deptInput, departments)
+    const subInput = r.subDepartment || ''
 
-    const deptId = match.type === 'exact' || match.type === 'fuzzy' ? match.dept.id : undefined
-    const deptName = match.type === 'exact' || match.type === 'fuzzy'
-      ? match.dept.name
+    // Üst departman: sadece kök departmanlar arasında ara
+    let parentMatch: DeptMatch = { type: 'none' }
+    if (deptInput) parentMatch = matchDepartment(deptInput, rootDepts)
+    const deptId = parentMatch.type === 'exact' || parentMatch.type === 'fuzzy' ? parentMatch.dept.id : undefined
+    const deptName = parentMatch.type === 'exact' || parentMatch.type === 'fuzzy'
+      ? parentMatch.dept.name
       : deptInput
+
+    // Alt departman: parent bulunduysa onun çocukları arasında ara
+    let subMatch: DeptMatch = { type: 'none' }
+    let subResolved: ParsedRow['subDeptMatch'] = !subInput ? 'empty' : 'none'
+    let subDeptId: string | undefined
+    let subDeptName = subInput
+    let subCandidates: Array<{ id: string; name: string }> | undefined
+
+    if (subInput && deptId) {
+      const childDepts = departments.filter(d => d.parentId === deptId)
+      subMatch = matchDepartment(subInput, childDepts)
+      if (subMatch.type === 'exact' || subMatch.type === 'fuzzy') {
+        subDeptId = subMatch.dept.id
+        subDeptName = subMatch.dept.name
+        subResolved = subMatch.type
+      } else if (subMatch.type === 'ambiguous') {
+        subResolved = 'ambiguous'
+        subCandidates = subMatch.candidates
+      } else {
+        // Bu parent altında bulunamadı — başka parent altında var mı kontrol et (mismatch?)
+        const elsewhere = departments.find(
+          d => d.parentId && d.parentId !== deptId && d.name.toLowerCase() === subInput.toLowerCase(),
+        )
+        subResolved = elsewhere ? 'mismatch' : 'none'
+      }
+    } else if (subInput && !deptId) {
+      // Üst departman bulunamadıysa alt departman doğrulaması yapılmaz
+      subResolved = 'none'
+    }
 
     return {
       rowIndex: i + 2,
@@ -189,8 +229,12 @@ async function parseImportFile(
       tcKimlik: normalizeTcKimlik(r.tcKimlik || ''),
       deptId,
       deptName,
-      deptMatch: !deptInput ? 'empty' : match.type,
-      deptCandidates: match.type === 'ambiguous' ? match.candidates : undefined,
+      deptMatch: !deptInput ? 'empty' : parentMatch.type,
+      deptCandidates: parentMatch.type === 'ambiguous' ? parentMatch.candidates : undefined,
+      subDeptId,
+      subDeptName,
+      subDeptMatch: subResolved,
+      subDeptCandidates: subCandidates,
     }
   })
 
@@ -235,10 +279,22 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
       rowResults.push({ rowIndex: row.rowIndex, email: row.email || '—', status: 'error', reason: 'Ad veya Soyad eksik' })
       continue
     }
+    if (!row.title || !row.title.trim()) {
+      rowResults.push({ rowIndex: row.rowIndex, email: row.email || '—', status: 'error', reason: 'Unvan zorunludur' })
+      continue
+    }
     // E-posta opsiyonel — boş bırakılırsa sentetik adres üretilir + welcome mail atlanır.
     // Doluysa format ve duplicate kontrolü yapılır.
     if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
       rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Geçersiz e-posta formatı' })
+      continue
+    }
+    // Departman ZORUNLU (yeni kural — kök departman atama için)
+    if (row.deptMatch === 'empty' || !row.deptName) {
+      rowResults.push({
+        rowIndex: row.rowIndex, email: row.email, status: 'error',
+        reason: 'Departman zorunludur',
+      })
       continue
     }
     if (row.deptMatch === 'ambiguous') {
@@ -248,10 +304,32 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
       })
       continue
     }
-    if (row.deptMatch === 'none' && row.deptName) {
+    if (row.deptMatch === 'none') {
       rowResults.push({
         rowIndex: row.rowIndex, email: row.email, status: 'error',
         reason: `Departman bulunamadı: "${row.deptName}"`,
+      })
+      continue
+    }
+    // Alt Departman OPSİYONEL ama doluysa parent ile uyumlu olmalı
+    if (row.subDeptMatch === 'mismatch') {
+      rowResults.push({
+        rowIndex: row.rowIndex, email: row.email, status: 'error',
+        reason: `"${row.subDeptName}" alt departmanı "${row.deptName}" altında değil`,
+      })
+      continue
+    }
+    if (row.subDeptMatch === 'none' && row.subDeptName) {
+      rowResults.push({
+        rowIndex: row.rowIndex, email: row.email, status: 'error',
+        reason: `Alt departman bulunamadı: "${row.subDeptName}"`,
+      })
+      continue
+    }
+    if (row.subDeptMatch === 'ambiguous') {
+      rowResults.push({
+        rowIndex: row.rowIndex, email: row.email, status: 'error',
+        reason: `Alt departman eşleşmesi belirsiz: "${row.subDeptName}" — ${row.subDeptCandidates?.map(c => c.name).join(', ')}`,
       })
       continue
     }
@@ -341,28 +419,41 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     if (body.rows.length > 500) return errorResponse('Tek seferde en fazla 500 satır yüklenebilir', 400)
 
     // Departmanları tekrar doğrula (client-provided ID'ye güvenmiyoruz — cross-tenant koruma)
-    const deptIds = Array.from(new Set(body.rows.map(r => r.deptId).filter(Boolean) as string[]))
-    const validDepts = deptIds.length > 0
+    const allClientDeptIds = Array.from(new Set(
+      body.rows.flatMap(r => [r.deptId, r.subDeptId].filter(Boolean) as string[]),
+    ))
+    const validDepts = allClientDeptIds.length > 0
       ? await prisma.department.findMany({
-          where: { id: { in: deptIds }, organizationId: orgId },
-          select: { id: true, name: true },
+          where: { id: { in: allClientDeptIds }, organizationId: orgId },
+          select: { id: true, name: true, parentId: true },
         })
       : []
-    const validDeptIds = new Set(validDepts.map(d => d.id))
+    const validDeptMap = new Map(validDepts.map(d => [d.id, d]))
 
-    rows = body.rows.map((r, i) => ({
-      rowIndex: r.rowIndex || i + 2,
-      firstName: (r.firstName || '').trim(),
-      lastName: (r.lastName || '').trim(),
-      email: (r.email || '').trim().toLowerCase(),
-      password: r.password || '',
-      phone: (r.phone || '').trim(),
-      title: (r.title || '').trim(),
-      tcKimlik: normalizeTcKimlik(r.tcKimlik || ''),
-      deptId: r.deptId && validDeptIds.has(r.deptId) ? r.deptId : undefined,
-      deptName: r.deptName || '',
-      deptMatch: r.deptId && validDeptIds.has(r.deptId) ? 'exact' : (r.deptName ? 'none' : 'empty'),
-    }))
+    rows = body.rows.map((r, i) => {
+      const parentValid = r.deptId ? validDeptMap.get(r.deptId) : undefined
+      const subValid = r.subDeptId ? validDeptMap.get(r.subDeptId) : undefined
+      // Üst departman gerçek bir kök mü?
+      const parentOk = !!parentValid && !parentValid.parentId
+      // Alt departman parent altında mı?
+      const subOk = !!subValid && !!parentValid && subValid.parentId === parentValid.id
+      return {
+        rowIndex: r.rowIndex || i + 2,
+        firstName: (r.firstName || '').trim(),
+        lastName: (r.lastName || '').trim(),
+        email: (r.email || '').trim().toLowerCase(),
+        password: r.password || '',
+        phone: (r.phone || '').trim(),
+        title: (r.title || '').trim(),
+        tcKimlik: normalizeTcKimlik(r.tcKimlik || ''),
+        deptId: parentOk ? r.deptId : undefined,
+        deptName: r.deptName || '',
+        deptMatch: parentOk ? 'exact' : (r.deptName ? 'none' : 'empty'),
+        subDeptId: subOk ? r.subDeptId : undefined,
+        subDeptName: r.subDeptName || '',
+        subDeptMatch: subOk ? 'exact' : (r.subDeptName ? (r.subDeptId ? 'mismatch' : 'none') : 'empty'),
+      }
+    })
   } else {
     // ── File mode: Excel dosyası ────────────────────────────────────────
     const formData = await request.formData().catch(() => null)
@@ -445,7 +536,10 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   const emailPromises: Promise<void>[] = []
 
   // Departman ID → name çözümlemesi (PDF + sonuç tablosu için, tek sorgu)
-  const distinctDeptIds = Array.from(new Set(validRows.map(r => r.deptId).filter((id): id is string => !!id)))
+  // Hem parent hem alt id'leri eklenir (UI'da hangisine atandığı gösterilebilsin)
+  const distinctDeptIds = Array.from(new Set(
+    validRows.flatMap(r => [r.deptId, r.subDeptId].filter((id): id is string => !!id)),
+  ))
   const deptNameMap = distinctDeptIds.length > 0
     ? Object.fromEntries(
         (await prisma.department.findMany({
@@ -461,15 +555,15 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     // varsaymıyoruz; admin'in girdiği değer Supabase Auth tarafından doğrulanır (en az 8).
     const tempPassword = row.password.trim() || generateTempPassword()
 
-    // Email opsiyonel — boşsa Supabase Auth için sentetik adres üret.
-    // .invalid TLD (RFC 6761) DNS'te asla resolve etmez → yanlışlıkla mail gönderimi sonuçsuz kalır.
-    // Sentetik adres tcHash bazlı → idempotent, aynı TC için aynı adres üretilir; ama TC zaten
-    // org-içi unique olduğu için Supabase'in email-unique kuralı kırılmaz.
-    // Personel TC + şifre ile login olur; sentetik email asla görmez.
+    // Email opsiyonel — boşsa sentetik adres üretilir (synthetic-email helper).
+    // Personel TC + şifre ile login olur; sentetik email asla UI'da görünmez.
     const hasRealEmail = !!row.email
     const effectiveEmail = hasRealEmail
       ? row.email
-      : `staff-${hashTcKimlik(row.tcKimlik).slice(0, 12)}@klinovax.invalid`
+      : generateSyntheticEmail(hashTcKimlik(row.tcKimlik))
+
+    // Atama: alt departman varsa oraya, yoksa parent'a ata
+    const assignedDeptId = row.subDeptId ?? row.deptId
 
     try {
       const { dbUser: newUser } = await createAuthUser({
@@ -480,7 +574,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         role: 'staff',
         organizationId: orgId,
         phone: row.phone || undefined,
-        departmentId: row.deptId,
+        departmentId: assignedDeptId,
         title: row.title || undefined,
         mustChangePassword: true,
         // KVKK: ham TC sadece createAuthUser içinde encrypt + hash'lenir, sonra atılır
@@ -496,7 +590,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         status: 'created',
         tempPassword,
         tcKimlik: row.tcKimlik || undefined,
-        department: row.deptId ? (deptNameMap[row.deptId] ?? null) : null,
+        department: assignedDeptId ? (deptNameMap[assignedDeptId] ?? null) : null,
         title: row.title || null,
       })
 

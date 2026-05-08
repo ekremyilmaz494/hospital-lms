@@ -19,10 +19,13 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
 
   const departments = await prisma.department.findMany({
     where: { organizationId: orgId },
-    select: { name: true },
+    select: { name: true, parentId: true, parent: { select: { name: true } } },
     orderBy: { name: 'asc' },
   })
-  const deptNames = departments.map(d => d.name)
+  const rootDeptNames = departments.filter(d => !d.parentId).map(d => d.name)
+  const altDeptLabels = departments
+    .filter(d => d.parentId && d.parent)
+    .map(d => `${d.parent!.name} > ${d.name}`)
 
   const wb = new ExcelJS.Workbook()
   wb.creator = `${BRAND.fullName} LMS`
@@ -34,14 +37,15 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   // Sütun sırası: kimlik bilgileri → e-posta → ŞİFRE (opsiyonel) → iletişim → org alanları.
   // Zorunlu alanlar header'da "*" ile işaretlenir — kullanıcı Excel'i açtığı an görsün.
   sheet.columns = [
-    { header: 'Ad *',           key: 'ad',       width: 18 },
-    { header: 'Soyad *',        key: 'soyad',    width: 18 },
-    { header: 'TC Kimlik No *', key: 'tc',       width: 18 },
-    { header: 'E-posta',        key: 'email',    width: 32 },
-    { header: 'Şifre',          key: 'sifre',    width: 18 },
-    { header: 'Telefon',        key: 'telefon',  width: 16 },
-    { header: 'Departman',      key: 'departman', width: 20 },
-    { header: 'Unvan',          key: 'unvan',    width: 22 },
+    { header: 'Ad *',           key: 'ad',         width: 18 },
+    { header: 'Soyad *',        key: 'soyad',      width: 18 },
+    { header: 'TC Kimlik No *', key: 'tc',         width: 18 },
+    { header: 'Departman *',    key: 'departman',  width: 20 },
+    { header: 'Alt Departman',  key: 'altDepartman', width: 22 },
+    { header: 'E-posta',        key: 'email',      width: 32 },
+    { header: 'Şifre',          key: 'sifre',      width: 18 },
+    { header: 'Telefon',        key: 'telefon',    width: 16 },
+    { header: 'Unvan *',        key: 'unvan',      width: 22 },
   ]
 
   // Başlık satırı stili
@@ -60,42 +64,51 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   // Şifre dolu satırlar → admin'in seçtiği şifre kullanılır.
   // Şifre boş satırlar → sistem güvenli geçici şifre üretir (Pass-XXXXXXXX-!1 formatı).
   // Tüm satırlarda mustChangePassword=true — personel ilk girişte şifresini değiştirmek zorunda.
+  // Alt departmanı olan ilk root + onun bir alt'ı (varsa) — örnek satırlarda kullanılır
+  const exampleRoot = rootDeptNames[0] || 'Dahiliye'
+  const exampleAltRaw = altDeptLabels[0] // "Dahiliye > Endokrinoloji" formatında
+  const exampleAlt = exampleAltRaw ? exampleAltRaw.split(' > ')[1] : ''
+
   const exampleRows = [
     {
       ad: 'Ayşe', soyad: 'Yılmaz',
       tc: '10000000146',
+      departman: exampleRoot,
+      altDepartman: exampleAlt, // alt departman varsa örnek olarak doldur
       email: 'ayse.yilmaz@hastane.com',
       sifre: 'Geçici1234!',
       telefon: '05551234567',
-      departman: deptNames[0] || 'Acil Servis',
       unvan: 'Hemşire',
     },
     {
       ad: 'Mehmet', soyad: 'Demir',
       tc: '11111111110',
+      departman: rootDeptNames[1] || exampleRoot,
+      altDepartman: '', // alt departman opsiyonel — boşsa parent'a atanır
       email: 'mehmet.demir@hastane.com',
       sifre: 'Klinov2026!',
       telefon: '05559876543',
-      departman: deptNames[1] || deptNames[0] || 'Dahiliye',
       unvan: 'Doktor',
     },
     {
       ad: 'Fatma', soyad: 'Kaya',
       tc: '12345678950',
+      departman: rootDeptNames[2] || rootDeptNames[0] || exampleRoot,
+      altDepartman: '',
       email: 'fatma.kaya@hastane.com',
-      sifre: '', // şifre boş → davet linki gider
+      sifre: '', // şifre boş → sistem geçici şifre üretir
       telefon: '',
-      departman: deptNames[2] || deptNames[0] || 'Yoğun Bakım',
       unvan: 'Başhemşire',
     },
     {
       ad: 'Ali', soyad: 'Çelik',
       tc: '99999999990', // sahte ama Mod10/11 checksum'ı geçer
+      departman: rootDeptNames[0] || exampleRoot, // departman ZORUNLU
+      altDepartman: '',
       email: '', // E-posta opsiyonel — boşsa welcome mail atılmaz; personel TC + şifreyle giriş yapar
       sifre: '',
       telefon: '05321112233',
-      departman: '',
-      unvan: '',
+      unvan: 'Teknisyen', // Unvan ZORUNLU
     },
   ]
   exampleRows.forEach(r => sheet.addRow(r))
@@ -110,24 +123,28 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   const separatorRow = sheet.getRow(exampleRows.length + 2)
   separatorRow.getCell(1).value = '↓ Örnek satırları silip kendi personelinizi buraya girin ↓'
   separatorRow.getCell(1).font = { bold: true, color: { argb: 'FF0D9668' }, size: 10 }
-  sheet.mergeCells(`A${exampleRows.length + 2}:H${exampleRows.length + 2}`)
+  sheet.mergeCells(`A${exampleRows.length + 2}:I${exampleRows.length + 2}`)
   separatorRow.alignment = { horizontal: 'center' }
 
-  // Departman için dropdown doğrulaması — G sütunu (Şifre eklendiği için bir sağa kaydı)
-  if (deptNames.length > 0) {
+  // Departman dropdown — D sütunu, sadece kök departmanlar
+  if (rootDeptNames.length > 0) {
     const separatorIdx = exampleRows.length + 2
     for (let r = 2; r <= 500; r++) {
       if (r === separatorIdx) continue
-      sheet.getCell(`G${r}`).dataValidation = {
+      sheet.getCell(`D${r}`).dataValidation = {
         type: 'list',
-        allowBlank: true,
-        formulae: [`Departmanlar!$A$2:$A$${deptNames.length + 1}`],
+        allowBlank: false,
+        formulae: [`Departmanlar!$A$2:$A$${rootDeptNames.length + 1}`],
         showErrorMessage: true,
         errorTitle: 'Geçersiz departman',
-        error: 'Lütfen Departmanlar sayfasındaki listeden seçin',
+        error: 'Lütfen Departmanlar sayfasındaki listeden bir kök departman seçin',
       }
     }
   }
+
+  // Alt Departman — E sütunu, opsiyonel free-text (parent eşleşmesi backend'de doğrulanır)
+  // Excel cross-cell INDIRECT validation karmaşık + Türkçe karakter sorunlu olduğu için
+  // backend'de regex+match yapılıyor.
 
   // TC sütunu (C) — text formatı (öndeki 0 kaybolmasın diye)
   for (let r = 2; r <= 500; r++) {
@@ -137,18 +154,30 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   // Başlık satırını dondur
   sheet.views = [{ state: 'frozen', ySplit: 1 }]
 
-  // ── Sayfa 2: Departmanlar (referans) ──────────────────────────────
+  // ── Sayfa 2: Departmanlar (kök referans — D sütunu dropdown'unun veri kaynağı) ──
   const deptSheet = wb.addWorksheet('Departmanlar')
-  deptSheet.columns = [{ header: 'Geçerli Departman Adları', key: 'name', width: 32 }]
+  deptSheet.columns = [{ header: 'Kök Departman Adları', key: 'name', width: 32 }]
   const deptHeaderRow = deptSheet.getRow(1)
   deptHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
   deptHeaderRow.fill = {
     type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D9668' },
   }
-  if (deptNames.length === 0) {
+  if (rootDeptNames.length === 0) {
     deptSheet.addRow({ name: '(Önce admin panelinden departman oluşturun)' })
   } else {
-    deptNames.forEach(n => deptSheet.addRow({ name: n }))
+    rootDeptNames.forEach(n => deptSheet.addRow({ name: n }))
+  }
+
+  // ── Sayfa 3: Alt Departmanlar (referans) ──────────────────────────
+  const altSheet = wb.addWorksheet('Alt Departmanlar')
+  altSheet.columns = [{ header: 'Üst Departman > Alt Departman', key: 'label', width: 50 }]
+  const altHeader = altSheet.getRow(1)
+  altHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+  altHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D9668' } }
+  if (altDeptLabels.length === 0) {
+    altSheet.addRow({ label: '(Henüz alt departman yok — kök departman zorunlu, alt opsiyonel)' })
+  } else {
+    altDeptLabels.forEach(l => altSheet.addRow({ label: l }))
   }
 
   // ── Sayfa 3: Yardım ───────────────────────────────────────────────
@@ -157,8 +186,8 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   const help = [
     'TOPLU PERSONEL YÜKLEME — KULLANIM KILAVUZU',
     '',
-    'ZORUNLU ALANLAR: Ad, Soyad, TC Kimlik No',
-    'OPSİYONEL ALANLAR: E-posta, Şifre, Telefon, Departman, Unvan',
+    'ZORUNLU ALANLAR: Ad, Soyad, TC Kimlik No, Departman, Unvan',
+    'OPSİYONEL ALANLAR: Alt Departman, E-posta, Şifre, Telefon',
     '',
     'ŞİFRE NASIL ÇALIŞIR:',
     '  • Şifre alanı BOŞ bırakılırsa → sistem güvenli bir geçici şifre üretir.',
@@ -184,19 +213,25 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     '  • Doluysa benzersiz olmalı, daha önce sistemde kayıtlı olmamalı.',
     '  • Türkçe karakter (ş, ç, ğ, ü, ö, ı) KULLANMAYIN. Excel otomatik link yaparsa sistem temizler.',
     '',
-    'DEPARTMAN:',
+    'DEPARTMAN (zorunlu — kök departman):',
     '  • "Departmanlar" sayfasındaki tam adı seçin (hücreye tıkladığınızda açılır liste çıkar).',
-    '  • Kısaltma yazarsanız (örn. "Acil" → "Acil Servis") sistem otomatik eşler — tek eşleşme varsa.',
-    '  • Birden fazla departman eşleşirse sistem hata verir, siz seçersiniz.',
-    '  • Boş bırakırsanız atama sonradan yapılabilir.',
+    '  • Sadece KÖK departmanlar listelenir (alt departmanlar değil).',
+    '  • Kısaltma yazarsanız (örn. "Dahili" → "Dahiliye") sistem otomatik eşler — tek eşleşme varsa.',
+    '  • Boş bırakılan satır REDDEDİLİR.',
+    '',
+    'ALT DEPARTMAN (opsiyonel):',
+    '  • Boş bırakılırsa personel kök departmana (yukarıdaki Departman) atanır.',
+    '  • Doluysa: yazdığınız alt departman adı yukarıdaki Departman\'ın altında olmalı (örn. "Dahiliye" altında "Endokrinoloji").',
+    '  • "Alt Departmanlar" sayfasında geçerli kombinasyonlar listelenmiştir ("Üst > Alt" formatında).',
+    '  • Yanlış üst-alt eşleşmesi (örn. Cerrahi altında Endokrinoloji) hata verir.',
     '',
     'TELEFON:',
     '  • Başında 0 olmak üzere 11 haneli (05XXXXXXXXX).',
     '  • Opsiyonel — boş bırakılabilir.',
     '',
-    'UNVAN:',
+    'UNVAN (zorunlu):',
     '  • Hemşire, Doktor, Başhemşire, Teknisyen, vb.',
-    '  • Opsiyonel.',
+    '  • Boş bırakılan satır REDDEDİLİR.',
     '',
     'İPUÇLARI:',
     '  • İlk 4 satır (italik, gri) ÖRNEKLERDİR — silip kendi verilerinizi yazın.',

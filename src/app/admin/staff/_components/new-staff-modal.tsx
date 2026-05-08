@@ -30,7 +30,7 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<SuccessState | null>(null);
   const [mode, setMode] = useState<Mode>('invite');
-  const [form, setForm] = useState({ ad: '', soyad: '', email: '', sifre: '', telefon: '', departman: '', unvan: '', tc: '' });
+  const [form, setForm] = useState({ ad: '', soyad: '', email: '', sifre: '', telefon: '', departman: '', altDepartman: '', unvan: '', tc: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<'link' | 'pwd' | 'tc' | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -44,11 +44,16 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
     const e: Record<string, string> = {};
     if (!form.ad.trim()) e.ad = 'Ad zorunludur';
     if (!form.soyad.trim()) e.soyad = 'Soyad zorunludur';
-    if (!form.email.trim()) e.email = 'E-posta zorunludur';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Geçerli bir e-posta girin';
+    // E-posta opsiyonel; ama davet modunda zorunlu (mail gönderemeyiz aksi halde)
+    if (mode === 'invite' && !form.email.trim()) {
+      e.email = 'Davet göndermek için e-posta gereklidir';
+    } else if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      e.email = 'Geçerli bir e-posta girin';
+    }
     if (mode === 'direct' && form.sifre.trim() && form.sifre.length < 8) e.sifre = 'Şifre en az 8 karakter olmalıdır';
     if (form.telefon && !/^0\d{10}$/.test(form.telefon.replace(/\s/g, ''))) e.telefon = 'Geçerli telefon formatı: 05XX XXX XX XX';
-    if (!form.departman) e.departman = 'Departman seçiniz';
+    if (!form.departman) e.departman = 'Departman zorunludur';
+    if (!form.unvan.trim()) e.unvan = 'Unvan zorunludur';
 
     // TC: direkt modda zorunlu (resmi denetim eşleşmesi için), invite modda opsiyonel.
     // Boş bırakılırsa atlanır; girildiyse 11 hane + checksum doğrulanır.
@@ -68,13 +73,16 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
     setSaving(true);
     try {
       const tcNorm = normalizeTcKimlik(form.tc);
+      // departmentId: alt departman seçildiyse onun id'si, yoksa parent'ın id'si
+      const assignedDeptId = form.altDepartman || form.departman;
       const payload: Record<string, unknown> = {
         mode,
         firstName: form.ad,
         lastName: form.soyad,
-        email: form.email,
+        // E-posta opsiyonel — boşsa gönderme, backend sentetik üretir
+        ...(form.email.trim() ? { email: form.email.trim() } : {}),
         phone: form.telefon || undefined,
-        departmentId: form.departman || undefined,
+        departmentId: assignedDeptId,
         title: form.unvan || undefined,
         // TC sadece doluysa gönderilir; server checksum'ı zod refine ile yeniden doğrular.
         ...(tcNorm ? { tcKimlik: tcNorm } : {}),
@@ -95,11 +103,13 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
       };
       if (!res.ok) throw new Error(body.error || 'Kayıt başarısız');
 
-      const deptName = departments.find(d => d.id === form.departman)?.name;
+      // Hangi departmana atandıysa onun adı (alt > parent)
+      const deptName = departments.find(d => d.id === assignedDeptId)?.name;
 
       setSuccess({
         mode,
-        email: form.email,
+        // Sentetik adres dönmüş olabilir — kullanıcının yazdığını gösteriyoruz; boşsa "—"
+        email: form.email.trim() || '—',
         emailSent: body.emailSent !== false,
         inviteUrl: body.inviteUrl,
         tempPassword: body.tempPassword,
@@ -358,7 +368,11 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
             </Field>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="E-posta *" error={errors.email}>
+            <Field
+              label={mode === 'invite' ? 'E-posta *' : 'E-posta'}
+              error={errors.email}
+              hint={mode === 'direct' && !errors.email ? 'Opsiyonel — boşsa personel TC + şifreyle giriş yapar.' : undefined}
+            >
               <Input type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} style={fieldStyle('email')} />
             </Field>
             {mode === 'direct' ? (
@@ -388,16 +402,39 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
                 className="h-10 w-full rounded-lg border px-3 text-sm"
                 style={fieldStyle('departman')}
                 value={form.departman}
-                onChange={(e) => setForm(f => ({ ...f, departman: e.target.value }))}
+                onChange={(e) => setForm(f => ({ ...f, departman: e.target.value, altDepartman: '' }))}
               >
                 <option value="">Seçin...</option>
-                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {departments.filter(d => !d.parentId).map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
               </select>
             </Field>
-            <Field label="Unvan">
-              <Input placeholder="örn. Hemşire" className="h-10" value={form.unvan} onChange={(e) => setForm(f => ({ ...f, unvan: e.target.value }))} style={fieldStyle('unvan')} />
+            <Field
+              label="Alt Departman"
+              hint={form.departman
+                ? (departments.some(d => d.parentId === form.departman)
+                    ? 'Opsiyonel — seçmezseniz personel üst departmana atanır.'
+                    : 'Bu departmanın alt birimi yok.')
+                : 'Önce üst departman seçin.'}
+            >
+              <select
+                className="h-10 w-full rounded-lg border px-3 text-sm disabled:opacity-50"
+                style={fieldStyle('altDepartman')}
+                value={form.altDepartman}
+                disabled={!form.departman || !departments.some(d => d.parentId === form.departman)}
+                onChange={(e) => setForm(f => ({ ...f, altDepartman: e.target.value }))}
+              >
+                <option value="">— (opsiyonel)</option>
+                {departments.filter(d => d.parentId === form.departman).map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
             </Field>
           </div>
+          <Field label="Unvan *" error={errors.unvan}>
+            <Input placeholder="örn. Hemşire" className="h-10" value={form.unvan} onChange={(e) => setForm(f => ({ ...f, unvan: e.target.value }))} style={fieldStyle('unvan')} />
+          </Field>
 
           {/* TC Kimlik No — direct modda zorunlu (resmi denetim için), invite modda opsiyonel.
               KVKK: değer DB'ye AES-256-GCM ile şifreli, lookup için HMAC-SHA256 hash'li yazılır.

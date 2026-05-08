@@ -2,7 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
-import { checkRateLimit } from '@/lib/redis'
+import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { updateDepartmentSchema } from '@/lib/validations'
 
 // GET /api/admin/departments/[id] — Departman detayı + personelleri
@@ -117,6 +117,7 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, or
     newData: parsed.data,
   })
 
+  await invalidateOrgCache(organizationId, 'staff').catch(() => { /* best-effort */ })
   revalidatePath('/admin/departments')
 
   return jsonResponse(department)
@@ -152,6 +153,7 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ params, dbUser, or
     oldData: { name: department.name, staffCount: department._count.users },
   })
 
+  await invalidateOrgCache(organizationId, 'staff').catch(() => { /* best-effort */ })
   revalidatePath('/admin/departments')
 
   return jsonResponse({ success: true })
