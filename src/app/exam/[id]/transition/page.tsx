@@ -11,7 +11,7 @@ interface QuestionResult {
   isCorrect: boolean;
 }
 
-const COUNTDOWN_SECONDS = 10;
+const COUNTDOWN_SECONDS = 120;
 
 function TransitionContent() {
   const router = useRouter();
@@ -766,13 +766,21 @@ function TransitionContent() {
             />
           </svg>
           <div className="tr-count-digit">
-            <span className="tr-count-num">{timeLeft}</span>
+            <span className="tr-count-num">
+              {timeLeft >= 60
+                ? `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`
+                : timeLeft}
+            </span>
           </div>
         </div>
 
         <p className="tr-count-hint">
           <Clock className="h-3 w-3" />
-          {timeLeft > 0 ? `${timeLeft} saniye sonra otomatik geçiş` : 'Yönlendiriliyor…'}
+          {timeLeft > 0
+            ? timeLeft >= 60
+              ? `${Math.floor(timeLeft / 60)} dk ${timeLeft % 60} sn sonra otomatik geçiş`
+              : `${timeLeft} saniye sonra otomatik geçiş`
+            : 'Yönlendiriliyor…'}
         </p>
 
         <button onClick={navigate} className="tr-count-cta">
