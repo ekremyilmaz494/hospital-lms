@@ -627,9 +627,7 @@ export default function PreExamPage() {
           top: 0;
           z-index: 50;
           padding: 14px 24px 0;
-          background: rgba(255, 255, 255, 0.88);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
+          background: #ffffff;
           border-bottom: 1px solid var(--ed-rule);
         }
         .pe-header-row {

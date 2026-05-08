@@ -61,8 +61,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 24px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
+  background: #ffffff;
   border-bottom: 1px solid var(--k-border);
 }
 .vd-header-left { display: flex; align-items: center; gap: 14px; min-width: 0; }

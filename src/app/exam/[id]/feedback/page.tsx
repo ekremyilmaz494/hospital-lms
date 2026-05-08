@@ -551,8 +551,7 @@ function FeedbackContent() {
           position: sticky;
           top: 0;
           z-index: 30;
-          background: rgba(247, 244, 234, 0.9);
-          backdrop-filter: blur(12px);
+          background: var(--k-bg);
           border-bottom: 1px solid var(--k-border);
         }
         .fb-sticky-inner {
@@ -1034,8 +1033,7 @@ function FeedbackContent() {
           right: 0;
           z-index: 40;
           padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
-          background: rgba(255, 255, 255, 0.95);
-          backdrop-filter: blur(12px);
+          background: #ffffff;
           border-top: 1px solid var(--k-border);
         }
         @media (max-width: 640px) {
