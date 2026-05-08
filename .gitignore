@@ -97,3 +97,11 @@ yarn.lock
 tmp-test-users-credentials.txt
 tmp-seed-log.txt
 .env*.local
+
+# Lokal admin yardımcı scriptleri (plaintext credential içerebilir, repoya gitmemeli)
+scripts/create-super-admin.mjs
+scripts/fix-super-admin-kvkk.mjs
+
+# Yerel binary/rapor dosyaları (proje dizini geçici sahnesi olarak kullanılınca biriken artıklar)
+*.dmg
+tamamlama_raporu.pdf
