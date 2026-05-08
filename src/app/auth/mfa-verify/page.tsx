@@ -18,6 +18,7 @@ function MFAVerifyForm() {
   const searchParams = useSearchParams();
   const factorId = searchParams.get('factorId') || '';
   const role = searchParams.get('role') || 'staff';
+  const mustChangePassword = searchParams.get('mustChangePassword') === '1';
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -78,6 +79,11 @@ function MFAVerifyForm() {
         setCode(['', '', '', '', '', '']);
         inputRefs.current[0]?.focus();
         setLoading(false);
+        return;
+      }
+
+      if (mustChangePassword) {
+        router.push('/auth/change-password?reason=first-login');
         return;
       }
 

@@ -236,6 +236,7 @@ export async function POST(request: NextRequest) {
       return jsonResponse({
         mfaRequired: true,
         factorId: activeFactor.id,
+        mustChangePassword: dbUser.mustChangePassword,
       })
     }
 
@@ -261,6 +262,7 @@ export async function POST(request: NextRequest) {
           phoneMissing: !dbUser.phone,
           // Telefonun son 4 hanesi — UI'da "****3456 numaralı telefonunuza kod gönderildi" göstermek için
           phoneMasked: dbUser.phone ? `****${dbUser.phone.slice(-4)}` : null,
+          mustChangePassword: dbUser.mustChangePassword,
         })
       }
     }

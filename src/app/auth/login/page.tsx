@@ -220,12 +220,14 @@ function LoginForm() {
       }
 
       if (data.mfaRequired) {
-        router.push(`/auth/mfa-verify?factorId=${encodeURIComponent(data.factorId)}`);
+        const mustChange = data.mustChangePassword ? '&mustChangePassword=1' : '';
+        router.push(`/auth/mfa-verify?factorId=${encodeURIComponent(data.factorId)}${mustChange}`);
         return;
       }
 
       if (data.smsMfaRequired) {
-        router.push(data.phoneMissing ? '/auth/phone-setup' : '/auth/sms-verify');
+        const mustChange = data.mustChangePassword ? '?mustChangePassword=1' : '';
+        router.push(data.phoneMissing ? `/auth/phone-setup${mustChange}` : `/auth/sms-verify${mustChange}`);
         return;
       }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { MessageSquare, Loader2, RotateCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,6 +13,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
 
 function SmsVerifyForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const mustChangePassword = searchParams.get('mustChangePassword') === '1';
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [rememberDevice, setRememberDevice] = useState(true); // default açık — UX iyi
   const [error, setError] = useState('');
@@ -108,6 +110,10 @@ function SmsVerifyForm() {
         return;
       }
       // Full reload: onAuthStateChange ile race condition'dan kaçın (CLAUDE.md kuralı)
+      if (mustChangePassword) {
+        window.location.href = '/auth/change-password?reason=first-login';
+        return;
+      }
       window.location.href = data.redirectTo || '/staff/dashboard';
     } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
