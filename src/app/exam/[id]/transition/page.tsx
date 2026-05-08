@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { Play, Award, CheckCircle2, ArrowRight, Check, X, Clock } from 'lucide-react';
+import { Play, Award, CheckCircle2, ArrowRight, Check, X } from 'lucide-react';
 
 interface QuestionResult {
   questionText: string;
@@ -10,8 +10,6 @@ interface QuestionResult {
   correctOptionText: string | null;
   isCorrect: boolean;
 }
-
-const COUNTDOWN_SECONDS = 120;
 
 function TransitionContent() {
   const router = useRouter();
@@ -24,8 +22,6 @@ function TransitionContent() {
   const passingScore = searchParams.get('passingScore');
   const attemptsRemaining = Number(searchParams.get('attemptsRemaining') ?? '0');
   const attemptIdParam = searchParams.get('attemptId');
-  const [timeLeft, setTimeLeft] = useState(COUNTDOWN_SECONDS);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const navigatedRef = useRef(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
   const [feedbackRequired, setFeedbackRequired] = useState(false);
@@ -69,27 +65,11 @@ function TransitionContent() {
       });
   }, [id, isPreToVideos, isVideosToPost, router]);
 
-  const shouldCountdown = !isPostResult && passedGuardChecked;
-
   const navigate = () => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
-    if (timerRef.current) clearInterval(timerRef.current);
     router.replace(destination);
   };
-
-  useEffect(() => {
-    if (!shouldCountdown) return;
-    timerRef.current = setInterval(() => {
-      setTimeLeft(prev => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [shouldCountdown]);
-
-  useEffect(() => {
-    if (timeLeft === 0 && shouldCountdown) navigate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft]);
 
   useEffect(() => {
     if (!isPostResult) return;
@@ -722,18 +702,15 @@ function TransitionContent() {
     );
   }
 
-  // ═══ COUNTDOWN TRANSITION ═══
+  // ═══ MANUAL TRANSITION (countdown kaldırıldı — kullanıcı butona basınca geçer) ═══
   const title = isPreToVideos ? 'Ön sınavı tamamladın' : 'Tüm videoları izledin';
   const subtitle = isPreToVideos
-    ? 'Şimdi eğitim videolarına geçeceksin.'
-    : 'Şimdi son sınava gireceksin — başarılı olursan eğitimi tamamlamış sayılırsın.';
+    ? 'Hazır olduğunuzda eğitim videolarına geçebilirsiniz.'
+    : 'Hazır olduğunuzda son sınava başlayabilirsiniz — başarılı olursan eğitimi tamamlamış sayılırsın.';
   const ctaLabel = isPreToVideos ? 'Videolara Geç' : 'Son Sınava Başla';
   const CtaIcon = isPreToVideos ? Play : Award;
   const HeroIcon = isPreToVideos ? CheckCircle2 : Award;
   const eyebrowLabel = isPreToVideos ? 'Geçiş · Videolar' : 'Geçiş · Son Sınav';
-
-  const circumference = 2 * Math.PI * 54;
-  const progress = ((COUNTDOWN_SECONDS - timeLeft) / COUNTDOWN_SECONDS) * circumference;
 
   return (
     <div className="tr-count">
@@ -752,36 +729,6 @@ function TransitionContent() {
             <strong>{score}%</strong>
           </div>
         )}
-
-        <div className="tr-count-ring-wrap">
-          <svg viewBox="0 0 128 128" className="tr-count-ring">
-            <circle cx="64" cy="64" r="54" fill="none" strokeWidth="5" stroke="var(--ed-rule)" />
-            <circle
-              cx="64" cy="64" r="54" fill="none" strokeWidth="5"
-              stroke="var(--ed-ink)" strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={circumference - progress}
-              transform="rotate(-90 64 64)"
-              className="tr-count-arc"
-            />
-          </svg>
-          <div className="tr-count-digit">
-            <span className="tr-count-num">
-              {timeLeft >= 60
-                ? `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`
-                : timeLeft}
-            </span>
-          </div>
-        </div>
-
-        <p className="tr-count-hint">
-          <Clock className="h-3 w-3" />
-          {timeLeft > 0
-            ? timeLeft >= 60
-              ? `${Math.floor(timeLeft / 60)} dk ${timeLeft % 60} sn sonra otomatik geçiş`
-              : `${timeLeft} saniye sonra otomatik geçiş`
-            : 'Yönlendiriliyor…'}
-        </p>
 
         <button onClick={navigate} className="tr-count-cta">
           <CtaIcon className="h-4 w-4" />
