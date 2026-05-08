@@ -432,7 +432,7 @@ export default function TrainingDetailPage() {
                         const st = statusMap[s.status] || statusMap.assigned;
                         const StatusIcon = st.icon;
                         return (
-                          <div key={s.name} className="grid items-center px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 60px 60px 95px 75px 90px 90px', gap: '8px', background: K.SURFACE, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
+                          <div key={s.assignmentId} className="grid items-center px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 60px 60px 95px 75px 90px 90px', gap: '8px', background: K.SURFACE, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE; }}
                           >
