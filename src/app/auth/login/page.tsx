@@ -331,12 +331,11 @@ function LoginForm() {
         .ed-input::placeholder { color: ${K.TEXT_MUTED}; opacity: 0.7; }
         .ed-checkbox {
           appearance: none;
-          width: 14px; height: 14px;
+          -webkit-appearance: none;
           border: 1.5px solid ${K.BORDER};
           background: ${K.SURFACE};
           cursor: pointer;
           position: relative;
-          flex-shrink: 0;
           border-radius: 3px;
           transition: background-color 160ms ease, border-color 160ms ease;
         }
@@ -562,6 +561,17 @@ function LoginForm() {
                     className="ed-checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      minWidth: 16,
+                      minHeight: 16,
+                      maxWidth: 16,
+                      maxHeight: 16,
+                      flexShrink: 0,
+                      flexGrow: 0,
+                      aspectRatio: '1 / 1',
+                    }}
                   />
                   <span className="text-[13px]" style={{ color: K.TEXT_SECONDARY }}>
                     Bu cihazda oturumumu açık tut <span style={{ opacity: 0.7 }}>(7 gün)</span>
