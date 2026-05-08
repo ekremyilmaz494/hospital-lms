@@ -148,7 +148,14 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
         }}
       >
         {/* ── Header ── */}
-        <DialogHeader className="px-7 pt-7 pb-5" style={{ borderBottom: `1px solid ${RULE}` }}>
+        <DialogHeader
+          className="px-7"
+          style={{
+            paddingTop: 44,
+            paddingBottom: 20,
+            borderBottom: `1px solid ${RULE}`,
+          }}
+        >
           <div
             style={{
               fontFamily: FONT_MONO,
@@ -157,7 +164,7 @@ export function AssignStaffModal({ trainingId, maxAttemptsAllowed, open, onOpenC
               letterSpacing: '0.22em',
               textTransform: 'uppercase',
               color: GOLD,
-              marginBottom: 8,
+              marginBottom: 10,
             }}
           >
             № 03 · Personel Ata
