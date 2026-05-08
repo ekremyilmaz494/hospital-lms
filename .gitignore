@@ -92,3 +92,7 @@ yarn.lock
 
 # Local secrets (CloudFront private key, env backups)
 .secrets/
+
+# Test seed scripti çıktıları (TC + parola içerir, asla commit etme)
+tmp-test-users-credentials.txt
+tmp-seed-log.txt

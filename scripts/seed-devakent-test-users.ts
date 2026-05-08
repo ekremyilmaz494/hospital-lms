@@ -147,6 +147,7 @@ async function main() {
   let success = 0
   let failed = 0
   const failures: Array<{ tc: string; reason: string }> = []
+  const created: Array<{ name: string; tc: string; email: string }> = []
 
   for (let i = 0; i < tcs.length; i++) {
     const tc = tcs[i]
@@ -169,8 +170,9 @@ async function main() {
         tcKimlik: tc,
       })
       success++
+      created.push({ name: `${firstName} ${lastName}`, tc, email })
       const num = String(i + 1).padStart(2, '0')
-      console.log(`  [${num}/${TARGET_COUNT}] ✓ ${firstName} ${lastName} (${email})`)
+      console.log(`  [${num}/${TARGET_COUNT}] ✓ ${firstName} ${lastName} · TC: ${tc} · ${email}`)
     } catch (err) {
       failed++
       const reason = err instanceof AuthUserError || err instanceof DbUserError
@@ -182,7 +184,23 @@ async function main() {
     }
   }
 
-  // 6) Özet
+  // 6) TC listesini ayrı dosyaya yaz (gitignored, login için referans)
+  if (created.length > 0) {
+    const fs = await import('fs')
+    const path = await import('path')
+    const outFile = path.join(process.cwd(), 'tmp-test-users-credentials.txt')
+    const lines = [
+      `# Devakent Hastanesi test kullanıcıları (parola: ${PASSWORD})`,
+      `# Üretildi: ${new Date().toISOString()}`,
+      `# Bu dosya .gitignore'da. Test sonrası: pnpm tsx scripts/cleanup-devakent-test-users.ts --confirm`,
+      ``,
+      ...created.map(u => `${u.tc}\t${u.name}\t${u.email}`),
+    ]
+    fs.writeFileSync(outFile, lines.join('\n'), 'utf8')
+    console.log(`\n✓ TC + e-posta listesi yazıldı: ${outFile}`)
+  }
+
+  // 7) Özet
   console.log(`\n═══════════════════════════════════════`)
   console.log(`✓ Başarılı: ${success}/${TARGET_COUNT}`)
   if (failed > 0) {
@@ -191,7 +209,7 @@ async function main() {
   }
   console.log(`═══════════════════════════════════════`)
   console.log(`\nLogin için kullanılabilecek parola: ${PASSWORD}`)
-  console.log(`Email pattern: test-XXX@${EMAIL_DOMAIN}\n`)
+  console.log(`Login için TC veya e-posta kullanılabilir.\n`)
 }
 
 main()
