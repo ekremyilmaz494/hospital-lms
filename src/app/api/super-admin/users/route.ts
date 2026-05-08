@@ -50,7 +50,7 @@ export const POST = withSuperAdminRoute(async ({ request, audit }) => {
       organizationId: parsed.data.organizationId,
       phone: parsed.data.phone,
       title: parsed.data.title,
-      mustChangePassword: !parsed.data.password,
+      mustChangePassword: true,
     })
   } catch (err) {
     if (err instanceof AuthUserError) {

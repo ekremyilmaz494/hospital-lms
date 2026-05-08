@@ -3,14 +3,29 @@ import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/ap
 import { withAdminRoute } from '@/lib/api-handler'
 import { createAssignmentSchema } from '@/lib/validations'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
-import { getActivePeriod } from '@/lib/training-periods'
 import { sendEmail, trainingAssignedEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
+import { getActivePeriod, findActivePeriod } from '@/lib/training-periods'
 
 export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
   const { id } = params
 
   const { searchParams } = new URL(request.url)
+
+  // Lightweight mode for assignment modal: aktif dönemdeki userId set'i.
+  // Modal "zaten atanmış kullanıcıları" disable etmek için kullanır.
+  if (searchParams.get('currentPeriodOnly') === '1') {
+    const activePeriod = await findActivePeriod(organizationId)
+    if (!activePeriod) {
+      return jsonResponse({ userIds: [] }, 200, { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' })
+    }
+    const rows = await prisma.trainingAssignment.findMany({
+      where: { trainingId: id, periodId: activePeriod.id, training: { organizationId } },
+      select: { userId: true },
+    })
+    return jsonResponse({ userIds: rows.map(r => r.userId) }, 200, { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' })
+  }
+
   const { page, limit, skip } = safePagination(searchParams)
 
   const where = { trainingId: id, training: { organizationId: organizationId } }
@@ -83,11 +98,22 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Bu eğitim atanamaz: en az bir video veya ses içeriği eklenmelidir.', 400)
   }
 
-  const activePeriod = await getActivePeriod(organizationId)
+  // Aktif dönem zorunlu — atama bu döneme bağlanır.
+  // bulk-assign endpoint'i ile aynı pattern: getActivePeriod 409 throw eder.
+  const targetPeriod = await getActivePeriod(organizationId)
+  if (targetPeriod.status === 'closed') {
+    return errorResponse('Kapalı döneme atama yapılamaz', 409)
+  }
 
-  // Create assignments for all users (skip existing in current period)
+  // Mevcut atamalar — periodId scope'lu ki önceki dönemde atanmış kullanıcı
+  // yeni dönemde tekrar atanabilsin (composite unique [trainingId,userId,periodId]).
   const existingAssignments = await prisma.trainingAssignment.findMany({
-    where: { trainingId: id, userId: { in: parsed.data.userIds }, periodId: activePeriod.id, training: { organizationId: organizationId } },
+    where: {
+      trainingId: id,
+      userId: { in: parsed.data.userIds },
+      periodId: targetPeriod.id,
+      training: { organizationId: organizationId },
+    },
     select: { userId: true },
   })
   const existingUserIds = new Set(existingAssignments.map(a => a.userId))
@@ -105,7 +131,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
     data: newUserIds.map(userId => ({
       trainingId: id,
       userId,
-      periodId: activePeriod.id,
+      periodId: targetPeriod.id,
       maxAttempts: parsed.data.maxAttempts,
       originalMaxAttempts: parsed.data.maxAttempts,
       assignedById: dbUser.id,

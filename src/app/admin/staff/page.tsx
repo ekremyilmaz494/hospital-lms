@@ -76,7 +76,8 @@ export default function StaffPage() {
   const [isSavingDept, setIsSavingDept] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptColor, setNewDeptColor] = useState(DEPARTMENT_COLORS[0]);
-  const [editingDept, setEditingDept] = useState<{ id: string; name: string; color: string } | null>(null);
+  const [newDeptParentId, setNewDeptParentId] = useState<string>('');
+  const [editingDept, setEditingDept] = useState<{ id: string; name: string; color: string; parentId: string | null } | null>(null);
   const [editDeptSaving, setEditDeptSaving] = useState(false);
   const [deletingDeptId, setDeletingDeptId] = useState<string | null>(null);
 
@@ -353,7 +354,7 @@ export default function StaffPage() {
                   >
                     <DropdownMenuItem
                       className="gap-2"
-                      onClick={(e) => { e.stopPropagation(); setEditingDept({ id: dept.id, name: dept.name, color: dept.color }); }}
+                      onClick={(e) => { e.stopPropagation(); setEditingDept({ id: dept.id, name: dept.name, color: dept.color, parentId: dept.parentId ?? null }); }}
                       style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
                     >
                       <Edit className="h-4 w-4" /> Düzenle
@@ -461,6 +462,21 @@ export default function StaffPage() {
                   style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
                 />
               </Field>
+              <Field label="Üst Departman (opsiyonel)">
+                <select
+                  value={newDeptParentId}
+                  onChange={(e) => setNewDeptParentId(e.target.value)}
+                  className="k-input h-10 w-full"
+                  style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
+                >
+                  <option value="">Bağımsız (üst seviye)</option>
+                  {allDepartments
+                    .filter(d => !d.parentId) // sadece kök departmanlar parent olabilir (max 2 seviye)
+                    .map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                </select>
+              </Field>
               <Field label="Renk">
                 <div className="flex flex-wrap gap-2">
                   {DEPARTMENT_COLORS.map(c => {
@@ -493,13 +509,18 @@ export default function StaffPage() {
                     const res = await fetch('/api/admin/departments', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ name: newDeptName.trim(), color: newDeptColor }),
+                      body: JSON.stringify({
+                        name: newDeptName.trim(),
+                        color: newDeptColor,
+                        parentId: newDeptParentId || null,
+                      }),
                     });
                     const resData = await res.json().catch(() => ({}));
                     if (!res.ok) throw new Error(resData.error || 'Departman oluşturulamadı');
                     toast(`"${newDeptName.trim()}" departmanı oluşturuldu`, 'success');
                     setShowAddDept(false);
                     setNewDeptName('');
+                    setNewDeptParentId('');
                     refetch();
                   } catch (err) {
                     toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
@@ -550,7 +571,7 @@ export default function StaffPage() {
               <button className="k-btn k-btn-ghost" onClick={() => setShowAssignStaff(true)}>
                 <UserPlus size={15} /> Personel Ekle
               </button>
-              <button className="k-btn k-btn-ghost" onClick={() => setEditingDept({ id: selectedDeptData.id, name: selectedDeptData.name, color: selectedDeptData.color })}>
+              <button className="k-btn k-btn-ghost" onClick={() => setEditingDept({ id: selectedDeptData.id, name: selectedDeptData.name, color: selectedDeptData.color, parentId: selectedDeptData.parentId ?? null })}>
                 <Edit size={15} /> Düzenle
               </button>
               <button
@@ -640,14 +661,19 @@ export default function StaffPage() {
                       const res = await fetch(`/api/admin/departments/${editingDept.id}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: editingDept.name, color: editingDept.color }),
+                        body: JSON.stringify({
+                          name: editingDept.name,
+                          color: editingDept.color,
+                          parentId: editingDept.parentId ?? null,
+                        }),
                       });
-                      if (!res.ok) throw new Error('Güncellenemedi');
+                      const resData = await res.json().catch(() => ({}));
+                      if (!res.ok) throw new Error(resData.error || 'Güncellenemedi');
                       toast('Departman güncellendi', 'success');
                       setEditingDept(null);
                       refetch();
-                    } catch {
-                      toast('Departman güncellenemedi', 'error');
+                    } catch (err) {
+                      toast(err instanceof Error ? err.message : 'Departman güncellenemedi', 'error');
                     } finally {
                       setEditDeptSaving(false);
                     }
@@ -669,6 +695,21 @@ export default function StaffPage() {
                 className="h-10"
                 style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
               />
+            </Field>
+            <Field label="Üst Departman (opsiyonel)">
+              <select
+                value={editingDept.parentId ?? ''}
+                onChange={(e) => setEditingDept({ ...editingDept, parentId: e.target.value || null })}
+                className="k-input h-10 w-full"
+                style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
+              >
+                <option value="">Bağımsız (üst seviye)</option>
+                {allDepartments
+                  .filter(d => d.id !== editingDept.id && !d.parentId)
+                  .map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+              </select>
             </Field>
             <Field label="Renk">
               <div className="flex flex-wrap gap-2.5">

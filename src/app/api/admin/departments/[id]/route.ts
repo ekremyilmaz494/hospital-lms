@@ -67,6 +67,38 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, or
     if (duplicate) return errorResponse('Bu isimde bir departman zaten mevcut', 409)
   }
 
+  // parentId değişiyorsa hiyerarşi kuralları:
+  // - kendisini parent yapamaz
+  // - 2 seviye limiti: parent'ın kendi parentId'si null olmalı
+  // - bu departman zaten başka departmanlara parent ise (children var), parent atanamaz
+  //   (kendisi 2. seviyeye düşerse alttaki çocukları 3. seviyede kalır → kural ihlali)
+  if (parsed.data.parentId !== undefined && parsed.data.parentId !== existing.parentId) {
+    const newParentId = parsed.data.parentId
+    if (newParentId) {
+      if (newParentId === id) {
+        return errorResponse('Departman kendisinin üst departmanı olamaz', 400)
+      }
+      // Parent bilgisi + bu departmanın kendi child sayısı paralel sorgulanır;
+      // ikisi de aynı parentId değişimi senaryosuna ait bağımsız check'ler.
+      const [parent, ownChildrenCount] = await Promise.all([
+        prisma.department.findFirst({
+          where: { id: newParentId, organizationId },
+          select: { id: true, parentId: true },
+        }),
+        prisma.department.count({
+          where: { parentId: id, organizationId },
+        }),
+      ])
+      if (!parent) return errorResponse('Üst departman bulunamadı', 404)
+      if (parent.parentId) {
+        return errorResponse('Alt departmanın altına departman atanamaz (max 2 seviye)', 400)
+      }
+      if (ownChildrenCount > 0) {
+        return errorResponse('Bu departmanın alt birimleri var; önce onları taşıyın', 400)
+      }
+    }
+  }
+
   const department = await prisma.$transaction(async (tx) => {
     const verified = await tx.department.findFirst({ where: { id, organizationId } })
     if (!verified) throw new Error('NOT_FOUND')

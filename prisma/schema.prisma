@@ -231,6 +231,8 @@ model Invoice {
 }
 
 // ── DEPARTMANLAR ──
+// Max 2 seviye hiyerarşi: parentId set olabilir, ama parent'ın kendi parentId'si null olmalı.
+// Bu kural API katmanında (validations + endpoint check) zorlanır; DB cycle önlemez.
 model Department {
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
@@ -239,16 +241,20 @@ model Department {
   color          String   @default("#0d9668") @db.VarChar(7)
   sortOrder      Int      @default(0) @map("sort_order")
   isActive       Boolean  @default(true) @map("is_active")
+  parentId       String?  @map("parent_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization  Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent        Department?              @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Department[]             @relation("DepartmentHierarchy")
   users         User[]
   trainingRules DepartmentTrainingRule[]
   invitations   Invitation[]
 
   @@unique([organizationId, name])
   @@index([organizationId], map: "idx_departments_org")
+  @@index([parentId], map: "idx_departments_parent")
   @@map("departments")
 }
 

@@ -202,11 +202,26 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
       // 4. Personel Atamalarını Yap
       if (selectedDepts && selectedDepts.length > 0) {
+        // Hiyerarşi expansion: selectedDepts içinde parent departman varsa,
+        // onun child departmanlarını da dahil et. Frontend parent seçili iken child'ı
+        // "otomatik dahil" gösteriyor, backend de aynı semantiği uygulamalı.
+        const expandedDepts = await tx.department.findMany({
+          where: {
+            organizationId,
+            OR: [
+              { id: { in: selectedDepts } },
+              { parentId: { in: selectedDepts } },
+            ],
+          },
+          select: { id: true },
+        })
+        const allDeptIds = expandedDepts.map(d => d.id)
+
         const usersToAssign = await tx.user.findMany({
           where: {
             organizationId: organizationId,
             isActive: true,
-            departmentId: { in: selectedDepts },
+            departmentId: { in: allDeptIds },
           }
         })
 

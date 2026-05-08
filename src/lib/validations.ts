@@ -72,11 +72,14 @@ export const updateOrganizationSchema = createOrganizationSchema.partial().exten
 export const slugSchema = z.string().min(3).max(50).regex(/^[a-z0-9-]+$/, 'Sadece küçük harf, rakam ve tire kullanılabilir')
 
 // ── Department ──
+// Max 2 seviye hiyerarşi: parentId set edilirse, parent'ın kendi parentId'si null olmalı.
+// Bu kural endpoint katmanında (POST/PATCH) DB sorgusuyla doğrulanır.
 export const createDepartmentSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   sortOrder: z.number().int().min(0).optional(),
+  parentId: z.string().uuid().nullable().optional(),
 })
 
 export const updateDepartmentSchema = createDepartmentSchema.partial()

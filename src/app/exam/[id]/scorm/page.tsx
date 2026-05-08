@@ -309,8 +309,7 @@ export default function ScormPlayerPage() {
           justify-content: space-between;
           gap: 16px;
           padding: 14px 24px;
-          background: rgba(255, 255, 255, 0.92);
-          backdrop-filter: blur(12px);
+          background: #ffffff;
           border-bottom: 1px solid #e5e0d5;
           flex-shrink: 0;
         }

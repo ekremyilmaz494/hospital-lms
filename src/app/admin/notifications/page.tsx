@@ -429,11 +429,11 @@ export default function NotificationsPage() {
           style={{ background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(4px)' }}
         >
           <div
-            className="k-card w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+            className="k-card w-full max-w-2xl max-h-[85vh] flex flex-col"
             style={{ borderColor: 'var(--k-border)' }}
           >
             {/* Modal Header */}
-            <div className="k-card-head flex items-center justify-between">
+            <div className="k-card-head flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div
                   className="flex h-10 w-10 items-center justify-center rounded-xl"
@@ -460,7 +460,7 @@ export default function NotificationsPage() {
               </button>
             </div>
 
-            <div className="k-card-body">
+            <div className="k-card-body flex-1 overflow-y-auto">
               {/* Mode Toggle */}
               <div className="flex gap-2 mb-5">
                 <button
@@ -724,33 +724,34 @@ export default function NotificationsPage() {
                 </label>
               </div>
 
-              {/* Footer */}
-              <div
-                className="flex items-center justify-between pt-4"
-                style={{ borderTop: '1px solid var(--k-border)' }}
-              >
-                <div className="text-xs" style={{ color: 'var(--k-text-muted)' }}>
-                  <span className="font-bold" style={{ color: 'var(--k-primary)' }}>
-                    {getRecipientCount()}
-                  </span> kişiye gönderilecek
-                  {alsoSendEmail && <span className="ml-1.5">(+ e-posta)</span>}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowSendModal(false)}
-                    className="k-btn k-btn-ghost"
-                  >
-                    İptal
-                  </button>
-                  <button
-                    onClick={handleSend}
-                    disabled={sending || getRecipientCount() === 0 || !sendTitle.trim() || !sendMessage.trim()}
-                    className="k-btn k-btn-primary"
-                  >
-                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    {sending ? 'Gönderiliyor...' : 'Gönder'}
-                  </button>
-                </div>
+            </div>
+
+            {/* Footer — modal dibinde sabit, body scroll edilirken kaybolmaz */}
+            <div
+              className="flex items-center justify-between gap-3 px-5 py-4 shrink-0"
+              style={{ borderTop: '1px solid var(--k-border)', background: 'var(--k-surface)' }}
+            >
+              <div className="text-xs" style={{ color: 'var(--k-text-muted)' }}>
+                <span className="font-bold" style={{ color: 'var(--k-primary)' }}>
+                  {getRecipientCount()}
+                </span> kişiye gönderilecek
+                {alsoSendEmail && <span className="ml-1.5">(+ e-posta)</span>}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSendModal(false)}
+                  className="k-btn k-btn-ghost"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={sending || getRecipientCount() === 0 || !sendTitle.trim() || !sendMessage.trim()}
+                  className="k-btn k-btn-primary"
+                >
+                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {sending ? 'Gönderiliyor...' : 'Gönder'}
+                </button>
               </div>
             </div>
           </div>

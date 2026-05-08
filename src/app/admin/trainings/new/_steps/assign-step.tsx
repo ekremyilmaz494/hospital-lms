@@ -1,6 +1,7 @@
 'use client';
 
-import { Users, Check, Trash2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { Users, Check, Trash2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useFetch } from '@/hooks/use-fetch';
@@ -25,11 +26,50 @@ export default function AssignStep({
 }: AssignStepProps) {
   // 4. adıma kadar fetch atılmaz — wizard performansı için step içinde tutulur.
   const { data: departmentsData } = useFetch<Dept[]>('/api/admin/departments');
-  const departments: Dept[] = departmentsData ?? [];
+  const departments: Dept[] = useMemo(() => departmentsData ?? [], [departmentsData]);
 
-  const totalSelectedStaff = departments
-    .filter(d => selectedDepts.includes(d.id))
-    .reduce((sum, d) => sum + d.staff.filter(s => !excludedStaff.includes(s.id)).length, 0);
+  // Hiyerarşi gruplandırması: roots (parentId=null) + her root için children listesi.
+  const { roots, childrenByParent, deptById } = useMemo(() => {
+    const roots: Dept[] = [];
+    const childrenByParent = new Map<string, Dept[]>();
+    const deptById = new Map<string, Dept>();
+    for (const d of departments) {
+      deptById.set(d.id, d);
+      if (!d.parentId) {
+        roots.push(d);
+      } else {
+        const list = childrenByParent.get(d.parentId) ?? [];
+        list.push(d);
+        childrenByParent.set(d.parentId, list);
+      }
+    }
+    return { roots, childrenByParent, deptById };
+  }, [departments]);
+
+  // Effective selection: kullanıcı parent seçtiyse child'ları da dahildir (backend expansion'la
+  // uyumlu). UI ve count hesabı bu effective set üzerinden yapılır.
+  const effectiveDeptIds = useMemo(() => {
+    const set = new Set<string>(selectedDepts);
+    for (const id of selectedDepts) {
+      const kids = childrenByParent.get(id) ?? [];
+      for (const k of kids) set.add(k.id);
+    }
+    return set;
+  }, [selectedDepts, childrenByParent]);
+
+  // Toplam seçili personel: effective dept'lerin staff'ından excluded olanları çıkar.
+  // Parent + child kombinasyonunda aynı user iki kez sayılmasın diye Set kullanılıyor.
+  const totalSelectedStaff = useMemo(() => {
+    const userIds = new Set<string>();
+    for (const id of effectiveDeptIds) {
+      const dept = deptById.get(id);
+      if (!dept) continue;
+      for (const s of dept.staff) {
+        if (!excludedStaff.includes(s.id)) userIds.add(s.id);
+      }
+    }
+    return userIds.size;
+  }, [effectiveDeptIds, excludedStaff, deptById]);
 
   const toggleDept = (id: string) => {
     setSelectedDepts(prev =>
@@ -43,6 +83,23 @@ export default function AssignStep({
     );
   };
 
+  const q = deptSearch.trim().toLocaleLowerCase('tr-TR');
+  const matchesQuery = (dept: Dept): boolean => {
+    if (!q) return true;
+    if (dept.name.toLocaleLowerCase('tr-TR').includes(q)) return true;
+    return dept.staff.some(s => s.name.toLocaleLowerCase('tr-TR').includes(q));
+  };
+
+  // Filtre: bir root görünür eğer kendisi veya child'ı eşleşir.
+  const visibleRoots = roots.filter(root => {
+    if (matchesQuery(root)) return true;
+    const kids = childrenByParent.get(root.id) ?? [];
+    return kids.some(matchesQuery);
+  });
+
+  // "Tümünü Seç/Kaldır" — sadece kök departmanları toggle eder; child'lar parent'a bağlı.
+  const allRootsSelected = roots.length > 0 && roots.every(r => selectedDepts.includes(r.id));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -51,7 +108,9 @@ export default function AssignStep({
         </div>
         <div>
           <h3 className="text-lg font-bold" style={{ fontFamily: K.FONT_DISPLAY }}>Personel Atama</h3>
-          <p className="text-xs" style={{ color: K.TEXT_MUTED }}>Eğitimi atamak istediğiniz departmanları seçin</p>
+          <p className="text-xs" style={{ color: K.TEXT_MUTED }}>
+            Departman seçin — alt birim varsa onu seçerek sadece o gruba atayabilirsiniz.
+          </p>
         </div>
       </div>
 
@@ -65,69 +124,137 @@ export default function AssignStep({
         />
         <Button
           variant="outline"
-          onClick={() => setSelectedDepts(selectedDepts.length === departments.length ? [] : departments.map(d => d.id))}
+          onClick={() => setSelectedDepts(allRootsSelected ? [] : roots.map(d => d.id))}
           className="h-11 rounded-xl"
           style={{ borderColor: K.BORDER, color: K.TEXT_SECONDARY }}
         >
-          {selectedDepts.length === departments.length ? 'Tümünü Kaldır' : 'Tümünü Seç'}
+          {allRootsSelected ? 'Tümünü Kaldır' : 'Tümünü Seç'}
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {departments.filter(dept => {
-          const q = deptSearch.trim().toLocaleLowerCase('tr-TR');
-          if (!q) return true;
-          if (dept.name.toLocaleLowerCase('tr-TR').includes(q)) return true;
-          return dept.staff.some(s => s.name.toLocaleLowerCase('tr-TR').includes(q));
-        }).map((dept) => {
-          const isSelected = selectedDepts.includes(dept.id);
-          const activeStaff = dept.staff.filter(s => !excludedStaff.includes(s.id));
-          const isExpanded = expandedDept === dept.id;
+      <div className="space-y-4">
+        {visibleRoots.map((root) => {
+          const isRootSelected = selectedDepts.includes(root.id);
+          const rootKids = childrenByParent.get(root.id) ?? [];
+          const visibleKids = q ? rootKids.filter(k => matchesQuery(k) || matchesQuery(root)) : rootKids;
+          const rootActiveStaff = root.staff.filter(s => !excludedStaff.includes(s.id));
+          const isRootExpanded = expandedDept === root.id;
+          // Toplam etki: root + tüm child'lar (effective dahil)
+          const subtreeStaffTotal = root.staff.length + rootKids.reduce((sum, k) => sum + k.staff.length, 0);
+
           return (
-            <div key={dept.id} className="relative">
-              <button
-                type="button"
-                onClick={() => toggleDept(dept.id)}
-                className="relative flex w-full flex-col items-start gap-2 rounded-xl border p-4 text-left"
-                style={{
-                  borderColor: isSelected ? dept.color : K.BORDER,
-                  background: isSelected ? K.BG : K.SURFACE,
-                  transition: 'border-color 150ms ease, background 150ms ease',
-                }}
-              >
-                {isSelected && (
-                  <div className="absolute top-3 right-3 flex h-5 w-5 items-center justify-center rounded-full" style={{ background: dept.color }}>
-                    <Check className="h-3 w-3 text-white" />
-                  </div>
-                )}
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold text-white" style={{ background: dept.color }}>
-                  {dept.name[0]}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">{dept.name}</p>
-                  <p className="text-xs font-mono" style={{ color: K.TEXT_MUTED }}>
-                    {isSelected ? `${activeStaff.length}/${dept.staff.length}` : `${dept.staff.length}`} kişi
-                  </p>
-                </div>
-              </button>
-              {isSelected && (
+            <div key={root.id} className="space-y-2">
+              {/* Root departman kartı */}
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setExpandedDept(isExpanded ? null : dept.id)}
-                  className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-[11px] font-medium transition-colors duration-150"
-                  style={{ color: dept.color, background: isExpanded ? `${dept.color}10` : 'transparent' }}
+                  onClick={() => toggleDept(root.id)}
+                  className="relative flex w-full items-start gap-3 rounded-xl border p-4 text-left"
+                  style={{
+                    borderColor: isRootSelected ? root.color : K.BORDER,
+                    background: isRootSelected ? K.BG : K.SURFACE,
+                    transition: 'border-color 150ms ease, background 150ms ease',
+                  }}
                 >
-                  {isExpanded ? 'Gizle' : 'Kişileri Gör'}
+                  {isRootSelected && (
+                    <div className="absolute top-3 right-3 flex h-5 w-5 items-center justify-center rounded-full" style={{ background: root.color }}>
+                      <Check className="h-3 w-3 text-white" />
+                    </div>
+                  )}
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg text-base font-bold text-white" style={{ background: root.color }}>
+                    {root.name[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold">{root.name}</p>
+                    <p className="text-xs font-mono" style={{ color: K.TEXT_MUTED }}>
+                      {isRootSelected ? `${rootActiveStaff.length}/${root.staff.length}` : `${root.staff.length}`} kişi (direkt)
+                      {rootKids.length > 0 && ` · ${rootKids.length} alt birim · toplam ${subtreeStaffTotal} kişi`}
+                    </p>
+                  </div>
                 </button>
+                {isRootSelected && (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedDept(isRootExpanded ? null : root.id)}
+                    className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-[11px] font-medium transition-colors duration-150"
+                    style={{ color: root.color, background: isRootExpanded ? `${root.color}10` : 'transparent' }}
+                  >
+                    {isRootExpanded ? 'Gizle' : 'Direkt bağlı kişileri gör'}
+                  </button>
+                )}
+              </div>
+
+              {/* Alt birim kartları (indented) */}
+              {visibleKids.length > 0 && (
+                <div className="ml-6 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {visibleKids.map((kid) => {
+                    const isKidSelected = selectedDepts.includes(kid.id);
+                    const kidActiveStaff = kid.staff.filter(s => !excludedStaff.includes(s.id));
+                    const isKidExpanded = expandedDept === kid.id;
+                    const isKidAutoIncluded = isRootSelected; // parent seçiliyse child otomatik dahil
+                    const isKidEffective = isKidAutoIncluded || isKidSelected;
+
+                    return (
+                      <div key={kid.id} className="relative">
+                        <button
+                          type="button"
+                          onClick={() => !isKidAutoIncluded && toggleDept(kid.id)}
+                          disabled={isKidAutoIncluded}
+                          className="relative flex w-full items-start gap-2 rounded-lg border p-3 text-left disabled:cursor-not-allowed"
+                          style={{
+                            borderColor: isKidEffective ? kid.color : K.BORDER,
+                            background: isKidEffective ? K.BG : K.SURFACE,
+                            opacity: isKidAutoIncluded ? 0.85 : 1,
+                            transition: 'border-color 150ms ease, background 150ms ease',
+                          }}
+                        >
+                          <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: K.TEXT_MUTED }} />
+                          <div className="flex h-7 w-7 items-center justify-center rounded text-[11px] font-bold text-white shrink-0" style={{ background: kid.color }}>
+                            {kid.name[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate">{kid.name}</p>
+                            <p className="text-[10px] font-mono" style={{ color: K.TEXT_MUTED }}>
+                              {isKidEffective ? `${kidActiveStaff.length}/${kid.staff.length}` : `${kid.staff.length}`} kişi
+                            </p>
+                          </div>
+                          {isKidAutoIncluded && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5" style={{ background: `${kid.color}20`, color: kid.color }}>
+                              Otomatik
+                            </span>
+                          )}
+                          {!isKidAutoIncluded && isKidSelected && (
+                            <div className="flex h-4 w-4 items-center justify-center rounded-full" style={{ background: kid.color }}>
+                              <Check className="h-2.5 w-2.5 text-white" />
+                            </div>
+                          )}
+                        </button>
+                        {isKidEffective && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedDept(isKidExpanded ? null : kid.id)}
+                            className="mt-1 flex w-full items-center justify-center gap-1 rounded py-1 text-[10px] font-medium"
+                            style={{ color: kid.color, background: isKidExpanded ? `${kid.color}10` : 'transparent' }}
+                          >
+                            {isKidExpanded ? 'Gizle' : 'Kişileri gör'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           );
         })}
       </div>
 
-      {expandedDept && selectedDepts.includes(expandedDept) && (() => {
-        const dept = departments.find(d => d.id === expandedDept);
+      {expandedDept && (() => {
+        const dept = deptById.get(expandedDept);
         if (!dept) return null;
+        // Görünür olması için ya direkt seçili olmalı ya da parent'ı seçili olmalı.
+        const isVisible = effectiveDeptIds.has(dept.id);
+        if (!isVisible) return null;
         return (
           <div
             className="rounded-xl border overflow-hidden"
@@ -151,7 +278,11 @@ export default function AssignStep({
               </button>
             </div>
             <div className="divide-y" style={{ borderColor: K.BORDER }}>
-              {dept.staff.map((staff) => {
+              {dept.staff.length === 0 ? (
+                <div className="px-4 py-6 text-center text-xs" style={{ color: K.TEXT_MUTED }}>
+                  Bu departmana doğrudan bağlı personel yok.
+                </div>
+              ) : dept.staff.map((staff) => {
                 const isExcluded = excludedStaff.includes(staff.id);
                 return (
                   <div

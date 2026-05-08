@@ -209,13 +209,14 @@
   }
 }
 
-/* ── MOBILE TOUCH-FRIENDLY — Minimum 44x44px hit targets (WCAG 2.5.5) ── */
+/* ── MOBILE TOUCH-FRIENDLY — Minimum 44x44px hit targets (WCAG 2.5.5) ──
+ * Görsel olarak şekillendirilmiş checkbox/radio/switch kontrolleri hariç
+ * tutulur — bunlar kendi boyutlarını saklar; tap target'ı sarmalayan label
+ * sağlar. Aksi halde 14px'lik özel checkbox 44px'e şişer (login + KVKK). */
 @media (max-width: 768px) {
-  button,
+  button:not([role="checkbox"]):not([role="radio"]):not([role="switch"]),
   [role="button"],
   a,
-  input[type="checkbox"],
-  input[type="radio"],
   select,
   .clickable-card,
   .clickable-row,
@@ -236,8 +237,9 @@
     padding: 16px;
   }
 
-  /* Comfortable spacing for form elements */
-  input,
+  /* Comfortable spacing for form elements — checkbox/radio hariç (kendi
+   * boyutları korunur, aksi halde dikey dikdörtgene dönüşürler). */
+  input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
     min-height: 44px;

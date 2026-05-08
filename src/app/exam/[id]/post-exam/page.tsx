@@ -1,6 +1,5 @@
 'use client';
 
-import './post-exam.css';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Clock, ChevronRight, AlertTriangle, Lock, LogOut } from 'lucide-react';
@@ -157,25 +156,8 @@ export default function PostExamPage() {
 
   useEffect(() => {
     if (!isExamOnly) return;
-    // iOS Safari (iPhone/iPad) `requestFullscreen` desteklemez — ham çağrı
-    // sessiz reject döndürür ve kullanıcıyı tıkanmış toast'a hapseder.
-    // Mobil Safari'de fullscreen yerine "exam shell" modu (data-exam-shell)
-    // ile topbar/sidebar gizlenir; visibilitychange + blur tab switch denetimi
-    // zaten ayrı bir effect'te yürür → kopya kontrolü korunur.
-    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-    const isIOS = /iPad|iPhone|iPod/.test(ua) || (/Mac/.test(ua) && 'ontouchend' in document);
-    const supportsFullscreen = typeof document.documentElement.requestFullscreen === 'function' && !isIOS;
-
-    if (!supportsFullscreen) {
-      document.documentElement.setAttribute('data-exam-shell', 'on');
-      return () => {
-        document.documentElement.removeAttribute('data-exam-shell');
-      };
-    }
-
-    document.documentElement.requestFullscreen().catch(() => {
-      // Desktop'ta da reddedilebilir (permission). Shell moduna düş.
-      document.documentElement.setAttribute('data-exam-shell', 'on');
+    document.documentElement.requestFullscreen?.().catch(() => {
+      toast('Tam ekran moduna geçin', 'warning');
     });
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement) {
@@ -184,10 +166,7 @@ export default function PostExamPage() {
       }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.documentElement.removeAttribute('data-exam-shell');
-    };
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [isExamOnly, toast]);
 
   const handleFinishRef = useRef<() => void>(undefined);
@@ -264,6 +243,13 @@ export default function PostExamPage() {
         <h2>Sınav başlatılamadı</h2>
         <p>{startError || error}</p>
         <button onClick={() => router.push('/staff/my-trainings')} className="pe-err-link">← Eğitimlerime Dön</button>
+        <style>{`
+          .pe-err { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; gap: 10px; max-width: 420px; margin: 0 auto; }
+          .pe-err-icon { width: 56px; height: 56px; border-radius: 4px; background: var(--k-error-bg); color: var(--k-error); display: flex; align-items: center; justify-content: center; }
+          .pe-err h2 { font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; font-size: 22px; color: var(--ed-ink); margin: 0; }
+          .pe-err p { font-size: 13px; color: var(--ed-ink-soft); margin: 0; }
+          .pe-err-link { margin-top: 10px; background: none; border: none; color: var(--ed-ink); font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; cursor: pointer; }
+        `}</style>
       </div>
     );
   }
@@ -444,6 +430,452 @@ export default function PostExamPage() {
         </aside>
       </div>
 
+      <style jsx>{`
+        .pe-root { min-height: 100vh; background: var(--ed-cream); padding-bottom: 40px; }
+
+        .pe-warn-banner {
+          position: sticky;
+          top: 0;
+          z-index: 60;
+          padding: 8px 16px;
+          background: var(--k-error);
+          color: var(--ed-cream);
+          font-family: var(--font-display, system-ui);
+          font-size: 12px;
+          font-weight: 600;
+          text-align: center;
+        }
+
+        .pe-header {
+          position: sticky;
+          top: 0;
+          z-index: 50;
+          padding: 14px 24px 0;
+          background: #ffffff;
+          border-bottom: 1px solid var(--ed-rule);
+        }
+        .pe-header-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding-bottom: 10px;
+        }
+        .pe-header-left {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          min-width: 0;
+        }
+        .pe-phase-chip {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 10px;
+          border-radius: 4px;
+          background: var(--ed-ink);
+          color: var(--ed-cream);
+          font-family: var(--font-display, system-ui);
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          flex-shrink: 0;
+        }
+        .pe-phase-chip-ok { background: var(--ed-ink); }
+        .pe-training {
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
+          font-size: 15px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 24;
+          color: var(--ed-ink);
+          margin: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 320px;
+        }
+        .pe-counter {
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          color: var(--ed-ink-soft);
+          font-variant-numeric: tabular-nums;
+          flex-shrink: 0;
+        }
+        .pe-counter strong {
+          color: var(--ed-ink);
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
+          font-weight: 500;
+        }
+
+        .pe-header-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+        .pe-timer {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          height: 36px;
+          padding: 0 12px;
+          border-radius: 4px;
+          background: #ffffff;
+          border: 1px solid var(--ed-rule);
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
+          font-size: 16px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 28, 'SOFT' 50;
+          color: var(--ed-ink);
+          font-variant-numeric: tabular-nums;
+          letter-spacing: -0.02em;
+          transition: background 220ms ease, color 220ms ease, border-color 220ms ease;
+        }
+        .pe-timer :global(svg) { color: var(--ed-ink-soft); }
+        .pe-timer-crit {
+          background: var(--k-error-bg);
+          border-color: var(--k-error);
+          color: var(--k-error);
+          animation: pe-pulse 1.4s ease-in-out infinite;
+        }
+        .pe-timer-crit :global(svg) { color: var(--k-error); }
+        @keyframes pe-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(179, 38, 30, 0.3); }
+          50% { box-shadow: 0 0 0 4px rgba(179, 38, 30, 0); }
+        }
+
+        .pe-exit {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          height: 36px;
+          padding: 0 12px;
+          border-radius: 4px;
+          background: transparent;
+          color: var(--ed-ink-soft);
+          border: 1px solid transparent;
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+        }
+        .pe-exit:hover { background: var(--k-error-bg); color: var(--k-error); border-color: var(--k-error); }
+
+        .pe-progress {
+          height: 3px;
+          background: transparent;
+          margin: 0 -24px;
+          border-top: 1px solid var(--ed-rule);
+        }
+        .pe-progress-fill {
+          height: 100%;
+          background: var(--ed-ink);
+          transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .pe-body {
+          max-width: 1180px;
+          margin: 0 auto;
+          padding: 28px 24px 0;
+          display: grid;
+          grid-template-columns: 1fr 280px;
+          gap: 20px;
+          align-items: start;
+        }
+
+        .pe-question-card {
+          padding: 32px;
+          background: #ffffff;
+          border: 1px solid var(--ed-rule);
+          border-radius: 4px;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(10, 10, 10, 0.02);
+        }
+        .pe-q-head {
+          display: flex;
+          align-items: flex-start;
+          gap: 14px;
+          margin-bottom: 28px;
+          padding-bottom: 20px;
+          border-bottom: 1px dashed var(--ed-rule);
+        }
+        .pe-q-num {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          width: 48px;
+          height: 48px;
+          border-radius: 4px;
+          background: var(--ed-ink);
+          color: var(--ed-cream);
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
+          font-size: 16px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 28, 'SOFT' 50;
+          letter-spacing: -0.01em;
+          font-variant-numeric: tabular-nums;
+        }
+        .pe-q-text {
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
+          font-size: 20px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 42, 'SOFT' 50;
+          color: var(--ed-ink);
+          letter-spacing: -0.015em;
+          line-height: 1.4;
+          margin: 0;
+          flex: 1;
+        }
+
+        .pe-options {
+          list-style: none;
+          padding: 0;
+          margin: 0 0 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .pe-option {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          width: 100%;
+          padding: 14px 18px;
+          background: #ffffff;
+          border: 1px solid var(--ed-rule);
+          border-radius: 4px;
+          text-align: left;
+          cursor: pointer;
+          font-family: inherit;
+          transition: border-color 160ms ease, background 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .pe-option:hover { border-color: var(--k-border-hover); background: var(--ed-cream); }
+        .pe-option-on {
+          background: var(--ed-ink);
+          border-color: var(--ed-ink);
+        }
+        .pe-option-on:hover { background: var(--ed-olive); border-color: var(--ed-olive); }
+        .pe-option:focus-visible { outline: 2px solid var(--ed-ink); outline-offset: 2px; }
+
+        .pe-option-letter {
+          flex-shrink: 0;
+          width: 32px;
+          height: 32px;
+          border-radius: 4px;
+          background: var(--ed-cream);
+          border: 1px solid var(--ed-rule);
+          color: var(--ed-ink-soft);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
+          font-size: 13px;
+          font-weight: 500;
+        }
+        .pe-option-letter-on {
+          background: var(--ed-cream);
+          color: var(--ed-ink);
+          border-color: var(--ed-cream);
+        }
+        .pe-option-text {
+          flex: 1;
+          font-size: 14px;
+          line-height: 1.5;
+          color: var(--ed-ink);
+        }
+        .pe-option-on .pe-option-text { color: var(--ed-cream); }
+
+        .pe-actions {
+          display: flex;
+          justify-content: flex-end;
+          padding-top: 8px;
+        }
+        .pe-next, .pe-finish {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          height: 48px;
+          padding: 0 22px;
+          border-radius: 4px;
+          font-family: var(--font-display, system-ui);
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          border: 1px solid transparent;
+          transition: background 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .pe-next:active, .pe-finish:active { transform: scale(0.97); }
+        .pe-next {
+          background: var(--ed-ink);
+          color: var(--ed-cream);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        .pe-next:hover { background: var(--ed-olive); }
+
+        .pe-finish-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+        .pe-finish-ok {
+          background: var(--ed-ink);
+          color: var(--ed-cream);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        .pe-finish-ok:hover:not(:disabled) { background: var(--ed-olive); }
+        .pe-finish:disabled { opacity: 0.6; cursor: not-allowed; }
+        .pe-finish-warn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          color: var(--k-warning);
+          margin: 0;
+        }
+        .pe-submit-err {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .pe-submit-err p {
+          font-size: 12px;
+          color: var(--k-error);
+          margin: 0;
+        }
+        .pe-submit-err button {
+          background: none;
+          border: none;
+          color: var(--ed-ink);
+          font-family: var(--font-display, system-ui);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          text-decoration: underline;
+        }
+
+        .pe-spin {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top-color: #ffffff;
+          animation: pe-rot 700ms linear infinite;
+        }
+        @keyframes pe-rot { to { transform: rotate(360deg); } }
+
+        .pe-navigator {
+          padding: 22px 20px;
+          background: #ffffff;
+          border: 1px solid var(--ed-rule);
+          border-radius: 4px;
+          position: sticky;
+          top: 90px;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        }
+        .pe-nav-title {
+          font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
+          font-size: 14px;
+          font-weight: 500;
+          font-variation-settings: 'opsz' 24;
+          color: var(--ed-ink);
+          margin: 0 0 14px;
+          padding-bottom: 10px;
+          border-bottom: 1px dashed var(--ed-rule);
+        }
+
+        .pe-nav-grid {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 6px;
+          margin-bottom: 18px;
+        }
+        .pe-nav-cell {
+          aspect-ratio: 1;
+          border-radius: 8px;
+          background: var(--ed-cream);
+          border: 1px solid var(--ed-rule);
+          color: var(--ed-ink-soft);
+          font-family: var(--font-mono, monospace);
+          font-size: 11px;
+          font-weight: 600;
+          font-variant-numeric: tabular-nums;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+        }
+        .pe-nav-cell:disabled { cursor: not-allowed; }
+        .pe-nav-answered { background: var(--k-success-bg); border-color: var(--k-success); color: var(--ed-ink); }
+        .pe-nav-current {
+          background: var(--ed-ink);
+          border-color: var(--ed-ink);
+          color: var(--ed-cream);
+          font-weight: 700;
+          box-shadow: 0 0 0 3px rgba(10, 122, 71, 0.12);
+        }
+        .pe-nav-locked { background: var(--k-warning-bg); border-color: var(--ed-rule); color: var(--ed-ink-soft); }
+        .pe-nav-future { background: transparent; border-color: var(--ed-rule); color: var(--k-warning); opacity: 0.7; }
+
+        .pe-nav-legend {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .pe-nav-legend li {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-family: var(--font-display, system-ui);
+          font-size: 11px;
+          color: var(--ed-ink-soft);
+          font-variant-numeric: tabular-nums;
+        }
+        .pe-nav-legend strong { color: var(--ed-ink); font-weight: 600; font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; }
+        .pe-nav-swatch {
+          width: 12px;
+          height: 12px;
+          border-radius: 4px;
+          border: 1px solid var(--ed-rule);
+          flex-shrink: 0;
+        }
+        .pe-nav-swatch-ink { background: var(--ed-ink); border-color: var(--ed-ink); }
+        .pe-nav-swatch-ok { background: var(--k-success-bg); border-color: var(--k-success); }
+        .pe-nav-swatch-locked { background: var(--k-warning-bg); }
+        .pe-nav-swatch-future { background: transparent; }
+
+        @media (max-width: 960px) {
+          .pe-body { grid-template-columns: 1fr; padding: 20px 16px 0; }
+          .pe-navigator { position: static; order: -1; }
+          .pe-nav-grid { grid-template-columns: repeat(8, 1fr); }
+        }
+
+        @media (max-width: 640px) {
+          .pe-header { padding: 12px 16px 0; }
+          .pe-header-left { gap: 10px; }
+          .pe-training { font-size: 13px; max-width: 160px; }
+          .pe-counter { font-size: 10px; }
+          .pe-question-card { padding: 22px 18px; }
+          .pe-q-text { font-size: 17px; }
+          .pe-q-num { width: 40px; height: 40px; font-size: 14px; border-radius: 10px; }
+          .pe-option { padding: 12px 14px; gap: 10px; }
+          .pe-option-text { font-size: 13px; }
+          .pe-option-letter { width: 28px; height: 28px; font-size: 12px; }
+          .pe-next, .pe-finish { width: 100%; }
+          .pe-finish-wrap { width: 100%; }
+          .pe-nav-grid { grid-template-columns: repeat(6, 1fr); }
+        }
+
+        @media (max-width: 480px) {
+          .pe-exit span { display: none; }
+          .pe-exit { width: 36px; padding: 0; justify-content: center; }
+          .pe-header-left { flex-wrap: wrap; }
+          .pe-training { max-width: 100%; }
+        }
+      `}</style>
     </div>
   );
 }

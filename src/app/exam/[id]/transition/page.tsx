@@ -11,7 +11,7 @@ interface QuestionResult {
   isCorrect: boolean;
 }
 
-const COUNTDOWN_SECONDS = 10;
+const COUNTDOWN_SECONDS = 120;
 
 function TransitionContent() {
   const router = useRouter();
@@ -724,9 +724,13 @@ function TransitionContent() {
 
   // ═══ COUNTDOWN TRANSITION ═══
   const title = isPreToVideos ? 'Ön sınavı tamamladın' : 'Tüm videoları izledin';
-  const subtitle = isPreToVideos ? 'Şimdi eğitim videolarına geçeceksin.' : 'Şimdi son sınava gireceksin.';
+  const subtitle = isPreToVideos
+    ? 'Şimdi eğitim videolarına geçeceksin.'
+    : 'Şimdi son sınava gireceksin — başarılı olursan eğitimi tamamlamış sayılırsın.';
   const ctaLabel = isPreToVideos ? 'Videolara Geç' : 'Son Sınava Başla';
   const CtaIcon = isPreToVideos ? Play : Award;
+  const HeroIcon = isPreToVideos ? CheckCircle2 : Award;
+  const eyebrowLabel = isPreToVideos ? 'Geçiş · Videolar' : 'Geçiş · Son Sınav';
 
   const circumference = 2 * Math.PI * 54;
   const progress = ((COUNTDOWN_SECONDS - timeLeft) / COUNTDOWN_SECONDS) * circumference;
@@ -735,10 +739,10 @@ function TransitionContent() {
     <div className="tr-count">
       <div className="tr-count-inner">
         <div className="tr-count-icon">
-          <CheckCircle2 className="h-7 w-7" />
+          <HeroIcon className="h-7 w-7" />
         </div>
 
-        <span className="tr-count-eyebrow">Geçiş</span>
+        <span className="tr-count-eyebrow">{eyebrowLabel}</span>
         <h1 className="tr-count-title">{title}</h1>
         <p className="tr-count-subtitle">{subtitle}</p>
 
@@ -751,10 +755,10 @@ function TransitionContent() {
 
         <div className="tr-count-ring-wrap">
           <svg viewBox="0 0 128 128" className="tr-count-ring">
-            <circle cx="64" cy="64" r="54" fill="none" strokeWidth="5" stroke="var(--k-border)" />
+            <circle cx="64" cy="64" r="54" fill="none" strokeWidth="5" stroke="var(--ed-rule)" />
             <circle
               cx="64" cy="64" r="54" fill="none" strokeWidth="5"
-              stroke="var(--k-text-primary)" strokeLinecap="round"
+              stroke="var(--ed-ink)" strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={circumference - progress}
               transform="rotate(-90 64 64)"
@@ -762,14 +766,21 @@ function TransitionContent() {
             />
           </svg>
           <div className="tr-count-digit">
-            <span>{timeLeft}</span>
-            <span className="tr-count-unit">sn</span>
+            <span className="tr-count-num">
+              {timeLeft >= 60
+                ? `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`
+                : timeLeft}
+            </span>
           </div>
         </div>
 
         <p className="tr-count-hint">
           <Clock className="h-3 w-3" />
-          {timeLeft > 0 ? `${timeLeft} saniye sonra otomatik geçiş` : 'Yönlendiriliyor…'}
+          {timeLeft > 0
+            ? timeLeft >= 60
+              ? `${Math.floor(timeLeft / 60)} dk ${timeLeft % 60} sn sonra otomatik geçiş`
+              : `${timeLeft} saniye sonra otomatik geçiş`
+            : 'Yönlendiriliyor…'}
         </p>
 
         <button onClick={navigate} className="tr-count-cta">
@@ -786,7 +797,7 @@ function TransitionContent() {
           align-items: center;
           justify-content: center;
           padding: 24px 20px;
-          background: var(--k-bg);
+          background: var(--ed-cream);
           position: relative;
           overflow: hidden;
         }
@@ -798,18 +809,18 @@ function TransitionContent() {
           width: 700px;
           height: 700px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(10, 122, 71, 0.07) 0%, transparent 60%);
+          background: radial-gradient(circle, var(--ed-gold-a10, rgba(201, 169, 97, 0.10)) 0%, transparent 60%);
           pointer-events: none;
         }
         .tr-count-inner {
           width: 100%;
           max-width: 480px;
           text-align: center;
-          background: var(--k-surface);
-          border: 1px solid var(--k-border);
-          border-radius: 20px;
+          background: #ffffff;
+          border: 1px solid var(--ed-rule);
+          border-radius: 4px;
           padding: 36px 32px;
-          box-shadow: 0 12px 40px rgba(10, 10, 10, 0.06);
+          box-shadow: 0 12px 40px rgba(10, 22, 40, 0.06);
           position: relative;
           display: flex;
           flex-direction: column;
@@ -819,8 +830,8 @@ function TransitionContent() {
           width: 56px;
           height: 56px;
           border-radius: 999px;
-          background: var(--k-primary);
-          color: var(--k-bg);
+          background: var(--ed-ink);
+          color: var(--ed-cream);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -828,12 +839,12 @@ function TransitionContent() {
         }
         .tr-count-eyebrow {
           display: inline-block;
-          font-family: var(--font-display, system-ui);
+          font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
           font-size: 10px;
           font-weight: 600;
-          letter-spacing: 0.14em;
+          letter-spacing: 0.18em;
           text-transform: uppercase;
-          color: var(--k-text-muted);
+          color: var(--ed-gold);
           margin-bottom: 8px;
         }
         .tr-count-title {
@@ -841,15 +852,17 @@ function TransitionContent() {
           font-size: 28px;
           font-weight: 500;
           font-variation-settings: 'opsz' 56, 'SOFT' 50;
-          color: var(--k-text-primary);
+          color: var(--ed-ink);
           letter-spacing: -0.02em;
           line-height: 1.1;
           margin: 0 0 6px;
         }
         .tr-count-subtitle {
           font-size: 13px;
-          color: var(--k-text-muted);
+          line-height: 1.5;
+          color: var(--ed-ink-soft);
           margin: 0 0 16px;
+          max-width: 340px;
         }
 
         .tr-count-score {
@@ -858,18 +871,19 @@ function TransitionContent() {
           gap: 6px;
           padding: 6px 14px;
           border-radius: 999px;
-          background: var(--k-bg);
-          border: 1px solid var(--k-border);
-          font-family: var(--font-display, system-ui);
+          background: var(--ed-cream);
+          border: 1px solid var(--ed-rule);
+          font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
           font-size: 11px;
-          color: var(--k-text-muted);
+          letter-spacing: 0.04em;
+          color: var(--ed-ink-soft);
           margin-bottom: 24px;
         }
         .tr-count-score strong {
           font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
           font-size: 14px;
-          font-weight: 500;
-          color: var(--k-text-primary);
+          font-weight: 600;
+          color: var(--ed-ink);
           font-variant-numeric: tabular-nums;
         }
 
@@ -885,26 +899,18 @@ function TransitionContent() {
           position: absolute;
           inset: 0;
           display: flex;
-          align-items: baseline;
+          align-items: center;
           justify-content: center;
-          gap: 3px;
         }
-        .tr-count-digit > span:first-child {
+        .tr-count-num {
           font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif;
-          font-size: 42px;
+          font-size: 48px;
           font-weight: 500;
           font-variation-settings: 'opsz' 72, 'SOFT' 50;
-          color: var(--k-text-primary);
+          color: var(--ed-ink);
           font-variant-numeric: tabular-nums;
           letter-spacing: -0.03em;
           line-height: 1;
-          align-self: center;
-        }
-        .tr-count-unit {
-          font-family: var(--font-display, system-ui);
-          font-size: 12px;
-          color: var(--k-text-muted);
-          margin-bottom: 6px;
         }
 
         .tr-count-hint {
@@ -912,9 +918,10 @@ function TransitionContent() {
           align-items: center;
           justify-content: center;
           gap: 6px;
-          font-family: var(--font-display, system-ui);
+          font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
           font-size: 11px;
-          color: var(--k-text-muted);
+          letter-spacing: 0.04em;
+          color: var(--ed-ink-soft);
           margin: 0 0 24px;
           font-variant-numeric: tabular-nums;
         }
@@ -927,17 +934,17 @@ function TransitionContent() {
           height: 52px;
           padding: 0 28px;
           border-radius: 999px;
-          background: var(--k-primary);
-          color: var(--k-bg);
+          background: var(--ed-ink);
+          color: var(--ed-cream);
           font-family: var(--font-display, system-ui);
           font-size: 14px;
           font-weight: 600;
-          border: none;
+          border: 1px solid var(--ed-ink);
           cursor: pointer;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 6px 20px rgba(10, 10, 10, 0.15);
-          transition: background 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 6px 20px rgba(10, 22, 40, 0.18);
+          transition: background 160ms ease, border-color 160ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .tr-count-cta:hover { background: var(--k-primary-hover); }
+        .tr-count-cta:hover { background: var(--ed-olive); border-color: var(--ed-olive); }
         .tr-count-cta:active { transform: scale(0.97); }
 
         @media (max-width: 480px) {

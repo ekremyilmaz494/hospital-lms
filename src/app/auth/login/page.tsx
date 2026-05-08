@@ -220,29 +220,29 @@ function LoginForm() {
       }
 
       if (data.mfaRequired) {
-        router.push(`/auth/mfa-verify?factorId=${encodeURIComponent(data.factorId)}`);
+        const mustChange = data.mustChangePassword ? '&mustChangePassword=1' : '';
+        router.push(`/auth/mfa-verify?factorId=${encodeURIComponent(data.factorId)}${mustChange}`);
         return;
       }
 
       if (data.smsMfaRequired) {
-        router.push(data.phoneMissing ? '/auth/phone-setup' : '/auth/sms-verify');
+        const mustChange = data.mustChangePassword ? '?mustChangePassword=1' : '';
+        router.push(data.phoneMissing ? `/auth/phone-setup${mustChange}` : `/auth/sms-verify${mustChange}`);
+        return;
+      }
+
+      if (data.mustChangePassword) {
+        router.push('/auth/change-password?reason=first-login');
         return;
       }
 
       const role = data.user?.role as string | undefined;
-      // mustChangePassword: KVKK onayı da henüz yapılmamışsa önce KVKK modali açılır,
-      // pendingRedirect = change-password → KVKK sonrası doğru yere gider.
-      let target: string;
-      if (data.mustChangePassword) {
-        target = '/auth/change-password?reason=first-login';
-      } else {
-        const rolePrefix = getRolePath(role, 'dashboard');
-        const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
-        const targetPath = isRedirectCompatible ? redirectTo : (role && ROLE_ROUTES[role]) || '/staff/dashboard';
-        // Server zaten cross-subdomain ise tam URL hesapladı (apex → subdomain).
-        // Subdomain login'de data.redirectTo null → buildPostLoginUrl same-domain path döner.
-        target = data.redirectTo ?? buildPostLoginUrl(targetPath, data.organizationSlug ?? null);
-      }
+      const rolePrefix = getRolePath(role, 'dashboard');
+      const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
+      const targetPath = isRedirectCompatible ? redirectTo : (role && ROLE_ROUTES[role]) || '/staff/dashboard';
+      // Server zaten cross-subdomain ise tam URL hesapladı (apex → subdomain).
+      // Subdomain login'de data.redirectTo null → buildPostLoginUrl same-domain path döner.
+      const target = data.redirectTo ?? buildPostLoginUrl(targetPath, data.organizationSlug ?? null);
 
       // Setup wizard guard cache'ini önceden doldur — admin layout aynı anahtarı
       // okuyup /api/admin/setup fetch'ini atlar (ilk login'de 1 round-trip kazanç).
@@ -332,22 +332,14 @@ function LoginForm() {
         .ed-input:focus { border-color: ${K.PRIMARY}; background: ${K.SURFACE}; box-shadow: 0 0 0 3px ${K.PRIMARY_LIGHT}; }
         .ed-input::placeholder { color: ${K.TEXT_MUTED}; opacity: 0.7; }
         .ed-checkbox {
-          -webkit-appearance: none;
-          -moz-appearance: none;
           appearance: none;
-          box-sizing: border-box;
-          width: 14px; height: 14px;
-          min-width: 14px; min-height: 14px;
-          max-width: 14px; max-height: 14px;
+          -webkit-appearance: none;
           border: 1.5px solid ${K.BORDER};
           background: ${K.SURFACE};
           cursor: pointer;
           position: relative;
-          flex-shrink: 0;
           border-radius: 3px;
           transition: background-color 160ms ease, border-color 160ms ease;
-          margin: 0;
-          padding: 0;
         }
         .ed-checkbox:checked { background: ${K.PRIMARY}; border-color: ${K.PRIMARY}; }
         .ed-checkbox:checked::after {
@@ -571,6 +563,17 @@ function LoginForm() {
                     className="ed-checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      minWidth: 16,
+                      minHeight: 16,
+                      maxWidth: 16,
+                      maxHeight: 16,
+                      flexShrink: 0,
+                      flexGrow: 0,
+                      aspectRatio: '1 / 1',
+                    }}
                   />
                   <span className="text-[13px]" style={{ color: K.TEXT_SECONDARY }}>
                     Bu cihazda oturumumu açık tut <span style={{ opacity: 0.7 }}>(7 gün)</span>

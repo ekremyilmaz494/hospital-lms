@@ -18,6 +18,7 @@ export interface Department {
   color: string;
   description: string;
   staffCount: number;
+  parentId?: string | null;
 }
 
 export interface StaffPageData {
