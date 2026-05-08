@@ -16,6 +16,7 @@ export interface Dept {
   count: number;
   color: string;
   staff: DeptStaff[];
+  parentId?: string | null;
 }
 
 export interface VideoItem {
