@@ -15,6 +15,7 @@ import {
 } from '@/lib/invitations'
 import { encryptTcKimlik, hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
+import { defaultPeriodBounds } from '@/lib/training-periods'
 
 export const GET = withSuperAdminRoute(async ({ request }) => {
   const { searchParams } = new URL(request.url)
@@ -151,6 +152,22 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
         order: i,
         isDefault: true,
       })),
+    })
+
+    // Yeni org için cari yıl aktif eğitim dönemi oluştur.
+    // Olmadan admin atama yapamaz (getActivePeriod → 409).
+    const currentYear = new Date().getFullYear()
+    const { startDate: periodStart, endDate: periodEnd } = defaultPeriodBounds(currentYear)
+    await tx.trainingPeriod.create({
+      data: {
+        organizationId: org.id,
+        year: currentYear,
+        label: `${currentYear} Eğitim Dönemi`,
+        startDate: periodStart,
+        endDate: periodEnd,
+        isDefault: true,
+        status: 'active',
+      },
     })
 
     return org
