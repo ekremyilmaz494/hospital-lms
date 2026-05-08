@@ -66,8 +66,10 @@ export default function TrainingDetailPage() {
     createdAt: string;
     reviewedAt: string | null;
   };
+  // URL'deki [id] parametresi assignment.id de olabiliyor; attempt-requests endpoint'i
+  // sadece gerçek training.id ile çalıştığı için training yüklendikten sonra t.id kullan.
   const { data: requestData, refetch: refetchRequests } = useFetch<{ requests: AttemptRequest[] }>(
-    id ? `/api/staff/attempt-requests?trainingId=${encodeURIComponent(id)}` : null,
+    training?.id ? `/api/staff/attempt-requests?trainingId=${encodeURIComponent(training.id)}` : null,
   );
   const myRequest = requestData?.requests?.[0] ?? null;
 
@@ -75,7 +77,7 @@ export default function TrainingDetailPage() {
   const [submittingRequest, setSubmittingRequest] = useState(false);
 
   const submitAttemptRequest = async () => {
-    if (!id || reasonText.trim().length < 10) {
+    if (!training?.id || reasonText.trim().length < 10) {
       toast('Lütfen en az 10 karakterlik açıklama yazın', 'error');
       return;
     }
@@ -84,7 +86,7 @@ export default function TrainingDetailPage() {
       const res = await fetch('/api/staff/attempt-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trainingId: id, reason: reasonText.trim() }),
+        body: JSON.stringify({ trainingId: training.id, reason: reasonText.trim() }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Talep gönderilemedi');
