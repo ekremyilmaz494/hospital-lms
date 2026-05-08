@@ -26,6 +26,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     const now = new Date()
 
     // 1) Zorunlu eğitim metadata'sı (assignments YOK — sayım ayrı aggregate ile)
+    // take YOK — compliance raporu tüm zorunlu eğitimleri kapsamalı, silent truncation olmamalı.
     const trainings = await prisma.training.findMany({
       where: {
         organizationId: orgId,
@@ -42,7 +43,6 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
         renewalPeriodMonths: true,
       },
       orderBy: { complianceDeadline: 'asc' },
-      take: 100,
     })
 
     const trainingIds = trainings.map(t => t.id)
@@ -81,7 +81,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
         _count: { _all: true },
       }),
       // Her eğitim için tamamlamayan personel listesi (detay paneli için)
-      // Cap: 500 kayıt (20 eğitim × 25 ≈ yeterli örnek)
+      // Cap dinamik: training sayısı × 25 (per-training 10 örnek + emniyet payı), min 500.
       prisma.trainingAssignment.findMany({
         where: {
           trainingId: { in: trainingIds },
@@ -106,7 +106,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
             select: { postExamScore: true },
           },
         },
-        take: 500,
+        take: Math.max(500, trainingIds.length * 25),
       }),
     ])
 

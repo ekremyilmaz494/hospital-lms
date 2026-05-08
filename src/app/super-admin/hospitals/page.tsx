@@ -76,7 +76,10 @@ export default function HospitalsPage() {
   const [confirmText, setConfirmText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data, isLoading, error, refetch } = useFetch<HospitalsResponse>('/api/super-admin/hospitals?limit=100');
+  // limit=500: API safePagination max'ı 500'dür. Stat sayaçları client-side hesaplandığı
+  // için tüm hastaneleri çekmek gerekir — 500'ü aşan org sayısına ulaştığımızda pagination
+  // eklenmeli. Hard-coded 100 silent truncation yaratıyordu.
+  const { data, isLoading, error, refetch } = useFetch<HospitalsResponse>('/api/super-admin/hospitals?limit=500');
 
   const allHospitals = data?.hospitals ?? [];
 
