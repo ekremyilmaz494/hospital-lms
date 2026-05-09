@@ -1,6 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, parseBody, safePagination, ApiError, getAppUrl } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination, ApiError, getOrgUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createStaffSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
@@ -337,17 +337,19 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       newData: { email: resolvedEmail, role: 'staff', expiresAt },
     })
 
-    const inviteUrl = buildInvitationUrl(getAppUrl(), raw)
+    const orgForInvite = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { name: true, slug: true, brandColor: true },
+    })
+    // Token tenant subdomain'inde aktive edilir — accept sonrası kullanıcı
+    // doğrudan kendi hastane staff panel'ine düşer.
+    const inviteUrl = buildInvitationUrl(getOrgUrl(orgForInvite?.slug), raw)
     let emailSent = true
     try {
-      const org = await prisma.organization.findUnique({
-        where: { id: orgId },
-        select: { name: true, brandColor: true },
-      })
       emailSent = await sendInvitationEmail({
         to: resolvedEmail,
-        organizationName: org?.name ?? 'Hastane',
-        brandColor: org?.brandColor ?? null,
+        organizationName: orgForInvite?.name ?? 'Hastane',
+        brandColor: orgForInvite?.brandColor ?? null,
         inviteUrl,
         inviterName: `${dbUser.firstName} ${dbUser.lastName}`,
         recipientName: `${data.firstName} ${data.lastName}`,
@@ -435,7 +437,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     try {
       const org = await prisma.organization.findUnique({
         where: { id: orgId },
-        select: { name: true, brandColor: true },
+        select: { name: true, slug: true, brandColor: true },
       })
       await sendStaffWelcomeEmail({
         to: user.email,
@@ -443,7 +445,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         organizationName: org?.name ?? 'Hastane',
         brandColor: org?.brandColor ?? null,
         tempPassword: effectivePassword,
-        loginUrl: `${getAppUrl()}/auth/login`,
+        // Personel doğrudan kendi hastane subdomain'ine yönlenir
+        loginUrl: `${getOrgUrl(org?.slug)}/auth/login`,
       })
       welcomeEmailSent = true
     } catch (err) {

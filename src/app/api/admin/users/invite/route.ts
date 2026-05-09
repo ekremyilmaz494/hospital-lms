@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, parseBody, ApiError, getAppUrl } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, ApiError, getOrgUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { inviteAdminSchema } from '@/lib/validations'
 import { logger } from '@/lib/logger'
@@ -52,7 +52,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { id: true, name: true, ownerUserId: true, maxAdmins: true, brandColor: true },
+    select: { id: true, name: true, slug: true, ownerUserId: true, maxAdmins: true, brandColor: true },
   })
   if (!org) throw new ApiError('Organizasyon bulunamadı', 404)
 
@@ -154,7 +154,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         organizationName: org.name,
         brandColor: org.brandColor,
         tempPassword: effectivePassword,
-        loginUrl: `${getAppUrl()}/auth/login`,
+        // Davet edilen admin doğrudan kendi hastane subdomain'ine gitsin
+        loginUrl: `${getOrgUrl(org.slug)}/auth/login`,
       })
     } catch (err) {
       welcomeEmailSent = false
@@ -229,8 +230,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     },
   })
 
-  // Davet maili gönder
-  const inviteUrl = buildInvitationUrl(getAppUrl(), raw)
+  // Davet maili gönder — token tenant subdomain'inde aktive edilir,
+  // accept sonrası kullanıcı zaten doğru subdomain'de admin panel'ine düşer.
+  const inviteUrl = buildInvitationUrl(getOrgUrl(org.slug), raw)
   let emailSent = true
   try {
     emailSent = await sendInvitationEmail({

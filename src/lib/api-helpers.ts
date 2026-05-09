@@ -40,6 +40,44 @@ export function getAppUrl(): string {
   return url || 'http://localhost:3000'
 }
 
+/**
+ * Tenant subdomain URL'ini üretir (ör. https://adana-hastanesi.klinovax.com).
+ *
+ * Davet/welcome email link'leri ve "esas yönetici giriş URL'i" gibi tenant-bound
+ * akışlar için doğrudan org subdomain'ini gösterir; kullanıcı apex → subdomain
+ * redirect adımını atlar ve yanlış subdomain'e gitme şansı kalmaz.
+ *
+ * `orgSlug` null/empty olursa (legacy org veya henüz slug atanmamış kayıt) apex
+ * URL'ine fallback yapar — apex login route'u TC ile arayıp kullanıcıyı doğru
+ * subdomain'e zaten yönlendirir, yani UX bozulmaz sadece 1 ekstra hop olur.
+ *
+ * Localhost dev ortamında subdomain DNS yoktur (`*.localhost` resolve etmez),
+ * yine apex'e fallback. Production'da `*.klinovax.com` wildcard A kaydı
+ * sayesinde her slug otomatik çalışır.
+ */
+export function getOrgUrl(orgSlug: string | null | undefined): string {
+  const base = getAppUrl()
+
+  // Slug yoksa apex'e fallback (apex login zaten TC ile org seçimi yapar)
+  if (!orgSlug) return base
+
+  // Dev/test fallback: subdomain anlamsız (DNS yok), apex'i dön
+  if (
+    base.includes('localhost') ||
+    base.includes('127.0.0.1') ||
+    base.includes('vercel.app') // preview deploy: subdomain wildcard yok
+  ) {
+    return base
+  }
+
+  // https://klinovax.com → https://<slug>.klinovax.com
+  // https://www.klinovax.com → https://<slug>.klinovax.com (www atılır)
+  return base.replace(
+    /^(https?:\/\/)(?:www\.)?(.+?)\/*$/,
+    `$1${orgSlug}.$2`,
+  )
+}
+
 /** Generate a random UUID v4 for request tracing */
 export function generateRequestId(): string {
   return crypto.randomUUID()

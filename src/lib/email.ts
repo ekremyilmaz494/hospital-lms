@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { BRAND } from '@/lib/brand'
 import { emailLayout, cta, alertBox, infoCard } from '@/lib/email-layout'
+import { getOrgUrl } from '@/lib/api-helpers'
 
 /**
  * Escapes HTML special characters to prevent HTML injection in email templates.
@@ -762,14 +763,19 @@ export async function sendSubscriptionExpiredEmail(to: string, organizationName:
  * Self-service kayıt sonrası admin kullanıcıya gönderilen hoş geldiniz e-postası.
  * E-posta doğrulama linki Supabase tarafından ayrıca gönderilir;
  * bu e-posta bilgilendirme amaçlıdır.
+ *
+ * `orgSlug` verilirse giriş linki tenant subdomain'ine yönlenir (apex redirect
+ * adımı atlanır). Verilmezse apex'e fallback (login route TC ile org seçimi
+ * yapar, UX bozulmaz).
  */
 export async function sendSelfRegistrationEmail(params: {
   to: string
   adminName: string
   organizationName: string
+  orgSlug?: string | null
 }) {
-  const { to, adminName, organizationName } = params
-  const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/login`
+  const { to, adminName, organizationName, orgSlug } = params
+  const loginUrl = `${getOrgUrl(orgSlug)}/auth/login`
   const content = `
     <h2 style="color: #1e293b; margin-top: 0;">Kaydınız Başarılı</h2>
     <p style="color: #64748b;">Merhaba ${escapeHtml(adminName)},</p>

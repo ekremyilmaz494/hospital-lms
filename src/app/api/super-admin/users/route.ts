@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, parseBody, getAppUrl } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, getOrgUrl } from '@/lib/api-helpers'
 import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createUserSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
@@ -94,11 +94,13 @@ export const POST = withSuperAdminRoute(async ({ request, audit }) => {
   // Hoş geldiniz e-postası — admin ve staff için ayrı template
   const org = await prisma.organization.findUnique({
     where: { id: parsed.data.organizationId },
-    select: { name: true, brandColor: true },
+    select: { name: true, brandColor: true, slug: true },
   })
   const hospitalName = org?.name ?? ''
   const brandColor = org?.brandColor ?? null
-  const loginUrl = `${getAppUrl()}/auth/login`
+  // Doğrudan tenant subdomain'i — apex redirect adımı atlanır.
+  // org.slug null ise getOrgUrl apex'e fallback eder (legacy kayıt için defansif).
+  const loginUrl = `${getOrgUrl(org?.slug)}/auth/login`
   const fullName = `${parsed.data.firstName} ${parsed.data.lastName}`.trim()
 
   let emailSent = true
