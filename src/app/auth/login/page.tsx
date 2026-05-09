@@ -2,7 +2,7 @@
 
 import React, { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, Clock, ArrowRight, AlertCircle, Building2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import dynamic from 'next/dynamic';
@@ -71,7 +71,6 @@ const K = {
 };
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const rawRedirect = searchParams.get('redirectTo');
   const redirectTo = rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : null;
@@ -221,18 +220,18 @@ function LoginForm() {
 
       if (data.mfaRequired) {
         const mustChange = data.mustChangePassword ? '&mustChangePassword=1' : '';
-        router.push(`/auth/mfa-verify?factorId=${encodeURIComponent(data.factorId)}${mustChange}`);
+        window.location.href = `/auth/mfa-verify?factorId=${encodeURIComponent(data.factorId)}${mustChange}`;
         return;
       }
 
       if (data.smsMfaRequired) {
         const mustChange = data.mustChangePassword ? '?mustChangePassword=1' : '';
-        router.push(data.phoneMissing ? `/auth/phone-setup${mustChange}` : `/auth/sms-verify${mustChange}`);
+        window.location.href = data.phoneMissing ? `/auth/phone-setup${mustChange}` : `/auth/sms-verify${mustChange}`;
         return;
       }
 
       if (data.mustChangePassword) {
-        router.push('/auth/change-password?reason=first-login');
+        window.location.href = '/auth/change-password?reason=first-login';
         return;
       }
 

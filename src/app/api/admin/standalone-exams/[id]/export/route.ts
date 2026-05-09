@@ -328,6 +328,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="sinav-sonuclari-${dateStr}.pdf"`,
+          'Cache-Control': 'private, no-store',
         },
       })
     }
@@ -477,6 +478,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="sinav-sonuclari-${dateStr}.xlsx"`,
+        'Cache-Control': 'private, no-store',
       },
     })
   } catch (err) {

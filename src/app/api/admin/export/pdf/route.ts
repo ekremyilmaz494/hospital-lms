@@ -168,6 +168,7 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId: orgI
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename=${type ?? 'rapor'}.pdf`,
+      'Cache-Control': 'private, no-store',
     },
   })
 }, { requireOrganization: true })
@@ -326,6 +327,7 @@ async function renderCertificateListPdf(certs: CertListItem[], orgName: string, 
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename=${filename}`,
+      'Cache-Control': 'private, no-store',
     },
   })
 }
@@ -374,6 +376,7 @@ async function renderCertificateBundlePdf(
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename=${filename}`,
+      'Cache-Control': 'private, no-store',
     },
   })
 }

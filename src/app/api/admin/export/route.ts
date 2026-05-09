@@ -70,6 +70,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': 'attachment; filename=personel.csv',
+          'Cache-Control': 'private, no-store',
         },
       })
     }
@@ -79,6 +80,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename=personel.xlsx',
+        'Cache-Control': 'private, no-store',
       },
     })
   }
@@ -131,6 +133,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename=egitimler.xlsx',
+        'Cache-Control': 'private, no-store',
       },
     })
   }
@@ -196,6 +199,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': 'attachment; filename=sinav-sonuclari.csv',
           'X-Total-Rows': String(totalCount),
+          'Cache-Control': 'private, no-store',
         },
       })
     }
@@ -255,6 +259,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename=sinav-sonuclari.xlsx',
         'X-Total-Rows': String(attempts.length),
+        'Cache-Control': 'private, no-store',
       },
     })
   }

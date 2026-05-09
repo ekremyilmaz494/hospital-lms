@@ -851,6 +851,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="rapor-${section}-${dateStr}.pdf"`,
+          'Cache-Control': 'private, no-store',
         },
       })
     }
@@ -1110,6 +1111,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="rapor-${section}-${dateStr}.xlsx"`,
+        'Cache-Control': 'private, no-store',
       },
     })
   } catch (err) {

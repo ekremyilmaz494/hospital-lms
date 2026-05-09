@@ -99,21 +99,16 @@ export function BulkAssignModal({
 
     let cancelled = false;
     setExistingLoading(true);
-    console.log('[bulk-assign] fetching existing for trainings:', key);
     fetch(`/api/admin/bulk-assign/existing?trainingIds=${encodeURIComponent(key)}`)
-      .then(r => {
-        console.log('[bulk-assign] existing response status:', r.status);
-        return r.ok ? r.json() : null;
-      })
+      .then(r => (r.ok ? r.json() : null))
       .then((data: { assignments?: { trainingId: string; userId: string }[] } | null) => {
         if (cancelled) return;
-        console.log('[bulk-assign] existing assignments count:', data?.assignments?.length ?? 0, data);
         const next = new Set<string>();
         for (const a of data?.assignments ?? []) next.add(`${a.trainingId}:${a.userId}`);
         setExistingPairs(next);
         setExistingFetchedFor(key);
       })
-      .catch((err) => { console.error('[bulk-assign] existing fetch error:', err); })
+      .catch(() => { /* ağ hatası — kullanıcıya 'mevcut atamalar yüklenemedi' bilgisi UI'da gösterilir */ })
       .finally(() => { if (!cancelled) setExistingLoading(false); });
 
     return () => { cancelled = true; };

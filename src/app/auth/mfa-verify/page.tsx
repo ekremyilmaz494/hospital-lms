@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Shield, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { BlurFade } from '@/components/ui/blur-fade';
@@ -14,7 +14,6 @@ const ROLE_ROUTES: Record<string, string> = {
 };
 
 function MFAVerifyForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const factorId = searchParams.get('factorId') || '';
   const role = searchParams.get('role') || 'staff';
@@ -83,12 +82,11 @@ function MFAVerifyForm() {
       }
 
       if (mustChangePassword) {
-        router.push('/auth/change-password?reason=first-login');
+        window.location.assign('/auth/change-password?reason=first-login');
         return;
       }
 
-      router.push(ROLE_ROUTES[role] || '/staff/dashboard');
-      router.refresh();
+      window.location.assign(ROLE_ROUTES[role] || '/staff/dashboard');
     } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
       setLoading(false);

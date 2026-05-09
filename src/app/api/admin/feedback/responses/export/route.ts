@@ -190,6 +190,7 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId, audi
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="geri-bildirim-${dateStr}.pdf"`,
+          'Cache-Control': 'private, no-store',
         },
       })
     }
@@ -287,6 +288,7 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId, audi
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="geri-bildirim-${dateStr}.xlsx"`,
+        'Cache-Control': 'private, no-store',
       },
     })
   } catch (err) {
