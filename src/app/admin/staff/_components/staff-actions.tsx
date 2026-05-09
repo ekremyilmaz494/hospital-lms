@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
-  MoreHorizontal, Eye, Edit, GraduationCap, Mail, Trash2,
+  MoreHorizontal, Eye, Edit, GraduationCap, Mail, Trash2, KeyRound,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
+import { ResetPasswordModal } from '@/components/shared/reset-password-modal';
 import { K } from '../_lib/palette';
 import type { Staff } from '../_types';
 import { isSyntheticEmail } from '@/lib/synthetic-email';
@@ -26,6 +27,7 @@ export function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: ()
   const [assignTrainingOpen, setAssignTrainingOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
 
   const handleDelete = async (purge: boolean) => {
     setDeleting(true);
@@ -92,6 +94,13 @@ export function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: ()
               <Mail className="h-4 w-4" /> E-posta Gönder
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem
+            className="gap-2"
+            onClick={() => setResetOpen(true)}
+            style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+          >
+            <KeyRound className="h-4 w-4" /> Şifre Sıfırla
+          </DropdownMenuItem>
           <DropdownMenuSeparator style={{ background: K.BORDER_LIGHT, margin: '4px 0' }} />
           <DropdownMenuItem
             className="gap-2"
@@ -108,6 +117,15 @@ export function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: ()
         staffName={staff.name}
         open={assignTrainingOpen}
         onOpenChange={setAssignTrainingOpen}
+      />
+
+      <ResetPasswordModal
+        isOpen={resetOpen}
+        onClose={() => setResetOpen(false)}
+        userId={staff.id}
+        userName={staff.name}
+        userEmail={staff.email}
+        userRole="staff"
       />
 
       <PremiumModal

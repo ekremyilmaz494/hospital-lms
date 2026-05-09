@@ -487,6 +487,65 @@ export async function sendStaffWelcomeEmail(params: {
   })
 }
 
+/**
+ * Yönetici tarafından şifre sıfırlandığında gönderilen mail.
+ * Geçici şifre maile düşer; ilk girişte mustChangePassword=true ile değiştirme zorunlu.
+ * Mail gönderilemezse endpoint tempPassword'u response'ta döner — admin PDF basıp elden teslim eder.
+ */
+export async function sendPasswordResetByAdminEmail(params: {
+  to: string
+  recipientName: string
+  organizationName: string
+  tempPassword: string
+  loginUrl: string
+  resetByName: string
+  brandColor?: string | null
+}) {
+  const { to, recipientName, organizationName, tempPassword, loginUrl, resetByName, brandColor } = params
+  const content = `
+    <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">Şifreniz sıfırlandı</h2>
+    <p style="color: #475569; line-height: 1.6;">Sayın ${escapeHtml(recipientName)},</p>
+    <p style="color: #475569; line-height: 1.6;">
+      <strong>${escapeHtml(organizationName)}</strong> kurumundaki hesabınızın şifresi
+      <strong>${escapeHtml(resetByName)}</strong> tarafından sıfırlandı. Aşağıdaki geçici şifre ile sisteme giriş yapabilirsiniz.
+    </p>
+
+    <div style="background: #f1f5f9; padding: 18px 20px; border-radius: 10px; margin: 20px 0;">
+      <p style="margin: 0 0 8px; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Yeni Giriş Bilgileri</p>
+      <p style="margin: 6px 0; color: #0f172a; font-size: 14px;">
+        <span style="color: #64748b; display: inline-block; width: 110px;">E-posta</span>
+        <strong>${escapeHtml(to)}</strong>
+      </p>
+      <p style="margin: 6px 0; color: #0f172a; font-size: 14px;">
+        <span style="color: #64748b; display: inline-block; width: 110px;">Geçici şifre</span>
+        <code style="background: white; border: 1px solid #e2e8f0; padding: 4px 10px; border-radius: 6px; font-family: 'JetBrains Mono', Menlo, monospace; font-size: 13px; color: #0f172a;">${escapeHtml(tempPassword)}</code>
+      </p>
+    </div>
+
+    ${alertBox('Güvenlik: İlk girişinizde şifrenizi değiştirmeniz gerekmektedir. Geçici şifreyi kimseyle paylaşmayınız. Bu işlemi siz talep etmediyseniz hemen yöneticinizle iletişime geçin.', 'warning')}
+
+    <div style="text-align: center; margin: 28px 0 8px;">
+      ${cta(loginUrl, 'Sisteme Giriş Yap')}
+    </div>
+
+    <p style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin-top: 28px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+      Bu e-posta sistem tarafından otomatik olarak gönderilmiştir. Sorularınız için lütfen kurum yöneticinizle iletişime geçiniz.
+    </p>
+  `
+  const html = emailLayout({
+    org: { name: organizationName, brandColor },
+    content,
+    theme: 'tenant',
+    headerSubtitle: 'Şifre Sıfırlama Bildirimi',
+  })
+
+  await sendEmail({
+    to,
+    subject: `${organizationName} · Şifreniz sıfırlandı`,
+    html,
+  })
+}
+
 // Yaklaşan eğitim deadline hatırlatması (3/1 gün kala)
 export function upcomingTrainingReminderEmail(staffName: string, trainingTitle: string, dueDate: string, daysLeft: number) {
   const urgencyColor = daysLeft <= 1 ? '#dc2626' : '#f59e0b'

@@ -2,11 +2,12 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserCog, UserPlus, ShieldCheck, Mail, AlertCircle, Clock, X } from 'lucide-react';
+import { UserCog, UserPlus, ShieldCheck, Mail, AlertCircle, Clock, X, KeyRound } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import { ResetPasswordModal } from '@/components/shared/reset-password-modal';
 import { InviteAdminModal } from './_components/invite-admin-modal';
 
 interface AdminListItem {
@@ -48,6 +49,7 @@ export default function YoneticilerPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [resetTarget, setResetTarget] = useState<AdminListItem | null>(null);
 
   const { data, isLoading, refetch } = useFetch<AdminsPayload>('/api/admin/users');
   const { data: invitesData, refetch: refetchInvites } = useFetch<InvitationsPayload>('/api/admin/invitations');
@@ -182,6 +184,7 @@ export default function YoneticilerPage() {
               <th className="px-5 py-3">Unvan</th>
               <th className="px-5 py-3">Durum</th>
               <th className="px-5 py-3">Eklenme</th>
+              {isOwner && <th className="px-5 py-3 text-right">İşlem</th>}
             </tr>
           </thead>
           <tbody>
@@ -224,6 +227,29 @@ export default function YoneticilerPage() {
                 <td className="px-5 py-3 text-sm" style={{ color: 'var(--k-text-muted)' }}>
                   {new Date(a.createdAt).toLocaleDateString('tr-TR')}
                 </td>
+                {isOwner && (
+                  <td className="px-5 py-3 text-right">
+                    {/* Esas Yönetici kendi şifresini bu yoldan sıfırlayamaz — Profil > Şifre Değiştir kullansın */}
+                    {a.id !== user?.id && a.isActive ? (
+                      <button
+                        type="button"
+                        onClick={() => setResetTarget(a)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--k-surface-hover)]"
+                        style={{
+                          borderColor: 'var(--k-border)',
+                          color: 'var(--k-text-secondary)',
+                          background: 'var(--k-surface)',
+                        }}
+                        title="Bu yöneticinin şifresini sıfırla"
+                      >
+                        <KeyRound className="h-3.5 w-3.5" />
+                        Şifre Sıfırla
+                      </button>
+                    ) : (
+                      <span style={{ color: 'var(--k-text-muted)', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -303,6 +329,17 @@ export default function YoneticilerPage() {
           onSaved={() => { refetch(); refetchInvites(); }}
           maxAdmins={data.maxAdmins}
           currentCount={data.activeAdminCount + pendingInvitations.length}
+        />
+      )}
+
+      {resetTarget && (
+        <ResetPasswordModal
+          isOpen={!!resetTarget}
+          onClose={() => setResetTarget(null)}
+          userId={resetTarget.id}
+          userName={`${resetTarget.firstName} ${resetTarget.lastName}`}
+          userEmail={resetTarget.email}
+          userRole="admin"
         />
       )}
     </div>

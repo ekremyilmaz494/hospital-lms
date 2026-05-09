@@ -238,6 +238,16 @@ export default function ForgotPasswordPage() {
                 </p>
               </BlurFade>
 
+              <BlurFade delay={0.17} duration={0.4}>
+                <div
+                  className="mt-4 px-4 py-3 text-[12.5px] leading-relaxed"
+                  style={{ background: '#fafaf9', borderLeft: `3px solid ${RULE}`, color: INK_SOFT }}
+                >
+                  E-posta adresinizi hatırlamıyor veya kuruma <strong style={{ color: INK }}>TC Kimlik No</strong> ile giriş yapıyorsanız,
+                  şifre sıfırlama için <strong style={{ color: INK }}>kurum yöneticinize</strong> başvurun.
+                </div>
+              </BlurFade>
+
               <BlurFade delay={0.18} duration={0.4}>
                 <div className="my-6 h-px" style={{ background: RULE }} />
               </BlurFade>
