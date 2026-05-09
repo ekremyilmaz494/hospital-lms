@@ -69,7 +69,10 @@ function TransitionContent() {
       });
   }, [id, isPreToVideos, isVideosToPost, router]);
 
-  const shouldCountdown = !isPostResult && passedGuardChecked;
+  // Countdown devre dışı — kullanıcı manuel butonla geçer (hazır hissetmeden sınava
+  // itilmesin diye). Yapı (state/ref/useEffect) korundu çünkü tamamen silmek
+  // Turbopack 16.2.4'te derleme döngüsüne sokuyor (commit 21e14c2'de gözlemlendi).
+  const shouldCountdown = false;
 
   const navigate = () => {
     if (navigatedRef.current) return;
@@ -725,8 +728,8 @@ function TransitionContent() {
   // ═══ COUNTDOWN TRANSITION ═══
   const title = isPreToVideos ? 'Ön sınavı tamamladın' : 'Tüm videoları izledin';
   const subtitle = isPreToVideos
-    ? 'Şimdi eğitim videolarına geçeceksin.'
-    : 'Şimdi son sınava gireceksin — başarılı olursan eğitimi tamamlamış sayılırsın.';
+    ? 'Hazır olduğunuzda eğitim videolarına geçebilirsiniz.'
+    : 'Hazır olduğunuzda son sınava başlayabilirsiniz — başarılı olursan eğitimi tamamlamış sayılırsın.';
   const ctaLabel = isPreToVideos ? 'Videolara Geç' : 'Son Sınava Başla';
   const CtaIcon = isPreToVideos ? Play : Award;
   const HeroIcon = isPreToVideos ? CheckCircle2 : Award;
@@ -753,35 +756,39 @@ function TransitionContent() {
           </div>
         )}
 
-        <div className="tr-count-ring-wrap">
-          <svg viewBox="0 0 128 128" className="tr-count-ring">
-            <circle cx="64" cy="64" r="54" fill="none" strokeWidth="5" stroke="var(--ed-rule)" />
-            <circle
-              cx="64" cy="64" r="54" fill="none" strokeWidth="5"
-              stroke="var(--ed-ink)" strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={circumference - progress}
-              transform="rotate(-90 64 64)"
-              className="tr-count-arc"
-            />
-          </svg>
-          <div className="tr-count-digit">
-            <span className="tr-count-num">
-              {timeLeft >= 60
-                ? `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`
-                : timeLeft}
-            </span>
+        {shouldCountdown && (
+          <div className="tr-count-ring-wrap">
+            <svg viewBox="0 0 128 128" className="tr-count-ring">
+              <circle cx="64" cy="64" r="54" fill="none" strokeWidth="5" stroke="var(--ed-rule)" />
+              <circle
+                cx="64" cy="64" r="54" fill="none" strokeWidth="5"
+                stroke="var(--ed-ink)" strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference - progress}
+                transform="rotate(-90 64 64)"
+                className="tr-count-arc"
+              />
+            </svg>
+            <div className="tr-count-digit">
+              <span className="tr-count-num">
+                {timeLeft >= 60
+                  ? `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`
+                  : timeLeft}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
-        <p className="tr-count-hint">
-          <Clock className="h-3 w-3" />
-          {timeLeft > 0
-            ? timeLeft >= 60
-              ? `${Math.floor(timeLeft / 60)} dk ${timeLeft % 60} sn sonra otomatik geçiş`
-              : `${timeLeft} saniye sonra otomatik geçiş`
-            : 'Yönlendiriliyor…'}
-        </p>
+        {shouldCountdown && (
+          <p className="tr-count-hint">
+            <Clock className="h-3 w-3" />
+            {timeLeft > 0
+              ? timeLeft >= 60
+                ? `${Math.floor(timeLeft / 60)} dk ${timeLeft % 60} sn sonra otomatik geçiş`
+                : `${timeLeft} saniye sonra otomatik geçiş`
+              : 'Yönlendiriliyor…'}
+          </p>
+        )}
 
         <button onClick={navigate} className="tr-count-cta">
           <CtaIcon className="h-4 w-4" />
