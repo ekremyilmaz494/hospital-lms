@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, ApiError, getAppUrl } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, ApiError, getOrgUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
@@ -74,9 +74,10 @@ export const POST = withAdminRoute<{ id: string }>(
     }
 
     // Org bilgisi (admin reset değilse yukarıda çekilmedi — mail için lazım)
+    // slug → tenant subdomain login link'i için (apex redirect adımı atlanır)
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { name: true, brandColor: true },
+      select: { name: true, slug: true, brandColor: true },
     })
     if (!org) throw new ApiError('Organizasyon bulunamadı', 404)
 
@@ -121,7 +122,8 @@ export const POST = withAdminRoute<{ id: string }>(
         organizationName: org.name,
         brandColor: org.brandColor,
         tempPassword,
-        loginUrl: `${getAppUrl()}/auth/login`,
+        // Şifre sıfırlanan kullanıcı doğrudan kendi hastane subdomain'ine
+        loginUrl: `${getOrgUrl(org.slug)}/auth/login`,
         resetByName: `${dbUser.firstName} ${dbUser.lastName}`,
       })
     } catch (err) {

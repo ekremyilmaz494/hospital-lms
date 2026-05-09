@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, getAppUrl } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, getOrgUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
@@ -527,12 +527,12 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   // Hoş geldiniz maili için hastane bilgileri (tek sorgu, loop öncesi)
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { name: true, brandColor: true },
+    select: { name: true, slug: true, brandColor: true },
   })
   const hospitalName = org?.name ?? 'Hastane'
   const brandColor = org?.brandColor ?? null
-  const appUrl = getAppUrl()
-  const loginUrl = `${appUrl}/auth/login`
+  // Toplu yüklenen personel doğrudan kendi hastane subdomain'ine yönlenir
+  const loginUrl = `${getOrgUrl(org?.slug)}/auth/login`
   const emailPromises: Promise<void>[] = []
 
   // Departman ID → name çözümlemesi (PDF + sonuç tablosu için, tek sorgu)

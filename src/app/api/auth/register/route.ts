@@ -117,6 +117,8 @@ export async function POST(request: Request) {
         to: email,
         adminName: `${firstName} ${lastName}`,
         organizationName: hospitalName,
+        // Doğrudan tenant subdomain login link'i — slug yoksa apex fallback
+        orgSlug: org.slug,
       })
     } catch (err) {
       emailSent = false

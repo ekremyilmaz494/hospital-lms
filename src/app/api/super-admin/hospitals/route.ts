@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, parseBody, safePagination, getAppUrl } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, safePagination, getOrgUrl } from '@/lib/api-helpers'
 import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createHospitalWithAdminSchema } from '@/lib/validations'
 import { sendInvitationEmail, sendStaffWelcomeEmail } from '@/lib/email'
@@ -237,7 +237,9 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
         organizationName: orgData.name,
         brandColor: null, // brand henüz set edilmedi (yeni hastane)
         tempPassword: effectivePassword,
-        loginUrl: `${getAppUrl()}/auth/login`,
+        // Esas yönetici doğrudan kendi hastane subdomain'ine gitsin —
+        // apex redirect adımı atlanır, yanlış URL hatası imkansız.
+        loginUrl: `${getOrgUrl(hospital.slug)}/auth/login`,
       })
     } catch (err) {
       welcomeEmailSent = false
@@ -295,7 +297,9 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
     },
   })
 
-  const inviteUrl = buildInvitationUrl(getAppUrl(), raw)
+  // Davet linki tenant subdomain'ine gönderilir — accept sonrası kullanıcı
+  // doğrudan kendi hastanesinin admin panel'ine yönlenir.
+  const inviteUrl = buildInvitationUrl(getOrgUrl(hospital.slug), raw)
   let emailSent = true
   try {
     emailSent = await sendInvitationEmail({
