@@ -266,6 +266,35 @@ export async function GET(request: Request) {
     }
   }
 
+  // 7.5 Stale draft trainings — 30+ gün dokunulmamış taslakları sil + ilişkili
+  // S3 dosyalarını temizle. Aksi halde yarım kalan eğitim taslakları abonelik
+  // training limitini şişirir ve orphan video'lar S3'te birikir.
+  const staleDrafts = await prisma.training.findMany({
+    where: {
+      publishStatus: 'draft',
+      draftUpdatedAt: { lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+    },
+    select: { id: true, draftData: true },
+  })
+  let staleDraftS3Deleted = 0
+  for (const d of staleDrafts) {
+    // Tip-açık iterasyon: draftData free-form JSON, defensively cast
+    const dd = d.draftData as { videos?: Array<{ url?: string; documentKey?: string | null }> } | null
+    const keys: string[] = []
+    if (dd?.videos && Array.isArray(dd.videos)) {
+      for (const v of dd.videos) {
+        if (v.url) keys.push(v.url)
+        if (v.documentKey) keys.push(v.documentKey)
+      }
+    }
+    for (const key of keys) {
+      try { await deleteObject(key); staleDraftS3Deleted++ } catch { /* ignore */ }
+    }
+  }
+  const deletedDrafts = staleDrafts.length > 0
+    ? await prisma.training.deleteMany({ where: { id: { in: staleDrafts.map(d => d.id) } } })
+    : { count: 0 }
+
   // 8. Delete old backups (older than 90 days) and their S3 objects
   const oldBackups = await prisma.dbBackup.findMany({
     where: { createdAt: { lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } },
@@ -286,6 +315,8 @@ export async function GET(request: Request) {
     deletedExpoTicketsOk: deletedExpoTicketsOk.count,
     deletedExpoTicketsError: deletedExpoTicketsError.count,
     deletedBackups: deletedBackups.count,
+    deletedDrafts: deletedDrafts.count,
+    staleDraftS3Deleted,
     certRemindersSent,
     overdueRemindersSent,
     subscriptionWarningsSent,

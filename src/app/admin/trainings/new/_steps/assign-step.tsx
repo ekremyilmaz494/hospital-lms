@@ -788,7 +788,7 @@ function SummaryPanel({
                   className="h-2 w-2 rounded-full"
                   style={{ background: d.color }}
                 />
-                <span className="max-w-[140px] truncate">{d.name}</span>
+                <span className="max-w-35 truncate">{d.name}</span>
                 <X
                   className="h-3 w-3 opacity-50 group-hover/chip:opacity-100"
                   style={{ color: K.TEXT_MUTED }}

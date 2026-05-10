@@ -389,6 +389,12 @@ model Training {
   isFromLibrary   Boolean @default(false) @map("is_from_library")
   sourceLibraryId String? @map("source_library_id") @db.Uuid
 
+  // Wizard taslak state'i — publishStatus='draft' iken full snapshot.
+  // Yayın sonrası tutulur (ileride re-edit içinde reuse) ama yayın akışı bu kolonu okumaz.
+  draftData      Json?     @map("draft_data")
+  draftStep      Int?      @default(1) @map("draft_step")
+  draftUpdatedAt DateTime? @map("draft_updated_at") @db.Timestamptz
+
   organization      Organization               @relation(fields: [organizationId], references: [id])
   sourceLibrary     ContentLibrary?            @relation("TrainingFromLibrary", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
   createdBy         User?                      @relation("TrainingCreator", fields: [createdById], references: [id], onDelete: SetNull)
@@ -412,6 +418,8 @@ model Training {
   @@index([organizationId, isCompulsory], map: "idx_trainings_org_compulsory")
   @@index([organizationId, createdAt], map: "idx_trainings_org_created")
   @@index([organizationId, startDate, endDate], map: "idx_trainings_org_start_end")
+  // Taslaklar listesi: createdById + publishStatus='draft' lookup
+  @@index([organizationId, createdById, publishStatus], map: "idx_trainings_org_creator_publish")
   @@map("trainings")
 }
 

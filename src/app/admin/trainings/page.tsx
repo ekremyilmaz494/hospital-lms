@@ -175,8 +175,13 @@ export default function TrainingsPage() {
       accessorKey: 'title',
       header: 'Eğitim Adı',
       size: 280,
-      cell: ({ row }) => (
-        <Link href={`/admin/trainings/${row.original.id}`} className="flex items-center gap-3 group min-w-0">
+      cell: ({ row }) => {
+        const isDraft = row.original.publishStatus === 'draft';
+        // Taslak satırları wizard'a, yayınlanmış olanlar detay sayfasına gitsin.
+        const href = isDraft ? `/admin/trainings/new/${row.original.id}` : `/admin/trainings/${row.original.id}`;
+        const displayTitle = (row.getValue('title') as string)?.trim() || (isDraft ? 'İsimsiz Taslak' : '—');
+        return (
+        <Link href={href} className="flex items-center gap-3 group min-w-0">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
             style={{ background: `color-mix(in srgb, ${categoryColors[row.original.category] || 'var(--k-primary)'} 14%, transparent)` }}
@@ -190,7 +195,7 @@ export default function TrainingsPage() {
               onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--k-primary)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--k-text-primary)'; }}
             >
-              {row.getValue('title')}
+              {displayTitle}
             </p>
             <div className="flex items-center gap-2 mt-0.5">
               <span
@@ -205,7 +210,8 @@ export default function TrainingsPage() {
             </div>
           </div>
         </Link>
-      ),
+        );
+      },
     },
     {
       accessorKey: 'assignedCount',
@@ -283,8 +289,15 @@ export default function TrainingsPage() {
             <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/trainings/${row.original.id}`)}>
               <Eye className="h-4 w-4" /> Detay Görüntüle
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/trainings/${row.original.id}/edit`)}>
-              <Edit className="h-4 w-4" /> Düzenle
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => router.push(
+                row.original.publishStatus === 'draft'
+                  ? `/admin/trainings/new/${row.original.id}`
+                  : `/admin/trainings/${row.original.id}/edit`,
+              )}
+            >
+              <Edit className="h-4 w-4" /> {row.original.publishStatus === 'draft' ? 'Devam Et' : 'Düzenle'}
             </DropdownMenuItem>
             {row.original.publishStatus !== 'published' && (
               <DropdownMenuItem className="gap-2" onClick={() => handlePublishStatus(row.original, 'published')}>
