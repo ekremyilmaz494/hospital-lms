@@ -134,8 +134,8 @@ model Organization {
   orgContentLibrary      ContentLibrary[]             @relation("OrgContentLibrary")
   examAttempts           ExamAttempt[]
   certificates           Certificate[]
-  // EY.FR.40 Eğitim Geri Bildirim
-  feedbackForm           TrainingFeedbackForm?
+  // EY.FR.40 Eğitim Geri Bildirim — bir org birden çok form taslağı tutar (tek aktif)
+  feedbackForms          TrainingFeedbackForm[]
   feedbackResponses      TrainingFeedbackResponse[]
   // Ek deneme hakkı talepleri
   attemptRequests        ExamAttemptRequest[]
@@ -1259,17 +1259,27 @@ model QuestionBankOption {
 
 // ──────────────────────────────────────────────────────────────
 // EY.FR.40 EĞİTİM DEĞERLENDİRME (GERİ BİLDİRİM) FORMU
-// Her organizasyon için tek form; kategoriler + item'lar dinamik.
-// Eğitim/sınav akışı sonunda (geçsin/kalsın) personele gösterilir.
+// Her organizasyon birden çok form taslağı tutabilir; bir anda yalnızca biri
+// aktif olur. Aktif tek-form kuralı DB seviyesinde partial unique index ile
+// garantilenir (migration SQL'inde elle eklenmiştir, prisma diff bunu üretmez).
+// Eğitim/sınav akışı sonunda (geçsin/kalsın) personele aktif form gösterilir.
 // ──────────────────────────────────────────────────────────────
 
 model TrainingFeedbackForm {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String   @unique @map("organization_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
   title          String   @default("Eğitim Değerlendirme Anket Formu") @db.VarChar(255)
   description    String?  @db.Text
   documentCode   String?  @default("EY.FR.40") @map("document_code") @db.VarChar(50)
-  isActive       Boolean  @default(true) @map("is_active")
+  isActive       Boolean  @default(false) @map("is_active")
+  // Bu form aktive edildiğinde tüm eğitimlerde feedback zorunluluğunu nasıl
+  // ayarlayacağı: true → tüm Training.feedbackMandatory=true (sertifika gating
+  // çalışır), false → tüm Training.feedbackMandatory=false (form opsiyonel).
+  isMandatory    Boolean  @default(true)  @map("is_mandatory")
+  // Yanıt verilmiş ama artık kullanılmayan formlar arşive alınır — silmek
+  // istenir ama yanıt geçmişi (FK: TrainingFeedbackResponse.formId) korunur.
+  // Liste UI'sı default arşivsizleri gösterir.
+  isArchived     Boolean  @default(false) @map("is_archived")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -1277,6 +1287,9 @@ model TrainingFeedbackForm {
   categories   TrainingFeedbackCategory[]
   responses    TrainingFeedbackResponse[]
 
+  @@index([organizationId], map: "idx_feedback_forms_org")
+  @@index([organizationId, updatedAt(sort: Desc)], map: "idx_feedback_forms_org_updated")
+  @@index([organizationId, isArchived], map: "idx_feedback_forms_org_archive")
   @@map("training_feedback_forms")
 }
 

@@ -5,6 +5,7 @@ import { trainingFeedbackSubmitSchema } from '@/lib/validations'
 import { checkRateLimit } from '@/lib/redis'
 import { isValidAnswer, isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
 import { isTrainingAccessible } from '@/lib/training-helpers'
+import { issueCertificateForAttempt } from '@/lib/certificate-helpers'
 import { logger } from '@/lib/logger'
 
 /**
@@ -52,6 +53,10 @@ export const POST = withStaffRoute(async ({ request, dbUser, organizationId, aud
           organizationId: true,
           isActive: true,
           publishStatus: true,
+          // Sertifika ertelemesi: feedbackMandatory=true ise bu route sertifikayı üretir.
+          title: true,
+          renewalPeriodMonths: true,
+          feedbackMandatory: true,
         },
       },
       assignment: { select: { originalMaxAttempts: true } },
@@ -214,6 +219,28 @@ export const POST = withStaffRoute(async ({ request, dbUser, organizationId, aud
       entityId: response.id,
       newData: { attemptId: attempt.id, trainingId: attempt.trainingId, includeName },
     })
+
+    // Ertelenmiş sertifika üretimi: zorunlu feedback'li eğitimlerde exam/submit
+    // sertifikayı oluşturmadı — feedback geldiğine göre, geçmiş başarılı denemeler için
+    // şimdi üretilebilir. Idempotent (Certificate.attemptId @unique). Fire-and-forget:
+    // feedback yanıtı kullanıcıya geri döner, sertifika emaili arka planda akar.
+    if (attempt.isPassed && attempt.training.feedbackMandatory) {
+      issueCertificateForAttempt({
+        attemptId: attempt.id,
+        userId: dbUser.id,
+        trainingId: attempt.trainingId,
+        organizationId: attempt.training.organizationId,
+        trainingTitle: attempt.training.title,
+        renewalPeriodMonths: attempt.training.renewalPeriodMonths,
+        recipientEmail: dbUser.email,
+        recipientFullName: `${dbUser.firstName ?? ''} ${dbUser.lastName ?? ''}`.trim(),
+      }).catch(err => {
+        logger.error('FeedbackSubmit', 'Ertelenmiş sertifika üretilemedi', {
+          err,
+          attemptId: attempt.id,
+        })
+      })
+    }
 
     return jsonResponse({ success: true, responseId: response.id, submittedAt: response.submittedAt })
   } catch (err) {

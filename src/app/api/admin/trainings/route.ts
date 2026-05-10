@@ -121,10 +121,22 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   try {
     const training = await prisma.$transaction(async (tx) => {
+      // Aktif feedback formu varsa yeni eğitim de aynı zorunluluk politikasını
+      // miras alır — aksi halde admin "Tüm Eğitimlere Ata" yapsa bile sonradan
+      // eklenen eğitim feedbackMandatory=false ile kalır ve sertifika gating
+      // bypass eder. Aktif form yoksa default false (eski davranış).
+      const activeForm = await tx.trainingFeedbackForm.findFirst({
+        where: { organizationId, isActive: true, isArchived: false },
+        select: { isMandatory: true },
+      })
+      const inheritedFeedbackMandatory = activeForm?.isMandatory ?? false
+
       // 1. Eğitimi Oluştur
       const t = await tx.training.create({
         data: {
           ...trainingData,
+          // Client gönderdiyse onu kullan, yoksa aktif form mirasını al.
+          feedbackMandatory: trainingData.feedbackMandatory ?? inheritedFeedbackMandatory,
           startDate: new Date(trainingData.startDate),
           endDate: new Date(trainingData.endDate),
           complianceDeadline: trainingData.complianceDeadline ? new Date(trainingData.complianceDeadline) : null,
