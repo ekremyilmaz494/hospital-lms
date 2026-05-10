@@ -116,10 +116,11 @@ interface ParsedRow {
   deptName: string
   deptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty'
   deptCandidates?: Array<{ id: string; name: string }>
-  // Alt departman (opsiyonel) — boşsa personel deptId'ye atanır, doluysa subDeptId'ye atanır
+  // Alt departman (opsiyonel) — boşsa personel deptId'ye atanır, doluysa subDeptId'ye atanır.
+  // 'auto-create': parent altında bulunamadı → import sırasında parent altına yaratılacak (ünvan gibi serbest metin).
   subDeptId?: string
   subDeptName: string
-  subDeptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty' | 'mismatch'
+  subDeptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty' | 'mismatch' | 'auto-create'
   subDeptCandidates?: Array<{ id: string; name: string }>
 }
 
@@ -207,11 +208,9 @@ async function parseImportFile(
         subResolved = 'ambiguous'
         subCandidates = subMatch.candidates
       } else {
-        // Bu parent altında bulunamadı — başka parent altında var mı kontrol et (mismatch?)
-        const elsewhere = departments.find(
-          d => d.parentId && d.parentId !== deptId && d.name.toLowerCase() === subInput.toLowerCase(),
-        )
-        subResolved = elsewhere ? 'mismatch' : 'none'
+        // Parent altında yok — kullanıcı serbest metin yazıyor (ünvan gibi).
+        // Import aşamasında parent altına yaratılacak; preview'da "yeni" olarak işaretlenir.
+        subResolved = 'auto-create'
       }
     } else if (subInput && !deptId) {
       // Üst departman bulunamadıysa alt departman doğrulaması yapılmaz
@@ -311,21 +310,9 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
       })
       continue
     }
-    // Alt Departman OPSİYONEL ama doluysa parent ile uyumlu olmalı
-    if (row.subDeptMatch === 'mismatch') {
-      rowResults.push({
-        rowIndex: row.rowIndex, email: row.email, status: 'error',
-        reason: `"${row.subDeptName}" alt departmanı "${row.deptName}" altında değil`,
-      })
-      continue
-    }
-    if (row.subDeptMatch === 'none' && row.subDeptName) {
-      rowResults.push({
-        rowIndex: row.rowIndex, email: row.email, status: 'error',
-        reason: `Alt departman bulunamadı: "${row.subDeptName}"`,
-      })
-      continue
-    }
+    // Alt Departman OPSİYONEL ve serbest metin — parent altında yoksa import sırasında yaratılır.
+    // 'mismatch' (başka parent altında) ve 'none' (hiç yok) artık hata değil; her ikisi de
+    // 'auto-create' gibi davranır: kullanıcının yazdığı parent altına yaratılır.
     if (row.subDeptMatch === 'ambiguous') {
       rowResults.push({
         rowIndex: row.rowIndex, email: row.email, status: 'error',
@@ -437,6 +424,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       const parentOk = !!parentValid && !parentValid.parentId
       // Alt departman parent altında mı?
       const subOk = !!subValid && !!parentValid && subValid.parentId === parentValid.id
+      const subName = (r.subDeptName || '').trim()
+      // Parent OK + alt-departman adı yazılmış ama mevcut bir kayıt eşleşmiyorsa → auto-create
+      const subAutoCreate = parentOk && !!subName && !subOk
       return {
         rowIndex: r.rowIndex || i + 2,
         firstName: (r.firstName || '').trim(),
@@ -450,8 +440,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         deptName: r.deptName || '',
         deptMatch: parentOk ? 'exact' : (r.deptName ? 'none' : 'empty'),
         subDeptId: subOk ? r.subDeptId : undefined,
-        subDeptName: r.subDeptName || '',
-        subDeptMatch: subOk ? 'exact' : (r.subDeptName ? (r.subDeptId ? 'mismatch' : 'none') : 'empty'),
+        subDeptName: subName,
+        subDeptMatch: subOk ? 'exact' : (subAutoCreate ? 'auto-create' : (subName ? 'none' : 'empty')),
       }
     })
   } else {
@@ -537,6 +527,66 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   // Departman ID → name çözümlemesi (PDF + sonuç tablosu için, tek sorgu)
   // Hem parent hem alt id'leri eklenir (UI'da hangisine atandığı gösterilebilsin)
+  // Auto-create alt departmanlar: kullanıcı serbest metin yazmış, parent altında yok → yarat.
+  // Aynı (parent, isim) çiftini tek seferde yarat — Excel'de N satır aynı alt departmanı
+  // referanslıyorsa N kayıt değil 1 kayıt oluşur.
+  const autoCreateMap = new Map<string, string>() // key: `${parentId}::${nameLower}` → newDeptId
+  const autoCreatePending: Array<{ key: string; parentId: string; name: string }> = []
+  for (const row of validRows) {
+    if (row.subDeptMatch !== 'auto-create' || !row.deptId || !row.subDeptName) continue
+    const name = row.subDeptName.trim()
+    if (!name) continue
+    const key = `${row.deptId}::${name.toLowerCase()}`
+    if (autoCreateMap.has(key) || autoCreatePending.some(p => p.key === key)) continue
+    autoCreatePending.push({ key, parentId: row.deptId, name })
+  }
+  if (autoCreatePending.length > 0) {
+    // Department schema: @@unique([organizationId, name]) — adlar org içinde benzersiz, parent'a bakılmaz.
+    // O yüzden "aynı isim varsa parent'tan bağımsız mevcudunu kullan" mantığı zorunlu;
+    // yoksa Excel'de iki farklı parent altında aynı alt isim → ikinci satırda P2002 patlar.
+    const orgDepts = await prisma.department.findMany({
+      where: { organizationId: orgId },
+      select: { id: true, name: true, parentId: true },
+    })
+    for (const p of autoCreatePending) {
+      const nameLower = p.name.toLowerCase()
+      const hit = orgDepts.find(d => d.name.toLowerCase() === nameLower)
+      if (hit) {
+        // Org'da zaten bu ada sahip bir departman var (kök ya da başka parent altında olsa bile).
+        // Schema gereği duplicate yaratamayız → mevcut kaydı kullan.
+        autoCreateMap.set(p.key, hit.id)
+        continue
+      }
+      try {
+        const created = await prisma.department.create({
+          data: { organizationId: orgId, parentId: p.parentId, name: p.name },
+          select: { id: true, name: true, parentId: true },
+        })
+        autoCreateMap.set(p.key, created.id)
+        // Sonraki pending kayıtların aynı ismi referanslayabilmesi için cache'i güncel tut.
+        orgDepts.push(created)
+      } catch (err) {
+        // Race / case farklı duplicate → son çare olarak yeniden oku ve reuse et.
+        const dup = await prisma.department.findFirst({
+          where: { organizationId: orgId, name: { equals: p.name, mode: 'insensitive' } },
+          select: { id: true },
+        })
+        if (dup) {
+          autoCreateMap.set(p.key, dup.id)
+        } else {
+          logger.error('Bulk Import', `Alt departman yaratılamadı: ${p.name}`, err instanceof Error ? err.message : err)
+        }
+      }
+    }
+    // Row'ların subDeptId'sini doldur
+    for (const row of validRows) {
+      if (row.subDeptId || row.subDeptMatch !== 'auto-create' || !row.deptId || !row.subDeptName) continue
+      const key = `${row.deptId}::${row.subDeptName.trim().toLowerCase()}`
+      const id = autoCreateMap.get(key)
+      if (id) row.subDeptId = id
+    }
+  }
+
   const distinctDeptIds = Array.from(new Set(
     validRows.flatMap(r => [r.deptId, r.subDeptId].filter((id): id is string => !!id)),
   ))

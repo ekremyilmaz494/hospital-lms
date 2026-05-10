@@ -42,7 +42,7 @@ interface ParsedRow {
   // Alt departman (opsiyonel)
   subDeptId?: string;
   subDeptName: string;
-  subDeptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty' | 'mismatch';
+  subDeptMatch: 'exact' | 'fuzzy' | 'ambiguous' | 'none' | 'empty' | 'mismatch' | 'auto-create';
   subDeptCandidates?: Array<{ id: string; name: string }>;
 }
 
@@ -224,13 +224,30 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         next[idx].subDeptName = sub?.name || '';
         next[idx].subDeptMatch = patch.subDeptId ? 'exact' : 'empty';
       }
+      // Alt departman serbest metin: yazılan ad parent'ın çocukları arasında varsa
+      // ID'ye bağla (exact), yoksa auto-create işaretle (import'ta yaratılır).
+      if ('subDeptName' in patch && !('subDeptId' in patch)) {
+        const name = (patch.subDeptName || '').trim();
+        const parentId = next[idx].deptId;
+        if (!name) {
+          next[idx].subDeptId = undefined;
+          next[idx].subDeptMatch = 'empty';
+        } else if (!parentId) {
+          // Parent yoksa serbest yaz, validation departman zorunlu der
+          next[idx].subDeptId = undefined;
+          next[idx].subDeptMatch = 'none';
+        } else {
+          const hit = departments.find(
+            d => d.parentId === parentId && d.name.toLowerCase() === name.toLowerCase(),
+          );
+          next[idx].subDeptId = hit?.id;
+          next[idx].subDeptMatch = hit ? 'exact' : 'auto-create';
+        }
+      }
       return next;
     });
   };
 
-  // Bir parent altındaki alt departmanları getir (Map ile O(n) bir kez hesaplandığı için ucuz)
-  const childrenOf = (parentId?: string): Department[] =>
-    parentId ? departments.filter(d => d.parentId === parentId) : [];
 
   const downloadErrorReport = async () => {
     if (!importResult) return;
@@ -468,16 +485,17 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
             <div className="bid-table-scroll">
               <table className="bid-table">
                 <colgroup>
-                  <col style={{ width: 44 }} />
-                  <col style={{ minWidth: 120 }} />
-                  <col style={{ minWidth: 120 }} />
-                  <col style={{ minWidth: 140 }} />
-                  <col style={{ minWidth: 220 }} />
-                  <col style={{ minWidth: 170 }} />
-                  <col style={{ minWidth: 130 }} />
-                  <col style={{ minWidth: 160 }} />
-                  <col style={{ minWidth: 140 }} />
-                  <col style={{ minWidth: 200 }} />
+                  <col style={{ width: 44 }} />        {/* # */}
+                  <col style={{ minWidth: 120 }} />    {/* Ad */}
+                  <col style={{ minWidth: 120 }} />    {/* Soyad */}
+                  <col style={{ minWidth: 140 }} />    {/* TC Kimlik */}
+                  <col style={{ minWidth: 220 }} />    {/* E-posta */}
+                  <col style={{ minWidth: 170 }} />    {/* Şifre */}
+                  <col style={{ minWidth: 130 }} />    {/* Telefon */}
+                  <col style={{ minWidth: 160 }} />    {/* Departman */}
+                  <col style={{ minWidth: 160 }} />    {/* Alt Departman */}
+                  <col style={{ minWidth: 140 }} />    {/* Unvan */}
+                  <col style={{ minWidth: 200 }} />    {/* Durum — eksikti, error metni dikey kırpılıyordu */}
                 </colgroup>
                 <thead>
                   <tr>
@@ -530,22 +548,12 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                           </select>
                         </td>
                         <td>
-                          {(() => {
-                            const subs = childrenOf(row.deptId);
-                            if (subs.length === 0) {
-                              return <span className="text-xs text-muted-foreground">—</span>;
-                            }
-                            return (
-                              <select
-                                value={row.subDeptId || ''}
-                                onChange={(e) => updateRow(idx, { subDeptId: e.target.value || undefined })}
-                                className={`bid-sel ${row.subDeptMatch === 'ambiguous' || row.subDeptMatch === 'none' || row.subDeptMatch === 'mismatch' ? 'bid-sel-err' : ''}`}
-                              >
-                                <option value="">— (opsiyonel)</option>
-                                {subs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                              </select>
-                            );
-                          })()}
+                          {/* Alt departman ünvan gibi serbest metin: yazılan ad mevcut child'a uyarsa
+                              ID'ye bağlanır, yoksa import sırasında parent altına yaratılır. */}
+                          <CellInput
+                            value={row.subDeptName}
+                            onChange={(v) => updateRow(idx, { subDeptName: v })}
+                          />
                         </td>
                         <td><CellInput value={row.title} onChange={(v) => updateRow(idx, { title: v })} /></td>
                         <td>
@@ -1125,7 +1133,9 @@ function CredentialsResult({
           items: pdfReadyRows.map(r => ({
             fullName: r.name,
             tcKimlik: r.tcKimlik!,
-            email: r.email,
+            // Boş string zod .email() validasyonunu kıyor → null gönder.
+            // Sentetik email'li satırlarda email API tarafında zaten gizleniyor.
+            email: r.email && r.email.trim() ? r.email : null,
             tempPassword: r.tempPassword!,
             department: r.department ?? null,
             title: r.title ?? null,
