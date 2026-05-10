@@ -105,9 +105,11 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   }
   slug = slugCandidate
 
-  // Davet edilecek admin'in email'i sistemde başka bir hesapta mevcut mu?
-  const existingUser = await prisma.user.findUnique({ where: { email: adminEmail }, select: { id: true } })
-  if (existingUser) return errorResponse('Bu e-posta adresi sistemde başka bir kullanıcıya kayıtlı', 409)
+  // E-posta verilmişse çakışma kontrolü yap
+  if (adminEmail) {
+    const existingUser = await prisma.user.findUnique({ where: { email: adminEmail }, select: { id: true } })
+    if (existingUser) return errorResponse('Bu e-posta adresi sistemde başka bir kullanıcıya kayıtlı', 409)
+  }
 
   // Plan doğrulama
   if (planId) {
@@ -178,10 +180,13 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
     const effectivePassword = adminPassword ||
       ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1')
 
+    // E-posta verilmemişse TC hash'inden sistem e-postası üret — Supabase için gerekli.
+    const effectiveEmail = adminEmail ?? `noemail-${hashTcKimlik(adminTcKimlik).slice(0, 12)}@klinovax.internal`
+
     let result
     try {
       result = await createAuthUser({
-        email: adminEmail,
+        email: effectiveEmail,
         password: effectivePassword,
         firstName: adminFirstName,
         lastName: adminLastName,
@@ -219,7 +224,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       newData: {
         hospitalName: orgData.name,
         hospitalCode: orgData.code,
-        adminEmail,
+        adminEmail: adminEmail ?? null,
         ownerUserId: ownerUser.id,
         mode: 'direct',
         planId,
@@ -228,22 +233,22 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       },
     })
 
-    // Hoş geldiniz maili — best effort
-    let welcomeEmailSent = true
-    try {
-      await sendStaffWelcomeEmail({
-        to: ownerUser.email,
-        staffName: `${ownerUser.firstName} ${ownerUser.lastName}`,
-        organizationName: orgData.name,
-        brandColor: null, // brand henüz set edilmedi (yeni hastane)
-        tempPassword: effectivePassword,
-        // Esas yönetici doğrudan kendi hastane subdomain'ine gitsin —
-        // apex redirect adımı atlanır, yanlış URL hatası imkansız.
-        loginUrl: `${getOrgUrl(hospital.slug)}/auth/login`,
-      })
-    } catch (err) {
-      welcomeEmailSent = false
-      logger.warn('hospital-create', `Hoş geldiniz maili gönderilemedi: ${ownerUser.email}`, err instanceof Error ? err.message : err)
+    // Hoş geldiniz maili — sadece gerçek e-posta varsa gönder
+    let welcomeEmailSent = false
+    if (adminEmail) {
+      try {
+        await sendStaffWelcomeEmail({
+          to: adminEmail,
+          staffName: `${ownerUser.firstName} ${ownerUser.lastName}`,
+          organizationName: orgData.name,
+          brandColor: null,
+          tempPassword: effectivePassword,
+          loginUrl: `${getOrgUrl(hospital.slug)}/auth/login`,
+        })
+        welcomeEmailSent = true
+      } catch (err) {
+        logger.warn('hospital-create', `Hoş geldiniz maili gönderilemedi: ${adminEmail}`, err instanceof Error ? err.message : err)
+      }
     }
 
     return jsonResponse({
@@ -259,13 +264,15 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   }
 
   // ── INVITE MODE — Davet linki gönder, esas yönetici email'den şifresini kurar ──
+  // adminEmail, superRefine ile invite modda zorunlu kılındığı için burada her zaman tanımlı.
+  const inviteEmail = adminEmail!
   const { raw, hash } = generateInvitationToken()
   const expiresAt = computeInvitationExpiry()
 
   const invitation = await prisma.invitation.create({
     data: {
       tokenHash: hash,
-      email: adminEmail,
+      email: inviteEmail,
       firstName: adminFirstName,
       lastName: adminLastName,
       phone: null,
@@ -303,7 +310,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   let emailSent = true
   try {
     emailSent = await sendInvitationEmail({
-      to: adminEmail,
+      to: inviteEmail,
       organizationName: orgData.name,
       inviteUrl,
       inviterName: `${dbUser.firstName} ${dbUser.lastName}`,

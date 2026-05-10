@@ -47,7 +47,8 @@ export const createHospitalWithAdminSchema = createOrganizationSchema.extend({
   mode: z.enum(['invite', 'direct']).default('invite'),
   adminFirstName: z.string().min(1, 'Admin adı zorunludur').max(100),
   adminLastName: z.string().min(1, 'Admin soyadı zorunludur').max(100),
-  adminEmail: z.string().min(1).max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
+  // Invite modda davet linki e-postaya gideceği için zorunlu; direct modda opsiyonel.
+  adminEmail: z.string().max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin').optional(),
   // Direct mode'da admin şifre belirleyebilir; boş gelirse server üretir.
   // Invite mode'da yok sayılır.
   adminPassword: z.string().min(8, 'Şifre en az 8 karakter olmalıdır').max(128).optional(),
@@ -58,6 +59,14 @@ export const createHospitalWithAdminSchema = createOrganizationSchema.extend({
     .max(20)
     .transform(val => normalizeTcKimlik(val))
     .refine(val => isValidTcKimlik(val), { message: 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)' }),
+}).superRefine((data, ctx) => {
+  if (data.mode === 'invite' && !data.adminEmail) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['adminEmail'],
+      message: 'Davet linki modu için e-posta zorunludur',
+    })
+  }
 })
 
 export const updateOrganizationSchema = createOrganizationSchema.partial().extend({

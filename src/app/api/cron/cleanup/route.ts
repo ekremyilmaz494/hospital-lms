@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, certificateExpiryReminderEmail, overdueTrainingReminderEmail } from '@/lib/email'
-import { deleteObject } from '@/lib/s3'
+import { deleteObject, downloadBuffer } from '@/lib/s3'
+import { decryptBackup } from '@/lib/backup-crypto'
+import { logger } from '@/lib/logger'
 import { ATTEMPT_TERMINAL_STATUSES, type AttemptStatus, type AssignmentStatus } from '@/lib/exam-state-machine'
 import type { UserRole } from '@/types/database'
 
@@ -295,17 +297,112 @@ export async function GET(request: Request) {
     ? await prisma.training.deleteMany({ where: { id: { in: staleDrafts.map(d => d.id) } } })
     : { count: 0 }
 
-  // 8. Delete old backups (older than 90 days) and their S3 objects
+  // 8. Delete old backups (older than 90 days) — verify-before-delete politikası.
+  //
+  // Eski yaklaşım eski yedekleri körü körüne siliyordu. Bu, sessizce bozulan
+  // yedek serisinin "silinen sonuncusunun da bozuk olduğunu" gizliyordu. Şimdi:
+  //  1) Aynı orgun >90 gün eski yedeği için, daha YENİ ve doğrulanmış (verified=true)
+  //     en az 1 yedek olmalı — yoksa silmeyi atla (org'un en az bir geçerli yedeği kalsın).
+  //  2) S3'ten download + decrypt + JSON parse round-trip yap; başarılıysa sil.
+  //     Round-trip başarısızsa silmeyi atla, admin'e uyarı için failure kaydı bırak.
+  //  3) S3 delete hatası logla (sessiz yutma yok).
+  const oldBackupCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
   const oldBackups = await prisma.dbBackup.findMany({
-    where: { createdAt: { lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } },
-    select: { id: true, fileUrl: true },
+    where: { createdAt: { lt: oldBackupCutoff } },
+    select: { id: true, fileUrl: true, organizationId: true, status: true, createdAt: true },
   })
+
+  // Org başına yenisi var mı haritası — tek query ile topla
+  const orgIdsWithOld = [...new Set(oldBackups.map(b => b.organizationId).filter((x): x is string => !!x))]
+  const recentVerified = orgIdsWithOld.length > 0
+    ? await prisma.dbBackup.findMany({
+        where: {
+          organizationId: { in: orgIdsWithOld },
+          createdAt: { gte: oldBackupCutoff },
+          status: 'completed',
+          verified: true,
+        },
+        select: { organizationId: true },
+      })
+    : []
+  const orgsWithRecentVerified = new Set(recentVerified.map(r => r.organizationId).filter((x): x is string => !!x))
+
+  const idsToDelete: string[] = []
+  const skippedNoRecent: string[] = []
+  const skippedVerifyFail: Array<{ id: string; reason: string }> = []
+  const deletedKeys: string[] = []
+
   for (const b of oldBackups) {
-    await deleteObject(b.fileUrl).catch(() => {})
+    // Org'ta yenisi yoksa eskiyi tutmayı tercih et — hiçbiri kalmasın senaryosunu engelle.
+    if (b.organizationId && !orgsWithRecentVerified.has(b.organizationId)) {
+      skippedNoRecent.push(b.id)
+      continue
+    }
+    // Local fallback yedekleri için S3'te dosya yok — sadece DB row'unu sil.
+    if (b.fileUrl === 'local' || !b.fileUrl) {
+      idsToDelete.push(b.id)
+      continue
+    }
+
+    // S3 round-trip doğrulaması — silmeden önce dosyanın okunabildiğine emin ol.
+    let canDelete = false
+    let failReason = ''
+    try {
+      const buf = await downloadBuffer(b.fileUrl)
+      if (buf.byteLength === 0) {
+        failReason = 'empty_file'
+      } else {
+        const raw = buf.toString('utf-8')
+        const json = decryptBackup(raw)
+        // JSON parse — başarılıysa yedek geri yüklenebilir durumda demektir.
+        JSON.parse(json)
+        canDelete = true
+      }
+    } catch (err) {
+      failReason = err instanceof Error ? err.message.slice(0, 120) : 'unknown'
+    }
+
+    if (!canDelete) {
+      skippedVerifyFail.push({ id: b.id, reason: failReason })
+      // DB'de bozuk olarak işaretle ki monitoring fark etsin
+      await prisma.dbBackup.update({
+        where: { id: b.id },
+        data: { status: 'verification_failed', verified: false },
+      }).catch(() => { /* best-effort */ })
+      continue
+    }
+
+    // Doğrulandı, S3'ten sil
+    try {
+      await deleteObject(b.fileUrl)
+      deletedKeys.push(b.fileUrl)
+      idsToDelete.push(b.id)
+    } catch (err) {
+      logger.error('cleanup', 'S3 delete basarisiz, DB row korundu', { id: b.id, err: err instanceof Error ? err.message : String(err) })
+      // S3 silme hatası — DB row'unu silme (drift'i engelle)
+    }
   }
-  const deletedBackups = oldBackups.length > 0
-    ? await prisma.dbBackup.deleteMany({ where: { id: { in: oldBackups.map(b => b.id) } } })
+
+  const deletedBackups = idsToDelete.length > 0
+    ? await prisma.dbBackup.deleteMany({ where: { id: { in: idsToDelete } } })
     : { count: 0 }
+
+  // Verify-fail olanlar için admin uyarısı
+  if (skippedVerifyFail.length > 0) {
+    const adminEmail = process.env.ADMIN_ALERT_EMAIL
+    if (adminEmail) {
+      sendEmail({
+        to: adminEmail,
+        subject: `[Yedekleme Uyarısı] ${skippedVerifyFail.length} eski yedek doğrulamadan geçemedi`,
+        html: `<h3>Cleanup Cron — Verify Before Delete</h3>
+          <p><strong>Tarih:</strong> ${new Date().toLocaleString('tr-TR')}</p>
+          <p>Aşağıdaki yedekler 90+ gün eski olmasına rağmen okunabilirlik testinden geçemedi.
+          DB satırları <code>verification_failed</code> olarak işaretlendi, S3 dosyaları korundu.</p>
+          <ul>${skippedVerifyFail.slice(0, 50).map(f => `<li><code>${f.id}</code> — ${f.reason}</li>`).join('')}</ul>
+          <p>Lütfen anahtar (BACKUP_ENCRYPTION_KEY) ve S3 erişimini kontrol edin.</p>`,
+      }).catch(err => logger.warn('cleanup', 'Verify-fail uyari emaili gonderilemedi', (err as Error).message))
+    }
+  }
 
   return NextResponse.json({
     success: true,
@@ -315,6 +412,9 @@ export async function GET(request: Request) {
     deletedExpoTicketsOk: deletedExpoTicketsOk.count,
     deletedExpoTicketsError: deletedExpoTicketsError.count,
     deletedBackups: deletedBackups.count,
+    skippedBackupsNoRecent: skippedNoRecent.length,
+    skippedBackupsVerifyFail: skippedVerifyFail.length,
+    deletedBackupS3Keys: deletedKeys.length,
     deletedDrafts: deletedDrafts.count,
     staleDraftS3Deleted,
     certRemindersSent,

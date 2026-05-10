@@ -54,6 +54,15 @@ export default function NewHospitalPage() {
     }
 
     const adminPassword = String(formData.get('adminPassword') ?? '').trim();
+    const adminEmailRaw = String(formData.get('adminEmail') ?? '').trim();
+
+    // Invite modda e-posta zorunlu — server zaten reddeder ama erken gösterelim
+    if (mode === 'invite' && !adminEmailRaw) {
+      setSaveError('Davet linki modu için e-posta zorunludur.');
+      setSaving(false);
+      return;
+    }
+
     const body: Record<string, unknown> = {
       mode,
       name: formData.get('name'),
@@ -63,7 +72,7 @@ export default function NewHospitalPage() {
       email: formData.get('email'),
       adminFirstName: formData.get('adminFirstName'),
       adminLastName: formData.get('adminLastName'),
-      adminEmail: formData.get('adminEmail'),
+      ...(adminEmailRaw && { adminEmail: adminEmailRaw }),
       adminTcKimlik: normalizeTcKimlik(tcRaw),
       ...(planId && { planId }),
       trialDays: Number(formData.get('trialDays') ?? 14),
@@ -412,8 +421,15 @@ export default function NewHospitalPage() {
                 </div>
               </div>
               <div>
-                <Label style={{ color: 'var(--color-text-secondary)' }}>E-posta *</Label>
+                <Label style={{ color: 'var(--color-text-secondary)' }}>
+                  E-posta{mode === 'invite' ? ' *' : ''}
+                </Label>
                 <Input name="adminEmail" placeholder="admin@hastane.com" type="email" autoComplete="email" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                {mode === 'direct' && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Boş bırakılabilir — e-posta olmadan da hesap oluşturulur.
+                  </p>
+                )}
               </div>
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>TC Kimlik No *</Label>

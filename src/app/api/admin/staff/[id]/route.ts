@@ -20,6 +20,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
       select: {
         id: true, firstName: true, lastName: true, email: true,
         phone: true, departmentId: true, title: true, isActive: true,
+        hireDate: true,
       },
     })
     if (!staff) return errorResponse('Personel bulunamadı', 404)
@@ -44,6 +45,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
       title: staff.title ?? '',
       initials: `${(staff.firstName?.[0] ?? '').toUpperCase()}${(staff.lastName?.[0] ?? '').toUpperCase()}`,
       isActive: staff.isActive,
+      hireDate: staff.hireDate ? staff.hireDate.toISOString().split('T')[0] : '',
     }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
   }
 
@@ -136,11 +138,15 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, or
   const safeUpdateSchema = z.object({
     firstName: z.string().min(1).max(100).optional(),
     lastName: z.string().min(1).max(100).optional(),
+    email: z.string().email('Geçersiz e-posta formatı').max(255).optional(),
     phone: z.string().max(20).optional(),
     title: z.string().max(100).optional(),
     departmentId: z.string().uuid().optional(),
     department: z.string().max(100).optional(),
     isActive: z.boolean().optional(),
+    // İşe giriş tarihi — '' veya 'YYYY-MM-DD' kabul. Boş gelirse null'a çevrilir
+    // (alanın temizlenmesine izin verir).
+    hireDate: z.union([z.string().length(0), z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.null()]).optional(),
   })
   const parsed = safeUpdateSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
@@ -160,9 +166,53 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, or
     dataToUpdate.department = deptCheck.name
   }
 
+  // Email değişikliği — Supabase Auth ile senkron olmalı (auth identity = email).
+  // Sıra: önce Prisma uniqueness kontrolü → Auth update → DB update.
+  // Auth başarılı olup DB başarısız olursa kullanıcının auth e-postası ile DB e-postası
+  // sapabilir; logger.error ile incident bırakırız.
+  let emailChanged = false
+  if (typeof parsed.data.email === 'string' && parsed.data.email.toLowerCase() !== existing.email.toLowerCase()) {
+    const newEmail = parsed.data.email.toLowerCase().trim()
+    // Çakışma kontrolü (case-insensitive)
+    const dup = await prisma.user.findFirst({
+      where: { email: { equals: newEmail, mode: 'insensitive' }, NOT: { id } },
+      select: { id: true },
+    })
+    if (dup) return errorResponse('Bu e-posta başka bir personelde kayıtlı', 409)
+
+    try {
+      const supabase = await createServiceClient()
+      const { error: authErr } = await supabase.auth.admin.updateUserById(id, { email: newEmail })
+      if (authErr) {
+        logger.error('staff-update', 'Auth email guncellenemedi', { userId: id, message: authErr.message })
+        return errorResponse('E-posta güncellenemedi (Auth tarafı reddetti)', 500)
+      }
+    } catch (err) {
+      logger.error('staff-update', 'Auth client hatasi', { userId: id, err: err instanceof Error ? err.message : String(err) })
+      return errorResponse('E-posta güncellenemedi', 500)
+    }
+    dataToUpdate.email = newEmail
+    emailChanged = true
+  } else if (parsed.data.email) {
+    // Aynı e-posta — değişiklik yok, alanı update'ten çıkar
+    delete dataToUpdate.email
+  }
+
+  // hireDate boş string → null (alanı temizle), 'YYYY-MM-DD' → Date
+  if ('hireDate' in dataToUpdate) {
+    const v = dataToUpdate.hireDate
+    dataToUpdate.hireDate = v && typeof v === 'string' ? new Date(v) : null
+  }
+
   const staff = await prisma.user.update({
     where: { id, organizationId: orgId },
     data: dataToUpdate,
+  }).catch(async (err) => {
+    // DB update fail — eğer Auth zaten güncellendiyse drift loglarız
+    if (emailChanged) {
+      logger.error('staff-update', 'Auth-DB drift: Auth e-posta degisti ama DB update fail', { userId: id, err: err instanceof Error ? err.message : String(err) })
+    }
+    throw err
   })
 
   await audit({

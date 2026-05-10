@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Save, User, Building2, Phone, Mail, Briefcase, Check } from 'lucide-react';
+import { ArrowLeft, Save, User, Building2, Phone, Mail, Briefcase, Check, CalendarDays } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,6 +36,8 @@ interface StaffEditData {
   title: string;
   initials: string;
   isActive: boolean;
+  /** İşe giriş tarihi — 'YYYY-MM-DD' veya boş */
+  hireDate: string;
 }
 
 interface Dept {
@@ -83,7 +85,10 @@ export default function EditStaffPage() {
     const e: Record<string, string> = {};
     if (!formData.firstName.trim()) e.firstName = 'Ad zorunludur';
     if (!formData.lastName.trim()) e.lastName = 'Soyad zorunludur';
+    if (!formData.email.trim()) e.email = 'E-posta zorunludur';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) e.email = 'Geçerli e-posta formatı girin';
     if (formData.phone && !/^0\d{10}$/.test(formData.phone.replace(/\s/g, ''))) e.phone = 'Geçerli telefon formatı: 05XX XXX XX XX';
+    if (formData.hireDate && !/^\d{4}-\d{2}-\d{2}$/.test(formData.hireDate)) e.hireDate = 'Tarih formatı YYYY-MM-DD olmalı';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -98,11 +103,13 @@ export default function EditStaffPage() {
         body: JSON.stringify({
           firstName: formData.firstName,
           lastName: formData.lastName,
+          email: formData.email.trim(),
           phone: formData.phone,
           title: formData.title,
           departmentId: formData.departmentId || undefined,
           department: formData.department || undefined,
           isActive: formData.isActive,
+          hireDate: formData.hireDate || null,
         }),
       });
       if (!res.ok) {
@@ -291,18 +298,19 @@ export default function EditStaffPage() {
               </Field>
             </div>
 
-            <Field label="E-posta" icon={<Mail className="h-3 w-3" />} hint="E-posta adresi değiştirilemez.">
+            <Field
+              label="E-posta *"
+              icon={<Mail className="h-3 w-3" />}
+              error={errors.email}
+              hint={!errors.email ? 'Değiştirme sonrası kullanıcı yeni e-posta ile giriş yapar.' : undefined}
+            >
               <Input
                 value={formData.email}
-                disabled
+                onChange={(e) => update('email', e.target.value)}
                 autoComplete="email"
+                placeholder="ornek@hastane.com"
                 className="se-input"
-                style={{
-                  ...inputStyle(),
-                  background: K.BG,
-                  color: K.TEXT_MUTED,
-                  cursor: 'not-allowed',
-                }}
+                style={inputStyle(errors.email)}
               />
             </Field>
 
@@ -384,6 +392,21 @@ export default function EditStaffPage() {
                 />
               </Field>
             </div>
+
+            <Field
+              label="İşe Giriş Tarihi"
+              icon={<CalendarDays className="h-3 w-3" />}
+              error={errors.hireDate}
+              hint={!errors.hireDate ? 'Boş bırakılabilir, sonradan eklenebilir.' : undefined}
+            >
+              <Input
+                type="date"
+                value={formData.hireDate}
+                onChange={(e) => update('hireDate', e.target.value)}
+                className="se-input"
+                style={inputStyle(errors.hireDate)}
+              />
+            </Field>
 
             {/* Active/Inactive toggle */}
             <div style={{
