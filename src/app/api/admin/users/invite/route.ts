@@ -75,7 +75,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         expiresAt: { gt: new Date() },
       },
     }),
-    prisma.user.findUnique({ where: { email: data.email }, select: { id: true } }),
+    data.email ? prisma.user.findUnique({ where: { email: data.email }, select: { id: true } }) : Promise.resolve(null),
     prisma.user.findFirst({
       where: { organizationId: orgId, tcHash },
       select: { id: true },
@@ -103,11 +103,12 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   if (data.mode === 'direct') {
     const effectivePassword = data.password ||
       ('Pass' + randomBytes(4).toString('hex').toUpperCase() + '!1')
+    const effectiveEmail = data.email ?? `noemail-${hashTcKimlik(data.tcKimlik).slice(0, 12)}@klinovax.internal`
 
     let result
     try {
       result = await createAuthUser({
-        email: data.email,
+        email: effectiveEmail,
         password: effectivePassword,
         firstName: data.firstName,
         lastName: data.lastName,

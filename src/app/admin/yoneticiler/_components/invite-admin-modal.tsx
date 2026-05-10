@@ -45,8 +45,8 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
     const e: Record<string, string> = {};
     if (!form.ad.trim()) e.ad = 'Ad zorunludur';
     if (!form.soyad.trim()) e.soyad = 'Soyad zorunludur';
-    if (!form.email.trim()) e.email = 'E-posta zorunludur';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Geçerli bir e-posta girin';
+    if (mode === 'invite' && !form.email.trim()) e.email = 'E-posta zorunludur';
+    else if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Geçerli bir e-posta girin';
     if (form.telefon && !/^0\d{10}$/.test(form.telefon.replace(/\s/g, ''))) e.telefon = 'Geçerli telefon formatı: 05XX XXX XX XX';
 
     const tcNorm = normalizeTcKimlik(form.tc);
@@ -85,7 +85,7 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
         mode,
         firstName: form.ad,
         lastName: form.soyad,
-        email: form.email,
+        email: form.email.trim() || undefined,
         phone: form.telefon || undefined,
         title: form.unvan || undefined,
         tcKimlik: tcNorm,
@@ -328,7 +328,7 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
                      style={fieldStyle('soyad')} />
             </FieldRow>
           </div>
-          <FieldRow label="E-posta *" error={errors.email}>
+          <FieldRow label={mode === 'invite' ? 'E-posta *' : 'E-posta'} error={errors.email}>
             <Input data-field="email" type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email}
                    onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
                    style={fieldStyle('email')} />

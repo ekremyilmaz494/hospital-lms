@@ -143,6 +143,8 @@ export const inviteAdminSchema = z.discriminatedUnion('mode', [
   z.object({
     mode: z.literal('direct'),
     ...baseAdminInviteFields,
+    // Direct modda e-posta opsiyonel — boşsa backend sentetik adres üretir
+    email: z.string().max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin').optional(),
     // Şifre opsiyonel — boş gelirse server güvenli şifre üretip response'ta döner
     password: z.string().min(8).max(128).regex(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
