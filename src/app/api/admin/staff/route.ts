@@ -44,11 +44,58 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
         { title: { contains: search, mode: 'insensitive' } },
       ]
     }
-    if (department) where.departmentId = department
     if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 
+    // Departmanları önce çek — hem hiyerarşik staffCount toplamı hem de
+    // department filter'ında descendant id'lerini çözmek için gerekli.
+    const rawDepartments = await prisma.department.findMany({
+      where: { organizationId: orgId },
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        description: true,
+        parentId: true,
+        _count: { select: { users: { where: { role: 'staff' satisfies UserRole, isActive: true } } } },
+      },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    })
+
+    // parentId → children id list (tek pass)
+    const childrenByParent = new Map<string, string[]>()
+    for (const d of rawDepartments) {
+      if (!d.parentId) continue
+      const list = childrenByParent.get(d.parentId)
+      if (list) list.push(d.id)
+      else childrenByParent.set(d.parentId, [d.id])
+    }
+
+    // BFS ile descendant id'leri topla (self dahil)
+    const collectSubtree = (rootId: string): string[] => {
+      const result: string[] = []
+      const queue: string[] = [rootId]
+      while (queue.length) {
+        const id = queue.shift()!
+        result.push(id)
+        const children = childrenByParent.get(id)
+        if (children) queue.push(...children)
+      }
+      return result
+    }
+
+    if (department) {
+      // Sadece bu org'a ait bir departman ID'si mi (cross-tenant koruma)
+      const exists = rawDepartments.some(d => d.id === department)
+      if (exists) {
+        const subtree = collectSubtree(department)
+        where.departmentId = { in: subtree }
+      } else {
+        where.departmentId = department // fallback (zaten 0 sonuç dönecek)
+      }
+    }
+
     // 1. dalga — sayfa listesi + global stat'lar + aktif period paralel
-    const [staff, total, rawDepartments, activeStaff, overallAvgAgg, activePeriod] = await Promise.all([
+    const [staff, total, activeStaff, overallAvgAgg, activePeriod] = await Promise.all([
       prisma.user.findMany({
         where,
         select: {
@@ -68,18 +115,6 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
         take: limit,
       }),
       prisma.user.count({ where }),
-      prisma.department.findMany({
-        where: { organizationId: orgId },
-        select: {
-          id: true,
-          name: true,
-          color: true,
-          description: true,
-          parentId: true,
-          _count: { select: { users: { where: { role: 'staff' satisfies UserRole, isActive: true } } } },
-        },
-        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      }),
       prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
       // Tüm org için tek sayı — groupBy yerine aggregate (tek satır döner, ucuz)
       prisma.examAttempt.aggregate({
@@ -158,12 +193,24 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
 
     const avgScoreMap = new Map(avgScores.map(a => [a.userId, Math.round(Number(a._avg.postExamScore ?? 0))]))
 
+    // staffCount = self + tüm descendants (recursive). Leaf'lerde = self.
+    // Parent kartlarda toplam personel sayısı, alt departman badge'lerde
+    // kendi sayısı doğru görünür.
+    const directCountById = new Map(rawDepartments.map(d => [d.id, d._count.users]))
+    const totalCountById = new Map<string, number>()
+    for (const d of rawDepartments) {
+      const subtree = collectSubtree(d.id)
+      let total = 0
+      for (const id of subtree) total += directCountById.get(id) ?? 0
+      totalCountById.set(d.id, total)
+    }
+
     const departments = rawDepartments.map(d => ({
       id: d.id,
       name: d.name,
       color: d.color,
       description: d.description || '',
-      staffCount: d._count.users,
+      staffCount: totalCountById.get(d.id) ?? d._count.users,
       parentId: d.parentId ?? null,
     }))
 
