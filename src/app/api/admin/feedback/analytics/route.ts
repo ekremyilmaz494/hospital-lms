@@ -8,24 +8,25 @@ import { logger } from '@/lib/logger'
  * GET /api/admin/feedback/analytics
  *
  * Query:
+ *   - formId — belirli form (opsiyonel; default: aktif form)
  *   - trainingId — belirli eğitim (opsiyonel)
  *   - dateFrom, dateTo — tarih aralığı
  *
- * Dönüş:
- *   - totalResponses
- *   - passedCount / failedCount
- *   - overallAverage (tüm likert_5 cevapların ortalaması)
- *   - recommendationRate (yes_partial_no → Evet yüzdesi)
- *   - categories: [{ categoryId, categoryName, avgScore, itemCount, items: [{itemId, text, avg, count}] }]
+ * Çoklu form desteği: org birden çok form taslağı tutar (organization_id artık
+ * unique değil). Default davranış aktif formu okumaktır; admin geçmiş formların
+ * raporlarına erişmek isterse `?formId=...` ile seçer. Yanıt verisi formSnapshot
+ * ile dondurulmuş olduğu için form silinmiş/arşivli olsa bile rapor çalışır.
  */
 export const GET = withAdminRoute(async ({ request, dbUser, organizationId }) => {
   const url = new URL(request.url)
+  const explicitFormId = url.searchParams.get('formId') || undefined
   const trainingId = url.searchParams.get('trainingId') || undefined
   const dateFrom = url.searchParams.get('dateFrom')
   const dateTo = url.searchParams.get('dateTo')
 
   const where = {
     organizationId,
+    ...(explicitFormId ? { formId: explicitFormId } : {}),
     ...(trainingId ? { trainingId } : {}),
     ...(dateFrom || dateTo
       ? {
@@ -38,16 +39,20 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId }) =>
   }
 
   try {
-    // Tek sorguda: response'lar + answer + item(kategori ile)
-    // Paralel: summary + detail
     const [summary, form] = await Promise.all([
       prisma.trainingFeedbackResponse.groupBy({
         by: ['isPassed'],
         where,
         _count: { _all: true },
       }),
-      prisma.trainingFeedbackForm.findUnique({
-        where: { organizationId },
+      // Form seçimi: explicit formId verildiyse onu kullan, yoksa org'un aktif
+      // formunu al. Form silinmiş/arşivli olabilir → o durumda rapor metaverisi
+      // formSnapshot'tan okunamayacağı için kategori detayı boş döner; özet
+      // (toplam yanıt + ortalama) yine yanıtlardan hesaplanır.
+      prisma.trainingFeedbackForm.findFirst({
+        where: explicitFormId
+          ? { id: explicitFormId, organizationId }
+          : { organizationId, isActive: true },
         select: {
           id: true,
           categories: {

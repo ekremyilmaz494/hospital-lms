@@ -105,6 +105,7 @@ export const adminNav: NavGroup[] = [
         children: [
           { title: 'Eğitim Listesi', href: '/admin/trainings' },
           { title: 'Yeni Eğitim', href: '/admin/trainings/new' },
+          { title: 'Ek Hak Talepleri', href: '/admin/trainings/attempt-requests' },
           { title: 'Kategori Yönetimi', href: '/admin/settings/categories' },
         ],
       },
@@ -116,7 +117,6 @@ export const adminNav: NavGroup[] = [
           { title: 'Sınav Listesi', href: '/admin/exams' },
           { title: 'Yeni Sınav', href: '/admin/exams/new' },
           { title: 'Soru Bankası', href: '/admin/exams/question-bank' },
-          { title: 'Ek Hak Talepleri', href: '/admin/exams/attempt-requests' },
         ],
       },
       { title: 'Medya Kütüphanesi', href: '/admin/content-library', icon: Library },

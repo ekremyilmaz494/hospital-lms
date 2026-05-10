@@ -34,23 +34,40 @@ export function isAttemptFeedbackTriggered(attempt: {
 
 /**
  * Kullanıcının bekleyen ZORUNLU geri bildirim'i varsa döner.
- * "Zorunlu" = training.feedbackMandatory === true
+ * "Zorunlu" = training.feedbackMandatory === true VE org'da aktif form var
  * "Bekleyen" = trigger koşulunu sağlayan bir attempt'i var AMA kullanıcı henüz
  *              bu training için feedback göndermemiş (anonim dahil).
+ *
+ * Kilit-koruma: Aktif form yoksa pending null döner (banner gösterilmez,
+ * /api/exam/start guard'ı atlatılır). Aksi halde admin form yaratmadan
+ * Training.feedbackMandatory=true bırakırsa personel hem feedback ekranına
+ * gidemez (form yok) hem de yeni eğitim başlatamaz (423 Locked) → kilit.
+ *
+ * Sertifika gating tarafı: exam/submit ve feedback/submit içinde de aktif form
+ * varlığı kontrol edilir; aktif form yoksa feedbackMandatory etkisiz sayılır.
  *
  * Kullanım:
  *  - /api/exam/[id]/start → guard (başka eğitim başlatmayı engelle)
  *  - /api/staff/pending-mandatory-feedback → banner için
- *
- * Tek sorgu + in-memory filter. Tipik personel en fazla 1-2 atama ile çalışır,
- * liste küçük. Perf açısından endişelenilecek bir yerinde değil.
  */
 export async function getPendingMandatoryFeedback(userId: string): Promise<{
   trainingId: string
   trainingTitle: string
   attemptId: string
 } | null> {
-  // Zorunlu eğitimi olan ve trigger koşulunu sağlayan attempt'leri çek
+  // Önce kullanıcının org'unda aktif form var mı? Yoksa kilit önlemek için null.
+  const userOrg = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { organizationId: true },
+  })
+  if (!userOrg?.organizationId) return null
+
+  const activeForm = await prisma.trainingFeedbackForm.findFirst({
+    where: { organizationId: userOrg.organizationId, isActive: true, isArchived: false },
+    select: { id: true },
+  })
+  if (!activeForm) return null
+
   const attempts = await prisma.examAttempt.findMany({
     where: {
       userId,
@@ -71,7 +88,6 @@ export async function getPendingMandatoryFeedback(userId: string): Promise<{
 
   if (attempts.length === 0) return null
 
-  // Kullanıcının feedback verdiği training ID'lerini tek sorguda çek
   const submittedTrainingIds = new Set(
     (await prisma.trainingFeedbackResponse.findMany({
       where: { attempt: { userId } },
@@ -105,9 +121,11 @@ export type PendingFeedbackItem = {
  * kuralını kullanır; tek fark: `feedbackMandatory` filtresi YOK, çünkü kullanıcı
  * opsiyonel formu da görmek isteyebilir.
  *
- * EY.FR.40 form per organization tek (`organizationId @unique`); form yoksa
- * doldurulacak hiçbir şey yok demektir → çağıran taraf form varlığını kontrol
- * eder. Bu helper sadece attempt-bazlı bekleyen kayıtları toplar.
+ * NOT: Org artık birden çok form taslağı tutar (organizationId @unique
+ * kaldırıldı, partial unique index ile tek aktif kuralı korundu). Bu helper
+ * yalnızca attempt-bazlı bekleyen kayıtları toplar — aktif form varlığı kontrolü
+ * çağıran taraf (`/api/staff/feedback/pending`) içinde yapılır, böylece form
+ * yoksa boş liste döner ve kullanıcı kilitlenmez.
  */
 export async function getAllPendingFeedback(userId: string): Promise<PendingFeedbackItem[]> {
   const [attempts, submittedRows] = await Promise.all([

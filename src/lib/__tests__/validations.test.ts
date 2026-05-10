@@ -243,13 +243,15 @@ describe('trainingFeedbackFormUpsertSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('kategori listesi boşsa reddeder', () => {
+  it('kategori listesi boş olabilir (taslak kayıt için)', () => {
+    // Çoklu taslak desteği: yeni form sıfır kategoriyle başlayabilir.
+    // Aktivasyon endpoint'i 1 kategori + 1 item zorunluluğunu ayrıca kontrol eder.
     const result = trainingFeedbackFormUpsertSchema.safeParse({
-      title: 'EY.FR.40',
-      isActive: true,
+      title: 'Yeni Taslak',
+      isActive: false,
       categories: [],
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   it('başlık boşsa reddeder', () => {

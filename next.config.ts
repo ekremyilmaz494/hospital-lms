@@ -125,6 +125,12 @@ const nextConfig: NextConfig = {
     // Eski bookmark/SEO için 301 redirect.
     { source: '/marketing', destination: '/', permanent: true },
     { source: '/marketing/:path*', destination: '/:path*', permanent: true },
+    // Ek hak talepleri sınav değil, eğitim assignment life-cycle'ına ait.
+    {
+      source: '/admin/exams/attempt-requests',
+      destination: '/admin/trainings/attempt-requests',
+      permanent: true,
+    },
   ],
   headers: async () => [
     {

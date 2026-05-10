@@ -64,7 +64,9 @@ const DEFAULT_FORM: SeedCategory[] = [
 ]
 
 async function seedForOrganization(organizationId: string): Promise<'created' | 'skipped'> {
-  const existing = await prisma.trainingFeedbackForm.findUnique({
+  // Çoklu form taslağı destekleniyor (organization_id artık unique değil).
+  // Org'un herhangi bir formu varsa atla — admin elle yönetir.
+  const existing = await prisma.trainingFeedbackForm.findFirst({
     where: { organizationId },
     select: { id: true },
   })

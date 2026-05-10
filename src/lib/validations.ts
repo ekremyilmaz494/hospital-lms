@@ -691,11 +691,15 @@ export const trainingFeedbackSubmitSchema = z.object({
 })
 
 /** Admin form editörü: tüm formu replace eder */
+/**
+ * PUT body'si — content/meta düzenleme. `isActive` BURADA YOK çünkü
+ * aktivasyon ayrı endpoint'te (atomik bulk-assign + concurrent-safe).
+ */
 export const trainingFeedbackFormUpsertSchema = z.object({
   title: z.string().min(1).max(255),
   description: z.string().max(2000).optional().nullable(),
   documentCode: z.string().max(50).optional().nullable(),
-  isActive: z.boolean().default(true),
+  isMandatory: z.boolean().default(true),
   categories: z.array(z.object({
     id: z.uuid().optional(),
     name: z.string().min(1).max(255),
@@ -707,5 +711,14 @@ export const trainingFeedbackFormUpsertSchema = z.object({
       isRequired: z.boolean().default(true),
       order: z.number().int().min(0).max(999),
     })).min(0).max(100),
-  })).min(1).max(20),
+  })).min(0).max(20),
+})
+
+/**
+ * Yeni form taslağı oluşturma — şablon seçimi opsiyonel.
+ * `templateKey` verilirse FEEDBACK_FORM_TEMPLATES'tan kopyalanır; yoksa boş başlar.
+ */
+export const trainingFeedbackFormCreateSchema = z.object({
+  templateKey: z.string().min(1).max(64).optional(),
+  title: z.string().min(1).max(255).optional(),
 })
