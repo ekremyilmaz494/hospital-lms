@@ -15,7 +15,6 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from './helpers/font'
-import { maskTcKimlik } from '../tc'
 
 export interface CredentialItem {
   fullName: string
@@ -53,7 +52,9 @@ export async function buildStaffCredentialsPdf(data: CredentialsPdfData): Promis
   await applyTurkishFont(doc)
 
   const W = 210
-  const mask = data.maskMode === 'masked'
+  // maskMode artık kullanılmıyor (TC kolonu PDF'ten kaldırıldı). API contract'ı korumak için
+  // CredentialsPdfData üzerinde tutuldu — yeni caller'lar uyarı almasın diye sessizce yok sayılır.
+  void data.maskMode
 
   // ── Header ──
   doc.setFillColor(...NAVY)
@@ -80,14 +81,15 @@ export async function buildStaffCredentialsPdf(data: CredentialsPdfData): Promis
   doc.text(`Personel sayısı: ${data.items.length}`, 15, 54)
 
   // ── Table ──
+  // E-posta + TC kolonları kaldırıldı (admin isteği). KVKK açısından da daha güvenli:
+  // PDF kaybolursa TC + şifre birlikte sızmaz. Personel TC'sini zaten kendisi biliyor;
+  // teslim sırasında ad-soyad eşleşmesi yeterli.
   autoTable(doc, {
     startY: 62,
-    head: [['Ad Soyad', 'TC Kimlik No', 'Geçici Şifre', 'E-posta', 'Departman / Unvan']],
+    head: [['Ad Soyad', 'Geçici Şifre', 'Departman / Unvan']],
     body: data.items.map(item => [
       item.fullName,
-      mask ? maskTcKimlik(item.tcKimlik) : item.tcKimlik,
       item.tempPassword,
-      item.email ?? '—',
       [item.department, item.title].filter(Boolean).join(' / ') || '—',
     ]),
     styles: {
@@ -106,11 +108,10 @@ export async function buildStaffCredentialsPdf(data: CredentialsPdfData): Promis
     },
     alternateRowStyles: { fillColor: CREAM },
     columnStyles: {
-      0: { cellWidth: 38 },
-      1: { cellWidth: 30, font: TURKISH_FONT_FAMILY, fontStyle: 'bold' },
-      2: { cellWidth: 32, font: TURKISH_FONT_FAMILY, fontStyle: 'bold' },
-      3: { cellWidth: 50 },
-      4: { cellWidth: 30 },
+      0: { cellWidth: 65 },                                                                   // Ad Soyad
+      // Geçici Şifre: bold + 14 karakterlik şifre + tek satır garantisi (overflow: 'visible').
+      1: { cellWidth: 50, font: TURKISH_FONT_FAMILY, fontStyle: 'bold', overflow: 'visible' },
+      2: { cellWidth: 65 },                                                                   // Departman / Unvan
     },
     margin: { left: 15, right: 15 },
   })
@@ -135,7 +136,7 @@ export async function buildStaffCredentialsPdf(data: CredentialsPdfData): Promis
   doc.setTextColor(...INK)
   doc.setFontSize(8.5)
   const lines = [
-    '• Bu belge personelin TC Kimlik No ve geçici şifresini içerir; KVKK kapsamında özel nitelikli kişisel veridir.',
+    '• Bu belge personellerin geçici giriş şifrelerini içerir; KVKK kapsamında kişisel veridir.',
     '• Geçici şifre TEK KULLANIMLIK\'tır. Personel ilk giriş sonrası şifresini değiştirmek zorundadır.',
     '• Belgeyi personele elden teslim ediniz; e-posta veya mesajlaşma uygulamaları ile paylaşmayınız.',
     '• Teslim sonrası belgeyi GÜVENLİ ŞEKİLDE İMHA EDİNİZ (parçalama veya yakma).',

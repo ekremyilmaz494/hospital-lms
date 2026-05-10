@@ -24,7 +24,8 @@ import { buildStaffCredentialsPdf } from '@/lib/pdf/staff-credentials'
 const itemSchema = z.object({
   fullName: z.string().min(1).max(220),
   tcKimlik: z.string().refine(isValidTcKimlik, { message: 'Geçersiz TC' }),
-  email: z.string().email().nullable().optional(),
+  // Boş string'i null gibi kabul et — sentetik email'li satırlarda frontend "" gönderebilir.
+  email: z.preprocess(v => (v === '' ? null : v), z.string().email().nullable().optional()),
   tempPassword: z.string().min(6).max(64),
   department: z.string().max(120).nullable().optional(),
   title: z.string().max(120).nullable().optional(),
