@@ -1,8 +1,49 @@
+import path from 'path'
+import { promises as fs } from 'fs'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { uploadBuffer, backupKey } from '@/lib/s3'
 import { encryptBackup } from '@/lib/backup-crypto'
+import { checkRateLimit } from '@/lib/redis'
+import { sendEmail } from '@/lib/email'
+import { logger } from '@/lib/logger'
+
+/** Yedek boyut uyarı eşiği — bu üzeri admin'e e-posta uyarısı gönderir. */
+const BACKUP_SIZE_WARN_MB = 100
+
+/**
+ * Cron schedule'ı vercel.json'dan tek seferde okuyup TR-localized human-readable
+ * string'e çevirir. Sonuç process lifetime boyunca cache'lenir — vercel.json
+ * deploy sırasında değiştiği için runtime'da değişmez.
+ */
+let nextAutoCache: string | null = null
+async function readNextAutoSchedule(): Promise<string> {
+  if (nextAutoCache) return nextAutoCache
+  try {
+    const vercelJsonPath = path.join(process.cwd(), 'vercel.json')
+    const raw = await fs.readFile(vercelJsonPath, 'utf-8')
+    const conf = JSON.parse(raw) as { crons?: Array<{ path: string; schedule: string }> }
+    const cron = conf.crons?.find(c => c.path === '/api/cron/backup')
+    if (!cron) {
+      nextAutoCache = 'Tanımlı değil'
+      return nextAutoCache
+    }
+    // Cron format: "M H D Mon DOW". Günlük ise "M H * * *".
+    const parts = cron.schedule.split(/\s+/)
+    if (parts.length === 5 && parts[2] === '*' && parts[3] === '*' && parts[4] === '*') {
+      const minute = String(parts[0]).padStart(2, '0')
+      const hour = String(parts[1]).padStart(2, '0')
+      nextAutoCache = `Her gün ${hour}:${minute} UTC`
+    } else {
+      nextAutoCache = `Cron: ${cron.schedule}`
+    }
+    return nextAutoCache
+  } catch {
+    nextAutoCache = 'Tanımlı değil'
+    return nextAutoCache
+  }
+}
 
 // decryptBackup artık @/lib/backup-crypto'dan import edilir. Download endpoint'i
 // doğrudan oradan çeker — bu dosyadan re-export sadece geriye dönük uyumluluk için.
@@ -29,18 +70,25 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     : '-'
   const totalSize = rawBackups.reduce((sum, b) => sum + Number(b.fileSizeMb ?? 0), 0)
 
+  const nextAuto = await readNextAutoSchedule()
+
   return jsonResponse({
     backups,
     stats: {
       lastBackup,
       totalSize: totalSize > 0 ? `${totalSize.toFixed(2)} MB` : '-',
-      nextAuto: 'Her gün 03:15 UTC',
+      nextAuto,
     },
   }, 200, { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' })
 }, { strict: true, requireOrganization: true })
 
 export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => {
   const orgId = organizationId
+
+  // Rate-limit: Manuel yedek S3 maliyetli + cron yarış yaratabilir.
+  // Saatte 5 yeterli — admin gerçekten ihtiyaç duyduğunda almak için.
+  const allowed = await checkRateLimit(`manual-backup:${dbUser.id}`, 5, 3600)
+  if (!allowed) return errorResponse('Çok fazla manuel yedek isteği. Saatte en fazla 5 yedek alınabilir.', 429)
 
   const auditLogCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
 
@@ -113,6 +161,29 @@ export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => 
     entityType: 'backup',
     entityId: backup.id,
   })
+
+  // Boyut uyarısı: snapshot büyüdükçe S3 maliyeti + restore süresi büyür.
+  // 100 MB üzeri admin'e e-posta uyarısı (ADMIN_ALERT_EMAIL tanımlıysa).
+  if (sizeMb > BACKUP_SIZE_WARN_MB) {
+    const adminEmail = process.env.ADMIN_ALERT_EMAIL
+    if (adminEmail) {
+      sendEmail({
+        to: adminEmail,
+        subject: `[Yedekleme Uyarısı] Manuel yedek ${Math.round(sizeMb)} MB`,
+        html: `<h3>Büyük Yedek Uyarısı</h3>
+          <p>Manuel yedek <strong>${sizeMb.toFixed(2)} MB</strong> boyutuna ulaştı (eşik: ${BACKUP_SIZE_WARN_MB} MB).</p>
+          <p><strong>Kurum:</strong> ${orgId}</p>
+          <p><strong>Yedek ID:</strong> ${backup.id}</p>
+          <p><strong>Tarih:</strong> ${new Date().toLocaleString('tr-TR')}</p>
+          <p>Yedek boyutu büyüdükçe restore süresi ve S3 maliyeti artar. Aksiyon önerileri:</p>
+          <ul>
+            <li>AuditLog retention'ını 90 günden daha kısa tutmayı düşünün</li>
+            <li>Yedek dosyasının nasıl şişdiğini analiz edin (videoProgress / examAnswers genelde en büyük)</li>
+            <li>Silinebilir/arşivlenebilir veri var mı inceleyin</li>
+          </ul>`,
+      }).catch(err => logger.warn('manual-backup', 'Boyut uyari emaili gonderilemedi', (err as Error).message))
+    }
+  }
 
   return jsonResponse(backup, 201)
 }, { strict: true, requireOrganization: true })
