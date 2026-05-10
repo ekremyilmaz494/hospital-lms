@@ -5,8 +5,9 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createTrainingBodySchema } from '@/lib/validations'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
-import { invalidateOrgCache } from '@/lib/redis'
+import { invalidateOrgCache, checkRateLimit } from '@/lib/redis'
 import { findActivePeriod } from '@/lib/training-periods'
+import { logger } from '@/lib/logger'
 
 /**
  * POST /api/admin/trainings/[id]/publish
@@ -22,6 +23,11 @@ import { findActivePeriod } from '@/lib/training-periods'
  * Wizard "Yayınla" butonu artık bu endpoint'i çağırır.
  */
 export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  // Rate limit: yayın ağır bir işlem (transaction + multi-table writes + cache invalidation).
+  // Saatte 30 yayın çoğu admin için yeterli; bot'u yavaşlatır.
+  const allowed = await checkRateLimit(`training-publish:${dbUser.id}`, 30, 3600)
+  if (!allowed) return errorResponse('Çok fazla yayın işlemi, lütfen biraz sonra tekrar deneyin', 429)
+
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz veri', 400)
 
@@ -90,33 +96,42 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
       // Question'lar cascade ile QuestionOption'ı siler
       await tx.question.deleteMany({ where: { trainingId: t.id } })
 
-      // 3) Videoları yeniden yarat
+      // 3) Videoları yeniden yarat — N sıralı create yerine tek createMany.
+      // Library item lookup'ları paralel toplanır (sıralı await yerine Promise.all).
       if (videos && videos.length > 0) {
-        for (const [idx, v] of videos.entries()) {
-          let url = v.url
-          let ct = v.contentType || 'video'
-          let duration = v.durationSeconds || (ct === 'video' ? 300 : 0)
-          const docKey = v.documentKey ?? null
-          const pgCount = v.pageCount ?? null
-          let videoTitle = v.title
-
-          if ((v as Record<string, unknown>).libraryItemId) {
-            const libItem = await tx.contentLibrary.findFirst({
-              where: { id: (v as Record<string, unknown>).libraryItemId as string, organizationId },
+        const libItemIds = videos
+          .map(v => (v as Record<string, unknown>).libraryItemId as string | undefined)
+          .filter((id): id is string => !!id)
+        const libItems = libItemIds.length > 0
+          ? await tx.contentLibrary.findMany({
+              where: { id: { in: libItemIds }, organizationId },
             })
-            if (libItem?.s3Key) {
-              url = libItem.s3Key
-              ct = (libItem.contentType as typeof ct) || 'video'
-              duration = (libItem.duration || 0) * 60
-              videoTitle = videoTitle || libItem.title
+          : []
+        const libMap = new Map(libItems.map(l => [l.id, l]))
+
+        const videoData = videos
+          .map((v, idx) => {
+            let url = v.url
+            let ct = v.contentType || 'video'
+            let duration = v.durationSeconds || (ct === 'video' ? 300 : 0)
+            const docKey = v.documentKey ?? null
+            const pgCount = v.pageCount ?? null
+            let videoTitle = v.title
+
+            const libId = (v as Record<string, unknown>).libraryItemId as string | undefined
+            if (libId) {
+              const libItem = libMap.get(libId)
+              if (libItem?.s3Key) {
+                url = libItem.s3Key
+                ct = (libItem.contentType as typeof ct) || 'video'
+                duration = (libItem.duration || 0) * 60
+                videoTitle = videoTitle || libItem.title
+              }
             }
-          }
 
-          if (!url) continue
-          const defaultTitle = url.split('/').pop()?.replace(/\.[^.]+$/, '') || (ct === 'pdf' ? `Doküman ${idx + 1}` : `Video ${idx + 1}`)
-
-          await tx.trainingVideo.create({
-            data: {
+            if (!url) return null
+            const defaultTitle = url.split('/').pop()?.replace(/\.[^.]+$/, '') || (ct === 'pdf' ? `Doküman ${idx + 1}` : `Video ${idx + 1}`)
+            return {
               trainingId: t.id,
               title: videoTitle || defaultTitle,
               videoUrl: url,
@@ -126,32 +141,44 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
               pageCount: pgCount,
               documentKey: docKey,
               sortOrder: idx,
-            },
+            }
           })
+          .filter((d): d is NonNullable<typeof d> => d !== null)
+
+        if (videoData.length > 0) {
+          await tx.trainingVideo.createMany({ data: videoData })
         }
       }
 
-      // 4) Soruları + Şıkları yeniden yarat
+      // 4) Soruları + Şıkları yeniden yarat — N sıralı yerine 2 createMany batch.
+      // Question'ları önce createMany ile yarat, sonra ID'leri findMany ile topla,
+      // option'ları tek createMany ile insert et. (Postgres createMany returnId desteklemiyor)
       if (questions && questions.length > 0) {
-        for (const [idx, q] of questions.entries()) {
-          const question = await tx.question.create({
-            data: {
-              trainingId: t.id,
-              questionText: q.text,
-              points: q.points,
-              sortOrder: idx,
-            },
-          })
-          for (const [optIdx, opt] of q.options.entries()) {
-            await tx.questionOption.create({
-              data: {
-                questionId: question.id,
-                optionText: opt,
-                isCorrect: q.correct === optIdx,
-                sortOrder: optIdx,
-              },
-            })
-          }
+        await tx.question.createMany({
+          data: questions.map((q, idx) => ({
+            trainingId: t.id,
+            questionText: q.text,
+            points: q.points,
+            sortOrder: idx,
+          })),
+        })
+        const insertedQuestions = await tx.question.findMany({
+          where: { trainingId: t.id },
+          orderBy: { sortOrder: 'asc' },
+          select: { id: true, sortOrder: true },
+        })
+        const optionData = questions.flatMap((q, qIdx) => {
+          const qId = insertedQuestions.find(iq => iq.sortOrder === qIdx)?.id
+          if (!qId) return []
+          return q.options.map((opt, optIdx) => ({
+            questionId: qId,
+            optionText: opt,
+            isCorrect: q.correct === optIdx,
+            sortOrder: optIdx,
+          }))
+        })
+        if (optionData.length > 0) {
+          await tx.questionOption.createMany({ data: optionData })
         }
       }
 
@@ -216,6 +243,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
 
     return jsonResponse(training, 200)
   } catch (err) {
-    return errorResponse((err as Error).message || 'Eğitim yayınlanırken bir hata oluştu', 500)
+    logger.error('training-publish', 'Yayın hatası', err instanceof Error ? err.message : err)
+    return errorResponse('Eğitim yayınlanırken bir hata oluştu', 500)
   }
 }, { requireOrganization: true })

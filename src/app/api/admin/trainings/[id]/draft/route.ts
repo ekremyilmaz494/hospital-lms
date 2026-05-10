@@ -1,7 +1,13 @@
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { checkRateLimit } from '@/lib/redis'
+
+/** Auto-save body byte limit: 512 KB.
+ *  Tipik wizard snapshot'ı 5-50 KB; 512 KB margin'la "kötü niyetli/bozuk istemci"yi
+ *  Postgres satırını şişirmeden engeller. */
+const MAX_DRAFT_BYTES = 512 * 1024
 
 /**
  * Wizard auto-save için draft state CRUD'ı.
@@ -54,7 +60,16 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
 }, { requireOrganization: true })
 
 export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
-  const body = await parseBody(request)
+  // Rate limit: auto-save genellikle 1-2 sn debounce; saatte 600 (≈ 6 sn) jeneröz.
+  const allowed = await checkRateLimit(`training-draft-patch:${dbUser.id}`, 600, 3600)
+  if (!allowed) return errorResponse('Çok fazla taslak güncellemesi, lütfen biraz sonra tekrar deneyin', 429)
+
+  // Body byte cap — JSONB'yi şişirmemek için PATCH boyutu sınırlandırılır.
+  // parseBody yerine raw text okuyup uzunluğu kontrol ediyoruz.
+  const raw = await request.text()
+  if (raw.length > MAX_DRAFT_BYTES) return errorResponse('Taslak verisi çok büyük', 413)
+  let body: unknown
+  try { body = raw ? JSON.parse(raw) : null } catch { return errorResponse('Geçersiz JSON', 400) }
   if (!body) return errorResponse('Geçersiz veri', 400)
 
   const parsed = patchBodySchema.safeParse(body)

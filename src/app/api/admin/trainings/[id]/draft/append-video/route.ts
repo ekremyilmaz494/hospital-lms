@@ -3,6 +3,22 @@ import { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { checkRateLimit } from '@/lib/redis'
+import { logger } from '@/lib/logger'
+
+const S3_KEY_RE = /^(videos|documents|audio)\/([^/]+)\/([^/]+)\/[^/]+\.[a-zA-Z0-9]+$/
+
+// presign endpoint key'leri (videos|documents|audio)/{orgId}/{trainingId}/{uuid}.{ext}
+// formatında üretiyor (lib/s3.ts). url alanı bu format'a uymalı VE orgId çağıran admin'in
+// org'una eşit olmalı; aksi halde admin A başka org'un S3 key'ini draft'a iliştirebilir.
+function isValidS3KeyForOrg(key: string, orgId: string): boolean {
+  if (typeof key !== 'string' || key.length === 0) return false
+  if (key.includes('://')) return false
+  if (key.includes('..')) return false
+  const m = S3_KEY_RE.exec(key)
+  if (!m) return false
+  return m[2] === orgId
+}
 
 /**
  * POST /api/admin/trainings/[id]/draft/append-video
@@ -36,11 +52,22 @@ interface DraftVideoSnapshot {
 }
 
 export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
+  // Rate limit: tipik wizard birkaç dakikada birkaç dosya yükler; saatte 100 jeneröz.
+  const allowed = await checkRateLimit(`training-draft-append-video:${dbUser.id}`, 100, 3600)
+  if (!allowed) return errorResponse('Çok fazla istek, lütfen biraz sonra tekrar deneyin', 429)
+
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz veri', 400)
 
   const parsed = bodySchema.safeParse(body)
   if (!parsed.success) return errorResponse('Geçersiz video verisi', 400)
+
+  // IDOR: url, çağıran admin'in org'una ait bir presigned S3 key olmalı.
+  // Aksi halde başka org'un dosyası bu draft'a iliştirilebilir.
+  if (!isValidS3KeyForOrg(parsed.data.url, organizationId)) {
+    logger.warn('append-video', 'Org dışı veya geçersiz S3 key reddedildi', { userId: dbUser.id, key: parsed.data.url.slice(0, 80) })
+    return errorResponse('Geçersiz dosya referansı', 400)
+  }
 
   // Read-modify-write — kısa transaction (concurrent PATCH'lerden sonra append'in
   // kaybolmasını engellemek için tek kullanıcı senaryosunda bile transactional
@@ -92,6 +119,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
     if (!updated) return errorResponse('Taslak bulunamadı', 404)
     return jsonResponse({ ok: true, video: updated })
   } catch (err) {
-    return errorResponse((err as Error).message || 'Video eklenemedi', 500)
+    logger.error('append-video', 'Video eklenemedi', err instanceof Error ? err.message : err)
+    return errorResponse('Video eklenemedi', 500)
   }
 }, { requireOrganization: true })

@@ -76,15 +76,37 @@ const inferKind = (file: File): UploadKind => {
   return 'video';
 };
 
+/** Tamamlanmış (done/error/canceled) kayıtların state'te kalma süresi.
+ *  Widget bunları görsel olarak 4 sn sonra gizliyor; provider 60 sn sonra
+ *  array'den de düşürüyor — yoksa uzun admin oturumlarında array sınırsız büyür. */
+const TERMINAL_RETENTION_MS = 60_000;
+
 export function UploadManagerProvider({ children }: { children: ReactNode }) {
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   // XHR referansları state'e konmaz (re-render tetiklemesin); cancel için ref.
   const xhrMap = useRef<Map<string, XMLHttpRequest>>(new Map());
   const callbackMap = useRef<Map<string, { onComplete?: EnqueueArgs['onComplete']; onError?: EnqueueArgs['onError'] }>>(new Map());
+  // Terminal state'e gelen upload'ların kuyruktan otomatik düşürülme zamanları.
+  const reapTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const scheduleReap = useCallback((uploadId: string) => {
+    const existing = reapTimers.current.get(uploadId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      setUploads(prev => prev.filter(u => u.uploadId !== uploadId));
+      callbackMap.current.delete(uploadId);
+      reapTimers.current.delete(uploadId);
+    }, TERMINAL_RETENTION_MS);
+    reapTimers.current.set(uploadId, timer);
+  }, []);
 
   const updateUpload = useCallback((uploadId: string, patch: Partial<UploadItem>) => {
     setUploads(prev => prev.map(u => (u.uploadId === uploadId ? { ...u, ...patch } : u)));
-  }, []);
+    // Terminal state'e geçtiyse otomatik kırpma kuyruğuna ekle.
+    if (patch.status === 'done' || patch.status === 'error' || patch.status === 'canceled') {
+      scheduleReap(uploadId);
+    }
+  }, [scheduleReap]);
 
   const enqueue = useCallback((args: EnqueueArgs): string => {
     const uploadId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? crypto.randomUUID() : `up_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -232,9 +254,20 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
   const dismiss = useCallback((uploadId: string) => {
     setUploads(prev => prev.filter(u => u.uploadId !== uploadId));
     callbackMap.current.delete(uploadId);
+    const t = reapTimers.current.get(uploadId);
+    if (t) { clearTimeout(t); reapTimers.current.delete(uploadId); }
   }, []);
 
   const getByDraft = useCallback((draftId: string) => uploads.filter(u => u.draftId === draftId), [uploads]);
+
+  // Provider unmount'ta tüm reap timer'larını temizle (memory leak önleme)
+  useEffect(() => {
+    const timers = reapTimers.current;
+    return () => {
+      timers.forEach(t => clearTimeout(t));
+      timers.clear();
+    };
+  }, []);
 
   // beforeunload — aktif yükleme varsa kullanıcıyı uyar
   useEffect(() => {

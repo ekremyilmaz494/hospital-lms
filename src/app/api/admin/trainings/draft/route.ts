@@ -2,7 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
-import { invalidateOrgCache } from '@/lib/redis'
+import { invalidateOrgCache, checkRateLimit } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 
 /**
  * POST /api/admin/trainings/draft
@@ -16,6 +17,11 @@ import { invalidateOrgCache } from '@/lib/redis'
  * zaten limit içinde sayılmış).
  */
 export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => {
+  // Rate limit: kullanıcı saatte en fazla 30 yeni taslak yaratabilsin (idempotent
+  // davranış zaten bot'u yavaşlatır, bu ek savunma katmanı).
+  const allowed = await checkRateLimit(`training-draft-create:${dbUser.id}`, 30, 3600)
+  if (!allowed) return errorResponse('Çok fazla istek, lütfen biraz sonra tekrar deneyin', 429)
+
   // Önce var olan taslak — single-draft kuralı
   const existing = await prisma.training.findFirst({
     where: {
@@ -70,6 +76,8 @@ export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => 
 
     return jsonResponse({ id: draft.id }, 201)
   } catch (err) {
-    return errorResponse((err as Error).message || 'Taslak oluşturulamadı', 500)
+    // CLAUDE.md: iç sistem detayı (Prisma constraint adı vb.) kullanıcıya gösterilmez.
+    logger.error('training-draft-create', 'Taslak oluşturma hatası', err instanceof Error ? err.message : err)
+    return errorResponse('Taslak oluşturulamadı', 500)
   }
 }, { requireOrganization: true })
