@@ -12,7 +12,7 @@ import { InviteAdminModal } from './_components/invite-admin-modal';
 
 interface AdminListItem {
   id: string;
-  email: string;
+  email: string | null;
   firstName: string;
   lastName: string;
   title: string | null;
@@ -206,9 +206,15 @@ export default function YoneticilerPage() {
                     )}
                   </div>
                 </td>
-                <td className="px-5 py-3 text-sm flex items-center gap-1.5" style={{ color: 'var(--k-text-secondary)' }}>
-                  <Mail className="h-3.5 w-3.5" style={{ color: 'var(--k-text-muted)' }} />
-                  {a.email}
+                <td className="px-5 py-3 text-sm" style={{ color: 'var(--k-text-secondary)' }}>
+                  {a.email ? (
+                    <span className="flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5" style={{ color: 'var(--k-text-muted)' }} />
+                      {a.email}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--k-text-muted)' }}>—</span>
+                  )}
                 </td>
                 <td className="px-5 py-3 text-sm" style={{ color: 'var(--k-text-secondary)' }}>
                   {a.title ?? '—'}
@@ -338,7 +344,7 @@ export default function YoneticilerPage() {
           onClose={() => setResetTarget(null)}
           userId={resetTarget.id}
           userName={`${resetTarget.firstName} ${resetTarget.lastName}`}
-          userEmail={resetTarget.email}
+          userEmail={resetTarget.email ?? ''}
           userRole="admin"
         />
       )}

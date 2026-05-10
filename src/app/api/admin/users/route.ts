@@ -46,6 +46,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       activeAdminCount,
       admins: admins.map(a => ({
         ...a,
+        email: a.email?.endsWith('@klinovax.internal') ? null : a.email,
         isOwner: a.id === ownerUserId,
       })),
     },
