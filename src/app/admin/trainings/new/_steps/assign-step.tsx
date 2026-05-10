@@ -237,139 +237,112 @@ export default function AssignStep({
             />
           </div>
 
-          {/* Departman listesi */}
-          <div
-            className="overflow-hidden rounded-2xl border bg-white"
-            style={{ borderColor: K.BORDER_SOFT }}
-          >
-            {visibleRoots.length === 0 ? (
-              <div className="px-6 py-12 text-center">
-                <Users
-                  className="mx-auto mb-3 h-8 w-8 opacity-40"
-                  style={{ color: K.TEXT_MUTED }}
-                />
-                <p className="text-sm font-medium" style={{ color: K.TEXT_SECONDARY }}>
-                  {q
-                    ? 'Aramaya uygun sonuç yok.'
-                    : filterMode === 'selected'
-                      ? 'Henüz departman seçmediniz.'
-                      : filterMode === 'excluded'
-                        ? 'Hariç tutulan personel yok.'
-                        : 'Departman bulunamadı.'}
-                </p>
-              </div>
-            ) : (
-              <ul className="divide-y" style={{ borderColor: K.BORDER_SOFT }}>
-                {visibleRoots.map((root) => {
-                  const kids = childrenByParent.get(root.id) ?? [];
-                  const visibleKids = q
-                    ? kids.filter((k) => matchesQuery(k) || matchesQuery(root))
-                    : kids;
+          {/* Departman kart grid'i */}
+          {visibleRoots.length === 0 ? (
+            <div
+              className="rounded-2xl border bg-white px-6 py-14 text-center"
+              style={{ borderColor: K.BORDER_SOFT }}
+            >
+              <Users
+                className="mx-auto mb-3 h-10 w-10 opacity-40"
+                style={{ color: K.TEXT_MUTED }}
+              />
+              <p className="text-sm font-medium" style={{ color: K.TEXT_SECONDARY }}>
+                {q
+                  ? 'Aramaya uygun sonuç yok.'
+                  : filterMode === 'selected'
+                    ? 'Henüz departman seçmediniz.'
+                    : filterMode === 'excluded'
+                      ? 'Hariç tutulan personel yok.'
+                      : 'Departman bulunamadı.'}
+              </p>
+            </div>
+          ) : (
+            // Responsive grid: mobile 1 kolon, md 2 kolon (sağ panel altta stack), lg 1 kolon
+            // (sağ panel devreye girer, sol bölüm dar), xl 2 kolon (sol bölüm tekrar geniş).
+            <div className="grid auto-rows-max grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              {visibleRoots.map((root) => {
+                const kids = childrenByParent.get(root.id) ?? [];
+                const visibleKids = q
+                  ? kids.filter((k) => matchesQuery(k) || matchesQuery(root))
+                  : kids;
 
-                  const rootSelected = selectedDepts.includes(root.id);
-                  const rootExcludedCount = root.staff.filter((s) =>
-                    excludedStaff.includes(s.id),
-                  ).length;
-                  const childSelected = kids.some((k) => selectedDepts.includes(k.id));
-                  const childHasExcluded = kids.some((k) =>
-                    k.staff.some((s) => excludedStaff.includes(s.id)),
-                  );
-                  // Indeterminate: parent değil ama child seçili VEYA seçili ama içinde hariç var
-                  let rootCheck: CheckState = rootSelected;
-                  if (!rootSelected && childSelected) rootCheck = 'mixed';
-                  else if (rootSelected && (rootExcludedCount > 0 || childHasExcluded))
-                    rootCheck = 'mixed';
+                const rootSelected = selectedDepts.includes(root.id);
+                const rootExcludedCount = root.staff.filter((s) =>
+                  excludedStaff.includes(s.id),
+                ).length;
+                const childSelected = kids.some((k) => selectedDepts.includes(k.id));
+                const childHasExcluded = kids.some((k) =>
+                  k.staff.some((s) => excludedStaff.includes(s.id)),
+                );
+                // Indeterminate: parent değil ama child seçili VEYA seçili ama içinde hariç var
+                let rootCheck: CheckState = rootSelected;
+                if (!rootSelected && childSelected) rootCheck = 'mixed';
+                else if (rootSelected && (rootExcludedCount > 0 || childHasExcluded))
+                  rootCheck = 'mixed';
 
-                  const subtreeTotal =
-                    root.staff.length + kids.reduce((s, k) => s + k.staff.length, 0);
+                const subtreeTotal =
+                  root.staff.length + kids.reduce((s, k) => s + k.staff.length, 0);
 
-                  // Child'ları göster: kullanıcı manuel açtı VEYA aktif arama VEYA parent/herhangi child seçili.
-                  const isExpanded =
-                    expandedRoots.has(root.id) ||
-                    !!q ||
-                    rootSelected ||
-                    childSelected;
+                // Child'ları göster: kullanıcı manuel açtı VEYA aktif arama VEYA bir alt birim seçili.
+                // Parent ticklenmesi otomatik açma TETİKLEMEZ — bilinçli karar (UX).
+                const isExpanded =
+                  expandedRoots.has(root.id) || !!q || childSelected;
 
-                  return (
-                    <li key={root.id}>
-                      <DepartmentRow
-                        dept={root}
-                        depth={0}
-                        check={rootCheck}
-                        autoIncluded={false}
-                        excludedCount={rootExcludedCount}
-                        secondaryLine={
-                          kids.length > 0
-                            ? `${subtreeTotal} personel · ${kids.length} alt birim`
-                            : `${root.staff.length} personel`
-                        }
-                        childCount={kids.length}
-                        isExpanded={isExpanded}
-                        onToggleExpand={
-                          kids.length > 0
-                            ? () =>
-                                setExpandedRoots((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(root.id)) next.delete(root.id);
-                                  else next.add(root.id);
-                                  return next;
-                                })
-                            : undefined
-                        }
-                        onToggle={() => toggleDept(root.id)}
-                        onOpenStaff={() => setExpandedDept(root.id)}
-                        canOpenStaff={effectiveDeptIds.has(root.id) && root.staff.length > 0}
-                      />
+                return (
+                  <DepartmentCard
+                    key={root.id}
+                    dept={root}
+                    check={rootCheck}
+                    excludedCount={rootExcludedCount}
+                    totalStaffCount={subtreeTotal}
+                    childCount={kids.length}
+                    isExpanded={isExpanded}
+                    onToggleExpand={
+                      kids.length > 0
+                        ? () =>
+                            setExpandedRoots((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(root.id)) next.delete(root.id);
+                              else next.add(root.id);
+                              return next;
+                            })
+                        : undefined
+                    }
+                    onToggle={() => toggleDept(root.id)}
+                    onOpenStaff={() => setExpandedDept(root.id)}
+                    canOpenStaff={effectiveDeptIds.has(root.id) && root.staff.length > 0}
+                  >
+                    {visibleKids.map((kid) => {
+                      const kidSelected = selectedDepts.includes(kid.id);
+                      const autoIncluded = rootSelected;
+                      const kidExcludedCount = kid.staff.filter((s) =>
+                        excludedStaff.includes(s.id),
+                      ).length;
+                      let kidCheck: CheckState = kidSelected || autoIncluded;
+                      if ((kidSelected || autoIncluded) && kidExcludedCount > 0)
+                        kidCheck = 'mixed';
 
-                      {visibleKids.length > 0 && isExpanded && (
-                        <ul
-                          className="relative"
-                          style={{ background: K.BG_SOFT }}
-                        >
-                          {/* Sol rail: child'ları parent'a görsel olarak bağlar */}
-                          <span
-                            aria-hidden
-                            className="pointer-events-none absolute top-0 bottom-0 w-px"
-                            style={{ left: 32, background: K.BORDER_SOFT }}
-                          />
-                          {visibleKids.map((kid) => {
-                            const kidSelected = selectedDepts.includes(kid.id);
-                            const autoIncluded = rootSelected;
-                            const kidExcludedCount = kid.staff.filter((s) =>
-                              excludedStaff.includes(s.id),
-                            ).length;
-                            let kidCheck: CheckState = kidSelected || autoIncluded;
-                            if ((kidSelected || autoIncluded) && kidExcludedCount > 0)
-                              kidCheck = 'mixed';
-
-                            return (
-                              <li key={kid.id}>
-                                <DepartmentRow
-                                  dept={kid}
-                                  depth={1}
-                                  check={kidCheck}
-                                  autoIncluded={autoIncluded}
-                                  excludedCount={kidExcludedCount}
-                                  secondaryLine={`${kid.staff.length} personel`}
-                                  onToggle={
-                                    autoIncluded ? undefined : () => toggleDept(kid.id)
-                                  }
-                                  onOpenStaff={() => setExpandedDept(kid.id)}
-                                  canOpenStaff={
-                                    effectiveDeptIds.has(kid.id) && kid.staff.length > 0
-                                  }
-                                />
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+                      return (
+                        <SubDeptRow
+                          key={kid.id}
+                          dept={kid}
+                          check={kidCheck}
+                          autoIncluded={autoIncluded}
+                          excludedCount={kidExcludedCount}
+                          onToggle={autoIncluded ? undefined : () => toggleDept(kid.id)}
+                          onOpenStaff={() => setExpandedDept(kid.id)}
+                          canOpenStaff={
+                            effectiveDeptIds.has(kid.id) && kid.staff.length > 0
+                          }
+                        />
+                      );
+                    })}
+                  </DepartmentCard>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* SAĞ — Sticky özet */}
@@ -505,46 +478,311 @@ function FilterChips({
   );
 }
 
-// ---------- Department row ----------
+// ---------- Department card (root) ----------
 
-interface DepartmentRowProps {
+interface DepartmentCardProps {
   dept: Dept;
-  depth: 0 | 1;
   check: CheckState;
-  autoIncluded: boolean;
   excludedCount: number;
-  secondaryLine: string;
-  childCount?: number;
-  isExpanded?: boolean;
+  totalStaffCount: number;
+  childCount: number;
+  isExpanded: boolean;
   onToggleExpand?: () => void;
-  onToggle?: () => void;
+  onToggle: () => void;
   onOpenStaff: () => void;
   canOpenStaff: boolean;
+  children?: React.ReactNode;
 }
 
-function DepartmentRow({
+function DepartmentCard({
   dept,
-  depth,
   check,
-  autoIncluded,
   excludedCount,
-  secondaryLine,
+  totalStaffCount,
   childCount,
   isExpanded,
   onToggleExpand,
   onToggle,
   onOpenStaff,
   canOpenStaff,
-}: DepartmentRowProps) {
+  children,
+}: DepartmentCardProps) {
   const isOn = check === true || check === 'mixed';
-  const isEmpty = dept.staff.length === 0 && (childCount ?? 0) === 0;
+  const isEmpty = totalStaffCount === 0 && childCount === 0;
+
+  // Selected: 8-digit hex (renk + alpha) — color-mix() Safari < 16.2 desteklemiyor.
+  // ${color}14 ≈ %8 alpha; ${color}33 ≈ %20 alpha.
+  const tintBg = isOn ? `${dept.color}14` : K.SURFACE;
+  const dividerColor = isOn ? `${dept.color}33` : K.BORDER_SOFT;
 
   return (
-    <div
-      className="group/row relative flex items-center gap-2.5 py-2 pr-2 transition-colors duration-150 hover:bg-stone-50"
-      style={{ paddingLeft: depth === 1 ? 48 : 12 }}
+    <article
+      className="group/card relative flex flex-col self-start overflow-hidden rounded-2xl border"
+      style={{
+        background: tintBg,
+        borderColor: isOn ? K.BORDER : K.BORDER_SOFT,
+        boxShadow: isOn ? K.SHADOW_CARD : 'none',
+        transition: 'box-shadow 150ms ease, border-color 150ms ease',
+      }}
     >
-      {/* Custom checkbox (button, indeterminate desteği için) */}
+      {/* Sol accent şerit — seçim göstergesi */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute top-0 bottom-0 left-0"
+        style={{
+          width: 4,
+          background: isOn ? dept.color : 'transparent',
+          opacity: check === 'mixed' ? 0.5 : 1,
+        }}
+      />
+
+      {/* Header — uniform yükseklik */}
+      <div className="flex items-start gap-3 px-4 py-4 pl-5">
+        {/* Avatar (büyük, kart hiyerarşisinde dominant) */}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={`${dept.name} seç`}
+          className="shrink-0"
+        >
+          <div
+            className="flex items-center justify-center rounded-xl font-bold text-white"
+            style={{
+              background: dept.color,
+              width: 44,
+              height: 44,
+              fontSize: 16,
+              fontFamily: K.FONT_DISPLAY,
+              opacity: isEmpty ? 0.5 : 1,
+            }}
+          >
+            {dept.name[0]?.toLocaleUpperCase('tr-TR')}
+          </div>
+        </button>
+
+        {/* Başlık + sayım */}
+        <button
+          type="button"
+          onClick={onToggle}
+          className="min-w-0 flex-1 text-left"
+        >
+          <p
+            className="truncate font-bold leading-snug"
+            style={{
+              fontFamily: K.FONT_DISPLAY,
+              fontSize: 16,
+              color: K.TEXT_PRIMARY,
+              opacity: isEmpty ? 0.6 : 1,
+            }}
+          >
+            {dept.name}
+          </p>
+          <p
+            className="mt-1 truncate text-xs font-medium"
+            style={{
+              color: K.TEXT_MUTED,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            <span style={{ color: K.TEXT_SECONDARY }}>{totalStaffCount}</span> personel
+            {childCount > 0 && (
+              <>
+                {' · '}
+                <span style={{ color: K.TEXT_SECONDARY }}>{childCount}</span> alt birim
+              </>
+            )}
+          </p>
+          {excludedCount > 0 && (
+            <span
+              className="mt-1.5 inline-flex h-4 items-center rounded px-1.5 text-[9px] font-semibold"
+              style={{
+                background: K.WARNING_BG,
+                color: K.WARNING,
+                border: `1px solid ${K.WARNING}40`,
+              }}
+            >
+              {excludedCount} hariç
+            </span>
+          )}
+        </button>
+
+        {/* Checkbox */}
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={check === 'mixed' ? 'mixed' : check}
+          aria-label={`${dept.name} seçimi`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors duration-150"
+          style={{
+            background: isOn ? dept.color : K.SURFACE,
+            border: `1.5px solid ${isOn ? dept.color : K.BORDER}`,
+          }}
+        >
+          {check === true && (
+            <svg
+              viewBox="0 0 12 12"
+              className="h-3 w-3"
+              fill="none"
+              stroke="white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="2.5,6.5 5,9 9.5,3.5" />
+            </svg>
+          )}
+          {check === 'mixed' && (
+            <span className="block h-0.5 w-2.5 rounded-sm bg-white" />
+          )}
+        </button>
+      </div>
+
+      {/* Action satırı: drawer + expand */}
+      <div
+        className="flex items-center justify-between border-t px-3 py-2 pl-5"
+        style={{ borderColor: dividerColor }}
+      >
+        <button
+          type="button"
+          onClick={onOpenStaff}
+          disabled={!canOpenStaff}
+          className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition-colors duration-150 hover:bg-white disabled:cursor-not-allowed disabled:opacity-30"
+          style={{ color: K.TEXT_SECONDARY }}
+        >
+          Personeli görüntüle
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+
+        {onToggleExpand && (
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            aria-label={isExpanded ? 'Alt birimleri gizle' : 'Alt birimleri göster'}
+            aria-expanded={isExpanded}
+            className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium transition-colors duration-150 hover:bg-white"
+            style={{ color: K.TEXT_SECONDARY }}
+          >
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {childCount} alt birim
+            </span>
+            <ChevronDown
+              className="h-3.5 w-3.5"
+              style={{
+                transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+                transition: 'transform 150ms ease',
+              }}
+            />
+          </button>
+        )}
+      </div>
+
+      {/* Expanded alt birim listesi */}
+      {isExpanded && children && (
+        <ul
+          className="border-t pl-1"
+          style={{
+            borderColor: dividerColor,
+            background: K.BG_SOFT,
+          }}
+        >
+          {children}
+        </ul>
+      )}
+    </article>
+  );
+}
+
+// ---------- Sub-department row (kart içi alt birim) ----------
+
+interface SubDeptRowProps {
+  dept: Dept;
+  check: CheckState;
+  autoIncluded: boolean;
+  excludedCount: number;
+  onToggle?: () => void;
+  onOpenStaff: () => void;
+  canOpenStaff: boolean;
+}
+
+function SubDeptRow({
+  dept,
+  check,
+  autoIncluded,
+  excludedCount,
+  onToggle,
+  onOpenStaff,
+  canOpenStaff,
+}: SubDeptRowProps) {
+  const isOn = check === true || check === 'mixed';
+
+  return (
+    <li
+      className="flex items-center gap-2.5 px-4 py-2 transition-colors duration-150 hover:bg-white"
+    >
+      {/* Renk dot — alt birim kimliği */}
+      <span
+        aria-hidden
+        className="h-2 w-2 shrink-0 rounded-full"
+        style={{ background: dept.color, opacity: isOn ? 1 : 0.45 }}
+      />
+
+      {/* İsim + badge'ler */}
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={!onToggle}
+        className="min-w-0 flex-1 text-left disabled:cursor-not-allowed"
+      >
+        <div className="flex items-center gap-1.5">
+          <span
+            className="truncate font-semibold"
+            style={{ color: K.TEXT_PRIMARY, fontSize: 13 }}
+          >
+            {dept.name}
+          </span>
+          {autoIncluded && (
+            <span
+              className="inline-flex h-4 items-center rounded px-1.5 text-[9px] font-semibold"
+              style={{
+                background: K.SURFACE,
+                color: K.TEXT_MUTED,
+                border: `1px solid ${K.BORDER_SOFT}`,
+              }}
+            >
+              otomatik
+            </span>
+          )}
+          {excludedCount > 0 && (
+            <span
+              className="inline-flex h-4 items-center rounded px-1.5 text-[9px] font-semibold"
+              style={{
+                background: K.WARNING_BG,
+                color: K.WARNING,
+                border: `1px solid ${K.WARNING}40`,
+              }}
+            >
+              {excludedCount} hariç
+            </span>
+          )}
+        </div>
+      </button>
+
+      {/* Personel sayısı */}
+      <span
+        className="shrink-0 text-[11px] font-medium"
+        style={{
+          color: K.TEXT_MUTED,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {dept.staff.length}
+      </span>
+
+      {/* Checkbox */}
       <button
         type="button"
         role="checkbox"
@@ -563,7 +801,15 @@ function DepartmentRow({
         }}
       >
         {check === true && (
-          <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            viewBox="0 0 12 12"
+            className="h-2.5 w-2.5"
+            fill="none"
+            stroke="white"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="2.5,6.5 5,9 9.5,3.5" />
           </svg>
         )}
@@ -572,93 +818,7 @@ function DepartmentRow({
         )}
       </button>
 
-      {/* Avatar */}
-      <button
-        type="button"
-        onClick={onToggle}
-        disabled={!onToggle}
-        className="flex shrink-0 items-center disabled:cursor-not-allowed"
-      >
-        <div
-          className="flex shrink-0 items-center justify-center rounded-md font-bold text-white"
-          style={{
-            background: dept.color,
-            width: depth === 1 ? 26 : 30,
-            height: depth === 1 ? 26 : 30,
-            fontSize: depth === 1 ? 11 : 12,
-            opacity: isEmpty ? 0.55 : 1,
-          }}
-        >
-          {dept.name[0]?.toLocaleUpperCase('tr-TR')}
-        </div>
-      </button>
-
-      {/* Title + secondary line */}
-      <button
-        type="button"
-        onClick={onToggle}
-        disabled={!onToggle}
-        className="min-w-0 flex-1 text-left disabled:cursor-not-allowed"
-      >
-        <div className="flex items-center gap-1.5">
-          <p
-            className="truncate font-semibold"
-            style={{
-              color: K.TEXT_PRIMARY,
-              fontSize: depth === 1 ? 13 : 14,
-            }}
-          >
-            {dept.name}
-          </p>
-          {autoIncluded && (
-            <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-medium">
-              otomatik
-            </Badge>
-          )}
-          {excludedCount > 0 && (
-            <Badge
-              variant="outline"
-              className="h-4 px-1.5 text-[9px] font-medium"
-              style={{ borderColor: K.WARNING, color: K.WARNING }}
-            >
-              {excludedCount} hariç
-            </Badge>
-          )}
-        </div>
-        <p
-          className="truncate text-[11px]"
-          style={{
-            color: K.TEXT_MUTED,
-            fontVariantNumeric: 'tabular-nums',
-            opacity: isEmpty ? 0.6 : 1,
-          }}
-        >
-          {secondaryLine}
-        </p>
-      </button>
-
-      {/* Expand children toggle (root, child'ı varsa) */}
-      {onToggleExpand && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleExpand();
-          }}
-          aria-label={isExpanded ? 'Alt birimleri gizle' : 'Alt birimleri göster'}
-          aria-expanded={isExpanded}
-          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition-colors duration-150 hover:bg-stone-100"
-          style={{ color: K.TEXT_SECONDARY }}
-        >
-          <ChevronDown
-            className="h-3.5 w-3.5 transition-transform duration-150"
-            style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}
-          />
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{childCount}</span>
-        </button>
-      )}
-
-      {/* Open staff drawer */}
+      {/* Drawer trigger */}
       <button
         type="button"
         onClick={(e) => {
@@ -667,12 +827,12 @@ function DepartmentRow({
         }}
         disabled={!canOpenStaff}
         aria-label="Personel listesini aç"
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors duration-150 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-25"
-        style={{ color: K.TEXT_SECONDARY }}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded transition-colors duration-150 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-25"
+        style={{ color: K.TEXT_MUTED }}
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-3.5 w-3.5" />
       </button>
-    </div>
+    </li>
   );
 }
 
