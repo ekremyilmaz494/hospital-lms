@@ -300,8 +300,8 @@ export default function AssignStep({
                         excludedCount={rootExcludedCount}
                         secondaryLine={
                           kids.length > 0
-                            ? `${root.staff.length} kişi · ${kids.length} alt birim · ${subtreeTotal} toplam`
-                            : `${root.staff.length} kişi`
+                            ? `${subtreeTotal} personel · ${kids.length} alt birim`
+                            : `${root.staff.length} personel`
                         }
                         childCount={kids.length}
                         isExpanded={isExpanded}
@@ -350,7 +350,7 @@ export default function AssignStep({
                                   check={kidCheck}
                                   autoIncluded={autoIncluded}
                                   excludedCount={kidExcludedCount}
-                                  secondaryLine={`${kid.staff.length} kişi`}
+                                  secondaryLine={`${kid.staff.length} personel`}
                                   onToggle={
                                     autoIncluded ? undefined : () => toggleDept(kid.id)
                                   }

@@ -27,12 +27,12 @@ interface BasicInfoStepProps {
   setStartDate: (v: string) => void;
   endDate: string;
   setEndDate: (v: string) => void;
-  maxAttempts: number;
-  setMaxAttempts: (v: number) => void;
-  examDurationMinutes: number;
-  setExamDurationMinutes: (v: number) => void;
-  smgPoints: number;
-  setSmgPoints: (v: number) => void;
+  maxAttempts: number | '';
+  setMaxAttempts: (v: number | '') => void;
+  examDurationMinutes: number | '';
+  setExamDurationMinutes: (v: number | '') => void;
+  smgPoints: number | '';
+  setSmgPoints: (v: number | '') => void;
   isCompulsory: boolean;
   setIsCompulsory: (v: boolean) => void;
   complianceDeadline: string;
@@ -174,21 +174,21 @@ export default function BasicInfoStep({
                 <Award className="h-3.5 w-3.5" style={{ color: K.WARNING }} />
                 <Label className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>Deneme Hakkı</Label>
               </div>
-              <Input type="number" value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} className="h-10" style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }} />
+              <Input type="number" min={1} max={10} value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value ? Number(e.target.value) : '')} placeholder="örn. 3" className="h-10" style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }} />
             </div>
             <div>
               <div className="flex items-center gap-1.5 mb-2">
                 <Clock className="h-3.5 w-3.5" style={{ color: K.PRIMARY_HOVER }} />
                 <Label className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>Süre (dk)</Label>
               </div>
-              <Input type="number" value={examDurationMinutes} onChange={(e) => setExamDurationMinutes(Number(e.target.value))} className="h-10" style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }} />
+              <Input type="number" min={1} max={600} value={examDurationMinutes} onChange={(e) => setExamDurationMinutes(e.target.value ? Number(e.target.value) : '')} placeholder="örn. 30" className="h-10" style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }} />
             </div>
             <div>
               <div className="flex items-center gap-1.5 mb-2">
                 <Award className="h-3.5 w-3.5" style={{ color: K.SUCCESS }} />
                 <Label className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>SMG Puanı</Label>
               </div>
-              <Input type="number" min={0} max={999} value={smgPoints} onChange={(e) => setSmgPoints(Number(e.target.value))} className="h-10" style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }} />
+              <Input type="number" min={0} max={999} value={smgPoints} onChange={(e) => setSmgPoints(e.target.value ? Number(e.target.value) : '')} placeholder="örn. 10" className="h-10" style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }} />
               <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>Eğitim geçilince staff&apos;a yazılacak SMG puanı</p>
             </div>
           </div>
