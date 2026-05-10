@@ -354,7 +354,7 @@ export default function StaffPage() {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDept(dept.id); setCurrentPage(1); setSearchQuery(''); } }}
               role="button"
               tabIndex={0}
-              className="k-card group relative cursor-pointer p-5 transition-all hover:-translate-y-0.5"
+              className="k-card group relative cursor-pointer p-5 transition-all hover:-translate-y-0.5 flex flex-col"
               style={{ borderLeft: `3px solid ${deptColor}` }}
             >
               <div className="flex items-start justify-between mb-3">
@@ -449,42 +449,80 @@ export default function StaffPage() {
               )}
 
               {children.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3" aria-label="Alt departmanlar">
-                  {children.map(child => {
-                    const childColor = semanticDeptColor(child.name) ?? child.color;
-                    return (
-                      <button
-                        key={child.id}
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setSelectedDept(child.id); setCurrentPage(1); setSearchQuery(''); }}
-                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium transition-all hover:scale-[1.03]"
-                        style={{ background: `${childColor}1a`, color: childColor, border: `1px solid ${childColor}33` }}
-                        title={`${child.staffCount} personel`}
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: childColor }} />
-                        {child.name}
-                        <span className="tabular-nums opacity-70">{child.staffCount}</span>
-                      </button>
-                    );
-                  })}
+                <div className="mb-3" aria-label="Alt departmanlar">
+                  <div
+                    className="flex items-center gap-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ color: 'var(--k-text-muted)' }}
+                  >
+                    <span>Alt Birimler</span>
+                    <span className="tabular-nums" style={{ color: 'var(--k-text-muted)' }}>· {children.length}</span>
+                  </div>
+                  <ul className="flex flex-col -mx-1.5">
+                    {children.map(child => {
+                      const childColor = semanticDeptColor(child.name) ?? child.color;
+                      return (
+                        <li key={child.id}>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setSelectedDept(child.id); setCurrentPage(1); setSearchQuery(''); }}
+                            className="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md text-xs hover:bg-[color:var(--k-surface-hover)] focus-visible:bg-[color:var(--k-surface-hover)] focus-visible:outline-none"
+                            title={`${child.staffCount} personel`}
+                          >
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ background: childColor }}
+                              aria-hidden
+                            />
+                            <span
+                              className="flex-1 text-left truncate font-medium"
+                              style={{ color: 'var(--k-text-primary)' }}
+                            >
+                              {child.name}
+                            </span>
+                            <span
+                              className="tabular-nums text-[11px] font-semibold px-1.5 py-0.5 rounded"
+                              style={{ color: childColor, background: `${childColor}14` }}
+                            >
+                              {child.staffCount}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               )}
 
-              <div className="flex items-center gap-2.5 pt-3 border-t" style={{ borderColor: 'var(--k-border)' }}>
+              <div className="flex items-center gap-2.5 pt-3 border-t mt-auto" style={{ borderColor: 'var(--k-border)' }}>
                 <div className="flex">
-                  {(staffByDeptMap.get(dept.id) ?? []).slice(0, 3).map(s => (
-                    <Avatar key={s.id} className="h-6 w-6 -ml-1.5 first:ml-0 ring-2 ring-white">
-                      <AvatarFallback className="text-[9px] font-semibold text-white" style={{ background: deptColor }}>
-                        {s.initials}
-                      </AvatarFallback>
-                    </Avatar>
-                  ))}
-                  {dept.staffCount > 3 && (
-                    <div className="h-6 w-6 rounded-full -ml-1.5 ring-2 ring-white flex items-center justify-center text-[9px] font-bold"
-                         style={{ background: 'var(--k-surface-hover)', color: 'var(--k-text-muted)' }}>
-                      +{dept.staffCount - 3}
-                    </div>
-                  )}
+                  {(() => {
+                    const directStaff = staffByDeptMap.get(dept.id) ?? [];
+                    const shown = directStaff.slice(0, 3);
+                    const hidden = Math.max(0, dept.staffCount - shown.length);
+                    return (
+                      <>
+                        {shown.map(s => (
+                          <Avatar key={s.id} className="h-6 w-6 -ml-1.5 first:ml-0 ring-2 ring-white">
+                            <AvatarFallback className="text-[9px] font-semibold text-white" style={{ background: deptColor }}>
+                              {s.initials}
+                            </AvatarFallback>
+                          </Avatar>
+                        ))}
+                        {hidden > 0 && (
+                          <div
+                            className="h-6 w-6 rounded-full ring-2 ring-white flex items-center justify-center text-[9px] font-bold"
+                            style={{
+                              background: 'var(--k-surface-hover)',
+                              color: 'var(--k-text-muted)',
+                              marginLeft: shown.length > 0 ? -6 : 0,
+                            }}
+                          >
+                            +{hidden}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <span className="text-xs ml-auto tabular-nums" style={{ color: 'var(--k-text-muted)' }}>
                   <strong style={{ color: 'var(--k-text-primary)' }}>{dept.staffCount}</strong> kişi
