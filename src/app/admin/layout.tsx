@@ -16,6 +16,8 @@ import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
+import { UploadManagerProvider } from '@/components/admin/upload-manager';
+import { UploadManagerWidget } from '@/components/admin/upload-manager-widget';
 
 const roleLabels: Record<string, string> = {
   admin: 'Hastane Admin',
@@ -87,6 +89,7 @@ export default function AdminLayout({
 
   return (
     <TooltipProvider>
+      <UploadManagerProvider>
       <div className="min-h-screen" style={{ background: 'var(--k-bg, #fafaf9)' }}>
 
         {/* Sidebar: sadece md ve üzerinde göster */}
@@ -138,7 +141,9 @@ export default function AdminLayout({
           items={adminBottomNavItems}
           onMorePress={() => setMobileDrawerOpen(true)}
         />
+        <UploadManagerWidget />
       </div>
+      </UploadManagerProvider>
     </TooltipProvider>
   );
 }

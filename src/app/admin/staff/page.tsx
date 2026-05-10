@@ -366,7 +366,7 @@ export default function StaffPage() {
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger
-                    className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--k-surface-hover)] transition-opacity"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-(--k-surface-hover) transition-opacity"
                     onClick={(e) => e.stopPropagation()}
                     aria-label="Departman işlemleri"
                   >
@@ -499,7 +499,7 @@ export default function StaffPage() {
           {!showAddDept ? (
             <button
               onClick={() => setShowAddDept(true)}
-              className="flex flex-col items-center justify-center gap-2.5 min-h-[180px] p-7 rounded-2xl border-2 border-dashed transition-all hover:-translate-y-0.5"
+              className="flex flex-col items-center justify-center gap-2.5 min-h-45 p-7 rounded-2xl border-2 border-dashed transition-all hover:-translate-y-0.5"
               style={{ borderColor: 'var(--k-border)', color: 'var(--k-text-muted)' }}
             >
               <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -514,7 +514,7 @@ export default function StaffPage() {
                 <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>
                   Yeni Departman
                 </span>
-                <button onClick={() => setShowAddDept(false)} className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-[var(--k-surface-hover)]" aria-label="Kapat">
+                <button onClick={() => setShowAddDept(false)} className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-(--k-surface-hover)" aria-label="Kapat">
                   <X size={14} style={{ color: 'var(--k-text-muted)' }} />
                 </button>
               </div>
@@ -597,8 +597,8 @@ export default function StaffPage() {
             >
               <ChevronRight size={14} className="rotate-180" /> Tüm Departmanlar
             </button>
-            <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+            <div className="flex items-center gap-3 flex-1 min-w-50">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
                    style={{ background: `${selectedDeptColor}20`, color: selectedDeptColor }}>
                 <Building2 size={20} />
               </div>
