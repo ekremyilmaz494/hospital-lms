@@ -50,9 +50,20 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   if (!log) return errorResponse('Yükleme kaydı bulunamadı veya başka organizasyona ait', 404)
 
-  const data = log.newData as { createdUserIds?: string[]; createdInvitationIds?: string[] } | null
-  const userIds = data?.createdUserIds ?? []
-  const invitationIds = data?.createdInvitationIds ?? []
+  const data = log.newData as {
+    createdUserIds?: string[] | Record<string, string>
+    createdInvitationIds?: string[] | Record<string, string>
+  } | null
+
+  // Geriye uyumluluk: eski sanitizeAuditData bug'ı yüzünden array yerine
+  // object olarak kaydedilmiş batch'leri de kabul et ({"0":"uuid","1":"uuid"})
+  const toIdArray = (v: string[] | Record<string, string> | undefined): string[] => {
+    if (!v) return []
+    if (Array.isArray(v)) return v
+    return Object.values(v)
+  }
+  const userIds = toIdArray(data?.createdUserIds)
+  const invitationIds = toIdArray(data?.createdInvitationIds)
 
   if (userIds.length === 0 && invitationIds.length === 0) {
     return errorResponse('Bu kayıt geri alınamaz (eski kayıt, kullanıcı/davet ID bilgisi yok)', 400)

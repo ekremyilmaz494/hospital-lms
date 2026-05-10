@@ -412,6 +412,12 @@ export async function parseBody<T>(request: Request): Promise<T | null> {
 /** Sanitize sensitive PII from audit log data */
 function sanitizeAuditData(data: unknown): unknown {
   if (!data || typeof data !== 'object') return data;
+  // Array → array map (yoksa Postgres'te object'e dönüşür, rollback gibi
+  // tüketiciler array bekleyince createdUserIds boş okuyup hiçbir şey
+  // silmez — production'da 141 staff'lık batch bu yüzden rollback'lenemedi)
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeAuditData(item));
+  }
   const obj = data as Record<string, unknown>;
   const sanitized: Record<string, unknown> = {};
   // KVKK: Kişisel veriler audit log'da redact edilmeli
