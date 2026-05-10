@@ -54,17 +54,31 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, or
 
   if (!existing) return errorResponse('Departman bulunamadı', 404)
 
-  // İsim değişiyorsa çakışma kontrolü
-  if (parsed.data.name && parsed.data.name !== existing.name) {
-    const duplicate = await prisma.department.findUnique({
+  // Çakışma kontrolü: yeni state'in (name, parentId) kombinasyonu aynı parent altında
+  // başka bir departmanla çakışıyor mu? Schema'da partial unique index'ler var:
+  // (orgId, name) WHERE parent_id IS NULL ve (orgId, name, parent_id) WHERE parent_id IS NOT NULL.
+  const newName = parsed.data.name ?? existing.name
+  const newParentId = parsed.data.parentId !== undefined ? parsed.data.parentId : existing.parentId
+  const nameChanged = parsed.data.name && parsed.data.name !== existing.name
+  const parentChanged = parsed.data.parentId !== undefined && parsed.data.parentId !== existing.parentId
+  if (nameChanged || parentChanged) {
+    const duplicate = await prisma.department.findFirst({
       where: {
-        organizationId_name: {
-          organizationId,
-          name: parsed.data.name,
-        },
+        organizationId,
+        name: newName,
+        parentId: newParentId ?? null,
+        NOT: { id },
       },
+      select: { id: true },
     })
-    if (duplicate) return errorResponse('Bu isimde bir departman zaten mevcut', 409)
+    if (duplicate) {
+      return errorResponse(
+        newParentId
+          ? 'Bu isimde bir alt departman bu üst departman altında zaten mevcut'
+          : 'Bu isimde bir kök departman zaten mevcut',
+        409,
+      )
+    }
   }
 
   // parentId değişiyorsa hiyerarşi kuralları:

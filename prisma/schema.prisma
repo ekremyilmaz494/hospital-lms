@@ -252,7 +252,12 @@ model Department {
   trainingRules DepartmentTrainingRule[]
   invitations   Invitation[]
 
-  @@unique([organizationId, name])
+  // Unique kuralı parent'a göre değişir, Prisma composite + nullable key destekleyemediği için
+  // partial unique index'ler raw migration ile tanımlandı:
+  //   departments_org_name_root_unique     WHERE parent_id IS NULL  (kök departmanlarda isim org'da unique)
+  //   departments_org_name_parent_unique   WHERE parent_id IS NOT NULL  (aynı parent altında alt dep ismi unique)
+  // Bu sayede aynı isim farklı parent altında olabilir (ör. BAŞHEKİMLİK > ACİL SERVİS + HEMŞİRELİK > ACİL SERVİS).
+  @@index([organizationId, name], map: "idx_departments_org_name")
   @@index([organizationId], map: "idx_departments_org")
   @@index([parentId], map: "idx_departments_parent")
   @@map("departments")

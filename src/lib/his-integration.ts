@@ -444,19 +444,29 @@ export async function syncDepartmentsFromHis(integration: HisIntegration): Promi
           continue
         }
 
-        await prisma.department.upsert({
-          where: {
-            organizationId_name: { organizationId: integration.organizationId, name },
-          },
-          create: {
-            organizationId: integration.organizationId,
-            name,
-            description: description ?? null,
-          },
-          update: {
-            description: description ?? undefined,
-          },
+        // HIS sadece kök departmanları senkronize ediyor (parentId null).
+        // Schema'da (orgId, name) artık global unique değil — partial unique
+        // index'ler parentId-aware. Composite key Prisma'ya yansımadığı için
+        // upsert yerine findFirst + create/update pattern.
+        const existingRoot = await prisma.department.findFirst({
+          where: { organizationId: integration.organizationId, name, parentId: null },
+          select: { id: true },
         })
+        if (existingRoot) {
+          await prisma.department.update({
+            where: { id: existingRoot.id },
+            data: { description: description ?? undefined },
+          })
+        } else {
+          await prisma.department.create({
+            data: {
+              organizationId: integration.organizationId,
+              name,
+              description: description ?? null,
+              parentId: null,
+            },
+          })
+        }
 
         result.processedRecords++
         result.created++ // upsert için kesin ayrımı DB'den okumak gerekir, created sayılır

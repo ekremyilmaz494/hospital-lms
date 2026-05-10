@@ -58,18 +58,25 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
 
   const { name, description, color, sortOrder, parentId } = parsed.data
 
-  // Aynı isimde departman var mı kontrol et
-  const existing = await prisma.department.findUnique({
+  // Aynı parent altında aynı isimde departman var mı kontrol et.
+  // Schema: (orgId, name) artık global unique değil — parent farketmediği için
+  // farklı parent altındaki aynı isim serbest. parentId null = kök departman seviyesi.
+  const existing = await prisma.department.findFirst({
     where: {
-      organizationId_name: {
-        organizationId,
-        name,
-      },
+      organizationId,
+      name,
+      parentId: parentId ?? null,
     },
+    select: { id: true },
   })
 
   if (existing) {
-    return errorResponse('Bu isimde bir departman zaten mevcut', 409)
+    return errorResponse(
+      parentId
+        ? 'Bu isimde bir alt departman bu üst departman altında zaten mevcut'
+        : 'Bu isimde bir kök departman zaten mevcut',
+      409,
+    )
   }
 
   // Max 2 seviye kuralı: parent kendisi child ise yeni departman 3. seviyede olur — yasak.

@@ -208,13 +208,28 @@ async function parseImportFile(
         subResolved = 'ambiguous'
         subCandidates = subMatch.candidates
       } else {
-        // Parent altında yok — kullanıcı serbest metin yazıyor (ünvan gibi).
-        // Import aşamasında parent altına yaratılacak; preview'da "yeni" olarak işaretlenir.
+        // Parent altında yok — import aşamasında parent altına yaratılacak (auto-create).
+        // Schema artık (orgId, name, parentId) unique → aynı isim farklı parent altında
+        // olabilir, başka root altındaki aynı isimli kayıt reuse edilmez.
         subResolved = 'auto-create'
       }
     } else if (subInput && !deptId) {
       // Üst departman bulunamadıysa alt departman doğrulaması yapılmaz
       subResolved = 'none'
+    } else if (!subInput && deptId) {
+      // Alt departman boş + parent var → "{ParentName} (Genel)" formatında auto-create.
+      // Personel root'a düşmesin diye parent ile aynı seviyede bir "diğerleri" sub'ı oluşur.
+      // Schema artık aynı isim farklı parent altında izin verdiği için her parent'ın
+      // kendi "(Genel)" sub'ı olur.
+      subResolved = 'auto-create'
+      subDeptName = `${deptName} (Genel)`
+      // Bu sub mevcut ağaçta zaten var mı? (önceki import'tan kalmış olabilir)
+      const childDepts = departments.filter(d => d.parentId === deptId)
+      const existingGenel = childDepts.find(d => d.name === subDeptName)
+      if (existingGenel) {
+        subDeptId = existingGenel.id
+        subResolved = 'exact'
+      }
     }
 
     return {
@@ -541,19 +556,19 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     autoCreatePending.push({ key, parentId: row.deptId, name })
   }
   if (autoCreatePending.length > 0) {
-    // Department schema: @@unique([organizationId, name]) — adlar org içinde benzersiz, parent'a bakılmaz.
-    // O yüzden "aynı isim varsa parent'tan bağımsız mevcudunu kullan" mantığı zorunlu;
-    // yoksa Excel'de iki farklı parent altında aynı alt isim → ikinci satırda P2002 patlar.
+    // Department schema: partial unique index'ler — (orgId, name) kök seviyesinde,
+    // (orgId, name, parent_id) alt seviyede unique. Aynı isim FARKLI parent altında
+    // serbestçe yaratılabilir. Reuse kuralı sadece AYNI parent altındaki aynı isim için.
     const orgDepts = await prisma.department.findMany({
       where: { organizationId: orgId },
       select: { id: true, name: true, parentId: true },
     })
     for (const p of autoCreatePending) {
       const nameLower = p.name.toLowerCase()
-      const hit = orgDepts.find(d => d.name.toLowerCase() === nameLower)
+      // Sadece aynı parent altında aynı isim varsa reuse — farklı parent altındaki
+      // aynı isim ayrı kayıt; auto-create yeni bir tane yaratabilir.
+      const hit = orgDepts.find(d => d.name.toLowerCase() === nameLower && d.parentId === p.parentId)
       if (hit) {
-        // Org'da zaten bu ada sahip bir departman var (kök ya da başka parent altında olsa bile).
-        // Schema gereği duplicate yaratamayız → mevcut kaydı kullan.
         autoCreateMap.set(p.key, hit.id)
         continue
       }
@@ -563,12 +578,16 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
           select: { id: true, name: true, parentId: true },
         })
         autoCreateMap.set(p.key, created.id)
-        // Sonraki pending kayıtların aynı ismi referanslayabilmesi için cache'i güncel tut.
+        // Sonraki pending kayıtların aynı (parent, isim) referanslayabilmesi için cache güncel.
         orgDepts.push(created)
       } catch (err) {
-        // Race / case farklı duplicate → son çare olarak yeniden oku ve reuse et.
+        // Race condition: aynı parent altında aynı isim eşzamanlı yaratıldı → yeniden oku ve reuse et.
         const dup = await prisma.department.findFirst({
-          where: { organizationId: orgId, name: { equals: p.name, mode: 'insensitive' } },
+          where: {
+            organizationId: orgId,
+            parentId: p.parentId,
+            name: { equals: p.name, mode: 'insensitive' },
+          },
           select: { id: true },
         })
         if (dup) {

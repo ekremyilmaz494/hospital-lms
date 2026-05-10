@@ -354,21 +354,31 @@ async function main() {
   console.log(`  Plan: ${plan.name}`)
 
   // ── 3. DEPARTMENTS ──
+  // Schema'da artık (orgId, name, parentId) bazlı partial unique index'ler var.
+  // Composite key Prisma'ya yansımıyor → upsert yerine findFirst + create/update.
+  // Seed sadece kök departmanları oluşturuyor (parentId null).
   console.log('\n[3/9] Departmanlar oluşturuluyor...')
   const deptIds: string[] = []
   for (const dept of DEPARTMENTS) {
-    const d = await prisma.department.upsert({
-      where: { organizationId_name: { organizationId: org.id, name: dept.name } },
-      update: { description: dept.description, color: dept.color, sortOrder: dept.sortOrder },
-      create: {
-        organizationId: org.id,
-        name: dept.name,
-        description: dept.description,
-        color: dept.color,
-        sortOrder: dept.sortOrder,
-        isActive: true,
-      },
+    const existing = await prisma.department.findFirst({
+      where: { organizationId: org.id, name: dept.name, parentId: null },
+      select: { id: true },
     })
+    const d = existing
+      ? await prisma.department.update({
+          where: { id: existing.id },
+          data: { description: dept.description, color: dept.color, sortOrder: dept.sortOrder },
+        })
+      : await prisma.department.create({
+          data: {
+            organizationId: org.id,
+            name: dept.name,
+            description: dept.description,
+            color: dept.color,
+            sortOrder: dept.sortOrder,
+            isActive: true,
+          },
+        })
     deptIds.push(d.id)
     console.log(`  Departman: ${d.name}`)
   }
