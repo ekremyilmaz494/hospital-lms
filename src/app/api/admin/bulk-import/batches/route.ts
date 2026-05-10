@@ -32,10 +32,18 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
 
   const adminMap = new Map(users.map(u => [u.id, `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email]))
 
+  // Geriye uyumluluk: eski sanitizeAuditData bug'ı yüzünden createdUserIds
+  // bazı batch'lerde array yerine {"0":"uuid",...} object olarak kaydedildi.
+  const toIdArray = (v: string[] | Record<string, string> | undefined): string[] => {
+    if (!v) return []
+    if (Array.isArray(v)) return v
+    return Object.values(v)
+  }
+
   // createdUserIds'deki kullanıcılar hâlâ aktif mi? Kontrol et (rollback anlamlı mı?)
   const allCreatedIds = logs.flatMap(l => {
-    const data = l.newData as { createdUserIds?: string[] } | null
-    return data?.createdUserIds ?? []
+    const data = l.newData as { createdUserIds?: string[] | Record<string, string> } | null
+    return toIdArray(data?.createdUserIds)
   })
   const activeUsers = allCreatedIds.length > 0
     ? await prisma.user.findMany({
@@ -50,10 +58,10 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       totalRows?: number
       created?: number
       failed?: number
-      createdUserIds?: string[]
+      createdUserIds?: string[] | Record<string, string>
     } | null
 
-    const createdIds = data?.createdUserIds ?? []
+    const createdIds = toIdArray(data?.createdUserIds)
     const stillActive = createdIds.filter(id => activeUserSet.has(id)).length
 
     return {
