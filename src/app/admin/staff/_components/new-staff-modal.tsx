@@ -66,8 +66,37 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
     setSaving(true);
     try {
       const tcNorm = normalizeTcKimlik(form.tc);
-      // departmentId: alt departman seçildiyse onun id'si, yoksa parent'ın id'si
-      const assignedDeptId = form.altDepartman || form.departman;
+
+      // Alt departman free-text:
+      //   - boşsa → personel parent'a atanır
+      //   - mevcut bir alt dept ile case-insensitive eşleşiyorsa → o dept kullanılır
+      //   - yeni bir isimse → önce alt dept oluşturulur, sonra personel ona atanır
+      const altInput = form.altDepartman.trim();
+      let assignedDeptId = form.departman;
+      if (altInput) {
+        const existing = departments.find(
+          d => d.parentId === form.departman
+            && d.name.localeCompare(altInput, 'tr', { sensitivity: 'base' }) === 0,
+        );
+        if (existing) {
+          assignedDeptId = existing.id;
+        } else {
+          const parent = departments.find(d => d.id === form.departman);
+          const createRes = await fetch('/api/admin/departments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: altInput,
+              color: parent?.color ?? '#0d9668',
+              parentId: form.departman,
+            }),
+          });
+          const created = await createRes.json().catch(() => ({}));
+          if (!createRes.ok) throw new Error(created.error || 'Alt departman oluşturulamadı');
+          assignedDeptId = created.id;
+        }
+      }
+
       const payload: Record<string, unknown> = {
         // Excel akışıyla uyumlu — her zaman direct: hesap anında açılır,
         // email doluysa welcome mail + geçici şifre gönderilir, boşsa TC + şifre ile giriş.
@@ -345,24 +374,23 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
             </Field>
             <Field
               label="Alt Departman"
-              hint={form.departman
-                ? (departments.some(d => d.parentId === form.departman)
-                    ? 'Opsiyonel — seçmezseniz personel üst departmana atanır.'
-                    : 'Bu departmanın alt birimi yok.')
-                : 'Önce üst departman seçin.'}
+              hint="Opsiyonel — mevcut alt birimden seçin veya yeni bir isim yazın (otomatik oluşturulur)."
             >
-              <select
-                className="h-10 w-full rounded-lg border px-3 text-sm disabled:opacity-50"
-                style={fieldStyle('altDepartman')}
+              <Input
+                list="alt-departman-suggestions"
+                placeholder="Örn: Endokrinoloji"
+                className="h-10"
                 value={form.altDepartman}
-                disabled={!form.departman || !departments.some(d => d.parentId === form.departman)}
                 onChange={(e) => setForm(f => ({ ...f, altDepartman: e.target.value }))}
-              >
-                <option value="">— (opsiyonel)</option>
-                {departments.filter(d => d.parentId === form.departman).map(d => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
+                style={fieldStyle('altDepartman')}
+              />
+              <datalist id="alt-departman-suggestions">
+                {departments
+                  .filter(d => d.parentId === form.departman)
+                  .map(d => (
+                    <option key={d.id} value={d.name} />
+                  ))}
+              </datalist>
             </Field>
           </div>
           <Field label="Unvan *" error={errors.unvan}>
