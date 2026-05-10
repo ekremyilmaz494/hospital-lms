@@ -42,6 +42,8 @@ export async function GET(request: Request) {
 
   const results: Array<{ orgId: string; status: string; sizeMb?: number }> = []
   const failures: string[] = []
+  const oversizedBackups: Array<{ orgId: string; orgName: string; sizeMb: number }> = []
+  const BACKUP_SIZE_WARN_MB = 100
 
   for (const org of organizations) {
     try {
@@ -123,6 +125,11 @@ export async function GET(request: Request) {
       if (!isVerified) {
         failures.push(`${org.name} (${org.id}): verification_failed (${deep.reason ?? 'unknown'})`)
       }
+
+      // Boyut uyarısı — ileride büyüyen kurumlar için erken sinyal
+      if (sizeMb > BACKUP_SIZE_WARN_MB) {
+        oversizedBackups.push({ orgId: org.id, orgName: org.name, sizeMb: Math.round(sizeMb * 100) / 100 })
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Bilinmeyen hata'
       logger.error('Cron Backup', `Yedekleme başarısız: ${org.name}`, { orgId: org.id, error: errorMsg })
@@ -140,6 +147,22 @@ export async function GET(request: Request) {
       }).catch(() => { /* swallow nested error */ })
 
       results.push({ orgId: org.id, status: 'failed' })
+    }
+  }
+
+  // Boyut uyarısı (failures'tan bağımsız) — büyüyen kurumlar için erken sinyal
+  if (oversizedBackups.length > 0) {
+    const adminEmail = process.env.ADMIN_ALERT_EMAIL
+    if (adminEmail) {
+      sendEmail({
+        to: adminEmail,
+        subject: `[Yedekleme Uyarısı] ${oversizedBackups.length} kurum yedeği ${BACKUP_SIZE_WARN_MB} MB üzerinde`,
+        html: `<h3>Büyük Yedek Uyarısı (Cron)</h3>
+          <p><strong>Tarih:</strong> ${new Date().toLocaleString('tr-TR')}</p>
+          <p>Aşağıdaki kurumların günlük yedeği ${BACKUP_SIZE_WARN_MB} MB eşiğini aştı:</p>
+          <ul>${oversizedBackups.map(o => `<li>${o.orgName} (<code>${o.orgId}</code>): <strong>${o.sizeMb} MB</strong></li>`).join('')}</ul>
+          <p>Yedek boyutu büyüdükçe restore süresi, S3 maliyeti ve cron timeout riski artar.</p>`,
+      }).catch(err => logger.warn('BackupCron', 'Boyut uyari emaili gonderilemedi', (err as Error).message))
     }
   }
 

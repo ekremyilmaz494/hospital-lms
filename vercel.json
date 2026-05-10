@@ -14,7 +14,7 @@
     },
     {
       "path": "/api/cron/verify-backup",
-      "schedule": "0 4 * * 0"
+      "schedule": "0 4 * * *"
     },
     {
       "path": "/api/cron/reminders",

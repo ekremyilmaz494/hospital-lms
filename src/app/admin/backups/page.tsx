@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, Plus, Clock, HardDrive, CheckCircle } from 'lucide-react';
+import { Download, Plus, Clock, HardDrive, CheckCircle, Activity, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatCard } from '@/components/shared/stat-card';
@@ -36,9 +36,27 @@ interface BackupsData {
   stats: { lastBackup: string; totalSize: string; nextAuto: string };
 }
 
+interface HealthData {
+  healthLevel: 'healthy' | 'warning' | 'critical';
+  healthIssues: string[];
+  last7Days: { total: number; completed: number; failed: number; verificationFailed: number; successRate: number | null };
+  lastBackup: { at: string; sizeMb: number | null; type: string; ageHours: number | null } | null;
+  lastVerified: { at: string; ageHours: number | null } | null;
+  totals: { count: number; sizeMb: number };
+}
+
+function formatRelativeHours(h: number | null): string {
+  if (h === null) return '—';
+  if (h < 1) return 'az önce';
+  if (h < 24) return `${h} saat önce`;
+  const d = Math.round(h / 24);
+  return `${d} gün önce`;
+}
+
 export default function BackupsPage() {
   const { toast } = useToast();
   const { data, isLoading, error, refetch } = useFetch<BackupsData>('/api/admin/backups');
+  const { data: health } = useFetch<HealthData>('/api/admin/backups/health');
 
   if (isLoading) {
     return <PageLoading />;
@@ -70,10 +88,92 @@ export default function BackupsPage() {
         action={{ label: 'Manuel Yedek Al', icon: Plus, onClick: handleManualBackup }}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <BlurFade delay={0.05}><StatCard title="Son Yedek" value={stats.lastBackup} icon={CheckCircle} accentColor={K.SUCCESS} /></BlurFade>
-        <BlurFade delay={0.1}><StatCard title="Toplam Boyut" value={stats.totalSize} icon={HardDrive} accentColor={K.INFO} /></BlurFade>
-        <BlurFade delay={0.15}><StatCard title="Sonraki Otomatik" value={stats.nextAuto} icon={Clock} accentColor={K.ACCENT} /></BlurFade>
+      {/* Health rozet — health verisi geldiğinde stale/critical durumlarını üstte gösterir */}
+      {health && health.healthLevel !== 'healthy' && (
+        <BlurFade delay={0}>
+          <div
+            className="flex items-start gap-3 rounded-2xl px-4 py-3"
+            style={{
+              background: health.healthLevel === 'critical' ? K.ERROR_BG : K.WARNING_BG,
+              border: `1.5px solid ${health.healthLevel === 'critical' ? K.ERROR : K.WARNING}`,
+            }}
+          >
+            <AlertTriangle
+              className="h-5 w-5 shrink-0 mt-0.5"
+              style={{ color: health.healthLevel === 'critical' ? K.ERROR : K.WARNING }}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: K.TEXT_PRIMARY }}>
+                {health.healthLevel === 'critical' ? 'Yedekleme sisteminde kritik sorun' : 'Yedekleme sisteminde uyarı'}
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {health.healthIssues.map((issue, i) => (
+                  <li key={i} className="text-[13px]" style={{ color: K.TEXT_SECONDARY }}>• {issue}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </BlurFade>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <BlurFade delay={0.05}>
+          <StatCard
+            title="Son Yedek"
+            value={health?.lastBackup ? formatRelativeHours(health.lastBackup.ageHours) : stats.lastBackup}
+            icon={CheckCircle}
+            accentColor={
+              health?.lastBackup && health.lastBackup.ageHours !== null && health.lastBackup.ageHours <= 30
+                ? K.SUCCESS
+                : K.WARNING
+            }
+          />
+        </BlurFade>
+        <BlurFade delay={0.1}>
+          <StatCard
+            title="Son 7 Gün Başarı"
+            value={
+              health?.last7Days.successRate !== null && health?.last7Days.successRate !== undefined
+                ? `${health.last7Days.successRate}% (${health.last7Days.completed}/${health.last7Days.total})`
+                : '—'
+            }
+            icon={Activity}
+            accentColor={
+              health?.last7Days.successRate === null || health?.last7Days.successRate === undefined ? K.TEXT_MUTED
+              : health.last7Days.successRate >= 100 ? K.SUCCESS
+              : health.last7Days.successRate >= 80 ? K.WARNING
+              : K.ERROR
+            }
+          />
+        </BlurFade>
+        <BlurFade delay={0.15}>
+          <StatCard
+            title="Son Doğrulama"
+            value={health?.lastVerified ? formatRelativeHours(health.lastVerified.ageHours) : '—'}
+            icon={ShieldCheck}
+            accentColor={
+              !health?.lastVerified ? K.TEXT_MUTED
+              : (health.lastVerified.ageHours ?? 999) <= 36 ? K.SUCCESS
+              : K.WARNING
+            }
+          />
+        </BlurFade>
+        <BlurFade delay={0.2}>
+          <StatCard
+            title="Toplam Boyut"
+            value={
+              health?.totals.sizeMb !== undefined && health.totals.sizeMb > 0
+                ? `${health.totals.sizeMb.toFixed(2)} MB · ${health.totals.count} yedek`
+                : stats.totalSize
+            }
+            icon={HardDrive}
+            accentColor={K.INFO}
+          />
+        </BlurFade>
+      </div>
+
+      <div className="text-[12px] flex items-center gap-1.5" style={{ color: K.TEXT_MUTED }}>
+        <Clock className="h-3.5 w-3.5" /> Sonraki otomatik yedek: {stats.nextAuto}
       </div>
 
       <BlurFade delay={0.2}>
