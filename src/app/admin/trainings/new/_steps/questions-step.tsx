@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { K, distributePoints, type QuestionItem } from './types';
+import type { AiPendingState } from '@/components/admin/trainings/ai-question-generator';
 
 const AiQuestionGenerator = dynamic(
   () => import('@/components/admin/trainings/ai-question-generator'),
@@ -23,6 +24,14 @@ interface QuestionsStepProps {
   /** AI tab'ında üretilmiş ama henüz eklenmemiş soru sayısı için parent'a bildirim.
    *  Parent buna göre "Sonraki Adım" geçişini engelleyebilir. */
   onPendingAiChange?: (count: number) => void;
+  /** Aktif tab — controlled. Mode geçişinde AI hook unmount olmasın diye
+   *  Tabs `value` controlled + AI tab `forceMount`. */
+  activeMode: 'manual' | 'ai';
+  setActiveMode: (mode: 'manual' | 'ai') => void;
+  /** AI pending state (displayed + queue) — parent'ta tutulur, draft'a kaydedilir.
+   *  Mode geçişi ve sayfa yenileme sonrası restore. */
+  aiPending: AiPendingState;
+  setAiPending: (state: AiPendingState) => void;
 }
 
 export default function QuestionsStep({
@@ -30,6 +39,8 @@ export default function QuestionsStep({
   passingScore, setPassingScore,
   addQuestion, removeQuestion,
   onPendingAiChange,
+  activeMode, setActiveMode,
+  aiPending, setAiPending,
 }: QuestionsStepProps) {
   const handleAiAdd = (
     items: { text: string; options: string[]; correct: number }[],
@@ -100,7 +111,10 @@ export default function QuestionsStep({
         </div>
       </div>
 
-      <Tabs defaultValue="manual" className="w-full flex-col gap-4">
+      {/* Tabs controlled — `activeMode` parent state'te. AI TabsContent
+          `forceMount` ile gizli kalsa bile mount kalır → hook unmount olmaz,
+          pending displayed + queue korunur. */}
+      <Tabs value={activeMode} onValueChange={(v) => setActiveMode(v as 'manual' | 'ai')} className="w-full flex-col gap-4">
         <TabsList className="w-full h-11 p-1 bg-stone-100">
           <TabsTrigger value="manual" className="h-9 text-sm font-semibold">
             <Pencil className="h-3.5 w-3.5" />
@@ -234,13 +248,18 @@ export default function QuestionsStep({
           </div>
         </TabsContent>
 
-        <TabsContent value="ai" className="pt-4">
+        {/* keepMounted: AI tab gizli olsa bile DOM'da kalır → AiQuestionGenerator
+            unmount olmaz, hook state (displayed + queue) korunur. Base UI bu
+            modda hidden attribute'unu otomatik yönetir. */}
+        <TabsContent value="ai" className="pt-4" keepMounted>
           <AiQuestionGenerator
             onAdd={handleAiAdd}
             onPendingChange={onPendingAiChange}
             manualQuestions={questions
               .filter((q) => q.text.trim() !== '' && q.options.some((o) => o.trim() !== ''))
               .map((q) => ({ text: q.text }))}
+            initialState={aiPending}
+            onStateChange={setAiPending}
           />
         </TabsContent>
       </Tabs>

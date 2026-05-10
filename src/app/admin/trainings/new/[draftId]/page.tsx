@@ -47,6 +47,27 @@ const steps = [
   { id: 4, title: 'Personel Atama', description: 'Hedef kitle', icon: Users },
 ];
 
+/** AI pending state — henüz "Soruları Ekle" butonuyla onaylanmamış AI soruları.
+ *  Lokal tipi import'lamak yerine inline tutuyoruz (component bağımlılık zinciri sade kalsın). */
+interface AiPendingSnapshot {
+  displayed: Array<{
+    questionText: string;
+    options: string[];
+    correctIndex: number;
+    sourceQuote: string;
+    sourcePage?: number;
+    clientId: string;
+  }>;
+  queue: Array<{
+    questionText: string;
+    options: string[];
+    correctIndex: number;
+    sourceQuote: string;
+    sourcePage?: number;
+    clientId: string;
+  }>;
+}
+
 /** Auto-save'in PATCH'leyeceği tam wizard snapshot'ı — DB'de Json kolonu olarak saklanır. */
 interface DraftSnapshot {
   title: string;
@@ -54,9 +75,9 @@ interface DraftSnapshot {
   selectedCategory: string;
   startDate: string;
   endDate: string;
-  maxAttempts: number;
-  examDurationMinutes: number;
-  smgPoints: number;
+  maxAttempts: number | '';
+  examDurationMinutes: number | '';
+  smgPoints: number | '';
   isCompulsory: boolean;
   complianceDeadline: string;
   regulatoryBody: string;
@@ -66,6 +87,9 @@ interface DraftSnapshot {
   passingScore: number;
   selectedDepts: string[];
   excludedStaff: string[];
+  /** Step 3 AI tab — pending sorular ve aktif mod (manuel/ai) */
+  questionsActiveMode?: 'manual' | 'ai';
+  aiPending?: AiPendingSnapshot;
 }
 
 export default function DraftWizardPage() {
@@ -91,9 +115,9 @@ export default function DraftWizardPage() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-  const [maxAttempts, setMaxAttempts] = useState(3);
-  const [examDurationMinutes, setExamDurationMinutes] = useState(30);
-  const [smgPoints, setSmgPoints] = useState(10);
+  const [maxAttempts, setMaxAttempts] = useState<number | ''>('');
+  const [examDurationMinutes, setExamDurationMinutes] = useState<number | ''>('');
+  const [smgPoints, setSmgPoints] = useState<number | ''>('');
   const [isCompulsory, setIsCompulsory] = useState(false);
   const [complianceDeadline, setComplianceDeadline] = useState('');
   const [regulatoryBody, setRegulatoryBody] = useState('');
@@ -109,6 +133,9 @@ export default function DraftWizardPage() {
   ]);
   const [passingScore, setPassingScore] = useState(70);
   const [pendingAiCount, setPendingAiCount] = useState(0);
+  // AI tab pending state — mode geçişi ve sayfa yenilemede korunur, draft'a kaydedilir.
+  const [questionsActiveMode, setQuestionsActiveMode] = useState<'manual' | 'ai'>('manual');
+  const [aiPending, setAiPending] = useState<AiPendingSnapshot>({ displayed: [], queue: [] });
 
   // Step 4
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
@@ -135,9 +162,9 @@ export default function DraftWizardPage() {
           setSelectedCategory(draftData.selectedCategory ?? '');
           if (draftData.startDate) setStartDate(draftData.startDate);
           if (draftData.endDate) setEndDate(draftData.endDate);
-          setMaxAttempts(draftData.maxAttempts ?? 3);
-          setExamDurationMinutes(draftData.examDurationMinutes ?? 30);
-          setSmgPoints(draftData.smgPoints ?? 10);
+          setMaxAttempts(draftData.maxAttempts ?? '');
+          setExamDurationMinutes(draftData.examDurationMinutes ?? '');
+          setSmgPoints(draftData.smgPoints ?? '');
           setIsCompulsory(!!draftData.isCompulsory);
           setComplianceDeadline(draftData.complianceDeadline ?? '');
           setRegulatoryBody(draftData.regulatoryBody ?? '');
@@ -149,6 +176,12 @@ export default function DraftWizardPage() {
           setPassingScore(draftData.passingScore ?? 70);
           setSelectedDepts(Array.isArray(draftData.selectedDepts) ? draftData.selectedDepts : []);
           setExcludedStaff(Array.isArray(draftData.excludedStaff) ? draftData.excludedStaff : []);
+          if (draftData.questionsActiveMode === 'manual' || draftData.questionsActiveMode === 'ai') {
+            setQuestionsActiveMode(draftData.questionsActiveMode);
+          }
+          if (draftData.aiPending && Array.isArray(draftData.aiPending.displayed) && Array.isArray(draftData.aiPending.queue)) {
+            setAiPending(draftData.aiPending);
+          }
         }
         setCurrentStep(Math.min(4, Math.max(1, draftStep || 1)));
         setHydrated(true);
@@ -178,11 +211,13 @@ export default function DraftWizardPage() {
     maxAttempts, examDurationMinutes, smgPoints, isCompulsory,
     complianceDeadline, regulatoryBody, renewalPeriodMonths,
     videos: persistableVideos, questions, passingScore, selectedDepts, excludedStaff,
+    questionsActiveMode, aiPending,
   }), [
     title, description, selectedCategory, startDate, endDate,
     maxAttempts, examDurationMinutes, smgPoints, isCompulsory,
     complianceDeadline, regulatoryBody, renewalPeriodMonths,
     persistableVideos, questions, passingScore, selectedDepts, excludedStaff,
+    questionsActiveMode, aiPending,
   ]);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -361,9 +396,10 @@ export default function DraftWizardPage() {
       if (!selectedCategory) return 'Kategori seçilmelidir.';
       if (!startDate || !endDate) return 'Başlangıç ve bitiş tarihleri zorunludur.';
       if (new Date(startDate) > new Date(endDate)) return 'Bitiş tarihi başlangıç tarihinden önce olamaz.';
-      const ma = Number(maxAttempts);
+      // Boş input → default kullan (UX: kullanıcı alanı temizlerse hata vermez, kayıtta default oturur).
+      const ma = maxAttempts === '' ? 3 : Number(maxAttempts);
       if (!Number.isFinite(ma) || ma < 1 || ma > 10) return 'Deneme hakkı 1 ile 10 arasında olmalıdır.';
-      const ed = Number(examDurationMinutes);
+      const ed = examDurationMinutes === '' ? 30 : Number(examDurationMinutes);
       if (!Number.isFinite(ed) || ed < 1 || ed > 600) return 'Sınav süresi 1 ile 600 dakika arasında olmalıdır.';
       if (isCompulsory) {
         if (!complianceDeadline) return 'Zorunlu eğitimler için uyum son tarihi girilmelidir.';
@@ -431,7 +467,7 @@ export default function DraftWizardPage() {
           passingScore: Number(passingScore) || 70,
           maxAttempts: Number(maxAttempts) || 3,
           examDurationMinutes: Number(examDurationMinutes) || 30,
-          smgPoints: Math.max(0, Math.min(999, Number(smgPoints) || 0)),
+          smgPoints: Math.max(0, Math.min(999, Number(smgPoints) || 10)),
           startDate: new Date(startDate).toISOString(),
           endDate: new Date(endDate).toISOString(),
           isCompulsory,
@@ -584,6 +620,8 @@ export default function DraftWizardPage() {
               addQuestion={addQuestion}
               removeQuestion={removeQuestion}
               onPendingAiChange={setPendingAiCount}
+              activeMode={questionsActiveMode} setActiveMode={setQuestionsActiveMode}
+              aiPending={aiPending} setAiPending={setAiPending}
             />
           )}
           {currentStep === 4 && (

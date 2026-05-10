@@ -17,11 +17,21 @@ import { generateQuestions, OpenRouterError } from '@/lib/openrouter'
 import { isValidModelId } from '@/lib/openrouter-models'
 import { logger } from '@/lib/logger'
 
+const sourceFileSchema = z.object({
+  s3Key: z.string().min(1),
+  mimeType: z.string().min(1).optional(),
+  filename: z.string().min(1).optional(),
+})
+
 const bodySchema = z.object({
-  sourceS3Keys: z.array(z.string().min(1)).min(1).max(10),
+  sources: z.array(sourceFileSchema).min(1).max(10).optional(),
+  sourceS3Keys: z.array(z.string().min(1)).min(1).max(10).optional(),
   model: z.string().refine(isValidModelId, { message: 'Geçersiz model id' }),
   excluded: z.array(z.object({ text: z.string() })).min(1),
-})
+}).refine(
+  (data) => (data.sources && data.sources.length > 0) || (data.sourceS3Keys && data.sourceS3Keys.length > 0),
+  { message: 'En az bir kaynak (sources veya sourceS3Keys) gerekli' },
+)
 
 export const POST = withAdminRoute(
   async ({ request, organizationId, audit }) => {
@@ -32,7 +42,10 @@ export const POST = withAdminRoute(
     if (!parsed.success) {
       throw new ApiError(parsed.error.issues[0]?.message ?? 'Geçersiz veri', 400)
     }
-    const { sourceS3Keys, model, excluded } = parsed.data
+    const { sources, sourceS3Keys, model, excluded } = parsed.data
+    const normalizedSources = sources && sources.length > 0
+      ? sources
+      : (sourceS3Keys ?? []).map((s3Key) => ({ s3Key }))
 
     const allowed = await checkRateLimit(`ai-replenish:${organizationId}`, 100, 3600)
     if (!allowed) {
@@ -54,7 +67,7 @@ export const POST = withAdminRoute(
     try {
       questions = await generateQuestions({
         model,
-        sourceS3Keys,
+        sources: normalizedSources,
         count: 1,
         excluded,
         customApiKey,

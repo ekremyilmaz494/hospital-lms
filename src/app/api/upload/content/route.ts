@@ -10,7 +10,14 @@ const MAX_DOCUMENT_SIZE = 100 * 1024 * 1024
 const MAX_AUDIO_SIZE = 200 * 1024 * 1024
 
 const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
-const DOCUMENT_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.presentationml.presentation']
+// Doküman: PDF Claude tarafından native parse edilir (file_url),
+// office formatları sunucuda text'e çevrilip Claude'a content olarak gönderilir.
+const DOCUMENT_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',   // .docx
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',          // .xlsx
+]
 const AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/mp4', 'audio/x-m4a', 'audio/m4a', 'audio/ogg', 'audio/aac', 'audio/x-aac']
 const ALL_ALLOWED_TYPES = [...VIDEO_TYPES, ...DOCUMENT_TYPES, ...AUDIO_TYPES]
 
@@ -38,7 +45,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
     }
 
     if (!ALL_ALLOWED_TYPES.includes(file.type)) {
-      return errorResponse('İzin verilmeyen dosya türü. MP4, WebM, PDF, PPTX ve ses dosyaları (MP3, WAV, M4A, OGG, AAC) kabul edilir.', 400)
+      return errorResponse('İzin verilmeyen dosya türü. Video (MP4/WebM), doküman (PDF/DOCX/PPTX/XLSX) veya ses (MP3/WAV/M4A/OGG/AAC) kabul edilir.', 400)
     }
 
     const contentType = detectContentType(file.type)

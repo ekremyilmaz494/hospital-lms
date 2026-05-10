@@ -9,18 +9,23 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
-import { getDownloadUrl } from '@/lib/s3';
+import { getDownloadUrl, downloadBuffer } from '@/lib/s3';
 import { getModel, isValidModelId } from '@/lib/openrouter-models';
 import { QUESTION_GENERATION_SYSTEM_PROMPT, buildUserPrompt, type ExcludedQuestion } from '@/lib/openrouter-prompt';
+import { isOfficeMimeType, extractTextFromOfficeDocument, OFFICE_MIME_TYPES } from '@/lib/document-extractor';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const REQUEST_TIMEOUT_MS = 60_000; // PDF parsing modeller için 60s — küçük PDF'lerde 5-15s yeterli
 
-/** OpenRouter'dan dönen tek soru. Zod ile validate ediliyor. */
+/** OpenRouter'dan dönen tek soru. Zod ile validate ediliyor.
+ *  sourceQuote ZORUNLU — kaynaktan birebir alıntı; boş gelirse soru filtrelenir
+ *  (model "kaynak dışı" üretmiş demektir, hallucination koruması). */
 const generatedQuestionSchema = z.object({
   questionText: z.string().min(5).max(500),
   options: z.array(z.string().min(1).max(300)).length(4),
   correctIndex: z.number().int().min(0).max(3),
+  sourceQuote: z.string().min(3).max(400),
+  sourcePage: z.number().int().positive().optional(),
 });
 
 const generationResponseSchema = z.object({
@@ -29,11 +34,19 @@ const generationResponseSchema = z.object({
 
 export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
 
+/** Kaynak dosya — S3'te key + (opsiyonel) bilinen MIME type.
+ *  MIME type bilinmiyorsa key extension'undan tahmin edilir. */
+export interface SourceFile {
+  s3Key: string;
+  mimeType?: string;
+  filename?: string;
+}
+
 export interface GenerateOptions {
   /** OpenRouter model id (CURATED_MODELS'tan biri) */
   model: string;
-  /** S3 key listesi — admin'in step 2'de yüklediği kaynaklar */
-  sourceS3Keys: string[];
+  /** Kaynak dosyalar — admin'in step 2'de yüklediği PDF/DOCX/PPTX/XLSX/image */
+  sources: SourceFile[];
   /** Üretilecek soru sayısı */
   count: number;
   /** Tekrar etmemesi gereken mevcut sorular */
@@ -73,39 +86,66 @@ function createClient(customApiKey?: string | null): OpenAI {
 }
 
 /**
- * S3 key'i → OpenAI/Anthropic formatlı multimodal content block.
+ * Kaynak dosyayı OpenAI/Anthropic formatlı content block(s)'a çevirir.
  *
- * PDF'ler `file_url` olarak gönderiliyor (Anthropic Claude native PDF support);
- * görseller `image_url` olarak. Diğer dosya tipleri (txt, docx) için v1'de
- * desteklenmiyor — frontend filtreliyor.
+ * PDF: `file` content block (Claude native PDF parse).
+ * Image: `image_url` content block.
+ * Office (DOCX/PPTX/XLSX): S3'ten buffer indir, text'e çevir, `text` content
+ *   block olarak döner. Çıkan metin boşsa boş array döner (caller filtreler).
+ *
+ * Tek bir kaynak birden fazla content block üretebilir (örn. text wrapper).
  */
-async function buildContentBlock(s3Key: string): Promise<OpenAI.Chat.Completions.ChatCompletionContentPart> {
-  const url = await getDownloadUrl(s3Key); // 1 saatlik signed URL
-  const lower = s3Key.toLowerCase();
-  const isPdf = lower.endsWith('.pdf');
+async function buildContentBlocks(
+  source: SourceFile,
+): Promise<OpenAI.Chat.Completions.ChatCompletionContentPart[]> {
+  const lower = source.s3Key.toLowerCase();
+  const filename = source.filename ?? source.s3Key.split('/').pop() ?? 'document';
+  const isPdf = lower.endsWith('.pdf') || source.mimeType === 'application/pdf';
   const isImage = /\.(png|jpe?g|webp|gif)$/.test(lower);
+  const officeMime = source.mimeType && isOfficeMimeType(source.mimeType)
+    ? source.mimeType
+    : guessOfficeMimeFromExtension(lower);
 
   if (isPdf) {
-    // OpenRouter, PDF'i Anthropic-style "file" content block olarak alır.
-    // OpenAI SDK tip tanımı bu type'ı bilmediği için cast ediyoruz.
-    // OpenRouter PDF: Anthropic-style "file" content block. OpenAI SDK type'larında
-    // bu type yok; cast ile geçiyoruz. Runtime'da OpenRouter doğru parse eder.
-    return {
+    const url = await getDownloadUrl(source.s3Key);
+    return [{
       type: 'file',
-      file: { file_data: url, filename: s3Key.split('/').pop() ?? 'document.pdf' },
-    } as unknown as OpenAI.Chat.Completions.ChatCompletionContentPart;
+      file: { file_data: url, filename },
+    } as unknown as OpenAI.Chat.Completions.ChatCompletionContentPart];
   }
 
   if (isImage) {
-    return {
-      type: 'image_url',
-      image_url: { url },
-    };
+    const url = await getDownloadUrl(source.s3Key);
+    return [{ type: 'image_url', image_url: { url } }];
+  }
+
+  if (officeMime) {
+    // Office formatları: sunucuda text'e çevir, prompt'a göm.
+    const buffer = await downloadBuffer(source.s3Key);
+    const text = await extractTextFromOfficeDocument(buffer, officeMime);
+    if (!text) {
+      logger.warn('openrouter', 'office document yielded empty text', { s3Key: source.s3Key, mimeType: officeMime });
+      return [];
+    }
+    const formatLabel = officeMime === OFFICE_MIME_TYPES.DOCX ? 'Word'
+      : officeMime === OFFICE_MIME_TYPES.PPTX ? 'PowerPoint'
+      : 'Excel';
+    return [{
+      type: 'text',
+      text: `<source filename="${filename}" type="${formatLabel}">\n${text}\n</source>`,
+    }];
   }
 
   throw new OpenRouterError(
-    `Desteklenmeyen kaynak türü: ${s3Key}. Sadece PDF ve görsel (png/jpg/webp) destekleniyor.`,
+    `Desteklenmeyen kaynak türü: ${source.s3Key}. Sadece PDF, görsel (png/jpg/webp) ve office (DOCX/PPTX/XLSX) destekleniyor.`,
   );
+}
+
+function guessOfficeMimeFromExtension(lower: string): string | null {
+  if (lower.endsWith('.docx')) return OFFICE_MIME_TYPES.DOCX;
+  if (lower.endsWith('.pptx')) return OFFICE_MIME_TYPES.PPTX;
+  if (lower.endsWith('.xlsx')) return OFFICE_MIME_TYPES.XLSX;
+  return null;
 }
 
 /**
@@ -124,12 +164,15 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
   if (opts.count < 1 || opts.count > 20) {
     throw new OpenRouterError(`count 1-20 arası olmalı, alındı: ${opts.count}`);
   }
-  if (opts.sourceS3Keys.length === 0) {
-    throw new OpenRouterError('En az bir kaynak (PDF/görsel) gerekli.');
+  if (opts.sources.length === 0) {
+    throw new OpenRouterError('En az bir kaynak (PDF/görsel/DOCX/PPTX/XLSX) gerekli.');
   }
 
   const model = getModel(opts.model);
-  if (model && !model.supportsPdf && opts.sourceS3Keys.some((k) => k.toLowerCase().endsWith('.pdf'))) {
+  const hasPdf = opts.sources.some(
+    (s) => s.s3Key.toLowerCase().endsWith('.pdf') || s.mimeType === 'application/pdf',
+  );
+  if (model && !model.supportsPdf && hasPdf) {
     throw new OpenRouterError(
       `${model.label} modeli PDF dosyalarını desteklemiyor. Lütfen PDF destekli bir model seçin (Claude veya Gemini).`,
     );
@@ -137,8 +180,14 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
 
   const client = createClient(opts.customApiKey);
 
-  // Kaynak content block'larını paralel hazırla (S3 signed URL'leri eş zamanlı al)
-  const contentBlocks = await Promise.all(opts.sourceS3Keys.map(buildContentBlock));
+  // Kaynak content block'larını paralel hazırla (S3 signed URL + office text extract eş zamanlı)
+  const blocksNested = await Promise.all(opts.sources.map(buildContentBlocks));
+  const contentBlocks = blocksNested.flat();
+  if (contentBlocks.length === 0) {
+    throw new OpenRouterError(
+      'Kaynak dosyalardan metin çıkarılamadı. Office formatında metin yoksa (sadece görsel slide gibi), lütfen PDF olarak yükleyin.',
+    );
+  }
 
   // User mesaj content'i: önce tüm kaynaklar, sonra prompt metni
   const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
@@ -156,7 +205,9 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
         { role: 'system', content: QUESTION_GENERATION_SYSTEM_PROMPT },
         { role: 'user', content: userContent },
       ],
-      temperature: 0.7, // bir miktar çeşitlilik, ama deterministik kalıba yakın
+      // Faktüel/kaynağa-sadık üretim için düşük temperature.
+      // 0.7 → 0.3 (hallucination riski azalır, çeşitlilik biraz düşer; sınav doğruluğu öncelik).
+      temperature: 0.3,
       max_tokens: 4000, // 15 soru ~ 2.5K token, marj koyduk
     });
     rawResponse = completion.choices[0]?.message?.content ?? null;

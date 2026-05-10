@@ -19,7 +19,11 @@ import {
 } from 'lucide-react';
 import { CURATED_MODELS, DEFAULT_MODEL_ID, getModel } from '@/lib/openrouter-models';
 import { K } from '@/app/admin/trainings/new/_steps/types';
-import { useAiQuestionQueue } from '@/hooks/use-ai-question-queue';
+import { useAiQuestionQueue, type AiPendingState } from '@/hooks/use-ai-question-queue';
+
+/** Pending AI questions snapshot — parent (questions-step) tarafından state lift için.
+ *  Mode geçişlerinde ve sayfa yenilemesinde restore. */
+export type { AiPendingState };
 
 export interface AiQuestionGeneratorProps {
   onAdd: (questions: { text: string; options: string[]; correct: number }[]) => void;
@@ -29,18 +33,31 @@ export interface AiQuestionGeneratorProps {
   /** Henüz "Soruları Ekle" basılmamış ama üretilmiş soru sayısı.
    *  Parent step navigation'ı engellemek için kullanır. */
   onPendingChange?: (count: number) => void;
+  /** Parent'tan restore edilecek pending state (mode geçişi/sayfa yenileme). */
+  initialState?: AiPendingState;
+  /** Her displayed/queue değişiminde parent'a snapshot — draft'a kaydetmek için. */
+  onStateChange?: (state: AiPendingState) => void;
 }
 
 interface UploadedSource {
   s3Key: string;
   fileName: string;
+  mimeType: string;
   sizeBytes: number;
   pageCount?: number;
 }
 
 const MAX_SOURCES = 3;
 const MAX_TOTAL_SIZE_MB = 30;
-const ACCEPTED_TYPES = ['application/pdf'];
+// Claude native PDF; office formatları sunucuda text'e çevrilip prompt'a gömülür.
+const ACCEPTED_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+];
+const ACCEPTED_EXTENSIONS = '.pdf,.docx,.pptx,.xlsx';
+const ACCEPTED_LABEL = 'PDF, Word (.docx), PowerPoint (.pptx) veya Excel (.xlsx)';
 
 // Tier rozetleri için sıkı emerald tabanlı sofistike palet — varsayılan medikal AI
 // renk kombinasyonlarından (mor/mavi gradient) kaçınıyoruz.
@@ -54,7 +71,7 @@ const tierStyles: Record<string, { dot: string; label: string; bg: string }> = {
 
 const FONT_EDITORIAL = "var(--font-editorial, Georgia, serif)";
 
-export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingChange }: AiQuestionGeneratorProps) {
+export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingChange, initialState, onStateChange }: AiQuestionGeneratorProps) {
   const [uploadedSources, setUploadedSources] = useState<UploadedSource[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -77,21 +94,27 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
     [manualQuestions],
   );
 
-  const selectedKeys = useMemo(() => uploadedSources.map((s) => s.s3Key), [uploadedSources]);
+  const sources = useMemo(
+    () => uploadedSources.map((s) => ({ s3Key: s.s3Key, mimeType: s.mimeType, filename: s.fileName })),
+    [uploadedSources],
+  );
 
   const queue = useAiQuestionQueue({
-    sourceS3Keys: selectedKeys,
+    sources,
     model: modelId,
     displayTarget: aiCountToGenerate,
     staticExcluded,
+    initialState,
+    onStateChange,
   });
 
   // Üretilmiş ama henüz "Soruları Ekle" ile manuel listeye taşınmamış sayıyı parent'a bildir.
   // Parent step 3 validation'ında bunu kullanarak ileri geçişi engeller.
-  // Unmount olduğunda 0 döneriz: tab değiştiğinde queue zaten kaybolur.
+  // Eskiden unmount'ta 0 dönüyorduk; artık pending state lift edildi (mode geçişinde
+  // hook unmount olmaz forceMount sayesinde, sayfa yenilemede draft'tan restore olur),
+  // o yüzden cleanup'a gerek yok.
   useEffect(() => {
     onPendingChange?.(queue.displayed.length);
-    return () => onPendingChange?.(0);
   }, [queue.displayed.length, onPendingChange]);
 
   const removeSource = (s3Key: string) => {
@@ -101,7 +124,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
   const uploadFile = useCallback(async (file: File) => {
     setUploadError(null);
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      setUploadError(`${file.name}: sadece PDF dosyaları kabul edilir.`);
+      setUploadError(`${file.name}: sadece ${ACCEPTED_LABEL} kabul edilir.`);
       return;
     }
     if (uploadedSources.length >= MAX_SOURCES) {
@@ -121,7 +144,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileName: file.name,
-          contentType: file.type || 'application/pdf',
+          contentType: file.type,
         }),
       });
       if (!presignRes.ok) {
@@ -135,7 +158,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
       // Content-Type S3 imzasıyla birebir eşleşmeli.
       const putRes = await fetch(presign.uploadUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': file.type || 'application/pdf' },
+        headers: { 'Content-Type': file.type },
         body: file,
       });
       if (!putRes.ok) {
@@ -145,7 +168,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
 
       setUploadedSources((prev) => [
         ...prev,
-        { s3Key: presign.key, fileName: presign.fileName, sizeBytes: file.size },
+        { s3Key: presign.key, fileName: presign.fileName, mimeType: file.type, sizeBytes: file.size },
       ]);
     } catch {
       setUploadError('Ağ hatası — yükleme tamamlanamadı.');
@@ -257,7 +280,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="application/pdf"
+                  accept={ACCEPTED_EXTENSIONS}
                   multiple
                   onChange={(e) => {
                     handleFiles(e.target.files);
@@ -274,10 +297,10 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
                 </div>
                 <div className="aiq-uploader-text">
                   <span className="aiq-uploader-title">
-                    {uploading ? 'Yükleniyor…' : 'PDF sürükle veya seçmek için tıkla'}
+                    {uploading ? 'Yükleniyor…' : 'Dosya sürükle veya seçmek için tıkla'}
                   </span>
                   <span className="aiq-uploader-hint">
-                    Maks {MAX_SOURCES} dosya · toplam {MAX_TOTAL_SIZE_MB}MB
+                    {ACCEPTED_LABEL} · Maks {MAX_SOURCES} dosya · toplam {MAX_TOTAL_SIZE_MB}MB
                   </span>
                 </div>
               </label>
@@ -337,7 +360,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
             <button
               type="button"
               className="aiq-cta"
-              disabled={selectedKeys.length === 0 || aiCountToGenerate === 0}
+              disabled={sources.length === 0 || aiCountToGenerate === 0}
               onClick={() => void queue.generate()}
             >
               <span className="aiq-cta-icon">
@@ -501,6 +524,19 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
                       Yeni yedek hazırlanıyor
                     </span>
                   )}
+                  {/* Yedek 5'in altındaysa toplu yedek doldurma butonu — admin
+                      sürekli soru silip yedekler tükendiyse tek tıkla doldurur. */}
+                  {queue.queue.length < 5 && !queue.isReplenishing && (
+                    <button
+                      type="button"
+                      className="aiq-refill-btn"
+                      onClick={() => void queue.refillQueue()}
+                      title="Yedekleri 5'e tamamla"
+                    >
+                      <RefreshCw size={12} strokeWidth={2.5} />
+                      +{5 - queue.queue.length} yedek üret
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -549,6 +585,16 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
                           </div>
                         );
                       })}
+                    </div>
+                    {/* Source quote — sorunun kaynaktaki birebir alıntısı.
+                        Hallucination kontrolü; admin doğrulamasını kolaylaştırır. */}
+                    <div className="aiq-card-cite">
+                      <BookOpenCheck size={11} strokeWidth={2.5} />
+                      <span className="aiq-card-cite-label">Kaynak:</span>
+                      <span className="aiq-card-cite-quote">&ldquo;{q.sourceQuote}&rdquo;</span>
+                      {q.sourcePage && (
+                        <span className="aiq-card-cite-page">s. {q.sourcePage}</span>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -1418,6 +1464,29 @@ function Styles() {
         50% { opacity: 1; transform: scale(1.1); }
       }
 
+      /* REFILL — yedekleri tek tıkla doldurma */
+      .aiq-refill-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 11px 5px 9px;
+        background: var(--aiq-surface);
+        color: var(--aiq-emerald-deep);
+        border: 1px solid var(--aiq-border);
+        border-radius: 999px;
+        font-family: var(--aiq-display);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background 120ms ease, border-color 120ms ease;
+      }
+      .aiq-refill-btn:hover {
+        background: var(--aiq-emerald-pale);
+        border-color: var(--aiq-emerald);
+      }
+
       /* QUESTION CARD */
       .aiq-list {
         list-style: none;
@@ -1501,7 +1570,44 @@ function Styles() {
         display: flex;
         flex-direction: column;
         gap: 6px;
-        padding: 0 20px 18px;
+        padding: 0 20px 12px;
+      }
+      /* Source quote — kart altında dipnot gibi italic alıntı.
+         Hallucination kontrol göstergesi — admin "kaynakta var mı?" doğrulayabilsin. */
+      .aiq-card-cite {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        margin: 0 20px 18px;
+        padding: 10px 12px;
+        background: var(--aiq-emerald-pale);
+        border: 1px solid var(--aiq-emerald-soft);
+        border-radius: 8px;
+        font-family: var(--aiq-display);
+        font-size: 11.5px;
+        line-height: 1.5;
+        color: var(--aiq-emerald-deep);
+      }
+      .aiq-card-cite > svg {
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+      .aiq-card-cite-label {
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 10px;
+        margin-right: 2px;
+      }
+      .aiq-card-cite-quote {
+        font-style: italic;
+        flex: 1;
+      }
+      .aiq-card-cite-page {
+        font-family: var(--aiq-mono);
+        font-size: 10.5px;
+        opacity: 0.75;
+        margin-left: 4px;
       }
       .aiq-opt {
         display: flex;
