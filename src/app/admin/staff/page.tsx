@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { PeriodSelector } from '@/components/shared/period-selector';
 import { type ColumnDef } from '@tanstack/react-table';
 import {
-  Users, Plus, Upload, MoreHorizontal, Edit,
+  Users, Plus, Upload, Download, MoreHorizontal, Edit,
   Building2, Trash2, UserPlus, ChevronRight, X, Save, History, Award,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -81,7 +81,6 @@ export default function StaffPage() {
   const [showAssignStaff, setShowAssignStaff] = useState(false);
   const [isSavingDept, setIsSavingDept] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
-  const [newDeptAltName, setNewDeptAltName] = useState('');
   const [newDeptColor, setNewDeptColor] = useState(DEPARTMENT_COLORS[0]);
   const [editingDept, setEditingDept] = useState<{ id: string; name: string; color: string; parentId: string | null } | null>(null);
   const [editDeptSaving, setEditDeptSaving] = useState(false);
@@ -287,6 +286,13 @@ export default function StaffPage() {
             title="Toplu yükleme geçmişi"
           >
             <History size={14} /> Yükleme Geçmişi
+          </button>
+          <button
+            onClick={() => { window.location.href = '/api/admin/staff/export'; }}
+            className="k-btn k-btn-ghost"
+            title="Tüm personeli toplu yükleme şablonu formatında Excel olarak indir"
+          >
+            <Download size={15} /> Excel İndir
           </button>
           <button onClick={() => setShowBulkImport(true)} className="k-btn k-btn-ghost">
             <Upload size={15} /> Toplu Yükle
@@ -524,18 +530,6 @@ export default function StaffPage() {
                   style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
                 />
               </Field>
-              <Field label="Alt Departman (opsiyonel)">
-                <Input
-                  placeholder="Örn: Endokrinoloji"
-                  value={newDeptAltName}
-                  onChange={(e) => setNewDeptAltName(e.target.value)}
-                  className="h-10"
-                  style={{ background: 'var(--k-surface)', borderColor: 'var(--k-border)' }}
-                />
-                <p className="text-[11px] mt-1" style={{ color: 'var(--k-text-muted)' }}>
-                  Doldurursanız, yukarıdaki departmanın altına bu isimde bir alt departman da oluşturulur.
-                </p>
-              </Field>
               <Field label="Renk">
                 <div className="flex flex-wrap gap-2">
                   {DEPARTMENT_COLORS.map(c => {
@@ -566,50 +560,17 @@ export default function StaffPage() {
                   setIsSavingDept(true);
                   try {
                     const parentName = newDeptName.trim();
-                    const altName = newDeptAltName.trim();
+                    const res = await fetch('/api/admin/departments', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name: parentName, color: newDeptColor }),
+                    });
+                    const resData = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(resData.error || 'Departman oluşturulamadı');
 
-                    // 1) Parent: aynı isimli kök departman varsa onu kullan, yoksa oluştur
-                    let parentId: string;
-                    const existingParent = rootDepartments.find(
-                      d => d.name.localeCompare(parentName, 'tr', { sensitivity: 'base' }) === 0
-                    );
-                    if (existingParent) {
-                      parentId = existingParent.id;
-                      if (!altName) {
-                        toast(`"${parentName}" zaten mevcut. Altına eklemek için Alt Departman alanını doldurun.`, 'error');
-                        return;
-                      }
-                    } else {
-                      const res = await fetch('/api/admin/departments', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: parentName, color: newDeptColor }),
-                      });
-                      const resData = await res.json().catch(() => ({}));
-                      if (!res.ok) throw new Error(resData.error || 'Departman oluşturulamadı');
-                      parentId = resData.id;
-                    }
-
-                    // 2) Alt departman doldurulmuşsa onu da oluştur
-                    if (altName) {
-                      const resChild = await fetch('/api/admin/departments', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: altName, color: newDeptColor, parentId }),
-                      });
-                      const childData = await resChild.json().catch(() => ({}));
-                      if (!resChild.ok) throw new Error(childData.error || 'Alt departman oluşturulamadı');
-                    }
-
-                    toast(
-                      altName
-                        ? `"${parentName}" altına "${altName}" eklendi`
-                        : `"${parentName}" departmanı oluşturuldu`,
-                      'success',
-                    );
+                    toast(`"${parentName}" departmanı oluşturuldu`, 'success');
                     setShowAddDept(false);
                     setNewDeptName('');
-                    setNewDeptAltName('');
                     refreshDepartments();
                   } catch (err) {
                     toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');

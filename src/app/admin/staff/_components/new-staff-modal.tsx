@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, UserPlus, Mail, KeyRound, Copy, CheckCheck, FileDown } from 'lucide-react';
+import { Save, UserPlus, KeyRound, Copy, CheckCheck, FileDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
@@ -9,13 +9,9 @@ import { Field } from './field';
 import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc';
 import type { Department } from '../_types';
 
-type Mode = 'invite' | 'direct';
-
 interface SuccessState {
-  mode: Mode;
   email: string;
   emailSent: boolean;
-  inviteUrl?: string;
   tempPassword?: string;
   // TC ile direkt mod sonucunda PDF üretebilmek için saklanır.
   // Sadece bu admin'in oturumu içinde, modal açık kaldığı sürece tutulur.
@@ -29,10 +25,9 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<SuccessState | null>(null);
-  const [mode, setMode] = useState<Mode>('invite');
   const [form, setForm] = useState({ ad: '', soyad: '', email: '', sifre: '', telefon: '', departman: '', altDepartman: '', unvan: '', tc: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [copied, setCopied] = useState<'link' | 'pwd' | 'tc' | null>(null);
+  const [copied, setCopied] = useState<'pwd' | 'tc' | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -42,25 +37,23 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
 
   const validate = () => {
     const e: Record<string, string> = {};
+    // Excel template ile aynı zorunluluk şeması:
+    // Zorunlu: Ad, Soyad, TC, Departman, Unvan
+    // Opsiyonel: Alt Departman, E-posta, Şifre, Telefon
     if (!form.ad.trim()) e.ad = 'Ad zorunludur';
     if (!form.soyad.trim()) e.soyad = 'Soyad zorunludur';
-    // E-posta opsiyonel; ama davet modunda zorunlu (mail gönderemeyiz aksi halde)
-    if (mode === 'invite' && !form.email.trim()) {
-      e.email = 'Davet göndermek için e-posta gereklidir';
-    } else if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       e.email = 'Geçerli bir e-posta girin';
     }
-    if (mode === 'direct' && form.sifre.trim() && form.sifre.length < 8) e.sifre = 'Şifre en az 8 karakter olmalıdır';
+    if (form.sifre.trim() && form.sifre.length < 8) e.sifre = 'Şifre en az 8 karakter olmalıdır';
     if (form.telefon && !/^0\d{10}$/.test(form.telefon.replace(/\s/g, ''))) e.telefon = 'Geçerli telefon formatı: 05XX XXX XX XX';
     if (!form.departman) e.departman = 'Departman zorunludur';
     if (!form.unvan.trim()) e.unvan = 'Unvan zorunludur';
 
-    // TC: direkt modda zorunlu (resmi denetim eşleşmesi için), invite modda opsiyonel.
-    // Boş bırakılırsa atlanır; girildiyse 11 hane + checksum doğrulanır.
     const tcNorm = normalizeTcKimlik(form.tc);
-    if (mode === 'direct' && !tcNorm) {
-      e.tc = 'TC Kimlik No zorunludur (resmi sertifika eşleşmesi için)';
-    } else if (tcNorm && !isValidTcKimlik(tcNorm)) {
+    if (!tcNorm) {
+      e.tc = 'TC Kimlik No zorunludur';
+    } else if (!isValidTcKimlik(tcNorm)) {
       e.tc = 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)';
     }
 
@@ -76,18 +69,18 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
       // departmentId: alt departman seçildiyse onun id'si, yoksa parent'ın id'si
       const assignedDeptId = form.altDepartman || form.departman;
       const payload: Record<string, unknown> = {
-        mode,
+        // Excel akışıyla uyumlu — her zaman direct: hesap anında açılır,
+        // email doluysa welcome mail + geçici şifre gönderilir, boşsa TC + şifre ile giriş.
+        mode: 'direct',
         firstName: form.ad,
         lastName: form.soyad,
-        // E-posta opsiyonel — boşsa gönderme, backend sentetik üretir
         ...(form.email.trim() ? { email: form.email.trim() } : {}),
         phone: form.telefon || undefined,
         departmentId: assignedDeptId,
         title: form.unvan || undefined,
-        // TC sadece doluysa gönderilir; server checksum'ı zod refine ile yeniden doğrular.
-        ...(tcNorm ? { tcKimlik: tcNorm } : {}),
+        tcKimlik: tcNorm,
       };
-      if (mode === 'direct' && form.sifre.trim()) payload.password = form.sifre.trim();
+      if (form.sifre.trim()) payload.password = form.sifre.trim();
 
       const res = await fetch('/api/admin/staff', {
         method: 'POST',
@@ -97,31 +90,25 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
       const body = await res.json().catch(() => ({})) as {
         error?: string;
         emailSent?: boolean;
-        inviteUrl?: string;
         tempPassword?: string;
         tcKimlik?: string;
       };
       if (!res.ok) throw new Error(body.error || 'Kayıt başarısız');
 
-      // Hangi departmana atandıysa onun adı (alt > parent)
       const deptName = departments.find(d => d.id === assignedDeptId)?.name;
 
       setSuccess({
-        mode,
-        // Sentetik adres dönmüş olabilir — kullanıcının yazdığını gösteriyoruz; boşsa "—"
         email: form.email.trim() || '—',
         emailSent: body.emailSent !== false,
-        inviteUrl: body.inviteUrl,
         tempPassword: body.tempPassword,
-        tcKimlik: body.tcKimlik ?? (tcNorm || undefined),
+        tcKimlik: body.tcKimlik ?? tcNorm,
         fullName: `${form.ad} ${form.soyad}`.trim(),
         department: deptName,
         title: form.unvan || undefined,
       });
 
-      // TC ile direkt kayıtta admin'in PDF'i indirebilmesi için modal açık kalır
-      // (otomatik kapanma sadece davet+mail başarılı durumunda).
-      const hasTcPdf = mode === 'direct' && !!tcNorm && !!body.tempPassword;
+      // TC + geçici şifre döndüyse PDF indirilebilsin diye modal açık kalır.
+      const hasTcPdf = !!tcNorm && !!body.tempPassword;
       if (body.emailSent !== false && !hasTcPdf) {
         closeTimerRef.current = setTimeout(() => { onSaved(); onClose(); }, 2000);
       } else {
@@ -134,7 +121,7 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
     }
   };
 
-  const copyToClipboard = async (text: string, kind: 'link' | 'pwd' | 'tc') => {
+  const copyToClipboard = async (text: string, kind: 'pwd' | 'tc') => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(kind);
@@ -204,9 +191,7 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
       onClose={() => { if (!saving) onClose(); }}
       eyebrow="Personel Kaydı"
       title="Yeni personel ekle"
-      subtitle={mode === 'invite'
-        ? 'Davet linki gönderilir; personel kendi şifresini kuracak.'
-        : 'Şifre belirleyip hesabı doğrudan oluşturur.'}
+      subtitle="Hesap anında oluşur. E-posta doluysa hoş geldin maili + geçici şifre gönderilir; boşsa personel TC + şifre ile giriş yapar."
       size="lg"
       disableEscape={saving}
       footer={
@@ -217,7 +202,7 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
               <>
                 <PremiumButton variant="ghost" onClick={onClose} disabled={saving}>İptal</PremiumButton>
                 <PremiumButton onClick={handleSave} loading={saving} icon={<Save className="h-4 w-4" />}>
-                  {saving ? 'Kaydediliyor' : (mode === 'invite' ? 'Daveti Gönder' : 'Personel Ekle')}
+                  {saving ? 'Kaydediliyor' : 'Personel Ekle'}
                 </PremiumButton>
               </>
             }
@@ -237,38 +222,16 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
               <UserPlus className="h-6 w-6" />
             </div>
             <h4 className="text-lg font-semibold" style={{ color: 'var(--k-text-primary)' }}>
-              {success.mode === 'invite' ? 'Davet oluşturuldu' : 'Personel başarıyla eklendi'}
+              Personel başarıyla eklendi
             </h4>
             <p className="text-sm" style={{ color: 'var(--k-text-secondary)' }}>
-              {success.emailSent
+              {success.emailSent && success.email !== '—'
                 ? `Bilgilendirme e-postası ${success.email} adresine gönderildi.`
-                : 'E-posta gönderilemedi — aşağıdaki bilgiyi personele manuel iletin.'}
+                : 'E-posta gönderilmedi — aşağıdaki bilgiyi personele manuel iletin.'}
             </p>
           </div>
 
-          {/* Mail gitmediyse fallback panel */}
-          {!success.emailSent && success.mode === 'invite' && success.inviteUrl && (
-            <div className="rounded-lg p-3 border" style={{ background: 'var(--k-warning-bg, #fef3c7)', borderColor: 'var(--k-warning, #f59e0b)' }}>
-              <div className="flex items-center gap-2 mb-2 text-xs font-semibold" style={{ color: 'var(--k-warning-text, #92400e)' }}>
-                <Mail className="h-3.5 w-3.5" /> Davet Linki (manuel paylaş)
-              </div>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs px-2 py-1.5 rounded font-mono break-all"
-                      style={{ background: '#fff', color: 'var(--k-text-primary)' }}>
-                  {success.inviteUrl}
-                </code>
-                <button type="button"
-                        onClick={() => copyToClipboard(success.inviteUrl!, 'link')}
-                        className="h-8 px-2 rounded text-xs font-semibold inline-flex items-center gap-1.5"
-                        style={{ background: 'var(--k-primary)', color: '#fff' }}>
-                  {copied === 'link' ? <CheckCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  {copied === 'link' ? 'Kopyalandı' : 'Kopyala'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {!success.emailSent && success.mode === 'direct' && success.tempPassword && (
+          {!success.emailSent && success.tempPassword && (
             <div className="rounded-lg p-3 border" style={{ background: 'var(--k-warning-bg, #fef3c7)', borderColor: 'var(--k-warning, #f59e0b)' }}>
               <div className="flex items-center gap-2 mb-2 text-xs font-semibold" style={{ color: 'var(--k-warning-text, #92400e)' }}>
                 <KeyRound className="h-3.5 w-3.5" /> Geçici Şifre (manuel paylaş)
@@ -292,9 +255,9 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
             </div>
           )}
 
-          {/* TC ile direkt kayıt: PDF indirme paneli — yazıcıdan basıp personele elden teslim için.
+          {/* PDF indirme paneli — yazıcıdan basıp personele elden teslim için.
               KVKK: PDF altında "imha edin" uyarısı var. Admin oturumu açık olduğu sürece üretilebilir. */}
-          {success.mode === 'direct' && success.tcKimlik && success.tempPassword && (
+          {success.tcKimlik && success.tempPassword && (
             <div className="rounded-lg p-3 border-2" style={{ background: '#ecfdf5', borderColor: 'var(--k-primary, #0d9668)' }}>
               <div className="flex items-center gap-2 mb-2 text-xs font-semibold" style={{ color: 'var(--k-primary, #0d9668)' }}>
                 <FileDown className="h-3.5 w-3.5" /> Resmi Giriş Belgesi
@@ -340,25 +303,6 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {/* Mode toggle: davet linki / şifre belirle */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <ModeOption
-              active={mode === 'invite'}
-              onClick={() => setMode('invite')}
-              icon={<Mail className="h-4 w-4" />}
-              title="Davet linki gönder"
-              hint="Önerilen — personel kendi şifresini kurar, e-posta doğrulanır."
-              badge="Varsayılan"
-            />
-            <ModeOption
-              active={mode === 'direct'}
-              onClick={() => setMode('direct')}
-              icon={<KeyRound className="h-4 w-4" />}
-              title="Şifre belirle"
-              hint="Acil/offline — admin şifre verir, personel ilk girişte değiştirir."
-            />
-          </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Ad *" error={errors.ad}>
               <Input placeholder="Personel adı" className="h-10" value={form.ad} onChange={(e) => setForm(f => ({ ...f, ad: e.target.value }))} style={fieldStyle('ad')} />
@@ -369,33 +313,22 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field
-              label={mode === 'invite' ? 'E-posta *' : 'E-posta'}
+              label="E-posta"
               error={errors.email}
-              hint={mode === 'direct' && !errors.email ? 'Opsiyonel — boşsa personel TC + şifreyle giriş yapar.' : undefined}
+              hint={!errors.email ? 'Opsiyonel — boşsa personel TC + şifreyle giriş yapar.' : undefined}
             >
               <Input type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} style={fieldStyle('email')} />
             </Field>
-            {mode === 'direct' ? (
-              <Field label="Şifre" error={errors.sifre} hint={!errors.sifre ? 'Boş bırakın — sistem üretip personele iletir.' : undefined}>
-                <Input type="password" placeholder="Boş bırakın — sistem üretir" className="h-10" value={form.sifre} onChange={(e) => setForm(f => ({ ...f, sifre: e.target.value }))} style={fieldStyle('sifre')} />
-              </Field>
-            ) : (
-              <Field label="Telefon" error={errors.telefon}>
-                <Input placeholder="05XX XXX XX XX" className="h-10"
-                       value={form.telefon}
-                       onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))}
-                       style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
-              </Field>
-            )}
-          </div>
-          {mode === 'direct' && (
-            <Field label="Telefon" error={errors.telefon}>
-              <Input placeholder="05XX XXX XX XX" className="h-10"
-                     value={form.telefon}
-                     onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))}
-                     style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
+            <Field label="Şifre" error={errors.sifre} hint={!errors.sifre ? 'Boş bırakın — sistem üretip personele iletir.' : undefined}>
+              <Input type="password" placeholder="Boş bırakın — sistem üretir" className="h-10" value={form.sifre} onChange={(e) => setForm(f => ({ ...f, sifre: e.target.value }))} style={fieldStyle('sifre')} />
             </Field>
-          )}
+          </div>
+          <Field label="Telefon" error={errors.telefon}>
+            <Input placeholder="05XX XXX XX XX" className="h-10"
+                   value={form.telefon}
+                   onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))}
+                   style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
+          </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Departman *" error={errors.departman}>
               <select
@@ -436,15 +369,13 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
             <Input placeholder="örn. Hemşire" className="h-10" value={form.unvan} onChange={(e) => setForm(f => ({ ...f, unvan: e.target.value }))} style={fieldStyle('unvan')} />
           </Field>
 
-          {/* TC Kimlik No — direct modda zorunlu (resmi denetim için), invite modda opsiyonel.
+          {/* TC Kimlik No — Excel template ile uyumlu, her zaman zorunlu.
               KVKK: değer DB'ye AES-256-GCM ile şifreli, lookup için HMAC-SHA256 hash'li yazılır.
               Plaintext sadece form gönderim anında network'te yer alır (HTTPS). */}
           <Field
-            label={mode === 'direct' ? 'TC Kimlik No *' : 'TC Kimlik No'}
+            label="TC Kimlik No *"
             error={errors.tc}
-            hint={!errors.tc ? (mode === 'direct'
-              ? 'Resmi denetim ve sertifika eşleşmesi için zorunlu. AES-256-GCM ile şifreli saklanır.'
-              : 'Opsiyonel — personel daveti kabul ettiğinde TC zaten istenebilir.') : undefined}
+            hint={!errors.tc ? 'Resmi denetim ve sertifika eşleşmesi için zorunlu. AES-256-GCM ile şifreli saklanır.' : undefined}
           >
             <Input
               placeholder="11 haneli TC Kimlik No"
@@ -462,36 +393,3 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
   );
 }
 
-function ModeOption({ active, onClick, icon, title, hint, badge }: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-  hint: string;
-  badge?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="text-left p-3 rounded-lg border transition-colors"
-      style={{
-        background: active ? 'var(--k-primary-light, #d1fae5)' : 'var(--k-surface)',
-        borderColor: active ? 'var(--k-primary)' : 'var(--k-border)',
-        borderWidth: active ? 2 : 1,
-      }}
-    >
-      <div className="flex items-center gap-2 mb-1">
-        <span style={{ color: active ? 'var(--k-primary)' : 'var(--k-text-secondary)' }}>{icon}</span>
-        <span className="text-sm font-semibold" style={{ color: 'var(--k-text-primary)' }}>{title}</span>
-        {badge && (
-          <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider"
-                style={{ background: 'var(--k-primary)', color: '#fff' }}>
-            {badge}
-          </span>
-        )}
-      </div>
-      <p className="text-[11px] leading-relaxed" style={{ color: 'var(--k-text-muted)' }}>{hint}</p>
-    </button>
-  );
-}
