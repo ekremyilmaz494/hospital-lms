@@ -296,11 +296,8 @@ export default function ReportsPage() {
         </div>
       </header>
 
-      {/* Eğitim Dönemi seçici */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>
-          Dönem:
-        </span>
+      {/* Eğitim Dönemi seçici — trigger'ın kendi eyebrow'u var */}
+      <div className="flex flex-wrap">
         <PeriodSelector value={periodId} onChange={setPeriodId} includeAll />
       </div>
 
