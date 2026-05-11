@@ -285,14 +285,18 @@ export default function DraftWizardPage() {
   // Aynı draftId'ye ait upload'ları follow et; tamamlananı videos[]'a yansıt.
   const draftUploads = uploadMgr.getByDraft(draftId);
 
-  // contentItemId → progress map (content-step prop'u için)
-  const uploadProgress = useMemo<Record<number, number>>(() => {
-    const map: Record<number, number> = {};
+  // contentItemId → { pct, status } map (content-step prop'u için)
+  // status: 'compressing' (ffmpeg.wasm transcode), 'uploading' (S3 PUT). UI ikisini
+  // farklı renk/etiketle gösterir.
+  const uploadProgress = useMemo<Record<number, { pct: number; status: 'compressing' | 'uploading' }>>(() => {
+    const map: Record<number, { pct: number; status: 'compressing' | 'uploading' }> = {};
     for (const u of draftUploads) {
-      if (u.status === 'uploading' || u.status === 'pending') {
-        map[u.contentItemId] = u.progress;
+      if (u.status === 'compressing') {
+        map[u.contentItemId] = { pct: u.progress, status: 'compressing' };
+      } else if (u.status === 'uploading' || u.status === 'pending') {
+        map[u.contentItemId] = { pct: u.progress, status: 'uploading' };
       } else if (u.status === 'done' && u.progress < 100) {
-        map[u.contentItemId] = 100;
+        map[u.contentItemId] = { pct: 100, status: 'uploading' };
       }
     }
     return map;
@@ -389,8 +393,8 @@ export default function DraftWizardPage() {
   const addQuestion = () => setQuestions(prev => [...prev, { id: Date.now(), text: '', points: 10, options: ['', '', '', ''], correct: -1 }]);
   const removeQuestion = (id: number) => setQuestions(prev => prev.filter(q => q.id !== id));
 
-  // Wizard validasyonu için aktif upload sayısı
-  const activeUploadCount = draftUploads.filter(u => u.status === 'uploading' || u.status === 'pending').length;
+  // Wizard validasyonu için aktif upload sayısı (compression dahil — kullanıcı sonraki adıma geçmesin)
+  const activeUploadCount = draftUploads.filter(u => u.status === 'uploading' || u.status === 'pending' || u.status === 'compressing').length;
 
   const validateStep = (step: number): string | null => {
     if (step === 1) {
