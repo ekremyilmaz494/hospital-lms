@@ -13,6 +13,13 @@ interface ResetPasswordModalProps {
   userEmail: string;
   /** 'staff' | 'admin' — hangi UI tonu kullanılacak (admin reset daha güçlü uyarı) */
   userRole: 'staff' | 'admin';
+  /**
+   * POST edilecek endpoint. Default: `/api/admin/users/${userId}/reset-password` (admin caller).
+   * Süper admin akışı için `/api/super-admin/users/${userId}/reset-password` geçilir.
+   */
+  endpoint?: string;
+  /** Çağıran rol — onay metnini biçimlendirmek için. Default 'admin'. */
+  caller?: 'admin' | 'super_admin';
   onSuccess?: () => void;
 }
 
@@ -39,6 +46,8 @@ export function ResetPasswordModal({
   userName,
   userEmail,
   userRole,
+  endpoint,
+  caller = 'admin',
   onSuccess,
 }: ResetPasswordModalProps) {
   const { toast } = useToast();
@@ -46,10 +55,12 @@ export function ResetPasswordModal({
   const [result, setResult] = useState<ResetResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const resolvedEndpoint = endpoint ?? `/api/admin/users/${userId}/reset-password`;
+
   const handleConfirm = async () => {
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/admin/users/${userId}/reset-password`, { method: 'POST' });
+      const res = await fetch(resolvedEndpoint, { method: 'POST' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(body.error || 'Şifre sıfırlama başarısız');
@@ -117,10 +128,16 @@ export function ResetPasswordModal({
             <div className="text-sm leading-relaxed" style={{ color: 'var(--k-text-secondary)' }}>
               Sistem yeni bir <strong>geçici şifre</strong> üretecek ve kullanıcının e-posta adresine gönderecek.
               Kullanıcı bir sonraki girişinde şifresini değiştirmek zorunda kalacak.
-              {userRole === 'admin' && (
+              {userRole === 'admin' && caller === 'admin' && (
                 <>
                   <br /><br />
                   <strong>Yönetici hesabı sıfırlıyorsunuz.</strong> Bu işlem yalnızca Esas Yönetici tarafından yapılabilir.
+                </>
+              )}
+              {userRole === 'admin' && caller === 'super_admin' && (
+                <>
+                  <br /><br />
+                  <strong>Hastane yöneticisinin şifresini sıfırlıyorsunuz.</strong> İşlem audit log’a kaydedilecek ve mail kullanıcının organizasyonu adına gönderilecek.
                 </>
               )}
             </div>
