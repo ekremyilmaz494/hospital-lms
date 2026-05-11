@@ -72,8 +72,14 @@ interface UploadManagerContextValue {
 const MULTIPART_THRESHOLD = 10 * 1024 * 1024; // 10 MB
 /** Multipart parça boyutu — S3 minimum 5 MB. 8 MB Türkiye/Frankfurt RTT için iyi denge. */
 const PART_SIZE = 8 * 1024 * 1024; // 8 MB
-/** Aynı anda kaç parça yüklensin — TCP slow-start'ı maskeler, NIC'i doyurur. */
-const PART_CONCURRENCY = 4;
+/** Aynı anda kaç parça yüklensin — TCP slow-start'ı maskeler, NIC'i doyurur.
+ *  Browser aynı origin'e ~6 paralel socket açıyor; birden fazla dosya aynı anda
+ *  yüklenirse 3+3=6 sınırı yakalanır, daha yüksek concurrency soketleri kuyruğa
+ *  iter ve "ağ hatası" olarak görünür. */
+const PART_CONCURRENCY = 3;
+/** Parça başına maksimum deneme — 1 ilk girişim + 2 retry. Transient ağ hataları
+ *  ve S3 Transfer Acceleration edge node warm-up gecikmelerine karşı tampon. */
+const PART_MAX_ATTEMPTS = 3;
 
 const UploadManagerContext = createContext<UploadManagerContextValue | null>(null);
 
@@ -330,7 +336,8 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         });
       };
 
-      // Concurrency limit'li worker pool. Bir parça fail olursa bir kez tekrar dener.
+      // Concurrency limit'li worker pool. Her parça PART_MAX_ATTEMPTS kez denenir;
+      // başarısızlık aralarında exponential backoff (500ms, 1500ms) bekler.
       const queue = [...allUrls];
       const results: { partNumber: number; etag: string }[] = [];
       // Hata referansını ref-cell'de tut — closure'da type narrowing'i bozmaz.
@@ -340,18 +347,23 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         while (queue.length > 0 && !errorBox.value && !aborted) {
           const next = queue.shift();
           if (!next) break;
-          try {
-            const res = await uploadPart(next.partNumber, next.url);
-            results.push(res);
-          } catch {
-            // Tek seferlik retry — geçici ağ hatalarına karşı.
+          let lastErr: Error | null = null;
+          for (let attempt = 1; attempt <= PART_MAX_ATTEMPTS; attempt++) {
+            if (aborted) return;
             try {
               const res = await uploadPart(next.partNumber, next.url);
               results.push(res);
-            } catch (err2) {
-              errorBox.value = err2 instanceof Error ? err2 : new Error(String(err2));
+              lastErr = null;
+              break;
+            } catch (err) {
+              lastErr = err instanceof Error ? err : new Error(String(err));
+              if (attempt < PART_MAX_ATTEMPTS) {
+                // Exponential backoff: 500ms, 1500ms — edge node warm-up ve transient'lere zaman tanı.
+                await new Promise(r => setTimeout(r, 500 * Math.pow(3, attempt - 1)));
+              }
             }
           }
+          if (lastErr && !errorBox.value) errorBox.value = lastErr;
         }
       };
 
