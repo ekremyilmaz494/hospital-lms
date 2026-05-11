@@ -23,11 +23,15 @@ export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => 
   if (!allowed) return errorResponse('Çok fazla istek, lütfen biraz sonra tekrar deneyin', 429)
 
   // Önce var olan taslak — single-draft kuralı
+  // isActive:true filtresi şart: DELETE soft-delete (isActive=false) yapıyor ama
+  // publishStatus'ü 'draft' bırakıyor. Filtresiz arama silinmiş taslağı diriltir
+  // ve "Yeni Eğitim" silinen sihirbaza geri döner.
   const existing = await prisma.training.findFirst({
     where: {
       organizationId,
       createdById: dbUser.id,
       publishStatus: 'draft',
+      isActive: true,
     },
     orderBy: { draftUpdatedAt: 'desc' },
     select: { id: true },

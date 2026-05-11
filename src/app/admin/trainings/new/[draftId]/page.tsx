@@ -24,7 +24,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
-import { TRAINING_CATEGORIES } from '@/lib/training-categories';
 import {
   K, cardStyle, distributePoints,
   type VideoItem, type QuestionItem, type CategoryOption,
@@ -99,8 +98,11 @@ export default function DraftWizardPage() {
   const draftId = params.draftId;
   const uploadMgr = useUploadManager();
 
+  // Kategoriler tek kaynaktan: Kategori Yönetimi (TrainingCategory tablosu).
+  // Statik fallback kaldırıldı — yönetimde silinen/eklenen kategoriler sihirbaza
+  // birebir yansısın. İlk yüklemede DB boşsa GET endpoint kendisi default'ları seed'liyor.
   const { data: dbCategories } = useFetch<{ id: string; value: string; label: string; icon: string }[]>('/api/admin/training-categories');
-  const categories: readonly CategoryOption[] = dbCategories && dbCategories.length > 0 ? dbCategories : TRAINING_CATEGORIES;
+  const categories: readonly CategoryOption[] = dbCategories ?? [];
 
   const [hydrated, setHydrated] = useState(false);
   const [hydrationError, setHydrationError] = useState<string | null>(null);

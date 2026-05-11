@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { useFetch } from '@/hooks/use-fetch';
+import { useFetch, invalidateFetchCache } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
 import { CategoryIcon, CATEGORY_ICON_NAMES } from '@/components/shared/category-icon';
 
@@ -79,6 +79,8 @@ export default function CategoriesPage() {
       setNewLabel('');
       setNewIcon('BookOpen');
       setNewColor(K.PRIMARY);
+      // Sihirbazın in-memory cache'i de güncel kalsın
+      invalidateFetchCache('/api/admin/training-categories');
       refetch();
     } catch {
       toast('Bir hata oluştu', 'error');
@@ -99,6 +101,7 @@ export default function CategoriesPage() {
       }
       toast('Kategori silindi', 'success');
       setDeleteTarget(null);
+      invalidateFetchCache('/api/admin/training-categories');
       refetch();
     } catch {
       toast('Bir hata oluştu', 'error');
@@ -124,6 +127,7 @@ export default function CategoriesPage() {
         body: JSON.stringify({ order: cat.order }),
       }),
     ]);
+    invalidateFetchCache('/api/admin/training-categories');
     refetch();
   }
 
