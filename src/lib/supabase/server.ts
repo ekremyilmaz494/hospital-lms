@@ -18,6 +18,11 @@ import { getCookieDomain } from './cookie-domain'
  */
 export async function createClient() {
   const cookieStore = await cookies()
+  // "7 gün açık tut" sentinel — varsa auth-token refresh'lerinde maxAge'i 7 güne zorla.
+  // Aksi halde Supabase SSR token refresh callback'i cookie'yi session-only olarak
+  // yeniden yazıyor ve middleware override'ı arada bir kaybedilebiliyor.
+  const rememberMe = cookieStore.get('hlms-remember-me')?.value === '1'
+  const REMEMBER_ME_MAX_AGE = 7 * 24 * 60 * 60
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,9 +35,12 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             const domain = getCookieDomain()
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, domain ? { ...options, domain } : options)
-            )
+            cookiesToSet.forEach(({ name, value, options }) => {
+              const baseOpts = (rememberMe && name.includes('-auth-token'))
+                ? { ...options, maxAge: REMEMBER_ME_MAX_AGE }
+                : options
+              cookieStore.set(name, value, domain ? { ...baseOpts, domain } : baseOpts)
+            })
           } catch {
             // Called from Server Component — ignore
           }
