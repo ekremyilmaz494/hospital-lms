@@ -182,9 +182,18 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
     Array.from(files).forEach((f) => void uploadFile(f));
   }, [uploadFile]);
 
+  // Skeleton placeholder kartlar (queue boşken silinen slot için) — admin
+  // "Soruları Ekle" basarsa boş soru gönderilmesin diye add'den de exclude
+  // edilir, button da disable olur.
+  const realDisplayed = useMemo(
+    () => queue.displayed.filter((q) => !q.isPlaceholder),
+    [queue.displayed],
+  );
+  const hasPlaceholder = realDisplayed.length !== queue.displayed.length;
+
   const handleAdd = () => {
-    if (queue.displayed.length === 0) return;
-    const mapped = queue.displayed.map((q) => ({
+    if (realDisplayed.length === 0 || hasPlaceholder) return;
+    const mapped = realDisplayed.map((q) => ({
       text: q.questionText,
       options: q.options.slice(0, 4),
       correct: q.correctIndex,
@@ -371,7 +380,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
                   ? 'AI üretmesi gerekmez'
                   : `${aiCountToGenerate} Soru Üret`}
               </span>
-              <span className="aiq-cta-hint">~30s</span>
+              <span className="aiq-cta-hint">~45s</span>
             </button>
           )}
 
@@ -381,13 +390,14 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
                 type="button"
                 className="aiq-cta"
                 onClick={handleAdd}
-                disabled={queue.displayed.length === 0}
+                disabled={realDisplayed.length === 0 || hasPlaceholder}
+                title={hasPlaceholder ? 'Yedek sorular hazırlanıyor — tamamlanması bekleniyor' : undefined}
               >
                 <span className="aiq-cta-icon">
                   <PlusCircle size={16} strokeWidth={2.5} />
                 </span>
                 <span className="aiq-cta-label">
-                  Soruları Ekle <em>({queue.displayed.length})</em>
+                  Soruları Ekle <em>({realDisplayed.length})</em>
                 </span>
               </button>
               <button
@@ -418,7 +428,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
               <div className="aiq-results-empty-content">
                 <span className="aiq-results-empty-mono">
                   {aiCountToGenerate > 0
-                    ? `${aiCountToGenerate} SORU · KAYNAK GROUNDED · ~30 SANİYE`
+                    ? `20 SORU · KAYNAK GROUNDED · ~45 SANİYE`
                     : 'TOPLAM 10 SORU · MANUEL YETERLİ'}
                 </span>
                 <h3>
@@ -444,7 +454,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
                   </p>
                 ) : (
                   <p>
-                    Sistem <em>{aiCountToGenerate + 5}</em> soru üretecek. {aiCountToGenerate} tanesi burada görünür, 5 tanesi yedek olarak sahne arkasında bekler.
+                    Sistem tek çağrıda <em>20</em> soru üretecek. {aiCountToGenerate} tanesi burada görünür, {20 - aiCountToGenerate} tanesi yedek olarak sahne arkasında bekler.
                   </p>
                 )}
                 {aiCountToGenerate > 0 && (
@@ -524,19 +534,25 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
                       Yeni yedek hazırlanıyor
                     </span>
                   )}
-                  {/* Yedek 5'in altındaysa toplu yedek doldurma butonu — admin
-                      sürekli soru silip yedekler tükendiyse tek tıkla doldurur. */}
-                  {queue.queue.length < 5 && !queue.isReplenishing && (
-                    <button
-                      type="button"
-                      className="aiq-refill-btn"
-                      onClick={() => void queue.refillQueue()}
-                      title="Yedekleri 5'e tamamla"
-                    >
-                      <RefreshCw size={12} strokeWidth={2.5} />
-                      +{5 - queue.queue.length} yedek üret
-                    </button>
-                  )}
+                  {/* Yedek hedefin altındaysa toplu doldurma butonu. Hedef
+                      dinamik: TOTAL_GENERATE(20) - displayTarget. Manuel 0 ise
+                      hedef 10, manuel 5 ise hedef 15 yedek olur. */}
+                  {(() => {
+                    const queueTargetMax = Math.max(0, 20 - aiCountToGenerate);
+                    const need = queueTargetMax - queue.queue.length;
+                    if (need <= 0 || queue.isReplenishing) return null;
+                    return (
+                      <button
+                        type="button"
+                        className="aiq-refill-btn"
+                        onClick={() => void queue.refillQueue()}
+                        title={`Yedekleri ${queueTargetMax}'e tamamla`}
+                      >
+                        <RefreshCw size={12} strokeWidth={2.5} />
+                        +{need} yedek üret
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -547,55 +563,61 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
                     className="aiq-card"
                     style={{ animationDelay: `${qIdx * 50}ms` }}
                   >
-                    <div className="aiq-card-head">
-                      <span className="aiq-card-num">
-                        {String(qIdx + 1).padStart(2, '0')}
-                      </span>
-                      <p className="aiq-card-q">{q.questionText}</p>
-                      <button
-                        type="button"
-                        className="aiq-card-del"
-                        onClick={() => queue.remove(q.clientId)}
-                        aria-label="Bu soruyu sil"
-                        title="Soruyu sil — yerine yenisi gelecek"
-                      >
-                        <Trash2 size={14} strokeWidth={2.5} />
-                      </button>
-                    </div>
-                    <div className="aiq-card-opts">
-                      {q.options.slice(0, 4).map((opt, optIdx) => {
-                        const isCorrect = q.correctIndex === optIdx;
-                        return (
-                          <div
-                            key={optIdx}
-                            className={
-                              isCorrect ? 'aiq-opt aiq-opt--correct' : 'aiq-opt'
-                            }
+                    {q.isPlaceholder ? (
+                      <PlaceholderCard idx={qIdx} />
+                    ) : (
+                      <>
+                        <div className="aiq-card-head">
+                          <span className="aiq-card-num">
+                            {String(qIdx + 1).padStart(2, '0')}
+                          </span>
+                          <p className="aiq-card-q">{q.questionText}</p>
+                          <button
+                            type="button"
+                            className="aiq-card-del"
+                            onClick={() => queue.remove(q.clientId)}
+                            aria-label="Bu soruyu sil"
+                            title="Soruyu sil — yerine yenisi gelecek"
                           >
-                            <span className="aiq-opt-letter">
-                              {['A', 'B', 'C', 'D'][optIdx]}
-                            </span>
-                            <span className="aiq-opt-text">{opt}</span>
-                            {isCorrect && (
-                              <span className="aiq-opt-mark">
-                                <CheckCircle2 size={14} strokeWidth={2.5} />
-                                <span>Doğru</span>
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {/* Source quote — sorunun kaynaktaki birebir alıntısı.
-                        Hallucination kontrolü; admin doğrulamasını kolaylaştırır. */}
-                    <div className="aiq-card-cite">
-                      <BookOpenCheck size={11} strokeWidth={2.5} />
-                      <span className="aiq-card-cite-label">Kaynak:</span>
-                      <span className="aiq-card-cite-quote">&ldquo;{q.sourceQuote}&rdquo;</span>
-                      {q.sourcePage && (
-                        <span className="aiq-card-cite-page">s. {q.sourcePage}</span>
-                      )}
-                    </div>
+                            <Trash2 size={14} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                        <div className="aiq-card-opts">
+                          {q.options.slice(0, 4).map((opt, optIdx) => {
+                            const isCorrect = q.correctIndex === optIdx;
+                            return (
+                              <div
+                                key={optIdx}
+                                className={
+                                  isCorrect ? 'aiq-opt aiq-opt--correct' : 'aiq-opt'
+                                }
+                              >
+                                <span className="aiq-opt-letter">
+                                  {['A', 'B', 'C', 'D'][optIdx]}
+                                </span>
+                                <span className="aiq-opt-text">{opt}</span>
+                                {isCorrect && (
+                                  <span className="aiq-opt-mark">
+                                    <CheckCircle2 size={14} strokeWidth={2.5} />
+                                    <span>Doğru</span>
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Source quote — sorunun kaynaktaki birebir alıntısı.
+                            Hallucination kontrolü; admin doğrulamasını kolaylaştırır. */}
+                        <div className="aiq-card-cite">
+                          <BookOpenCheck size={11} strokeWidth={2.5} />
+                          <span className="aiq-card-cite-label">Kaynak:</span>
+                          <span className="aiq-card-cite-quote">&ldquo;{q.sourceQuote}&rdquo;</span>
+                          {q.sourcePage && (
+                            <span className="aiq-card-cite-page">s. {q.sourcePage}</span>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </li>
                 ))}
               </ol>
@@ -604,6 +626,35 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
         </main>
       </div>
     </>
+  );
+}
+
+/**
+ * Skeleton placeholder kartı — queue boşken silinen indekste bekleyen slot.
+ * Replenish API döndüğünde gerçek soruyla in-place değiştirilir.
+ *
+ * Display sayısı görsel olarak sabit kalır (kullanıcı "10 göster" beklentisi
+ * korunur); admin "burada bir kart vardı, hemen yenisi geliyor" hissini alır.
+ */
+function PlaceholderCard({ idx }: { idx: number }) {
+  return (
+    <div className="aiq-placeholder">
+      <div className="aiq-placeholder-head">
+        <span className="aiq-card-num aiq-placeholder-num">
+          <Loader2 size={18} strokeWidth={2.5} className="aiq-spin-icon" />
+        </span>
+        <div className="aiq-placeholder-caption">
+          <span className="aiq-placeholder-label">Yedek soru hazırlanıyor</span>
+          <span className="aiq-placeholder-hint">Soru #{String(idx + 1).padStart(2, '0')} • kaynaktan üretiliyor</span>
+        </div>
+      </div>
+      <div className="aiq-skeleton-opts">
+        <div className="aiq-skeleton-line" />
+        <div className="aiq-skeleton-line aiq-skeleton-line--2" />
+        <div className="aiq-skeleton-line aiq-skeleton-line--3" />
+        <div className="aiq-skeleton-line" />
+      </div>
+    </div>
   );
 }
 
@@ -1547,6 +1598,47 @@ function Styles() {
         margin: 0;
         letter-spacing: -0.005em;
       }
+      /* PLACEHOLDER — queue boşken silinen indekse oturan skeleton kart.
+         Mevcut .aiq-card wrapper'ı içinde özel iç içerik; numara yerine
+         spinner, soru/options yerine pulse line'ları. */
+      .aiq-placeholder {
+        padding: 18px 20px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .aiq-placeholder-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .aiq-placeholder-num {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--aiq-emerald);
+        opacity: 0.7;
+      }
+      .aiq-placeholder-caption {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+      }
+      .aiq-placeholder-label {
+        font-family: var(--aiq-display);
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--aiq-emerald-deep);
+      }
+      .aiq-placeholder-hint {
+        font-family: var(--aiq-mono);
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: var(--aiq-muted);
+      }
+
       .aiq-card-del {
         flex-shrink: 0;
         width: 30px;

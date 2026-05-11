@@ -1,13 +1,18 @@
 'use client';
 
 /**
- * AI question generation queue hook — 10+5 hybrid strategy.
+ * AI question generation queue hook — tek çağrıda 20 soru üretir.
  *
- * Initial generate() istekte 15 soru üretilir: 10 tanesi `displayed`'a,
- * 5 tanesi gizli `queue`'a düşer. Admin bir soru silince queue'dan biri
- * displayed slot'una çekilir ve arka planda yeni bir soru üretmek için
- * replenish endpoint'i fire-and-forget çağrılır. Birden fazla silme aynı
- * anda olursa her biri kendi replenish çağrısını başlatır — yarış güvenli.
+ * Initial generate(): tek HTTP isteğiyle 20 soru üretilir. İlk N tanesi
+ * (displayTarget) `displayed`'a, kalan 20-N tanesi gizli `queue`'a düşer.
+ * Manuel 0 → 10 göster + 10 yedek. Manuel 5 → 5 göster + 15 yedek.
+ *
+ * Silme davranışı (in-place):
+ *  - Queue'da yedek varsa → silinen kart **aynı indekste** queue'dan gelen
+ *    soruyla değiştirilir (en alta DEĞİL).
+ *  - Queue boşsa → silinen indekse skeleton placeholder bırakılır;
+ *    background replenish API'si döndüğünde gerçek soru o slota yerleşir.
+ *  - İki yolda da display sayısı görsel olarak hep sabit kalır.
  *
  * State persistence: `initialState` prop ile parent state'ten restore
  * eder; her displayed/queue değişiminde `onStateChange` çağrılır → parent
@@ -32,6 +37,9 @@ export interface GeneratedQuestion {
   sourcePage?: number;
   /** Stable client-side id for React keys. */
   clientId: string;
+  /** Skeleton/loading slot — queue boşken silinen indekse bırakılır,
+   *  replenish döndüğünde gerçek soruyla değiştirilir. */
+  isPlaceholder?: boolean;
 }
 
 /** Parent'a snapshot için pending state — manuel ↔ AI geçişi ve sayfa yenilemede restore. */
@@ -81,7 +89,10 @@ interface RawQuestion {
 }
 
 const DEFAULT_DISPLAY_TARGET = 10;
-const QUEUE_TARGET = 5;
+/** Tek çağrıda üretilen toplam soru sayısı (display + queue). Kullanıcı kararı:
+ *  "tek çağrıda 20 soru, en az yarısı yedek". PDF input'u tekrar tekrar
+ *  göndermemek için tek isteğe topluyoruz (replenish'lerden ~5-7× ucuz). */
+const TOTAL_GENERATE = 20;
 
 const newId = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -185,7 +196,9 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
         body: JSON.stringify({
           sources,
           model,
-          count: displayTargetSafe + QUEUE_TARGET,
+          // Tek çağrıda 20 soru — manuel sayısından bağımsız. Display'i
+          // displayTargetSafe kadar göster, kalanı queue'da yedek tut.
+          count: TOTAL_GENERATE,
           excluded: staticExcludedRef.current,
         }),
       });
@@ -203,7 +216,7 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
         return;
       }
       setDisplayed(all.slice(0, displayTargetSafe));
-      setQueue(all.slice(displayTargetSafe, displayTargetSafe + QUEUE_TARGET));
+      setQueue(all.slice(displayTargetSafe, TOTAL_GENERATE));
     } catch {
       setError('Ağ hatası — lütfen tekrar deneyin.');
     } finally {
@@ -211,12 +224,18 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
     }
   }, [sources, model, displayTargetSafe]);
 
-  /** Tek soru üretir ve queue'ya ekler. Internal — hem fireReplenish hem
-   *  refillQueue tarafından kullanılır. Hata durumunda false döner. */
-  const fetchOneToQueue = useCallback(async (): Promise<boolean> => {
+  /** Tek soru üretir ve hedeflenen yere yerleştirir. Internal — hem
+   *  fireReplenish hem refillQueue tarafından kullanılır.
+   *
+   *  @param replaceClientId - verilirse displayed'da bu id'li skeleton'u
+   *    gerçek soruyla değiştirir; verilmezse queue'ya ekler.
+   *  @returns success boolean */
+  const fetchOneToQueue = useCallback(async (replaceClientId?: string): Promise<boolean> => {
     const excluded = [
       ...staticExcludedRef.current,
-      ...displayedRef.current.map((q) => ({ text: q.questionText })),
+      ...displayedRef.current
+        .filter((q) => !q.isPlaceholder)
+        .map((q) => ({ text: q.questionText })),
       ...queueRef.current.map((q) => ({ text: q.questionText })),
     ];
     const res = await fetch('/api/admin/trainings/ai/replenish-question', {
@@ -233,23 +252,50 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
     if (!data.question) return false;
     const withSource = withId(data.question);
     if (!withSource) return false; // sourceQuote yoktu → atla
-    setQueue((prev) => [...prev, withSource]);
+
+    if (replaceClientId) {
+      // Skeleton slotunu gerçek soruyla in-place değiştir
+      let placed = false;
+      setDisplayed((prev) => {
+        const idx = prev.findIndex((q) => q.clientId === replaceClientId);
+        if (idx < 0) return prev; // slot artık yok (reset/regenerate edildi)
+        placed = true;
+        return prev.toSpliced(idx, 1, withSource);
+      });
+      // Slot bulunamadıysa kaybetmeyelim — queue'ya at
+      if (!placed) {
+        setQueue((prev) => [...prev, withSource]);
+      }
+    } else {
+      // Normal yedek doldurma → queue'ya ekle
+      setQueue((prev) => [...prev, withSource]);
+    }
     return true;
   }, [sources, model]);
 
-  const fireReplenish = useCallback(async () => {
+  const fireReplenish = useCallback(async (replaceClientId?: string) => {
     setReplenishCount((c) => c + 1);
     try {
-      await fetchOneToQueue();
+      const ok = await fetchOneToQueue(replaceClientId);
+      if (!ok && replaceClientId) {
+        // Replenish başarısız → skeleton'ı kullanıcıya gösterip durmamak için kaldır
+        setDisplayed((prev) => prev.filter((q) => q.clientId !== replaceClientId));
+      }
     } catch {
       setError('Yenileme başarısız — yeni soru eklenemedi.');
+      if (replaceClientId) {
+        setDisplayed((prev) => prev.filter((q) => q.clientId !== replaceClientId));
+      }
     } finally {
       setReplenishCount((c) => Math.max(0, c - 1));
     }
   }, [fetchOneToQueue]);
 
   const refillQueue = useCallback(async () => {
-    const need = QUEUE_TARGET - queueRef.current.length;
+    // Yedek hedefi dinamik: TOTAL_GENERATE - displayTarget
+    // (manuel 0 → 10 yedek, manuel 5 → 15 yedek hedefi)
+    const queueTarget = Math.max(0, TOTAL_GENERATE - displayTargetSafe);
+    const need = queueTarget - queueRef.current.length;
     if (need <= 0) return;
     setReplenishCount((c) => c + need);
     try {
@@ -263,26 +309,39 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
     } finally {
       setReplenishCount((c) => Math.max(0, c - need));
     }
-  }, [fetchOneToQueue]);
+  }, [fetchOneToQueue, displayTargetSafe]);
 
   const remove = useCallback(
     (clientId: string) => {
-      // Optimistic: remove from displayed and pull one from queue.
-      let pulled: GeneratedQuestion | undefined;
-      setQueue((prevQ) => {
-        if (prevQ.length === 0) return prevQ;
-        pulled = prevQ[0];
-        return prevQ.slice(1);
-      });
-      setDisplayed((prev) => {
-        const filtered = prev.filter((q) => q.clientId !== clientId);
-        if (pulled) {
-          return [...filtered, pulled];
-        }
-        return filtered;
-      });
-      // Fire-and-forget replenish.
-      void fireReplenish();
+      // In-place replenish: silinen kartın yeri korunur (en alta atılmaz).
+      // - Queue dolu ise: yedek aynı indekse girer (hemen görünür).
+      // - Queue boş ise: skeleton placeholder bırakılır, replenish API'si
+      //   döndüğünde gerçek soru o slota yerleşir.
+      const currentDisplayed = displayedRef.current;
+      const currentQueue = queueRef.current;
+      const idx = currentDisplayed.findIndex((q) => q.clientId === clientId);
+      if (idx < 0) return;
+
+      if (currentQueue.length > 0) {
+        const pulled = currentQueue[0];
+        setQueue(currentQueue.slice(1));
+        setDisplayed(currentDisplayed.toSpliced(idx, 1, pulled));
+        // Queue'yu 1 yedekle tamamla (background; UI bloklanmaz)
+        void fireReplenish();
+      } else {
+        const placeholderId = newId();
+        const placeholder: GeneratedQuestion = {
+          questionText: '',
+          options: [],
+          correctIndex: 0,
+          sourceQuote: '',
+          clientId: placeholderId,
+          isPlaceholder: true,
+        };
+        setDisplayed(currentDisplayed.toSpliced(idx, 1, placeholder));
+        // Replenish bittiğinde skeleton'u gerçek soruyla değiştir
+        void fireReplenish(placeholderId);
+      }
     },
     [fireReplenish],
   );

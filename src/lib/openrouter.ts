@@ -208,7 +208,9 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
       // Faktüel/kaynağa-sadık üretim için düşük temperature.
       // 0.7 → 0.3 (hallucination riski azalır, çeşitlilik biraz düşer; sınav doğruluğu öncelik).
       temperature: 0.3,
-      max_tokens: 4000, // 15 soru ~ 2.5K token, marj koyduk
+      max_tokens: 6000, // 20 soru ~ 3.3K token; uzun sourceQuote'lu modellerde
+                        // truncation'ı önlemek için marj. Kesilen JSON = parse
+                        // fail = 20 sorunun hepsi çöpe.
     });
     rawResponse = completion.choices[0]?.message?.content ?? null;
     if (!rawResponse) {
