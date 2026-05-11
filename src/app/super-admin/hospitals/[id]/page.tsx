@@ -5,7 +5,7 @@ import { useState } from 'react';
 import {
   ArrowLeft, Users, GraduationCap, TrendingUp,
   Edit, Ban, CheckCircle, Calendar, Activity, UserCog, LogIn, UserPlus,
-  TriangleAlert, Shield,
+  TriangleAlert, Shield, KeyRound,
 } from 'lucide-react';
 import { PageLoading } from '@/components/shared/page-loading';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,10 @@ import {
 import { StatCard } from '@/components/shared/stat-card';
 import { useFetch, invalidateFetchCache } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
+import { ResetPasswordModal } from '@/components/shared/reset-password-modal';
 import { NewAdminModal } from './_components/new-admin-modal';
+
+type AdminRow = { id: string; name: string; email: string; lastLogin: string };
 
 interface HospitalDetail {
   id: string;
@@ -37,7 +40,7 @@ interface HospitalDetail {
   staffCount: number;
   trainingCount: number;
   completionRate: number;
-  admins?: { id: string; name: string; email: string; lastLogin: string }[];
+  admins?: AdminRow[];
   recentActivity?: { action: string; detail: string; time: string; user: string }[];
 }
 
@@ -48,6 +51,7 @@ export default function HospitalDetailPage() {
   const { toast } = useToast();
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
   const [showNewAdminModal, setShowNewAdminModal] = useState(false);
+  const [resetTarget, setResetTarget] = useState<AdminRow | null>(null);
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [suspendReason, setSuspendReason] = useState('');
   const [confirmText, setConfirmText] = useState('');
@@ -235,6 +239,14 @@ export default function HospitalDetailPage() {
                     <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{admin.email}</p>
                   </div>
                   <button
+                    title={`"${admin.name}" şifresini sıfırla`}
+                    onClick={() => setResetTarget(admin)}
+                    className="flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-opacity duration-150 hover:opacity-80"
+                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)', background: 'var(--color-surface)' }}
+                  >
+                    <KeyRound className="h-3 w-3" /> Şifre
+                  </button>
+                  <button
                     title={`"${admin.name}" olarak giriş yap`}
                     disabled={impersonatingId === admin.id}
                     onClick={() => handleImpersonate(admin)}
@@ -288,6 +300,23 @@ export default function HospitalDetailPage() {
           hospitalName={hospital.name}
           onClose={() => setShowNewAdminModal(false)}
           onSaved={() => {
+            invalidateFetchCache(`/api/super-admin/hospitals/${id}`);
+            refetch();
+          }}
+        />
+      )}
+
+      {resetTarget && (
+        <ResetPasswordModal
+          isOpen={!!resetTarget}
+          onClose={() => setResetTarget(null)}
+          userId={resetTarget.id}
+          userName={resetTarget.name}
+          userEmail={resetTarget.email}
+          userRole="admin"
+          caller="super_admin"
+          endpoint={`/api/super-admin/users/${resetTarget.id}/reset-password`}
+          onSuccess={() => {
             invalidateFetchCache(`/api/super-admin/hospitals/${id}`);
             refetch();
           }}
