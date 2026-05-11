@@ -138,6 +138,18 @@ export default function StaffPage() {
     return map;
   }, [allStaff]);
 
+  // Seçili kök departmanın rengi — null ise "Tüm Personel" tab'ı veya
+  // departman seçilmemiş. Tablo cell'lerinde avatar/badge bu rengi alır
+  // (kullanıcı kararı: BAŞHEKİMLİK seçince hepsi mor olsun, alt birim
+  // bilgisi badge METNİYLE okunur). Null ise her satır kendi alt birim
+  // rengini gösterir (Tüm Personel tab'ında orientation için).
+  const selectedDeptColor = useMemo(() => {
+    if (!selectedDept) return null;
+    const dept = departmentMap.get(selectedDept);
+    if (!dept) return null;
+    return semanticDeptColor(dept.name) ?? dept.color;
+  }, [selectedDept, departmentMap]);
+
   const columns: ColumnDef<Staff>[] = useMemo(() => [
     {
       accessorKey: 'name',
@@ -145,7 +157,8 @@ export default function StaffPage() {
       size: 250,
       cell: ({ row }) => {
         const dept = departmentMap.get(row.original.departmentId ?? '');
-        const color = dept ? (semanticDeptColor(dept.name) ?? dept.color) : 'var(--k-primary)';
+        const ownColor = dept ? (semanticDeptColor(dept.name) ?? dept.color) : 'var(--k-primary)';
+        const color = selectedDeptColor ?? ownColor;
         return (
           <div className="k-person">
             <div className="k-person-avatar" style={{ background: color }}>
@@ -165,7 +178,8 @@ export default function StaffPage() {
       size: 140,
       cell: ({ row }) => {
         const dept = departmentMap.get(row.original.departmentId ?? '');
-        const color = dept ? (semanticDeptColor(dept.name) ?? dept.color) : 'var(--k-primary)';
+        const ownColor = dept ? (semanticDeptColor(dept.name) ?? dept.color) : 'var(--k-primary)';
+        const color = selectedDeptColor ?? ownColor;
         return (
           <span className="k-badge k-badge-no-dot"
                 style={{ background: `${color}20`, color }}>
@@ -258,7 +272,7 @@ export default function StaffPage() {
       size: 50,
       cell: ({ row }) => <StaffActions staff={row.original} onChanged={refetch} />,
     },
-  ], [departmentMap, refetch]);
+  ], [departmentMap, refetch, selectedDeptColor]);
 
   if (isLoading) {
     return <PageLoading />;
@@ -267,9 +281,9 @@ export default function StaffPage() {
   const statsData = data?.stats ?? { totalStaff: 0, activeStaff: 0, departmentCount: 0, avgScore: 0 };
   const filteredStaff = allStaff;
   const selectedDeptData = selectedDept ? departmentMap.get(selectedDept) : null;
-  const selectedDeptColor = selectedDeptData
-    ? (semanticDeptColor(selectedDeptData.name) ?? selectedDeptData.color)
-    : 'var(--k-primary)';
+  // Header rendering için renk — selectedDeptColor (yukarıdaki useMemo) null
+  // dönerse primary fallback. Body genelinde aynı pattern kullanılır.
+  const selectedDeptColorOrPrimary = selectedDeptColor ?? 'var(--k-primary)';
 
   return (
     <div className="k-page">
@@ -674,7 +688,7 @@ export default function StaffPage() {
       {/* Selected department detail + table */}
       {activeView === 'departments' && selectedDept && selectedDeptData && (
         <section className="flex flex-col gap-4">
-          <header className="k-card flex flex-wrap items-center gap-5 p-5" style={{ borderLeft: `3px solid ${selectedDeptColor}` }}>
+          <header className="k-card flex flex-wrap items-center gap-5 p-5" style={{ borderLeft: `3px solid ${selectedDeptColorOrPrimary}` }}>
             <button
               onClick={() => { setSelectedDept(null); setCurrentPage(1); setSearchQuery(''); }}
               className="k-btn k-btn-subtle k-btn-sm"
@@ -684,7 +698,7 @@ export default function StaffPage() {
             </button>
             <div className="flex items-center gap-3 flex-1 min-w-50">
               <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                   style={{ background: `${selectedDeptColor}20`, color: selectedDeptColor }}>
+                   style={{ background: `${selectedDeptColorOrPrimary}20`, color: selectedDeptColorOrPrimary }}>
                 <Building2 size={20} />
               </div>
               <div>
