@@ -6,7 +6,8 @@ import { PeriodSelector } from '@/components/shared/period-selector';
 import { type ColumnDef } from '@tanstack/react-table';
 import {
   Users, Plus, Upload, Download, MoreHorizontal, Edit,
-  Building2, Trash2, UserPlus, ChevronRight, X, Save, History, Award,
+  Building2, Trash2, UserPlus, ChevronRight, ChevronDown, X, Save, History, Award,
+  Layers,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -91,6 +92,18 @@ export default function StaffPage() {
   const [subDeptName, setSubDeptName] = useState('');
   const [subDeptColor, setSubDeptColor] = useState(DEPARTMENT_COLORS[0]);
   const [isSavingSubDept, setIsSavingSubDept] = useState(false);
+
+  // Departman kart genişletme: hangi root dept'lerin alt birimleri açık.
+  // Default uniform yükseklik için tümü gizli; chevron toggle ile açılır.
+  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
+  const toggleDeptExpand = (id: string) => {
+    setExpandedDepts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const allStaff = useMemo(() => data?.staff ?? [], [data]);
   const allDepartments = useMemo(() => data?.departments ?? [], [data]);
@@ -343,10 +356,11 @@ export default function StaffPage() {
 
       {/* Department grid */}
       {activeView === 'departments' && !selectedDept && (
-        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', alignItems: 'stretch' }}>
           {rootDepartments.map(dept => {
             const deptColor = semanticDeptColor(dept.name) ?? dept.color;
             const children = childrenByParent.get(dept.id) ?? [];
+            const isExpanded = expandedDepts.has(dept.id);
             return (
             <article
               key={dept.id}
@@ -355,7 +369,7 @@ export default function StaffPage() {
               role="button"
               tabIndex={0}
               className="k-card group relative cursor-pointer p-5 transition-all hover:-translate-y-0.5 flex flex-col"
-              style={{ borderLeft: `3px solid ${deptColor}` }}
+              style={{ borderLeft: `3px solid ${deptColor}`, minHeight: 200 }}
             >
               <div className="flex items-start justify-between mb-3">
                 <div
@@ -437,6 +451,28 @@ export default function StaffPage() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                {/* Chevron expand toggle — sadece alt birim varsa görünür.
+                    Default kapalı: kart uniform yükseklik. Kullanıcı ister
+                    alt birim adlarını görebilir; kapalıyken sadece sayı şeridi. */}
+                {children.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); toggleDeptExpand(dept.id); }}
+                    aria-label={isExpanded ? 'Alt birimleri gizle' : 'Alt birimleri göster'}
+                    aria-expanded={isExpanded}
+                    title={isExpanded ? 'Alt birimleri gizle' : `${children.length} alt birimi göster`}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-(--k-surface-hover) transition-colors"
+                  >
+                    <ChevronDown
+                      size={14}
+                      style={{
+                        color: 'var(--k-text-muted)',
+                        transition: 'transform 180ms ease',
+                        transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                      }}
+                    />
+                  </button>
+                )}
               </div>
 
               <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--k-text-primary)' }}>
@@ -448,7 +484,18 @@ export default function StaffPage() {
                 </p>
               )}
 
-              {children.length > 0 && (
+              {/* Default (collapsed): sadece sayı — uniform yükseklik için minimal şerit */}
+              {children.length > 0 && !isExpanded && (
+                <div className="mb-3 inline-flex items-center gap-1.5 self-start px-2 py-1 rounded-md text-[11px] font-medium"
+                     style={{ background: `${deptColor}10`, color: deptColor }}>
+                  <Layers size={11} strokeWidth={2.5} />
+                  <span className="tabular-nums">{children.length} alt birim</span>
+                </div>
+              )}
+
+              {/* Expanded: alt birim listesi açılır. Kart yüksekliği esner;
+                  diğer kartlar grid satır bağımsızlığıyla etkilenmez. */}
+              {children.length > 0 && isExpanded && (
                 <div className="mb-3" aria-label="Alt departmanlar">
                   <div
                     className="flex items-center gap-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider"
