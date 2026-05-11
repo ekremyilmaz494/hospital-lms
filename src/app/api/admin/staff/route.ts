@@ -219,7 +219,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     const stats = {
       totalStaff: total,
       activeStaff,
-      departmentCount: rawDepartments.length,
+      // Sadece kök departmanları say — alt birimler ana departman olarak sayılmaz
+      departmentCount: rawDepartments.filter(d => !d.parentId).length,
       avgScore: overallAvgScore
     }
 
