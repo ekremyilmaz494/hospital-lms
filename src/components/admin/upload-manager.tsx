@@ -233,9 +233,16 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         xhr.onload = () => {
           abortMap.current.delete(uploadId);
           if (xhr.status >= 200 && xhr.status < 300) finalizeSuccess(key);
-          else failUpload(`Dosya yüklenemedi (HTTP ${xhr.status}). Yetki/CORS hatası olabilir.`);
+          else {
+            const body = (xhr.responseText || '').slice(0, 300);
+            console.error('[upload] single PUT HTTP error', { status: xhr.status, responseURL: xhr.responseURL, body });
+            failUpload(`Dosya yüklenemedi (HTTP ${xhr.status}). ${body.slice(0, 120)}`);
+          }
         };
-        xhr.onerror = () => failUpload('Dosya yüklenemedi — S3 CORS yetkisi reddedildi olabilir.');
+        xhr.onerror = () => {
+          console.error('[upload] single PUT network error', { status: xhr.status, responseURL: xhr.responseURL });
+          failUpload(`Dosya yüklenemedi (status=${xhr.status}). S3 CORS reddi veya bağlantı kesintisi.`);
+        };
         xhr.ontimeout = () => failUpload('Bağlantı zaman aşımına uğradı.');
 
         xhr.open('PUT', uploadUrl);
@@ -326,10 +333,16 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
               updateProgress();
               resolve({ partNumber, etag });
             } else {
-              reject(new Error(`Parça ${partNumber} HTTP ${xhr.status}`));
+              const body = (xhr.responseText || '').slice(0, 300);
+              console.error('[upload] part HTTP error', { partNumber, status: xhr.status, responseURL: xhr.responseURL, body });
+              reject(new Error(`Parça ${partNumber} HTTP ${xhr.status}: ${body.slice(0, 120)}`));
             }
           };
-          xhr.onerror = () => { activeXhrs.delete(partNumber); reject(new Error(`Parça ${partNumber} ağ hatası`)); };
+          xhr.onerror = () => {
+            activeXhrs.delete(partNumber);
+            console.error('[upload] part network error', { partNumber, status: xhr.status, responseURL: xhr.responseURL });
+            reject(new Error(`Parça ${partNumber} ağ hatası (status=${xhr.status})`));
+          };
           xhr.ontimeout = () => { activeXhrs.delete(partNumber); reject(new Error(`Parça ${partNumber} zaman aşımı`)); };
           xhr.open('PUT', url);
           xhr.send(blob);
