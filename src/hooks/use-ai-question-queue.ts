@@ -244,8 +244,10 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
       body: JSON.stringify({ sources, model, excluded }),
     });
     if (!res.ok) {
-      const msg = await readError(res);
-      setError(msg);
+      // Replenish çağrıları arka plan; global banner panik yaratmasın.
+      // Sadece manuel refillQueue tetikledi ise kullanıcıya göster — onu
+      // refillQueue içinde ayrıca yakalıyoruz. In-place skeleton path için
+      // sessizce false dön; caller skeleton'u kaldırır.
       return false;
     }
     const data = (await res.json()) as { question?: RawQuestion };
@@ -278,11 +280,14 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
     try {
       const ok = await fetchOneToQueue(replaceClientId);
       if (!ok && replaceClientId) {
-        // Replenish başarısız → skeleton'ı kullanıcıya gösterip durmamak için kaldır
+        // Replenish başarısız → skeleton'ı sessizce kaldır, display sayısı
+        // 1 azalır. Global error banner GÖSTERME — kullanıcı her silmede
+        // panik görmemeli; havuz tamamen tükendi ise zaten manuel "yedek
+        // üret" butonu var.
         setDisplayed((prev) => prev.filter((q) => q.clientId !== replaceClientId));
       }
     } catch {
-      setError('Yenileme başarısız — yeni soru eklenemedi.');
+      // Network/exception → yine sessiz; skeleton temizle.
       if (replaceClientId) {
         setDisplayed((prev) => prev.filter((q) => q.clientId !== replaceClientId));
       }
@@ -298,12 +303,21 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
     const need = queueTarget - queueRef.current.length;
     if (need <= 0) return;
     setReplenishCount((c) => c + need);
+    setError(null);
     try {
       // Paralel — N paralel API çağrısı; her biri 1 soru getirir, queue'ya eklenir.
       // Race güvenli çünkü her çağrı kendi `excluded` listesini hesaplar
       // (current displayed + queue + static); ufak bir tekrar riski vardır
       // ama tekrar gelen sorular zaten farklı clientId ile kaydedilir.
-      await Promise.all(Array.from({ length: need }, () => fetchOneToQueue()));
+      const results = await Promise.all(
+        Array.from({ length: need }, () => fetchOneToQueue()),
+      );
+      // Manuel buton — kullanıcı geri bildirim bekliyor. Hepsi başarısızsa
+      // göster, kısmen başarılıysa sessiz (yedek arttı, kullanıcı görür).
+      const successCount = results.filter(Boolean).length;
+      if (successCount === 0) {
+        setError('Yedek üretimi başarısız — model uygun cevap döndüremedi. Lütfen tekrar deneyin.');
+      }
     } catch {
       setError('Yedek üretimi başarısız — lütfen tekrar deneyin.');
     } finally {
@@ -323,11 +337,12 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
       if (idx < 0) return;
 
       if (currentQueue.length > 0) {
+        // 20 soruluk havuzdan in-place al — ekstra API çağrısı YOK.
+        // Havuz tüketilene kadar (10 silmeye kadar) yeni üretim gereksiz.
+        // Kullanıcı manuel "yedek üret" butonuyla cömertçe doldurabilir.
         const pulled = currentQueue[0];
         setQueue(currentQueue.slice(1));
         setDisplayed(currentDisplayed.toSpliced(idx, 1, pulled));
-        // Queue'yu 1 yedekle tamamla (background; UI bloklanmaz)
-        void fireReplenish();
       } else {
         const placeholderId = newId();
         const placeholder: GeneratedQuestion = {
