@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@/generated/prisma/client'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
@@ -235,7 +236,13 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, d
 
   // Soft delete: isActive false yap, cascade silme yerine veri korunur
   await prisma.$transaction([
-    prisma.training.update({ where: { id, organizationId: orgId }, data: { isActive: false } }),
+    prisma.training.update({
+      where: { id, organizationId: orgId },
+      // Silinen taslağın sihirbaz state'i geride kalmasın — POST /draft idempotent
+      // araması publishStatus+isActive filtresine güvense de defansif olarak
+      // draftData/draftStep'i de temizliyoruz (geri yükleme/restore senaryosu için).
+      data: { isActive: false, draftData: Prisma.DbNull, draftStep: 1 },
+    }),
     // Devam eden sınav girişimlerini iptal et (force ile onaylandı)
     // State machine ile uyumlu: EXPIRE event'inin toplu hali (non-terminal → expired)
     ...(activeAttemptCount > 0

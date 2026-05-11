@@ -46,7 +46,10 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     })
   }
 
-  return jsonResponse(categories, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
+  // Wizard'ın bu listeyi anlık görmesi gerekiyor (admin kategori ekledikten sonra
+  // hemen "Yeni Eğitim"e geçebilir). 60s tarayıcı cache'i sihirbaz ile yönetim
+  // sayfası arasında stale render'a yol açıyordu — no-store ile kapatıldı.
+  return jsonResponse(categories, 200, { 'Cache-Control': 'no-store' })
 }, { requireOrganization: true })
 
 export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
