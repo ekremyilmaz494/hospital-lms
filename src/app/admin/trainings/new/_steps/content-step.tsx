@@ -18,7 +18,7 @@ const ContentLibraryModal = dynamic(
 interface ContentStepProps {
   videos: VideoItem[];
   setVideos: React.Dispatch<React.SetStateAction<VideoItem[]>>;
-  uploadProgress: Record<number, number>;
+  uploadProgress: Record<number, { pct: number; status: 'compressing' | 'uploading' }>;
   uploadFileToS3: (itemId: number, file: File) => Promise<void>;
   addFromLibrary: (items: SelectedContent[]) => void;
   removeVideo: (id: number) => void;
@@ -224,28 +224,38 @@ export default function ContentStep({
                       <p className="text-sm font-medium" style={{ color: K.TEXT_PRIMARY }}>
                         {video.file.name}
                       </p>
-                      {uploadProgress[video.id] !== undefined ? (
-                        <div className="mt-1.5">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: K.BORDER }}>
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${uploadProgress[video.id]}%`,
-                                  background: K.PRIMARY,
-                                  transition: 'width 0.2s ease',
-                                }}
-                              />
+                      {uploadProgress[video.id] !== undefined ? (() => {
+                        const up = uploadProgress[video.id];
+                        const isCompressing = up.status === 'compressing';
+                        const barColor = isCompressing ? K.WARNING : K.PRIMARY;
+                        const label = isCompressing
+                          ? 'Sıkıştırılıyor...'
+                          : up.pct < 80 ? 'Dosya gönderiliyor...'
+                          : up.pct < 100 ? "S3'e yükleniyor..."
+                          : 'Tamamlandı!';
+                        return (
+                          <div className="mt-1.5">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: K.BORDER }}>
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${up.pct}%`,
+                                    background: barColor,
+                                    transition: 'width 0.2s ease',
+                                  }}
+                                />
+                              </div>
+                              <span className="text-xs font-bold shrink-0" style={{ fontFamily: K.FONT_MONO, color: barColor, minWidth: 36, textAlign: 'right' }}>
+                                {up.pct}%
+                              </span>
                             </div>
-                            <span className="text-xs font-bold shrink-0" style={{ fontFamily: K.FONT_MONO, color: K.PRIMARY, minWidth: 36, textAlign: 'right' }}>
-                              {uploadProgress[video.id]}%
-                            </span>
+                            <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>
+                              {(video.file.size / (1024 * 1024)).toFixed(1)} MB • {label}
+                            </p>
                           </div>
-                          <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>
-                            {(video.file.size / (1024 * 1024)).toFixed(1)} MB • {uploadProgress[video.id] < 80 ? 'Dosya gönderiliyor...' : uploadProgress[video.id] < 100 ? 'S3\'e yükleniyor...' : 'Tamamlandı!'}
-                          </p>
-                        </div>
-                      ) : (
+                        );
+                      })() : (
                         <p className="text-xs mt-0.5" style={{ color: video.url ? K.SUCCESS : K.TEXT_MUTED }}>
                           {(video.file.size / (1024 * 1024)).toFixed(2)} MB
                           {video.contentType === 'pdf' && video.pageCount ? ` • ${video.pageCount} sayfa` : ''}
@@ -325,28 +335,37 @@ export default function ContentStep({
                         <p className="text-sm font-medium" style={{ color: K.TEXT_PRIMARY }}>
                           {video.file.name}
                         </p>
-                        {uploadProgress[video.id] !== undefined ? (
-                          <div className="mt-1.5">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: K.BORDER }}>
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{
-                                    width: `${uploadProgress[video.id]}%`,
-                                    background: K.WARNING,
-                                    transition: 'width 0.2s ease',
-                                  }}
-                                />
+                        {uploadProgress[video.id] !== undefined ? (() => {
+                          const up = uploadProgress[video.id];
+                          const isCompressing = up.status === 'compressing';
+                          const label = isCompressing
+                            ? 'Sıkıştırılıyor...'
+                            : up.pct < 80 ? 'Dosya gönderiliyor...'
+                            : up.pct < 100 ? "S3'e yükleniyor..."
+                            : 'Tamamlandı!';
+                          return (
+                            <div className="mt-1.5">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: K.BORDER }}>
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${up.pct}%`,
+                                      background: K.WARNING,
+                                      transition: 'width 0.2s ease',
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-xs font-bold shrink-0" style={{ fontFamily: K.FONT_MONO, color: K.WARNING, minWidth: 36, textAlign: 'right' }}>
+                                  {up.pct}%
+                                </span>
                               </div>
-                              <span className="text-xs font-bold shrink-0" style={{ fontFamily: K.FONT_MONO, color: K.WARNING, minWidth: 36, textAlign: 'right' }}>
-                                {uploadProgress[video.id]}%
-                              </span>
+                              <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>
+                                {(video.file.size / (1024 * 1024)).toFixed(1)} MB • {label}
+                              </p>
                             </div>
-                            <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>
-                              {(video.file.size / (1024 * 1024)).toFixed(1)} MB • {uploadProgress[video.id] < 80 ? 'Dosya gönderiliyor...' : uploadProgress[video.id] < 100 ? 'S3\'e yükleniyor...' : 'Tamamlandı!'}
-                            </p>
-                          </div>
-                        ) : (
+                          );
+                        })() : (
                           <p className="text-xs mt-0.5" style={{ color: video.url ? K.SUCCESS : K.TEXT_MUTED }}>
                             Ses · {(video.file.size / (1024 * 1024)).toFixed(2)} MB
                             {video.durationSeconds ? ` · ${Math.floor(video.durationSeconds / 60)}:${String(video.durationSeconds % 60).padStart(2, '0')} dk` : ''}
