@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import type { User } from "@/types/database";
 import { ToastProvider } from "@/components/shared/toast";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
-import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { DevSWCleaner } from "@/components/dev-sw-cleaner";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { CrispWidget } from "@/components/providers/crisp-widget";
@@ -100,7 +99,6 @@ export default async function RootLayout({
       className={`${fontDisplay.variable} ${fontBody.variable} ${fontMono.variable}`}
     >
       <head>
-        <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0d9668" />
         {/* Pre-paint data-color set — FOUC önler. Next 16 App Router'da native script + dangerouslySetInnerHTML zorunlu (next/script beforeInteractive artık desteklenmiyor). */}
         <script
@@ -122,7 +120,6 @@ export default async function RootLayout({
               <ErrorBoundary>
                 {children}
                 {process.env.NODE_ENV === 'development' && <DevSWCleaner />}
-                <PWAInstallPrompt />
                 <CookieConsent />
                 <CrispWidget />
               </ErrorBoundary>

@@ -29,6 +29,7 @@ const PUBLIC_ROUTES = [
   '/certificates/verify',
   '/api/public/',
   '/dev-reset',
+  '/clear-cache',
 ]
 
 function isPublicRoute(pathname: string): boolean {

@@ -20,7 +20,10 @@
 /out/
 
 # next-pwa / Serwist build artifacts (her build'de hash değişir)
-/public/sw.js
+# 2026-05-11: public/sw.js artık kill-switch SW olarak commit edildi — eski
+# next-pwa cache'lerini temizler ve kendini unregister eder. PWA disabled
+# olduğu için build bu dosyayı overwrite etmez. Diğer worker pattern'leri
+# (workbox/swe-worker/worker-) gelecekte tekrar PWA açılırsa diye gitignored kalır.
 /public/sw.js.map
 /public/swe-worker-*.js
 /public/swe-worker-*.js.map

@@ -25,53 +25,16 @@ if (process.env.NODE_ENV === 'production' && !process.env.CI) {
   }
 }
 
+// ⚠️ 2026-05-11 — PWA tamamen DEVRE DIŞI
+// Geçmiş prod build'in service worker'ı stale chunk'lar serve ediyordu →
+// admin kullanıcılar redesign-öncesi staff paneline düşüyordu. public/sw.js
+// kill-switch SW ile değiştirildi (eski cache'leri temizleyip kendini unregister
+// eden minimal SW). next-pwa wrapper'ını `disable: true` yaparak build'in bu
+// dosyayı overwrite etmesini engelliyoruz. Wrapper'ı tamamen sökme + paket
+// kaldırma sonraki temizlik PR'ında yapılacak.
 const withPWA = withPWAInit({
   dest: "public",
-  // Service worker'ı sadece production'da aktif et
-  disable: process.env.NODE_ENV === "development",
-  // Offline navigasyonda /offline fallback sayfasını göster
-  fallbacks: {
-    document: "/offline",
-  },
-  // Push event ve notificationclick için custom worker
-  customWorkerSrc: "worker",
-  workboxOptions: {
-    disableDevLogs: true,
-    runtimeCaching: [
-      // API çağrıları: önce ağ, ağ yoksa cache
-      {
-        urlPattern: /\/api\/.*/i,
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "api-cache",
-          expiration: { maxEntries: 50, maxAgeSeconds: 60 },
-          networkTimeoutSeconds: 10,
-          cacheableResponse: { statuses: [0, 200] },
-        },
-      },
-      // Statik varlıklar: cache ama arka planda güncelle (eski chunk sorunu önlenir)
-      {
-        urlPattern: /\/_next\/static\/.*/i,
-        handler: "StaleWhileRevalidate",
-        options: {
-          cacheName: "static-cache",
-          expiration: { maxEntries: 200, maxAgeSeconds: 86400 * 7 },
-        },
-      },
-      // Görseller: önce cache
-      {
-        urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-        handler: "CacheFirst",
-        options: {
-          cacheName: "image-cache",
-          expiration: { maxEntries: 60, maxAgeSeconds: 86400 * 7 },
-        },
-      },
-    ],
-  },
-  reloadOnOnline: true,
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: false,
+  disable: true,
 });
 
 const nextConfig: NextConfig = {
