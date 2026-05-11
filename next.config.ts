@@ -109,14 +109,17 @@ const nextConfig: NextConfig = {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
-            `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+            // unpkg.com: ffmpeg-core.js (client-side video compress). 'wasm-unsafe-eval': WebAssembly icin gerekli.
+            `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://unpkg.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: https: blob:",
             "font-src 'self' data:",
-            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io",
+            // unpkg.com: ffmpeg-core.wasm fetch
+            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://unpkg.com",
             "media-src 'self' https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             "frame-src 'self' https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
-            "worker-src 'self'",
+            // blob:: ffmpeg.wasm internal worker'i blob URL'den olusturuyor
+            "worker-src 'self' blob:",
             "manifest-src 'self'",
             "frame-ancestors 'none'",
           ].join('; ')
