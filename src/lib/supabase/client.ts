@@ -6,6 +6,16 @@ export const hasSupabaseCredentials =
   !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
   !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+const REMEMBER_ME_MAX_AGE = 7 * 24 * 60 * 60
+
+/** Sentinel cookie `hlms-remember-me=1` set'lenmiş mi? Login route'u set eder. */
+function hasRememberMeFlag(): boolean {
+  if (typeof document === 'undefined') return false
+  return document.cookie
+    .split(';')
+    .some((c) => c.trim() === 'hlms-remember-me=1')
+}
+
 /**
  * Cookie attribute'larını obje formuna serialize eder (document.cookie set'i için).
  * Multi-tenant için Domain= eklenir ki subdomain'ler arası session paylaşımı çalışsın.
@@ -49,8 +59,15 @@ export function createClient() {
         },
         setAll(cookiesToSet) {
           if (typeof document === 'undefined') return
+          // Sentinel her setAll'da yeniden okunur — login/logout sırasında flag değişebilir,
+          // sadece tek sayfa load'unda cache'lemek refresh sonrası state'i bozar.
+          const rememberMe = hasRememberMeFlag()
           for (const { name, value, options } of cookiesToSet) {
-            document.cookie = serializeCookie(name, value, options as Record<string, unknown>)
+            const baseOpts = options as Record<string, unknown>
+            const opts = (rememberMe && name.includes('-auth-token'))
+              ? { ...baseOpts, maxAge: REMEMBER_ME_MAX_AGE }
+              : baseOpts
+            document.cookie = serializeCookie(name, value, opts)
           }
         },
       },
