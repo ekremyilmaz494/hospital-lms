@@ -1,4 +1,15 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, CopyObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  CopyObjectCommand,
+  HeadObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getSignedUrl as getCloudfrontSignedUrl } from '@aws-sdk/cloudfront-signer'
 import { logger } from '@/lib/logger'
@@ -10,6 +21,21 @@ export const s3 = new S3Client({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+  responseChecksumValidation: 'WHEN_REQUIRED',
+})
+
+// Transfer Acceleration enabled client — used for upload presigning only.
+// Türkiye'den eu-central-1'e RTT yüksek; CloudFront edge'leri (İstanbul/Sofya)
+// üzerinden upload AWS backbone'una taşınınca hissedilir hızlanma sağlar.
+// Download/server-side operasyonlarda fark yok, sadece presigned PUT URL'lerinde kullanılır.
+export const s3Accelerate = new S3Client({
+  region: process.env.AWS_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+  useAccelerateEndpoint: true,
   requestChecksumCalculation: 'WHEN_REQUIRED',
   responseChecksumValidation: 'WHEN_REQUIRED',
 })
@@ -53,8 +79,80 @@ export async function getUploadUrl(key: string, contentType: string) {
     ContentType: contentType,
   })
 
-  const url = await getSignedUrl(s3, command, { expiresIn: 1800 })
+  // Transfer Acceleration endpoint kullanılır — Türkiye'den 1.5-3x daha hızlı upload.
+  const url = await getSignedUrl(s3Accelerate, command, { expiresIn: 1800 })
   return url
+}
+
+/**
+ * Multipart upload — büyük dosyalar (>10 MB) için parça parça paralel yükleme.
+ * Avantaj: single PUT'ta tek TCP bağlantısının throughput limitine takılmaz,
+ * paralel parçalar aggregate bandwidth'i artırır.
+ * Akış:
+ *   1. createMultipart → uploadId
+ *   2. signMultipartParts → her parça için presigned PUT URL
+ *   3. Client paralel olarak PUT eder, her başarılı parça ETag döner
+ *   4. completeMultipart → ETag listesiyle parçaları birleştir
+ *   5. Hata/iptal: abortMultipart
+ */
+export async function createMultipart(key: string, contentType: string) {
+  if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
+    throw new Error(`İzin verilmeyen dosya türü: ${contentType}.`)
+  }
+  const res = await s3Accelerate.send(
+    new CreateMultipartUploadCommand({
+      Bucket: BUCKET,
+      Key: key,
+      ContentType: contentType,
+    }),
+  )
+  if (!res.UploadId) throw new Error('Multipart upload başlatılamadı')
+  return { uploadId: res.UploadId, key }
+}
+
+export async function signMultipartParts(key: string, uploadId: string, partNumbers: number[]) {
+  const urls = await Promise.all(
+    partNumbers.map(async (partNumber) => {
+      const command = new UploadPartCommand({
+        Bucket: BUCKET,
+        Key: key,
+        UploadId: uploadId,
+        PartNumber: partNumber,
+      })
+      const url = await getSignedUrl(s3Accelerate, command, { expiresIn: 1800 })
+      return { partNumber, url }
+    }),
+  )
+  return urls
+}
+
+export async function completeMultipart(
+  key: string,
+  uploadId: string,
+  parts: { partNumber: number; etag: string }[],
+) {
+  await s3Accelerate.send(
+    new CompleteMultipartUploadCommand({
+      Bucket: BUCKET,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: {
+        Parts: parts
+          .sort((a, b) => a.partNumber - b.partNumber)
+          .map(p => ({ PartNumber: p.partNumber, ETag: p.etag })),
+      },
+    }),
+  )
+}
+
+export async function abortMultipart(key: string, uploadId: string) {
+  try {
+    await s3Accelerate.send(
+      new AbortMultipartUploadCommand({ Bucket: BUCKET, Key: key, UploadId: uploadId }),
+    )
+  } catch (err) {
+    logger.warn('s3-abort-multipart', `Multipart abort başarısız (orphan parça kalmış olabilir): ${key}`, err)
+  }
 }
 
 /** Generate presigned URL for downloading from S3 (fallback if no CloudFront) */

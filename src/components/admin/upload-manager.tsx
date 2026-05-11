@@ -68,6 +68,13 @@ interface UploadManagerContextValue {
   getByDraft: (draftId: string) => UploadItem[];
 }
 
+/** Multipart eşiği: bu boyutun üstündeki dosyalar parça parça yüklenir. */
+const MULTIPART_THRESHOLD = 10 * 1024 * 1024; // 10 MB
+/** Multipart parça boyutu — S3 minimum 5 MB. 8 MB Türkiye/Frankfurt RTT için iyi denge. */
+const PART_SIZE = 8 * 1024 * 1024; // 8 MB
+/** Aynı anda kaç parça yüklensin — TCP slow-start'ı maskeler, NIC'i doyurur. */
+const PART_CONCURRENCY = 4;
+
 const UploadManagerContext = createContext<UploadManagerContextValue | null>(null);
 
 const inferKind = (file: File): UploadKind => {
@@ -83,8 +90,9 @@ const TERMINAL_RETENTION_MS = 60_000;
 
 export function UploadManagerProvider({ children }: { children: ReactNode }) {
   const [uploads, setUploads] = useState<UploadItem[]>([]);
-  // XHR referansları state'e konmaz (re-render tetiklemesin); cancel için ref.
-  const xhrMap = useRef<Map<string, XMLHttpRequest>>(new Map());
+  // Aktif upload'lar için abort handle'ları. Single PUT'ta tek XHR'i,
+  // multipart'ta tüm parça XHR'lerini + abort API çağrısını sarar.
+  const abortMap = useRef<Map<string, { abort: () => void }>>(new Map());
   const callbackMap = useRef<Map<string, { onComplete?: EnqueueArgs['onComplete']; onError?: EnqueueArgs['onError'] }>>(new Map());
   // Terminal state'e gelen upload'ların kuyruktan otomatik düşürülme zamanları.
   const reapTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -162,91 +170,228 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         } catch { /* ignore */ }
       }
 
-      updateUpload(uploadId, { progress: 5, status: 'uploading' });
+      updateUpload(uploadId, { progress: 1, status: 'uploading' });
 
-      const presignRes = await fetch('/api/upload/presign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: file.name,
-          contentType: file.type,
-          trainingId: draftId,
-        }),
-      });
-      if (!presignRes.ok) {
-        const err = await presignRes.json().catch(() => ({}));
-        throw new Error(err.error || 'Yükleme URL alınamadı');
-      }
-      const { uploadUrl, key } = (await presignRes.json()) as { uploadUrl: string; key: string };
+      const useMultipart = file.size > MULTIPART_THRESHOLD;
 
-      const xhr = new XMLHttpRequest();
-      xhrMap.current.set(uploadId, xhr);
+      const finalizeSuccess = (key: string) => {
+        const result = { key, durationSeconds, pageCount };
+        updateUpload(uploadId, { progress: 100, status: 'done', result });
 
-      xhr.upload.onprogress = (ev) => {
-        if (!ev.lengthComputable) return;
-        const pct = Math.max(5, Math.round((ev.loaded / ev.total) * 95));
-        updateUpload(uploadId, { progress: pct });
+        // Server-side persistence: kullanıcı wizard'da değil bile olsa
+        // tamamlanan upload draftData.videos'a kalıcı yazılmalı.
+        void fetch(`/api/admin/trainings/${draftId}/draft/append-video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
+          body: JSON.stringify({
+            id: contentItemId,
+            title: file.name.replace(/\.[^.]+$/, ''),
+            url: key,
+            contentType: kind,
+            durationSeconds,
+            pageCount,
+          }),
+        }).catch(() => { /* best-effort */ });
+
+        callbackMap.current.get(uploadId)?.onComplete?.(result);
       };
 
-      xhr.onload = () => {
-        xhrMap.current.delete(uploadId);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const result = { key, durationSeconds, pageCount };
-          updateUpload(uploadId, { progress: 100, status: 'done', result });
+      const failUpload = (msg: string) => {
+        abortMap.current.delete(uploadId);
+        updateUpload(uploadId, { status: 'error', errorMessage: msg });
+        callbackMap.current.get(uploadId)?.onError?.(msg);
+      };
 
-          // Server-side persistence: kullanıcı wizard'da değil bile olsa
-          // tamamlanan upload draftData.videos'a kalıcı yazılmalı. Aksi halde
-          // wizard'a dönüldüğünde hydration boş gelir ve dosya kaybolmuş gözükür.
-          void fetch(`/api/admin/trainings/${draftId}/draft/append-video`, {
+      if (!useMultipart) {
+        // ----- Single PUT (küçük dosya) — Transfer Acceleration ile presigned -----
+        const presignRes = await fetch('/api/upload/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name, contentType: file.type, trainingId: draftId }),
+        });
+        if (!presignRes.ok) {
+          const err = await presignRes.json().catch(() => ({}));
+          throw new Error(err.error || 'Yükleme URL alınamadı');
+        }
+        const { uploadUrl, key } = (await presignRes.json()) as { uploadUrl: string; key: string };
+
+        const xhr = new XMLHttpRequest();
+        abortMap.current.set(uploadId, { abort: () => { try { xhr.abort(); } catch { /* ignore */ } } });
+
+        xhr.upload.onprogress = (ev) => {
+          if (!ev.lengthComputable) return;
+          const pct = Math.max(1, Math.round((ev.loaded / ev.total) * 99));
+          updateUpload(uploadId, { progress: pct });
+        };
+        xhr.onload = () => {
+          abortMap.current.delete(uploadId);
+          if (xhr.status >= 200 && xhr.status < 300) finalizeSuccess(key);
+          else failUpload(`Dosya yüklenemedi (HTTP ${xhr.status}). Yetki/CORS hatası olabilir.`);
+        };
+        xhr.onerror = () => failUpload('Dosya yüklenemedi — S3 CORS yetkisi reddedildi olabilir.');
+        xhr.ontimeout = () => failUpload('Bağlantı zaman aşımına uğradı.');
+
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
+        return;
+      }
+
+      // ----- Multipart upload (büyük dosya) — paralel parçalar -----
+      const createRes = await fetch('/api/upload/multipart/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type, trainingId: draftId }),
+      });
+      if (!createRes.ok) {
+        const err = await createRes.json().catch(() => ({}));
+        throw new Error(err.error || 'Multipart upload başlatılamadı');
+      }
+      const { uploadId: s3UploadId, key } = (await createRes.json()) as { uploadId: string; key: string };
+
+      const totalParts = Math.ceil(file.size / PART_SIZE);
+      const partNumbers = Array.from({ length: totalParts }, (_, i) => i + 1);
+
+      // Tüm parça URL'lerini tek istekte al — 100 parça limiti var, daha büyük dosyalar için batch'le.
+      const allUrls: { partNumber: number; url: string }[] = [];
+      for (let i = 0; i < partNumbers.length; i += 100) {
+        const batch = partNumbers.slice(i, i + 100);
+        const signRes = await fetch('/api/upload/multipart/sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, uploadId: s3UploadId, partNumbers: batch }),
+        });
+        if (!signRes.ok) {
+          const err = await signRes.json().catch(() => ({}));
+          throw new Error(err.error || 'Parça URL imzalanamadı');
+        }
+        const { urls } = (await signRes.json()) as { urls: { partNumber: number; url: string }[] };
+        allUrls.push(...urls);
+      }
+
+      // İlerleme: her parçanın yüklenmiş byte'ı ayrı tutulur, toplam dosya boyutuna oranlanır.
+      const partLoaded = new Map<number, number>();
+      const activeXhrs = new Map<number, XMLHttpRequest>();
+      let aborted = false;
+
+      abortMap.current.set(uploadId, {
+        abort: () => {
+          aborted = true;
+          activeXhrs.forEach(x => { try { x.abort(); } catch { /* ignore */ } });
+          activeXhrs.clear();
+          void fetch('/api/upload/multipart/abort', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             keepalive: true,
-            body: JSON.stringify({
-              id: contentItemId,
-              title: file.name.replace(/\.[^.]+$/, ''),
-              url: key,
-              contentType: kind,
-              durationSeconds,
-              pageCount,
-            }),
+            body: JSON.stringify({ key, uploadId: s3UploadId }),
           }).catch(() => { /* best-effort */ });
+        },
+      });
 
-          callbackMap.current.get(uploadId)?.onComplete?.(result);
-        } else {
-          const msg = `Dosya yüklenemedi (HTTP ${xhr.status}). Yetki/CORS hatası olabilir.`;
-          updateUpload(uploadId, { status: 'error', errorMessage: msg });
-          callbackMap.current.get(uploadId)?.onError?.(msg);
+      const updateProgress = () => {
+        let loaded = 0;
+        partLoaded.forEach(v => { loaded += v; });
+        const pct = Math.max(1, Math.min(99, Math.round((loaded / file.size) * 99)));
+        updateUpload(uploadId, { progress: pct });
+      };
+
+      const uploadPart = (partNumber: number, url: string): Promise<{ partNumber: number; etag: string }> => {
+        return new Promise((resolve, reject) => {
+          if (aborted) { reject(new Error('aborted')); return; }
+          const start = (partNumber - 1) * PART_SIZE;
+          const end = Math.min(start + PART_SIZE, file.size);
+          const blob = file.slice(start, end);
+
+          const xhr = new XMLHttpRequest();
+          activeXhrs.set(partNumber, xhr);
+          xhr.upload.onprogress = (ev) => {
+            if (!ev.lengthComputable) return;
+            partLoaded.set(partNumber, ev.loaded);
+            updateProgress();
+          };
+          xhr.onload = () => {
+            activeXhrs.delete(partNumber);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              // ETag header'ı tırnak içinde döner; CompleteMultipartUpload aynen kabul eder.
+              const etag = xhr.getResponseHeader('ETag') || xhr.getResponseHeader('etag');
+              if (!etag) { reject(new Error(`Parça ${partNumber}: ETag header yok (CORS ExposeHeaders kontrol et)`)); return; }
+              partLoaded.set(partNumber, end - start); // tam boyut
+              updateProgress();
+              resolve({ partNumber, etag });
+            } else {
+              reject(new Error(`Parça ${partNumber} HTTP ${xhr.status}`));
+            }
+          };
+          xhr.onerror = () => { activeXhrs.delete(partNumber); reject(new Error(`Parça ${partNumber} ağ hatası`)); };
+          xhr.ontimeout = () => { activeXhrs.delete(partNumber); reject(new Error(`Parça ${partNumber} zaman aşımı`)); };
+          xhr.open('PUT', url);
+          xhr.send(blob);
+        });
+      };
+
+      // Concurrency limit'li worker pool. Bir parça fail olursa bir kez tekrar dener.
+      const queue = [...allUrls];
+      const results: { partNumber: number; etag: string }[] = [];
+      // Hata referansını ref-cell'de tut — closure'da type narrowing'i bozmaz.
+      const errorBox: { value: Error | null } = { value: null };
+
+      const worker = async () => {
+        while (queue.length > 0 && !errorBox.value && !aborted) {
+          const next = queue.shift();
+          if (!next) break;
+          try {
+            const res = await uploadPart(next.partNumber, next.url);
+            results.push(res);
+          } catch {
+            // Tek seferlik retry — geçici ağ hatalarına karşı.
+            try {
+              const res = await uploadPart(next.partNumber, next.url);
+              results.push(res);
+            } catch (err2) {
+              errorBox.value = err2 instanceof Error ? err2 : new Error(String(err2));
+            }
+          }
         }
       };
 
-      xhr.onerror = () => {
-        xhrMap.current.delete(uploadId);
-        const msg = 'Dosya yüklenemedi — S3 CORS yetkisi reddedildi olabilir.';
-        updateUpload(uploadId, { status: 'error', errorMessage: msg });
-        callbackMap.current.get(uploadId)?.onError?.(msg);
-      };
-      xhr.ontimeout = () => {
-        xhrMap.current.delete(uploadId);
-        const msg = 'Bağlantı zaman aşımına uğradı.';
-        updateUpload(uploadId, { status: 'error', errorMessage: msg });
-        callbackMap.current.get(uploadId)?.onError?.(msg);
-      };
+      await Promise.all(Array.from({ length: PART_CONCURRENCY }, () => worker()));
 
-      xhr.open('PUT', uploadUrl);
-      xhr.setRequestHeader('Content-Type', file.type);
-      xhr.send(file);
+      if (aborted) return; // cancel() zaten state'i 'canceled' yaptı
+      if (errorBox.value) {
+        void fetch('/api/upload/multipart/abort', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+          body: JSON.stringify({ key, uploadId: s3UploadId }),
+        }).catch(() => {});
+        failUpload(errorBox.value.message || 'Multipart yükleme başarısız');
+        return;
+      }
+
+      // Birleştir
+      const completeRes = await fetch('/api/upload/multipart/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, uploadId: s3UploadId, parts: results }),
+      });
+      if (!completeRes.ok) {
+        const err = await completeRes.json().catch(() => ({}));
+        throw new Error(err.error || 'Multipart tamamlanamadı');
+      }
+      abortMap.current.delete(uploadId);
+      finalizeSuccess(key);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Yükleme başarısız';
+      abortMap.current.delete(uploadId);
       updateUpload(uploadId, { status: 'error', errorMessage: msg });
       callbackMap.current.get(uploadId)?.onError?.(msg);
     }
   }, [updateUpload]);
 
   const cancel = useCallback((uploadId: string) => {
-    const xhr = xhrMap.current.get(uploadId);
-    if (xhr) {
-      try { xhr.abort(); } catch { /* ignore */ }
-      xhrMap.current.delete(uploadId);
+    const handle = abortMap.current.get(uploadId);
+    if (handle) {
+      try { handle.abort(); } catch { /* ignore */ }
+      abortMap.current.delete(uploadId);
     }
     updateUpload(uploadId, { status: 'canceled' });
   }, [updateUpload]);
