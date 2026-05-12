@@ -20,6 +20,7 @@ import { useFetch, invalidateFetchCache } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
 import { ResetPasswordModal } from '@/components/shared/reset-password-modal';
 import { NewAdminModal } from './_components/new-admin-modal';
+import { BulkResetStaffModal } from './_components/bulk-reset-staff-modal';
 
 type AdminRow = { id: string; name: string; email: string; lastLogin: string };
 
@@ -52,6 +53,7 @@ export default function HospitalDetailPage() {
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
   const [showNewAdminModal, setShowNewAdminModal] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminRow | null>(null);
+  const [bulkResetOpen, setBulkResetOpen] = useState(false);
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [suspendReason, setSuspendReason] = useState('');
   const [confirmText, setConfirmText] = useState('');
@@ -168,6 +170,16 @@ export default function HospitalDetailPage() {
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
           >
             <Edit className="h-4 w-4" /> Düzenle
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setBulkResetOpen(true)}
+            disabled={hospital.staffCount === 0}
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-error)' }}
+            title="Bu hastanedeki tüm personelin (sadece staff) şifresini sıfırla ve PDF olarak indir"
+          >
+            <KeyRound className="h-4 w-4" /> Personel Şifrelerini Sıfırla
           </Button>
           <Button
             variant="outline"
@@ -305,6 +317,14 @@ export default function HospitalDetailPage() {
           }}
         />
       )}
+
+      <BulkResetStaffModal
+        open={bulkResetOpen}
+        onClose={() => setBulkResetOpen(false)}
+        hospitalId={hospital.id}
+        hospitalName={hospital.name}
+        staffCount={hospital.staffCount}
+      />
 
       {resetTarget && (
         <ResetPasswordModal

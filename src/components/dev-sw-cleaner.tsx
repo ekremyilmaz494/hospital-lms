@@ -26,7 +26,7 @@ export function DevSWCleaner() {
           const regs = await navigator.serviceWorker.getRegistrations();
           if (regs.length > 0) {
             await Promise.all(regs.map((r) => r.unregister()));
-            // eslint-disable-next-line no-console
+             
             console.info(`[dev] ${regs.length} service worker unregistered`);
           }
         }
@@ -34,12 +34,12 @@ export function DevSWCleaner() {
           const keys = await caches.keys();
           if (keys.length > 0) {
             await Promise.all(keys.map((k) => caches.delete(k)));
-            // eslint-disable-next-line no-console
+             
             console.info(`[dev] ${keys.length} cache keys cleared`);
           }
         }
       } catch (err) {
-        // eslint-disable-next-line no-console
+         
         console.warn('[dev] SW/cache cleanup failed:', err);
       }
     })();

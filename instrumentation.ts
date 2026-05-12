@@ -5,7 +5,7 @@
  * ve Turbopack dev modunda modül çözümleme başarısız olur.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type SentryModule = typeof import('@sentry/nextjs')
 
 async function loadSentry(): Promise<SentryModule | null> {
