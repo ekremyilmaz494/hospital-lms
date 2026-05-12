@@ -80,6 +80,8 @@ next-env.d.ts
 
 # Claude Code hook logs
 .claude/command-log.txt
+# Claude Code scheduler runtime lock (per-machine, must not sync)
+.claude/scheduled_tasks.lock
 tmp/
 /tmp/
 # Geçici smoke test fixture'ları (örn. scripts/smoke-*.mjs üretimleri)
