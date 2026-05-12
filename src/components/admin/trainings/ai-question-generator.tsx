@@ -25,6 +25,14 @@ import { useAiQuestionQueue, type AiPendingState } from '@/hooks/use-ai-question
  *  Mode geçişlerinde ve sayfa yenilemesinde restore. */
 export type { AiPendingState };
 
+export interface AiUploadedSource {
+  s3Key: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  pageCount?: number;
+}
+
 export interface AiQuestionGeneratorProps {
   onAdd: (questions: { text: string; options: string[]; correct: number }[]) => void;
   /** Manuel sekmede admin'in yazdığı dolu sorular — AI dedup ve hedef toplam
@@ -37,15 +45,13 @@ export interface AiQuestionGeneratorProps {
   initialState?: AiPendingState;
   /** Her displayed/queue değişiminde parent'a snapshot — draft'a kaydetmek için. */
   onStateChange?: (state: AiPendingState) => void;
+  /** Parent'ta tutulan kaynak dosyalar (draft restore için). Verilmezse local. */
+  initialSources?: AiUploadedSource[];
+  /** Her upload/remove sonrası parent'a snapshot — draft'a kaydetmek için. */
+  onSourcesChange?: (sources: AiUploadedSource[]) => void;
 }
 
-interface UploadedSource {
-  s3Key: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  pageCount?: number;
-}
+type UploadedSource = AiUploadedSource;
 
 const MAX_SOURCES = 3;
 const MAX_TOTAL_SIZE_MB = 30;
@@ -71,8 +77,21 @@ const tierStyles: Record<string, { dot: string; label: string; bg: string }> = {
 
 const FONT_EDITORIAL = "var(--font-editorial, Georgia, serif)";
 
-export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingChange, initialState, onStateChange }: AiQuestionGeneratorProps) {
-  const [uploadedSources, setUploadedSources] = useState<UploadedSource[]>([]);
+export default function AiQuestionGenerator({
+  onAdd,
+  manualQuestions,
+  onPendingChange,
+  initialState,
+  onStateChange,
+  initialSources,
+  onSourcesChange,
+}: AiQuestionGeneratorProps) {
+  // initialSources sadece ilk mount'ta tohum; sonraki güncellemeler onSourcesChange üzerinden parent'a iletilir.
+  const [uploadedSources, setUploadedSources] = useState<UploadedSource[]>(() => initialSources ?? []);
+  // Her uploadedSources değişiminde parent'a bildir — draft auto-save için.
+  useEffect(() => {
+    onSourcesChange?.(uploadedSources);
+  }, [uploadedSources, onSourcesChange]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -207,6 +226,15 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
     void queue.generate();
   };
 
+  // AI tab'ında üretilmiş soruları sıfırla — admin "manuel'e dönmek istiyorum"
+  // dediğinde tek tıkla temizlenir. Queue + displayed gider; parent state
+  // (initialState/onStateChange) hook tarafından otomatik snapshot'lanır.
+  const handleAbandon = () => {
+    if (queue.displayed.length === 0 && queue.queue.length === 0) return;
+    if (!window.confirm('AI tarafından üretilen sorular silinecek. Devam edilsin mi?')) return;
+    queue.reset();
+  };
+
   const hasResults = queue.displayed.length > 0;
   const showInitialUi = !hasResults && !queue.isGenerating;
 
@@ -228,7 +256,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
               üretsin.
             </h2>
             <p className="aiq-hero-sub">
-              Yüklediğin PDF&apos;ten çoktan seçmeli soru. Beğenmediğini sil — yerine yenisi gelir.
+              Yüklediğin dokümandan çoktan seçmeli soru. Beğenmediğini sil — yerine yenisi gelir.
             </p>
           </div>
 
@@ -236,7 +264,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
           <section className="aiq-section">
             <header className="aiq-section-head">
               <span className="aiq-step-num">01</span>
-              <span className="aiq-step-label">Kaynak PDF</span>
+              <span className="aiq-step-label">Kaynak Dosya</span>
               <span className="aiq-section-count">{uploadedSources.length}/{MAX_SOURCES}</span>
             </header>
 
@@ -386,6 +414,9 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
 
           {hasResults && (
             <div className="aiq-action-stack">
+              <p className="aiq-action-hint" style={{ fontSize: 11, color: K.TEXT_MUTED, margin: '0 0 4px', lineHeight: 1.4 }}>
+                Bu sorular henüz sınava eklenmedi. Eklemek için aşağıdaki butona bas.
+              </p>
               <button
                 type="button"
                 className="aiq-cta"
@@ -397,7 +428,7 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
                   <PlusCircle size={16} strokeWidth={2.5} />
                 </span>
                 <span className="aiq-cta-label">
-                  Soruları Ekle <em>({realDisplayed.length})</em>
+                  Bu {realDisplayed.length} Soruyu Sınava Ekle
                 </span>
               </button>
               <button
@@ -407,6 +438,15 @@ export default function AiQuestionGenerator({ onAdd, manualQuestions, onPendingC
               >
                 <RefreshCw size={13} strokeWidth={2.5} />
                 Tümünü Yeniden Üret
+              </button>
+              <button
+                type="button"
+                className="aiq-cta-secondary"
+                onClick={handleAbandon}
+                style={{ color: K.ERROR, borderColor: K.ERROR }}
+              >
+                <X size={13} strokeWidth={2.5} />
+                Vazgeç / Temizle
               </button>
             </div>
           )}

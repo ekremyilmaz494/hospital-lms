@@ -8,38 +8,30 @@ vi.mock('@/lib/api-helpers', () => ({
   errorResponse: vi.fn((msg: string, status = 400) => Response.json({ error: msg }, { status })),
 }))
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    user: { count: vi.fn() },
-    training: { count: vi.fn(), findMany: vi.fn() },
-    trainingAssignment: { count: vi.fn(), findMany: vi.fn(), groupBy: vi.fn() },
-    certificate: { count: vi.fn(), findMany: vi.fn() },
-    examAttempt: { count: vi.fn() },
-    auditLog: { findMany: vi.fn() },
-  },
-}))
-
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-vi.mock('@/lib/redis', () => ({
-  getCached: vi.fn().mockResolvedValue(null),
-  setCached: vi.fn().mockResolvedValue(undefined),
-}))
-
 import { GET } from '../stats/route'
 import { getAuthUser, requireRole } from '@/lib/api-helpers'
-import { prisma } from '@/lib/prisma'
 
 const mockGetAuthUser = vi.mocked(getAuthUser)
 const mockRequireRole = vi.mocked(requireRole)
-const mockUserCount = vi.mocked(prisma.user.count)
-const mockTrainingCount = vi.mocked(prisma.training.count)
-const mockTrainingFindMany = vi.mocked(prisma.training.findMany)
-const mockAssignmentGroupBy = vi.mocked(prisma.trainingAssignment.groupBy)
 
-describe('GET /api/admin/dashboard/stats', () => {
+/**
+ * `/api/admin/dashboard/stats` 2026-05 itibarıyla deprecate edildi
+ * (commit ab7e1a5 — split endpoint cleanup). Route artık her durumda 410 döner.
+ * Dashboard verisi `/api/admin/dashboard/combined` üzerinden alınıyor.
+ *
+ * Bu test dosyası deprecation davranışını koruma altına alır:
+ *   - Kimlik doğrulamasız istek → 401 (withAdminRoute wrapper)
+ *   - Yetkisiz rol → 403 (withAdminRoute wrapper)
+ *   - Yetkili admin → 410 Gone (deprecation cevabı)
+ *
+ * Eğer biri route'un işlevsel kısmını "yeniden canlandırırsa" bu test başarısız
+ * olur ve PR review'da yakalanır.
+ */
+describe('GET /api/admin/dashboard/stats (deprecated → 410 Gone)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -51,11 +43,8 @@ describe('GET /api/admin/dashboard/stats', () => {
       error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
     })
 
-    const response = await GET(new Request("http://localhost/api/admin/dashboard/stats"))
-    const data = await response.json()
-
+    const response = await GET(new Request('http://localhost/api/admin/dashboard/stats'))
     expect(response.status).toBe(401)
-    expect(data.error).toBe('Unauthorized')
   })
 
   it('returns 403 when not admin role', async () => {
@@ -66,17 +55,14 @@ describe('GET /api/admin/dashboard/stats', () => {
     } as never)
 
     mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
     )
 
-    const response = await GET(new Request("http://localhost/api/admin/dashboard/stats"))
-    const data = await response.json()
-
+    const response = await GET(new Request('http://localhost/api/admin/dashboard/stats'))
     expect(response.status).toBe(403)
-    expect(data.error).toBe('Forbidden')
   })
 
-  it('returns stats data on success', async () => {
+  it('returns 410 Gone for authenticated admin (deprecation contract)', async () => {
     mockGetAuthUser.mockResolvedValue({
       user: { id: 'admin-1' },
       dbUser: { id: 'admin-1', role: 'admin', organizationId: 'org-1', isActive: true },
@@ -85,40 +71,10 @@ describe('GET /api/admin/dashboard/stats', () => {
 
     mockRequireRole.mockReturnValue(null)
 
-    // Mock staff counts
-    mockUserCount.mockResolvedValue(25 as never)
-
-    // Mock training counts
-    mockTrainingCount.mockResolvedValue(10 as never)
-
-    // Mock assignment status aggregation
-    mockAssignmentGroupBy.mockResolvedValue([
-      { status: 'passed', _count: 5 },
-      { status: 'failed', _count: 2 },
-      { status: 'in_progress', _count: 3 },
-    ] as never)
-
-    // Mock compulsory trainings
-    mockTrainingFindMany.mockResolvedValue([] as never)
-
-    const response = await GET(new Request("http://localhost/api/admin/dashboard/stats"))
+    const response = await GET(new Request('http://localhost/api/admin/dashboard/stats'))
     const data = await response.json()
 
-    expect(response.status).toBe(200)
-    expect(data.stats).toBeDefined()
-    expect(Array.isArray(data.stats)).toBe(true)
-    expect(data.stats.length).toBe(5)
-
-    // Verify stat titles
-    const titles = data.stats.map((s: { title: string }) => s.title)
-    expect(titles).toContain('Toplam Personel')
-    expect(titles).toContain('Aktif Egitim')
-    expect(titles).toContain('Tamamlanma Orani')
-    expect(titles).toContain('Geciken Egitim')
-    expect(titles).toContain('Uyum Orani')
-
-    // Verify stats endpoint returns these sections
-    expect(data.complianceAlerts).toBeDefined()
-    expect(data.statusDistribution).toBeDefined()
+    expect(response.status).toBe(410)
+    expect(data.error).toMatch(/combined/i)
   })
 })

@@ -13,6 +13,8 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
     const periodIdParam = searchParams.get('periodId')
 
     // periodId param varsa o dönemi kullan; yoksa aktif döneme düş.
+    // Boş liste senaryosunda UI'ın doğru mesaj gösterebilmesi için `meta.reason`
+    // ekleniyor — "atama yok" ile "aktif dönem yok" durumlarını karıştırma.
     let periodId: string
     if (periodIdParam) {
       const period = await prisma.trainingPeriod.findFirst({
@@ -22,6 +24,7 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
       if (!period) {
         return jsonResponse({
           data: [], page, limit, totalCount: 0, totalPages: 0,
+          meta: { reason: 'period_not_found' as const },
         }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
       }
       periodId = period.id
@@ -30,6 +33,7 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
       if (!activePeriod) {
         return jsonResponse({
           data: [], page, limit, totalCount: 0, totalPages: 0,
+          meta: { reason: 'no_active_period' as const },
         }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
       }
       periodId = activePeriod.id

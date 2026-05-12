@@ -1,40 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
-import { getAttemptWithPhaseCheck } from '@/lib/exam-helpers'
-
-/** Seeded 32-bit PRNG (mulberry32) — deterministic, same seed → same sequence */
-function seededRng(seed: number): () => number {
-  let s = seed >>> 0
-  return () => {
-    s = (s + 0x6D2B79F5) >>> 0
-    let t = s
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-/** FNV-1a hash → 32-bit seed from a string (attempt.id + phase-specific salt) */
-function stringToSeed(input: string): number {
-  let hash = 0x811c9dc5
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return hash >>> 0
-}
-
-/** Deterministic Fisher-Yates shuffle: aynı seed → aynı sıra. */
-function shuffle<T>(arr: T[], seed: number): T[] {
-  const rng = seededRng(seed)
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
+import {
+  getAttemptWithPhaseCheck,
+  getEffectiveExamQuestions,
+  shuffle,
+  stringToSeed,
+} from '@/lib/exam-helpers'
 
 export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
   const { id } = params
@@ -78,7 +50,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
   const savedMap = new Map(savedAnswers.map(a => [a.questionId, a.selectedOptionId]))
 
   // Get questions with options (exclude isCorrect for security)
-  let questions = await prisma.question.findMany({
+  const allQuestions = await prisma.question.findMany({
     where: { trainingId: training.id },
     include: {
       options: {
@@ -89,24 +61,11 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
     orderBy: { sortOrder: 'asc' },
   })
 
-  // Attempt.id + phase'e bağlı deterministic seed — aynı attempt için soru sırası
-  // her requestte aynı kalır. Böylece randomQuestionCount subset'inde farklı soru
-  // seçilmez ve cevaplanmış sorular tab kapandığında "kaybolmaz".
-  const attemptSeed = attempt ? stringToSeed(`${attempt.id}:${phase}:q`) : 0
-
-  // randomizeQuestions=true ise sırayı karıştır; aksi halde sortOrder ile bırak.
-  // examOnly + randomQuestionCount yapılandırılmışsa subset seçimi için shuffle zorunlu.
-  const examOnlyWithRandomSubset = !!training.examOnly && !!training.randomQuestionCount && training.randomQuestionCount > 0 && training.randomQuestionCount < questions.length
-  const needsShuffle = training.randomizeQuestions || examOnlyWithRandomSubset
-  if (needsShuffle) {
-    questions = shuffle(questions, attemptSeed)
-  }
-
-  // examOnly sınavlarda rastgele soru sayısı limiti — shuffle deterministic olduğu
-  // için slice sonucu da attempt boyunca sabit.
-  if (training.examOnly && training.randomQuestionCount && training.randomQuestionCount > 0 && training.randomQuestionCount < questions.length) {
-    questions = questions.slice(0, training.randomQuestionCount)
-  }
+  // Aynı subset/sırayı submit route'u da kullanır — getEffectiveExamQuestions
+  // deterministik seed (attempt.id + phase) ile her iki tarafa eşit küme verir.
+  const questions = attempt
+    ? getEffectiveExamQuestions(allQuestions, training, attempt.id, phase as 'pre' | 'post')
+    : allQuestions
 
   return jsonResponse({
     trainingTitle: training.title,

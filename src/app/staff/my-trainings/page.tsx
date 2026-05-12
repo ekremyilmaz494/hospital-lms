@@ -91,13 +91,20 @@ export default function MyTrainingsPage() {
     ? `/api/staff/my-trainings?limit=100&periodId=${selectedPeriodId}`
     : '/api/staff/my-trainings?limit=100';
 
+  type EmptyReason = 'no_active_period' | 'period_not_found';
+  type ListResponse = { data: Training[]; meta?: { reason?: EmptyReason } } | Training[];
   const { data: rawData, isLoading, error } =
-    useFetch<{ data: Training[] } | Training[]>(apiUrl);
+    useFetch<ListResponse>(apiUrl);
 
   const allItems: Training[] = useMemo(
     () => (Array.isArray(rawData) ? rawData : (rawData as { data: Training[] })?.data ?? []),
     [rawData],
   );
+
+  const emptyReason: EmptyReason | null = useMemo(() => {
+    if (Array.isArray(rawData)) return null;
+    return (rawData as { meta?: { reason?: EmptyReason } } | undefined)?.meta?.reason ?? null;
+  }, [rawData]);
 
   const segmented = useMemo(() => {
     const list = allItems.filter(t => (activeTab === 'exams' ? t.examOnly : !t.examOnly));
@@ -337,11 +344,25 @@ export default function MyTrainingsPage() {
               )}
 
               {segmented.list.length === 0 && (
-                <EmptyBlock
-                  icon={BookOpen}
-                  title={`Henüz ${activeTab === 'exams' ? 'sınav' : 'eğitim'} atanmadı`}
-                  description={`Yöneticin sana ${activeTab === 'exams' ? 'bir sınav' : 'bir eğitim'} atadığında burada görünecek.`}
-                />
+                emptyReason === 'no_active_period' ? (
+                  <EmptyBlock
+                    icon={Lock}
+                    title="Aktif eğitim dönemi yok"
+                    description="Hastanende şu anda açık bir eğitim dönemi bulunmuyor. Yöneticin dönemi açtığında eğitimlerin burada listelenecek."
+                  />
+                ) : emptyReason === 'period_not_found' ? (
+                  <EmptyBlock
+                    icon={BookOpen}
+                    title="Seçili dönem bulunamadı"
+                    description="Bu döneme erişimin yok ya da dönem kaldırılmış. Lütfen başka bir dönem seç."
+                  />
+                ) : (
+                  <EmptyBlock
+                    icon={BookOpen}
+                    title={`Henüz ${activeTab === 'exams' ? 'sınav' : 'eğitim'} atanmadı`}
+                    description={`Yöneticin sana ${activeTab === 'exams' ? 'bir sınav' : 'bir eğitim'} atadığında burada görünecek.`}
+                  />
+                )
               )}
             </div>
           </>

@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { logActivity } from '@/lib/activity-logger'
 import { getPendingMandatoryFeedback } from '@/lib/feedback-helpers'
 import { isTrainingAccessible } from '@/lib/training-helpers'
+import { advancePastVideosIfNoneRequired } from '@/lib/exam-helpers'
 import {
   attemptNextStatus,
   assignmentNextStatus,
@@ -122,11 +123,20 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
         include: { videoProgress: true },
       })
     }
+    // Videosuz/PDF-only eğitim: attempt watching_videos'a girdiyse otomatik
+    // post_exam'e ilerlet — aksi halde attempt sonsuza dek bu statede kalır.
+    if (resumed.status === 'watching_videos') {
+      const advance = await advancePastVideosIfNoneRequired(resumed.id, resumed.trainingId)
+      if (advance.advanced) {
+        resumed = { ...resumed, status: 'post_exam', postExamStartedAt: new Date() }
+      }
+    }
     const examOnly = assignment.training.examOnly === true
+    const redirectTo = resumed.status === 'post_exam' ? 'post-exam' : undefined
     return jsonResponse({
       ...resumed,
       examOnly,
-      redirectTo: examOnly ? 'post-exam' : undefined,
+      redirectTo,
     })
   }
 
@@ -273,6 +283,14 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
 
   if (!attempt) return errorResponse('Maksimum deneme sayısına ulaştınız', 403)
 
+  // Videosuz/PDF-only eğitim: watching_videos'da takılı kalmasın.
+  if (attempt.status === 'watching_videos') {
+    const advance = await advancePastVideosIfNoneRequired(attempt.id, attempt.trainingId)
+    if (advance.advanced) {
+      attempt = { ...attempt, status: 'post_exam', postExamStartedAt: new Date() }
+    }
+  }
+
   await audit({
     action: 'exam.started',
     entityType: 'exam_attempt',
@@ -291,9 +309,10 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   })
 
   const examOnly = assignment.training.examOnly === true
+  const redirectTo = attempt.status === 'post_exam' ? 'post-exam' : undefined
   return jsonResponse({
     ...attempt,
     examOnly,
-    redirectTo: examOnly ? 'post-exam' : undefined,
+    redirectTo,
   })
 }, { requireOrganization: true })

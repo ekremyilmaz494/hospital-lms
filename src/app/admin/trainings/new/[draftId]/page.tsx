@@ -89,6 +89,15 @@ interface DraftSnapshot {
   /** Step 3 AI tab — pending sorular ve aktif mod (manuel/ai) */
   questionsActiveMode?: 'manual' | 'ai';
   aiPending?: AiPendingSnapshot;
+  /** Step 3 AI tab — yüklenmiş kaynak dosyalar (S3 key + metadata).
+   *  Sayfa yenilenince admin kaynakları tekrar yüklemek zorunda kalmasın. */
+  aiUploadedSources?: Array<{
+    s3Key: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    pageCount?: number;
+  }>;
 }
 
 export default function DraftWizardPage() {
@@ -133,6 +142,9 @@ export default function DraftWizardPage() {
   const [complianceDeadline, setComplianceDeadline] = useState('');
   const [regulatoryBody, setRegulatoryBody] = useState('');
   const [renewalPeriodMonths, setRenewalPeriodMonths] = useState<number | ''>('');
+  // R2 — Publish hatasında step 4'te inline banner için (toast'a ek). Step değişiminde
+  // de görünür kalır, kullanıcı tekrar publish denerken bağlamı kaybetmez.
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   // Step 2 — videos artık manager üzerinden upload ediliyor
   const [videos, setVideos] = useState<VideoItem[]>([]);
@@ -147,6 +159,10 @@ export default function DraftWizardPage() {
   // AI tab pending state — mode geçişi ve sayfa yenilemede korunur, draft'a kaydedilir.
   const [questionsActiveMode, setQuestionsActiveMode] = useState<'manual' | 'ai'>('manual');
   const [aiPending, setAiPending] = useState<AiPendingSnapshot>({ displayed: [], queue: [] });
+  // F — AI kaynak dosyaları (S3 key) draft'a kaydedilir. Sayfa yenilenince admin
+  // tekrar dosya yüklemek zorunda kalmaz. S3 lifecycle policy bu key'leri belirli
+  // bir süre sonra silebilir; o durumda hydration sonrası admin yeniden yüklemeli.
+  const [aiUploadedSources, setAiUploadedSources] = useState<NonNullable<DraftSnapshot['aiUploadedSources']>>([]);
 
   // Step 4
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
@@ -193,6 +209,9 @@ export default function DraftWizardPage() {
           if (draftData.aiPending && Array.isArray(draftData.aiPending.displayed) && Array.isArray(draftData.aiPending.queue)) {
             setAiPending(draftData.aiPending);
           }
+          if (Array.isArray(draftData.aiUploadedSources)) {
+            setAiUploadedSources(draftData.aiUploadedSources);
+          }
         }
         setCurrentStep(Math.min(4, Math.max(1, draftStep || 1)));
         setHydrated(true);
@@ -222,13 +241,13 @@ export default function DraftWizardPage() {
     maxAttempts, examDurationMinutes, smgPoints, isCompulsory,
     complianceDeadline, regulatoryBody, renewalPeriodMonths,
     videos: persistableVideos, questions, passingScore, selectedDepts, excludedStaff,
-    questionsActiveMode, aiPending,
+    questionsActiveMode, aiPending, aiUploadedSources,
   }), [
     title, description, selectedCategory, startDate, endDate,
     maxAttempts, examDurationMinutes, smgPoints, isCompulsory,
     complianceDeadline, regulatoryBody, renewalPeriodMonths,
     persistableVideos, questions, passingScore, selectedDepts, excludedStaff,
-    questionsActiveMode, aiPending,
+    questionsActiveMode, aiPending, aiUploadedSources,
   ]);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -528,6 +547,7 @@ export default function DraftWizardPage() {
       }
     }
     setPublishing(true);
+    setPublishError(null);
     try {
       // Önce taslağı son haliyle senkronla — debounce'tan kaçan değişiklikler için
       await fetch(`/api/admin/trainings/${draftId}/draft`, {
@@ -573,10 +593,21 @@ export default function DraftWizardPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || 'Eğitim oluşturulamadı');
       }
+      // R1 — Yayın sonrası listeye değil, oluşturulan eğitimin detayına git.
+      // Admin "az önce oluşturduğum eğitim hangi?" sorusunu sormak zorunda kalmasın.
+      const published = await res.json().catch(() => null) as { id?: string } | null;
       toast('Eğitim başarıyla yayınlandı!', 'success');
-      router.push('/admin/trainings');
+      if (published?.id) {
+        router.push(`/admin/trainings/${published.id}`);
+      } else {
+        router.push('/admin/trainings');
+      }
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
+      const msg = err instanceof Error ? err.message : 'Bir hata oluştu';
+      toast(msg, 'error');
+      // R2 — Toast hızlıca kaybolur; admin "ne oldu?" sorusunu kaybetmesin diye
+      // adım üzerinde inline kalsın. Sonraki publish denemesinde başta sıfırlanır.
+      setPublishError(msg);
       setPublishing(false);
     }
   };
@@ -709,16 +740,32 @@ export default function DraftWizardPage() {
               onPendingAiChange={setPendingAiCount}
               activeMode={questionsActiveMode} setActiveMode={setQuestionsActiveMode}
               aiPending={aiPending} setAiPending={setAiPending}
+              aiUploadedSources={aiUploadedSources} setAiUploadedSources={setAiUploadedSources}
             />
           )}
           {currentStep === 4 && (
-            <AssignStep
-              selectedDepts={selectedDepts} setSelectedDepts={setSelectedDepts}
-              excludedStaff={excludedStaff} setExcludedStaff={setExcludedStaff}
-              expandedDept={expandedDept} setExpandedDept={setExpandedDept}
-              deptSearch={deptSearch} setDeptSearch={setDeptSearch}
-              trainingSummary={trainingSummary}
-            />
+            <>
+              {publishError && (
+                <div
+                  role="alert"
+                  className="mb-4 rounded-xl border px-4 py-3 text-sm"
+                  style={{
+                    background: 'var(--k-error-bg, #fef2f2)',
+                    borderColor: 'var(--k-error, #dc2626)',
+                    color: 'var(--k-error, #dc2626)',
+                  }}
+                >
+                  <strong className="font-semibold">Yayın başarısız:</strong> {publishError}
+                </div>
+              )}
+              <AssignStep
+                selectedDepts={selectedDepts} setSelectedDepts={setSelectedDepts}
+                excludedStaff={excludedStaff} setExcludedStaff={setExcludedStaff}
+                expandedDept={expandedDept} setExpandedDept={setExpandedDept}
+                deptSearch={deptSearch} setDeptSearch={setDeptSearch}
+                trainingSummary={trainingSummary}
+              />
+            </>
           )}
         </div>
 
