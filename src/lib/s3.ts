@@ -67,8 +67,17 @@ const ALLOWED_CONTENT_TYPES = [
   'video/quicktime',
 ]
 
-/** Generate presigned URL for uploading video to S3 */
-export async function getUploadUrl(key: string, contentType: string) {
+/**
+ * Generate presigned URL for uploading video to S3.
+ * `opts.accelerate=false` müşteri firewall'u *.s3-accelerate.amazonaws.com'u
+ * blokluyorsa client tarafından fallback için kullanılır — standart regional
+ * endpoint'e (~1.5-3x daha yavaş ama her zaman izinli) imza üretir.
+ */
+export async function getUploadUrl(
+  key: string,
+  contentType: string,
+  opts?: { accelerate?: boolean },
+) {
   if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
     throw new Error(`İzin verilmeyen dosya türü: ${contentType}. Sadece video, PDF, PPTX ve ses dosyaları yüklenebilir.`)
   }
@@ -79,8 +88,8 @@ export async function getUploadUrl(key: string, contentType: string) {
     ContentType: contentType,
   })
 
-  // Transfer Acceleration endpoint kullanılır — Türkiye'den 1.5-3x daha hızlı upload.
-  const url = await getSignedUrl(s3Accelerate, command, { expiresIn: 1800 })
+  const client = opts?.accelerate === false ? s3 : s3Accelerate
+  const url = await getSignedUrl(client, command, { expiresIn: 1800 })
   return url
 }
 
@@ -95,11 +104,19 @@ export async function getUploadUrl(key: string, contentType: string) {
  *   4. completeMultipart → ETag listesiyle parçaları birleştir
  *   5. Hata/iptal: abortMultipart
  */
-export async function createMultipart(key: string, contentType: string) {
+export async function createMultipart(
+  key: string,
+  contentType: string,
+  opts?: { accelerate?: boolean },
+) {
   if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
     throw new Error(`İzin verilmeyen dosya türü: ${contentType}.`)
   }
-  const res = await s3Accelerate.send(
+  // Create/Complete/Abort sunucu↔S3 arası çalışır, client'ın network'üne bağlı değil;
+  // yine de tutarlılık için aynı bucket addressing'i kullanılır. AcceleratedEndpoint
+  // ve standart endpoint aynı bucket'a yazar, sadece DNS farklı.
+  const client = opts?.accelerate === false ? s3 : s3Accelerate
+  const res = await client.send(
     new CreateMultipartUploadCommand({
       Bucket: BUCKET,
       Key: key,
@@ -110,7 +127,13 @@ export async function createMultipart(key: string, contentType: string) {
   return { uploadId: res.UploadId, key }
 }
 
-export async function signMultipartParts(key: string, uploadId: string, partNumbers: number[]) {
+export async function signMultipartParts(
+  key: string,
+  uploadId: string,
+  partNumbers: number[],
+  opts?: { accelerate?: boolean },
+) {
+  const client = opts?.accelerate === false ? s3 : s3Accelerate
   const urls = await Promise.all(
     partNumbers.map(async (partNumber) => {
       const command = new UploadPartCommand({
@@ -119,7 +142,7 @@ export async function signMultipartParts(key: string, uploadId: string, partNumb
         UploadId: uploadId,
         PartNumber: partNumber,
       })
-      const url = await getSignedUrl(s3Accelerate, command, { expiresIn: 1800 })
+      const url = await getSignedUrl(client, command, { expiresIn: 1800 })
       return { partNumber, url }
     }),
   )

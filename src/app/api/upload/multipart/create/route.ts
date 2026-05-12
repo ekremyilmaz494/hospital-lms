@@ -15,8 +15,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
   if (!allowed) return errorResponse('Çok fazla yükleme isteği. Lütfen bekleyin.', 429)
 
   try {
-    const body = await request.json() as { fileName: string; contentType: string; trainingId?: string }
-    const { fileName, contentType, trainingId } = body
+    const body = await request.json() as { fileName: string; contentType: string; trainingId?: string; accelerate?: boolean }
+    const { fileName, contentType, trainingId, accelerate } = body
 
     if (!fileName || !contentType) {
       return errorResponse('fileName ve contentType gerekli', 400)
@@ -38,7 +38,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
       return errorResponse('İzin verilmeyen dosya türü', 400)
     }
 
-    const { uploadId } = await createMultipart(key, contentType)
+    const { uploadId } = await createMultipart(key, contentType, { accelerate: accelerate !== false })
 
     return jsonResponse({ uploadId, key, fileName })
   } catch (err) {

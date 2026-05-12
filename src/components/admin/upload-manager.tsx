@@ -221,49 +221,85 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
       };
 
       if (!useMultipart) {
-        // ----- Single PUT (küçük dosya) — Transfer Acceleration ile presigned -----
-        const presignRes = await fetch('/api/upload/presign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: file.name, contentType: file.type, trainingId: draftId }),
-        });
-        if (!presignRes.ok) {
-          const err = await presignRes.json().catch(() => ({}));
-          throw new Error(err.error || 'Yükleme URL alınamadı');
-        }
-        const { uploadUrl, key } = (await presignRes.json()) as { uploadUrl: string; key: string };
-
-        const xhr = new XMLHttpRequest();
-        abortMap.current.set(uploadId, { abort: () => { try { xhr.abort(); } catch { /* ignore */ } } });
-
-        xhr.upload.onprogress = (ev) => {
-          if (!ev.lengthComputable) return;
-          const pct = Math.max(1, Math.round((ev.loaded / ev.total) * 99));
-          updateUpload(uploadId, { progress: pct });
-        };
-        xhr.onload = () => {
-          abortMap.current.delete(uploadId);
-          if (xhr.status >= 200 && xhr.status < 300) finalizeSuccess(key);
-          else {
-            const body = (xhr.responseText || '').slice(0, 300);
-            console.error('[upload] single PUT HTTP error', { status: xhr.status, responseURL: xhr.responseURL, body });
-            failUpload(`Dosya yüklenemedi (HTTP ${xhr.status}). ${body.slice(0, 120)}`);
+        // ----- Single PUT (küçük dosya) — Accelerated first, non-accelerated fallback -----
+        // Müşteri kurum ağı *.s3-accelerate.amazonaws.com'u blokluyorsa accelerated XHR
+        // status=0 ile fail eder; bu durumda standart regional endpoint'e tek seferlik
+        // fallback yaparak çoğu hastane/proxy senaryosunu kurtarıyoruz.
+        const performSinglePut = async (accelerate: boolean): Promise<void> => {
+          const startTime = performance.now();
+          const presignRes = await fetch('/api/upload/presign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName: file.name, contentType: file.type, trainingId: draftId, accelerate }),
+          });
+          if (!presignRes.ok) {
+            const err = await presignRes.json().catch(() => ({}));
+            throw new Error(err.error || 'Yükleme URL alınamadı');
           }
-        };
-        xhr.onerror = () => {
-          console.error('[upload] single PUT network error', { status: xhr.status, responseURL: xhr.responseURL });
-          failUpload(`Dosya yüklenemedi (status=${xhr.status}). S3 CORS reddi veya bağlantı kesintisi.`);
-        };
-        xhr.ontimeout = () => failUpload('Bağlantı zaman aşımına uğradı.');
+          const { uploadUrl, key } = (await presignRes.json()) as { uploadUrl: string; key: string };
 
-        xhr.open('PUT', uploadUrl);
-        xhr.timeout = XHR_TIMEOUT_MS;
-        xhr.setRequestHeader('Content-Type', file.type);
-        xhr.send(file);
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            abortMap.current.set(uploadId, { abort: () => { try { xhr.abort(); } catch { /* ignore */ } } });
+
+            xhr.upload.onprogress = (ev) => {
+              if (!ev.lengthComputable) return;
+              const pct = Math.max(1, Math.round((ev.loaded / ev.total) * 99));
+              updateUpload(uploadId, { progress: pct });
+            };
+            xhr.onload = () => {
+              abortMap.current.delete(uploadId);
+              if (xhr.status >= 200 && xhr.status < 300) {
+                finalizeSuccess(key);
+                resolve();
+              } else {
+                const body = (xhr.responseText || '').slice(0, 300);
+                const host = (() => { try { return new URL(xhr.responseURL || uploadUrl).hostname; } catch { return '(unknown)'; } })();
+                console.error('[upload] single PUT HTTP error', { status: xhr.status, host, accelerate, durationMs: Math.round(performance.now() - startTime), body });
+                reject(new Error(`HTTP_${xhr.status}`));
+              }
+            };
+            xhr.onerror = () => {
+              const host = (() => { try { return new URL(xhr.responseURL || uploadUrl).hostname; } catch { return '(unknown)'; } })();
+              console.error('[upload] single PUT network error', { status: xhr.status, host, accelerate, durationMs: Math.round(performance.now() - startTime), userAgent: navigator.userAgent });
+              reject(new Error('NETWORK'));
+            };
+            xhr.ontimeout = () => reject(new Error('TIMEOUT'));
+
+            xhr.open('PUT', uploadUrl);
+            xhr.timeout = XHR_TIMEOUT_MS;
+            xhr.setRequestHeader('Content-Type', file.type);
+            xhr.send(file);
+          });
+        };
+
+        try {
+          await performSinglePut(true);
+        } catch (err) {
+          // Cancel edilmişse fallback denemeden çık
+          if (canceledIds.current.has(uploadId)) return;
+          const firstMsg = err instanceof Error ? err.message : String(err);
+          console.warn('[upload] Accelerated single PUT failed, trying non-accelerated fallback', firstMsg);
+          try {
+            await performSinglePut(false);
+          } catch (err2) {
+            if (canceledIds.current.has(uploadId)) return;
+            const msg2 = err2 instanceof Error ? err2.message : String(err2);
+            if (msg2 === 'TIMEOUT') {
+              failUpload('Bağlantı zaman aşımına uğradı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
+            } else if (msg2.startsWith('HTTP_')) {
+              failUpload(`Dosya yüklenemedi (${msg2.replace('HTTP_', 'HTTP ')}). Sunucu yanıt verdi ama isteği reddetti — dosya türü veya boyutu uygun olmayabilir.`);
+            } else {
+              failUpload('Kurum ağı S3 video yüklemesini engelliyor olabilir. Yükleme başarısız (ağ hatası). Bilgisayarınızın güvenlik duvarı, kurumsal proxy veya antivirüs AWS S3 erişimini engelliyor olabilir. IT yöneticinizden şu alanlara HTTPS erişimi isteyin: *.s3.eu-central-1.amazonaws.com ve *.s3-accelerate.amazonaws.com.');
+            }
+          }
+        }
         return;
       }
 
       // ----- Multipart upload (büyük dosya) — paralel parçalar -----
+      // createMultipart sunucu↔S3 arası; accelerate parametresi server-side için
+      // bir DNS farkı yaratmaz, default'ta accelerated client kullanılır.
       const createRes = await fetch('/api/upload/multipart/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -278,22 +314,28 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
       const totalParts = Math.ceil(file.size / PART_SIZE);
       const partNumbers = Array.from({ length: totalParts }, (_, i) => i + 1);
 
-      // Tüm parça URL'lerini tek istekte al — 100 parça limiti var, daha büyük dosyalar için batch'le.
-      const allUrls: { partNumber: number; url: string }[] = [];
-      for (let i = 0; i < partNumbers.length; i += 100) {
-        const batch = partNumbers.slice(i, i + 100);
-        const signRes = await fetch('/api/upload/multipart/sign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, uploadId: s3UploadId, partNumbers: batch }),
-        });
-        if (!signRes.ok) {
-          const err = await signRes.json().catch(() => ({}));
-          throw new Error(err.error || 'Parça URL imzalanamadı');
+      // Parça URL'lerini imzalama — 100'lü batch. accelerate=true default;
+      // fallback'te aynı fonksiyon accelerate=false ile yeniden çağrılır.
+      const fetchPartUrls = async (partNos: number[], accelerate: boolean): Promise<{ partNumber: number; url: string }[]> => {
+        const collected: { partNumber: number; url: string }[] = [];
+        for (let i = 0; i < partNos.length; i += 100) {
+          const batch = partNos.slice(i, i + 100);
+          const signRes = await fetch('/api/upload/multipart/sign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, uploadId: s3UploadId, partNumbers: batch, accelerate }),
+          });
+          if (!signRes.ok) {
+            const err = await signRes.json().catch(() => ({}));
+            throw new Error(err.error || 'Parça URL imzalanamadı');
+          }
+          const { urls } = (await signRes.json()) as { urls: { partNumber: number; url: string }[] };
+          collected.push(...urls);
         }
-        const { urls } = (await signRes.json()) as { urls: { partNumber: number; url: string }[] };
-        allUrls.push(...urls);
-      }
+        return collected;
+      };
+
+      const allUrls = await fetchPartUrls(partNumbers, true);
 
       // İlerleme: her parçanın yüklenmiş byte'ı ayrı tutulur, toplam dosya boyutuna oranlanır.
       const partLoaded = new Map<number, number>();
@@ -321,12 +363,17 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         updateUpload(uploadId, { progress: pct });
       };
 
+      const results: { partNumber: number; etag: string }[] = [];
+      // Hangi accelerated/non-accelerated attempt'te olduğumuzu hata loguna dahil etmek için.
+      let currentAttemptAccelerated = true;
+
       const uploadPart = (partNumber: number, url: string): Promise<{ partNumber: number; etag: string }> => {
         return new Promise((resolve, reject) => {
           if (aborted) { reject(new Error('aborted')); return; }
           const start = (partNumber - 1) * PART_SIZE;
           const end = Math.min(start + PART_SIZE, file.size);
           const blob = file.slice(start, end);
+          const partStartTime = performance.now();
 
           const xhr = new XMLHttpRequest();
           activeXhrs.set(partNumber, xhr);
@@ -346,13 +393,15 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
               resolve({ partNumber, etag });
             } else {
               const body = (xhr.responseText || '').slice(0, 300);
-              console.error('[upload] part HTTP error', { partNumber, status: xhr.status, responseURL: xhr.responseURL, body });
+              const host = (() => { try { return new URL(xhr.responseURL || url).hostname; } catch { return '(unknown)'; } })();
+              console.error('[upload] part HTTP error', { partNumber, status: xhr.status, host, accelerated: currentAttemptAccelerated, durationMs: Math.round(performance.now() - partStartTime), body });
               reject(new Error(`Parça ${partNumber} HTTP ${xhr.status}: ${body.slice(0, 120)}`));
             }
           };
           xhr.onerror = () => {
             activeXhrs.delete(partNumber);
-            console.error('[upload] part network error', { partNumber, status: xhr.status, responseURL: xhr.responseURL });
+            const host = (() => { try { return new URL(xhr.responseURL || url).hostname; } catch { return '(unknown)'; } })();
+            console.error('[upload] part network error', { partNumber, status: xhr.status, host, accelerated: currentAttemptAccelerated, durationMs: Math.round(performance.now() - partStartTime), userAgent: navigator.userAgent });
             reject(new Error(`Parça ${partNumber} ağ hatası (status=${xhr.status})`));
           };
           xhr.ontimeout = () => { activeXhrs.delete(partNumber); reject(new Error(`Parça ${partNumber} zaman aşımı`)); };
@@ -362,46 +411,73 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         });
       };
 
-      // Concurrency limit'li worker pool. Her parça PART_MAX_ATTEMPTS kez denenir;
-      // başarısızlık aralarında exponential backoff (500ms, 1500ms) bekler.
-      const queue = [...allUrls];
-      const results: { partNumber: number; etag: string }[] = [];
-      // Hata referansını ref-cell'de tut — closure'da type narrowing'i bozmaz.
-      const errorBox: { value: Error | null } = { value: null };
+      // Concurrency limit'li worker pool. Verilen URL listesini paralel yükler,
+      // her parça için PART_MAX_ATTEMPTS deneme + exponential backoff.
+      const runWorkers = async (urlList: { partNumber: number; url: string }[]): Promise<Error | null> => {
+        const queue = [...urlList];
+        const errorBox: { value: Error | null } = { value: null };
 
-      const worker = async () => {
-        while (queue.length > 0 && !errorBox.value && !aborted) {
-          const next = queue.shift();
-          if (!next) break;
-          let lastErr: Error | null = null;
-          for (let attempt = 1; attempt <= PART_MAX_ATTEMPTS; attempt++) {
-            if (aborted) return;
-            try {
-              const res = await uploadPart(next.partNumber, next.url);
-              results.push(res);
-              lastErr = null;
-              break;
-            } catch (err) {
-              lastErr = err instanceof Error ? err : new Error(String(err));
-              if (attempt < PART_MAX_ATTEMPTS) {
-                // Exponential backoff: 500ms, 1500ms — edge node warm-up ve transient'lere zaman tanı.
-                await new Promise(r => setTimeout(r, 500 * Math.pow(3, attempt - 1)));
+        const worker = async () => {
+          while (queue.length > 0 && !errorBox.value && !aborted) {
+            const next = queue.shift();
+            if (!next) break;
+            let lastErr: Error | null = null;
+            for (let attempt = 1; attempt <= PART_MAX_ATTEMPTS; attempt++) {
+              if (aborted) return;
+              try {
+                const res = await uploadPart(next.partNumber, next.url);
+                results.push(res);
+                lastErr = null;
+                break;
+              } catch (err) {
+                lastErr = err instanceof Error ? err : new Error(String(err));
+                if (attempt < PART_MAX_ATTEMPTS) {
+                  await new Promise(r => setTimeout(r, 500 * Math.pow(3, attempt - 1)));
+                }
               }
             }
+            if (lastErr && !errorBox.value) errorBox.value = lastErr;
           }
-          if (lastErr && !errorBox.value) errorBox.value = lastErr;
-        }
+        };
+
+        await Promise.all(Array.from({ length: PART_CONCURRENCY }, () => worker()));
+        return errorBox.value;
       };
 
-      await Promise.all(Array.from({ length: PART_CONCURRENCY }, () => worker()));
+      let firstError = await runWorkers(allUrls);
+
+      // Non-accelerated fallback — accelerated endpoint engellenmişse standart
+      // regional endpoint ile sadece eksik kalan parçalar yeniden denenir.
+      let attemptedNonAccelerated = false;
+      if (!aborted && firstError) {
+        attemptedNonAccelerated = true;
+        currentAttemptAccelerated = false;
+        const successfulParts = new Set(results.map(r => r.partNumber));
+        const missingPartNumbers = partNumbers.filter(n => !successfulParts.has(n));
+        console.warn('[upload] Multipart accelerated fail, retrying missing parts via non-accelerated endpoint', {
+          missingCount: missingPartNumbers.length,
+          firstError: firstError.message,
+        });
+        try {
+          const fallbackUrls = await fetchPartUrls(missingPartNumbers, false);
+          firstError = await runWorkers(fallbackUrls);
+        } catch (err) {
+          firstError = err instanceof Error ? err : new Error(String(err));
+        }
+      }
 
       if (aborted) return; // cancel() zaten state'i 'canceled' yaptı
-      if (errorBox.value) {
+      if (firstError) {
         void fetch('/api/upload/multipart/abort', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
           body: JSON.stringify({ key, uploadId: s3UploadId }),
         }).catch(() => {});
-        failUpload(errorBox.value.message || 'Multipart yükleme başarısız');
+        // Accelerated + non-accelerated her ikisi de fail olduysa kullanıcıya
+        // kurum ağı talimatı ver — kod tarafında yapılabilecek her şey denenmiştir.
+        const msg = attemptedNonAccelerated
+          ? 'Kurum ağı S3 video yüklemesini engelliyor olabilir. Yükleme başarısız (ağ hatası). Bilgisayarınızın güvenlik duvarı, kurumsal proxy veya antivirüs AWS S3 erişimini engelliyor olabilir. IT yöneticinizden şu alanlara HTTPS erişimi isteyin: *.s3.eu-central-1.amazonaws.com ve *.s3-accelerate.amazonaws.com.'
+          : firstError.message || 'Multipart yükleme başarısız';
+        failUpload(msg);
         return;
       }
 

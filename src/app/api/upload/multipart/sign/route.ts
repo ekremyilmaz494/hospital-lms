@@ -10,8 +10,8 @@ import { logger } from '@/lib/logger'
  */
 export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) => {
   try {
-    const body = await request.json() as { key: string; uploadId: string; partNumbers: number[] }
-    const { key, uploadId, partNumbers } = body
+    const body = await request.json() as { key: string; uploadId: string; partNumbers: number[]; accelerate?: boolean }
+    const { key, uploadId, partNumbers, accelerate } = body
 
     if (!key || !uploadId || !Array.isArray(partNumbers) || partNumbers.length === 0) {
       return errorResponse('key, uploadId ve partNumbers gerekli', 400)
@@ -27,7 +27,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
       return errorResponse('Geçersiz parça numarası (1-10000 arası tamsayı olmalı)', 400)
     }
 
-    const urls = await signMultipartParts(key, uploadId, partNumbers)
+    const urls = await signMultipartParts(key, uploadId, partNumbers, { accelerate: accelerate !== false })
 
     // Teşhis: ilk URL'in imzalanmış header listesini logla. Flexible-checksums
     // middleware'i x-amz-checksum-crc32'yi signed-headers'a eklediyse browser
