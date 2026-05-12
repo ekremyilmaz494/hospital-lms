@@ -218,13 +218,19 @@ export default function PreExamPage() {
         body: JSON.stringify({ answers: formattedAnswers, phase: 'pre', tabSwitchCount }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as { error?: string; score?: number; nextStep?: string };
       if (!res.ok) {
         setSubmitError(data.error ?? 'Gönderim başarısız. Tekrar deneyin.');
         return;
       }
 
-      router.replace(`/exam/${id}/transition?from=pre&score=${data.score ?? 0}`);
+      // Videosuz/PDF-only eğitim: backend nextStep='post-exam' döndürür → transition
+      // ara ekranı "Videolara Geç" yazısıyla yanıltıcı olur, doğrudan son sınava git.
+      if (data.nextStep === 'post-exam') {
+        router.replace(`/exam/${id}/post-exam`);
+      } else {
+        router.replace(`/exam/${id}/transition?from=pre&score=${data.score ?? 0}`);
+      }
     } catch {
       setSubmitError('Bir hata oluştu. Tekrar deneyin.');
     } finally {

@@ -95,9 +95,16 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   }
 
   // Get correct answers
+  // KRITIK: questions/route.ts ile birebir aynı sırada al — getEffectiveExamQuestions
+  // Fisher-Yates shuffle kullanır ve giriş dizisi sırasına bağımlıdır. Postgres'in
+  // doğal satır sırası deterministik olmadığından `orderBy: { sortOrder: 'asc' }`
+  // şart; aksi halde aynı seed + farklı başlangıç sırası = farklı subset.
   const allQuestions = await prisma.question.findMany({
     where: { trainingId: attempt.trainingId },
-    include: { options: true },
+    include: {
+      options: { orderBy: { sortOrder: 'asc' } },
+    },
+    orderBy: { sortOrder: 'asc' },
   })
 
   // KRITIK: questions/route.ts ile aynı subset/sırayı uygula. randomQuestionCount
