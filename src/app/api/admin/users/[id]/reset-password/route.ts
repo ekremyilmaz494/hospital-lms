@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { sendPasswordResetByAdminEmail } from '@/lib/email'
 import { checkRateLimit } from '@/lib/redis'
+import { revokeAllUserSessions } from '@/lib/auth/revoke-user-sessions'
 
 /**
  * POST /api/admin/users/[id]/reset-password
@@ -101,6 +102,11 @@ export const POST = withAdminRoute<{ id: string }>(
       where: { id: targetUserId },
       data: { mustChangePassword: true },
     })
+
+    // KRITIK: Supabase updateUserById parola hash'ini gunceller ama mevcut refresh
+    // token'lari + trusted device'lari KORUR. Eski parolayla zaten giris yapmis
+    // kullanici oturumu yasamaya devam eder → yeni parola etkisiz. Bunu engelle.
+    await revokeAllUserSessions(targetUserId)
 
     await audit({
       action: 'user.password.reset_by_admin',

@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { sendPasswordResetByAdminEmail } from '@/lib/email'
 import { checkRateLimit } from '@/lib/redis'
+import { revokeAllUserSessions } from '@/lib/auth/revoke-user-sessions'
 
 /**
  * POST /api/super-admin/users/[id]/reset-password
@@ -91,6 +92,9 @@ export const POST = withSuperAdminRoute<{ id: string }>(
       where: { id: targetUserId },
       data: { mustChangePassword: true },
     })
+
+    // KRITIK: refresh token'lari + trusted device'lari iptal et — yoksa eski oturum yasamaya devam eder.
+    await revokeAllUserSessions(targetUserId)
 
     await audit({
       action: 'user.password.reset_by_super_admin',
