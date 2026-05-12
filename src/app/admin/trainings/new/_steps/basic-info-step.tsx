@@ -195,7 +195,10 @@ export default function BasicInfoStep({
                 <Clock className="h-3.5 w-3.5" style={{ color: K.PRIMARY_HOVER }} />
                 <Label className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>Süre (dk)</Label>
               </div>
-              <Input type="number" min={1} max={600} value={examDurationMinutes} onChange={(e) => setExamDurationMinutes(e.target.value ? Number(e.target.value) : '')} placeholder="örn. 30" className="h-10" style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }} />
+              {/* Backend `createTrainingBodySchema` 180 dk max ile validate eder — UI'da
+                  daha fazla girip publish'te 400 alma yanlış-pozitifini önlemek için aynı limit. */}
+              <Input type="number" min={1} max={180} value={examDurationMinutes} onChange={(e) => setExamDurationMinutes(e.target.value ? Number(e.target.value) : '')} placeholder="örn. 30" className="h-10" style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }} />
+              <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>maks. 180 dakika</p>
             </div>
             <div>
               <div className="flex items-center gap-1.5 mb-2">

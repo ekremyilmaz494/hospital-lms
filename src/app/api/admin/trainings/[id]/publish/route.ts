@@ -10,6 +10,17 @@ import { getOrCreateActivePeriodForAssignment } from '@/lib/training-periods'
 import { logger } from '@/lib/logger'
 
 /**
+ * Transaction içinde atılan, kullanıcı-yüzlü hata mesajı taşıyan sentinel error.
+ * Dış catch bunu yakalayıp 400 + mesaj döner; diğer hatalar generic 500'e düşer.
+ */
+class PublishValidationError extends Error {
+  constructor(public readonly userMessage: string) {
+    super(userMessage)
+    this.name = 'PublishValidationError'
+  }
+}
+
+/**
  * POST /api/admin/trainings/[id]/publish
  *
  * Var olan bir taslağı (publishStatus='draft') alır, body'deki finalize edilmiş
@@ -223,6 +234,16 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
           },
         })
 
+        // P0 §2.7 — Boş atama sessiz pass'i engelle: seçilen departmanlar silinmişse veya
+        // içlerinde aktif kullanıcı kalmamışsa publish 400 ile başarısız olmalı; admin
+        // "yayınlandı" sanıp hiç kimseye atama yapılmamış durumla karşılaşmamalı.
+        if (usersToAssign.length === 0) {
+          throw new PublishValidationError(
+            'Seçilen departmanlarda atama yapılabilecek aktif personel bulunamadı. ' +
+            'Departman silinmiş veya içinde aktif kullanıcı yok olabilir.',
+          )
+        }
+
         const excludedSet = new Set(excludedStaff || [])
         const assignments = usersToAssign
           .filter(u => !excludedSet.has(u.id))
@@ -236,12 +257,16 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
             assignedById: dbUser.id,
           }))
 
-        if (assignments.length > 0) {
-          await tx.trainingAssignment.createMany({
-            data: assignments,
-            skipDuplicates: true,
-          })
+        if (assignments.length === 0) {
+          throw new PublishValidationError(
+            'Tüm hedef personeller hariç tutulmuş; yayınlamak için en az 1 kişi kalmalı.',
+          )
         }
+
+        await tx.trainingAssignment.createMany({
+          data: assignments,
+          skipDuplicates: true,
+        })
       }
 
       return t
@@ -262,6 +287,9 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
 
     return jsonResponse(training, 200)
   } catch (err) {
+    if (err instanceof PublishValidationError) {
+      return errorResponse(err.userMessage, 400)
+    }
     logger.error('training-publish', 'Yayın hatası', err instanceof Error ? err.message : err)
     return errorResponse('Eğitim yayınlanırken bir hata oluştu', 500)
   }

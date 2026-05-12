@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { K, distributePoints, type QuestionItem } from './types';
-import type { AiPendingState } from '@/components/admin/trainings/ai-question-generator';
+import { K, distributePoints, minCorrectForPassing, type QuestionItem } from './types';
+import type { AiPendingState, AiUploadedSource } from '@/components/admin/trainings/ai-question-generator';
 
 const AiQuestionGenerator = dynamic(
   () => import('@/components/admin/trainings/ai-question-generator'),
@@ -32,6 +32,10 @@ interface QuestionsStepProps {
    *  Mode geçişi ve sayfa yenileme sonrası restore. */
   aiPending: AiPendingState;
   setAiPending: (state: AiPendingState) => void;
+  /** AI tab — yüklenen kaynak dosyalar parent'ta tutulur, draft'a kaydedilir.
+   *  Sayfa yenilendiğinde admin tekrar dosya yüklemek zorunda kalmaz. */
+  aiUploadedSources: AiUploadedSource[];
+  setAiUploadedSources: (sources: AiUploadedSource[]) => void;
 }
 
 export default function QuestionsStep({
@@ -41,6 +45,7 @@ export default function QuestionsStep({
   onPendingAiChange,
   activeMode, setActiveMode,
   aiPending, setAiPending,
+  aiUploadedSources, setAiUploadedSources,
 }: QuestionsStepProps) {
   const handleAiAdd = (
     items: { text: string; options: string[]; correct: number }[],
@@ -84,29 +89,42 @@ export default function QuestionsStep({
         className="rounded-xl p-5"
         style={{ background: K.BG, border: `1.5px solid ${K.BORDER}` }}
       >
+        {/*
+         * Baraj input'u "mevcut soru sayısı" üzerinden çalışır. `passingScore` yüzde (0-100);
+         * UI sadece görselleştirir. `minCorrectForPassing` yüzdeden geriye okuyup
+         * "en az kaç doğru" sayısını verir. 0 soruda input disabled.
+         */}
         <div className="flex items-center gap-1.5 mb-3">
           <Target className="h-4 w-4" style={{ color: K.PRIMARY }} />
           <Label className="text-sm font-semibold" style={{ color: K.TEXT_PRIMARY }}>
             Geçmek için en az kaç doğru?
           </Label>
-          <span className="text-[11px]" style={{ color: K.TEXT_MUTED }}>(10 sorudan)</span>
+          <span className="text-[11px]" style={{ color: K.TEXT_MUTED }}>
+            ({questions.length} sorudan)
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <Input
             type="number"
             min={1}
-            max={10}
+            max={Math.max(1, questions.length)}
             step={1}
-            value={Math.max(1, Math.min(10, Math.round(passingScore / 10)))}
+            disabled={questions.length === 0}
+            value={questions.length > 0 ? Math.min(questions.length, Math.max(1, minCorrectForPassing(passingScore, questions.length))) : 1}
             onChange={(e) => {
-              const correct = Math.max(1, Math.min(10, Number(e.target.value) || 1));
-              setPassingScore(correct * 10);
+              if (questions.length === 0) return;
+              const correct = Math.max(1, Math.min(questions.length, Number(e.target.value) || 1));
+              setPassingScore(Math.round((correct / questions.length) * 100));
             }}
             className="h-11 w-24 text-center text-lg font-bold"
             style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }}
           />
           <span className="text-sm" style={{ color: K.TEXT_MUTED }}>
-            doğru cevap = <strong style={{ color: K.PRIMARY }}>{Math.max(10, Math.min(100, passingScore))} puan</strong> baraj
+            {questions.length === 0 ? (
+              <em>Önce soru ekleyin</em>
+            ) : (
+              <>doğru cevap = <strong style={{ color: K.PRIMARY }}>%{Math.max(0, Math.min(100, passingScore))}</strong> baraj</>
+            )}
           </span>
         </div>
       </div>
@@ -260,6 +278,8 @@ export default function QuestionsStep({
               .map((q) => ({ text: q.text }))}
             initialState={aiPending}
             onStateChange={setAiPending}
+            initialSources={aiUploadedSources}
+            onSourcesChange={setAiUploadedSources}
           />
         </TabsContent>
       </Tabs>
