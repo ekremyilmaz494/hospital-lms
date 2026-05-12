@@ -131,6 +131,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
     data: newUserIds.map(userId => ({
       trainingId: id,
       userId,
+      organizationId,
       periodId: targetPeriod.id,
       maxAttempts: parsed.data.maxAttempts,
       originalMaxAttempts: parsed.data.maxAttempts,

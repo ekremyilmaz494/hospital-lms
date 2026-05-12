@@ -65,13 +65,14 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     )
 
     // Eksik assignment'ları belirle
-    const newAssignments: { userId: string; trainingId: string; assignedBy: string; dueDate?: Date }[] = []
+    const newAssignments: { userId: string; trainingId: string; organizationId: string; assignedBy: string; dueDate?: Date }[] = []
     for (const staff of allStaff) {
       for (const training of trainings) {
         if (!existingSet.has(`${staff.id}:${training.id}`)) {
           newAssignments.push({
             userId: staff.id,
             trainingId: training.id,
+            organizationId,
             assignedBy: dbUser.id,
             ...(dueDate ? { dueDate: new Date(dueDate) } : {}),
           })

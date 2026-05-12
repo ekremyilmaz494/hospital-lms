@@ -280,6 +280,7 @@ export async function GET(request: Request) {
           data: {
             trainingId: cert.training.id,
             userId: cert.user.id,
+            organizationId: cert.user.organizationId,
             status: 'assigned',
             periodId: renewalPeriod.id,
           },

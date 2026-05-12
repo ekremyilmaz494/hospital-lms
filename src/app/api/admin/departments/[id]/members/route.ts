@@ -22,20 +22,31 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
   if (!department) return errorResponse('Departman bulunamadı', 404)
 
   if (body.action === 'add') {
-    // Personelleri departmana ekle
-    await prisma.user.updateMany({
+    // Cross-tenant koruma: sadece bu organizasyona ait staff user'ları işle.
+    // body.userIds doğrudan loop'a verilirse, başka organizasyondan gönderilen
+    // bir ID updateMany tarafından update edilmese de autoAssign çağrılır → leak.
+    const validUsers = await prisma.user.findMany({
       where: {
         id: { in: body.userIds },
         organizationId,
         role: 'staff' satisfies UserRole,
       },
-      data: {
-        departmentId,
-      },
+      select: { id: true },
+    })
+    const validUserIds = validUsers.map(u => u.id)
+
+    if (validUserIds.length === 0) {
+      return errorResponse('Geçerli personel bulunamadı veya bu organizasyona ait değil', 403)
+    }
+
+    // Personelleri departmana ekle
+    await prisma.user.updateMany({
+      where: { id: { in: validUserIds }, organizationId },
+      data: { departmentId },
     })
 
-    // Departman kurallarına göre otomatik eğitim atama
-    for (const uid of body.userIds) {
+    // Departman kurallarına göre otomatik eğitim atama (sadece doğrulanmış ID'ler)
+    for (const uid of validUserIds) {
       await autoAssignByDepartment(uid, departmentId, organizationId, dbUser.id)
     }
 

@@ -11,6 +11,18 @@ export async function autoAssignByDepartment(
   organizationId: string,
   assignedById?: string
 ): Promise<number> {
+  // Cross-tenant koruma: userId verilen organizasyona ait olmalı.
+  // Çağrı yapan helper'lar (members/route.ts, training-rules/route.ts, vb.)
+  // bazen userId'yi sorgulamadan iletiyor — bu kontrol son kapı.
+  const user = await prisma.user.findFirst({
+    where: { id: userId, organizationId },
+    select: { id: true },
+  })
+  if (!user) {
+    logger.warn('AutoAssign', `Cross-tenant attempt blocked: user=${userId} org=${organizationId}`)
+    return 0
+  }
+
   const rules = await prisma.departmentTrainingRule.findMany({
     where: { departmentId, organizationId, isActive: true },
     include: { training: { select: { id: true, isActive: true, endDate: true } } },
@@ -39,6 +51,7 @@ export async function autoAssignByDepartment(
     .map((r) => ({
       trainingId: r.trainingId,
       userId,
+      organizationId,
       status: 'assigned' as const,
       assignedById,
     }))
