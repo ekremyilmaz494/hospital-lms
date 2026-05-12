@@ -83,11 +83,11 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     const existingSet = new Set(existing.map(e => `${e.trainingId}:${e.userId}`))
 
     // Yeni atama kombinasyonlarını oluştur
-    const newAssignments: { trainingId: string; userId: string; maxAttempts: number; originalMaxAttempts: number; assignedById: string; periodId: string }[] = []
+    const newAssignments: { trainingId: string; userId: string; organizationId: string; maxAttempts: number; originalMaxAttempts: number; assignedById: string; periodId: string }[] = []
     for (const trainingId of trainingIds) {
       for (const userId of userIds) {
         if (!existingSet.has(`${trainingId}:${userId}`)) {
-          newAssignments.push({ trainingId, userId, maxAttempts, originalMaxAttempts: maxAttempts, assignedById: dbUser.id, periodId })
+          newAssignments.push({ trainingId, userId, organizationId: orgId, maxAttempts, originalMaxAttempts: maxAttempts, assignedById: dbUser.id, periodId })
         }
       }
     }

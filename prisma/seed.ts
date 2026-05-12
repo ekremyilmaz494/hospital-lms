@@ -564,6 +564,7 @@ async function main() {
           data: {
             trainingId,
             userId,
+            organizationId: org.id,
             status,
             currentAttempt: isCompleted ? 1 : 0,
             maxAttempts: 3,
@@ -587,6 +588,7 @@ async function main() {
           data: {
             trainingId: trainingIds[tIdx],
             userId,
+            organizationId: org.id,
             status: 'assigned',
             currentAttempt: 0,
             maxAttempts: 3,

@@ -7,6 +7,7 @@ import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
+import { autoAssignByDepartment } from '@/lib/auto-assign'
 
 export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
   const orgId = organizationId
@@ -127,7 +128,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
   return jsonResponse(result, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 }, { requireOrganization: true })
 
-export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
   const orgId = organizationId
   const { id } = params
 
@@ -222,6 +223,22 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, or
     oldData: existing,
     newData: staff,
   })
+
+  // Departman değiştiyse → yeni departmanın eğitim kurallarına göre otomatik atama
+  // (existing.departmentId !== yeni). Aynı departmana resetleme veya departman dışı
+  // alan güncellemesinde autoAssign tetiklenmez. Best-effort: hata akışı durdurmaz.
+  const newDeptId = typeof dataToUpdate.departmentId === 'string' ? dataToUpdate.departmentId : null
+  if (
+    existing.role === 'staff' &&
+    newDeptId &&
+    newDeptId !== existing.departmentId
+  ) {
+    try {
+      await autoAssignByDepartment(id, newDeptId, orgId, dbUser.id)
+    } catch (err) {
+      logger.warn('staff-update', 'autoAssignByDepartment basarisiz', err instanceof Error ? err.message : err)
+    }
+  }
 
   revalidatePath('/admin/staff')
 

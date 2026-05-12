@@ -45,6 +45,22 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Bitiş tarihi geçmişte olamaz', 400)
   }
 
+  // Yayın için sıkı sanity check'ler — şema tek başına yetmez çünkü
+  // createTrainingBodySchema'da videos/questions/selectedDepts optional
+  // (taslak güncellemelerinde de kullanılan ortak şema). Yayın anında
+  // sorusuz veya atamasız eğitim üretmek tamamlanmamış akış demek.
+  if (!parsed.data.questions || parsed.data.questions.filter(q => q.text.trim()).length === 0) {
+    return errorResponse('Yayın için en az 1 soru tanımlanmalıdır.', 400)
+  }
+  if (!parsed.data.selectedDepts || parsed.data.selectedDepts.length === 0) {
+    return errorResponse(
+      parsed.data.isCompulsory
+        ? 'Zorunlu eğitim en az bir departmana atanmalıdır.'
+        : 'En az bir departman seçilmelidir; aksi halde eğitim hiç kimseye atanmaz.',
+      400,
+    )
+  }
+
   // Ownership kontrolü
   const draft = await prisma.training.findFirst({
     where: {
@@ -211,6 +227,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
           .map(u => ({
             trainingId: t.id,
             userId: u.id,
+            organizationId,
             ...(activePeriodId && { periodId: activePeriodId }),
             maxAttempts: trainingData.maxAttempts || 3,
             originalMaxAttempts: trainingData.maxAttempts || 3,

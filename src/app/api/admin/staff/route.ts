@@ -14,6 +14,7 @@ import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
 import type { UserRole } from '@/types/database'
 import { findActivePeriod, getEffectiveStartDate } from '@/lib/training-periods'
+import { autoAssignByDepartment } from '@/lib/auto-assign'
 import {
   generateInvitationToken,
   computeInvitationExpiry,
@@ -461,6 +462,15 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   }
 
   const user = result.dbUser
+
+  // Departman eğitim kurallarına göre otomatik atama (best-effort)
+  if (data.departmentId) {
+    try {
+      await autoAssignByDepartment(user.id, data.departmentId, orgId, dbUser.id)
+    } catch (err) {
+      logger.warn('Admin Staff', 'autoAssignByDepartment basarisiz', err instanceof Error ? err.message : err)
+    }
+  }
 
   await audit({
     action: 'create',

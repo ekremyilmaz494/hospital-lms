@@ -397,6 +397,7 @@ async function main() {
             data: {
               trainingId: training.id,
               userId,
+              organizationId: org.id,
               status,
               currentAttempt,
               maxAttempts: training.maxAttempts,

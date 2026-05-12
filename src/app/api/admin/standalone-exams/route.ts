@@ -229,6 +229,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
             .map((u) => ({
               trainingId: t.id,
               userId: u.id,
+              organizationId,
               ...(activePeriodId && { periodId: activePeriodId }),
               maxAttempts: examData.maxAttempts,
               originalMaxAttempts: examData.maxAttempts,

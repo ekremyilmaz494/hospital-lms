@@ -7,6 +7,7 @@ import { hashInvitationToken, getInvitationClaimError } from '@/lib/invitations'
 import { acceptInvitationSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { decryptTcKimlik } from '@/lib/tc-crypto'
+import { autoAssignByDepartment } from '@/lib/auto-assign'
 
 /**
  * Public davet endpoint'i — auth gerektirmez.
@@ -270,6 +271,20 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       },
     }).catch(err => logger.error('invitations.accept', 'Audit log başarısız', err)),
   ])
+
+  // Departman eğitim kurallarına göre otomatik atama (best-effort, sadece staff için)
+  if (invitation.role === 'staff' && invitation.departmentId) {
+    try {
+      await autoAssignByDepartment(
+        newUser.id,
+        invitation.departmentId,
+        invitation.organizationId,
+        invitation.invitedByUserId ?? undefined,
+      )
+    } catch (err) {
+      logger.warn('invitations.accept', 'autoAssignByDepartment basarisiz', err instanceof Error ? err.message : err)
+    }
+  }
 
   // Rol-bazlı yönlendirme — accept-form login'e değil direkt panele gitsin.
   // Login akışı middleware tarafında zaten Supabase session'ını kuracak.

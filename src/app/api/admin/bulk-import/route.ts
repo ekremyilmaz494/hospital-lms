@@ -10,6 +10,7 @@ import ExcelJS from 'exceljs'
 import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc'
 import { hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
 import { generateSyntheticEmail } from '@/lib/synthetic-email'
+import { autoAssignByDepartment } from '@/lib/auto-assign'
 
 // ── Header Alias Map ──────────────────────────────────────────────────────
 // Kullanıcı şablonu değiştirebilir veya kendi dosyasını yükleyebilir.
@@ -652,6 +653,15 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       })
       createdUserIds.push(newUser.id)
       created++
+
+      // Departman eğitim kurallarına göre otomatik atama (best-effort)
+      if (assignedDeptId) {
+        try {
+          await autoAssignByDepartment(newUser.id, assignedDeptId, orgId, dbUser.id)
+        } catch (err) {
+          logger.warn('bulk-import', 'autoAssignByDepartment basarisiz', err instanceof Error ? err.message : err)
+        }
+      }
       results.push({
         // Frontend'de sentetik adres tabloda gösterilmesin diye sadece gerçek email döner
         email: hasRealEmail ? row.email : '',

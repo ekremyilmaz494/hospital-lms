@@ -96,7 +96,7 @@ model Organization {
   emailEnabled     Boolean @default(true) @map("email_enabled")
 
   // Çok-sektörlü SaaS desteği — şu an "healthcare" ama UI/sözcük bazında değişebilir.
-  sector           String  @default("healthcare") @map("sector") @db.VarChar(50)
+  sector String @default("healthcare") @map("sector") @db.VarChar(50)
 
   // OpenRouter (AI soru üretimi) — org-specific custom API key (encrypted, opsiyonel)
   openrouterApiKeyEncrypted String? @map("openrouter_api_key_encrypted") @db.Text
@@ -134,6 +134,7 @@ model Organization {
   orgContentLibrary      ContentLibrary[]             @relation("OrgContentLibrary")
   examAttempts           ExamAttempt[]
   certificates           Certificate[]
+  trainingAssignments    TrainingAssignment[]
   // EY.FR.40 Eğitim Geri Bildirim — bir org birden çok form taslağı tutar (tek aktif)
   feedbackForms          TrainingFeedbackForm[]
   feedbackResponses      TrainingFeedbackResponse[]
@@ -332,6 +333,10 @@ model User {
   invitationsSent               Invitation[]                 @relation("InvitationsInvitedBy")
   invitationsAccepted           Invitation[]                 @relation("InvitationsAcceptedBy")
 
+  // TC ile login lookup (subdomain → orgId → tcHash) için composite unique.
+  // Aynı TC farklı kurumlarda olabilir (doktor 2 hastanede çalışabilir),
+  // o yüzden global unique değil, organizationId+tcHash composite unique.
+  @@unique([organizationId, tcHash], name: "user_org_tc_unique", map: "idx_users_org_tc_unique")
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
   @@index([departmentId], map: "idx_users_department")
@@ -340,10 +345,6 @@ model User {
   @@index([organizationId, isActive], map: "idx_users_org_active")
   @@index([organizationId, departmentId], map: "idx_users_org_department")
   @@index([organizationId, role], map: "idx_users_org_role")
-  // TC ile login lookup (subdomain → orgId → tcHash) için composite unique.
-  // Aynı TC farklı kurumlarda olabilir (doktor 2 hastanede çalışabilir),
-  // o yüzden global unique değil, organizationId+tcHash composite unique.
-  @@unique([organizationId, tcHash], name: "user_org_tc_unique", map: "idx_users_org_tc_unique")
   @@index([tcHash], map: "idx_users_tc_hash")
   @@map("users")
 }
@@ -400,7 +401,7 @@ model Training {
   draftStep      Int?      @default(1) @map("draft_step")
   draftUpdatedAt DateTime? @map("draft_updated_at") @db.Timestamptz
 
-  organization      Organization               @relation(fields: [organizationId], references: [id])
+  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   sourceLibrary     ContentLibrary?            @relation("TrainingFromLibrary", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
   createdBy         User?                      @relation("TrainingCreator", fields: [createdById], references: [id], onDelete: SetNull)
   videos            TrainingVideo[]
@@ -489,6 +490,9 @@ model TrainingAssignment {
   id                  String    @id @default(uuid()) @db.Uuid
   trainingId          String    @map("training_id") @db.Uuid
   userId              String    @map("user_id") @db.Uuid
+  // Denormalize: training.organizationId'den doldurulur. Cross-tenant query
+  // guard'larını tek alana indirir (training join'i olmadan filter).
+  organizationId      String    @map("organization_id") @db.Uuid
   periodId            String?   @map("period_id") @db.Uuid
   status              String    @default("assigned") @db.VarChar(30)
   currentAttempt      Int       @default(0) @map("current_attempt")
@@ -500,6 +504,7 @@ model TrainingAssignment {
 
   training     Training        @relation(fields: [trainingId], references: [id], onDelete: Cascade)
   user         User            @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   assignedBy   User?           @relation("AssignedByUser", fields: [assignedById], references: [id])
   period       TrainingPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
   examAttempts ExamAttempt[]
@@ -507,6 +512,7 @@ model TrainingAssignment {
   @@unique([trainingId, userId, periodId])
   @@index([userId], map: "idx_assignments_user")
   @@index([trainingId], map: "idx_assignments_training")
+  @@index([organizationId], map: "idx_assignments_organization")
   @@index([status], map: "idx_assignments_status")
   @@index([userId, status], map: "idx_assignments_user_status")
   @@index([trainingId, status], map: "idx_assignments_training_status")
@@ -717,10 +723,10 @@ model Certificate {
   organizationId   String?   @map("organization_id") @db.Uuid
   periodId         String?   @map("period_id") @db.Uuid
 
-  user         User            @relation(fields: [userId], references: [id])
-  training     Training        @relation(fields: [trainingId], references: [id])
-  attempt      ExamAttempt     @relation(fields: [attemptId], references: [id])
-  organization Organization?   @relation(fields: [organizationId], references: [id])
+  user         User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  training     Training        @relation(fields: [trainingId], references: [id], onDelete: Restrict)
+  attempt      ExamAttempt     @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  organization Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   period       TrainingPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
 
   @@index([userId], map: "idx_certificates_user")
@@ -1119,13 +1125,13 @@ model PushSubscription {
 // `token` cihaza özgü ve unique — birden fazla cihaz için kullanıcı başına
 // birden fazla satır olabilir (telefon + tablet vs).
 model ExpoPushToken {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String   @map("user_id") @db.Uuid
-  token       String   @unique @db.Text
-  platform    String   @db.VarChar(10) // 'ios' | 'android'
-  deviceName  String?  @map("device_name") @db.VarChar(100)
-  lastSeenAt  DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  token      String   @unique @db.Text
+  platform   String   @db.VarChar(10) // 'ios' | 'android'
+  deviceName String?  @map("device_name") @db.VarChar(100)
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1288,7 +1294,7 @@ model TrainingFeedbackForm {
   // Bu form aktive edildiğinde tüm eğitimlerde feedback zorunluluğunu nasıl
   // ayarlayacağı: true → tüm Training.feedbackMandatory=true (sertifika gating
   // çalışır), false → tüm Training.feedbackMandatory=false (form opsiyonel).
-  isMandatory    Boolean  @default(true)  @map("is_mandatory")
+  isMandatory    Boolean  @default(true) @map("is_mandatory")
   // Yanıt verilmiş ama artık kullanılmayan formlar arşive alınır — silmek
   // istenir ama yanıt geçmişi (FK: TrainingFeedbackResponse.formId) korunur.
   // Liste UI'sı default arşivsizleri gösterir.
@@ -1441,4 +1447,3 @@ model Invitation {
   @@index([email, organizationId], map: "idx_invitations_email_org")
   @@map("invitations")
 }
-
