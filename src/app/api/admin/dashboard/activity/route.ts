@@ -1,84 +1,17 @@
-import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
-import { getCached, setCached } from '@/lib/redis'
-import { logger } from '@/lib/logger'
-import type { AssignmentStatus } from '@/lib/exam-state-machine'
 
-const CACHE_TTL = 120 // 2 dakika
-const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=60' }
-
-export const GET = withAdminRoute(async ({ organizationId: orgId }) => {
-  const cacheKey = `dashboard:activity:${orgId}`
-  const cached = await getCached<object>(cacheKey)
-  if (cached) return jsonResponse(cached, 200, CACHE_HEADERS)
-
-  try {
-    const [topPerformerData, recentLogs] = await Promise.all([
-      prisma.trainingAssignment.findMany({
-        where: {
-          status: 'passed' satisfies AssignmentStatus,
-          training: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } },
-        },
-        include: {
-          user: { select: { id: true, firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
-          examAttempts: {
-            orderBy: { attemptNumber: 'desc' },
-            take: 1,
-            select: { postExamScore: true, preExamScore: true },
-          },
-        },
-        orderBy: { completedAt: 'desc' },
-        take: 20,
-      }),
-      prisma.auditLog.findMany({
-        where: { organizationId: orgId },
-        include: { user: { select: { firstName: true, lastName: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      }),
-    ])
-
-    // Top performers aggregation
-    const performerMap = new Map<string, { name: string; department: string; scores: number[]; courses: number; initials: string }>()
-    for (const a of topPerformerData) {
-      const key = a.userId
-      const existing = performerMap.get(key)
-      const score = Number(a.examAttempts[0]?.postExamScore ?? a.examAttempts[0]?.preExamScore ?? 0)
-      if (existing) {
-        existing.scores.push(score)
-        existing.courses++
-      } else {
-        const fn = a.user.firstName ?? ''
-        const ln = a.user.lastName ?? ''
-        performerMap.set(key, {
-          name: `${fn} ${ln}`,
-          department: a.user.departmentRel?.name ?? '',
-          scores: [score],
-          courses: 1,
-          initials: `${fn[0] ?? ''}${ln[0] ?? ''}`.toUpperCase(),
-        })
-      }
-    }
-    const topPerformers = Array.from(performerMap.values())
-      .map(p => ({ ...p, score: Math.round(p.scores.reduce((a, b) => a + b, 0) / p.scores.length), color: 'var(--color-primary)' }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 4)
-
-    // Recent activity
-    const recentActivity = recentLogs.map(log => ({
-      action: log.action,
-      user: log.user ? `${log.user.firstName} ${log.user.lastName}` : 'Sistem',
-      time: log.createdAt.toISOString(),
-      type: log.action.includes('delete') ? 'error' : log.action.includes('create') ? 'success' : 'info',
-    }))
-
-    const responseData = { topPerformers, recentActivity }
-
-    await setCached(cacheKey, responseData, CACHE_TTL)
-    return jsonResponse(responseData, 200, CACHE_HEADERS)
-  } catch (err) {
-    logger.error('Dashboard Activity', 'Activity verileri alinamadi', err instanceof Error ? err.message : err)
-    return errorResponse('Activity verileri alinamadi', 503)
-  }
+/**
+ * @deprecated 2026-05 — Bu split endpoint dashboard analizinde kaldırıldı (P1 §2.9).
+ *
+ * Frontend artık tüm dashboard verisini `/api/admin/dashboard/combined` üzerinden
+ * tek istekte alıyor. Bu route hâlâ aktif kalırsa combined ile aynı Redis cache
+ * key'ine (`dashboard:activity:{orgId}`) farklı TTL ve eski mantıkla yazarak
+ * verileri kirletme riski taşıyor — bu yüzden işlevsel kısmı boşaltıldı.
+ */
+export const GET = withAdminRoute(async () => {
+  return errorResponse(
+    'Bu uç nokta kullanımdan kaldırıldı; /api/admin/dashboard/combined kullanın',
+    410,
+  )
 }, { requireOrganization: true })
