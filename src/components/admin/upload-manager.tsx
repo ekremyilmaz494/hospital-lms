@@ -22,7 +22,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 
 export type UploadKind = 'video' | 'pdf' | 'audio';
 
-export type UploadStatus = 'pending' | 'compressing' | 'uploading' | 'done' | 'error' | 'canceled';
+export type UploadStatus = 'pending' | 'uploading' | 'done' | 'error' | 'canceled';
 
 export interface UploadItem {
   uploadId: string;          // local UUID
@@ -31,12 +31,10 @@ export interface UploadItem {
   fileName: string;
   fileSize: number;          // orijinal dosya boyutu
   kind: UploadKind;
-  progress: number;          // 0-100 — status'a göre upload veya compress yüzdesi
+  progress: number;          // 0-100 — XHR upload yüzdesi
   status: UploadStatus;
   errorMessage?: string;
   startedAt: number;
-  /** Sıkıştırılmış dosya boyutu — compression yapıldıysa doludur. */
-  compressedBytes?: number;
   /** Tamamlanma sonucu — done iken doludur. */
   result?: {
     key: string;
@@ -70,11 +68,6 @@ interface UploadManagerContextValue {
   getByDraft: (draftId: string) => UploadItem[];
 }
 
-/** Bu boyutun üzerindeki video dosyaları client-side sıkıştırılır (ffmpeg.wasm).
- *  Türkiye→Frankfurt upload bandwidth ~7 Mbps fiziksel limit; 20+ MB dosyalarda
- *  H.264 720p/CRF28 transcode upload süresini ~%50 azaltır. Audio/PDF ve küçük
- *  video'lar atlanır (transcode CPU maliyeti kazanca değmez). */
-const COMPRESS_THRESHOLD = 20 * 1024 * 1024; // 20 MB
 /** Multipart eşiği: bu boyutun üstündeki dosyalar parça parça yüklenir. */
 const MULTIPART_THRESHOLD = 10 * 1024 * 1024; // 10 MB
 /** Multipart parça boyutu — S3 minimum 5 MB. 8 MB Türkiye/Frankfurt RTT için iyi denge. */
@@ -111,8 +104,8 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
   // Aktif upload'lar için abort handle'ları. Single PUT'ta tek XHR'i,
   // multipart'ta tüm parça XHR'lerini + abort API çağrısını sarar.
   const abortMap = useRef<Map<string, { abort: () => void }>>(new Map());
-  // Compression sırasında veya pending'de cancel basıldıysa ffmpeg.wasm'ı kesemeyiz,
-  // ama bu Set'e yazıp sonraki aşamadan önce kontrol ederek upload'u başlatmayız.
+  // Pending durumda (PDF/audio meta tespiti sırasında) cancel basıldıysa
+  // upload başlatılmadan önce bu Set'ten kontrol edilir.
   const canceledIds = useRef<Set<string>>(new Set());
   const callbackMap = useRef<Map<string, { onComplete?: EnqueueArgs['onComplete']; onError?: EnqueueArgs['onError'] }>>(new Map());
   // Terminal state'e gelen upload'ların kuyruktan otomatik düşürülme zamanları.
@@ -161,10 +154,7 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
     return uploadId;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const startUpload = useCallback(async (uploadId: string, draftId: string, contentItemId: number, originalFile: File, kind: UploadKind) => {
-    // `file` upload sırasında compression sonucuyla değişebilir; `originalFile`
-    // metadata tespitinde (PDF page count, audio duration) referans olarak kalır.
-    let file = originalFile;
+  const startUpload = useCallback(async (uploadId: string, draftId: string, contentItemId: number, file: File, kind: UploadKind) => {
     try {
       // PDF sayfa sayısı tespiti — opsiyonel, hata yutulur
       let pageCount: number | undefined;
@@ -193,30 +183,6 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
             audio.onerror = () => { URL.revokeObjectURL(url); reject(new Error('audio meta')); };
           });
         } catch { /* ignore */ }
-      }
-
-      // Video sıkıştırma — bandwidth fiziksel limit (Türkiye-Frankfurt ~7 Mbps).
-      // 20+ MB video'larda H.264 720p/CRF28 transcode upload süresini ~%50 azaltır.
-      // Hata durumunda fallback: orijinal dosya upload edilir, kullanıcı süreçte kalır.
-      if (kind === 'video' && file.size > COMPRESS_THRESHOLD) {
-        try {
-          updateUpload(uploadId, { status: 'compressing', progress: 0 });
-          const { compressVideo } = await import('@/lib/video-compressor');
-          const result = await compressVideo(file, (pct) => {
-            if (canceledIds.current.has(uploadId)) return; // cancel'dan sonra UI güncellemesi yapma
-            updateUpload(uploadId, { progress: pct });
-          });
-          if (canceledIds.current.has(uploadId)) return; // compression sırasında iptal edilmişse upload başlatma
-          // Sıkıştırılmış blob'u File gibi kullan — uzantı .mp4'e zorlanır (output her zaman mp4)
-          const newName = file.name.replace(/\.[^.]+$/, '.mp4');
-          file = new File([result.blob], newName, { type: 'video/mp4' });
-          updateUpload(uploadId, { compressedBytes: result.compressedBytes });
-          console.log(`[upload] sıkıştırıldı: ${result.originalBytes} → ${result.compressedBytes} bytes (${Math.round((1 - result.compressedBytes / result.originalBytes) * 100)}% azaldı)`);
-        } catch (err) {
-          if (canceledIds.current.has(uploadId)) return;
-          console.warn('[upload] sıkıştırma başarısız, orijinal dosya yüklenecek', err);
-          // file değişmedi, orijinal upload devam eder
-        }
       }
 
       if (canceledIds.current.has(uploadId)) return; // PDF/audio meta tespiti sırasında iptal de mümkün

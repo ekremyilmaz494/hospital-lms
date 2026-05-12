@@ -3,6 +3,9 @@
 Admin video yüklediğinde otomatik olarak 720p H.264 formatına sıkıştırılır.
 Hedef: CloudFront bandwidth maliyetini %80-95 düşürmek.
 
+> **Not:** Client-side ffmpeg.wasm sıkıştırması kaldırıldı. Tüm transcoding bu pipeline'da
+> (MediaConvert) yapılır — orijinal dosya buradaki job tamamlanınca silinir.
+
 ## Mimari
 
 ```

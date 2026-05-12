@@ -18,7 +18,7 @@ const ContentLibraryModal = dynamic(
 interface ContentStepProps {
   videos: VideoItem[];
   setVideos: React.Dispatch<React.SetStateAction<VideoItem[]>>;
-  uploadProgress: Record<number, { pct: number; status: 'compressing' | 'uploading' }>;
+  uploadProgress: Record<number, number>;
   uploadFileToS3: (itemId: number, file: File) => Promise<void>;
   addFromLibrary: (items: SelectedContent[]) => void;
   removeVideo: (id: number) => void;
@@ -225,13 +225,9 @@ export default function ContentStep({
                         {video.file.name}
                       </p>
                       {uploadProgress[video.id] !== undefined ? (() => {
-                        const up = uploadProgress[video.id];
-                        const isCompressing = up.status === 'compressing';
-                        const barColor = isCompressing ? K.WARNING : K.PRIMARY;
-                        const label = isCompressing
-                          ? 'Sıkıştırılıyor...'
-                          : up.pct < 80 ? 'Dosya gönderiliyor...'
-                          : up.pct < 100 ? "S3'e yükleniyor..."
+                        const pct = uploadProgress[video.id];
+                        const label = pct < 80 ? 'Dosya gönderiliyor...'
+                          : pct < 100 ? "S3'e yükleniyor..."
                           : 'Tamamlandı!';
                         return (
                           <div className="mt-1.5">
@@ -240,14 +236,14 @@ export default function ContentStep({
                                 <div
                                   className="h-full rounded-full"
                                   style={{
-                                    width: `${up.pct}%`,
-                                    background: barColor,
+                                    width: `${pct}%`,
+                                    background: K.PRIMARY,
                                     transition: 'width 0.2s ease',
                                   }}
                                 />
                               </div>
-                              <span className="text-xs font-bold shrink-0" style={{ fontFamily: K.FONT_MONO, color: barColor, minWidth: 36, textAlign: 'right' }}>
-                                {up.pct}%
+                              <span className="text-xs font-bold shrink-0" style={{ fontFamily: K.FONT_MONO, color: K.PRIMARY, minWidth: 36, textAlign: 'right' }}>
+                                {pct}%
                               </span>
                             </div>
                             <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>
@@ -336,12 +332,9 @@ export default function ContentStep({
                           {video.file.name}
                         </p>
                         {uploadProgress[video.id] !== undefined ? (() => {
-                          const up = uploadProgress[video.id];
-                          const isCompressing = up.status === 'compressing';
-                          const label = isCompressing
-                            ? 'Sıkıştırılıyor...'
-                            : up.pct < 80 ? 'Dosya gönderiliyor...'
-                            : up.pct < 100 ? "S3'e yükleniyor..."
+                          const pct = uploadProgress[video.id];
+                          const label = pct < 80 ? 'Dosya gönderiliyor...'
+                            : pct < 100 ? "S3'e yükleniyor..."
                             : 'Tamamlandı!';
                           return (
                             <div className="mt-1.5">
@@ -350,14 +343,14 @@ export default function ContentStep({
                                   <div
                                     className="h-full rounded-full"
                                     style={{
-                                      width: `${up.pct}%`,
+                                      width: `${pct}%`,
                                       background: K.WARNING,
                                       transition: 'width 0.2s ease',
                                     }}
                                   />
                                 </div>
                                 <span className="text-xs font-bold shrink-0" style={{ fontFamily: K.FONT_MONO, color: K.WARNING, minWidth: 36, textAlign: 'right' }}>
-                                  {up.pct}%
+                                  {pct}%
                                 </span>
                               </div>
                               <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>

@@ -294,18 +294,14 @@ export default function DraftWizardPage() {
   // Aynı draftId'ye ait upload'ları follow et; tamamlananı videos[]'a yansıt.
   const draftUploads = uploadMgr.getByDraft(draftId);
 
-  // contentItemId → { pct, status } map (content-step prop'u için)
-  // status: 'compressing' (ffmpeg.wasm transcode), 'uploading' (S3 PUT). UI ikisini
-  // farklı renk/etiketle gösterir.
-  const uploadProgress = useMemo<Record<number, { pct: number; status: 'compressing' | 'uploading' }>>(() => {
-    const map: Record<number, { pct: number; status: 'compressing' | 'uploading' }> = {};
+  // contentItemId → progress yüzdesi (content-step prop'u için)
+  const uploadProgress = useMemo<Record<number, number>>(() => {
+    const map: Record<number, number> = {};
     for (const u of draftUploads) {
-      if (u.status === 'compressing') {
-        map[u.contentItemId] = { pct: u.progress, status: 'compressing' };
-      } else if (u.status === 'uploading' || u.status === 'pending') {
-        map[u.contentItemId] = { pct: u.progress, status: 'uploading' };
+      if (u.status === 'uploading' || u.status === 'pending') {
+        map[u.contentItemId] = u.progress;
       } else if (u.status === 'done' && u.progress < 100) {
-        map[u.contentItemId] = { pct: 100, status: 'uploading' };
+        map[u.contentItemId] = 100;
       }
     }
     return map;
@@ -402,8 +398,8 @@ export default function DraftWizardPage() {
   const addQuestion = () => setQuestions(prev => [...prev, { id: Date.now(), text: '', points: 10, options: ['', '', '', ''], correct: -1 }]);
   const removeQuestion = (id: number) => setQuestions(prev => prev.filter(q => q.id !== id));
 
-  // Wizard validasyonu için aktif upload sayısı (compression dahil — kullanıcı sonraki adıma geçmesin)
-  const activeUploadCount = draftUploads.filter(u => u.status === 'uploading' || u.status === 'pending' || u.status === 'compressing').length;
+  // Wizard validasyonu için aktif upload sayısı — kullanıcı sonraki adıma geçmesin
+  const activeUploadCount = draftUploads.filter(u => u.status === 'uploading' || u.status === 'pending').length;
 
   // Cross-step rollup — Step 4'teki özet panele ve uyarı bloklarına geçirilir.
   // Adım 1-3 state'inden türetilir; AssignStep prop-driven olduğu için saf okuma.

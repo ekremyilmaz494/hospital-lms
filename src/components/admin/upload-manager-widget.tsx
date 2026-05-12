@@ -19,7 +19,7 @@ export function UploadManagerWidget() {
   const [expanded, setExpanded] = useState(true);
   const [hideCompleted, setHideCompleted] = useState(false);
 
-  const active = uploads.filter(u => u.status === 'uploading' || u.status === 'pending' || u.status === 'compressing');
+  const active = uploads.filter(u => u.status === 'uploading' || u.status === 'pending');
   const completed = uploads.filter(u => u.status === 'done' || u.status === 'error' || u.status === 'canceled');
 
   // Tüm upload'lar tamamlandığında 4 sn sonra widget'ı otomatik gizle
@@ -64,9 +64,7 @@ export function UploadManagerWidget() {
           <div className="min-w-0 text-left">
             <p className="text-[13px] font-semibold truncate" style={{ color: '#1c1917' }}>
               {active.length > 0
-                ? (active.some(u => u.status === 'compressing')
-                    ? `${active.length} dosya sıkıştırılıyor (${totalProgress}%)`
-                    : `${active.length} dosya yükleniyor (${totalProgress}%)`)
+                ? `${active.length} dosya yükleniyor (${totalProgress}%)`
                 : `${completed.length} dosya tamamlandı`}
             </p>
             <p className="text-[11px]" style={{ color: '#78716c' }}>
@@ -104,7 +102,6 @@ export function UploadManagerWidget() {
                           u.status === 'error' ? '#ef4444'
                           : u.status === 'canceled' ? '#78716c'
                           : u.status === 'done' ? '#10b981'
-                          : u.status === 'compressing' ? '#f59e0b'
                           : '#0d9668',
                         transition: 'width 200ms ease',
                       }}
@@ -114,20 +111,14 @@ export function UploadManagerWidget() {
                     {u.status === 'error' ? 'Hata'
                       : u.status === 'canceled' ? 'İptal'
                       : u.status === 'done' ? '✓'
-                      : u.status === 'compressing' ? `Sıkıştırılıyor ${u.progress}%`
                       : `${u.progress}%`}
                   </span>
                 </div>
-                {u.status === 'done' && u.compressedBytes && (
-                  <p className="mt-0.5 text-[10px]" style={{ color: '#78716c' }}>
-                    {(u.fileSize / 1024 / 1024).toFixed(1)} → {(u.compressedBytes / 1024 / 1024).toFixed(1)} MB
-                  </p>
-                )}
                 {u.status === 'error' && u.errorMessage && (
                   <p className="mt-0.5 text-[10px]" style={{ color: '#ef4444' }}>{u.errorMessage}</p>
                 )}
               </div>
-              {(u.status === 'uploading' || u.status === 'pending' || u.status === 'compressing') ? (
+              {(u.status === 'uploading' || u.status === 'pending') ? (
                 <button
                   type="button"
                   onClick={() => cancel(u.uploadId)}
