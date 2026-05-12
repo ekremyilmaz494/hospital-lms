@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Mock prisma
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    user: { findFirst: vi.fn() },
     departmentTrainingRule: { findMany: vi.fn() },
     trainingAssignment: { findMany: vi.fn(), createMany: vi.fn() },
     auditLog: { create: vi.fn() },
@@ -14,10 +15,17 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
+// Mock training-periods — auto-assign aktif period çözmeye çalışır; testlerde
+// throw ettir ki periodId null kalsın ve mevcut assertion'lar korunsun.
+vi.mock('@/lib/training-periods', () => ({
+  getOrCreateActivePeriodForAssignment: vi.fn().mockRejectedValue(new Error('no period in tests')),
+}))
+
 import { autoAssignByDepartment } from '../auto-assign'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 
+const mockUserFindFirst = prisma.user.findFirst as ReturnType<typeof vi.fn>
 const mockRuleFindMany = prisma.departmentTrainingRule.findMany as ReturnType<typeof vi.fn>
 const mockAssignmentFindMany = prisma.trainingAssignment.findMany as ReturnType<typeof vi.fn>
 const mockCreateMany = prisma.trainingAssignment.createMany as ReturnType<typeof vi.fn>
@@ -30,6 +38,8 @@ const assignedById = 'admin-1'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Cross-tenant guard default — kullanıcı org'a ait, geçer.
+  mockUserFindFirst.mockResolvedValue({ id: userId })
 })
 
 describe('autoAssignByDepartment', () => {
@@ -62,6 +72,7 @@ describe('autoAssignByDepartment', () => {
         {
           trainingId: 'training-1',
           userId,
+          organizationId,
           status: 'assigned',
           assignedById,
         },

@@ -54,6 +54,27 @@ export async function findActivePeriod(organizationId: string) {
   })
 }
 
+/**
+ * Atama akışı için aktif period'u garanti eder.
+ * Aktif period varsa onu döner; yoksa içinde bulunulan takvim yılı için
+ * idempotent şekilde yeni period açar ve aktive eder.
+ *
+ * Atama yapmak istediğinde "aktif dönem yok" 409 ile akışı tıkamak yerine,
+ * varsayılan yıllık period'u otomatik aç (rolloverIfNeeded ile aynı mantık,
+ * sadece atama tetikli). Bu sayede `bulk-assign`, `trainings POST`,
+ * `trainings/[id]/assignments POST` ve `auto-assign` tek davranış üzerinden
+ * çalışır — `Training Period` tüm assignment kayıtlarında daima set edilir.
+ */
+export async function getOrCreateActivePeriodForAssignment(organizationId: string) {
+  const active = await findActivePeriod(organizationId)
+  if (active) return active
+
+  const currentYear = new Date().getUTCFullYear()
+  const created = await openNewPeriod(organizationId, { year: currentYear })
+  if (created.status === 'active') return created
+  return activatePeriod(created.id, organizationId, null)
+}
+
 /** Tenant guard ile period fetch — başka org'un period'unu sızdırmaz. */
 export async function getPeriodById(id: string, organizationId: string) {
   const period = await prisma.trainingPeriod.findFirst({

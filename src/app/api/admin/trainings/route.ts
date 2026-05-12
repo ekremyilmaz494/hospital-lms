@@ -7,7 +7,7 @@ import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { withCache, invalidateOrgCache } from '@/lib/redis'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
-import { findActivePeriod } from '@/lib/training-periods'
+import { getOrCreateActivePeriodForAssignment } from '@/lib/training-periods'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
@@ -112,11 +112,12 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   const { videos, questions, selectedDepts, excludedStaff, ...trainingData } = parsed.data
 
   // Eğitim oluşturma sırasında departman ataması yapılıyorsa aktif döneme ihtiyaç var.
+  // Aktif period yoksa otomatik aç — atamalar daima bir period'a bağlanır.
   // Transaction dışında fetch edilir — tx ile çalışmaz, isolation bozulmaz.
   let activePeriodId: string | null = null
   if (selectedDepts && selectedDepts.length > 0) {
-    const period = await findActivePeriod(organizationId)
-    activePeriodId = period?.id ?? null
+    const period = await getOrCreateActivePeriodForAssignment(organizationId)
+    activePeriodId = period.status === 'closed' ? null : period.id
   }
 
   try {

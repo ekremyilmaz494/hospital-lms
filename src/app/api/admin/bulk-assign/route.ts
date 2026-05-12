@@ -5,7 +5,7 @@ import { z } from 'zod/v4'
 import { logger } from '@/lib/logger'
 import { sendEmail, trainingAssignedEmail } from '@/lib/email'
 import type { UserRole } from '@/types/database'
-import { getActivePeriod, getPeriodById } from '@/lib/training-periods'
+import { getOrCreateActivePeriodForAssignment, getPeriodById } from '@/lib/training-periods'
 
 const bulkAssignSchema = z.object({
   trainingIds: z.array(z.string().uuid()).min(1, 'En az 1 eğitim seçilmeli'),
@@ -32,9 +32,10 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   try {
     // Period resolve: requested → tenant guard ile fetch; yoksa aktif period
+    // (yoksa otomatik aç — atama akışı "dönem yok" 409'una takılmaz).
     const targetPeriod = requestedPeriodId
       ? await getPeriodById(requestedPeriodId, orgId)
-      : await getActivePeriod(orgId)
+      : await getOrCreateActivePeriodForAssignment(orgId)
 
     if (targetPeriod.status === 'closed') {
       return errorResponse('Kapalı döneme atama yapılamaz', 409)
