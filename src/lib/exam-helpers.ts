@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
+import type { AttemptStatus } from '@/lib/exam-state-machine'
 
 /**
  * Get an active exam attempt and verify the user is in the required phase.
@@ -83,4 +84,103 @@ export async function getAttemptStatus(id: string, userId: string, userOrgId: st
   }
 
   return attempt
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Soru subset seçimi — questions ve submit route'ları aynı kümeyi görmeli.
+   Aksi halde randomQuestionCount aktifken kullanıcı 5 soru görür, submit
+   10 soru üzerinden puanlar (gösterilmeyen 5 = yanlış sayılır).
+   ────────────────────────────────────────────────────────────────────── */
+
+function seededRng(seed: number): () => number {
+  let s = seed >>> 0
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0
+    let t = s
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+export function stringToSeed(input: string): number {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return hash >>> 0
+}
+
+export function shuffle<T>(arr: T[], seed: number): T[] {
+  const rng = seededRng(seed)
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+type ExamSelectionTraining = {
+  examOnly: boolean
+  randomizeQuestions?: boolean | null
+  randomQuestionCount?: number | null
+}
+
+/**
+ * Hem soru ekranı (GET /questions) hem skor hesabı (POST /submit) için kullanılan
+ * deterministic soru kümesi. `attempt.id + phase` seed'i sayesinde aynı attempt'in
+ * her isteği aynı subset ve sırayı görür. Bu fonksiyon iki taraf da çağırmalı —
+ * aksi halde randomQuestionCount + examOnly kombinasyonunda puanlama bozulur.
+ */
+export function getEffectiveExamQuestions<Q extends { id: string }>(
+  questions: Q[],
+  training: ExamSelectionTraining,
+  attemptId: string,
+  phase: 'pre' | 'post',
+): Q[] {
+  const total = questions.length
+  const subsetActive =
+    !!training.examOnly &&
+    !!training.randomQuestionCount &&
+    training.randomQuestionCount > 0 &&
+    training.randomQuestionCount < total
+  const needsShuffle = !!training.randomizeQuestions || subsetActive
+  let result = needsShuffle
+    ? shuffle(questions, stringToSeed(`${attemptId}:${phase}:q`))
+    : questions
+  if (subsetActive) {
+    result = result.slice(0, training.randomQuestionCount as number)
+  }
+  return result
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   "Videosuz eğitim" akış kilidi —
+   Attempt watching_videos'a girdiğinde, eğitimde post_exam'i tetikleyecek
+   içerik (video/audio) yoksa attempt sonsuza dek bu statede takılı kalır.
+   Bu helper, çağrıldığında "zorunlu içerik var mı?" kontrolünü yapar ve
+   yoksa attempt'i otomatik post_exam'e taşır. Statussal guard ile çağrılır;
+   yarış koşulunda yalnızca watching_videos olan attempt güncellenir.
+   ────────────────────────────────────────────────────────────────────── */
+
+export async function advancePastVideosIfNoneRequired(
+  attemptId: string,
+  trainingId: string,
+): Promise<{ advanced: boolean; status: AttemptStatus }> {
+  const requiredCount = await prisma.trainingVideo.count({
+    where: { trainingId, contentType: { not: 'pdf' } },
+  })
+  if (requiredCount > 0) return { advanced: false, status: 'watching_videos' }
+  const now = new Date()
+  const updated = await prisma.examAttempt.updateMany({
+    where: { id: attemptId, status: 'watching_videos' },
+    data: {
+      status: 'post_exam',
+      videosCompletedAt: now,
+      postExamStartedAt: now,
+    },
+  })
+  return { advanced: updated.count > 0, status: updated.count > 0 ? 'post_exam' : 'watching_videos' }
 }

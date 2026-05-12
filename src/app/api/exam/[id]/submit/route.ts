@@ -9,6 +9,7 @@ import { sendEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity-logger'
 import { isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
 import { issueCertificateForAttempt } from '@/lib/certificate-helpers'
+import { getEffectiveExamQuestions, advancePastVideosIfNoneRequired } from '@/lib/exam-helpers'
 import {
   attemptNextStatus,
   assignmentNextStatus,
@@ -94,10 +95,21 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   }
 
   // Get correct answers
-  const questions = await prisma.question.findMany({
+  const allQuestions = await prisma.question.findMany({
     where: { trainingId: attempt.trainingId },
     include: { options: true },
   })
+
+  // KRITIK: questions/route.ts ile aynı subset/sırayı uygula. randomQuestionCount
+  // aktifken (examOnly) kullanıcıya gösterilen 5 sorudan başkasını puanlamaya
+  // dahil edersek, görülmemiş sorular sessizce "yanlış" sayılır ve sınav haksız
+  // yere kaldırılır. Deterministik seed (attempt.id + phase) iki tarafı eşler.
+  const questions = getEffectiveExamQuestions(
+    allQuestions,
+    attempt.training,
+    attempt.id,
+    phase,
+  )
 
   const questionMap = new Map(questions.map(q => [q.id, q]))
 
@@ -194,7 +206,14 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       return jsonResponse({ phase: 'pre', score: Number(attempt.preExamScore ?? score), nextStep: 'videos' })
     }
     await clearExamTimer(attempt.id)
-    return jsonResponse({ phase: 'pre', score, nextStep: 'videos' })
+    // Videosuz/PDF-only eğitim için akış kilidi kırma: eğitimde post_exam'i
+    // tetikleyecek içerik yoksa kullanıcıyı doğrudan son sınava yönlendir.
+    const advance = await advancePastVideosIfNoneRequired(attempt.id, attempt.trainingId)
+    return jsonResponse({
+      phase: 'pre',
+      score,
+      nextStep: advance.advanced ? 'post-exam' : 'videos',
+    })
   }
 
   // Post-exam
