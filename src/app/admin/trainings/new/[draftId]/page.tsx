@@ -110,6 +110,15 @@ export default function DraftWizardPage() {
   const [publishing, setPublishing] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
+  // Validasyondan ileri geçen adımlar. Geriye dönüp ilgili adımdaki kritik
+  // alanları bozarsa o adım otomatik dirty olur — `completedHashes`'taki snapshot
+  // mevcut state ile karşılaştırılır. Yayın butonu sadece tüm 4 step "fresh
+  // valid" olduğunda etkin.
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => new Set());
+  // Her başarılı validasyonun snapshot'ı — geri dönüp düzeltme yapılınca dirty
+  // hesabı için. Sadece o adımı etkileyen field'ları içerir; ref kullanıyoruz çünkü
+  // tetikleyici state mutasyonu istemiyoruz, derived olarak okunur.
+  const completedHashes = useRef<Map<number, string>>(new Map());
 
   // Step 1
   const [title, setTitle] = useState('');
@@ -396,6 +405,50 @@ export default function DraftWizardPage() {
   // Wizard validasyonu için aktif upload sayısı (compression dahil — kullanıcı sonraki adıma geçmesin)
   const activeUploadCount = draftUploads.filter(u => u.status === 'uploading' || u.status === 'pending' || u.status === 'compressing').length;
 
+  // Cross-step rollup — Step 4'teki özet panele ve uyarı bloklarına geçirilir.
+  // Adım 1-3 state'inden türetilir; AssignStep prop-driven olduğu için saf okuma.
+  const trainingSummary = useMemo(() => {
+    const realQuestionCount = questions.filter(q => q.text.trim() !== '').length;
+    const totalDur = videos
+      .filter(v => v.contentType === 'video' || v.contentType === 'audio')
+      .reduce((s, v) => s + (v.durationSeconds ?? 0), 0);
+    return {
+      title,
+      category: selectedCategory,
+      videoCount: videos.filter(v => v.contentType === 'video').length,
+      audioCount: videos.filter(v => v.contentType === 'audio').length,
+      pdfCount: videos.filter(v => v.contentType === 'pdf').length,
+      totalDurationSeconds: totalDur,
+      questionCount: realQuestionCount,
+      passingScore,
+      examDurationMinutes: examDurationMinutes === '' ? 30 : Number(examDurationMinutes),
+      isCompulsory,
+      renewalPeriodMonths: renewalPeriodMonths === '' ? null : Number(renewalPeriodMonths),
+      startDate,
+      endDate,
+    };
+  }, [title, selectedCategory, videos, questions, passingScore, examDurationMinutes, isCompulsory, renewalPeriodMonths, startDate, endDate]);
+
+  // Step hash'leri — geri dönüş sonrası dirty kontrolü için. Her adımın yayın-kritik
+  // field'larını içerir; eklemeyi sade tutmak için JSON kullanıyoruz (alanlar küçük).
+  const stepHashes = useMemo<Record<number, string>>(() => ({
+    1: JSON.stringify({ title, selectedCategory, startDate, endDate, maxAttempts, examDurationMinutes, smgPoints, isCompulsory, complianceDeadline, regulatoryBody, renewalPeriodMonths }),
+    2: JSON.stringify({ videos: videos.map(v => ({ id: v.id, url: v.url, contentType: v.contentType, title: v.title })) }),
+    3: JSON.stringify({ passingScore, questions: questions.map(q => ({ text: q.text, options: q.options, correct: q.correct })) }),
+    4: JSON.stringify({ selectedDepts, excludedStaff }),
+  }), [title, selectedCategory, startDate, endDate, maxAttempts, examDurationMinutes, smgPoints, isCompulsory, complianceDeadline, regulatoryBody, renewalPeriodMonths, videos, passingScore, questions, selectedDepts, excludedStaff]);
+
+  // Bir adım valid kabul edildiyse ve o adımın hash'i o anki hash ile eşleşiyorsa "completed".
+  // Eşleşmiyorsa kullanıcı sonradan değiştirmiş demektir → dirty (stepper uyarı, ileri geçişte yeniden validate).
+  const stepCompletedFresh = useCallback((step: number): boolean => {
+    if (!completedSteps.has(step)) return false;
+    return completedHashes.current.get(step) === stepHashes[step];
+  }, [completedSteps, stepHashes]);
+
+  const stepIsDirty = useCallback((step: number): boolean => {
+    return completedSteps.has(step) && completedHashes.current.get(step) !== stepHashes[step];
+  }, [completedSteps, stepHashes]);
+
   const validateStep = (step: number): string | null => {
     if (step === 1) {
       if (!title.trim()) return 'Eğitim adı boş olamaz.';
@@ -427,13 +480,24 @@ export default function DraftWizardPage() {
       if (pendingAiCount > 0) {
         return `AI sekmesinde ${pendingAiCount} adet üretilmiş soru var ama henüz eklenmedi. "Soruları Ekle (${pendingAiCount})" butonuna basın veya istemiyorsanız "Tümünü Yeniden Üret" ile temizleyin.`;
       }
+      // Boş satır sayılmaz — "Soru Ekle"den boş satır kalır veya AI sonrası boş slot olabilir.
+      // En az 1 GERÇEK soru zorunlu; aksi halde sınavsız eğitim yayınlanır.
+      const realQuestions = questions.filter(q => q.text.trim() !== '');
+      if (realQuestions.length === 0) return 'En az 1 soru tanımlanmalıdır. Manuel ekleyin veya AI ile üretin.';
       const ps = Number(passingScore);
       if (!Number.isFinite(ps) || ps < 0 || ps > 100) return 'Baraj puanı 0 ile 100 arasında olmalıdır.';
       for (const q of questions) {
-        if (!q.text.trim()) return 'Tüm soruların metni doldurulmalıdır.';
+        if (!q.text.trim()) return 'Tüm soruların metni doldurulmalıdır (boş satır bırakmayın).';
         const emptyOption = q.options.findIndex(o => !o.trim());
         if (emptyOption !== -1) return 'Tüm seçenekler doldurulmalıdır (boş seçenek bırakmayın).';
         if (q.correct < 0 || q.correct > 3) return 'Her soru için doğru cevap seçilmelidir.';
+      }
+    }
+    if (step === 4) {
+      if (selectedDepts.length === 0) {
+        return isCompulsory
+          ? 'Zorunlu eğitim en az bir departmana atanmalıdır.'
+          : 'En az bir departman seçmelisiniz. Eğitim kimseye atanmazsa görüntülenemez.';
       }
     }
     return null;
@@ -442,11 +506,24 @@ export default function DraftWizardPage() {
   const goToNextStep = () => {
     const err = validateStep(currentStep);
     if (err) { toast(err, 'error'); return; }
+    // Bu adımı "fresh valid" olarak işaretle — sonradan değiştirilirse dirty olur.
+    completedHashes.current.set(currentStep, stepHashes[currentStep]);
+    setCompletedSteps(prev => new Set(prev).add(currentStep));
     setCurrentStep(currentStep + 1);
   };
 
+  // Stepper üzerinden geçmiş adıma tıklama — currentStep iniyor ama completed
+  // flag'i kalıyor; geri dönüldükten sonra değişiklik yapılırsa dirty hesabı
+  // otomatik (hash karşılaştırması derived).
+  const jumpToStep = (target: number) => {
+    if (target > currentStep) return; // ileri zıplamaya izin yok
+    setCurrentStep(target);
+  };
+
   const handlePublish = async () => {
-    for (const step of [1, 2, 3]) {
+    // Yayın öncesi 4 adımı da revalidate — geriye dönüp düzenleme yapıldıysa
+    // (örn. Step 1'de tarihi geri aldı, Step 4'te bir dept kaldırdı) yakalanmalı.
+    for (const step of [1, 2, 3, 4]) {
       const err = validateStep(step);
       if (err) {
         toast(`Adım ${step}: ${err}`, 'error');
@@ -559,29 +636,35 @@ export default function DraftWizardPage() {
           <div className="flex items-center" style={{ gap: 0 }}>
             {steps.map((step, idx) => {
               const isActive = step.id === currentStep;
-              const isCompleted = step.id < currentStep;
-              const isPending = !isActive && !isCompleted;
-              const circleBg = isActive ? K.PRIMARY : isCompleted ? K.PRIMARY : '#f5f4f1';
-              const circleColor = isActive || isCompleted ? '#fff' : K.TEXT_MUTED;
+              const isFreshCompleted = step.id < currentStep && stepCompletedFresh(step.id);
+              const isDirty = stepIsDirty(step.id) && step.id < currentStep;
+              const isPending = step.id > currentStep;
+              // Renk kodu: dirty (uyarı, sarı) > fresh completed (yeşil) > active > pending.
+              const circleBg = isActive ? K.PRIMARY : isDirty ? K.WARNING : isFreshCompleted ? K.PRIMARY : '#f5f4f1';
+              const circleColor = isActive || isFreshCompleted || isDirty ? '#fff' : K.TEXT_MUTED;
               const circleBorder = isPending ? `1.5px solid ${K.BORDER}` : 'none';
+              const titleColor = isActive ? K.TEXT_PRIMARY : isDirty ? K.WARNING : isFreshCompleted ? K.PRIMARY : K.TEXT_MUTED;
               return (
                 <div key={step.id} className="flex flex-1 items-center">
                   <button
-                    onClick={() => step.id <= currentStep && setCurrentStep(step.id)}
+                    onClick={() => jumpToStep(step.id)}
+                    title={isDirty ? 'Bu adımda değişiklik yaptınız — yeniden kontrol edilmesi gerekiyor.' : undefined}
                     className="flex flex-1 items-center gap-3 px-3 py-2"
                     style={{ background: 'transparent', cursor: step.id <= currentStep ? 'pointer' : 'default', border: 'none', borderRadius: 10 }}
                   >
                     <div className="flex shrink-0 items-center justify-center"
                       style={{ width: 36, height: 36, borderRadius: 999, background: circleBg, color: circleColor, border: circleBorder, fontFamily: K.FONT_DISPLAY, fontWeight: 700, fontSize: 14 }}>
-                      {isCompleted ? <Check className="h-4 w-4" /> : step.id}
+                      {isFreshCompleted ? <Check className="h-4 w-4" /> : isDirty ? '!' : step.id}
                     </div>
                     <div className="text-left hidden lg:block">
-                      <p style={{ fontSize: 13, fontWeight: 600, color: isActive ? K.TEXT_PRIMARY : isCompleted ? K.PRIMARY : K.TEXT_MUTED, margin: 0 }}>{step.title}</p>
-                      <p style={{ fontSize: 11, color: K.TEXT_MUTED, margin: 0 }}>{step.description}</p>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: titleColor, margin: 0 }}>{step.title}</p>
+                      <p style={{ fontSize: 11, color: isDirty ? K.WARNING : K.TEXT_MUTED, margin: 0 }}>
+                        {isDirty ? 'Değişiklik — kontrol gerekli' : step.description}
+                      </p>
                     </div>
                   </button>
                   {idx < steps.length - 1 && (
-                    <div className="shrink-0" style={{ height: 2, width: 40, background: isCompleted ? K.PRIMARY : K.BORDER_SOFT, borderRadius: 999 }} />
+                    <div className="shrink-0" style={{ height: 2, width: 40, background: isFreshCompleted ? K.PRIMARY : isDirty ? K.WARNING : K.BORDER_SOFT, borderRadius: 999 }} />
                   )}
                 </div>
               );
@@ -605,6 +688,8 @@ export default function DraftWizardPage() {
               complianceDeadline={complianceDeadline} setComplianceDeadline={setComplianceDeadline}
               regulatoryBody={regulatoryBody} setRegulatoryBody={setRegulatoryBody}
               renewalPeriodMonths={renewalPeriodMonths} setRenewalPeriodMonths={setRenewalPeriodMonths}
+              questionCount={trainingSummary.questionCount}
+              passingScore={passingScore}
             />
           )}
           {currentStep === 2 && (
@@ -636,6 +721,7 @@ export default function DraftWizardPage() {
               excludedStaff={excludedStaff} setExcludedStaff={setExcludedStaff}
               expandedDept={expandedDept} setExpandedDept={setExpandedDept}
               deptSearch={deptSearch} setDeptSearch={setDeptSearch}
+              trainingSummary={trainingSummary}
             />
           )}
         </div>

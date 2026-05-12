@@ -9,6 +9,10 @@ import {
   X,
   UserMinus,
   RotateCcw,
+  AlertTriangle,
+  ShieldCheck,
+  RefreshCw,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +25,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { useFetch } from '@/hooks/use-fetch';
-import { K, type Dept, type DeptStaff } from './types';
+import { K, isSuggestedDeptForCategory, type Dept, type DeptStaff } from './types';
 
 interface AssignStepProps {
   selectedDepts: string[];
@@ -32,6 +36,22 @@ interface AssignStepProps {
   setExpandedDept: (v: string | null) => void;
   deptSearch: string;
   setDeptSearch: (v: string) => void;
+  /** Cross-step rollup — yayın öncesi özet panel ve uyarılar için. */
+  trainingSummary?: {
+    title: string;
+    category: string;
+    videoCount: number;
+    audioCount: number;
+    pdfCount: number;
+    totalDurationSeconds: number;
+    questionCount: number;
+    passingScore: number;
+    examDurationMinutes: number;
+    isCompulsory: boolean;
+    renewalPeriodMonths: number | null;
+    startDate: string;
+    endDate: string;
+  };
 }
 
 type FilterMode = 'all' | 'selected' | 'excluded';
@@ -46,6 +66,7 @@ export default function AssignStep({
   setExpandedDept,
   deptSearch,
   setDeptSearch,
+  trainingSummary,
 }: AssignStepProps) {
   const { data: departmentsData } = useFetch<Dept[]>('/api/admin/departments');
   const departments: Dept[] = useMemo(() => departmentsData ?? [], [departmentsData]);
@@ -151,9 +172,10 @@ export default function AssignStep({
     return dept.staff.some((s) => s.name.toLocaleLowerCase('tr-TR').includes(q));
   };
 
-  // Filter mode + search uygulanmış visible roots.
+  // Filter mode + search uygulanmış visible roots — kategori için "önerilen" olanlar
+  // önce gösterilir (admin'in dikkati ilk oraya çekilsin).
   const visibleRoots = useMemo(() => {
-    return roots.filter((root) => {
+    const filtered = roots.filter((root) => {
       const kids = childrenByParent.get(root.id) ?? [];
       const queryMatch = matchesQuery(root) || kids.some(matchesQuery);
       if (!queryMatch) return false;
@@ -166,8 +188,15 @@ export default function AssignStep({
       }
       return true;
     });
+    const category = trainingSummary?.category;
+    if (!category) return filtered;
+    return [...filtered].sort((a, b) => {
+      const aSug = isSuggestedDeptForCategory(category, a.name) ? 0 : 1;
+      const bSug = isSuggestedDeptForCategory(category, b.name) ? 0 : 1;
+      return aSug - bSug;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roots, childrenByParent, q, filterMode, effectiveDeptIds, excludedStaff]);
+  }, [roots, childrenByParent, q, filterMode, effectiveDeptIds, excludedStaff, trainingSummary?.category]);
 
   const allRootsSelected =
     roots.length > 0 && roots.every((r) => selectedDepts.includes(r.id));
@@ -179,9 +208,82 @@ export default function AssignStep({
   const hasSelected = selectedDepts.length > 0;
   const hasExcluded = excludedStaff.length > 0;
 
+  // Cross-step uyarı koşulları (rollup verisinden türetilir)
+  const compulsoryExcludedWarn = !!trainingSummary?.isCompulsory && hasExcluded;
+  const compulsoryNoDeptWarn = !!trainingSummary?.isCompulsory && !hasSelected;
+
   return (
     <div className="space-y-5">
       <Header />
+
+      {/* Cross-step uyarıları — Step 1'deki isCompulsory ile bu adımdaki seçim arasındaki çelişkiler */}
+      {(compulsoryNoDeptWarn || compulsoryExcludedWarn) && (
+        <div className="space-y-2">
+          {compulsoryNoDeptWarn && (
+            <div className="flex items-start gap-3 rounded-xl p-4" style={{ background: K.ERROR_BG, border: `1.5px solid ${K.ERROR}` }}>
+              <ShieldCheck className="h-5 w-5 mt-0.5 shrink-0" style={{ color: K.ERROR }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: K.ERROR }}>Zorunlu eğitim için atama gerekli</p>
+                <p className="mt-0.5 text-xs" style={{ color: K.TEXT_SECONDARY }}>
+                  Bu eğitim &quot;Zorunlu&quot; olarak işaretlendi (Temel Bilgiler adımı). Yayınlanabilmesi için en az bir departman seçmelisiniz.
+                </p>
+              </div>
+            </div>
+          )}
+          {compulsoryExcludedWarn && (
+            <div className="flex items-start gap-3 rounded-xl p-4" style={{ background: K.WARNING_BG, border: `1.5px solid ${K.WARNING}` }}>
+              <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" style={{ color: K.WARNING }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: K.TEXT_PRIMARY }}>Compliance uyarısı: zorunlu eğitimden personel hariç tutuldu</p>
+                <p className="mt-0.5 text-xs" style={{ color: K.TEXT_SECONDARY }}>
+                  Zorunlu eğitimlerden personel muaf tutmak denetim sorumluluğu gerektirir. Resmi muafiyet belgesi olmadan bu kişiler için yasal risk doğabilir.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Cross-step rollup — neyi yayınlıyoruz? */}
+      {trainingSummary && (
+        <div className="rounded-xl p-4" style={{ background: K.BG, border: `1.5px solid ${K.BORDER_SOFT}` }}>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Yayına Hazır Özet</p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs" style={{ color: K.TEXT_SECONDARY }}>
+            <span><strong style={{ color: K.TEXT_PRIMARY }}>{trainingSummary.title || '(Adsız)'}</strong></span>
+            <span>•</span>
+            <span>
+              <strong style={{ color: K.TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums' }}>{trainingSummary.videoCount + trainingSummary.audioCount}</strong> medya
+              {trainingSummary.pdfCount > 0 && <> + <strong style={{ color: K.TEXT_PRIMARY }}>{trainingSummary.pdfCount}</strong> doküman</>}
+            </span>
+            {trainingSummary.totalDurationSeconds > 0 && (
+              <>
+                <span>•</span>
+                <span>İçerik <strong style={{ color: K.TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums' }}>{Math.round(trainingSummary.totalDurationSeconds / 60)} dk</strong></span>
+              </>
+            )}
+            <span>•</span>
+            <span><strong style={{ color: K.TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums' }}>{trainingSummary.questionCount}</strong> soru / <strong style={{ color: K.TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums' }}>{trainingSummary.examDurationMinutes} dk</strong> sınav</span>
+            <span>•</span>
+            <span>Baraj <strong style={{ color: K.PRIMARY, fontVariantNumeric: 'tabular-nums' }}>{trainingSummary.passingScore}</strong></span>
+            {trainingSummary.isCompulsory && (
+              <>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1" style={{ color: K.WARNING }}>
+                  <ShieldCheck className="h-3 w-3" /> Zorunlu
+                </span>
+              </>
+            )}
+            {trainingSummary.renewalPeriodMonths && (
+              <>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1" style={{ color: K.INFO }}>
+                  <RefreshCw className="h-3 w-3" /> {trainingSummary.renewalPeriodMonths} ay yenileme
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
         {/* SOL — Departman seçici */}
@@ -289,6 +391,8 @@ export default function AssignStep({
                 const isExpanded =
                   expandedRoots.has(root.id) || !!q || childSelected;
 
+                const isSuggestedDept = isSuggestedDeptForCategory(trainingSummary?.category, root.name);
+
                 return (
                   <DepartmentCard
                     key={root.id}
@@ -298,6 +402,7 @@ export default function AssignStep({
                     totalStaffCount={subtreeTotal}
                     childCount={kids.length}
                     isExpanded={isExpanded}
+                    suggested={isSuggestedDept}
                     onToggleExpand={
                       kids.length > 0
                         ? () =>
@@ -491,6 +596,7 @@ interface DepartmentCardProps {
   onToggle: () => void;
   onOpenStaff: () => void;
   canOpenStaff: boolean;
+  suggested?: boolean;
   children?: React.ReactNode;
 }
 
@@ -505,6 +611,7 @@ function DepartmentCard({
   onToggle,
   onOpenStaff,
   canOpenStaff,
+  suggested = false,
   children,
 }: DepartmentCardProps) {
   const isOn = check === true || check === 'mixed';
@@ -566,17 +673,29 @@ function DepartmentCard({
           onClick={onToggle}
           className="min-w-0 flex-1 text-left"
         >
-          <p
-            className="truncate font-bold leading-snug"
-            style={{
-              fontFamily: K.FONT_DISPLAY,
-              fontSize: 16,
-              color: K.TEXT_PRIMARY,
-              opacity: isEmpty ? 0.6 : 1,
-            }}
-          >
-            {dept.name}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p
+              className="truncate font-bold leading-snug"
+              style={{
+                fontFamily: K.FONT_DISPLAY,
+                fontSize: 16,
+                color: K.TEXT_PRIMARY,
+                opacity: isEmpty ? 0.6 : 1,
+              }}
+            >
+              {dept.name}
+            </p>
+            {suggested && (
+              <span
+                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                style={{ background: K.PRIMARY_LIGHT, color: K.PRIMARY_HOVER }}
+                title="Bu kategori için önerilen departman"
+              >
+                <Star className="h-2.5 w-2.5" fill="currentColor" />
+                Önerilen
+              </span>
+            )}
+          </div>
           <p
             className="mt-1 truncate text-xs font-medium"
             style={{

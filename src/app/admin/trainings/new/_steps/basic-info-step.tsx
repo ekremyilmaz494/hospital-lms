@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Info, Calendar, Award, Clock, ShieldCheck, Building2, RefreshCw } from 'lucide-react';
+import { Info, Calendar, Award, Clock, ShieldCheck, Building2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CategoryIcon } from '@/components/shared/category-icon';
@@ -41,6 +41,10 @@ interface BasicInfoStepProps {
   setRegulatoryBody: (v: string) => void;
   renewalPeriodMonths: number | '';
   setRenewalPeriodMonths: (v: number | '') => void;
+  /** Cross-step context — Step 3'teki soru sayısı (uyarı için). 0 ise hiç soru yok. */
+  questionCount?: number;
+  /** Cross-step context — Baraj puanı (Step 3'ten); maxAttempts ile çelişki uyarısı için. */
+  passingScore?: number;
 }
 
 export default function BasicInfoStep({
@@ -57,7 +61,17 @@ export default function BasicInfoStep({
   complianceDeadline, setComplianceDeadline,
   regulatoryBody, setRegulatoryBody,
   renewalPeriodMonths, setRenewalPeriodMonths,
+  questionCount = 0,
+  passingScore = 70,
 }: BasicInfoStepProps) {
+  // Cross-step uyarı: 1 deneme + yüksek baraj birleşimi başarısızlık üretir.
+  // Compliance riski yok ama UX ipucu — admin bilinçli karar versin.
+  const attemptsNum = maxAttempts === '' ? 3 : Number(maxAttempts);
+  const showLowAttemptsHighScoreWarning = attemptsNum === 1 && passingScore >= 70;
+  // Sınav süresi vs soru sayısı: soru başına ≥18 saniye olması beklenir.
+  const examDur = examDurationMinutes === '' ? 30 : Number(examDurationMinutes);
+  const showTightExamWarning = questionCount > 0 && examDur > 0 && (examDur * 60) / questionCount < 18;
+
   return (
     <div className="space-y-7">
       <div className="flex items-center gap-3">
@@ -192,6 +206,28 @@ export default function BasicInfoStep({
               <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>Eğitim geçilince staff&apos;a yazılacak SMG puanı</p>
             </div>
           </div>
+
+          {/* Cross-step uyarıları — Step 3 verisiyle hesaplanır */}
+          {(showLowAttemptsHighScoreWarning || showTightExamWarning) && (
+            <div className="mt-4 space-y-2">
+              {showLowAttemptsHighScoreWarning && (
+                <div className="flex items-start gap-2 rounded-lg p-3" style={{ background: K.WARNING_BG, border: `1.5px solid ${K.WARNING}` }}>
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" style={{ color: K.WARNING }} />
+                  <p className="text-xs" style={{ color: K.TEXT_PRIMARY }}>
+                    1 deneme hakkı + {passingScore} puan baraj kombinasyonu personeli kolayca başarısız yapabilir. Daha fazla deneme veya daha düşük baraj puanı önerilir.
+                  </p>
+                </div>
+              )}
+              {showTightExamWarning && (
+                <div className="flex items-start gap-2 rounded-lg p-3" style={{ background: K.WARNING_BG, border: `1.5px solid ${K.WARNING}` }}>
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" style={{ color: K.WARNING }} />
+                  <p className="text-xs" style={{ color: K.TEXT_PRIMARY }}>
+                    {examDur} dakikada {questionCount} soru — soru başına ~{Math.round((examDur * 60) / questionCount)} saniye düşer. Sınav süresini artırmayı veya soru sayısını azaltmayı düşünün.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Compliance / Uyum Ayarları */}

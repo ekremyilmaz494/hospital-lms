@@ -101,3 +101,44 @@ export const minCorrectForPassing = (passingScore: number, totalQuestions: numbe
   if (totalQuestions <= 0 || passingScore <= 0) return 0;
   return Math.ceil((passingScore / 100) * totalQuestions);
 };
+
+/**
+ * Kategori → departman adı eşleştirmesi. Departmanlar tek tek backend'den geldiği için
+ * (eşit ID'leri tahmin edemeyiz) **isim bazlı fuzzy match** kullanıyoruz.
+ * Match kuralı: kategori anahtar kelimeleri departman adında geçiyor mu? (case-insensitive, TR)
+ *
+ * Kategori değerleri Kategori Yönetimi'nden geldiği için sabit liste değil — bilinen
+ * yaygın kategorileri kapsıyoruz; eşleşmeyen kategoride suggestion yok (silent fallback).
+ */
+const CATEGORY_DEPT_KEYWORDS: Record<string, string[]> = {
+  nursing: ['hemşire', 'hemsire'],
+  hemsirelik: ['hemşire', 'hemsire'],
+  doctor: ['doktor', 'hekim'],
+  hekim: ['doktor', 'hekim'],
+  pharmacy: ['eczane', 'eczacı', 'eczaci'],
+  eczane: ['eczane', 'eczacı', 'eczaci'],
+  laboratory: ['lab'],
+  lab: ['lab'],
+  radiology: ['radyoloji', 'görüntüleme', 'goruntuleme'],
+  radyoloji: ['radyoloji', 'görüntüleme', 'goruntuleme'],
+  it: ['bilgi işlem', 'bilgi islem', 'bt'],
+  technology: ['bilgi işlem', 'bilgi islem', 'bt'],
+  admin: ['idari', 'yönetim', 'yonetim'],
+  administrative: ['idari', 'yönetim', 'yonetim'],
+  cleaning: ['temizlik'],
+  temizlik: ['temizlik'],
+  security: ['güvenlik', 'guvenlik'],
+  guvenlik: ['güvenlik', 'guvenlik'],
+  fire_safety: ['güvenlik', 'guvenlik', 'isg'],
+  occupational_health: ['isg', 'iş güvenliği', 'is guvenligi'],
+  patient_rights: ['hasta hakları', 'hasta haklari'],
+};
+
+/** Kategori için bir departman "önerilen" mi? Bilinmeyen kategori → false. */
+export const isSuggestedDeptForCategory = (categoryValue: string | undefined, deptName: string): boolean => {
+  if (!categoryValue) return false;
+  const keywords = CATEGORY_DEPT_KEYWORDS[categoryValue.toLowerCase()];
+  if (!keywords) return false;
+  const lowName = deptName.toLocaleLowerCase('tr-TR');
+  return keywords.some(k => lowName.includes(k));
+};
