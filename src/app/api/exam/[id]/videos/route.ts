@@ -77,7 +77,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
 
     const videoList = await Promise.all(videos.map(async (v) => {
       const hasS3Key = v.videoKey && !v.videoKey.startsWith('/uploads')
-      const videoUrl = hasS3Key ? `/api/stream/${v.id}` : v.videoUrl
+      const videoUrl = hasS3Key ? await getStreamUrl(v.videoKey!) : v.videoUrl
       const documentUrl = v.documentKey ? await getStreamUrl(v.documentKey) : undefined
       return {
         id: v.id,
@@ -130,10 +130,10 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
 
   const videoList = await Promise.all(videos.map(async (v) => {
     const p = progressMap.get(v.id)
-    // S3 content → proxy through our API (avoids CORS issues)
+    // S3 content → CloudFront signed URL (CDN edge delivery)
     // Legacy /uploads videos → use path directly
     const hasS3Key = v.videoKey && !v.videoKey.startsWith('/uploads')
-    const url = hasS3Key ? `/api/stream/${v.id}` : v.videoUrl
+    const url = hasS3Key ? await getStreamUrl(v.videoKey!) : v.videoUrl
     const documentUrl = v.documentKey ? await getStreamUrl(v.documentKey) : undefined
     return {
       id: v.id,
