@@ -62,7 +62,21 @@ export async function resolveReportFilters(
     validatedDeptId = dept.id
   }
 
-  const userDeptFilter: Record<string, unknown> = validatedDeptId ? { departmentId: validatedDeptId } : {}
+  // Subtree expansion: parent dept seçildiğinde child dept'lerdeki staff'ı da kapsa.
+  // Staff listesi, dashboard, wizard ile aynı semantik — raporun mantığı kopmasın.
+  // validIds tek-org guard: cross-tenant id'leri zaten siler (defense in depth).
+  let userDeptFilter: Record<string, unknown> = {}
+  if (validatedDeptId) {
+    const rawDepartments = await prisma.department.findMany({
+      where: { organizationId: orgId },
+      select: { id: true, parentId: true },
+    })
+    const hierarchy = buildDepartmentHierarchy(rawDepartments)
+    const subtree = expandDepartmentSubtree(hierarchy, [validatedDeptId])
+    userDeptFilter = subtree.length > 1
+      ? { departmentId: { in: subtree } }
+      : { departmentId: validatedDeptId }
+  }
 
   const assignmentDateFilter: Record<string, unknown> = dateFrom || dateTo ? {
     assignedAt: {

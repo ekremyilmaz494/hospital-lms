@@ -279,6 +279,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
           userId: dbUser.id,
           trainingId: attempt.trainingId,
           organizationId,
+          periodId: attempt.assignment.periodId ?? null,
           trainingTitle: attempt.training.title,
           renewalPeriodMonths: attempt.training.renewalPeriodMonths,
           recipientEmail: dbUser.email,

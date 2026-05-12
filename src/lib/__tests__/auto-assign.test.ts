@@ -15,8 +15,9 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-// Mock training-periods — auto-assign aktif period çözmeye çalışır; testlerde
-// throw ettir ki periodId null kalsın ve mevcut assertion'lar korunsun.
+// Mock training-periods — auto-assign aktif period çözmeye çalışır.
+// Default: throw ettir → periodId null kalır (mevcut null-period assertion'ları korunur).
+// Case bazlı: aktif period'lu davranış için case içinde mockResolvedValueOnce ile override.
 vi.mock('@/lib/training-periods', () => ({
   getOrCreateActivePeriodForAssignment: vi.fn().mockRejectedValue(new Error('no period in tests')),
 }))
@@ -24,12 +25,14 @@ vi.mock('@/lib/training-periods', () => ({
 import { autoAssignByDepartment } from '../auto-assign'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { getOrCreateActivePeriodForAssignment } from '@/lib/training-periods'
 
 const mockUserFindFirst = prisma.user.findFirst as ReturnType<typeof vi.fn>
 const mockRuleFindMany = prisma.departmentTrainingRule.findMany as ReturnType<typeof vi.fn>
 const mockAssignmentFindMany = prisma.trainingAssignment.findMany as ReturnType<typeof vi.fn>
 const mockCreateMany = prisma.trainingAssignment.createMany as ReturnType<typeof vi.fn>
 const mockAuditCreate = prisma.auditLog.create as ReturnType<typeof vi.fn>
+const mockGetOrCreatePeriod = getOrCreateActivePeriodForAssignment as ReturnType<typeof vi.fn>
 
 const userId = 'user-1'
 const departmentId = 'dept-1'
@@ -153,6 +156,71 @@ describe('autoAssignByDepartment', () => {
         }),
       }),
     })
+  })
+
+  it('aktif period varsa periodId ile atama oluşturur', async () => {
+    mockGetOrCreatePeriod.mockResolvedValueOnce({ id: 'period-current', status: 'active' })
+    mockRuleFindMany.mockResolvedValue([
+      {
+        trainingId: 'training-1',
+        training: { id: 'training-1', isActive: true, endDate: null },
+      },
+    ])
+    mockAssignmentFindMany.mockResolvedValue([])
+    mockCreateMany.mockResolvedValue({ count: 1 })
+    mockAuditCreate.mockResolvedValue({ id: 'audit-1' })
+
+    const result = await autoAssignByDepartment(userId, departmentId, organizationId, assignedById)
+
+    expect(result).toBe(1)
+    // Existing check periodId-aware olmalı
+    expect(mockAssignmentFindMany).toHaveBeenCalledWith({
+      where: { userId, trainingId: { in: ['training-1'] }, periodId: 'period-current' },
+      select: { trainingId: true },
+    })
+    expect(mockCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          trainingId: 'training-1',
+          userId,
+          organizationId,
+          status: 'assigned',
+          assignedById,
+          periodId: 'period-current',
+        },
+      ],
+      skipDuplicates: true,
+    })
+  })
+
+  it('geçmiş dönemde atanmış eğitimi yeni dönemde tekrar atar', async () => {
+    // Yeni dönem aktif; existing check yeni period için sorgu yapacak,
+    // geçen dönemin atamaları bu filtrede dönmeyecek → atama oluşturulur.
+    mockGetOrCreatePeriod.mockResolvedValueOnce({ id: 'period-new', status: 'active' })
+    mockRuleFindMany.mockResolvedValue([
+      {
+        trainingId: 'training-1',
+        training: { id: 'training-1', isActive: true, endDate: null },
+      },
+    ])
+    // findMany yeni-period filter altında boş döner (geçen dönem ataması farklı periodId)
+    mockAssignmentFindMany.mockResolvedValue([])
+    mockCreateMany.mockResolvedValue({ count: 1 })
+    mockAuditCreate.mockResolvedValue({ id: 'audit-1' })
+
+    const result = await autoAssignByDepartment(userId, departmentId, organizationId, assignedById)
+
+    expect(result).toBe(1)
+    expect(mockAssignmentFindMany).toHaveBeenCalledWith({
+      where: { userId, trainingId: { in: ['training-1'] }, periodId: 'period-new' },
+      select: { trainingId: true },
+    })
+    expect(mockCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ periodId: 'period-new' })],
+        skipDuplicates: true,
+      }),
+    )
   })
 
   it('doğru atama sayısını döner', async () => {

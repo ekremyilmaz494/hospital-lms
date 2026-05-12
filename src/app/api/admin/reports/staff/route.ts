@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import type { UserRole } from '@/types/database'
+import { findActivePeriod } from '@/lib/training-periods'
 import { resolveReportFilters, REPORTS_CACHE_HEADERS, STAFF_CAP } from '../_shared'
 // Cache-Control: private, max-age=30, stale-while-revalidate=60 (REPORTS_CACHE_HEADERS)
 
@@ -15,7 +16,13 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
 
   const resolved = await resolveReportFilters(request, orgId)
   if (resolved.error) return resolved.error
-  const { userDeptFilter, assignmentDateFilter } = resolved.filters
+  const { userDeptFilter, assignmentDateFilter, periodId } = resolved.filters
+
+  // URL'de periodId yoksa aktif period'a düş (dashboard ile aynı pattern).
+  // Aktif period da yoksa null kalır → tüm dönemler kapsama girer.
+  const activePeriod = periodId ? null : await findActivePeriod(orgId)
+  const activePeriodId = periodId ?? activePeriod?.id ?? null
+  const assignmentPeriodFilter = activePeriodId ? { periodId: activePeriodId } : {}
 
   try {
     const [staff, totalStaffForCap] = await Promise.all([
@@ -29,7 +36,7 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
           departmentId: true,
           departmentRel: { select: { id: true, name: true, color: true } },
           assignments: {
-            where: { ...assignmentDateFilter, training: { isActive: true, publishStatus: { not: 'archived' } } },
+            where: { ...assignmentDateFilter, ...assignmentPeriodFilter, training: { isActive: true, publishStatus: { not: 'archived' } } },
             select: {
               id: true,
               status: true,

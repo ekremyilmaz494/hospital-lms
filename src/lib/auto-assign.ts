@@ -38,16 +38,11 @@ export async function autoAssignByDepartment(
   )
   if (activeRules.length === 0) return 0
 
-  // Tüm mevcut atamaları tek sorguda çek (N+1 yerine)
-  const trainingIds = activeRules.map((r) => r.trainingId)
-  const existingAssignments = await prisma.trainingAssignment.findMany({
-    where: { userId, trainingId: { in: trainingIds } },
-    select: { trainingId: true },
-  })
-  const existingSet = new Set(existingAssignments.map((a) => a.trainingId))
-
   // Aktif period — atama bu döneme bağlanır. Yoksa otomatik açılır.
   // Hata durumunda atama yine yapılır ama periodId null kalır (best-effort).
+  // Existing check'ten ÖNCE çözümlenir: existing filter periodId boyutunu da
+  // kullansın — kullanıcı geçen dönemde aynı eğitimi aldıysa yeni dönemde
+  // tekrar atama düşmeli (composite unique zaten izin veriyor).
   let periodId: string | null = null
   try {
     const period = await getOrCreateActivePeriodForAssignment(organizationId)
@@ -55,6 +50,19 @@ export async function autoAssignByDepartment(
   } catch (err) {
     logger.warn('AutoAssign', 'Period resolve basarisiz, periodId null', err instanceof Error ? err.message : err)
   }
+
+  // Tüm mevcut atamaları tek sorguda çek (N+1 yerine) — periodId boyutuyla.
+  // periodId=null kayıtları yalnızca periodId=null context'inde yakalanır.
+  const trainingIds = activeRules.map((r) => r.trainingId)
+  const existingAssignments = await prisma.trainingAssignment.findMany({
+    where: {
+      userId,
+      trainingId: { in: trainingIds },
+      periodId: periodId ?? null,
+    },
+    select: { trainingId: true },
+  })
+  const existingSet = new Set(existingAssignments.map((a) => a.trainingId))
 
   // Atanmamış eğitimleri toplu oluştur
   const toAssign = activeRules
