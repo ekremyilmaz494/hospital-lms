@@ -98,3 +98,56 @@ export async function resolveReportFilters(
 export const REPORTS_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
 }
+
+export interface DepartmentHierarchy {
+  childrenByParent: Map<string, string[]>
+  validIds: Set<string>
+}
+
+/**
+ * `rawDepartments` listesinden parent→children map'i ve geçerli id seti üretir.
+ * Birden çok kez subtree expansion yapılacaksa (örn. tüm departmanlar için
+ * staffCount hesabı), tek pass build edip helper'a inject edin — O(n²) yerine
+ * O(n+m).
+ */
+export function buildDepartmentHierarchy(
+  rawDepartments: { id: string; parentId: string | null }[],
+): DepartmentHierarchy {
+  const childrenByParent = new Map<string, string[]>()
+  for (const d of rawDepartments) {
+    if (!d.parentId) continue
+    const list = childrenByParent.get(d.parentId)
+    if (list) list.push(d.id)
+    else childrenByParent.set(d.parentId, [d.id])
+  }
+  return { childrenByParent, validIds: new Set(rawDepartments.map(d => d.id)) }
+}
+
+/**
+ * Verilen departman id'lerini BFS ile genişletir: tüm descendants (self dahil).
+ * Hiyerarşik departman filtreleri için tek nokta — staff listesi, raporlar,
+ * wizard, dashboard hepsi aynı semantiği kullanır: bir parent seçildiğinde
+ * alt birimlerdeki kullanıcılar da kapsama girer.
+ *
+ * Cross-tenant koruma: `validIds` setinde geçmeyen id'ler sessizce atlanır
+ * (geriye 0 sonuç dönecek bir filtrede güvenle kullanılır).
+ */
+export function expandDepartmentSubtree(
+  hierarchy: DepartmentHierarchy,
+  rootIds: string[],
+): string[] {
+  if (rootIds.length === 0) return []
+  const { childrenByParent, validIds } = hierarchy
+  const result: string[] = []
+  const seen = new Set<string>()
+  const queue: string[] = rootIds.filter(id => validIds.has(id))
+  while (queue.length) {
+    const id = queue.shift()!
+    if (seen.has(id)) continue
+    seen.add(id)
+    result.push(id)
+    const children = childrenByParent.get(id)
+    if (children) queue.push(...children)
+  }
+  return result
+}

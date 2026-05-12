@@ -5,7 +5,7 @@ import { createAssignmentSchema } from '@/lib/validations'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { sendEmail, trainingAssignedEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
-import { getActivePeriod, findActivePeriod } from '@/lib/training-periods'
+import { getOrCreateActivePeriodForAssignment, findActivePeriod } from '@/lib/training-periods'
 
 export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
   const { id } = params
@@ -99,8 +99,8 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
   }
 
   // Aktif dönem zorunlu — atama bu döneme bağlanır.
-  // bulk-assign endpoint'i ile aynı pattern: getActivePeriod 409 throw eder.
-  const targetPeriod = await getActivePeriod(organizationId)
+  // bulk-assign ile aynı pattern: yoksa otomatik aç (aktif period garantisi).
+  const targetPeriod = await getOrCreateActivePeriodForAssignment(organizationId)
   if (targetPeriod.status === 'closed') {
     return errorResponse('Kapalı döneme atama yapılamaz', 409)
   }

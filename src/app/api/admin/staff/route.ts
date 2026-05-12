@@ -15,6 +15,7 @@ import type { AssignmentStatus } from '@/lib/exam-state-machine'
 import type { UserRole } from '@/types/database'
 import { findActivePeriod, getEffectiveStartDate } from '@/lib/training-periods'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
+import { buildDepartmentHierarchy, expandDepartmentSubtree } from '@/app/api/admin/reports/_shared'
 import {
   generateInvitationToken,
   computeInvitationExpiry,
@@ -62,36 +63,19 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     })
 
-    // parentId → children id list (tek pass)
-    const childrenByParent = new Map<string, string[]>()
-    for (const d of rawDepartments) {
-      if (!d.parentId) continue
-      const list = childrenByParent.get(d.parentId)
-      if (list) list.push(d.id)
-      else childrenByParent.set(d.parentId, [d.id])
-    }
+    // Departman hiyerarşisini tek pass build et — hem filter hem rollup kullanır.
+    const deptHierarchy = buildDepartmentHierarchy(rawDepartments)
 
-    // BFS ile descendant id'leri topla (self dahil)
-    const collectSubtree = (rootId: string): string[] => {
-      const result: string[] = []
-      const queue: string[] = [rootId]
-      while (queue.length) {
-        const id = queue.shift()!
-        result.push(id)
-        const children = childrenByParent.get(id)
-        if (children) queue.push(...children)
-      }
-      return result
-    }
-
+    // BFS ile descendant id'leri toplama — paylaşılan helper (reports/_shared).
+    // Bir parent seçildiğinde alt birimler de kapsama girer; wizard, raporlar,
+    // dashboard hepsi aynı semantiği kullanır.
     if (department) {
-      // Sadece bu org'a ait bir departman ID'si mi (cross-tenant koruma)
-      const exists = rawDepartments.some(d => d.id === department)
-      if (exists) {
-        const subtree = collectSubtree(department)
+      const subtree = expandDepartmentSubtree(deptHierarchy, [department])
+      if (subtree.length > 0) {
         where.departmentId = { in: subtree }
       } else {
-        where.departmentId = department // fallback (zaten 0 sonuç dönecek)
+        // Cross-tenant departman id'si — sessizce 0 sonuç döndür
+        where.departmentId = department
       }
     }
 
@@ -200,7 +184,7 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     const directCountById = new Map(rawDepartments.map(d => [d.id, d._count.users]))
     const totalCountById = new Map<string, number>()
     for (const d of rawDepartments) {
-      const subtree = collectSubtree(d.id)
+      const subtree = expandDepartmentSubtree(deptHierarchy, [d.id])
       let total = 0
       for (const id of subtree) total += directCountById.get(id) ?? 0
       totalCountById.set(d.id, total)

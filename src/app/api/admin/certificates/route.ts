@@ -138,9 +138,29 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     }
 
     const attempt = await prisma.examAttempt.findFirst({
-      where: { id: attemptId, training: { organizationId } },
+      where: { id: attemptId, organizationId },
+      select: {
+        id: true,
+        userId: true,
+        trainingId: true,
+        isPassed: true,
+        assignment: { select: { periodId: true } },
+      },
     })
     if (!attempt) return errorResponse('Sınav denemesi bulunamadı', 404)
+
+    // Defansif tutarlılık: payload'taki userId/trainingId attempt ile eşleşmeli,
+    // attempt başarılı olmalı. Aksi halde admin yanlış sertifika basabilir veya
+    // başkasının attempt'i üzerinden hedef kullanıcıya sertifika atfedilebilir.
+    if (attempt.userId !== userId) {
+      return errorResponse('Sınav denemesi seçili kullanıcıya ait değil', 400)
+    }
+    if (attempt.trainingId !== trainingId) {
+      return errorResponse('Sınav denemesi seçili eğitime ait değil', 400)
+    }
+    if (!attempt.isPassed) {
+      return errorResponse('Bu deneme başarılı değil — manuel sertifika oluşturulamaz', 409)
+    }
 
     const code = `CERT-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
 
@@ -153,6 +173,9 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
           attemptId,
           certificateCode: code,
           expiresAt: expiresAt ? new Date(expiresAt) : null,
+          // Tenant + dönem izolasyonu — rapor/agregasyon sorguları için zorunlu
+          organizationId,
+          periodId: attempt.assignment?.periodId ?? null,
         },
       })
     } catch (e: unknown) {

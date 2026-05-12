@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { getOrCreateActivePeriodForAssignment } from '@/lib/training-periods'
 
 /**
  * Departman eğitim kurallarına göre otomatik atama yapar.
@@ -45,6 +46,16 @@ export async function autoAssignByDepartment(
   })
   const existingSet = new Set(existingAssignments.map((a) => a.trainingId))
 
+  // Aktif period — atama bu döneme bağlanır. Yoksa otomatik açılır.
+  // Hata durumunda atama yine yapılır ama periodId null kalır (best-effort).
+  let periodId: string | null = null
+  try {
+    const period = await getOrCreateActivePeriodForAssignment(organizationId)
+    if (period.status !== 'closed') periodId = period.id
+  } catch (err) {
+    logger.warn('AutoAssign', 'Period resolve basarisiz, periodId null', err instanceof Error ? err.message : err)
+  }
+
   // Atanmamış eğitimleri toplu oluştur
   const toAssign = activeRules
     .filter((r) => !existingSet.has(r.trainingId))
@@ -54,6 +65,7 @@ export async function autoAssignByDepartment(
       organizationId,
       status: 'assigned' as const,
       assignedById,
+      ...(periodId && { periodId }),
     }))
 
   let assignedCount = 0
