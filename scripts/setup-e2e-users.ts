@@ -19,6 +19,24 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'product
   process.exit(1)
 }
 
+// Erken hata: createAuthUser Supabase Admin client'ı kullanır; service role anahtarı
+// yoksa "supabaseKey is required" stack'iyle çöker (CI'da bu hata sebeple görüldü).
+// Bunun yerine net bir mesajla erken çık → CI loglarında secret eksikliği teşhis edilebilir.
+const REQUIRED_ENV = [
+  'DATABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+] as const
+const missing = REQUIRED_ENV.filter((k) => !process.env[k])
+if (missing.length > 0) {
+  console.error(
+    `❌ E2E setup atlandı — gerekli env değişkenleri yok: ${missing.join(', ')}.\n` +
+      `   GitHub Actions çalıştırıyorsanız repo Settings → Secrets and variables → Actions\n` +
+      `   altında bu secret'ları tanımlayın (NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY zorunlu).`,
+  )
+  process.exit(1)
+}
+
 const ORG_NAME = 'E2E Test Hastanesi'
 const ORG_CODE = 'E2E-TEST-001'
 
