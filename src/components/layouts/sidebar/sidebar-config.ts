@@ -152,7 +152,6 @@ export const adminNav: NavGroup[] = [
     items: [
       { title: 'Uyum Raporu', href: '/admin/compliance', icon: ShieldCheck },
       { title: 'Etkinlik Analizi', href: '/admin/effectiveness', icon: TrendingUp },
-      { title: 'Akreditasyon', href: '/admin/accreditation', icon: ClipboardCheck },
       {
         title: 'Geri Bildirim',
         href: '/admin/feedback-forms',
