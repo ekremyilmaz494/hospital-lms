@@ -59,7 +59,7 @@ export function FaqSection() {
       {/* JSON-LD payload is static (no user input) — safe for SEO rich snippets */}
       <script
         type="application/ld+json"
-        // eslint-disable-next-line react/no-danger
+         
         dangerouslySetInnerHTML={{ __html: FAQ_JSON_LD }}
       />
 
