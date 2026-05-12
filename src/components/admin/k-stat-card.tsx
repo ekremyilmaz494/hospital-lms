@@ -12,6 +12,11 @@ interface KStatCardProps {
     value: number;
     label: string;
     isPositive: boolean;
+    /**
+     * Trend değerinin sonuna eklenecek ek (örn. '%' yüzde için, '' mutlak sayılar için).
+     * Default '%' — geriye dönük uyumluluk; backend mutlak sayı dönüyorsa '' geçilmeli.
+     */
+    suffix?: string;
   };
 }
 
@@ -114,7 +119,7 @@ export function KStatCard({
             }}
           >
             {trend.isPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-            {trend.isPositive ? '+' : ''}{trend.value}%
+            {trend.isPositive ? '+' : ''}{trend.value}{trend.suffix ?? '%'}
           </span>
           <span style={{ color: TEXT_MUTED, fontWeight: 500 }}>{trend.label}</span>
         </div>

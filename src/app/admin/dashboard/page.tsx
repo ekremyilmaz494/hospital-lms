@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Users, GraduationCap, TrendingUp, AlertTriangle, Trophy, Activity, Clock,
   Plus, Send, Download, Building2, UserPlus, ShieldCheck,
@@ -57,7 +57,7 @@ function ChartSkeletonInline() {
 // ── Type definitions for split endpoints ──
 
 interface StatsData {
-  stats: { title: string; value: number | string; icon: string; accentColor: string; trend?: { value: number; label: string; isPositive: boolean } }[];
+  stats: { title: string; value: number | string; icon: string; accentColor: string; trend?: { value: number; label: string; isPositive: boolean; suffix?: string } }[];
   complianceAlerts: { training: string; regulatoryBody: string; daysLeft: number; complianceRate: number; status: string }[];
   statusDistribution: { name: string; value: number; color: string }[];
 }
@@ -271,12 +271,22 @@ export default function AdminDashboard() {
   const { data: dashboardData, isLoading: dashLoading, error: dashError, refetch: dashRefetch } =
     useFetch<DashboardCombinedData>('/api/admin/dashboard/combined', { interval: 90_000 });
 
-  // Uyumluluk katmanı — mevcut render kodunu bozmamak için
-  const stats = { data: dashboardData?.stats ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch };
-  const charts = { data: dashboardData?.charts ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch };
-  const compliance = { data: dashboardData?.compliance ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch };
-  const activity = { data: dashboardData?.activity ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch };
-  const certs = { data: dashboardData?.certs ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch };
+  // Mount'ta arka planda bir kez taze çekim — başka sayfadan dönerken (örn. eğitim
+  // oluşturma sonrası) Redis cache server tarafında invalidateDashboardCache ile
+  // temizlenmiş olur, useFetch'in client cache'i ise STALE_TIME süresince eski
+  // veriyi gösterir. Bu refetch o boşluğu kapatır.
+  useEffect(() => {
+    dashRefetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Uyumluluk katmanı — mevcut render kodunu bozmamak için, ancak referential
+  // stability için useMemo ile sarıldı (child component'lerde gereksiz re-render önler).
+  const stats = useMemo(() => ({ data: dashboardData?.stats ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch }), [dashboardData?.stats, dashLoading, dashError, dashRefetch]);
+  const charts = useMemo(() => ({ data: dashboardData?.charts ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch }), [dashboardData?.charts, dashLoading, dashError, dashRefetch]);
+  const compliance = useMemo(() => ({ data: dashboardData?.compliance ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch }), [dashboardData?.compliance, dashLoading, dashError, dashRefetch]);
+  const activity = useMemo(() => ({ data: dashboardData?.activity ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch }), [dashboardData?.activity, dashLoading, dashError, dashRefetch]);
+  const certs = useMemo(() => ({ data: dashboardData?.certs ?? null, isLoading: dashLoading, error: dashError, refetch: dashRefetch }), [dashboardData?.certs, dashLoading, dashError, dashRefetch]);
 
   const handleSendReminder = async (assignmentId: string, staffName: string) => {
     setSendingReminder(assignmentId);
@@ -296,16 +306,33 @@ export default function AdminDashboard() {
     }
   };
 
-  // ── Derived values from stats ──
-  const statCards = (stats.data?.stats ?? []).map(s => ({ ...s, icon: iconMap[s.icon] || Users }));
+  // ── Derived values from stats (memoize: 90sn polling'de gereksiz re-render önle) ──
+  const statCards = useMemo(
+    () => (stats.data?.stats ?? []).map(s => ({ ...s, icon: iconMap[s.icon] || Users })),
+    [stats.data?.stats],
+  );
   const complianceAlerts = stats.data?.complianceAlerts ?? [];
-  const statusDistribution = stats.data?.statusDistribution ?? [];
-  const totalAssignments = statusDistribution.reduce((s, d) => s + d.value, 0);
+  // Referential stability: `?? []` her render'da yeni boş dizi yaratır;
+  // useMemo ile sararak alt useMemo'ların gereksiz invalide olmasını önle.
+  const statusDistribution = useMemo(
+    () => stats.data?.statusDistribution ?? [],
+    [stats.data?.statusDistribution],
+  );
+  const totalAssignments = useMemo(
+    () => statusDistribution.reduce((s, d) => s + d.value, 0),
+    [statusDistribution],
+  );
 
   // ── Derived values from charts ──
-  const trendData = charts.data?.trendData ?? [];
+  const trendData = useMemo(
+    () => charts.data?.trendData ?? [],
+    [charts.data?.trendData],
+  );
   const departmentComparison = charts.data?.departmentComparison ?? [];
-  const hasTrendData = trendData.some(t => t.atanan > 0 || t.tamamlanan > 0 || t.basarisiz > 0);
+  const hasTrendData = useMemo(
+    () => trendData.some(t => t.atanan > 0 || t.tamamlanan > 0 || t.basarisiz > 0),
+    [trendData],
+  );
 
   // ── Derived values from compliance ──
   const overdueTrainings = compliance.data?.overdueTrainings ?? [];
