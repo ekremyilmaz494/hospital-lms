@@ -6,7 +6,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { createTrainingBodySchema } from '@/lib/validations'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { invalidateOrgCache, checkRateLimit } from '@/lib/redis'
-import { findActivePeriod } from '@/lib/training-periods'
+import { getOrCreateActivePeriodForAssignment } from '@/lib/training-periods'
 import { logger } from '@/lib/logger'
 
 /**
@@ -75,10 +75,12 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
 
   const { videos, questions, selectedDepts, excludedStaff, ...trainingData } = parsed.data
 
+  // Aktif period yoksa otomatik aç — POST /api/admin/trainings ile aynı semantik:
+  // taze kurulan org'da bile yayın atamaları daima bir period'a bağlanır.
   let activePeriodId: string | null = null
   if (selectedDepts && selectedDepts.length > 0) {
-    const period = await findActivePeriod(organizationId)
-    activePeriodId = period?.id ?? null
+    const period = await getOrCreateActivePeriodForAssignment(organizationId)
+    activePeriodId = period.status === 'closed' ? null : period.id
   }
 
   try {

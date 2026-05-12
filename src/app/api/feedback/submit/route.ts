@@ -59,7 +59,7 @@ export const POST = withStaffRoute(async ({ request, dbUser, organizationId, aud
           feedbackMandatory: true,
         },
       },
-      assignment: { select: { originalMaxAttempts: true } },
+      assignment: { select: { originalMaxAttempts: true, periodId: true } },
       feedbackResponse: { select: { id: true } },
     },
   })
@@ -230,6 +230,7 @@ export const POST = withStaffRoute(async ({ request, dbUser, organizationId, aud
         userId: dbUser.id,
         trainingId: attempt.trainingId,
         organizationId: attempt.training.organizationId,
+        periodId: attempt.assignment.periodId ?? null,
         trainingTitle: attempt.training.title,
         renewalPeriodMonths: attempt.training.renewalPeriodMonths,
         recipientEmail: dbUser.email,

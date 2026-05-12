@@ -21,6 +21,12 @@ export async function issueCertificateForAttempt(input: {
   userId: string
   trainingId: string
   organizationId: string
+  /**
+   * Attempt'in bağlı olduğu atamanın periodId'si. Dönem bazlı sertifika raporları
+   * için zorunlu; null geçilirse sertifika döneme bağlanmaz. Caller bunu
+   * `assignment.periodId` üzerinden taşır.
+   */
+  periodId: string | null
   trainingTitle: string
   renewalPeriodMonths: number | null
   recipientEmail: string
@@ -42,6 +48,7 @@ export async function issueCertificateForAttempt(input: {
         trainingId: input.trainingId,
         attemptId: input.attemptId,
         organizationId: input.organizationId,
+        periodId: input.periodId,
         certificateCode: code,
         expiresAt,
       },

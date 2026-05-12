@@ -28,6 +28,7 @@ const baseInput = {
   userId: 'user-1',
   trainingId: 'training-1',
   organizationId: 'org-1',
+  periodId: 'period-1' as string | null,
   trainingTitle: 'İSG Temel Eğitimi',
   renewalPeriodMonths: 12,
   recipientEmail: 'staff@devakent.com',
@@ -67,6 +68,7 @@ describe('issueCertificateForAttempt', () => {
       trainingId: 'training-1',
       attemptId: 'attempt-1',
       organizationId: 'org-1',
+      periodId: 'period-1',
       certificateCode: result.code,
     })
     expect(createArgs.data.expiresAt).toBeInstanceOf(Date)
@@ -87,6 +89,15 @@ describe('issueCertificateForAttempt', () => {
     await issueCertificateForAttempt({ ...baseInput, renewalPeriodMonths: null })
 
     expect(createMock.mock.calls[0][0].data.expiresAt).toBeNull()
+  })
+
+  it('periodId=null ise sertifikaya null yazılır (dönem yok)', async () => {
+    findUniqueMock.mockResolvedValue(null)
+    createMock.mockResolvedValue({ id: 'new-cert' })
+
+    await issueCertificateForAttempt({ ...baseInput, periodId: null })
+
+    expect(createMock.mock.calls[0][0].data.periodId).toBeNull()
   })
 
   it('paralel yarış (P2002) yutulur, throw etmez', async () => {
