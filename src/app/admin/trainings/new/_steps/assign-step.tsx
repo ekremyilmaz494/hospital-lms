@@ -416,7 +416,7 @@ export default function AssignStep({
                     }
                     onToggle={() => toggleDept(root.id)}
                     onOpenStaff={() => setExpandedDept(root.id)}
-                    canOpenStaff={effectiveDeptIds.has(root.id) && root.staff.length > 0}
+                    canOpenStaff={effectiveDeptIds.has(root.id) && (root.staff.length > 0 || kids.some(k => k.staff.length > 0))}
                   >
                     {visibleKids.map((kid) => {
                       const kidSelected = selectedDepts.includes(kid.id);
@@ -480,6 +480,7 @@ export default function AssignStep({
           {activeDept && (
             <StaffSheet
               dept={activeDept}
+              childDepts={childrenByParent.get(activeDept.id) ?? []}
               excludedStaff={excludedStaff}
               setExcludedStaff={setExcludedStaff}
             />
@@ -1147,39 +1148,55 @@ function SummaryPanel({
 
 interface StaffSheetProps {
   dept: Dept;
+  childDepts: Dept[];
   excludedStaff: string[];
   setExcludedStaff: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-function StaffSheet({ dept, excludedStaff, setExcludedStaff }: StaffSheetProps) {
+function StaffSheet({ dept, childDepts, excludedStaff, setExcludedStaff }: StaffSheetProps) {
   const [search, setSearch] = useState('');
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLocaleLowerCase('tr-TR');
-    if (!q) return dept.staff;
-    return dept.staff.filter(
-      (s) =>
-        s.name.toLocaleLowerCase('tr-TR').includes(q) ||
-        s.title.toLocaleLowerCase('tr-TR').includes(q),
-    );
-  }, [dept.staff, search]);
+  // Tüm gruplar: önce parent'ın direkt personeli, sonra her alt birimin personeli.
+  const groups = useMemo<Array<{ dept: Dept; staff: DeptStaff[] }>>(() => {
+    const result: Array<{ dept: Dept; staff: DeptStaff[] }> = [];
+    if (dept.staff.length > 0) result.push({ dept, staff: dept.staff });
+    for (const child of childDepts) {
+      if (child.staff.length > 0) result.push({ dept: child, staff: child.staff });
+    }
+    return result;
+  }, [dept, childDepts]);
 
-  const includedCount = dept.staff.filter((s) => !excludedStaff.includes(s.id)).length;
+  const allStaff = useMemo(() => groups.flatMap(g => g.staff), [groups]);
+
+  const filteredGroups = useMemo(() => {
+    const q = search.trim().toLocaleLowerCase('tr-TR');
+    if (!q) return groups;
+    return groups
+      .map(g => ({
+        dept: g.dept,
+        staff: g.staff.filter(
+          s => s.name.toLocaleLowerCase('tr-TR').includes(q) ||
+               s.title.toLocaleLowerCase('tr-TR').includes(q),
+        ),
+      }))
+      .filter(g => g.staff.length > 0);
+  }, [groups, search]);
+
+  const totalCount = allStaff.length;
+  const includedCount = allStaff.filter(s => !excludedStaff.includes(s.id)).length;
 
   const toggleStaff = (id: string) => {
-    setExcludedStaff((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setExcludedStaff(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
   const includeAll = () => {
-    const ids = new Set(dept.staff.map((s) => s.id));
-    setExcludedStaff((prev) => prev.filter((id) => !ids.has(id)));
+    const ids = new Set(allStaff.map(s => s.id));
+    setExcludedStaff(prev => prev.filter(id => !ids.has(id)));
   };
 
   const excludeAll = () => {
-    const ids = dept.staff.map((s) => s.id);
-    setExcludedStaff((prev) => Array.from(new Set([...prev, ...ids])));
+    const ids = allStaff.map(s => s.id);
+    setExcludedStaff(prev => Array.from(new Set([...prev, ...ids])));
   };
 
   return (
@@ -1200,8 +1217,8 @@ function StaffSheet({ dept, excludedStaff, setExcludedStaff }: StaffSheetProps) 
               {dept.name}
             </SheetTitle>
             <SheetDescription className="text-xs">
-              {includedCount} dahil · {dept.staff.length - includedCount} hariç ·{' '}
-              {dept.staff.length} toplam
+              {includedCount} dahil · {totalCount - includedCount} hariç ·{' '}
+              {totalCount} toplam
             </SheetDescription>
           </div>
         </div>
@@ -1233,89 +1250,113 @@ function StaffSheet({ dept, excludedStaff, setExcludedStaff }: StaffSheetProps) 
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {filtered.length === 0 ? (
+        {filteredGroups.length === 0 ? (
           <div className="px-5 py-12 text-center">
             <p className="text-sm" style={{ color: K.TEXT_MUTED }}>
-              {dept.staff.length === 0
-                ? 'Bu departmana doğrudan bağlı personel yok.'
+              {totalCount === 0
+                ? 'Bu departmana bağlı personel yok.'
                 : 'Aramaya uygun kişi yok.'}
             </p>
           </div>
         ) : (
-          <ul className="divide-y" style={{ borderColor: K.BORDER_SOFT }}>
-            {filtered.map((staff) => {
-              const excluded = excludedStaff.includes(staff.id);
-              const included = !excluded;
-              return (
-                <li
-                  key={staff.id}
-                  className="flex items-center gap-3 px-5 py-2.5 transition-colors duration-150 hover:bg-stone-50"
-                >
-                  <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={included}
-                    aria-label={`${staff.name} dahil`}
-                    onClick={() => toggleStaff(staff.id)}
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors duration-150"
-                    style={{
-                      background: included ? K.PRIMARY : K.SURFACE,
-                      border: `1.5px solid ${included ? K.PRIMARY : K.BORDER}`,
-                    }}
-                  >
-                    {included && (
-                      <svg
-                        viewBox="0 0 12 12"
-                        className="h-3 w-3"
-                        fill="none"
-                        stroke="white"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="2.5,6.5 5,9 9.5,3.5" />
-                      </svg>
-                    )}
-                  </button>
+          <div>
+            {filteredGroups.map((group, gIdx) => (
+              <div key={group.dept.id}>
+                {/* Alt birim başlığı — birden fazla grup varsa göster */}
+                {filteredGroups.length > 1 && (
                   <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                    style={{
-                      background: dept.color,
-                      opacity: included ? 1 : 0.4,
-                    }}
+                    className="flex items-center gap-2 px-5 py-2"
+                    style={{ background: K.BG, borderTop: gIdx > 0 ? `1px solid ${K.BORDER_SOFT}` : undefined }}
                   >
-                    {staff.initials}
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: group.dept.color }}
+                    />
+                    <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: K.TEXT_MUTED }}>
+                      {group.dept.name}
+                    </span>
+                    <span className="text-[10px]" style={{ color: K.TEXT_MUTED }}>
+                      ({group.staff.length})
+                    </span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="truncate text-sm font-medium"
-                      style={{
-                        color: included ? K.TEXT_PRIMARY : K.TEXT_MUTED,
-                        textDecoration: excluded ? 'line-through' : 'none',
-                      }}
-                    >
-                      {staff.name}
-                    </p>
-                    <p
-                      className="truncate text-xs"
-                      style={{ color: K.TEXT_MUTED }}
-                    >
-                      {staff.title}
-                    </p>
-                  </div>
-                  {excluded && (
-                    <Badge
-                      variant="outline"
-                      className="h-5 text-[10px]"
-                      style={{ borderColor: K.WARNING, color: K.WARNING }}
-                    >
-                      hariç
-                    </Badge>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                )}
+                <ul className="divide-y" style={{ borderColor: K.BORDER_SOFT }}>
+                  {group.staff.map((staff) => {
+                    const excluded = excludedStaff.includes(staff.id);
+                    const included = !excluded;
+                    return (
+                      <li
+                        key={staff.id}
+                        className="flex items-center gap-3 px-5 py-2.5 transition-colors duration-150 hover:bg-stone-50"
+                      >
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={included}
+                          aria-label={`${staff.name} dahil`}
+                          onClick={() => toggleStaff(staff.id)}
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors duration-150"
+                          style={{
+                            background: included ? K.PRIMARY : K.SURFACE,
+                            border: `1.5px solid ${included ? K.PRIMARY : K.BORDER}`,
+                          }}
+                        >
+                          {included && (
+                            <svg
+                              viewBox="0 0 12 12"
+                              className="h-3 w-3"
+                              fill="none"
+                              stroke="white"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polyline points="2.5,6.5 5,9 9.5,3.5" />
+                            </svg>
+                          )}
+                        </button>
+                        <div
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                          style={{
+                            background: group.dept.color,
+                            opacity: included ? 1 : 0.4,
+                          }}
+                        >
+                          {staff.initials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className="truncate text-sm font-medium"
+                            style={{
+                              color: included ? K.TEXT_PRIMARY : K.TEXT_MUTED,
+                              textDecoration: excluded ? 'line-through' : 'none',
+                            }}
+                          >
+                            {staff.name}
+                          </p>
+                          <p
+                            className="truncate text-xs"
+                            style={{ color: K.TEXT_MUTED }}
+                          >
+                            {staff.title}
+                          </p>
+                        </div>
+                        {excluded && (
+                          <Badge
+                            variant="outline"
+                            className="h-5 text-[10px]"
+                            style={{ borderColor: K.WARNING, color: K.WARNING }}
+                          >
+                            hariç
+                          </Badge>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </>
