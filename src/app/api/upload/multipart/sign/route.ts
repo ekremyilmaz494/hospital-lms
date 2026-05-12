@@ -1,6 +1,6 @@
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
-import { signMultipartParts } from '@/lib/s3'
+import { signMultipartParts, isValidS3KeyForOrg } from '@/lib/s3'
 import { logger } from '@/lib/logger'
 
 /**
@@ -8,13 +8,17 @@ import { logger } from '@/lib/logger'
  * Bir veya daha fazla parça numarası için presigned PUT URL'leri döner.
  * Client paralel olarak bu URL'lere parça gönderir.
  */
-export const POST = withAdminRoute(async ({ request }) => {
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) => {
   try {
     const body = await request.json() as { key: string; uploadId: string; partNumbers: number[] }
     const { key, uploadId, partNumbers } = body
 
     if (!key || !uploadId || !Array.isArray(partNumbers) || partNumbers.length === 0) {
       return errorResponse('key, uploadId ve partNumbers gerekli', 400)
+    }
+    if (!isValidS3KeyForOrg(key, organizationId)) {
+      logger.warn('multipart-sign', 'Org dışı veya geçersiz S3 key reddedildi', { userId: dbUser.id, key: String(key).slice(0, 80) })
+      return errorResponse('Geçersiz dosya referansı', 400)
     }
     if (partNumbers.length > 100) {
       return errorResponse('Tek istekte en fazla 100 parça imzalanabilir', 400)

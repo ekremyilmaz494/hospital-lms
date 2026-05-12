@@ -268,6 +268,22 @@ export async function verifyS3Object(key: string): Promise<number | null> {
   }
 }
 
+/**
+ * Multipart sign/complete/abort gibi raw key kabul eden endpoint'lerde IDOR guard.
+ * Key formatı `videos|documents|audio/{orgId}/{trainingId}/{uuid}.{ext}` —
+ * çağıran admin'in orgId'si key'in 2. segmentine eşit olmalı, aksi halde başka
+ * org'un (uploadId,key) çiftini ele geçirmiş bir kullanıcı imzalama/iptal/birleştirme
+ * yapabilir. UploadId pratikte unguessable ama bu defense-in-depth.
+ */
+const _S3_KEY_RE = /^(videos|documents|audio)\/([^/]+)\/([^/]+)\/[^/]+\.[a-zA-Z0-9]+$/
+export function isValidS3KeyForOrg(key: unknown, orgId: string): boolean {
+  if (typeof key !== 'string' || key.length === 0) return false
+  if (key.includes('://') || key.includes('..')) return false
+  const m = _S3_KEY_RE.exec(key)
+  if (!m) return false
+  return m[2] === orgId
+}
+
 /** Generate backup storage key */
 export function backupKey(orgId: string) {
   return `backups/${orgId}/${Date.now()}.json`

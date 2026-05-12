@@ -5,20 +5,7 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
-
-const S3_KEY_RE = /^(videos|documents|audio)\/([^/]+)\/([^/]+)\/[^/]+\.[a-zA-Z0-9]+$/
-
-// presign endpoint key'leri (videos|documents|audio)/{orgId}/{trainingId}/{uuid}.{ext}
-// formatında üretiyor (lib/s3.ts). url alanı bu format'a uymalı VE orgId çağıran admin'in
-// org'una eşit olmalı; aksi halde admin A başka org'un S3 key'ini draft'a iliştirebilir.
-function isValidS3KeyForOrg(key: string, orgId: string): boolean {
-  if (typeof key !== 'string' || key.length === 0) return false
-  if (key.includes('://')) return false
-  if (key.includes('..')) return false
-  const m = S3_KEY_RE.exec(key)
-  if (!m) return false
-  return m[2] === orgId
-}
+import { isValidS3KeyForOrg } from '@/lib/s3'
 
 /**
  * POST /api/admin/trainings/[id]/draft/append-video

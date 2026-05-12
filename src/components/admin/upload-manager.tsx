@@ -87,6 +87,11 @@ const PART_CONCURRENCY = 3;
 /** Parça başına maksimum deneme — 1 ilk girişim + 2 retry. Transient ağ hataları
  *  ve S3 Transfer Acceleration edge node warm-up gecikmelerine karşı tampon. */
 const PART_MAX_ATTEMPTS = 3;
+/** XHR timeout — bir TCP bağlantısı bu süre boyunca byte taşımazsa fail eder.
+ *  Türkiye→Frankfurt 8 MB parça en kötü 2 Mbps'de ~32 sn; 5 dk bol tampon.
+ *  Tek-PUT branch'inde 10 MB altı dosyalar için aynı limit yeterli (default 0
+ *  = sınırsız stuck TCP'lerde sonsuza dek bekliyordu — bug fix). */
+const XHR_TIMEOUT_MS = 5 * 60_000;
 
 const UploadManagerContext = createContext<UploadManagerContextValue | null>(null);
 
@@ -286,6 +291,7 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         xhr.ontimeout = () => failUpload('Bağlantı zaman aşımına uğradı.');
 
         xhr.open('PUT', uploadUrl);
+        xhr.timeout = XHR_TIMEOUT_MS;
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
         return;
@@ -385,6 +391,7 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
           };
           xhr.ontimeout = () => { activeXhrs.delete(partNumber); reject(new Error(`Parça ${partNumber} zaman aşımı`)); };
           xhr.open('PUT', url);
+          xhr.timeout = XHR_TIMEOUT_MS;
           xhr.send(blob);
         });
       };
