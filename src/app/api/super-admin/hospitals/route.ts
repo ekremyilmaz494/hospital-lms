@@ -37,7 +37,15 @@ export const GET = withSuperAdminRoute(async ({ request }) => {
       where,
       include: {
         subscription: { include: { plan: true } },
-        _count: { select: { users: true, trainings: true } },
+        _count: {
+          select: {
+            users: true,
+            // "Eğitim sayısı" yayındaki + aktif kayıtları gösterir — draft/arşiv
+            // sayıma girmez. Aksi halde hastane admin paneliyle tutarsız olur
+            // (admin sadece yayındaki eğitimleri görür).
+            trainings: { where: { isActive: true, publishStatus: { not: 'archived' } } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
