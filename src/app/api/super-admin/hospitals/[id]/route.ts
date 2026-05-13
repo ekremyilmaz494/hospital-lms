@@ -16,7 +16,15 @@ export const GET = withSuperAdminRoute<{ id: string }>(async ({ params }) => {
         orderBy: { createdAt: 'desc' },
       },
       trainings: { orderBy: { createdAt: 'desc' }, take: 10 },
-      _count: { select: { users: true, trainings: true, auditLogs: true } },
+      _count: {
+        select: {
+          users: true,
+          // Aktif eğitim sayısı — draft/arşiv hariç (hastane admin paneliyle
+          // tutarlı sayım).
+          trainings: { where: { isActive: true, publishStatus: { not: 'archived' } } },
+          auditLogs: true,
+        },
+      },
     },
   })
 
