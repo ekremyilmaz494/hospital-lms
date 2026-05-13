@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
-import { getStreamUrl } from '@/lib/s3'
+import { resolveTrainingVideoUrl } from '@/lib/training-video-url'
 import type { AttemptStatus } from '@/lib/exam-state-machine'
 
 /** Get signed streaming URL for a video */
@@ -29,7 +29,8 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
   })
   if (!video) return errorResponse('Video not found', 404)
 
-  const streamUrl = await getStreamUrl(video.videoKey)
+  const streamUrl = await resolveTrainingVideoUrl(video)
+  if (!streamUrl) return errorResponse('Video şu anda yüklenemiyor', 503)
 
   return jsonResponse({ streamUrl, video }, 200, { 'Cache-Control': 'private, no-store' })
 }, { requireOrganization: true })
