@@ -69,7 +69,11 @@ export const POST = withAdminRoute<{ id: string }>(
           }
 
           const updated = await tx.training.updateMany({
-            where: { organizationId, feedbackMandatory: { not: target.isMandatory } },
+            where: {
+              organizationId,
+              publishStatus: 'published',
+              feedbackMandatory: { not: target.isMandatory },
+            },
             data: { feedbackMandatory: target.isMandatory },
           })
           return { count: updated.count, isMandatory: target.isMandatory, title: target.title }

@@ -5,7 +5,6 @@ import { submitExamSchema } from '@/lib/validations'
 import { checkRateLimit, clearExamTimer } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { logger } from '@/lib/logger'
-import { sendEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity-logger'
 import { isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
 import { issueCertificateForAttempt } from '@/lib/certificate-helpers'
@@ -267,19 +266,6 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   const tabSwitchCount = parsed.data.tabSwitchCount ?? 0
   const suspicious = tabSwitchCount >= 3
 
-  // Sertifika gating'i çift kontrol: org'da aktif feedback form var mı?
-  // Yoksa feedbackMandatory=true olsa bile sertifika ÜRETİLİR — aksi halde
-  // admin form yaratmadan zorunluluğu açtığında personel sertifika alamaz
-  // (form yok + bekliyoruz kilit). Kullanıcının çıkışı: form aktive edilince
-  // bekleyen attempt'ler için sertifika feedback/submit'te idempotent üretilir.
-  const hasActiveForm = attempt.training.feedbackMandatory
-    ? !!(await prisma.trainingFeedbackForm.findFirst({
-        where: { organizationId, isActive: true, isArchived: false },
-        select: { id: true },
-      }))
-    : false
-  const shouldDeferCertificate = isPassed && attempt.training.feedbackMandatory && hasActiveForm
-
   // Non-critical: bildirim, sertifika, SMG, audit — response'u bloklamaz
   void Promise.allSettled([
     prisma.notification.create({
@@ -294,12 +280,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
         relatedTrainingId: attempt.trainingId,
       },
     }),
-    // Sertifika üretimi:
-    //  - feedbackMandatory=false VEYA aktif form yok → post-exam başarısı
-    //    sertifikayı hemen üretir (eski davranış + kilit-koruma)
-    //  - feedbackMandatory=true VE aktif form VAR → sertifika feedback'e ertelenir;
-    //    /api/feedback/submit içinde idempotent helper'la üretilir.
-    isPassed && !shouldDeferCertificate
+    isPassed
       ? issueCertificateForAttempt({
           attemptId: attempt.id,
           userId: dbUser.id,
@@ -373,9 +354,12 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   let feedbackRequired = false
   if (phase === 'post') {
     try {
-      // hasActiveForm yukarıda hesaplandı; tekrar query atmaya gerek yok.
+      const activeFormExists = !!(await prisma.trainingFeedbackForm.findFirst({
+        where: { organizationId, isActive: true, isArchived: false },
+        select: { id: true },
+      }))
       feedbackRequired =
-        hasActiveForm &&
+        activeFormExists &&
         isAttemptFeedbackTriggered(
           { status: 'completed', isPassed, attemptNumber: attempt.attemptNumber },
           attempt.assignment.originalMaxAttempts,

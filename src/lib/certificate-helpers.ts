@@ -7,9 +7,8 @@ import { logger } from '@/lib/logger'
 /**
  * EY.FR.40 — Sertifika üretimini idempotent şekilde yapan tek nokta.
  *
- * İki çağrı yerinden tetiklenir:
- *   1) /api/exam/[id]/submit — feedbackMandatory=false eğitimlerde post-exam başarısı sonrası
- *   2) /api/feedback/submit  — feedbackMandatory=true eğitimlerde feedback verildikten sonra
+ * Tek çağrı noktası: /api/exam/[id]/submit — post-exam başarısı sonrası her eğitimde.
+ * Feedback formu cert üretiminden bağımsız — form gösterilir ama cert'i engellemez.
  *
  * `Certificate.attemptId` unique → DB seviyesinde de race-safe; existingCert check
  * normal koşulda yeterli, paralel istek olursa P2002 yutulur.
