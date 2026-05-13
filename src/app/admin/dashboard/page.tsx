@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Users, GraduationCap, TrendingUp, AlertTriangle, Trophy, Activity, Clock,
   Plus, Send, Download, Building2, UserPlus, ShieldCheck,
-  Radio, BookOpen, RefreshCw, ChevronRight,
+  Radio, BookOpen, RefreshCw, ChevronRight, Medal, Crown,
+  CheckCircle2, XCircle, Info, AlertCircle,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useRealtimeExams } from '@/hooks/use-realtime-exams';
@@ -83,6 +84,19 @@ interface CertsData {
 const iconMap: Record<string, typeof Users> = { Users, GraduationCap, TrendingUp, AlertTriangle, ShieldCheck };
 
 const typeColors: Record<string, string> = { success: K.PRIMARY, error: '#b91c1c', info: '#1d4ed8', warning: '#b45309' };
+
+const activityTypeStyle: Record<string, { icon: typeof CheckCircle2; color: string; bg: string; ring: string }> = {
+  success: { icon: CheckCircle2, color: '#047857', bg: 'rgba(16, 185, 129, 0.14)', ring: 'rgba(16, 185, 129, 0.30)' },
+  error:   { icon: XCircle,      color: '#b91c1c', bg: 'rgba(239, 68, 68, 0.14)',  ring: 'rgba(239, 68, 68, 0.30)' },
+  warning: { icon: AlertCircle,  color: '#b45309', bg: 'rgba(245, 158, 11, 0.16)', ring: 'rgba(245, 158, 11, 0.32)' },
+  info:    { icon: Info,         color: '#1d4ed8', bg: 'rgba(59, 130, 246, 0.14)', ring: 'rgba(59, 130, 246, 0.30)' },
+};
+
+const medalTokens: { bg: string; ring: string; icon: typeof Crown; iconColor: string; label: string }[] = [
+  { bg: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', ring: 'rgba(245, 158, 11, 0.45)', icon: Crown,  iconColor: '#7c2d12', label: 'Şampiyon' },
+  { bg: 'linear-gradient(135deg, #e5e7eb 0%, #9ca3af 100%)', ring: 'rgba(156, 163, 175, 0.45)', icon: Medal,  iconColor: '#374151', label: 'İkinci'    },
+  { bg: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)', ring: 'rgba(180, 83, 9, 0.45)',   icon: Medal,  iconColor: '#451a03', label: 'Üçüncü'    },
+];
 
 const examStatusLabel: Record<string, { label: string; color: string; bg: string }> = {
   pre_exam: { label: 'Ön sınav', color: '#1d4ed8', bg: K.INFO_BG },
@@ -490,7 +504,7 @@ export default function AdminDashboard() {
         ) : (
           <KChartCard title="Departman Karşılaştırması" icon={<Building2 size={15} />}>
             {departmentComparison.length > 0 ? (
-              <div className="h-64">
+              <div style={{ minHeight: 256, maxHeight: 460, overflow: 'hidden' }} className="flex flex-col">
                 <DepartmentBar data={departmentComparison} />
               </div>
             ) : (
@@ -514,36 +528,104 @@ export default function AdminDashboard() {
           ) : activity.isLoading ? (
             <ListSkeleton rows={4} />
           ) : (
-            <MagicCard gradientColor="rgba(168, 85, 247, 0.04)" gradientOpacity={0.4} className="p-0" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
+            <MagicCard gradientColor="rgba(245, 158, 11, 0.05)" gradientOpacity={0.4} className="p-0" style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
               <div className="p-6">
                 <div className="mb-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: K.WARNING_BG }}>
-                      <Trophy className="h-4 w-4" style={{ color: K.ACCENT }} />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.18) 0%, rgba(245, 158, 11, 0.22) 100%)' }}>
+                      <Trophy className="h-4 w-4" style={{ color: '#b45309' }} />
                     </div>
-                    <h3 style={{ fontSize: 18, fontWeight: 700, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}>En Başarılı Personeller</h3>
+                    <div>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY, letterSpacing: '-0.01em' }}>En Başarılı Personeller</h3>
+                      <p className="text-[11px] font-medium" style={{ color: K.TEXT_MUTED, letterSpacing: '0.02em' }}>Bu dönem performans liderleri</p>
+                    </div>
                   </div>
-                  <Link href="/admin/staff" className="text-xs font-semibold" style={{ color: K.PRIMARY }}>Tümü</Link>
+                  <Link href="/admin/staff" className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors hover:opacity-80" style={{ background: K.PRIMARY_LIGHT, color: K.PRIMARY }}>
+                    Tümü <ChevronRight className="h-3 w-3" />
+                  </Link>
                 </div>
                 {topPerformers.length > 0 ? (
-                  <div className="space-y-2">
-                    {topPerformers.map((p, idx) => (
-                      <div key={p.name} className="clickable-row flex items-center gap-3 rounded-xl px-3 py-3">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: idx < 3 ? K.ACCENT : K.TEXT_MUTED }}>{idx + 1}</div>
-                        <Avatar className="h-9 w-9"><AvatarFallback className="text-xs font-semibold text-white" style={{ background: p.color }}>{p.initials}</AvatarFallback></Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="truncate text-sm font-semibold" style={{ color: K.TEXT_PRIMARY }}>{p.name}</p>
-                          <p className="text-xs" style={{ color: K.TEXT_MUTED }}>{p.department}</p>
+                  <div className="space-y-1.5">
+                    {topPerformers.map((p, idx) => {
+                      const medal = idx < 3 ? medalTokens[idx] : null;
+                      const scoreTier = p.score >= 95 ? { color: K.PRIMARY, bg: 'rgba(16, 185, 129, 0.10)' }
+                        : p.score >= 80 ? { color: '#b45309', bg: 'rgba(245, 158, 11, 0.10)' }
+                        : { color: K.TEXT_SECONDARY, bg: 'rgba(120, 113, 108, 0.10)' };
+                      const isLeader = idx === 0;
+                      return (
+                        <div
+                          key={p.name}
+                          className="group relative grid items-center gap-3 rounded-xl px-3 py-2.5 transition-colors"
+                          style={{
+                            gridTemplateColumns: 'auto auto minmax(0, 1fr) auto',
+                            background: isLeader ? 'linear-gradient(90deg, rgba(245, 158, 11, 0.06) 0%, transparent 100%)' : 'transparent',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = isLeader ? 'linear-gradient(90deg, rgba(245, 158, 11, 0.10) 0%, rgba(245, 158, 11, 0.02) 100%)' : 'rgba(15, 23, 42, 0.03)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = isLeader ? 'linear-gradient(90deg, rgba(245, 158, 11, 0.06) 0%, transparent 100%)' : 'transparent'; }}
+                        >
+                          {/* Rank rozeti — top 3 madalya, sonrası numerik */}
+                          {medal ? (
+                            <div
+                              className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                              style={{
+                                background: medal.bg,
+                                boxShadow: `0 0 0 2px ${K.SURFACE}, 0 0 0 4px ${medal.ring}, 0 2px 6px ${medal.ring}`,
+                              }}
+                              title={medal.label}
+                            >
+                              <medal.icon className="h-3.5 w-3.5" style={{ color: medal.iconColor }} strokeWidth={2.5} />
+                            </div>
+                          ) : (
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ background: K.BG, border: `1.5px solid ${K.BORDER_LIGHT}`, color: K.TEXT_MUTED, fontVariantNumeric: 'tabular-nums' }}>
+                              {idx + 1}
+                            </div>
+                          )}
+
+                          {/* Avatar — gradient */}
+                          <Avatar className="h-10 w-10 shrink-0">
+                            <AvatarFallback
+                              className="text-xs font-bold text-white"
+                              style={{
+                                background: `linear-gradient(135deg, ${p.color} 0%, color-mix(in srgb, ${p.color} 70%, #000) 100%)`,
+                                boxShadow: '0 1px 2px rgba(15, 23, 42, 0.10)',
+                              }}
+                            >
+                              {p.initials}
+                            </AvatarFallback>
+                          </Avatar>
+
+                          {/* Info */}
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold leading-tight" style={{ color: K.TEXT_PRIMARY, letterSpacing: '-0.005em' }} title={p.name}>
+                              {p.name}
+                            </p>
+                            <p className="mt-0.5 truncate text-[11px] font-medium uppercase" style={{ color: K.TEXT_MUTED, letterSpacing: '0.04em' }}>
+                              {p.department}
+                            </p>
+                          </div>
+
+                          {/* Score kapsülü */}
+                          <div className="flex shrink-0 items-center gap-2">
+                            <div className="text-right leading-tight">
+                              <div
+                                className="inline-flex items-baseline gap-0.5 rounded-lg px-2 py-0.5 font-mono tabular-nums"
+                                style={{ background: scoreTier.bg, color: scoreTier.color, fontSize: 14, fontWeight: 800 }}
+                              >
+                                <span style={{ fontSize: 10, opacity: 0.7 }}>%</span>{p.score}
+                              </div>
+                              <div className="mt-0.5 text-[10px] font-medium" style={{ color: K.TEXT_MUTED }}>
+                                {p.courses} eğitim
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold font-mono" style={{ color: p.score >= 95 ? K.PRIMARY : K.TEXT_PRIMARY }}>{p.score}%</p>
-                          <p className="text-[10px]" style={{ color: K.TEXT_MUTED }}>{p.courses} eğitim</p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="text-sm" style={{ color: K.TEXT_MUTED }}>Personel sınavları tamamladıkça performans verileri görünecek.</div>
+                  <div className="rounded-xl px-4 py-8 text-center text-sm" style={{ background: K.BG, color: K.TEXT_MUTED, border: `1px dashed ${K.BORDER_LIGHT}` }}>
+                    Personel sınavları tamamladıkça performans verileri burada görünecek.
+                  </div>
                 )}
               </div>
             </MagicCard>
@@ -561,32 +643,68 @@ export default function AdminDashboard() {
               <div className="p-6">
                 <div className="mb-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: K.PRIMARY_LIGHT }}>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(13, 150, 104, 0.14) 0%, rgba(13, 150, 104, 0.20) 100%)' }}>
                       <Activity className="h-4 w-4" style={{ color: K.PRIMARY }} />
                     </div>
-                    <h3 style={{ fontSize: 18, fontWeight: 700, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}>Son Aktiviteler</h3>
+                    <div>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY, letterSpacing: '-0.01em' }}>Son Aktiviteler</h3>
+                      <p className="text-[11px] font-medium" style={{ color: K.TEXT_MUTED, letterSpacing: '0.02em' }}>Canlı sistem olayları</p>
+                    </div>
                   </div>
-                  <Link href="/admin/audit-logs" className="text-xs font-semibold" style={{ color: K.PRIMARY }}>Tümü</Link>
+                  <Link href="/admin/audit-logs" className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors hover:opacity-80" style={{ background: K.PRIMARY_LIGHT, color: K.PRIMARY }}>
+                    Tümü <ChevronRight className="h-3 w-3" />
+                  </Link>
                 </div>
                 {recentActivity.length > 0 ? (
-                  <div className="space-y-4">
-                    {recentActivity.map((item, idx) => (
-                      <div key={idx} className="flex gap-3">
-                        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: `${typeColors[item.type] ?? K.INFO}15` }}>
-                          <div className="h-2 w-2 rounded-full" style={{ background: typeColors[item.type] ?? K.INFO }} />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm" style={{ color: K.TEXT_PRIMARY }}><span className="font-semibold">{item.user}</span> <span style={{ color: K.TEXT_SECONDARY }}>{item.action}</span></p>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Clock className="h-3 w-3" style={{ color: K.TEXT_MUTED }} />
-                            <span className="text-[11px] font-mono" style={{ color: K.TEXT_MUTED }}>{elapsedLabel(item.time)}</span>
+                  <div className="relative">
+                    {/* Timeline rail */}
+                    <span
+                      aria-hidden
+                      className="absolute left-[15px] top-3 bottom-3 w-px"
+                      style={{ background: `linear-gradient(180deg, ${K.BORDER_LIGHT} 0%, ${K.BORDER_LIGHT} 80%, transparent 100%)` }}
+                    />
+                    <div className="space-y-3.5">
+                      {recentActivity.map((item, idx) => {
+                        const style = activityTypeStyle[item.type] ?? activityTypeStyle.info;
+                        const Icon = style.icon;
+                        return (
+                          <div key={idx} className="group relative flex gap-3">
+                            {/* Knot */}
+                            <div
+                              className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform group-hover:scale-110"
+                              style={{
+                                background: style.bg,
+                                boxShadow: `0 0 0 2px ${K.SURFACE}, 0 0 0 4px ${style.ring}`,
+                              }}
+                            >
+                              <Icon className="h-3.5 w-3.5" style={{ color: style.color }} strokeWidth={2.5} />
+                            </div>
+
+                            <div className="min-w-0 flex-1 pt-0.5">
+                              <p className="text-sm leading-snug" style={{ color: K.TEXT_PRIMARY }}>
+                                <span className="font-semibold" style={{ color: K.TEXT_PRIMARY }}>{item.user}</span>
+                                {' '}
+                                <span style={{ color: K.TEXT_SECONDARY }}>{item.action}</span>
+                              </p>
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                  style={{ background: K.BG, border: `1px solid ${K.BORDER_LIGHT}`, color: K.TEXT_MUTED }}
+                                >
+                                  <Clock className="h-2.5 w-2.5" />
+                                  <span className="font-mono tabular-nums">{elapsedLabel(item.time)}</span>
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-sm" style={{ color: K.TEXT_MUTED }}>Sertifika süreleri yaklaştıkça hatırlatmalar burada görünecek.</div>
+                  <div className="rounded-xl px-4 py-8 text-center text-sm" style={{ background: K.BG, color: K.TEXT_MUTED, border: `1px dashed ${K.BORDER_LIGHT}` }}>
+                    Sistem olayları gerçekleştikçe burada görünecek.
+                  </div>
                 )}
               </div>
             </MagicCard>
