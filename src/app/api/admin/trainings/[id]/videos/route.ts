@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
-import { getUploadUrl, videoKey, documentKey, deleteObject, checkStorageQuota } from '@/lib/s3'
+import { getUploadUrl, videoKey, documentKey, audioKey, deleteObject, checkStorageQuota } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -69,7 +69,9 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
 
   const key = mediaType === 'pdf'
     ? documentKey(organizationId, id, body.filename)
-    : videoKey(organizationId, id, body.filename)
+    : mediaType === 'audio'
+      ? audioKey(organizationId, id, body.filename)
+      : videoKey(organizationId, id, body.filename)
 
   // Get upload URL first — if S3 fails, no orphan DB record
   let uploadUrl: string
@@ -85,7 +87,9 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
       trainingId: id,
       title: body.title,
       description: body.description,
-      videoUrl: mediaType === 'video' ? `${process.env.AWS_CLOUDFRONT_DOMAIN}/${key}` : key,
+      // videoKey kanonik kaynaktır; videoUrl artık DB'de tutulmaz.
+      // Read tarafında resolveTrainingVideoUrl(video) ile signed URL üretilir.
+      videoUrl: '',
       videoKey: key,
       durationSeconds: body.durationSeconds,
       contentType: mediaType,

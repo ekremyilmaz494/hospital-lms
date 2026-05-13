@@ -238,6 +238,28 @@ super_admin null `organizationId` ile gelirse 400 döner, route'a girmez. Bu, "g
 
 ---
 
+## 🎬 Video URL Kuralı (KRİTİK)
+
+`TrainingVideo.videoUrl` field'ı **upload zamanı artığıdır** — yeni kayıtlarda boş string olarak yazılır. Kanonik kaynak `videoKey`'dir. Frontend'in gördüğü her video URL'i şu helper'dan geçmek zorundadır:
+
+```ts
+import { resolveTrainingVideoUrl, resolveTrainingDocumentUrl } from '@/lib/training-video-url'
+
+const url = await resolveTrainingVideoUrl(video)        // signed URL veya ''
+const docUrl = await resolveTrainingDocumentUrl(video)  // signed URL veya ''
+```
+
+**Kurallar:**
+
+1. **Raw `videoUrl` döndürme YASAK.** API response'ta `videoUrl: v.videoUrl` yapma — `perf-check.js` `raw-video-url` kuralı commit'i engeller
+2. **Fallback `v.videoUrl` YASAK.** `getStreamUrl()` başarısız olursa `''` döner; ham `v.videoUrl`'ye fallback'e ASLA yapma. Frontend `!videoUrl` ise "İçerik şu anda yüklenemiyor" gösterir (`admin/trainings/[id]/page.tsx`'te zaten implementli)
+3. **Key family ayrımı:** Audio → `audioKey()`, PDF → `documentKey()`, video → `videoKey()`. Hepsini `videoKey()` ile çağırma — `videoKey()` ses uzantılarını reddeder, key prefix karışır
+4. **Upload route'ta `videoUrl: ''` yaz.** Asla `${AWS_CLOUDFRONT_DOMAIN}/${key}` interpolasyonu yapma — bu DB'ye zehirli unsigned URL yazar (CloudFront private distribution'da 403 üretir)
+
+**Neden bu kural var:** Bu sorun 5-6 kez düzeltilip her seferinde geri geldi (commit'ler: `cbf6251`, `adc2710`, `8e89267`, `1c91960`, `f74969c`). Upload route'unun DB'ye unsigned CloudFront URL yazması + detail route'unun bu URL'ye sessizce fallback yapması klasik kombosu. `perf-check.js`'in `raw-video-url` kuralı + `src/lib/__tests__/training-video-url.test.ts` + `src/app/api/admin/trainings/[id]/videos/__tests__/route.test.ts` birlikte regresyon engeli kurar — bu üç koruma katmanı bilinçli olarak ekildi, çıkarma.
+
+---
+
 ## 🔐 Auth & Redirect Döngüsü Önleme (KRİTİK)
 
 Geçmiş sonsuz yenilenme döngülerinden çıkarılmış kurallar:

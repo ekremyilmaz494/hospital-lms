@@ -9,6 +9,11 @@ import { logger } from '@/lib/logger'
  * GET /api/stream/[videoId]
  * Proxy content from S3 — supports Range requests for video seeking,
  * and inline display for PDF documents.
+ *
+ * @deprecated Bu proxy route legacy `/uploads/...` path'leri için tutulur;
+ *   yeni kayıtlar `resolveTrainingVideoUrl()` (lib/training-video-url.ts) ile
+ *   doğrudan CloudFront signed URL alır. Bkz: CLAUDE.md "Video URL Kuralı".
+ *   Commit `f74969c` staff exam akışını bu route'tan çıkardı (CDN'e taşıdı).
  */
 export const GET = withStaffRoute<{ videoId: string }>(
   async ({ request, params, organizationId }) => {

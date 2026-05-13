@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { getAttemptStatus } from '@/lib/exam-helpers'
-import { getStreamUrl } from '@/lib/s3'
+import { resolveTrainingVideoUrl, resolveTrainingDocumentUrl } from '@/lib/training-video-url'
 import type { AttemptStatus, AssignmentStatus } from '@/lib/exam-state-machine'
 
 export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
@@ -76,9 +76,10 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
     })
 
     const videoList = await Promise.all(videos.map(async (v) => {
-      const hasS3Key = v.videoKey && !v.videoKey.startsWith('/uploads')
-      const videoUrl = hasS3Key ? await getStreamUrl(v.videoKey!) : v.videoUrl
-      const documentUrl = v.documentKey ? await getStreamUrl(v.documentKey) : undefined
+      const [videoUrl, documentUrl] = await Promise.all([
+        resolveTrainingVideoUrl(v),
+        resolveTrainingDocumentUrl(v),
+      ])
       return {
         id: v.id,
         title: v.title,
@@ -88,7 +89,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
         pageCount: v.pageCount,
         completed: true,
         lastPosition: 0,
-        documentUrl,
+        documentUrl: documentUrl || undefined,
       }
     }))
 
@@ -130,11 +131,12 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
 
   const videoList = await Promise.all(videos.map(async (v) => {
     const p = progressMap.get(v.id)
-    // S3 content → CloudFront signed URL (CDN edge delivery)
-    // Legacy /uploads videos → use path directly
-    const hasS3Key = v.videoKey && !v.videoKey.startsWith('/uploads')
-    const url = hasS3Key ? await getStreamUrl(v.videoKey!) : v.videoUrl
-    const documentUrl = v.documentKey ? await getStreamUrl(v.documentKey) : undefined
+    // Tek kaynak: resolveTrainingVideoUrl() — signed CloudFront URL veya legacy /uploads path.
+    // Hata olursa '' döner, frontend "İçerik yüklenemiyor" gösterir.
+    const [url, documentUrl] = await Promise.all([
+      resolveTrainingVideoUrl(v),
+      resolveTrainingDocumentUrl(v),
+    ])
     return {
       id: v.id,
       title: v.title,
@@ -144,7 +146,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
       pageCount: v.pageCount,
       completed: p?.isCompleted ?? false,
       lastPosition: p?.lastPositionSeconds ?? 0,
-      documentUrl,
+      documentUrl: documentUrl || undefined,
     }
   }))
 

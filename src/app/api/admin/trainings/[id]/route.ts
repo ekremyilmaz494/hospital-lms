@@ -6,7 +6,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { updateTrainingSchema } from '@/lib/validations'
-import { getStreamUrl } from '@/lib/s3'
+import { resolveTrainingVideoUrl } from '@/lib/training-video-url'
 import {
   ATTEMPT_TERMINAL_STATUSES,
   ASSIGNMENT_TERMINAL_STATUSES,
@@ -66,18 +66,11 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
 
   if (!training) return errorResponse('Training not found', 404)
 
-  // S3 URL generation (parallel) — per-video try/catch: tek bir video sign hatası
-  // tüm Promise.all'ı çökertmesin, diğer videolar yine erişilebilir olsun.
+  // Signed URL üretimi tek noktada: resolveTrainingVideoUrl().
+  // Hata olursa helper '' döner ve frontend "İçerik şu anda yüklenemiyor" mesajını gösterir.
+  // Ham v.videoUrl'ye fallback YAPMAZ — bkz: CLAUDE.md "Video URL Kuralı".
   const streamUrls = await Promise.all(
-    training.videos.map(async (v) => {
-      if (!v.videoKey) return null
-      try {
-        return await getStreamUrl(v.videoKey)
-      } catch (err) {
-        console.error('[trainings/[id]] getStreamUrl failed', { videoId: v.id, err })
-        return null
-      }
-    }),
+    training.videos.map((v) => resolveTrainingVideoUrl(v)),
   )
 
   // Assignment stats from groupBy
@@ -142,7 +135,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
     videos: training.videos.map((v, i) => ({
       id: v.id,
       title: v.title,
-      videoUrl: streamUrls[i] ?? v.videoUrl,
+      videoUrl: streamUrls[i],
       duration: `${Math.floor(v.durationSeconds / 60)}:${String(v.durationSeconds % 60).padStart(2, '0')}`,
       order: v.sortOrder,
       contentType: v.contentType,

@@ -89,6 +89,23 @@ for (const file of apiFiles) {
       }
     }
 
+    // ── Rule N: Raw TrainingVideo.videoUrl döndürme yasak (error) ──
+    // CLAUDE.md "Video URL Kuralı": API response'larda v.videoUrl/video.videoUrl
+    // ham olarak döndürülemez. Mutlaka resolveTrainingVideoUrl() helper'ından geçer.
+    // Bu kural admin paneli videosunun 5-6 kez bozulup geri gelmesinin önüne geçer.
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('perf-check-disable-line')) continue;
+      if (/videoUrl:\s*(?:v|video|item|row|tv)\.videoUrl\b/.test(lines[i])) {
+        issues.push({
+          level: 'error',
+          file: fileShort,
+          line: i + 1,
+          rule: 'raw-video-url',
+          msg: 'Raw v.videoUrl API response\'a doniyor. resolveTrainingVideoUrl(v) kullan — bkz: CLAUDE.md "Video URL Kurali". COMMIT ENGELLENDI.',
+        });
+      }
+    }
+
     // ── Rule 4: include without select (warn) ──
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].includes('perf-check-disable-line')) continue;
