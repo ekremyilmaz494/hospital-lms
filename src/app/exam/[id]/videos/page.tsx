@@ -271,24 +271,31 @@ export default function VideoPlayerPage() {
 
   useEffect(() => {
     if (isReview || !isPlaying || !currentVideo) return;
+    // `currentTime` deps'e EKLENMEZ — 250ms'de bir güncellendiği için interval'i sürekli
+    // resetler, 15sn timer hiç ateşlenmez. Pozisyonu canlı kaynaktan (videoRef) oku.
     const heartbeat = setInterval(() => {
+      const time = videoRef.current?.currentTime ?? 0;
       fetch(`/api/exam/${id}/videos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoId: currentVideo.id, watchedTime: currentTime, position: currentTime }),
+        body: JSON.stringify({ videoId: currentVideo.id, watchedTime: time, position: time }),
       }).catch(() => setHeartbeatErrors(prev => prev + 1));
     }, 15000);
     return () => clearInterval(heartbeat);
-  }, [isPlaying, currentVideo?.id, currentTime, id, isReview, currentVideo]);
+  }, [isPlaying, currentVideo?.id, id, isReview, currentVideo]);
 
   useEffect(() => {
     const flushPosition = () => {
-      if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
-      if (isReview || !currentVideo || currentTime <= 0) return;
+      const video = videoRef.current;
+      if (video && !video.paused) video.pause();
+      // Pozisyonu canlı kaynaktan oku; `currentTime` state'i deps'e konursa
+      // 250ms'de bir listener re-mount olur, gereksiz GC + listener trashing.
+      const time = video?.currentTime ?? 0;
+      if (isReview || !currentVideo || time <= 0) return;
       const payload = JSON.stringify({
         videoId: currentVideo.id,
-        watchedTime: currentTime,
-        position: currentTime,
+        watchedTime: time,
+        position: time,
       });
       const blob = new Blob([payload], { type: 'application/json' });
       navigator.sendBeacon(`/api/exam/${id}/videos`, blob);
@@ -307,7 +314,7 @@ export default function VideoPlayerPage() {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pagehide', handlePageHide);
     };
-  }, [currentVideo, currentTime, id, isReview]);
+  }, [currentVideo, id, isReview]);
 
   useEffect(() => {
     const pos = currentVideo?.lastPosition ?? 0;
@@ -317,11 +324,12 @@ export default function VideoPlayerPage() {
   useEffect(() => {
     if (isReview) return;
     const saveOnExit = () => {
-      if (currentVideo && currentTime > 0) {
+      const time = videoRef.current?.currentTime ?? 0;
+      if (currentVideo && time > 0) {
         const payload = JSON.stringify({
           videoId: currentVideo.id,
-          watchedTime: currentTime,
-          position: currentTime,
+          watchedTime: time,
+          position: time,
         });
         const blob = new Blob([payload], { type: 'application/json' });
         navigator.sendBeacon(`/api/exam/${id}/videos`, blob);
@@ -334,7 +342,7 @@ export default function VideoPlayerPage() {
       window.removeEventListener('pagehide', saveOnExit);
       window.removeEventListener('beforeunload', saveOnExit);
     };
-  }, [currentVideo?.id, currentTime, id, isReview, currentVideo]);
+  }, [currentVideo?.id, id, isReview, currentVideo]);
 
   useEffect(() => {
     if (isReview) return;
