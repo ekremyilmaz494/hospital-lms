@@ -104,6 +104,7 @@ export default function VideoPlayerPage() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [videoError, setVideoError] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const lastAllowedTime = useRef(0);
   const [orientationHintDismissed, setOrientationHintDismissed] = useState(true);
 
@@ -125,6 +126,7 @@ export default function VideoPlayerPage() {
     setDuration(0);
     setIsPlaying(false);
     setVideoError(false);
+    setIsBuffering(false);
   }, []);
 
   useEffect(() => { videosRef.current = videosData; }, [videosData]);
@@ -158,6 +160,46 @@ export default function VideoPlayerPage() {
     if (video.paused) video.play().catch(() => {});
     else video.pause();
   }, []);
+
+  // Telemetry — playback anomaly event'lerini server'a yazar (best-effort, sessiz fail).
+  // Plan: idm-aws-taraf-nda-bir-dynamic-wirth.md Faz 1. Network metrikleri ile birlikte
+  // "video duraklıyor" şikayetinin gerçek root cause'unu (buffer underrun, CDN MISS,
+  // MEDIA_ERR_NETWORK, vs.) ölçmek için. currentVideo bu satıra göre yukarıda tanımlı.
+  const reportVideoEvent = useCallback(
+    (event: string, extra: Record<string, unknown> = {}) => {
+      const v = videoRef.current;
+      const conn = (navigator as unknown as { connection?: { effectiveType?: string; downlink?: number; rtt?: number } }).connection;
+      const payload = {
+        event,
+        videoId: currentVideo?.id ?? null,
+        currentTime: v?.currentTime ?? null,
+        duration: v?.duration ?? null,
+        readyState: v?.readyState ?? null,
+        networkState: v?.networkState ?? null,
+        bufferedEnd: v?.buffered?.length ? v.buffered.end(v.buffered.length - 1) : null,
+        effectiveType: conn?.effectiveType ?? null,
+        downlink: conn?.downlink ?? null,
+        rtt: conn?.rtt ?? null,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        timestamp: Date.now(),
+        ...extra,
+      };
+      try {
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        // sendBeacon: oynatma kesilse bile (örn. sekme kapanması) garantili teslimat
+        if (navigator.sendBeacon?.('/api/telemetry/video-event', blob)) return;
+      } catch {
+        /* sendBeacon yoksa fetch'e düş */
+      }
+      fetch('/api/telemetry/video-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      }).catch(() => { /* telemetry best-effort */ });
+    },
+    [currentVideo?.id],
+  );
 
   const toggleMute = useCallback(() => {
     const video = videoRef.current;
@@ -618,10 +660,36 @@ export default function VideoPlayerPage() {
                           }
                         }
                       }}
-                      onPlay={() => setIsPlaying(true)}
+                      onPlay={() => { setIsPlaying(true); setIsBuffering(false); }}
                       onPause={() => setIsPlaying(false)}
+                      onPlaying={() => setIsBuffering(false)}
                       onEnded={handleVideoEnded}
-                      onError={() => setVideoError(true)}
+                      onWaiting={() => {
+                        // Browser buffer'ı bekliyor — donmuş değil, yükleniyor.
+                        // "Duraklıyor" şikayetlerinin en yaygın nedeni: kullanıcıya görsel
+                        // geri bildirim yoktu. Plan: idm-aws-taraf-nda-bir-dynamic-wirth.md
+                        setIsBuffering(true);
+                        reportVideoEvent('waiting');
+                      }}
+                      onCanPlay={() => {
+                        setIsBuffering(false);
+                        reportVideoEvent('canplay');
+                      }}
+                      onStalled={() => reportVideoEvent('stalled')}
+                      onSuspend={() => reportVideoEvent('suspend')}
+                      onAbort={() => reportVideoEvent('abort')}
+                      onError={(e) => {
+                        const err = (e.target as HTMLVideoElement).error;
+                        // MEDIA_ERR code'ları: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED.
+                        // Telemetry'de ayrı tutulur ki "video dosyası bozuk" (3) ile
+                        // "byte-range fetch fail" (2) karışmasın.
+                        reportVideoEvent('error', {
+                          errorCode: err?.code ?? null,
+                          errorMessage: err?.message ?? null,
+                        });
+                        setIsBuffering(false);
+                        setVideoError(true);
+                      }}
                       onSeeking={() => {
                         if (isReview) return;
                         const video = videoRef.current;
@@ -631,12 +699,18 @@ export default function VideoPlayerPage() {
                       }}
                     />
                   )}
-                  {!videoError && !isPlaying && (
+                  {!videoError && !isPlaying && !isBuffering && (
                     <button onClick={togglePlay} className="vd-play-overlay" aria-label="Oynat">
                       <span>
                         <Play className="h-8 w-8" fill="currentColor" />
                       </span>
                     </button>
+                  )}
+                  {!videoError && isBuffering && (
+                    <div className="vd-buffer-overlay" role="status" aria-live="polite">
+                      <span className="vd-buffer-spinner" aria-hidden="true" />
+                      <span className="vd-buffer-text">Video yükleniyor…</span>
+                    </div>
                   )}
                 </div>
 

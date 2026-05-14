@@ -219,6 +219,37 @@
   justify-content: center;
 }
 
+/* ── Buffering overlay (browser onWaiting event'inde gösterilir) ──
+   "Video duraklıyor" şikayetlerinin önemli bir kısmı algı sorunuydu:
+   browser native pause'unu kullanıcı kod hatası sanıyordu. Bu overlay
+   "yükleniyor" mesajıyla beklemenin normal olduğunu gösterir. */
+.vd-buffer-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(10, 10, 10, 0.45);
+  pointer-events: none;
+  z-index: 4;
+}
+.vd-buffer-spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #ffffff;
+  animation: vd-rot 800ms linear infinite;
+}
+.vd-buffer-text {
+  color: #ffffff;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
 .vd-player-error {
   position: absolute;
   inset: 0;
