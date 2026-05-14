@@ -86,11 +86,13 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     return errorResponse('Geçerli alıcı bulunamadı', 400)
   }
 
-  // Bildirimleri toplu oluştur
+  // Bildirimleri toplu oluştur — senderId admin paneli "Gönderdiklerim"
+  // filtresi için doldurulur (sistem bildirimleri NULL kalır)
   const notifResult = await prisma.notification.createMany({
     data: validUsers.map(u => ({
       userId: u.id,
       organizationId,
+      senderId: dbUser.id,
       title,
       message,
       type,

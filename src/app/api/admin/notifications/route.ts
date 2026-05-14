@@ -5,11 +5,14 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { createNotificationSchema } from '@/lib/validations'
 import type { UserRole } from '@/types/database'
 
-export const GET = withAdminRoute(async ({ request, organizationId }) => {
+export const GET = withAdminRoute(async ({ request, dbUser, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit } = safePagination(searchParams)
 
-  const where = { organizationId }
+  // Admin paneli "Gönderdiklerim" görünümü: sadece bu admin'in (manuel olarak)
+  // gönderdiği bildirimleri göster. Sistem tarafından üretilen kayıtlar
+  // (sınav, atama, cron, abonelik) senderId NULL kalır ve listede gözükmez.
+  const where = { organizationId, senderId: dbUser.id }
 
   const [notifications, total] = await Promise.all([
     prisma.notification.findMany({
@@ -36,7 +39,7 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   return jsonResponse({ notifications, total, page, limit }, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
 }, { requireOrganization: true })
 
-export const POST = withAdminRoute(async ({ request, organizationId }) => {
+export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')
 
@@ -47,6 +50,7 @@ export const POST = withAdminRoute(async ({ request, organizationId }) => {
     data: {
       ...parsed.data,
       organizationId,
+      senderId: dbUser.id,
     },
   })
 
@@ -57,7 +61,7 @@ export const POST = withAdminRoute(async ({ request, organizationId }) => {
 }, { requireOrganization: true })
 
 // Bulk send to all staff
-export const PUT = withAdminRoute(async ({ request, organizationId }) => {
+export const PUT = withAdminRoute(async ({ request, dbUser, organizationId }) => {
   const body = await parseBody<{ title: string; message: string; type: string }>(request)
   if (!body?.title || !body?.message) return errorResponse('Title and message required')
 
@@ -83,6 +87,7 @@ export const PUT = withAdminRoute(async ({ request, organizationId }) => {
       data: batch.map(u => ({
         userId: u.id,
         organizationId,
+        senderId: dbUser.id,
         title: body.title,
         message: body.message,
         type: body.type ?? 'announcement',
