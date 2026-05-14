@@ -5,7 +5,14 @@ import {
   safePagination,
 } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
-import { getUploadUrl, getStreamUrl, videoKey, documentKey, audioKey } from '@/lib/s3'
+import {
+  getUploadUrl,
+  getStreamUrl,
+  videoKey,
+  documentKey,
+  audioKey,
+  getOrgStorageBytes,
+} from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -125,6 +132,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
       files: Array<{
         fileName: string
         contentType: string
+        fileSize?: number
         title?: string
         category?: string
         description?: string
@@ -141,6 +149,28 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
 
     if (body.files.length > 20) {
       return errorResponse('Tek seferde en fazla 20 dosya yüklenebilir', 400)
+    }
+
+    // Storage quota — toplam yüklenecek byte'ı önceden hesap et, organizasyonun
+    // limitini aşıyorsa hiç presign etmeden 413 dön. Plana göre maxStorageGb
+    // çekilir; client fileSize göndermezse 0 sayılır (geriye uyumluluk).
+    const totalIncomingBytes = body.files.reduce((s, f) => s + (typeof f.fileSize === 'number' && f.fileSize > 0 ? f.fileSize : 0), 0)
+    if (totalIncomingBytes > 0) {
+      const subscription = await prisma.organizationSubscription.findFirst({
+        where: { organizationId },
+        include: { plan: { select: { maxStorageGb: true } } },
+      })
+      const maxGb = subscription?.plan?.maxStorageGb ?? 10
+      const maxBytes = maxGb * 1024 * 1024 * 1024
+      const usedBytes = await getOrgStorageBytes(organizationId)
+      if (usedBytes + totalIncomingBytes > maxBytes) {
+        const usedGb = (usedBytes / (1024 * 1024 * 1024)).toFixed(1)
+        const incomingGb = (totalIncomingBytes / (1024 * 1024 * 1024)).toFixed(2)
+        return errorResponse(
+          `Depolama limitinizi aşıyor: ${usedGb}GB kullanılıyor + ${incomingGb}GB yüklenmek isteniyor (limit ${maxGb}GB). Planınızı yükseltin veya dosyalarınızı azaltın.`,
+          413,
+        )
+      }
     }
 
     // Her dosya bağımsız: presign + DB create paralel çalıştır.
@@ -182,31 +212,45 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
 
         const title = file.title || file.fileName.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
 
-        const item = await prisma.contentLibrary.create({
-          data: {
-            title,
-            description: file.description ?? null,
-            category: file.category || 'INFECTION_CONTROL',
-            contentType: detectedType,
-            fileType: detectedFileType,
-            s3Key: key,
-            thumbnailUrl: thumbnailKey,
-            duration: file.durationSeconds ? Math.ceil(file.durationSeconds / 60) : 0,
-            difficulty: file.difficulty || 'BASIC',
-            targetRoles: file.targetRoles && file.targetRoles.length > 0 ? file.targetRoles : ['all'],
-            smgPoints: typeof file.smgPoints === 'number' ? file.smgPoints : 0,
-            isActive: true,
-            organizationId,
-            createdById: dbUser.id,
-          },
-          select: {
-            id: true,
-            title: true,
-            contentType: true,
-            s3Key: true,
-            createdAt: true,
-          },
-        })
+        // s3Key'ler crypto.randomUUID() ile üretildiği için pratikte çakışmaz —
+        // ama (organizationId, s3Key) unique constraint'inin tetiklediği nadir
+        // race-condition'da kullanıcıya 500 yerine düzgün Türkçe hata göstermek
+        // için Prisma P2002'yi yakalayıp dosya bazında error döndürürüz.
+        let item: { id: string; title: string; contentType: string | null; s3Key: string | null; createdAt: Date }
+        try {
+          item = await prisma.contentLibrary.create({
+            data: {
+              title,
+              description: file.description ?? null,
+              category: file.category || 'INFECTION_CONTROL',
+              contentType: detectedType,
+              fileType: detectedFileType,
+              s3Key: key,
+              thumbnailUrl: thumbnailKey,
+              duration: file.durationSeconds ? Math.ceil(file.durationSeconds / 60) : 0,
+              difficulty: file.difficulty || 'BASIC',
+              targetRoles: file.targetRoles && file.targetRoles.length > 0 ? file.targetRoles : ['all'],
+              smgPoints: typeof file.smgPoints === 'number' ? file.smgPoints : 0,
+              fileSizeBytes: typeof file.fileSize === 'number' && file.fileSize > 0 ? BigInt(Math.floor(file.fileSize)) : null,
+              isActive: true,
+              organizationId,
+              createdById: dbUser.id,
+            },
+            select: {
+              id: true,
+              title: true,
+              contentType: true,
+              s3Key: true,
+              createdAt: true,
+            },
+          })
+        } catch (createErr) {
+          const code = (createErr as { code?: string })?.code
+          if (code === 'P2002') {
+            return { fileName: file.fileName, error: 'Bu dosya zaten kütüphanenizde mevcut' }
+          }
+          throw createErr
+        }
 
         return {
           ...item,

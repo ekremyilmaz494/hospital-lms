@@ -939,12 +939,16 @@ model ContentLibrary {
   fileType       String?  @map("file_type") @db.VarChar(20) // mp3 | mp4 | pdf | json | png | md | pptx
   contentData    Json?    @map("content_data") // quiz/flashcards JSON verisi
   organizationId String?  @map("organization_id") @db.Uuid
+  // Storage quota toplamı: trainingVideo.fileSizeBytes + contentLibrary.fileSizeBytes
+  // Upload anında client'tan gelen file.size yazılır; geçmiş kayıtlarda null kalır.
+  fileSizeBytes  BigInt?  @map("file_size_bytes")
 
   createdBy    User?                        @relation("ContentLibraryCreator", fields: [createdById], references: [id])
   organization Organization?                @relation("OrgContentLibrary", fields: [organizationId], references: [id], onDelete: SetNull)
   installs     OrganizationContentLibrary[]
   trainings    Training[]                   @relation("TrainingFromLibrary")
 
+  @@unique([organizationId, s3Key], map: "idx_content_library_org_s3key_unique")
   @@index([category], map: "idx_content_library_category")
   @@index([contentType], map: "idx_content_library_content_type")
   @@index([organizationId], map: "idx_content_library_org_id")

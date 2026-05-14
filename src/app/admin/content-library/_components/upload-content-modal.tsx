@@ -73,6 +73,9 @@ export default function UploadContentModal({ onClose, onSuccess }: UploadContent
     const payload = selectedFiles.map((f, idx) => ({
       fileName: f.name,
       contentType: f.type,
+      // fileSize: organizasyon storage quota'sına dahil etmek için sunucuya
+      // peşinen gönderilir; sunucu presign etmeden önce limiti kontrol eder.
+      fileSize: f.size,
       title: selectedFiles.length === 1 ? title : `${title}${selectedFiles.length > 1 ? ` (${idx + 1})` : ''}`,
       category,
       description: description || undefined,

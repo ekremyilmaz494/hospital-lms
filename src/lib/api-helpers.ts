@@ -329,18 +329,31 @@ export function assertRole(role: string, allowed: string[]): void {
   }
 }
 
-/** Structured API error that can be caught in route handlers */
+/** Structured API error that can be caught in route handlers.
+ *
+ * `details` opsiyonel structured payload — kullanıcıya gösterilmeyen ama
+ * client'ın işleyebileceği machine-readable bağlam (ör. 409'da bağımlı entity
+ * listesi). `message` Türkçe ve son kullanıcıya uygun olmalı; `details`
+ * teknik veridir.
+ */
 export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    public details?: Record<string, unknown>,
   ) {
     super(message)
     this.name = 'ApiError'
   }
 
   toResponse(): Response {
-    return errorResponse(this.message, this.status)
+    const requestId = generateRequestId()
+    const body: Record<string, unknown> = { error: this.message }
+    if (this.details) body.details = this.details
+    return NextResponse.json(body, {
+      status: this.status,
+      headers: { 'X-Request-Id': requestId },
+    })
   }
 }
 

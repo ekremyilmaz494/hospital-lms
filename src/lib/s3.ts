@@ -358,13 +358,29 @@ export function audioKey(orgId: string, trainingId: string, filename: string) {
   return `audio/${orgId}/${trainingId}/${id}.${ext}`
 }
 
-/** Organizasyonun toplam storage kullanımını byte cinsinden hesapla */
+/** Organizasyonun toplam storage kullanımını byte cinsinden hesapla.
+ *
+ * İki kaynağı toplar:
+ *  - trainingVideo.fileSizeBytes (Training'lere bağlı dosyalar)
+ *  - contentLibrary.fileSizeBytes (kuruma özel kütüphane öğeleri)
+ *
+ * Kütüphaneden install edilen platform içerikleri (organizationId=NULL ile
+ * yaratılan ContentLibrary kayıtları) bu org'a fiziksel kopyalama yapmadan
+ * referans olarak kullanıldığı için quota'ya dahil edilmez — sadece bu kurumun
+ * S3'e yüklediği nesneler sayılır.
+ */
 export async function getOrgStorageBytes(orgId: string): Promise<number> {
-  const result = await prisma.trainingVideo.aggregate({
-    where: { training: { organizationId: orgId } },
-    _sum: { fileSizeBytes: true },
-  })
-  return Number(result._sum.fileSizeBytes ?? 0)
+  const [videoAgg, libraryAgg] = await Promise.all([
+    prisma.trainingVideo.aggregate({
+      where: { training: { organizationId: orgId } },
+      _sum: { fileSizeBytes: true },
+    }),
+    prisma.contentLibrary.aggregate({
+      where: { organizationId: orgId },
+      _sum: { fileSizeBytes: true },
+    }),
+  ])
+  return Number(videoAgg._sum.fileSizeBytes ?? 0) + Number(libraryAgg._sum.fileSizeBytes ?? 0)
 }
 
 /** Storage quota kontrolü — limit aşılmışsa hata mesajı döner, yoksa null */

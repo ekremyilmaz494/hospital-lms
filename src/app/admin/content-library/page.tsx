@@ -1,14 +1,15 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import {
   Library, Clock, Star, CheckCircle2, Plus, Layers, X, ArrowRight,
-  Film, Search,
+  Film, Search, Eye,
   BookOpen, GraduationCap, Trash2, ChevronRight,
 } from 'lucide-react'
 import { useFetch } from '@/hooks/use-fetch'
+import { useDebounce } from '@/hooks/use-debounce'
 import { PageLoading } from '@/components/shared/page-loading'
 import { useToast } from '@/components/shared/toast'
 import { KStatCard } from '@/components/admin/k-stat-card'
@@ -20,11 +21,13 @@ import {
   type ContentLibraryDifficulty,
 } from '@/lib/content-library-categories'
 import { K, type ContentLibraryItem } from './_components/shared'
+import type { DependentTraining } from './_components/delete-confirm-modal'
 
 // Modal'lar kullanıcı etkileşimine kadar yüklenmez — initial bundle küçülür.
 const BulkInstallModal = dynamic(() => import('./_components/bulk-install-modal'), { ssr: false })
 const DeleteConfirmModal = dynamic(() => import('./_components/delete-confirm-modal'), { ssr: false })
 const UploadContentModal = dynamic(() => import('./_components/upload-content-modal'), { ssr: false })
+const PreviewModal = dynamic(() => import('./_components/preview-modal'), { ssr: false })
 
 interface PageData {
   items: ContentLibraryItem[]
@@ -49,9 +52,10 @@ interface ContentCardProps {
   installing: boolean
   onDelete: (item: ContentLibraryItem) => void
   deleting: boolean
+  onPreview: (item: ContentLibraryItem) => void
 }
 
-function ContentCard({ item, onInstall, installing, onDelete, deleting }: ContentCardProps) {
+function ContentCard({ item, onInstall, installing, onDelete, deleting, onPreview }: ContentCardProps) {
   const router = useRouter()
   const cat = CONTENT_LIBRARY_CATEGORIES[item.category as ContentLibraryCategoryKey]
   const diff = CONTENT_LIBRARY_DIFFICULTY[item.difficulty as ContentLibraryDifficulty]
@@ -133,6 +137,29 @@ function ContentCard({ item, onInstall, installing, onDelete, deleting }: Conten
 
         {/* Top-right actions */}
         <div className="absolute top-2.5 right-2.5 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onPreview(item) }}
+            title="Önizle"
+            aria-label="Önizle"
+            className="flex items-center justify-center opacity-0 group-hover:opacity-100"
+            style={{
+              width: 30,
+              height: 30,
+              color: K.TEXT_SECONDARY,
+              background: 'rgba(255,255,255,0.92)',
+              backdropFilter: 'blur(6px)',
+              border: `1px solid ${K.BORDER}`,
+              borderRadius: 8,
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(15, 23, 42, 0.08)',
+              transition: 'opacity 160ms ease, color 160ms ease, border-color 160ms ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = K.PRIMARY; e.currentTarget.style.borderColor = K.PRIMARY }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = K.TEXT_SECONDARY; e.currentTarget.style.borderColor = K.BORDER }}
+          >
+            <Eye size={14} />
+          </button>
           {item.isOwned && (
             <button
               type="button"
@@ -323,26 +350,37 @@ function MyVideosTab() {
   const { data, isLoading, error } = useFetch<MyVideosData>('/api/admin/content-library/my-videos')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedSearch = useDebounce(searchQuery, 300)
+  const allItems = useMemo(() => data?.items ?? [], [data?.items])
+
+  // Filter zinciri ve KPI agregasyonu — perf-check 4+ filter/map/reduce uyarısını
+  // gidermek için tek useMemo'ya topluyoruz. allItems değişmedikçe yeniden hesaplama yok.
+  const filtered = useMemo(() => {
+    const byCategory = categoryFilter
+      ? allItems.filter(i => i.category === categoryFilter)
+      : allItems
+    if (!debouncedSearch) return byCategory
+    const q = debouncedSearch.toLowerCase()
+    return byCategory.filter(i => i.title.toLowerCase().includes(q))
+  }, [allItems, categoryFilter, debouncedSearch])
+
+  const { totalDurationMin, totalSmg, linkedTrainingIds } = useMemo(() => {
+    let durationSum = 0
+    let smgSum = 0
+    const idSet = new Set<string>()
+    for (const item of allItems) {
+      durationSum += item.duration
+      smgSum += item.smgPoints
+      for (const t of item.usedInTrainings) idSet.add(t.id)
+    }
+    return { totalDurationMin: durationSum, totalSmg: smgSum, linkedTrainingIds: idSet }
+  }, [allItems])
 
   if (isLoading) return <PageLoading />
   if (error) return (
     <div className="flex h-64 items-center justify-center" style={{ fontSize: 13, color: K.ERROR }}>
       {error}
     </div>
-  )
-
-  const allItems = data?.items ?? []
-  const afterCategory = categoryFilter
-    ? allItems.filter(i => i.category === categoryFilter)
-    : allItems
-  const filtered = searchQuery
-    ? afterCategory.filter(i => i.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : afterCategory
-
-  const totalDurationMin = allItems.reduce((s, i) => s + i.duration, 0)
-  const totalSmg = allItems.reduce((s, i) => s + i.smgPoints, 0)
-  const linkedTrainingIds = new Set(
-    allItems.flatMap(i => i.usedInTrainings.map(t => t.id))
   )
 
   return (
@@ -749,14 +787,13 @@ function PlatformLibraryTab() {
   const [installingId, setInstallingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ContentLibraryItem | null>(null)
+  const [deleteBlocker, setDeleteBlocker] = useState<{ dependentTrainings?: DependentTraining[]; installCount?: number }>({})
+  const [previewTarget, setPreviewTarget] = useState<ContentLibraryItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  // Search debounce — kullanıcı yazarken her tuşta fetch atmayalım
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300)
-    return () => clearTimeout(t)
-  }, [searchQuery])
+  // useDebounce hook + trim() — input'ta her tuşta fetch atılmaz, 300ms boşluğa
+  // ulaşınca debouncedSearch güncellenir; trim() boşluk-only girişleri sıfırlar.
+  const trimmedSearch = useMemo(() => searchQuery.trim(), [searchQuery])
+  const debouncedSearch = useDebounce(trimmedSearch, 300)
 
   const fetchPage = useCallback(async (targetPage: number, append: boolean) => {
     const params = new URLSearchParams()
@@ -798,6 +835,17 @@ function PlatformLibraryTab() {
     if (isLoadingMore || items.length >= total) return
     fetchPage(page + 1, true)
   }, [fetchPage, isLoadingMore, items.length, total, page])
+
+  // Modal açma/kapama — hook'lar early return'lerden önce çağrılmak ZORUNDA.
+  const openDeleteModal = useCallback((item: ContentLibraryItem) => {
+    setDeleteBlocker({})
+    setDeleteTarget(item)
+  }, [])
+
+  const closeDeleteModal = useCallback(() => {
+    setDeleteTarget(null)
+    setDeleteBlocker({})
+  }, [])
 
   // KPI'lar — tüm filtre kapsamına ait (server-side aggregation)
   const totalLibraryCount = total
@@ -841,9 +889,20 @@ function PlatformLibraryTab() {
     try {
       const res = await fetch(`/api/admin/content-library/${target.id}`, { method: 'DELETE' })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Silme başarısız')
+      if (!res.ok) {
+        // 409: yapılandırılmış payload (details.dependentTrainings + installCount).
+        // Modal'da liste göstermek için state'e yaz, modal'ı açık tut.
+        if (res.status === 409 && json?.details) {
+          setDeleteBlocker({
+            dependentTrainings: json.details.dependentTrainings as DependentTraining[] | undefined,
+            installCount: typeof json.details.installCount === 'number' ? json.details.installCount : undefined,
+          })
+          return
+        }
+        throw new Error(json.error || 'Silme başarısız')
+      }
       toast(json.message ?? 'İçerik silindi', 'success')
-      setDeleteTarget(null)
+      closeDeleteModal()
       refetch()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error')
@@ -875,8 +934,17 @@ function PlatformLibraryTab() {
         <DeleteConfirmModal
           item={deleteTarget}
           loading={deletingId === deleteTarget.id}
-          onCancel={() => setDeleteTarget(null)}
+          onCancel={closeDeleteModal}
           onConfirm={handleDeleteConfirm}
+          dependentTrainings={deleteBlocker.dependentTrainings}
+          installCount={deleteBlocker.installCount}
+        />
+      )}
+
+      {previewTarget && (
+        <PreviewModal
+          item={previewTarget}
+          onClose={() => setPreviewTarget(null)}
         />
       )}
 
@@ -1001,8 +1069,9 @@ function PlatformLibraryTab() {
                 item={item}
                 onInstall={handleInstall}
                 installing={installingId === item.id}
-                onDelete={setDeleteTarget}
+                onDelete={openDeleteModal}
                 deleting={deletingId === item.id}
+                onPreview={setPreviewTarget}
               />
             ))}
           </div>

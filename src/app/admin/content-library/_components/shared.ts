@@ -43,4 +43,6 @@ export interface ContentLibraryItem {
   isActive: boolean
   isInstalled: boolean
   isOwned?: boolean
+  contentType?: string | null
+  s3Key?: string | null
 }

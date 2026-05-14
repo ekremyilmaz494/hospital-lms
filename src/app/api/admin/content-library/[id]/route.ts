@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import {
   jsonResponse,
   errorResponse,
+  ApiError,
 } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { deleteObject } from '@/lib/s3'
@@ -47,12 +48,14 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ params, dbUser, or
       )
     }
 
-    // Eğitim bağımlılığı kontrolü
+    // Eğitim bağımlılığı kontrolü — silme reddedildiğinde UI'da hangi
+    // eğitimlerin etkilendiğini listeleyebilmek için yapılandırılmış payload
+    // (ApiError.details) ile yanıt veriyoruz.
     const [dependentTrainings, installCount] = await Promise.all([
       prisma.training.findMany({
         where: { sourceLibraryId: id, organizationId },
-        select: { id: true, title: true },
-        take: 5,
+        select: { id: true, title: true, publishStatus: true },
+        take: 10,
       }),
       prisma.organizationContentLibrary.count({
         where: { contentLibraryId: id },
@@ -60,10 +63,13 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ params, dbUser, or
     ])
 
     if (dependentTrainings.length > 0 || installCount > 0) {
-      const titles = dependentTrainings.map((t) => `"${t.title}"`).join(', ')
-      return errorResponse(
-        `Bu içerik ${dependentTrainings.length > 0 ? titles + ' eğitim(ler)inde' : 'kurumunuzda'} hâlâ kullanılıyor. Önce ilgili eğitimi silin, ardından içeriği kaldırabilirsiniz.`,
+      throw new ApiError(
+        'Bu içerik aktif olarak kullanıldığı için silinemez. Önce bağlı eğitimleri silin veya arşivleyin.',
         409,
+        {
+          dependentTrainings,
+          installCount,
+        },
       )
     }
 
@@ -92,6 +98,9 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ params, dbUser, or
 
     return jsonResponse({ success: true, message: `"${item.title}" silindi` })
   } catch (err) {
+    // ApiError (örn. 409 bağımlılık) yapılandırılmış response döndürmeli;
+    // withApiHandler wrapper'ı bunu kendisi yakalar.
+    if (err instanceof ApiError) throw err
     logger.error('ContentLibraryDelete', 'İçerik silinemedi', err)
     return errorResponse('İçerik silinirken hata oluştu', 500)
   }
