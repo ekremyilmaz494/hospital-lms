@@ -301,6 +301,7 @@ model User {
   examAttempts                  ExamAttempt[]
   videoProgress                 VideoProgress[]
   notifications                 Notification[]
+  sentNotifications             Notification[]               @relation("NotificationSender")
   auditLogs                     AuditLog[]
   certificates                  Certificate[]
   kvkkRequests                  KvkkRequest[]                @relation("KvkkRequester")
@@ -372,6 +373,7 @@ model Training {
   regulatoryBody      String?   @map("regulatory_body") @db.VarChar(200)
   renewalPeriodMonths Int?      @map("renewal_period_months")
   smgPoints           Int       @default(10) @map("smg_points")
+  instructorName      String?   @map("instructor_name") @db.VarChar(255)
   createdById         String?   @map("created_by") @db.Uuid
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -644,6 +646,10 @@ model Notification {
   id                String   @id @default(uuid()) @db.Uuid
   userId            String   @map("user_id") @db.Uuid
   organizationId    String?  @map("organization_id") @db.Uuid
+  // Admin tarafından manuel gönderilen bildirimlerde dolu, sistem (sınav,
+  // atama, cron, abonelik) tarafından üretilenlerde NULL kalır. Admin
+  // bildirim panelinde sadece kendi gönderdiklerini görmek için filtre.
+  senderId          String?  @map("sender_id") @db.Uuid
   title             String   @db.VarChar(500)
   message           String   @db.Text
   type              String   @db.VarChar(50)
@@ -652,6 +658,7 @@ model Notification {
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sender          User?         @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
   organization    Organization? @relation(fields: [organizationId], references: [id])
   relatedTraining Training?     @relation(fields: [relatedTrainingId], references: [id])
 
@@ -660,6 +667,8 @@ model Notification {
   @@index([organizationId, isRead, createdAt], map: "idx_notifications_org_read_date")
   // Performance: composite index for org-wide notification queries sorted by date
   @@index([organizationId, createdAt], map: "idx_notifications_org_date")
+  // Admin "Gönderdiklerim" listesinde senderId + org filtresi
+  @@index([senderId, createdAt], map: "idx_notifications_sender_date")
   @@map("notifications")
 }
 
@@ -1303,6 +1312,11 @@ model TrainingFeedbackForm {
   // istenir ama yanıt geçmişi (FK: TrainingFeedbackResponse.formId) korunur.
   // Liste UI'sı default arşivsizleri gösterir.
   isArchived     Boolean  @default(false) @map("is_archived")
+  // PDF header'da gösterilen sabit doküman metadata'sı.
+  // Form snapshot'a otomatik kopyalanır → submit anındaki değerler korunur.
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz
+  revisionNumber Int       @default(0) @map("revision_number")
+  revisionDate   DateTime? @map("revision_date") @db.Timestamptz
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 

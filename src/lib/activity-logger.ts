@@ -18,6 +18,9 @@ export type ActivityAction =
   // Sertifika
   | 'certificate_view'
   | 'certificate_download'
+  // Geri bildirim — KVKK/denetim için tekil + toplu yanıt PDF indirme audit'i
+  | 'feedback_response_download'
+  | 'feedback_response_bulk_download'
   // Profil
   | 'profile_update'
   | 'password_change'
@@ -28,6 +31,8 @@ export type ResourceType =
   | 'exam'
   | 'exam_attempt'
   | 'certificate'
+  | 'training_feedback_response'
+  | 'training'
   | 'user'
 
 export interface LogActivityParams {

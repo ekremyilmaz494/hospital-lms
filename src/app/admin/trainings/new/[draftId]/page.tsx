@@ -71,6 +71,7 @@ interface AiPendingSnapshot {
 interface DraftSnapshot {
   title: string;
   description: string;
+  instructorName: string;
   selectedCategory: string;
   startDate: string;
   endDate: string;
@@ -132,6 +133,7 @@ export default function DraftWizardPage() {
   // Step 1
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [instructorName, setInstructorName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
@@ -186,6 +188,7 @@ export default function DraftWizardPage() {
         if (draftData) {
           setTitle(draftData.title ?? '');
           setDescription(draftData.description ?? '');
+          setInstructorName(draftData.instructorName ?? '');
           setSelectedCategory(draftData.selectedCategory ?? '');
           if (draftData.startDate) setStartDate(draftData.startDate);
           if (draftData.endDate) setEndDate(draftData.endDate);
@@ -237,13 +240,13 @@ export default function DraftWizardPage() {
   );
 
   const snapshot = useMemo<DraftSnapshot>(() => ({
-    title, description, selectedCategory, startDate, endDate,
+    title, description, instructorName, selectedCategory, startDate, endDate,
     maxAttempts, examDurationMinutes, smgPoints, isCompulsory,
     complianceDeadline, regulatoryBody, renewalPeriodMonths,
     videos: persistableVideos, questions, passingScore, selectedDepts, excludedStaff,
     questionsActiveMode, aiPending, aiUploadedSources,
   }), [
-    title, description, selectedCategory, startDate, endDate,
+    title, description, instructorName, selectedCategory, startDate, endDate,
     maxAttempts, examDurationMinutes, smgPoints, isCompulsory,
     complianceDeadline, regulatoryBody, renewalPeriodMonths,
     persistableVideos, questions, passingScore, selectedDepts, excludedStaff,
@@ -562,6 +565,7 @@ export default function DraftWizardPage() {
         body: JSON.stringify({
           title,
           description,
+          instructorName: instructorName.trim() || null,
           category: selectedCategory,
           passingScore: Number(passingScore) || 70,
           maxAttempts: Number(maxAttempts) || 3,
@@ -704,6 +708,7 @@ export default function DraftWizardPage() {
             <BasicInfoStep
               title={title} setTitle={setTitle}
               description={description} setDescription={setDescription}
+              instructorName={instructorName} setInstructorName={setInstructorName}
               selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory}
               categories={categories}
               startDate={startDate} setStartDate={setStartDate}

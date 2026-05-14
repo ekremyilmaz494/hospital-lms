@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, UserX, Calendar, Check, X, Building2 } from 'lucide-react';
+import { ArrowLeft, UserX, Calendar, Check, X, Building2, Download } from 'lucide-react';
 import { PageLoading } from '@/components/shared/page-loading';
+import { useFeedbackPdf } from '../_hooks/use-feedback-pdf';
 
 const K = {
   PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
@@ -52,6 +53,7 @@ export default function FeedbackResponseDetailPage() {
   const router = useRouter();
   const [data, setData] = useState<ResponseDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const { downloadResponsePdf, isPending: isPdfPending } = useFeedbackPdf();
 
   useEffect(() => {
     fetch(`/api/admin/feedback/responses/${id}`).then(r => r.json()).then(setData).finally(() => setLoading(false));
@@ -73,12 +75,34 @@ export default function FeedbackResponseDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
-      {/* Back */}
-      <button onClick={() => router.back()}
-        className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13px] font-semibold"
-        style={{ background: K.SURFACE, color: K.TEXT_SECONDARY, border: `1px solid ${K.BORDER}` }}>
-        <ArrowLeft className="w-4 h-4" /> Yanıtlara Dön
-      </button>
+      {/* Back + PDF download */}
+      <div className="flex items-center justify-between gap-3">
+        <button onClick={() => router.back()}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13px] font-semibold"
+          style={{ background: K.SURFACE, color: K.TEXT_SECONDARY, border: `1px solid ${K.BORDER}` }}>
+          <ArrowLeft className="w-4 h-4" /> Yanıtlara Dön
+        </button>
+        <button
+          onClick={() => void downloadResponsePdf(data.id)}
+          disabled={isPdfPending(data.id)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold disabled:opacity-60 disabled:cursor-wait"
+          style={{ background: K.PRIMARY, color: '#fff', boxShadow: '0 1px 3px rgba(13,150,104,0.3)' }}
+          title="Bu yanıtı tek sayfalık resmi form PDF'i olarak indir"
+        >
+          {isPdfPending(data.id) ? (
+            <>
+              <div className="w-4 h-4 rounded-full border-2 animate-spin"
+                style={{ borderColor: '#fff', borderTopColor: 'transparent' }} />
+              Hazırlanıyor...
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" />
+              PDF İndir
+            </>
+          )}
+        </button>
+      </div>
 
       {/* Header */}
       <div>

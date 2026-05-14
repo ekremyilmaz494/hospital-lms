@@ -31,10 +31,53 @@ export type FeedbackFormTemplate = {
   defaultTitle: string
   defaultDescription: string | null
   documentCode: string | null
+  /** PDF üst tablo metadata — template kopyalandığında forma seed edilir */
+  publishedAt?: Date | null
+  revisionNumber?: number
+  revisionDate?: Date | null
   categories: TemplateCategory[]
 }
 
 export const FEEDBACK_FORM_TEMPLATES: FeedbackFormTemplate[] = [
+  {
+    key: 'ey-fr-03-lms',
+    label: 'EY.FR.03 — Online Eğitim Değerlendirme (Önerilen)',
+    description: 'LMS / online eğitim odaklı 8 soruluk değerlendirme — sistem kullanımı, teknik kalite, genel deneyim.',
+    defaultTitle: 'Eğitim Değerlendirme Anket Formu',
+    defaultDescription: 'Online eğitim sonrası personelin doldurduğu standart değerlendirme.',
+    documentCode: 'EY.FR.03',
+    publishedAt: new Date('2026-01-07'),
+    revisionNumber: 0,
+    revisionDate: null,
+    categories: [
+      {
+        name: 'SİSTEM & KULLANILABİLİRLİK',
+        order: 0,
+        items: [
+          { text: 'Sisteme giriş işlemleri kolaydı', questionType: 'likert_5', isRequired: true, order: 0 },
+          { text: 'Programın kullanımı anlaşılırdı', questionType: 'likert_5', isRequired: true, order: 1 },
+          { text: 'Eğitim platformu kullanıcı dostuydu', questionType: 'likert_5', isRequired: true, order: 2 },
+          { text: 'Mobil cihaz / bilgisayar uyumluluğu yeterliydi', questionType: 'likert_5', isRequired: true, order: 3 },
+        ],
+      },
+      {
+        name: 'TEKNİK KALİTE',
+        order: 1,
+        items: [
+          { text: 'Eğitim sırasında teknik sorun yaşamadım', questionType: 'likert_5', isRequired: true, order: 0 },
+          { text: 'Ses ve görüntü kalitesi yeterliydi', questionType: 'likert_5', isRequired: true, order: 1 },
+        ],
+      },
+      {
+        name: 'GENEL DEĞERLENDİRME',
+        order: 2,
+        items: [
+          { text: 'Sanal eğitim sistemi zaman açısından kolaylık sağladı', questionType: 'likert_5', isRequired: true, order: 0 },
+          { text: 'Gelecekte bu yöntemle eğitim almaya devam etmek isterim', questionType: 'likert_5', isRequired: true, order: 1 },
+        ],
+      },
+    ],
+  },
   {
     key: 'ey-fr-40',
     label: 'EY.FR.40 — Eğitim Değerlendirme',

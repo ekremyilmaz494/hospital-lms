@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Info, Calendar, Award, Clock, ShieldCheck, Building2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Info, Calendar, Award, Clock, ShieldCheck, Building2, RefreshCw, AlertTriangle, UserSquare2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CategoryIcon } from '@/components/shared/category-icon';
@@ -20,6 +20,8 @@ interface BasicInfoStepProps {
   setTitle: (v: string) => void;
   description: string;
   setDescription: (v: string) => void;
+  instructorName: string;
+  setInstructorName: (v: string) => void;
   selectedCategory: string;
   setSelectedCategory: (v: string) => void;
   categories: readonly CategoryOption[];
@@ -50,6 +52,7 @@ interface BasicInfoStepProps {
 export default function BasicInfoStep({
   title, setTitle,
   description, setDescription,
+  instructorName, setInstructorName,
   selectedCategory, setSelectedCategory,
   categories,
   startDate, setStartDate,
@@ -94,6 +97,23 @@ export default function BasicInfoStep({
             className="mt-2 h-12 text-base"
             style={{ background: K.BG, borderColor: K.BORDER, borderRadius: 10 }}
           />
+        </div>
+
+        <div>
+          <div className="flex items-center gap-1.5 mb-2">
+            <UserSquare2 className="h-3.5 w-3.5" style={{ color: K.PRIMARY }} />
+            <Label className="text-sm font-medium" style={{ color: K.TEXT_SECONDARY }}>Eğitmen Adı</Label>
+          </div>
+          <Input
+            value={instructorName}
+            onChange={(e) => setInstructorName(e.target.value)}
+            placeholder="örn. Dr. Ahmet Yılmaz"
+            className="h-11"
+            style={{ background: K.BG, borderColor: K.BORDER, borderRadius: 10 }}
+          />
+          <p className="text-[11px] mt-1.5" style={{ color: K.TEXT_MUTED }}>
+            Geri bildirim formu PDF&apos;leri ve sertifikalarda görünür. Boş bırakılırsa raporlarda &quot;—&quot; gösterilir.
+          </p>
         </div>
 
         <div>

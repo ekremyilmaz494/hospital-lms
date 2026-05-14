@@ -277,6 +277,8 @@ const trainingQuestionInputSchema = z.object({
 export const createTrainingBodySchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().optional(),
+  // PDF raporlarında ve sertifikalarda görünür — opsiyonel
+  instructorName: z.string().max(255).nullable().optional(),
   category: z.string().max(100).optional(),
   thumbnailUrl: z.string().url().optional(),
   passingScore: z.coerce.number().int().min(0).max(100).default(70),
