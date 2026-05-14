@@ -9,9 +9,8 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  Check, CheckCheck, AlertTriangle, Info, CheckCircle, Zap,
-  BellOff, Search, X, BookOpen, Award, MessageSquare, Megaphone,
-  Clock3, Sparkles, Inbox, ChevronRight, Filter,
+  Check, CheckCheck,
+  BellOff, Search, X, Inbox, ChevronRight, Filter, Award,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
@@ -20,6 +19,9 @@ import {
   INK, INK_SOFT, CREAM, RULE, GOLD, OLIVE,
   FONT_DISPLAY, FONT_BODY, FONT_MONO,
 } from '@/lib/editorial-palette';
+import { getNotificationTypeMeta, FILTER_TYPES } from '@/lib/notification-types';
+import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
+import { useNotificationStore } from '@/store/notification-store';
 
 /* ─────────────────────────────────────────────────────
    Domain
@@ -34,38 +36,6 @@ interface Notification {
   isRead: boolean;
   relatedTrainingId: string | null;
   relatedTraining: { id: string; title: string } | null;
-}
-
-type TypeKey =
-  | 'error' | 'warning' | 'info' | 'success'
-  | 'reminder' | 'assignment' | 'announcement'
-  | 'competency_evaluation' | 'subscription_expiry';
-
-interface TypeMeta {
-  label: string;
-  icon: typeof Info;
-  ink: string;
-}
-
-const TYPE_META: Record<string, TypeMeta> = {
-  error:                 { label: 'ACİL',            icon: Zap,           ink: '#b3261e' },
-  warning:               { label: 'UYARI',           icon: AlertTriangle, ink: '#b4820b' },
-  info:                  { label: 'BİLGİ',           icon: Info,          ink: '#2c55b8' },
-  success:               { label: 'BAŞARI',          icon: CheckCircle,   ink: '#0a7a47' },
-  reminder:              { label: 'HATIRLATMA',      icon: Clock3,        ink: '#b4820b' },
-  assignment:            { label: 'EĞİTİM',          icon: BookOpen,      ink: '#1a3a28' },
-  announcement:          { label: 'DUYURU',          icon: Megaphone,     ink: '#0b1e3f' },
-  competency_evaluation: { label: 'YETKİNLİK',       icon: MessageSquare, ink: '#2c55b8' },
-  subscription_expiry:   { label: 'ABONELİK',        icon: Sparkles,      ink: '#8a5a11' },
-};
-
-const FILTER_TYPES: TypeKey[] = [
-  'assignment', 'reminder', 'announcement', 'competency_evaluation',
-  'warning', 'info', 'success', 'error',
-];
-
-function getTypeMeta(t: string): TypeMeta {
-  return TYPE_META[t] ?? TYPE_META.info;
 }
 
 /* ─── Date helpers ─── */
@@ -126,13 +96,22 @@ export default function StaffNotificationsPage() {
   const { data, isLoading, error, refetch } =
     useFetch<{ notifications: Notification[]; unreadCount: number }>('/api/staff/notifications');
 
+  // Supabase realtime → store'a INSERT'ler düşer. Store değişimini izleyip
+  // sayfa listesini API'den yeniden çekiyoruz (store kısmi cache, API kanonik).
+  useRealtimeNotifications();
+  const liveCount = useNotificationStore(s => s.notifications.length);
+  useEffect(() => {
+    if (liveCount > 0) void refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveCount]);
+
   const [markingAll, setMarkingAll] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [optimisticReadIds, setOptimisticReadIds] = useState<Set<string>>(new Set());
   const [optimisticAllRead, setOptimisticAllRead] = useState(false);
 
   const [search, setSearch] = useState('');
-  const [activeTypes, setActiveTypes] = useState<Set<TypeKey>>(new Set());
+  const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set());
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
@@ -165,7 +144,7 @@ export default function StaffNotificationsPage() {
       if (viewFilter === 'unread' && n.isRead) return false;
       if (viewFilter === 'today' && new Date(n.createdAt).getTime() < dayAgo) return false;
       if (viewFilter === 'week' && new Date(n.createdAt).getTime() < weekAgo) return false;
-      if (activeTypes.size > 0 && !activeTypes.has(n.type as TypeKey)) return false;
+      if (activeTypes.size > 0 && !activeTypes.has(n.type)) return false;
       if (q) {
         const hay = `${n.title} ${n.message} ${n.relatedTraining?.title ?? ''}`.toLocaleLowerCase('tr-TR');
         if (!hay.includes(q)) return false;
@@ -247,7 +226,7 @@ export default function StaffNotificationsPage() {
     }
   }, [rawUnreadCount, refetch, toast]);
 
-  const toggleType = useCallback((t: TypeKey) => {
+  const toggleType = useCallback((t: string) => {
     setActiveTypes(prev => {
       const next = new Set(prev);
       if (next.has(t)) next.delete(t); else next.add(t);
@@ -407,7 +386,7 @@ export default function StaffNotificationsPage() {
                   </div>
                   <ul className="max-h-72 overflow-auto py-1">
                     {FILTER_TYPES.map(t => {
-                      const m = getTypeMeta(t);
+                      const m = getNotificationTypeMeta(t);
                       const c = typeCounts[t] ?? 0;
                       const active = activeTypes.has(t);
                       return (
@@ -672,7 +651,7 @@ function NotificationEntry({
   onMarkRead: () => void;
   isMarking: boolean;
 }) {
-  const m = getTypeMeta(n.type);
+  const m = getNotificationTypeMeta(n.type);
   const Icon = m.icon;
   const unread = !n.isRead;
 

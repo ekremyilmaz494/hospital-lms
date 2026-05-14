@@ -155,6 +155,19 @@ export async function GET(request: Request) {
       })
       overdueRemindersSent++
     } catch { /* email hatası cron'u durdurmasın */ }
+
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: a.userId,
+          organizationId: a.organizationId,
+          type: 'reminder',
+          title: `Gecikmiş eğitim: ${a.training.title}`,
+          message: `"${a.training.title}" eğitiminiz ${daysOverdue} gündür süresini aştı. Lütfen en kısa sürede tamamlayın.`,
+          relatedTrainingId: a.trainingId,
+        },
+      })
+    } catch { /* dashboard bildirim hatası cron'u durdurmasın */ }
   }
 
   // 6. Sona eren / yakında bitecek abonelikleri kontrol et — admin'e bildirim gönder

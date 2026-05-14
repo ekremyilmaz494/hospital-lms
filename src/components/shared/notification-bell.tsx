@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/use-auth';
 import { useNotificationStore } from '@/store/notification-store';
+import { getNotificationTypeMeta } from '@/lib/notification-types';
 
 /**
  * Editorial chrome — hex sabit, dark mode'da flip yok (topbar ile uyumlu).
@@ -26,20 +27,14 @@ const CARD_BG = '#ffffff';
 const FONT_MONO = 'var(--font-jetbrains-mono), ui-monospace, monospace';
 const FONT_DISPLAY = 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif';
 
-const TYPE_DOT: Record<string, string> = {
-  info: '#2c55b8',
-  warning: '#b4820b',
-  error: '#b3261e',
-  success: '#0a7a47',
-};
-
 interface NotificationItem {
   id: string;
   title: string;
   message: string;
   time: string;
   isRead: boolean;
-  type: 'info' | 'warning' | 'error' | 'success';
+  /** Serbest string — merkezi `getNotificationTypeMeta(type)` ile ink rengine çevrilir. */
+  type: string;
 }
 
 interface NotificationBellProps {
@@ -73,7 +68,7 @@ export function NotificationBell({
     message: n.message,
     time: formatRelativeTime(n.createdAt),
     isRead: n.isRead,
-    type: (n.type === 'warning' || n.type === 'error' || n.type === 'success' ? n.type : 'info') as NotificationItem['type'],
+    type: n.type,
   }));
 
   const count = propUnreadCount ?? (propNotifications ? propNotifications.filter((n) => !n.isRead).length : store.unreadCount);
@@ -158,7 +153,7 @@ export function NotificationBell({
               >
                 <span
                   className="mt-1.5 h-2 w-2 shrink-0"
-                  style={{ backgroundColor: TYPE_DOT[n.type] || TYPE_DOT.info, borderRadius: 0 }}
+                  style={{ backgroundColor: getNotificationTypeMeta(n.type).ink, borderRadius: 0 }}
                 />
                 <div className="flex-1 min-w-0">
                   <p

@@ -8,14 +8,9 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
     const { searchParams } = new URL(request.url)
     const unreadOnly = searchParams.get('unread') === 'true'
 
-    // Sistem tarafından otomatik oluşturulan bildirimler hariç tutulur;
-    // sadece admin panelinden gönderilen bildirimler gösterilir.
-    const SYSTEM_TYPES = ['exam_passed', 'exam_failed', 'exam_started', 'training_assigned']
-
     const where: Record<string, unknown> = {
       userId: dbUser.id,
       organizationId,
-      type: { notIn: SYSTEM_TYPES },
     }
     if (unreadOnly) where.isRead = false
 

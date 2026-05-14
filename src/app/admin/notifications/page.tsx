@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import {
-  Bell, BellOff, Send, AlertTriangle, Info, Check, CheckCircle, Zap,
+  Bell, BellOff, Send, Check, CheckCircle,
   Filter, Clock, Inbox, Trash2, X, Users, UserMinus, Building2, Loader2, ChevronRight,
+  BookOpen,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,27 +13,35 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import { getNotificationTypeMeta } from '@/lib/notification-types';
+import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 
 interface Notification {
   id: string;
   title: string;
   message: string;
   type: string;
-  time: string;
+  createdAt: string;
   isRead: boolean;
+  relatedTrainingId: string | null;
+}
+
+interface AdminNotificationsResponse {
+  notifications: Notification[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 interface StaffMember { id: string; firstName: string; lastName: string; title: string | null }
 interface Department { id: string; name: string; users: StaffMember[]; _count: { users: number } }
 
-const typeConfig: Record<string, { color: string; icon: typeof Bell; label: string }> = {
-  warning: { color: 'var(--k-warning)', icon: AlertTriangle, label: 'Uyarı' },
-  error: { color: 'var(--k-error)', icon: Zap, label: 'Acil' },
-  info: { color: 'var(--k-info)', icon: Info, label: 'Bilgi' },
-  success: { color: 'var(--k-success)', icon: CheckCircle, label: 'Başarılı' },
-};
+/** Filter sidebar'da gözüken tipler. Tüm tipler değil; admin'in
+ * en sık kullandığı manuel gönderim tiplerine ek olarak sistem tetikli
+ * `training_assigned` + `exam_passed` görünür. */
+const ADMIN_FILTER_TYPES = ['info', 'warning', 'error', 'success', 'training_assigned', 'exam_passed'] as const;
 
-type FilterType = 'all' | 'unread' | 'warning' | 'error' | 'info' | 'success';
+type FilterType = 'all' | 'unread' | (typeof ADMIN_FILTER_TYPES)[number];
 
 function timeAgo(dateStr: string): string {
   try {
@@ -51,9 +61,13 @@ function timeAgo(dateStr: string): string {
 
 export default function NotificationsPage() {
   const { toast } = useToast();
-  const { data, isLoading, error, refetch } = useFetch<Notification[]>('/api/admin/notifications');
+  const { data, isLoading, error, refetch } = useFetch<AdminNotificationsResponse>('/api/admin/notifications');
   const [filter, setFilter] = useState<FilterType>('all');
   const [dismissing, setDismissing] = useState<string | null>(null);
+
+  // Yeni bildirim geldiğinde liste tazelensin — bell zaten store'a ekliyor,
+  // ama bu sayfanın kendi listesi useFetch'in cache'inden geliyor; refetch ile senkronize tut.
+  useRealtimeNotifications();
 
   const handleDelete = async (notifId: string) => {
     setDismissing(notifId);
@@ -214,7 +228,7 @@ export default function NotificationsPage() {
     );
   }
 
-  const notifications = Array.isArray(data) ? data : ((data as unknown as Record<string, unknown>)?.notifications as typeof data) ?? [];
+  const notifications: Notification[] = data?.notifications ?? [];
 
   const filtered = notifications.filter(n => {
     if (filter === 'all') return true;
@@ -224,10 +238,12 @@ export default function NotificationsPage() {
 
   const filters: { id: FilterType; label: string; icon: typeof Bell; count?: number }[] = [
     { id: 'all', label: 'Tümü', icon: Inbox, count: notifications.length },
-    { id: 'info', label: 'Bilgi', icon: Info },
-    { id: 'warning', label: 'Uyarı', icon: AlertTriangle },
-    { id: 'error', label: 'Acil', icon: Zap },
-    { id: 'success', label: 'Başarılı', icon: CheckCircle },
+    ...ADMIN_FILTER_TYPES.map((t) => {
+      const meta = getNotificationTypeMeta(t);
+      // Etiket: kicker uppercase yerine sentence-case göster (UI sözlüğüne uydur)
+      const sentenceLabel = meta.label.charAt(0) + meta.label.slice(1).toLocaleLowerCase('tr-TR');
+      return { id: t as FilterType, label: sentenceLabel, icon: meta.icon };
+    }),
   ];
 
   return (
@@ -273,8 +289,9 @@ export default function NotificationsPage() {
             <div className="space-y-0.5">
               {filters.map((f) => {
                 const isActive = filter === f.id;
-                const typeConf = typeConfig[f.id];
-                const iconColor = typeConf?.color || 'var(--k-text-muted)';
+                const iconColor = f.id === 'all' || f.id === 'unread'
+                  ? 'var(--k-text-muted)'
+                  : getNotificationTypeMeta(f.id).ink;
                 return (
                   <button
                     key={f.id}
@@ -323,8 +340,8 @@ export default function NotificationsPage() {
           {filtered.length > 0 ? (
             <div className="space-y-2">
               {filtered.map((n, i) => {
-                const cfg = typeConfig[n.type] || typeConfig.info;
-                const Icon = cfg.icon;
+                const meta = getNotificationTypeMeta(n.type);
+                const Icon = meta.icon;
                 const isDismissing = dismissing === n.id;
                 return (
                   <BlurFade key={n.id} delay={0.08 + i * 0.03}>
@@ -334,7 +351,7 @@ export default function NotificationsPage() {
                         background: 'var(--k-surface)',
                         borderColor: 'var(--k-border)',
                         borderLeftWidth: '3px',
-                        borderLeftColor: cfg.color,
+                        borderLeftColor: meta.ink,
                         opacity: isDismissing ? 0 : 1,
                         transform: isDismissing ? 'translateX(20px)' : 'translateX(0)',
                       }}
@@ -343,11 +360,11 @@ export default function NotificationsPage() {
                       <div
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                         style={{
-                          background: `color-mix(in srgb, ${cfg.color} 14%, transparent)`,
-                          border: `1px solid color-mix(in srgb, ${cfg.color} 22%, transparent)`,
+                          background: `color-mix(in srgb, ${meta.ink} 14%, transparent)`,
+                          border: `1px solid color-mix(in srgb, ${meta.ink} 22%, transparent)`,
                         }}
                       >
-                        <Icon className="h-5 w-5" style={{ color: cfg.color }} />
+                        <Icon className="h-5 w-5" style={{ color: meta.ink }} />
                       </div>
 
                       {/* Content */}
@@ -359,11 +376,11 @@ export default function NotificationsPage() {
                           <span
                             className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
                             style={{
-                              background: `color-mix(in srgb, ${cfg.color} 14%, transparent)`,
-                              color: cfg.color,
+                              background: `color-mix(in srgb, ${meta.ink} 14%, transparent)`,
+                              color: meta.ink,
                             }}
                           >
-                            {cfg.label}
+                            {meta.label}
                           </span>
                         </div>
                         <p
@@ -372,11 +389,24 @@ export default function NotificationsPage() {
                         >
                           {n.message}
                         </p>
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <Clock className="h-3 w-3" style={{ color: 'var(--k-text-muted)' }} />
-                          <span className="text-[11px] font-mono" style={{ color: 'var(--k-text-muted)' }}>
-                            {timeAgo(n.time)}
-                          </span>
+                        <div className="flex items-center gap-3 mt-2">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3 w-3" style={{ color: 'var(--k-text-muted)' }} />
+                            <span className="text-[11px] font-mono" style={{ color: 'var(--k-text-muted)' }}>
+                              {timeAgo(n.createdAt)}
+                            </span>
+                          </div>
+                          {n.relatedTrainingId && (
+                            <Link
+                              href={`/admin/trainings/${n.relatedTrainingId}`}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold transition-colors duration-150"
+                              style={{ color: 'var(--k-primary)' }}
+                            >
+                              <BookOpen className="h-3 w-3" />
+                              Eğitime git
+                              <ChevronRight className="h-3 w-3" />
+                            </Link>
+                          )}
                         </div>
                       </div>
 
@@ -637,9 +667,11 @@ export default function NotificationsPage() {
                     Bildirim Tipi
                   </Label>
                   <div className="flex gap-2 flex-wrap">
-                    {Object.entries(typeConfig).map(([key, cfg]) => {
-                      const Icon = cfg.icon;
+                    {(['info', 'warning', 'error', 'success'] as const).map((key) => {
+                      const meta = getNotificationTypeMeta(key);
+                      const Icon = meta.icon;
                       const isActive = sendType === key;
+                      const sentenceLabel = meta.label.charAt(0) + meta.label.slice(1).toLocaleLowerCase('tr-TR');
                       return (
                         <button
                           key={key}
@@ -647,14 +679,14 @@ export default function NotificationsPage() {
                           className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors duration-150"
                           style={{
                             background: isActive
-                              ? `color-mix(in srgb, ${cfg.color} 14%, transparent)`
+                              ? `color-mix(in srgb, ${meta.ink} 14%, transparent)`
                               : 'var(--k-bg)',
-                            color: isActive ? cfg.color : 'var(--k-text-muted)',
-                            border: `1px solid ${isActive ? cfg.color : 'var(--k-border)'}`,
+                            color: isActive ? meta.ink : 'var(--k-text-muted)',
+                            border: `1px solid ${isActive ? meta.ink : 'var(--k-border)'}`,
                           }}
                         >
                           <Icon className="h-3.5 w-3.5" />
-                          {cfg.label}
+                          {sentenceLabel}
                         </button>
                       );
                     })}

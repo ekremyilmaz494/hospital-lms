@@ -14,7 +14,18 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const [notifications, total] = await Promise.all([
     prisma.notification.findMany({
       where,
-      include: { user: { select: { firstName: true, lastName: true } } },
+      select: {
+        id: true,
+        userId: true,
+        organizationId: true,
+        title: true,
+        message: true,
+        type: true,
+        isRead: true,
+        createdAt: true,
+        relatedTrainingId: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
