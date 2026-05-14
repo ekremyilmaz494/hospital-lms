@@ -215,6 +215,7 @@ async function main() {
 
 main().catch((err) => {
   console.error('\n❌ Script hatası:', err)
-  prisma.$disconnect()
+  // prisma dinamik olarak main() içinde import edildiği için burada erişilemez;
+  // process.exit pool'u zaten cleanup yapar.
   process.exit(1)
 })
