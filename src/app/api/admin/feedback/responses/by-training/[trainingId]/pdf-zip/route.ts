@@ -263,7 +263,8 @@ export const GET = withAdminRoute<{ trainingId: string }>(async ({ params, dbUse
       metadata: { responseCount: responses.length, failedCount: failed },
     })
 
-    return new Response(zipBuffer, {
+    // Node Buffer'ı Uint8Array view'a sar: Web BodyInit'le tip-uyumlu, kopya yok.
+    return new Response(new Uint8Array(zipBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',

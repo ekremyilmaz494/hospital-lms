@@ -228,7 +228,8 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
       metadata: { participantName, isPassed: response.isPassed },
     })
 
-    return new Response(pdfBuffer, {
+    // Node Buffer'ı Uint8Array view'a sar: Web BodyInit'le tip-uyumlu, kopya yok.
+    return new Response(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
