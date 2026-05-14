@@ -7,7 +7,7 @@ import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-fact
 import { sendHospitalWelcomeEmail, sendStaffWelcomeEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 
-export const POST = withSuperAdminRoute(async ({ request, audit }) => {
+export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Invalid body')
 
@@ -51,6 +51,10 @@ export const POST = withSuperAdminRoute(async ({ request, audit }) => {
       phone: parsed.data.phone,
       title: parsed.data.title,
       mustChangePassword: true,
+      ...(parsed.data.tcKimlik && {
+        tcKimlik: parsed.data.tcKimlik,
+        tcAddedByUserId: dbUser.id,
+      }),
     })
   } catch (err) {
     if (err instanceof AuthUserError) {
@@ -132,9 +136,13 @@ export const POST = withSuperAdminRoute(async ({ request, audit }) => {
     })
   }
 
+  // tempPassword & tcKimlik HER ZAMAN dönülür — super admin elden teslim edebilsin diye.
+  // Plaintext password sadece bu noktada response'ta görünür; DB'de tutulmaz.
   return jsonResponse({
     ...result.dbUser,
     emailSent,
-    ...(emailSent ? {} : { tempPassword }),
+    tempPassword,
+    loginUrl,
+    ...(parsed.data.tcKimlik && { tcKimlik: parsed.data.tcKimlik }),
   }, 201)
 })

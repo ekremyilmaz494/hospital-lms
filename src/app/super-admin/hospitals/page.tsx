@@ -128,7 +128,7 @@ export default function HospitalsPage() {
     const { hospital, mode } = suspendTarget;
 
     // Type-to-confirm guard for suspend
-    if (mode === 'suspend' && confirmText.trim() !== hospital.name) return;
+    if (mode === 'suspend' && confirmText.trim() !== hospital.name.trim()) return;
 
     setIsSubmitting(true);
     try {
@@ -427,24 +427,24 @@ export default function HospitalsPage() {
                       <Label className="text-[13px] font-semibold">
                         Onaylamak için hastane adını yazın:{' '}
                         <span className="font-mono" style={{ color: 'var(--color-error)' }}>
-                          {suspendTarget.hospital.name}
+                          {suspendTarget.hospital.name.trim()}
                         </span>
                       </Label>
                       <input
                         type="text"
                         value={confirmText}
                         onChange={(e) => setConfirmText(e.target.value)}
-                        placeholder={suspendTarget.hospital.name}
+                        placeholder={suspendTarget.hospital.name.trim()}
                         className="w-full rounded-xl border px-3 py-2 text-[13px] outline-none"
                         style={{
                           background: 'var(--color-bg)',
-                          borderColor: confirmText && confirmText !== suspendTarget.hospital.name
+                          borderColor: confirmText && confirmText.trim() !== suspendTarget.hospital.name.trim()
                             ? 'var(--color-error)'
                             : 'var(--color-border)',
                           color: 'var(--color-text-primary)',
                         }}
                       />
-                      {confirmText && confirmText !== suspendTarget.hospital.name && (
+                      {confirmText && confirmText.trim() !== suspendTarget.hospital.name.trim() && (
                         <p className="text-[11px]" style={{ color: 'var(--color-error)' }}>
                           Hastane adı eşleşmiyor
                         </p>
@@ -479,7 +479,7 @@ export default function HospitalsPage() {
                   onClick={handleSuspendConfirm}
                   disabled={
                     isSubmitting ||
-                    (suspendTarget.mode === 'suspend' && confirmText.trim() !== suspendTarget.hospital.name)
+                    (suspendTarget.mode === 'suspend' && confirmText.trim() !== suspendTarget.hospital.name.trim())
                   }
                   className="rounded-xl px-4 py-2 text-[13px] font-semibold text-white transition-opacity duration-150 disabled:opacity-40"
                   style={{

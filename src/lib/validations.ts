@@ -109,6 +109,15 @@ export const createUserSchema = z.object({
   department: z.string().max(100).optional(),
   departmentId: z.string().uuid({ message: 'Geçersiz departman kimliği' }).optional(),
   title: z.string().max(100).optional(),
+  // Opsiyonel — verilirse normalize + checksum + encrypted/hashed olarak DB'ye yazılır.
+  // Süper admin admin atadığında zorunlu, staff create akışında opsiyonel.
+  tcKimlik: z
+    .string()
+    .min(1)
+    .max(20)
+    .transform(val => normalizeTcKimlik(val))
+    .refine(val => isValidTcKimlik(val), { message: 'Geçersiz TC Kimlik No (kontrol haneleri uyuşmuyor)' })
+    .optional(),
   // Süper admin akışında, yaratılan user yeni org'un Esas Yöneticisi olarak işaretlenir.
   // Org'un mevcut owner'ı varsa endpoint 409 döner (devir için ayrı endpoint).
   setAsOwner: z.boolean().optional(),

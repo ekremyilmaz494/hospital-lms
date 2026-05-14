@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Save, ShieldCheck, KeyRound, Copy } from 'lucide-react';
+import { useState } from 'react';
+import { Save, ShieldCheck, KeyRound, Copy, IdCard, Mail } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/shared/toast';
@@ -19,6 +19,44 @@ function Field({ label, error, hint, children }: { label: string; error?: string
   );
 }
 
+interface CredentialRowProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  copyLabel: string;
+}
+
+function CredentialRow({ icon, label, value, copyLabel }: CredentialRowProps) {
+  const { toast } = useToast();
+  return (
+    <div className="flex items-center gap-3 rounded-xl border px-3 py-2.5"
+         style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+           style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+        {icon}
+      </div>
+      <div className="flex flex-1 flex-col">
+        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+          {label}
+        </span>
+        <code className="text-[13px] font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>
+          {value}
+        </code>
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          navigator.clipboard.writeText(value).then(() => toast(`${copyLabel} kopyalandı`, 'success'));
+        }}
+        className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold"
+        style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
+      >
+        <Copy className="h-3 w-3" /> Kopyala
+      </button>
+    </div>
+  );
+}
+
 interface NewAdminModalProps {
   hospitalId: string;
   hospitalName: string;
@@ -26,23 +64,31 @@ interface NewAdminModalProps {
   onSaved: () => void;
 }
 
+interface CreatedAdmin {
+  email: string;
+  fullName: string;
+  tcKimlik: string;
+  tempPassword: string;
+  loginUrl: string;
+  emailSent: boolean;
+}
+
+const isValidTcFormat = (val: string) => /^\d{11}$/.test(val);
+
 export function NewAdminModal({ hospitalId, hospitalName, onClose, onSaved }: NewAdminModalProps) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [savedWithEmail, setSavedWithEmail] = useState(false);
-  const [fallbackPassword, setFallbackPassword] = useState<string | null>(null);
-  const [form, setForm] = useState({ ad: '', soyad: '', email: '', sifre: '', telefon: '', unvan: '' });
+  const [created, setCreated] = useState<CreatedAdmin | null>(null);
+  const [form, setForm] = useState({ ad: '', soyad: '', tc: '', email: '', sifre: '', telefon: '', unvan: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-  }, []);
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.ad.trim()) e.ad = 'Ad zorunludur';
     if (!form.soyad.trim()) e.soyad = 'Soyad zorunludur';
+    const tcNormalized = form.tc.replace(/\D/g, '');
+    if (!tcNormalized) e.tc = 'TC Kimlik No zorunludur';
+    else if (!isValidTcFormat(tcNormalized)) e.tc = '11 haneli rakam olmalıdır';
     if (!form.email.trim()) e.email = 'E-posta zorunludur';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Geçerli bir e-posta girin';
     if (form.sifre.trim()) {
@@ -66,25 +112,27 @@ export function NewAdminModal({ hospitalId, hospitalName, onClose, onSaved }: Ne
         body: JSON.stringify({
           role: 'admin',
           organizationId: hospitalId,
-          firstName: form.ad,
-          lastName: form.soyad,
-          email: form.email,
+          firstName: form.ad.trim(),
+          lastName: form.soyad.trim(),
+          email: form.email.trim(),
+          tcKimlik: form.tc.replace(/\D/g, ''),
           ...(form.sifre.trim() && { password: form.sifre.trim() }),
           ...(form.telefon && { phone: form.telefon.replace(/\s/g, '') }),
-          ...(form.unvan && { title: form.unvan }),
+          ...(form.unvan && { title: form.unvan.trim() }),
         }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Kayıt başarısız');
 
       onSaved();
-
-      if (body.emailSent === false && body.tempPassword) {
-        setFallbackPassword(body.tempPassword);
-      } else {
-        setSavedWithEmail(true);
-        closeTimerRef.current = setTimeout(() => onClose(), 1800);
-      }
+      setCreated({
+        email: body.email ?? form.email.trim(),
+        fullName: `${form.ad.trim()} ${form.soyad.trim()}`.trim(),
+        tcKimlik: body.tcKimlik ?? form.tc.replace(/\D/g, ''),
+        tempPassword: body.tempPassword ?? '',
+        loginUrl: body.loginUrl ?? '',
+        emailSent: body.emailSent === true,
+      });
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
     } finally {
@@ -97,19 +145,30 @@ export function NewAdminModal({ hospitalId, hospitalName, onClose, onSaved }: Ne
     borderColor: errors[field] ? 'var(--color-error)' : 'var(--color-border)',
   });
 
-  const isDone = savedWithEmail || fallbackPassword !== null;
+  const copyAll = () => {
+    if (!created) return;
+    const text = [
+      `Hastane: ${hospitalName}`,
+      `Yönetici: ${created.fullName}`,
+      `E-posta: ${created.email}`,
+      `TC Kimlik No: ${created.tcKimlik}`,
+      `Geçici Şifre: ${created.tempPassword}`,
+      created.loginUrl ? `Giriş: ${created.loginUrl}` : '',
+    ].filter(Boolean).join('\n');
+    navigator.clipboard.writeText(text).then(() => toast('Tüm bilgiler kopyalandı', 'success'));
+  };
 
   return (
     <PremiumModal
       isOpen
       onClose={() => { if (!saving) onClose(); }}
       eyebrow="Hastane Admin Kaydı"
-      title={`${hospitalName} için yeni admin`}
-      subtitle="Sınırsız sayıda admin ekleyebilirsiniz. Giriş bilgileri e-posta ile iletilir."
+      title={created ? `${created.fullName} oluşturuldu` : `${hospitalName} için yeni admin`}
+      subtitle={created ? 'Aşağıdaki bilgileri güvenli bir kanaldan yöneticiye iletin.' : 'Sınırsız sayıda admin ekleyebilirsiniz. TC ve geçici şifre kayıt sonrası gösterilecektir.'}
       size="lg"
       disableEscape={saving}
       footer={
-        !isDone ? (
+        !created ? (
           <PremiumModalFooter
             summary={<span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Zorunlu alanlar * ile işaretli</span>}
             actions={
@@ -121,53 +180,72 @@ export function NewAdminModal({ hospitalId, hospitalName, onClose, onSaved }: Ne
               </>
             }
           />
-        ) : fallbackPassword ? (
+        ) : (
           <PremiumModalFooter
+            summary={
+              <button
+                type="button"
+                onClick={copyAll}
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold"
+                style={{ color: 'var(--color-primary)' }}
+              >
+                <Copy className="h-3.5 w-3.5" /> Tüm bilgileri kopyala
+              </button>
+            }
             actions={<PremiumButton onClick={onClose}>Kapat</PremiumButton>}
           />
-        ) : null
+        )
       }
     >
-      {savedWithEmail ? (
-        <div className="flex flex-col items-center text-center py-8 gap-3">
-          <div className="w-14 h-14 rounded-full flex items-center justify-center"
-               style={{ background: 'var(--color-primary)', color: '#fff' }}>
-            <ShieldCheck className="h-6 w-6" />
-          </div>
-          <h4 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-            Admin başarıyla eklendi
-          </h4>
-          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            Giriş bilgileri {form.email} adresine gönderildi.
-          </p>
-        </div>
-      ) : fallbackPassword ? (
-        <div className="flex flex-col gap-4 py-2">
-          <div className="flex items-start gap-3 rounded-lg border p-3"
-               style={{ background: 'var(--color-warning-bg)', borderColor: 'var(--color-warning)' }}>
-            <KeyRound className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
+      {created ? (
+        <div className="flex flex-col gap-4 py-1">
+          <div className="flex items-start gap-3 rounded-xl border p-3"
+               style={{
+                 background: created.emailSent ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
+                 borderColor: created.emailSent ? 'var(--color-success)' : 'var(--color-warning)',
+               }}>
+            {created.emailSent ? (
+              <ShieldCheck className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--color-success)' }} />
+            ) : (
+              <KeyRound className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
+            )}
             <div className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
-              <p className="font-semibold mb-1">Admin oluşturuldu — fakat e-posta gönderilemedi</p>
+              <p className="font-semibold mb-1">
+                {created.emailSent ? 'Admin oluşturuldu ve giriş bilgileri e-posta ile iletildi' : 'Admin oluşturuldu — fakat e-posta gönderilemedi'}
+              </p>
               <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                Aşağıdaki geçici şifreyi {form.email} kullanıcısına güvenli kanaldan iletin. İlk girişte değiştirmesi istenecektir.
+                Yedek olarak aşağıdaki bilgileri kaydedin ve güvenli bir kanaldan yöneticiye iletin. İlk girişte şifre değiştirilmesi istenir.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5"
-               style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-            <code className="flex-1 text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>
-              {fallbackPassword}
-            </code>
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(fallbackPassword).then(() => toast('Şifre kopyalandı', 'success'));
-              }}
-              className="flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold"
-              style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
-            >
-              <Copy className="h-3 w-3" /> Kopyala
-            </button>
+
+          <div className="flex flex-col gap-2">
+            <CredentialRow
+              icon={<Mail className="h-4 w-4" />}
+              label="E-posta"
+              value={created.email}
+              copyLabel="E-posta"
+            />
+            <CredentialRow
+              icon={<IdCard className="h-4 w-4" />}
+              label="TC Kimlik No"
+              value={created.tcKimlik}
+              copyLabel="TC Kimlik No"
+            />
+            <CredentialRow
+              icon={<KeyRound className="h-4 w-4" />}
+              label="Geçici Şifre"
+              value={created.tempPassword}
+              copyLabel="Geçici şifre"
+            />
+            {created.loginUrl && (
+              <CredentialRow
+                icon={<ShieldCheck className="h-4 w-4" />}
+                label="Giriş Adresi"
+                value={created.loginUrl}
+                copyLabel="Giriş adresi"
+              />
+            )}
           </div>
         </div>
       ) : (
@@ -185,25 +263,33 @@ export function NewAdminModal({ hospitalId, hospitalName, onClose, onSaved }: Ne
             </Field>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="TC Kimlik No *" error={errors.tc} hint={!errors.tc ? 'Sadece 11 hane rakam' : undefined}>
+              <Input inputMode="numeric" placeholder="12345678901" className="h-10" maxLength={11}
+                     value={form.tc}
+                     onChange={(e) => setForm(f => ({ ...f, tc: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
+                     style={{ ...fieldStyle('tc'), fontFamily: 'var(--font-mono)' }} />
+            </Field>
             <Field label="E-posta *" error={errors.email}>
               <Input type="email" placeholder="admin@hastane.com" className="h-10" autoComplete="email"
                      value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
                      style={fieldStyle('email')} />
             </Field>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Şifre" error={errors.sifre}
-                   hint={!errors.sifre ? 'Boş bırakın — otomatik üretilip e-posta ile iletilir.' : undefined}>
+                   hint={!errors.sifre ? 'Boş bırakın — sistem üretir ve kayıttan sonra gösterilir.' : undefined}>
               <Input type="password" placeholder="Boş bırakın — sistem üretir" className="h-10" autoComplete="new-password"
                      value={form.sifre} onChange={(e) => setForm(f => ({ ...f, sifre: e.target.value }))}
                      style={fieldStyle('sifre')} />
             </Field>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Telefon" error={errors.telefon}>
               <Input placeholder="05XX XXX XX XX" className="h-10"
                      value={form.telefon}
                      onChange={(e) => setForm(f => ({ ...f, telefon: e.target.value.replace(/[^\d\s]/g, '') }))}
                      style={{ ...fieldStyle('telefon'), fontFamily: 'var(--font-mono)' }} />
             </Field>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Unvan">
               <Input placeholder="örn. Kalite Yöneticisi" className="h-10"
                      value={form.unvan} onChange={(e) => setForm(f => ({ ...f, unvan: e.target.value }))}

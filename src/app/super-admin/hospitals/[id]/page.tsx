@@ -68,7 +68,7 @@ export default function HospitalDetailPage() {
   const handleSuspendConfirm = async () => {
     if (!data) return;
     const mode: 'suspend' | 'activate' = data.isSuspended ? 'activate' : 'suspend';
-    if (mode === 'suspend' && confirmText.trim() !== data.name) return;
+    if (mode === 'suspend' && confirmText.trim() !== data.name.trim()) return;
 
     setIsSubmittingSuspend(true);
     try {
@@ -385,21 +385,21 @@ export default function HospitalDetailPage() {
                 <div className="space-y-1.5">
                   <Label className="text-[13px] font-semibold">
                     Onaylamak için hastane adını yazın:{' '}
-                    <span className="font-mono" style={{ color: 'var(--color-error)' }}>{hospital.name}</span>
+                    <span className="font-mono" style={{ color: 'var(--color-error)' }}>{hospital.name.trim()}</span>
                   </Label>
                   <input
                     type="text"
                     value={confirmText}
                     onChange={(e) => setConfirmText(e.target.value)}
-                    placeholder={hospital.name}
+                    placeholder={hospital.name.trim()}
                     className="w-full rounded-xl border px-3 py-2 text-[13px] outline-none"
                     style={{
                       background: 'var(--color-bg)',
-                      borderColor: confirmText && confirmText !== hospital.name ? 'var(--color-error)' : 'var(--color-border)',
+                      borderColor: confirmText && confirmText.trim() !== hospital.name.trim() ? 'var(--color-error)' : 'var(--color-border)',
                       color: 'var(--color-text-primary)',
                     }}
                   />
-                  {confirmText && confirmText !== hospital.name && (
+                  {confirmText && confirmText.trim() !== hospital.name.trim() && (
                     <p className="text-[11px]" style={{ color: 'var(--color-error)' }}>Hastane adı eşleşmiyor</p>
                   )}
                 </div>
@@ -427,7 +427,7 @@ export default function HospitalDetailPage() {
             </button>
             <button
               onClick={handleSuspendConfirm}
-              disabled={isSubmittingSuspend || (!hospital.isSuspended && confirmText.trim() !== hospital.name)}
+              disabled={isSubmittingSuspend || (!hospital.isSuspended && confirmText.trim() !== hospital.name.trim())}
               className="rounded-xl px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-40"
               style={{ background: hospital.isSuspended ? 'var(--color-success)' : 'var(--color-error)' }}
             >
