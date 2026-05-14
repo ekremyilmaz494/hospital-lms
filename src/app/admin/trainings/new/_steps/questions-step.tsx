@@ -1,11 +1,13 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useEffect, useRef, useState } from 'react';
 import { FileQuestion, Plus, Target, Trash2, CheckCircle2, Sparkles, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/components/shared/toast';
 import { K, distributePoints, minCorrectForPassing, type QuestionItem } from './types';
 import type { AiPendingState, AiUploadedSource } from '@/components/admin/trainings/ai-question-generator';
 
@@ -47,26 +49,62 @@ export default function QuestionsStep({
   aiPending, setAiPending,
   aiUploadedSources, setAiUploadedSources,
 }: QuestionsStepProps) {
+  const { toast } = useToast();
+  // AI'dan az önce eklenen soruların id'leri — 3 sn boyunca kart üzerinde "yeni eklendi"
+  // glow + kısa süreli rozet gösteririz. Sonra normalleşir, sadece kalıcı "AI" rozeti kalır.
+  const [flashedIds, setFlashedIds] = useState<Set<number>>(new Set());
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstFlashedRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => () => {
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+  }, []);
+
+  // Flash set'i değiştiğinde ilk yeni eklenen soruya yumuşak scroll yap.
+  // Manuel sekmeye otomatik geçtikten sonra browser layout'u oturunca kart görünür olur.
+  useEffect(() => {
+    if (flashedIds.size === 0) return;
+    const t = setTimeout(() => {
+      firstFlashedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [flashedIds]);
+
   const handleAiAdd = (
     items: { text: string; options: string[]; correct: number }[],
   ) => {
+    if (items.length === 0) return;
+    const newIds: number[] = [];
     setQuestions((prev) => {
       // Boş initial soruyu (text=='' && correct==-1) drop et — admin AI ile başlıyorsa.
       const cleaned = prev.filter((q) => q.text.trim() !== '' || q.correct !== -1 || q.options.some((o) => o.trim() !== ''));
       const baseId = cleaned.reduce((max, q) => Math.max(max, q.id), 0);
-      const mapped: QuestionItem[] = items.map((it, i) => ({
-        id: baseId + 1 + i,
-        text: it.text,
-        points: 0, // distributePoints will recompute on submit
-        options: [it.options[0] ?? '', it.options[1] ?? '', it.options[2] ?? '', it.options[3] ?? ''],
-        correct: it.correct,
-        aiGenerated: true,
-      }));
+      const mapped: QuestionItem[] = items.map((it, i) => {
+        const id = baseId + 1 + i;
+        newIds.push(id);
+        return {
+          id,
+          text: it.text,
+          points: 0, // distributePoints will recompute on submit
+          options: [it.options[0] ?? '', it.options[1] ?? '', it.options[2] ?? '', it.options[3] ?? ''],
+          correct: it.correct,
+          aiGenerated: true,
+        };
+      });
       const next = [...cleaned, ...mapped];
       // Puanları yeniden dağıt — toplam 100 olacak şekilde.
       const dist = distributePoints(next.length);
       return next.map((q, i) => ({ ...q, points: dist[i] ?? 0 }));
     });
+
+    // Görünür feedback üçlemesi: (1) Manuel sekmeye otomatik geçiş, (2) toast,
+    // (3) yeni kartlarda 3 sn flash highlight + ilkine scroll. Sebep: AI tab'ında
+    // kalıp "ne oldu?" diye soran kullanıcı şikayeti.
+    setActiveMode('manual');
+    setFlashedIds(new Set(newIds));
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => setFlashedIds(new Set()), 3000);
+    toast(`${items.length} soru sınava eklendi — Manuel sekmesinde görüntüleyebilirsiniz`, 'success');
   };
 
   return (
@@ -156,11 +194,20 @@ export default function QuestionsStep({
           </div>
 
           <div className="space-y-4">
-            {questions.map((q, qIdx) => (
+            {questions.map((q, qIdx) => {
+              const isFlashed = flashedIds.has(q.id);
+              const firstFlashed = isFlashed && q.id === Math.min(...Array.from(flashedIds));
+              return (
               <div
                 key={q.id}
-                className="rounded-xl border"
-                style={{ borderColor: K.BORDER, background: K.BG }}
+                ref={firstFlashed ? firstFlashedRef : undefined}
+                className="rounded-xl border qs-card-anim"
+                style={{
+                  borderColor: isFlashed ? K.SUCCESS : K.BORDER,
+                  background: K.BG,
+                  boxShadow: isFlashed ? `0 0 0 3px ${K.SUCCESS_BG}, 0 8px 24px -8px ${K.SUCCESS}40` : undefined,
+                  transition: 'border-color 600ms ease, box-shadow 600ms ease',
+                }}
               >
                 <div
                   className="flex items-center gap-3 px-5 py-3.5"
@@ -180,6 +227,14 @@ export default function QuestionsStep({
                     style={{ color: K.TEXT_PRIMARY }}
                   />
                   <div className="flex items-center gap-2 shrink-0">
+                    {isFlashed && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider"
+                        style={{ background: K.SUCCESS, color: '#fff' }}
+                      >
+                        <CheckCircle2 className="h-3 w-3" /> Yeni eklendi
+                      </span>
+                    )}
                     {q.aiGenerated && (
                       <span
                         className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold"
@@ -262,7 +317,8 @@ export default function QuestionsStep({
                   </p>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </TabsContent>
 
