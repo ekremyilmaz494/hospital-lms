@@ -91,5 +91,11 @@ export const PUT = withAdminRoute(async ({ request, organizationId }) => {
     totalSent += result.count
   }
 
+  // POST ile simetri: bulk gönderim sonrası staff ve admin listelerini
+  // tazele. Realtime hook yeni gelenleri client store'a düşürür, ama
+  // RSC cache'inde kalan eski sayfalar tutarsız kalabilir.
+  revalidatePath('/staff/notifications')
+  revalidatePath('/admin/notifications')
+
   return jsonResponse({ sent: totalSent })
 }, { requireOrganization: true })
