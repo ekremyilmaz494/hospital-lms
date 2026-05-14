@@ -46,7 +46,8 @@
       "WebFetch(domain:www.cornerstoneondemand.com)",
       "WebFetch(domain:fibr.ai)",
       "WebFetch(domain:swipepages.com)",
-      "Bash(gh run *)"
+      "Bash(gh run *)",
+      "Bash(pnpm tsc *)"
     ]
   }
 }
