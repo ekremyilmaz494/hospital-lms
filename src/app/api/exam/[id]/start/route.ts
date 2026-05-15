@@ -31,6 +31,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       status: true,
       currentAttempt: true,
       maxAttempts: true,
+      dueDate: true,
       training: {
         select: {
           startDate: true,
@@ -52,6 +53,11 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Bu eğitim arşivlenmiş, yeni sınav başlatılamaz.', 403)
   }
 
+  // Per-atama dueDate (2. tur override) varsa training.endDate yerine onu kullan.
+  // Bu sayede admin "Yeniden Ata"da yeni bitiş verince, ana training.endDate
+  // geçmiş olsa bile yeni round'daki personel sınava girebilir.
+  const effectiveDueDate = assignment.dueDate ?? assignment.training.endDate
+
   // ── Zorunlu geri bildirim kilidi ──
   // Kullanıcının başka bir eğitim için bekleyen zorunlu feedback'i varsa,
   // aynı eğitime devam/retry hariç yeni başlatmayı engelle.
@@ -71,7 +77,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   if (now < new Date(assignment.training.startDate)) {
     return errorResponse('Bu eğitim henüz başlanmamış.', 403)
   }
-  if (now > new Date(assignment.training.endDate)) {
+  if (now > new Date(effectiveDueDate)) {
     return errorResponse('Bu eğitimin süresi dolmuş.', 403)
   }
 

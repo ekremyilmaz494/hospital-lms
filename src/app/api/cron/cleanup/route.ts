@@ -126,10 +126,21 @@ export async function GET(request: Request) {
   }
 
   // 5. Gecikmiş eğitim hatırlatmaları (ilk gecikme günü)
+  // dueDate (per-atama override) öncelikli; null ise training.endDate fallback.
+  const overdueStart = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  const overdueEnd = new Date()
   const overdueAssignments = await prisma.trainingAssignment.findMany({
     where: {
       status: { in: ['assigned', 'in_progress', 'failed'] },
-      training: { endDate: { lt: new Date(), gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      OR: [
+        { dueDate: { lt: overdueEnd, gte: overdueStart } },
+        {
+          AND: [
+            { dueDate: null },
+            { training: { endDate: { lt: overdueEnd, gte: overdueStart } } },
+          ],
+        },
+      ],
     },
     include: {
       user: { select: { firstName: true, lastName: true, email: true } },
@@ -140,8 +151,9 @@ export async function GET(request: Request) {
 
   let overdueRemindersSent = 0
   for (const a of overdueAssignments) {
-    if (!a.training.endDate) continue
-    const daysOverdue = Math.floor((Date.now() - new Date(a.training.endDate).getTime()) / 86400000)
+    const effective = a.dueDate ?? a.training.endDate
+    if (!effective) continue
+    const daysOverdue = Math.floor((Date.now() - new Date(effective).getTime()) / 86400000)
     try {
       await sendEmail({
         to: a.user.email,
@@ -149,7 +161,7 @@ export async function GET(request: Request) {
         html: overdueTrainingReminderEmail(
           `${a.user.firstName} ${a.user.lastName}`,
           a.training.title,
-          new Date(a.training.endDate).toLocaleDateString('tr-TR'),
+          new Date(effective).toLocaleDateString('tr-TR'),
           daysOverdue,
         ),
       })

@@ -503,15 +503,27 @@ model TrainingAssignment {
   assignedById        String?   @map("assigned_by") @db.Uuid
   assignedAt          DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
   completedAt         DateTime? @map("completed_at") @db.Timestamptz
+  // Tekrar atama (2. tur) — aynı eğitim + aynı dönem içinde 1, 2, 3 ... round.
+  // round=1 = orijinal atama; round=2+ = admin tarafından açılan takip turu.
+  round                Int       @default(1) @map("round")
+  // Per-atama deadline override. null ise training.endDate fallback.
+  // 2. tur açıldığında bu kişilere özel yeni vade.
+  dueDate              DateTime? @map("due_date") @db.Timestamptz
+  // 2. tur açılış sebebi (audit/rapor): 'failed' | 'no_show' | 'overdue_in_progress'.
+  reassignmentReason   String?   @map("reassignment_reason") @db.VarChar(20)
+  // Önceki turun id'si — denetim zinciri.
+  previousAssignmentId String?   @map("previous_assignment_id") @db.Uuid
 
-  training     Training        @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  user         User            @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assignedBy   User?           @relation("AssignedByUser", fields: [assignedById], references: [id])
-  period       TrainingPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
-  examAttempts ExamAttempt[]
+  training             Training             @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  user                 User                 @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedBy           User?                @relation("AssignedByUser", fields: [assignedById], references: [id])
+  period               TrainingPeriod?      @relation(fields: [periodId], references: [id], onDelete: SetNull)
+  previousAssignment   TrainingAssignment?  @relation("AssignmentRounds", fields: [previousAssignmentId], references: [id], onDelete: SetNull)
+  nextRounds           TrainingAssignment[] @relation("AssignmentRounds")
+  examAttempts         ExamAttempt[]
 
-  @@unique([trainingId, userId, periodId])
+  @@unique([trainingId, userId, periodId, round])
   @@index([userId], map: "idx_assignments_user")
   @@index([trainingId], map: "idx_assignments_training")
   @@index([organizationId], map: "idx_assignments_organization")
@@ -520,6 +532,7 @@ model TrainingAssignment {
   @@index([trainingId, status], map: "idx_assignments_training_status")
   @@index([completedAt], map: "idx_assignments_completed_at")
   @@index([periodId], map: "idx_assignments_period")
+  @@index([trainingId, round], map: "idx_assignments_training_round")
   @@map("training_assignments")
 }
 

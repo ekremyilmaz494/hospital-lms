@@ -56,14 +56,21 @@ export async function GET(request: Request) {
     const targetStart = new Date(now + daysLeft * DAY_MS)
     const targetEnd = new Date(now + (daysLeft + 1) * DAY_MS)
 
+    // 2. tur açıldığında atamanın kendi dueDate'i öncelikli; aksi halde training.endDate fallback.
     const assignments = await prisma.trainingAssignment.findMany({ // perf-check-disable-line
       where: {
         status: { in: ['assigned', 'in_progress'] },
         ...activePeriodFilter,
-        training: {
-          isActive: true,
-          endDate: { gte: targetStart, lt: targetEnd },
-        },
+        training: { isActive: true },
+        OR: [
+          { dueDate: { gte: targetStart, lt: targetEnd } },
+          {
+            AND: [
+              { dueDate: null },
+              { training: { endDate: { gte: targetStart, lt: targetEnd } } },
+            ],
+          },
+        ],
       },
       include: {
         user: { select: { id: true, firstName: true, lastName: true, email: true, organizationId: true } },
@@ -74,7 +81,8 @@ export async function GET(request: Request) {
 
     for (const a of assignments) {
       const staffName = `${a.user.firstName} ${a.user.lastName}`
-      const dueDate = new Date(a.training.endDate).toLocaleDateString('tr-TR')
+      const effective = a.dueDate ?? a.training.endDate
+      const dueDate = new Date(effective).toLocaleDateString('tr-TR')
 
       try {
         await sendEmail({
@@ -112,17 +120,22 @@ export async function GET(request: Request) {
   }
 
   // ── 2. GECİKMİŞ EĞİTİM HATIRLATMALARI (süre dolduktan sonra 7 güne kadar günlük) ──
+  const overdueWindowStart = new Date(now - OVERDUE_MAX_DAYS * DAY_MS)
+  const overdueWindowEnd = new Date(now)
   const overdueAssignments = await prisma.trainingAssignment.findMany({ // perf-check-disable-line
     where: {
       status: { in: ['assigned', 'in_progress', 'failed'] },
       ...activePeriodFilter,
-      training: {
-        isActive: true,
-        endDate: {
-          lt: new Date(now),
-          gte: new Date(now - OVERDUE_MAX_DAYS * DAY_MS),
+      training: { isActive: true },
+      OR: [
+        { dueDate: { lt: overdueWindowEnd, gte: overdueWindowStart } },
+        {
+          AND: [
+            { dueDate: null },
+            { training: { endDate: { lt: overdueWindowEnd, gte: overdueWindowStart } } },
+          ],
         },
-      },
+      ],
     },
     include: {
       user: { select: { id: true, firstName: true, lastName: true, email: true, organizationId: true } },
@@ -133,8 +146,9 @@ export async function GET(request: Request) {
 
   for (const a of overdueAssignments) {
     const staffName = `${a.user.firstName} ${a.user.lastName}`
-    const dueDate = new Date(a.training.endDate).toLocaleDateString('tr-TR')
-    const daysOverdue = Math.floor((now - new Date(a.training.endDate).getTime()) / DAY_MS)
+    const effective = a.dueDate ?? a.training.endDate
+    const dueDate = new Date(effective).toLocaleDateString('tr-TR')
+    const daysOverdue = Math.floor((now - new Date(effective).getTime()) / DAY_MS)
 
     try {
       await sendEmail({
@@ -257,14 +271,14 @@ export async function GET(request: Request) {
     if (!renewalPeriod) continue
 
     // Zaten atanmış mı? (aktif period içinde aktif atama var mı)
-    const existingAssignment = await prisma.trainingAssignment.findUnique({ // perf-check-disable-line
+    // Composite unique artık round içeriyor; en güncel round'u dön.
+    const existingAssignment = await prisma.trainingAssignment.findFirst({ // perf-check-disable-line
       where: {
-        trainingId_userId_periodId: {
-          trainingId: cert.training.id,
-          userId: cert.user.id,
-          periodId: renewalPeriod.id,
-        },
+        trainingId: cert.training.id,
+        userId: cert.user.id,
+        periodId: renewalPeriod.id,
       },
+      orderBy: { round: 'desc' },
     })
     if (existingAssignment && existingAssignment.status !== 'passed') continue
 

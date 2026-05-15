@@ -14,6 +14,7 @@ import { StatCard } from '@/components/shared/stat-card';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFetch } from '@/hooks/use-fetch';
 import { AssignStaffModal } from './assign-staff-modal';
+import { IncompleteSegmentsModal } from './incomplete-segments-modal';
 import { useToast } from '@/components/shared/toast';
 import {
   Dialog,
@@ -77,6 +78,7 @@ export default function TrainingDetailPage() {
   const [activeTab, setActiveTab] = useState('staff');
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [reassignModalOpen, setReassignModalOpen] = useState(false);
   const [downloadingCompletion, setDownloadingCompletion] = useState<'pdf' | 'excel' | null>(null);
   const [downloadingTab, setDownloadingTab] = useState<'pdf' | 'excel' | null>(null);
   const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
@@ -197,6 +199,16 @@ export default function TrainingDetailPage() {
             <Edit className="h-4 w-4" /> Düzenle
           </Button>
           <Button
+            variant="outline"
+            className="gap-2 rounded-xl"
+            style={ghostBtnStyle}
+            disabled={!hasPlayableContent}
+            title={hasPlayableContent ? 'Bitiş tarihine kadar tamamlamayan personeller için yeni tarihle 2. atama aç' : 'Atama için en az bir video veya ses içeriği eklenmelidir.'}
+            onClick={() => setReassignModalOpen(true)}
+          >
+            <RotateCcw className="h-4 w-4" /> Tamamlamayanları Yeniden Ata
+          </Button>
+          <Button
             onClick={() => setAssignModalOpen(true)}
             disabled={!hasPlayableContent}
             title={hasPlayableContent ? undefined : 'Atama için en az bir video veya ses içeriği eklenmelidir.'}
@@ -217,6 +229,15 @@ export default function TrainingDetailPage() {
         onOpenChange={setAssignModalOpen}
         onSuccess={() => {
           refetch(); // refresh data
+        }}
+      />
+
+      <IncompleteSegmentsModal
+        trainingId={id as string}
+        open={reassignModalOpen}
+        onOpenChange={setReassignModalOpen}
+        onSuccess={() => {
+          refetch();
         }}
       />
 

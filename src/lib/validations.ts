@@ -329,6 +329,16 @@ export const createAssignmentSchema = z.object({
   maxAttempts: z.number().int().min(1).max(10).default(3),
 }).strict()
 
+// ── Re-Assignment (2. Tur) ──
+// Belirtilen tarihe kadar tamamlamayan personeller için aynı eğitime
+// yeni dueDate ile takip turu açar.
+export const reassignAssignmentSchema = z.object({
+  userIds: z.array(z.string().uuid()).min(1).max(5000),
+  newDueDate: z.string().datetime(), // ISO 8601
+  reason: z.enum(['failed', 'no_show', 'overdue_in_progress']),
+  additionalAttempts: z.number().int().min(1).max(10).default(3),
+}).strict()
+
 // ── Exam ──
 export const submitExamSchema = z.object({
   answers: z.array(z.object({

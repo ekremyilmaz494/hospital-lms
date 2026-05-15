@@ -26,6 +26,108 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
     return jsonResponse({ userIds: rows.map(r => r.userId) }, 200, { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' })
   }
 
+  // "2. Atama" modal — bitiş tarihine kadar tamamlamayanları 3 segmente böler.
+  // Sadece her kullanıcının **en güncel (max round) atamasını** değerlendirir;
+  // önceki turlar görmezden gelinir (zaten yeni tur açıldıysa kişiyi tekrar
+  // listelemenin anlamı yok).
+  if (searchParams.get('incompleteSegments') === '1') {
+    const activePeriod = await findActivePeriod(organizationId)
+    if (!activePeriod) {
+      return jsonResponse(
+        { failed: [], noShow: [], overdueInProgress: [] },
+        200,
+        { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' },
+      )
+    }
+
+    const rows = await prisma.trainingAssignment.findMany({
+      where: {
+        trainingId: id,
+        periodId: activePeriod.id,
+        organizationId,
+        status: { in: ['assigned', 'in_progress', 'failed'] },
+      },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        round: true,
+        dueDate: true,
+        currentAttempt: true,
+        maxAttempts: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            departmentRel: { select: { name: true } },
+          },
+        },
+        training: { select: { endDate: true } },
+        examAttempts: {
+          orderBy: { attemptNumber: 'desc' },
+          take: 1,
+          select: { postExamScore: true, isPassed: true },
+        },
+      },
+      orderBy: [{ userId: 'asc' }, { round: 'desc' }],
+    })
+
+    // Sadece her userId için en güncel round (round desc'ten sonra ilki)
+    const seenUsers = new Set<string>()
+    const latestPerUser: typeof rows = []
+    for (const r of rows) {
+      if (seenUsers.has(r.userId)) continue
+      seenUsers.add(r.userId)
+      latestPerUser.push(r)
+    }
+
+    const now = Date.now()
+    const failed: Array<{
+      assignmentId: string; userId: string; name: string; department: string | null;
+      currentAttempt: number; maxAttempts: number; lastScore: number | null; round: number;
+    }> = []
+    const noShow: Array<{
+      assignmentId: string; userId: string; name: string; department: string | null; round: number;
+    }> = []
+    const overdueInProgress: Array<{
+      assignmentId: string; userId: string; name: string; department: string | null;
+      currentAttempt: number; round: number;
+    }> = []
+
+    for (const a of latestPerUser) {
+      const name = `${a.user.firstName} ${a.user.lastName}`.trim()
+      const department = a.user.departmentRel?.name ?? null
+      const effectiveDue = (a.dueDate ?? a.training.endDate).valueOf()
+      const isOverdue = now > effectiveDue
+
+      if (a.status === 'failed') {
+        failed.push({
+          assignmentId: a.id,
+          userId: a.userId,
+          name,
+          department,
+          currentAttempt: a.currentAttempt,
+          maxAttempts: a.maxAttempts,
+          lastScore: a.examAttempts[0]?.postExamScore ? Number(a.examAttempts[0].postExamScore) : null,
+          round: a.round,
+        })
+      } else if (a.status === 'assigned' && a.currentAttempt === 0 && isOverdue) {
+        noShow.push({ assignmentId: a.id, userId: a.userId, name, department, round: a.round })
+      } else if (a.status === 'in_progress' && isOverdue) {
+        overdueInProgress.push({
+          assignmentId: a.id, userId: a.userId, name, department,
+          currentAttempt: a.currentAttempt, round: a.round,
+        })
+      }
+    }
+
+    return jsonResponse(
+      { failed, noShow, overdueInProgress },
+      200,
+      { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+    )
+  }
+
   const { page, limit, skip } = safePagination(searchParams)
 
   const where = { trainingId: id, training: { organizationId: organizationId } }
