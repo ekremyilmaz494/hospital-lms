@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft, GraduationCap, Users, TrendingUp, Clock, Edit, Play, BarChart3,
@@ -68,6 +68,16 @@ const statusMap: Record<string, { label: string; bg: string; text: string; icon:
   assigned: { label: 'Atandı', bg: K.INFO_BG, text: '#1d4ed8', icon: Users },
 };
 
+type StaffStatusFilter = 'all' | 'passed' | 'failed' | 'in_progress' | 'assigned';
+
+const STATUS_FILTERS: { value: StaffStatusFilter; label: string }[] = [
+  { value: 'all', label: 'Tümü' },
+  { value: 'passed', label: 'Geçti' },
+  { value: 'failed', label: 'Geçmedi' },
+  { value: 'in_progress', label: 'Tamamlamadı' },
+  { value: 'assigned', label: 'Başlamadı' },
+];
+
 export default function TrainingDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -82,6 +92,7 @@ export default function TrainingDetailPage() {
   const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
   const [resetting, setResetting] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
+  const [staffStatusFilter, setStaffStatusFilter] = useState<StaffStatusFilter>('all');
 
   if (!id) {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: K.TEXT_MUTED }}>Eğitim bulunamadı</div></div>;
@@ -100,6 +111,13 @@ export default function TrainingDetailPage() {
   }
 
   const assignedStaff = training.assignedStaff ?? [];
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { passed: 0, failed: 0, in_progress: 0, assigned: 0 };
+    for (const s of assignedStaff) {
+      if (counts[s.status] !== undefined) counts[s.status] += 1;
+    }
+    return counts;
+  }, [assignedStaff]);
   const trainingVideos = training.videos ?? [];
   const trainingQuestions = training.questions ?? [];
   // PDF içerikler son sınava geçişi tetiklemez — atama ancak en az 1 video/ses varsa yapılabilir
@@ -368,8 +386,11 @@ export default function TrainingDetailPage() {
               <motion.div key="staff" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
                 {assignedStaff.length > 0 ? (() => {
                   const q = staffSearch.trim().toLocaleLowerCase('tr');
+                  const byStatus = staffStatusFilter === 'all'
+                    ? assignedStaff
+                    : assignedStaff.filter(s => s.status === staffStatusFilter);
                   const filteredStaff = q
-                    ? assignedStaff.filter(s => {
+                    ? byStatus.filter(s => {
                         const statusLabel = (statusMap[s.status] ?? statusMap.assigned).label.toLocaleLowerCase('tr');
                         return (
                           s.name.toLocaleLowerCase('tr').includes(q) ||
@@ -377,9 +398,44 @@ export default function TrainingDetailPage() {
                           statusLabel.includes(q)
                         );
                       })
-                    : assignedStaff;
+                    : byStatus;
+                  const filterActive = staffStatusFilter !== 'all' || q.length > 0;
                   return (
                   <div>
+                    {/* Status Filter Chips */}
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      {STATUS_FILTERS.map(f => {
+                        const isActive = staffStatusFilter === f.value;
+                        const count = f.value === 'all'
+                          ? assignedStaff.length
+                          : statusCounts[f.value] ?? 0;
+                        const palette = f.value === 'all'
+                          ? { bg: K.SURFACE_HOVER, text: K.TEXT_PRIMARY, activeBg: K.TEXT_PRIMARY, activeText: '#ffffff' }
+                          : (() => {
+                              const m = statusMap[f.value] ?? statusMap.assigned;
+                              return { bg: K.SURFACE, text: K.TEXT_SECONDARY, activeBg: m.bg, activeText: m.text };
+                            })();
+                        return (
+                          <button
+                            key={f.value}
+                            type="button"
+                            onClick={() => setStaffStatusFilter(f.value)}
+                            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+                            style={{
+                              background: isActive ? palette.activeBg : palette.bg,
+                              color: isActive ? palette.activeText : palette.text,
+                              border: `1px solid ${isActive ? 'transparent' : K.BORDER_LIGHT}`,
+                            }}
+                          >
+                            {f.label}
+                            <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: isActive ? 'rgba(255,255,255,0.25)' : K.BG, color: isActive ? palette.activeText : K.TEXT_MUTED, fontFamily: 'var(--font-mono)' }}>
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
                     {/* Search */}
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div className="relative flex-1 max-w-md">
@@ -404,10 +460,20 @@ export default function TrainingDetailPage() {
                           </button>
                         )}
                       </div>
-                      {q && (
-                        <span className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>
-                          {filteredStaff.length} / {assignedStaff.length} personel
-                        </span>
+                      {filterActive && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>
+                            {filteredStaff.length} / {assignedStaff.length} personel
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => { setStaffStatusFilter('all'); setStaffSearch(''); }}
+                            className="text-xs font-semibold underline"
+                            style={{ color: K.PRIMARY }}
+                          >
+                            Filtreleri temizle
+                          </button>
+                        </div>
                       )}
                     </div>
                     {/* Header Row */}
@@ -426,7 +492,9 @@ export default function TrainingDetailPage() {
                     <div>
                       {filteredStaff.length === 0 ? (
                         <div className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>
-                          Aramaya uyan personel bulunamadı.
+                          {staffStatusFilter !== 'all' && !q
+                            ? 'Bu duruma uyan personel yok.'
+                            : 'Aramaya uyan personel bulunamadı.'}
                         </div>
                       ) : filteredStaff.map((s) => {
                         const st = statusMap[s.status] || statusMap.assigned;

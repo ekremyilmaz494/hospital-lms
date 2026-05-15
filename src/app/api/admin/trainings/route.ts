@@ -8,6 +8,8 @@ import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { withCache, invalidateOrgCache } from '@/lib/redis'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
 import { getOrCreateActivePeriodForAssignment } from '@/lib/training-periods'
+import { sendExpoPushToMany } from '@/lib/expo-push'
+import { logger } from '@/lib/logger'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
@@ -261,6 +263,47 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
       return t
     }, { timeout: 30000 })
+
+    // Atanan personellere otomatik bildirim + Expo push.
+    // Why: Personel admin'in eğitim tanımladığını ve hangi tarihler arasında
+    // tamamlaması gerektiğini anlık öğrensin. Notification.createMany toplu insert,
+    // sendExpoPushToMany fire-and-forget (admin response'unu bloklamaz).
+    try {
+      const assignedRows = await prisma.trainingAssignment.findMany({
+        where: { trainingId: training.id, organizationId },
+        select: { userId: true },
+      })
+      const assignedUserIds = assignedRows.map(r => r.userId)
+
+      if (assignedUserIds.length > 0) {
+        const startStr = new Date(trainingData.startDate).toLocaleDateString('tr-TR')
+        const endStr = new Date(trainingData.endDate).toLocaleDateString('tr-TR')
+        const notifTitle = 'Yeni Eğitim Atandı'
+        const notifMessage = `"${training.title}" adlı eğitim sizlere atandı. ${startStr} – ${endStr} tarihleri arasında tamamlamanız gerekmektedir.`
+
+        await prisma.notification.createMany({
+          data: assignedUserIds.map(uid => ({
+            userId: uid,
+            organizationId,
+            senderId: dbUser.id,
+            title: notifTitle,
+            message: notifMessage,
+            type: 'assignment',
+            relatedTrainingId: training.id,
+          })),
+        })
+
+        void sendExpoPushToMany(assignedUserIds, {
+          title: notifTitle,
+          body: notifMessage,
+          url: `/trainings/${training.id}`,
+          data: { trainingId: training.id, type: 'assignment' },
+        })
+      }
+    } catch (notifErr) {
+      // Bildirim hatası eğitim oluşturmayı geçersiz kılmasın — eğitim zaten yaratıldı.
+      logger.error('admin-trainings-create', 'Atama bildirimi gönderilemedi', notifErr)
+    }
 
     await audit({
       action: 'training.create.full',

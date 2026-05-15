@@ -61,6 +61,7 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
               title: true,
               category: true,
               maxAttempts: true,
+              startDate: true,
               endDate: true,
               examOnly: true,
               examDurationMinutes: true,
@@ -112,6 +113,11 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
         daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
       }
 
+      // Henüz açılmamış eğitim: start_date > now. UI'da kilitli kart + "X tarihinde
+      // açılacak" mesajı göstermek için. API hâlâ kaydı döndürür (kullanıcı eğitimin
+      // geleceğini bilsin), giriş engellemesi exam start endpoint'inde.
+      const isNotStarted = t.startDate ? now < t.startDate : false
+
       // Score from latest completed attempt
       const score = latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : undefined
 
@@ -122,6 +128,8 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
         status: a.status,
         attempt: (a as unknown as { _count: { examAttempts: number } })._count.examAttempts,
         maxAttempts: t.maxAttempts,
+        startDate: t.startDate ? t.startDate.toLocaleDateString('tr-TR') : null,
+        isNotStarted,
         deadline: deadline ? deadline.toLocaleDateString('tr-TR') : '',
         progress,
         daysLeft,

@@ -175,6 +175,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
 
   // Eğitim süresi dolmuş mu?
   const isExpired = t.endDate ? new Date() > new Date(t.endDate) : false
+  // Henüz açılmamış mı? Başlangıç tarihi gelmemişse personel detayda
+  // "Başla" butonu disabled olur ve banner gösterilir.
+  const isNotStarted = t.startDate ? new Date() < new Date(t.startDate) : false
 
   return jsonResponse({
     id: t.id,
@@ -187,11 +190,13 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     examDuration: t.examDurationMinutes,
     status: assignment.status,
     currentAttempt,
+    startDate: t.startDate ? t.startDate.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null,
     deadline: t.endDate ? t.endDate.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
     preExamScore,
     lastAttemptScore,
     examOnly: t.examOnly === true,
     isExpired,
+    isNotStarted,
     preExamCompleted,
     videosCompleted,
     postExamCompleted,
