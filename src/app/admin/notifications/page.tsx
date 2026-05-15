@@ -93,7 +93,9 @@ export default function NotificationsPage() {
   // ── Send Modal State ──
   const [showSendModal, setShowSendModal] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [selectedDeptId, setSelectedDeptId] = useState<string>('');
+  // Çoklu departman seçimi — admin birden fazla parent dept'i toplu seçebilir.
+  // "Tüm personele gönder" convenience butonu tüm parent dept'leri set'e ekler.
+  const [selectedDeptIds, setSelectedDeptIds] = useState<Set<string>>(new Set());
   const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
   const [excludedStaffIds, setExcludedStaffIds] = useState<Set<string>>(new Set());
   const [sendMode, setSendMode] = useState<'individual' | 'department'>('department');
@@ -131,19 +133,26 @@ export default function NotificationsPage() {
     }
   }, [showSendModal, departments.length]);
 
-  // Seçili departmanın personelleri.
-  // Ana (kök) departman seçildiyse: kendisi + tüm alt departmanlardaki çalışanlar (deduped).
-  // Alt departman seçildiyse: sadece kendi çalışanları.
-  const selectedDept = departments.find(d => d.id === selectedDeptId);
+  // Seçili departmanların TÜM personelleri (parent + alt birim üyeleri, deduped).
+  // Multi-select: birden fazla parent dept seçilebilir, hepsinin altındaki üyeler birleştirilir.
   const deptStaff = (() => {
-    if (!selectedDept) return [];
-    const isParent = selectedDept.parentId === null;
-    if (!isParent) return selectedDept.users ?? [];
-    const childDepts = departments.filter(d => d.parentId === selectedDept.id);
-    const merged = [selectedDept, ...childDepts].flatMap(d => d.users ?? []);
-    // Dedup: aynı user farklı dept'lerde geçerse (defensive — DB normalde tek dept tutar)
+    if (selectedDeptIds.size === 0) return [];
     const seen = new Set<string>();
-    return merged.filter(u => (seen.has(u.id) ? false : (seen.add(u.id), true)));
+    const result: StaffMember[] = [];
+    for (const deptId of selectedDeptIds) {
+      const parent = departments.find(d => d.id === deptId);
+      if (!parent) continue;
+      const childDepts = departments.filter(d => d.parentId === parent.id);
+      for (const d of [parent, ...childDepts]) {
+        for (const u of d.users ?? []) {
+          if (!seen.has(u.id)) {
+            seen.add(u.id);
+            result.push(u);
+          }
+        }
+      }
+    }
+    return result;
   })();
 
   // Bireysel modu için tüm çalışanlar (deduped)
@@ -177,14 +186,42 @@ export default function NotificationsPage() {
   // Gönderilecek kişi sayısı
   const getRecipientCount = () => {
     if (sendMode === 'individual') return selectedStaffIds.size;
-    if (!selectedDeptId) return 0;
-    return deptStaff.length - excludedStaffIds.size;
+    if (selectedDeptIds.size === 0) return 0;
+    // excludedStaffIds eski dept seçimlerinden artık olabilir — sadece mevcut deptStaff içindekileri say
+    const deptStaffIds = new Set(deptStaff.map(s => s.id));
+    const effectiveExcluded = Array.from(excludedStaffIds).filter(id => deptStaffIds.has(id)).length;
+    return deptStaff.length - effectiveExcluded;
   };
 
   const getRecipientIds = (): string[] => {
     if (sendMode === 'individual') return Array.from(selectedStaffIds);
     return deptStaff.filter(s => !excludedStaffIds.has(s.id)).map(s => s.id);
   };
+
+  const toggleDept = (id: string) => {
+    setSelectedDeptIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    // Dept değiştiğinde exclude listesi temizlenir — kullanıcı kafası karışmasın
+    setExcludedStaffIds(new Set());
+  };
+
+  const selectAllDepts = () => {
+    const allParentIds = departments.filter(d => d.parentId === null).map(d => d.id);
+    setSelectedDeptIds(new Set(allParentIds));
+    setExcludedStaffIds(new Set());
+  };
+
+  const clearAllDepts = () => {
+    setSelectedDeptIds(new Set());
+    setExcludedStaffIds(new Set());
+  };
+
+  const allParents = departments.filter(d => d.parentId === null);
+  const allDeptsSelected = allParents.length > 0 && allParents.every(d => selectedDeptIds.has(d.id));
 
   const handleSend = async () => {
     const recipientIds = getRecipientIds();
@@ -229,7 +266,7 @@ export default function NotificationsPage() {
       setAlsoSendEmail(false);
       setSelectedStaffIds(new Set());
       setExcludedStaffIds(new Set());
-      setSelectedDeptId('');
+      setSelectedDeptIds(new Set());
       refetch();
     } catch {
       toast('Bildirim gönderilemedi', 'error');
@@ -598,7 +635,7 @@ export default function NotificationsPage() {
                 <button
                   role="tab"
                   aria-selected={sendMode === 'individual'}
-                  onClick={() => { setSendMode('individual'); setSelectedDeptId(''); setExcludedStaffIds(new Set()); }}
+                  onClick={() => { setSendMode('individual'); setSelectedDeptIds(new Set()); setExcludedStaffIds(new Set()); }}
                   className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-semibold cursor-pointer transition-colors duration-200"
                   style={{
                     background: sendMode === 'individual' ? 'var(--k-surface)' : 'transparent',
@@ -622,21 +659,101 @@ export default function NotificationsPage() {
 
                 {sendMode === 'department' ? (
                   <div className="space-y-3">
-                    <select
-                      value={selectedDeptId}
-                      onChange={(e) => { setSelectedDeptId(e.target.value); setExcludedStaffIds(new Set()); }}
-                      className="k-input w-full"
+                    {/* "Tüm personele" + Temizle hızlı eylemler */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={allDeptsSelected ? clearAllDepts : selectAllDepts}
+                        aria-pressed={allDeptsSelected}
+                        className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+                        style={{
+                          background: allDeptsSelected
+                            ? 'var(--k-primary)'
+                            : 'color-mix(in srgb, var(--k-primary) 8%, transparent)',
+                          color: allDeptsSelected ? '#fff' : 'var(--k-primary)',
+                          border: `1px solid ${allDeptsSelected ? 'var(--k-primary)' : 'color-mix(in srgb, var(--k-primary) 25%, transparent)'}`,
+                          // @ts-expect-error focus ring uses theme token
+                          '--tw-ring-color': 'var(--k-primary)',
+                        }}
+                      >
+                        {allDeptsSelected ? <Check className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+                        Tüm Personele
+                      </button>
+                      {selectedDeptIds.size > 0 && !allDeptsSelected && (
+                        <button
+                          type="button"
+                          onClick={clearAllDepts}
+                          className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-semibold cursor-pointer transition-colors duration-200 hover:bg-[var(--k-bg)]"
+                          style={{ color: 'var(--k-text-muted)' }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Seçimi Temizle ({selectedDeptIds.size})
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Departman seçim grid'i — multi-select chip pattern */}
+                    <div
+                      role="group"
+                      aria-label="Departman seçimi"
+                      className="grid grid-cols-1 sm:grid-cols-2 gap-2"
                     >
-                      <option value="">Departman seçin...</option>
-                      {departmentOptions.map(opt => (
-                        <option key={opt.id} value={opt.id}>
-                          {opt.label} ({opt.count} kişi{opt.hasSubs ? ' — tüm alt birimler' : ''})
-                        </option>
-                      ))}
-                    </select>
+                      {departmentOptions.length === 0 ? (
+                        <div
+                          className="col-span-full text-center py-4 text-sm rounded-xl border"
+                          style={{ color: 'var(--k-text-muted)', borderColor: 'var(--k-border)', background: 'var(--k-bg)' }}
+                        >
+                          Departman bulunamadı
+                        </div>
+                      ) : departmentOptions.map(opt => {
+                        const isSelected = selectedDeptIds.has(opt.id);
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            role="checkbox"
+                            aria-checked={isSelected}
+                            aria-label={`${opt.label}, ${opt.count} kişi`}
+                            onClick={() => toggleDept(opt.id)}
+                            className="group/dept flex items-center gap-3 rounded-xl px-3 py-2.5 text-left cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+                            style={{
+                              background: isSelected
+                                ? 'color-mix(in srgb, var(--k-primary) 8%, var(--k-surface))'
+                                : 'var(--k-surface)',
+                              border: `1.5px solid ${isSelected ? 'var(--k-primary)' : 'var(--k-border)'}`,
+                              // @ts-expect-error focus ring uses theme token
+                              '--tw-ring-color': 'var(--k-primary)',
+                            }}
+                          >
+                            {/* Checkbox visual */}
+                            <span
+                              aria-hidden="true"
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-colors duration-150"
+                              style={{
+                                background: isSelected ? 'var(--k-primary)' : 'var(--k-bg)',
+                                border: isSelected ? 'none' : '1.5px solid var(--k-border)',
+                              }}
+                            >
+                              {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div
+                                className="text-[13px] font-semibold truncate"
+                                style={{ color: isSelected ? 'var(--k-primary)' : 'var(--k-text-primary)' }}
+                              >
+                                {opt.label}
+                              </div>
+                              <div className="text-[11px]" style={{ color: 'var(--k-text-muted)' }}>
+                                {opt.count} kişi{opt.hasSubs ? ' · tüm alt birimler' : ''}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
 
                     {/* Departman personeli — çıkarma özelliği */}
-                    {selectedDeptId && deptStaff.length > 0 && (
+                    {selectedDeptIds.size > 0 && deptStaff.length > 0 && (
                       <div
                         className="rounded-xl border p-3"
                         style={{ borderColor: 'var(--k-border)', background: 'var(--k-bg)' }}
