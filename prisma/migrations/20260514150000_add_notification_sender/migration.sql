@@ -11,10 +11,17 @@
 ALTER TABLE "notifications"
   ADD COLUMN IF NOT EXISTS "sender_id" UUID;
 
-ALTER TABLE "notifications"
-  ADD CONSTRAINT "notifications_sender_id_fkey"
-  FOREIGN KEY ("sender_id") REFERENCES "users"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'notifications_sender_id_fkey'
+  ) THEN
+    ALTER TABLE "notifications"
+      ADD CONSTRAINT "notifications_sender_id_fkey"
+      FOREIGN KEY ("sender_id") REFERENCES "users"("id")
+      ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END$$;
 
 CREATE INDEX IF NOT EXISTS "idx_notifications_sender_date"
   ON "notifications" ("sender_id", "created_at");

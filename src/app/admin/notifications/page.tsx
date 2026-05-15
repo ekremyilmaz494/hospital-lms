@@ -34,7 +34,13 @@ interface AdminNotificationsResponse {
 }
 
 interface StaffMember { id: string; firstName: string; lastName: string; title: string | null }
-interface Department { id: string; name: string; users: StaffMember[]; _count: { users: number } }
+interface Department {
+  id: string;
+  name: string;
+  parentId: string | null;
+  users: StaffMember[];
+  _count: { users: number };
+}
 
 /** Filter sidebar'da gözüken tipler. Tüm tipler değil; admin'in
  * en sık kullandığı manuel gönderim tiplerine ek olarak sistem tetikli
@@ -116,6 +122,7 @@ export default function NotificationsPage() {
         // API "staff" döndürebilir, frontend "users" bekliyor — normalize et
         const normalized = depts.map((dept: Record<string, unknown>) => ({
           ...dept,
+          parentId: (dept.parentId ?? null) as string | null,
           users: (dept.users ?? dept.staff ?? []) as StaffMember[],
           _count: (dept._count ?? { users: (dept.count as number) ?? 0 }) as { users: number },
         }));
@@ -124,10 +131,41 @@ export default function NotificationsPage() {
     }
   }, [showSendModal, departments.length]);
 
-  // Seçili departmanın personelleri
+  // Seçili departmanın personelleri.
+  // Ana (kök) departman seçildiyse: kendisi + tüm alt departmanlardaki çalışanlar (deduped).
+  // Alt departman seçildiyse: sadece kendi çalışanları.
   const selectedDept = departments.find(d => d.id === selectedDeptId);
-  const deptStaff = selectedDept?.users ?? [];
-  const allStaff = departments.flatMap(d => d.users ?? []);
+  const deptStaff = (() => {
+    if (!selectedDept) return [];
+    const isParent = selectedDept.parentId === null;
+    if (!isParent) return selectedDept.users ?? [];
+    const childDepts = departments.filter(d => d.parentId === selectedDept.id);
+    const merged = [selectedDept, ...childDepts].flatMap(d => d.users ?? []);
+    // Dedup: aynı user farklı dept'lerde geçerse (defensive — DB normalde tek dept tutar)
+    const seen = new Set<string>();
+    return merged.filter(u => (seen.has(u.id) ? false : (seen.add(u.id), true)));
+  })();
+
+  // Bireysel modu için tüm çalışanlar (deduped)
+  const allStaff = (() => {
+    const seen = new Set<string>();
+    return departments.flatMap(d => d.users ?? []).filter(u => (seen.has(u.id) ? false : (seen.add(u.id), true)));
+  })();
+
+  // Departman seçim listesi: SADECE ana (kök) departmanlar.
+  // Alt birim göndermek isteyenler "Kişi Bazlı" moda geçer — bu sayede liste sade kalır
+  // ve admin sub-dept seçip yanlışlıkla parent'a tek başına bildirim atmaz.
+  // Ana dept "kişi sayısı" = kendisi + alt dept kullanıcıları (deduped).
+  const departmentOptions = (() => {
+    const parents = departments.filter(d => d.parentId === null);
+    type Opt = { id: string; label: string; count: number; hasSubs: boolean };
+    return parents.map<Opt>(parent => {
+      const subs = departments.filter(d => d.parentId === parent.id);
+      const aggregatedSeen = new Set<string>();
+      const aggregated = [parent, ...subs].flatMap(d => d.users ?? []).filter(u => (aggregatedSeen.has(u.id) ? false : (aggregatedSeen.add(u.id), true)));
+      return { id: parent.id, label: parent.name, count: aggregated.length, hasSubs: subs.length > 0 };
+    });
+  })();
 
   // Bireysel modda filtrelenen personeller
   const filteredStaff = allStaff.filter(s => {
@@ -298,7 +336,7 @@ export default function NotificationsPage() {
                     onClick={() => setFilter(f.id)}
                     aria-label={`Filtrele: ${f.label}`}
                     aria-pressed={isActive}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors duration-150"
+                    className="group/filter relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] cursor-pointer transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--k-primary)_6%,transparent)]"
                     style={{
                       background: isActive
                         ? 'color-mix(in srgb, var(--k-primary) 12%, transparent)'
@@ -307,6 +345,13 @@ export default function NotificationsPage() {
                       fontWeight: isActive ? 600 : 500,
                     }}
                   >
+                    {isActive && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full"
+                        style={{ background: 'var(--k-primary)' }}
+                      />
+                    )}
                     <f.icon
                       className="h-4 w-4"
                       style={{
@@ -346,7 +391,7 @@ export default function NotificationsPage() {
                 return (
                   <BlurFade key={n.id} delay={0.08 + i * 0.03}>
                     <div
-                      className="group relative flex items-start gap-4 rounded-xl border p-5 transition-colors duration-200"
+                      className="group relative flex items-start gap-4 rounded-xl border p-5 transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--k-bg)_50%,var(--k-surface))]"
                       style={{
                         background: 'var(--k-surface)',
                         borderColor: 'var(--k-border)',
@@ -354,22 +399,34 @@ export default function NotificationsPage() {
                         borderLeftColor: meta.ink,
                         opacity: isDismissing ? 0 : 1,
                         transform: isDismissing ? 'translateX(20px)' : 'translateX(0)',
+                        transitionProperty: 'background-color, border-color, opacity, transform',
                       }}
                     >
                       {/* Icon */}
                       <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                        className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                         style={{
                           background: `color-mix(in srgb, ${meta.ink} 14%, transparent)`,
                           border: `1px solid color-mix(in srgb, ${meta.ink} 22%, transparent)`,
                         }}
                       >
                         <Icon className="h-5 w-5" style={{ color: meta.ink }} />
+                        {!n.isRead && (
+                          <span
+                            aria-label="Okunmamış"
+                            className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2"
+                            style={{
+                              background: meta.ink,
+                              // @ts-expect-error — Tailwind 4 supports CSS vars as ring color via inline style
+                              '--tw-ring-color': 'var(--k-surface)',
+                            }}
+                          />
+                        )}
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2.5 mb-1">
+                        <div className="flex items-center gap-2.5 mb-1 flex-wrap">
                           <p className="text-[13px] font-semibold" style={{ color: 'var(--k-text-primary)' }}>
                             {n.title}
                           </p>
@@ -382,6 +439,17 @@ export default function NotificationsPage() {
                           >
                             {meta.label}
                           </span>
+                          {!n.isRead && (
+                            <span
+                              className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                              style={{
+                                background: 'color-mix(in srgb, var(--k-primary) 12%, transparent)',
+                                color: 'var(--k-primary)',
+                              }}
+                            >
+                              Yeni
+                            </span>
+                          )}
                         </div>
                         <p
                           className="text-[13px] leading-relaxed"
@@ -410,19 +478,23 @@ export default function NotificationsPage() {
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      {/* Actions — always visible on touch, faded on desktop until hover */}
+                      <div className="flex items-center gap-1 shrink-0 opacity-60 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
                         <button
-                          className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150 disabled:opacity-50"
-                          style={{ color: 'var(--k-error)' }}
-                          title="Sil"
+                          className="flex h-11 w-11 items-center justify-center rounded-lg cursor-pointer transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--k-error)_12%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{
+                            color: 'var(--k-error)',
+                            // @ts-expect-error — focus ring uses theme token
+                            '--tw-ring-color': 'var(--k-error)',
+                          }}
+                          title="Bildirimi sil"
                           aria-label="Bildirimi sil"
                           disabled={dismissing === n.id}
                           onClick={() => handleDelete(n.id)}
                         >
                           {dismissing === n.id
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            : <Trash2 className="h-3.5 w-3.5" />}
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Trash2 className="h-4 w-4" />}
                         </button>
                       </div>
                     </div>
@@ -491,18 +563,48 @@ export default function NotificationsPage() {
             </div>
 
             <div className="k-card-body flex-1 overflow-y-auto">
-              {/* Mode Toggle */}
-              <div className="flex gap-2 mb-5">
+              {/* Step indicator: Kime */}
+              <div className="flex items-center gap-2 mb-3">
+                <span
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold"
+                  style={{ background: 'var(--k-primary)', color: '#fff' }}
+                >1</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--k-text-secondary)' }}>
+                  Kime gönderilecek?
+                </span>
+              </div>
+
+              {/* Mode Toggle — segmented control */}
+              <div
+                role="tablist"
+                aria-label="Alıcı seçim modu"
+                className="grid grid-cols-2 gap-1 p-1 mb-5 rounded-xl"
+                style={{ background: 'var(--k-bg)', border: '1px solid var(--k-border)' }}
+              >
                 <button
+                  role="tab"
+                  aria-selected={sendMode === 'department'}
                   onClick={() => { setSendMode('department'); setSelectedStaffIds(new Set()); }}
-                  className={sendMode === 'department' ? 'k-btn k-btn-primary' : 'k-btn k-btn-ghost'}
+                  className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-semibold cursor-pointer transition-colors duration-200"
+                  style={{
+                    background: sendMode === 'department' ? 'var(--k-surface)' : 'transparent',
+                    color: sendMode === 'department' ? 'var(--k-primary)' : 'var(--k-text-muted)',
+                    boxShadow: sendMode === 'department' ? '0 1px 2px rgba(15,23,42,0.06)' : 'none',
+                  }}
                 >
                   <Building2 className="h-4 w-4" />
                   Departman Bazlı
                 </button>
                 <button
+                  role="tab"
+                  aria-selected={sendMode === 'individual'}
                   onClick={() => { setSendMode('individual'); setSelectedDeptId(''); setExcludedStaffIds(new Set()); }}
-                  className={sendMode === 'individual' ? 'k-btn k-btn-primary' : 'k-btn k-btn-ghost'}
+                  className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-semibold cursor-pointer transition-colors duration-200"
+                  style={{
+                    background: sendMode === 'individual' ? 'var(--k-surface)' : 'transparent',
+                    color: sendMode === 'individual' ? 'var(--k-primary)' : 'var(--k-text-muted)',
+                    boxShadow: sendMode === 'individual' ? '0 1px 2px rgba(15,23,42,0.06)' : 'none',
+                  }}
                 >
                   <Users className="h-4 w-4" />
                   Kişi Bazlı
@@ -526,8 +628,10 @@ export default function NotificationsPage() {
                       className="k-input w-full"
                     >
                       <option value="">Departman seçin...</option>
-                      {departments.map(d => (
-                        <option key={d.id} value={d.id}>{d.name} ({d.users?.length ?? 0} kişi)</option>
+                      {departmentOptions.map(opt => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label} ({opt.count} kişi{opt.hasSubs ? ' — tüm alt birimler' : ''})
+                        </option>
                       ))}
                     </select>
 
@@ -657,6 +761,17 @@ export default function NotificationsPage() {
                 )}
               </div>
 
+              {/* Step indicator: Ne */}
+              <div className="flex items-center gap-2 mb-3 mt-2">
+                <span
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold"
+                  style={{ background: 'var(--k-primary)', color: '#fff' }}
+                >2</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--k-text-secondary)' }}>
+                  Bildirim içeriği
+                </span>
+              </div>
+
               {/* Notification Content */}
               <div className="space-y-4 mb-6">
                 <div>
@@ -666,7 +781,11 @@ export default function NotificationsPage() {
                   >
                     Bildirim Tipi
                   </Label>
-                  <div className="flex gap-2 flex-wrap">
+                  <div
+                    role="radiogroup"
+                    aria-label="Bildirim tipi"
+                    className="grid grid-cols-2 sm:grid-cols-4 gap-2"
+                  >
                     {(['info', 'warning', 'error', 'success'] as const).map((key) => {
                       const meta = getNotificationTypeMeta(key);
                       const Icon = meta.icon;
@@ -675,17 +794,31 @@ export default function NotificationsPage() {
                       return (
                         <button
                           key={key}
+                          role="radio"
+                          aria-checked={isActive}
+                          aria-label={sentenceLabel}
                           onClick={() => setSendType(key)}
-                          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors duration-150"
+                          className="group/type flex flex-col items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-xs font-semibold cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
                           style={{
                             background: isActive
                               ? `color-mix(in srgb, ${meta.ink} 14%, transparent)`
                               : 'var(--k-bg)',
                             color: isActive ? meta.ink : 'var(--k-text-muted)',
-                            border: `1px solid ${isActive ? meta.ink : 'var(--k-border)'}`,
+                            border: `1.5px solid ${isActive ? meta.ink : 'var(--k-border)'}`,
+                            // @ts-expect-error focus ring uses dynamic color
+                            '--tw-ring-color': meta.ink,
                           }}
                         >
-                          <Icon className="h-3.5 w-3.5" />
+                          <div
+                            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-200"
+                            style={{
+                              background: isActive
+                                ? `color-mix(in srgb, ${meta.ink} 18%, transparent)`
+                                : 'var(--k-surface)',
+                            }}
+                          >
+                            <Icon className="h-4 w-4" style={{ color: isActive ? meta.ink : 'var(--k-text-muted)' }} />
+                          </div>
                           {sentenceLabel}
                         </button>
                       );
@@ -726,35 +859,56 @@ export default function NotificationsPage() {
                 </div>
               </div>
 
-              {/* E-posta seçeneği */}
-              <div className="mb-6">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div
-                    onClick={() => setAlsoSendEmail(!alsoSendEmail)}
-                    role="checkbox"
-                    aria-checked={alsoSendEmail}
-                    aria-label="E-posta ile de gönder"
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors duration-150"
-                    style={{
-                      background: alsoSendEmail ? 'var(--k-primary)' : 'var(--k-bg)',
-                      border: alsoSendEmail ? 'none' : '2px solid var(--k-border)',
-                    }}
-                  >
-                    {alsoSendEmail && <Check className="h-3.5 w-3.5 text-white" />}
-                  </div>
-                  <div>
-                    <span
-                      className="text-sm font-medium"
-                      style={{ color: 'var(--k-text-primary)' }}
-                    >
-                      E-posta ile de gönder
-                    </span>
-                    <p className="text-[11px]" style={{ color: 'var(--k-text-muted)' }}>
-                      Bildirimle birlikte alıcılara e-posta da gönderilir
-                    </p>
-                  </div>
-                </label>
+              {/* Step indicator: Nasıl */}
+              <div className="flex items-center gap-2 mb-3">
+                <span
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold"
+                  style={{ background: 'var(--k-primary)', color: '#fff' }}
+                >3</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--k-text-secondary)' }}>
+                  Gönderim seçenekleri
+                </span>
               </div>
+
+              {/* E-posta seçeneği — proper switch toggle */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={alsoSendEmail}
+                aria-label="E-posta ile de gönder"
+                onClick={() => setAlsoSendEmail(!alsoSendEmail)}
+                className="w-full flex items-center justify-between gap-4 rounded-xl px-4 py-3.5 mb-6 text-left cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:bg-[color-mix(in_srgb,var(--k-primary)_4%,var(--k-bg))]"
+                style={{
+                  background: alsoSendEmail
+                    ? 'color-mix(in srgb, var(--k-primary) 6%, var(--k-bg))'
+                    : 'var(--k-bg)',
+                  border: `1px solid ${alsoSendEmail ? 'color-mix(in srgb, var(--k-primary) 30%, transparent)' : 'var(--k-border)'}`,
+                  // @ts-expect-error focus ring uses theme token
+                  '--tw-ring-color': 'var(--k-primary)',
+                }}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold" style={{ color: 'var(--k-text-primary)' }}>
+                    E-posta ile de gönder
+                  </p>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--k-text-muted)' }}>
+                    Bildirimle birlikte alıcılara e-posta da gönderilir
+                  </p>
+                </div>
+                {/* Switch track */}
+                <span
+                  aria-hidden="true"
+                  className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200"
+                  style={{
+                    background: alsoSendEmail ? 'var(--k-primary)' : 'color-mix(in srgb, var(--k-text-muted) 30%, transparent)',
+                  }}
+                >
+                  <span
+                    className="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                    style={{ transform: alsoSendEmail ? 'translateX(22px)' : 'translateX(2px)' }}
+                  />
+                </span>
+              </button>
 
             </div>
 
@@ -763,12 +917,30 @@ export default function NotificationsPage() {
               className="flex items-center justify-between gap-3 px-5 py-4 shrink-0"
               style={{ borderTop: '1px solid var(--k-border)', background: 'var(--k-surface)' }}
             >
-              <div className="text-xs" style={{ color: 'var(--k-text-muted)' }}>
-                <span className="font-bold" style={{ color: 'var(--k-primary)' }}>
-                  {getRecipientCount()}
-                </span> kişiye gönderilecek
-                {alsoSendEmail && <span className="ml-1.5">(+ e-posta)</span>}
+              {/* Recipient summary badge — prominent */}
+              <div
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2"
+                style={{
+                  background: getRecipientCount() > 0
+                    ? 'color-mix(in srgb, var(--k-primary) 10%, transparent)'
+                    : 'var(--k-bg)',
+                  border: `1px solid ${getRecipientCount() > 0 ? 'color-mix(in srgb, var(--k-primary) 25%, transparent)' : 'var(--k-border)'}`,
+                }}
+              >
+                <Users
+                  className="h-4 w-4"
+                  style={{ color: getRecipientCount() > 0 ? 'var(--k-primary)' : 'var(--k-text-muted)' }}
+                />
+                <div className="leading-tight">
+                  <div className="text-[15px] font-bold tabular-nums" style={{ color: getRecipientCount() > 0 ? 'var(--k-primary)' : 'var(--k-text-muted)' }}>
+                    {getRecipientCount()}
+                  </div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--k-text-muted)' }}>
+                    {alsoSendEmail ? 'kişi + e-posta' : 'kişi'}
+                  </div>
+                </div>
               </div>
+
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowSendModal(false)}
