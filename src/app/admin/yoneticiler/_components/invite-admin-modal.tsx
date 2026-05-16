@@ -329,7 +329,7 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
             </FieldRow>
           </div>
           <FieldRow label={mode === 'invite' ? 'E-posta *' : 'E-posta'} error={errors.email}>
-            <Input data-field="email" type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email}
+            <Input data-field="email" type="email" placeholder="ornek@kurum.com" className="h-10" value={form.email}
                    onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
                    style={fieldStyle('email')} />
           </FieldRow>

@@ -3,11 +3,11 @@ import { isValidTcKimlik, normalizeTcKimlik } from './tc'
 
 // ── Self-Service Kayıt ──
 export const selfRegisterSchema = z.object({
-  hospitalName: z.string().min(2, 'Hastane adı en az 2 karakter olmalıdır').max(255, 'Hastane adı en fazla 255 karakter olabilir'),
-  hospitalCode: z.string()
-    .min(3, 'Hastane kodu en az 3 karakter olmalıdır')
-    .max(20, 'Hastane kodu en fazla 20 karakter olabilir')
-    .regex(/^[a-z0-9-]+$/, 'Hastane kodu sadece küçük harf, rakam ve tire içerebilir'),
+  organizationName: z.string().min(2, 'Organizasyon adı en az 2 karakter olmalıdır').max(255, 'Organizasyon adı en fazla 255 karakter olabilir'),
+  organizationCode: z.string()
+    .min(3, 'Organizasyon kodu en az 3 karakter olmalıdır')
+    .max(20, 'Organizasyon kodu en fazla 20 karakter olabilir')
+    .regex(/^[a-z0-9-]+$/, 'Organizasyon kodu sadece küçük harf, rakam ve tire içerebilir'),
   address: z.string().max(500, 'Adres en fazla 500 karakter olabilir').optional(),
   phone: z.string().max(20, 'Telefon en fazla 20 karakter olabilir').optional(),
   firstName: z.string().min(2, 'Ad en az 2 karakter olmalıdır').max(100, 'Ad en fazla 100 karakter olabilir'),
@@ -43,7 +43,7 @@ export const createOrganizationSchema = z.object({
  *
  * `mode` set edilmezse 'invite' olarak default'lanır (geri uyumluluk).
  */
-export const createHospitalWithAdminSchema = createOrganizationSchema.extend({
+export const createOrganizationWithAdminSchema = createOrganizationSchema.extend({
   mode: z.enum(['invite', 'direct']).default('invite'),
   adminFirstName: z.string().min(1, 'Admin adı zorunludur').max(100),
   adminLastName: z.string().min(1, 'Admin soyadı zorunludur').max(100),

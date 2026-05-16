@@ -1,14 +1,17 @@
 import type { Metadata } from 'next'
+import { BRAND } from '@/lib/brand'
+
+const KVKK_EMAIL = `kvkk@${BRAND.domain}`
 
 export const metadata: Metadata = {
-  title: 'Kisisel Veri Saklama ve Imha Politikasi — Hastane LMS',
+  title: `Kisisel Veri Saklama ve Imha Politikasi — ${BRAND.fullName}`,
   description: '6698 sayili KVKK kapsaminda kisisel veri saklama sureleri ve imha yontemleri.',
 }
 
 const sections = [
   {
     title: '1. Amac ve Kapsam',
-    content: `Bu politika, 6698 sayili Kisisel Verilerin Korunmasi Kanunu ("KVKK") ve Kisisel Verilerin Silinmesi, Yok Edilmesi veya Anonim Hale Getirilmesi Hakkinda Yonetmelik uyarinca hazirlanmistir. Hastane LMS platformunda islenen tum kisisel verilerin saklanma sureleri, imha kosullari ve yontemlerini kapsar.`,
+    content: `Bu politika, 6698 sayili Kisisel Verilerin Korunmasi Kanunu ("KVKK") ve Kisisel Verilerin Silinmesi, Yok Edilmesi veya Anonim Hale Getirilmesi Hakkinda Yonetmelik uyarinca hazirlanmistir. ${BRAND.fullName} platformunda islenen tum kisisel verilerin saklanma sureleri, imha kosullari ve yontemlerini kapsar.`,
   },
   {
     title: '2. Tanimlar',
@@ -58,7 +61,7 @@ Imha islemleri kayit altina alinir ve 3 yil saklanir.`,
 
 **Basvuru Yollari:**
 - Platform icerisinden: Staff Paneli → Kisisel Verilerim (KVKK) → Yeni Talep
-- E-posta: kvkk@hastane-lms.com
+- E-posta: ${KVKK_EMAIL}
 - Posta: Hastane LMS Yazilim Teknolojileri, Ankara, Turkiye
 
 **Yasal Sure:** Talebiniz en gec **30 gun** icinde sonuclandirilir. Islem ucret gerektiriyorsa (Kurul tarifesi), bilgilendirilirsiniz.
@@ -71,14 +74,14 @@ Imha islemleri kayit altina alinir ve 3 yil saklanir.`,
 - Veritabani erisimi rol tabanli yetkilendirme (RLS) ile kisitlanir
 - Yedekleme verileri AES-256-GCM sifreleme ile korunur
 - Erisim ve islem kayitlari (audit log) tam izlenebilirlik saglar
-- Multi-tenant mimari: Her hastane verisi birbirinden tamamen izole`,
+- Multi-tenant mimari: Her organizasyon verisi birbirinden tamamen izole`,
   },
   {
     title: '8. Politika Guncellemeleri',
     content: `Bu politika, mevzuat degisiklikleri veya isleme faaliyetlerindeki degisiklikler dogrultusunda guncellenebilir. Guncellemeler platform uzerinden ve/veya e-posta ile bildirilir.
 
 **Son Guncelleme:** 6 Nisan 2026
-**Iletisim:** kvkk@hastane-lms.com`,
+**Iletisim:** ${KVKK_EMAIL}`,
   },
 ]
 

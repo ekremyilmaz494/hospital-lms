@@ -49,8 +49,8 @@ function createRequest(body: unknown) {
 }
 
 const validBody = {
-  hospitalName: 'Ankara Hastanesi',
-  hospitalCode: 'ankara-hastanesi',
+  organizationName: 'Ankara Hastanesi',
+  organizationCode: 'ankara-hastanesi',
   email: 'admin@ankara.com',
   password: 'SecurePass123!',
   firstName: 'Ahmet',
@@ -74,21 +74,21 @@ describe('POST /api/auth/register', () => {
   })
 
   it('returns 400 for invalid body (missing fields)', async () => {
-    const response = await POST(createRequest({ hospitalName: 'A' }))
+    const response = await POST(createRequest({ organizationName: 'A' }))
     const data = await response.json()
 
     expect(response.status).toBe(400)
     expect(data.error).toBeTruthy()
   })
 
-  it('returns 400 when hospital code already exists', async () => {
+  it('returns 400 when organization code already exists', async () => {
     mockOrgFindUnique.mockResolvedValue({ id: 'existing-org', code: 'ankara-hastanesi' } as never)
 
     const response = await POST(createRequest(validBody))
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data.error).toBe('Bu hastane kodu zaten kullanılıyor')
+    expect(data.error).toBe('Bu organizasyon kodu zaten kullanılıyor')
   })
 
   it('returns 400 when email already registered', async () => {

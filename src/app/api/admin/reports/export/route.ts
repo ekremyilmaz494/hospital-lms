@@ -466,7 +466,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
     const { org, staffCount, trainings, staff, departments, avgScoreResult, truncated } =
       await fetchReportData(orgId, dateFrom, dateTo)
 
-    const orgName = org?.name ?? 'Hastane'
+    const orgName = org?.name ?? 'Organizasyon'
     const sectionTitle = SECTION_TITLES[section]
     const dateStr = new Date().toISOString().slice(0, 10)
     const dateLabel = new Date().toLocaleDateString('tr-TR', {

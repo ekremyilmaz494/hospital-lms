@@ -65,8 +65,8 @@ const mockAssignmentFindFirst = prisma.trainingAssignment.findFirst as ReturnTyp
 const mockAttemptFindFirst = prisma.examAttempt.findFirst as ReturnType<typeof vi.fn<(...args: any[]) => any>>
 const mockDeptFindFirst = prisma.department.findFirst as ReturnType<typeof vi.fn<(...args: any[]) => any>>
 
-const ORG_A = 'org-a-hospital-uuid'
-const ORG_B = 'org-b-hospital-uuid'
+const ORG_A = 'org-a-organization-uuid'
+const ORG_B = 'org-b-organization-uuid'
 const USER_A_ADMIN = 'user-a-admin-uuid'
 const USER_B_ADMIN = 'user-b-admin-uuid'
 const USER_A_STAFF = 'user-a-staff-uuid'

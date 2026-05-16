@@ -11,7 +11,7 @@ import { logger } from '@/lib/logger'
 export const maxDuration = 60
 
 /**
- * POST /api/super-admin/hospitals/[id]/staff/bulk-reset-passwords
+ * POST /api/super-admin/organizations/[id]/staff/bulk-reset-passwords
  *
  * Bir hastanedeki TÜM AKTİF PERSONEL'in (role='staff') şifresini topluca sıfırlar.
  *  - Yalniz super_admin çağırabilir.
@@ -29,22 +29,22 @@ export const maxDuration = 60
  *  - TC plaintext yalnız PDF üretimi için decrypt edilir, response sonrasında atılır.
  */
 export const POST = withSuperAdminRoute<{ id: string }>(async ({ params, dbUser, audit }) => {
-  const hospitalId = params.id
+  const organizationId = params.id
 
   const rateOk = await checkRateLimit(`super-admin-bulk-reset:${dbUser.id}`, 5, 3600)
   if (!rateOk) {
     return errorResponse('Çok fazla toplu sıfırlama isteği. 60 dakika sonra tekrar deneyin.', 429)
   }
 
-  const hospital = await prisma.organization.findUnique({
-    where: { id: hospitalId },
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
     select: { id: true, name: true },
   })
-  if (!hospital) return errorResponse('Hastane bulunamadı', 404)
+  if (!organization) return errorResponse('Organizasyon bulunamadı', 404)
 
   const staff = await prisma.user.findMany({
     where: {
-      organizationId: hospitalId,
+      organizationId: organizationId,
       role: 'staff',
       isActive: true,
     },
@@ -61,7 +61,7 @@ export const POST = withSuperAdminRoute<{ id: string }>(async ({ params, dbUser,
   })
 
   if (staff.length === 0) {
-    return errorResponse('Bu hastanede şifresi sıfırlanacak aktif personel yok', 400)
+    return errorResponse('Bu organizasyonda şifresi sıfırlanacak aktif personel yok', 400)
   }
 
   const supabase = await createServiceClient()
@@ -141,8 +141,8 @@ export const POST = withSuperAdminRoute<{ id: string }>(async ({ params, dbUser,
     entityType: 'user',
     entityId: null,
     newData: {
-      hospitalId,
-      hospitalName: hospital.name,
+      organizationId,
+      organizationName: organization.name,
       totalStaff: staff.length,
       succeeded: items.length,
       failed: failed.length,
@@ -154,15 +154,15 @@ export const POST = withSuperAdminRoute<{ id: string }>(async ({ params, dbUser,
 
   logger.info('super-admin:bulk-reset', 'Toplu staff sifre sifirlama tamamlandi', {
     superAdminId: dbUser.id,
-    hospitalId,
+    organizationId,
     succeeded: items.length,
     failed: failed.length,
   })
 
   return jsonResponse({
     success: true,
-    hospitalId,
-    hospitalName: hospital.name,
+    organizationId,
+    organizationName: organization.name,
     total: staff.length,
     succeeded: items.length,
     failed: failed.length,

@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 
-interface HospitalData {
+interface OrganizationData {
   id: string;
   name: string;
   code: string;
@@ -22,10 +22,10 @@ interface HospitalData {
   expiresAt: string;
 }
 
-export default function EditHospitalPage() {
+export default function EditOrganizationPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const { data: hospital, isLoading, error } = useFetch<HospitalData>(`/api/super-admin/hospitals/${id}`);
+  const { data: organization, isLoading, error } = useFetch<OrganizationData>(`/api/super-admin/organizations/${id}`);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -37,7 +37,7 @@ export default function EditHospitalPage() {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-error)'}}>{error}</div></div>;
   }
 
-  if (!hospital) {
+  if (!organization) {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>;
   }
 
@@ -56,7 +56,7 @@ export default function EditHospitalPage() {
       expiresAt: formData.get('expiresAt'),
     };
     try {
-      const res = await fetch(`/api/super-admin/hospitals/${id}`, {
+      const res = await fetch(`/api/super-admin/organizations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -65,7 +65,7 @@ export default function EditHospitalPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-      router.push(`/super-admin/hospitals/${id}`);
+      router.push(`/super-admin/organizations/${id}`);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
@@ -79,7 +79,7 @@ export default function EditHospitalPage() {
         <Button variant="ghost" size="icon" onClick={() => router.back()} style={{ color: 'var(--color-text-secondary)' }}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <PageHeader title="Hastane Düzenle" subtitle={`${hospital.name ?? ''} bilgilerini güncelle`} />
+        <PageHeader title="Organizasyon Düzenle" subtitle={`${organization.name ?? ''} bilgilerini güncelle`} />
       </div>
 
       {saveError && (
@@ -90,39 +90,39 @@ export default function EditHospitalPage() {
 
       <form onSubmit={handleSave}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Hospital Info */}
+          {/* Organization Info */}
           <div className="rounded-xl border p-6" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: 'var(--color-primary-light)' }}>
                 <Building2 className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
               </div>
               <h3 className="text-lg font-bold">
-                Hastane Bilgileri
+                Organizasyon Bilgileri
               </h3>
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label style={{ color: 'var(--color-text-secondary)' }}>Hastane Adı *</Label>
-                  <Input name="name" defaultValue={hospital.name ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                  <Label style={{ color: 'var(--color-text-secondary)' }}>Organizasyon Adı *</Label>
+                  <Input name="name" defaultValue={organization.name ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
                 </div>
                 <div>
-                  <Label style={{ color: 'var(--color-text-secondary)' }}>Hastane Kodu</Label>
-                  <Input defaultValue={hospital.code ?? ''} disabled className="mt-1.5" style={{ background: 'var(--color-surface-hover)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }} />
+                  <Label style={{ color: 'var(--color-text-secondary)' }}>Organizasyon Kodu</Label>
+                  <Input defaultValue={organization.code ?? ''} disabled className="mt-1.5" style={{ background: 'var(--color-surface-hover)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }} />
                 </div>
               </div>
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Adres</Label>
-                <Input name="address" defaultValue={hospital.address ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                <Input name="address" defaultValue={organization.address ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label style={{ color: 'var(--color-text-secondary)' }}>Telefon</Label>
-                  <Input name="phone" defaultValue={hospital.phone ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                  <Input name="phone" defaultValue={organization.phone ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
                 </div>
                 <div>
                   <Label style={{ color: 'var(--color-text-secondary)' }}>E-posta</Label>
-                  <Input name="email" defaultValue={hospital.email ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                  <Input name="email" defaultValue={organization.email ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
                 </div>
               </div>
             </div>
@@ -141,14 +141,14 @@ export default function EditHospitalPage() {
             <div className="space-y-4">
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Durum</Label>
-                <select name="status" defaultValue={hospital.status ?? 'active'} className="mt-1.5 w-full rounded-md border px-3 py-2.5 text-sm" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}>
+                <select name="status" defaultValue={organization.status ?? 'active'} className="mt-1.5 w-full rounded-md border px-3 py-2.5 text-sm" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}>
                   <option value="active">Aktif</option>
                   <option value="suspended">Askıda</option>
                 </select>
               </div>
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Abonelik Planı</Label>
-                <select name="plan" defaultValue={hospital.plan ?? ''} className="mt-1.5 w-full rounded-md border px-3 py-2.5 text-sm" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}>
+                <select name="plan" defaultValue={organization.plan ?? ''} className="mt-1.5 w-full rounded-md border px-3 py-2.5 text-sm" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}>
                   <option value="starter">Başlangıç</option>
                   <option value="pro">Profesyonel</option>
                   <option value="enterprise">Kurumsal</option>
@@ -156,7 +156,7 @@ export default function EditHospitalPage() {
               </div>
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Abonelik Bitiş Tarihi</Label>
-                <Input name="expiresAt" type="date" defaultValue={hospital.expiresAt ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }} />
+                <Input name="expiresAt" type="date" defaultValue={organization.expiresAt ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }} />
               </div>
             </div>
           </div>

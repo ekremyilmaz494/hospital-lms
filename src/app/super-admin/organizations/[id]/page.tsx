@@ -24,7 +24,7 @@ import { BulkResetStaffModal } from './_components/bulk-reset-staff-modal';
 
 type AdminRow = { id: string; name: string; email: string; lastLogin: string };
 
-interface HospitalDetail {
+interface OrganizationDetail {
   id: string;
   name: string;
   code: string;
@@ -45,10 +45,10 @@ interface HospitalDetail {
   recentActivity?: { action: string; detail: string; time: string; user: string }[];
 }
 
-export default function HospitalDetailPage() {
+export default function OrganizationDetailPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const { data, isLoading, error, refetch } = useFetch<HospitalDetail>(`/api/super-admin/hospitals/${id}`);
+  const { data, isLoading, error, refetch } = useFetch<OrganizationDetail>(`/api/super-admin/organizations/${id}`);
   const { toast } = useToast();
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
   const [showNewAdminModal, setShowNewAdminModal] = useState(false);
@@ -72,7 +72,7 @@ export default function HospitalDetailPage() {
 
     setIsSubmittingSuspend(true);
     try {
-      const res = await fetch(`/api/super-admin/hospitals/${data.id}/suspend`, {
+      const res = await fetch(`/api/super-admin/organizations/${data.id}/suspend`, {
         method: mode === 'suspend' ? 'POST' : 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: mode === 'suspend' ? JSON.stringify({ reason: suspendReason.trim() || null }) : undefined,
@@ -81,9 +81,9 @@ export default function HospitalDetailPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || (mode === 'suspend' ? 'Askıya alma başarısız' : 'Aktif etme başarısız'));
       }
-      toast(mode === 'suspend' ? 'Hastane askıya alındı' : 'Hastane aktif edildi', 'success');
+      toast(mode === 'suspend' ? 'Organizasyon askıya alındı' : 'Organizasyon aktif edildi', 'success');
       closeSuspendModal();
-      invalidateFetchCache(`/api/super-admin/hospitals/${data.id}`);
+      invalidateFetchCache(`/api/super-admin/organizations/${data.id}`);
       refetch();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
@@ -124,7 +124,7 @@ export default function HospitalDetailPage() {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>;
   }
 
-  const hospital = data;
+  const organization = data;
   const admins = data.admins ?? [];
   const recentActivity = data.recentActivity ?? [];
 
@@ -138,26 +138,26 @@ export default function HospitalDetailPage() {
           </Button>
           <Avatar className="h-14 w-14 shrink-0">
             <AvatarFallback className="text-lg font-bold text-white" style={{ background: 'var(--color-primary)' }}>
-              {hospital.name?.slice(0, 2).toUpperCase() ?? ''}
+              {organization.name?.slice(0, 2).toUpperCase() ?? ''}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
             <h2 className="text-2xl font-bold truncate">
-              {hospital.name}
+              {organization.name}
             </h2>
             <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>{hospital.code}</span>
+              <span className="text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>{organization.code}</span>
               <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap"
                 style={{
-                  background: hospital.isSuspended ? 'var(--color-warning-bg)' : 'var(--color-success-bg)',
-                  color: hospital.isSuspended ? 'var(--color-warning)' : 'var(--color-success)',
+                  background: organization.isSuspended ? 'var(--color-warning-bg)' : 'var(--color-success-bg)',
+                  color: organization.isSuspended ? 'var(--color-warning)' : 'var(--color-success)',
                 }}>
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: hospital.isSuspended ? 'var(--color-warning)' : 'var(--color-success)' }} />
-                {hospital.isSuspended ? 'Askıda' : 'Aktif'}
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: organization.isSuspended ? 'var(--color-warning)' : 'var(--color-success)' }} />
+                {organization.isSuspended ? 'Askıda' : 'Aktif'}
               </span>
               <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap"
                 style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-                {hospital.plan}
+                {organization.plan}
               </span>
             </div>
           </div>
@@ -166,7 +166,7 @@ export default function HospitalDetailPage() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => router.push(`/super-admin/hospitals/${hospital.id}/edit`)}
+            onClick={() => router.push(`/super-admin/organizations/${organization.id}/edit`)}
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
           >
             <Edit className="h-4 w-4" /> Düzenle
@@ -175,9 +175,9 @@ export default function HospitalDetailPage() {
             variant="outline"
             className="gap-2"
             onClick={() => setBulkResetOpen(true)}
-            disabled={hospital.staffCount === 0}
+            disabled={organization.staffCount === 0}
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-error)' }}
-            title="Bu hastanedeki tüm personelin (sadece staff) şifresini sıfırla ve PDF olarak indir"
+            title="Bu organizasyondaki tüm personelin (sadece staff) şifresini sıfırla ve PDF olarak indir"
           >
             <KeyRound className="h-4 w-4" /> Personel Şifrelerini Sıfırla
           </Button>
@@ -187,10 +187,10 @@ export default function HospitalDetailPage() {
             onClick={() => setSuspendOpen(true)}
             style={{
               borderColor: 'var(--color-border)',
-              color: hospital.isSuspended ? 'var(--color-success)' : 'var(--color-error)',
+              color: organization.isSuspended ? 'var(--color-success)' : 'var(--color-error)',
             }}
           >
-            {hospital.isSuspended ? (
+            {organization.isSuspended ? (
               <><CheckCircle className="h-4 w-4" /> Aktif Et</>
             ) : (
               <><Ban className="h-4 w-4" /> Askıya Al</>
@@ -201,22 +201,22 @@ export default function HospitalDetailPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Toplam Personel" value={hospital.staffCount} icon={Users} accentColor="var(--color-primary)" />
-        <StatCard title="Aktif Eğitim" value={hospital.trainingCount} icon={GraduationCap} accentColor="var(--color-accent)" />
-        <StatCard title="Tamamlanma Oranı" value={`${hospital.completionRate}%`} icon={TrendingUp} accentColor="var(--color-success)" />
-        <StatCard title="Abonelik Bitiş" value={hospital.expiresAt} icon={Calendar} accentColor="var(--color-info)" />
+        <StatCard title="Toplam Personel" value={organization.staffCount} icon={Users} accentColor="var(--color-primary)" />
+        <StatCard title="Aktif Eğitim" value={organization.trainingCount} icon={GraduationCap} accentColor="var(--color-accent)" />
+        <StatCard title="Tamamlanma Oranı" value={`${organization.completionRate}%`} icon={TrendingUp} accentColor="var(--color-success)" />
+        <StatCard title="Abonelik Bitiş" value={organization.expiresAt} icon={Calendar} accentColor="var(--color-info)" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Hospital Info + Subscription */}
+        {/* Organization Info + Subscription */}
         <div className="lg:col-span-1 space-y-4">
           <div className="rounded-xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
             <h3 className="mb-4 text-sm font-bold">İletişim Bilgileri</h3>
             <div className="space-y-3 text-sm">
-              <div><span style={{ color: 'var(--color-text-muted)' }}>Adres:</span><p style={{ color: 'var(--color-text-primary)' }}>{hospital.address}</p></div>
-              <div><span style={{ color: 'var(--color-text-muted)' }}>Telefon:</span><p style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>{hospital.phone}</p></div>
-              <div><span style={{ color: 'var(--color-text-muted)' }}>E-posta:</span><p style={{ color: 'var(--color-text-primary)' }}>{hospital.email}</p></div>
-              <div><span style={{ color: 'var(--color-text-muted)' }}>Kayıt Tarihi:</span><p style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>{hospital.createdAt}</p></div>
+              <div><span style={{ color: 'var(--color-text-muted)' }}>Adres:</span><p style={{ color: 'var(--color-text-primary)' }}>{organization.address}</p></div>
+              <div><span style={{ color: 'var(--color-text-muted)' }}>Telefon:</span><p style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>{organization.phone}</p></div>
+              <div><span style={{ color: 'var(--color-text-muted)' }}>E-posta:</span><p style={{ color: 'var(--color-text-primary)' }}>{organization.email}</p></div>
+              <div><span style={{ color: 'var(--color-text-muted)' }}>Kayıt Tarihi:</span><p style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>{organization.createdAt}</p></div>
             </div>
           </div>
 
@@ -308,11 +308,11 @@ export default function HospitalDetailPage() {
 
       {showNewAdminModal && (
         <NewAdminModal
-          hospitalId={hospital.id}
-          hospitalName={hospital.name}
+          organizationId={organization.id}
+          organizationName={organization.name}
           onClose={() => setShowNewAdminModal(false)}
           onSaved={() => {
-            invalidateFetchCache(`/api/super-admin/hospitals/${id}`);
+            invalidateFetchCache(`/api/super-admin/organizations/${id}`);
             refetch();
           }}
         />
@@ -321,9 +321,9 @@ export default function HospitalDetailPage() {
       <BulkResetStaffModal
         open={bulkResetOpen}
         onClose={() => setBulkResetOpen(false)}
-        hospitalId={hospital.id}
-        hospitalName={hospital.name}
-        staffCount={hospital.staffCount}
+        organizationId={organization.id}
+        organizationName={organization.name}
+        staffCount={organization.staffCount}
       />
 
       {resetTarget && (
@@ -337,7 +337,7 @@ export default function HospitalDetailPage() {
           caller="super_admin"
           endpoint={`/api/super-admin/users/${resetTarget.id}/reset-password`}
           onSuccess={() => {
-            invalidateFetchCache(`/api/super-admin/hospitals/${id}`);
+            invalidateFetchCache(`/api/super-admin/organizations/${id}`);
             refetch();
           }}
         />
@@ -350,26 +350,26 @@ export default function HospitalDetailPage() {
             <div className="flex items-center gap-3 mb-1">
               <div
                 className="flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ background: hospital.isSuspended ? 'var(--color-success-bg)' : 'var(--color-error-bg)' }}
+                style={{ background: organization.isSuspended ? 'var(--color-success-bg)' : 'var(--color-error-bg)' }}
               >
-                {hospital.isSuspended
+                {organization.isSuspended
                   ? <CheckCircle className="h-5 w-5" style={{ color: 'var(--color-success)' }} />
                   : <TriangleAlert className="h-5 w-5" style={{ color: 'var(--color-error)' }} />
                 }
               </div>
               <DialogTitle>
-                {hospital.isSuspended ? 'Hastaneyi Aktif Et' : 'Hastaneyi Askıya Al'}
+                {organization.isSuspended ? 'Organizasyonu Aktif Et' : 'Organizasyonu Askıya Al'}
               </DialogTitle>
             </div>
             <DialogDescription>
-              {hospital.isSuspended
-                ? `"${hospital.name}" aktif edilecek ve kullanıcılar sisteme tekrar erişebilecek.`
-                : `"${hospital.name}" askıya alındığında bu hastane adminleri ve personeli sisteme erişemez.`}
+              {organization.isSuspended
+                ? `"${organization.name}" aktif edilecek ve kullanıcılar sisteme tekrar erişebilecek.`
+                : `"${organization.name}" askıya alındığında bu organizasyon adminleri ve personeli sisteme erişemez.`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {!hospital.isSuspended && (
+            {!organization.isSuspended && (
               <>
                 <div className="space-y-1.5">
                   <Label className="text-[13px] font-semibold">Askıya Alma Nedeni</Label>
@@ -384,34 +384,34 @@ export default function HospitalDetailPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[13px] font-semibold">
-                    Onaylamak için hastane adını yazın:{' '}
-                    <span className="font-mono" style={{ color: 'var(--color-error)' }}>{hospital.name.trim()}</span>
+                    Onaylamak için organizasyon adını yazın:{' '}
+                    <span className="font-mono" style={{ color: 'var(--color-error)' }}>{organization.name.trim()}</span>
                   </Label>
                   <input
                     type="text"
                     value={confirmText}
                     onChange={(e) => setConfirmText(e.target.value)}
-                    placeholder={hospital.name.trim()}
+                    placeholder={organization.name.trim()}
                     className="w-full rounded-xl border px-3 py-2 text-[13px] outline-none"
                     style={{
                       background: 'var(--color-bg)',
-                      borderColor: confirmText && confirmText.trim() !== hospital.name.trim() ? 'var(--color-error)' : 'var(--color-border)',
+                      borderColor: confirmText && confirmText.trim() !== organization.name.trim() ? 'var(--color-error)' : 'var(--color-border)',
                       color: 'var(--color-text-primary)',
                     }}
                   />
-                  {confirmText && confirmText.trim() !== hospital.name.trim() && (
-                    <p className="text-[11px]" style={{ color: 'var(--color-error)' }}>Hastane adı eşleşmiyor</p>
+                  {confirmText && confirmText.trim() !== organization.name.trim() && (
+                    <p className="text-[11px]" style={{ color: 'var(--color-error)' }}>Organizasyon adı eşleşmiyor</p>
                   )}
                 </div>
               </>
             )}
 
-            {hospital.isSuspended && (
+            {organization.isSuspended && (
               <div className="flex items-center gap-2.5 rounded-xl px-4 py-3"
                 style={{ background: 'var(--color-success-bg)', border: '1px solid var(--color-success)20' }}>
                 <Shield className="h-4 w-4 shrink-0" style={{ color: 'var(--color-success)' }} />
                 <p className="text-[12px]" style={{ color: 'var(--color-success)' }}>
-                  Bu hastane {hospital.staffCount} kullanıcıya sahip. Aktif etme sonrası tümü sisteme erişebilir.
+                  Bu organizasyon {organization.staffCount} kullanıcıya sahip. Aktif etme sonrası tümü sisteme erişebilir.
                 </p>
               </div>
             )}
@@ -427,11 +427,11 @@ export default function HospitalDetailPage() {
             </button>
             <button
               onClick={handleSuspendConfirm}
-              disabled={isSubmittingSuspend || (!hospital.isSuspended && confirmText.trim() !== hospital.name.trim())}
+              disabled={isSubmittingSuspend || (!organization.isSuspended && confirmText.trim() !== organization.name.trim())}
               className="rounded-xl px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-40"
-              style={{ background: hospital.isSuspended ? 'var(--color-success)' : 'var(--color-error)' }}
+              style={{ background: organization.isSuspended ? 'var(--color-success)' : 'var(--color-error)' }}
             >
-              {isSubmittingSuspend ? 'İşleniyor...' : hospital.isSuspended ? 'Aktif Et' : 'Askıya Al'}
+              {isSubmittingSuspend ? 'İşleniyor...' : organization.isSuspended ? 'Aktif Et' : 'Askıya Al'}
             </button>
           </div>
         </DialogContent>

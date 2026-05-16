@@ -243,7 +243,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
   doc.setTextColor(...WHITE)
   doc.text(formatDateLong(new Date()), metaRight, tileY + 21, { align: 'right' })
 
-  // KURUM (hospital — short version on right)
+  // KURUM (organization — short version on right)
   doc.setDrawColor(80, 130, 110)
   doc.line(metaRight - 36, tileY + 23.5, metaRight, tileY + 23.5)
   doc.setFont(TURKISH_FONT_FAMILY, 'normal')

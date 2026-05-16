@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       lastName,
       email,
       phone,
-      hospitalName,
+      organizationName,
       staffCount,
       message,
     } = body as {
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       lastName?: string
       email?: string
       phone?: string
-      hospitalName?: string
+      organizationName?: string
       staffCount?: string
       message?: string
     }
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     if (!phone || typeof phone !== 'string' || phone.trim().length < 5) {
       return errorResponse('Telefon alani zorunludur.', 400)
     }
-    if (!hospitalName || typeof hospitalName !== 'string' || hospitalName.trim().length < 2) {
+    if (!organizationName || typeof organizationName !== 'string' || organizationName.trim().length < 2) {
       return errorResponse('Hastane adi zorunludur.', 400)
     }
     if (!staffCount || typeof staffCount !== 'string') {
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       lastName: escapeHtml(lastName.trim().slice(0, 100)),
       email: email.trim().toLowerCase().slice(0, 200),
       phone: escapeHtml(phone.trim().slice(0, 30)),
-      hospitalName: escapeHtml(hospitalName.trim().slice(0, 200)),
+      organizationName: escapeHtml(organizationName.trim().slice(0, 200)),
       staffCount: escapeHtml(staffCount.trim().slice(0, 20)),
       message: message ? escapeHtml(message.trim().slice(0, 1000)) : '',
     }
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       try {
         await sendEmail({
           to: adminEmail,
-          subject: `[${BRAND.fullName}] Yeni Demo Talebi - ${sanitized.hospitalName}`,
+          subject: `[${BRAND.fullName}] Yeni Demo Talebi - ${sanitized.organizationName}`,
           html: `
             <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
               <div style="background: linear-gradient(135deg, #0d9668, #065f46); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
                 </tr>
                 <tr style="border-bottom: 1px solid #e2e8f0;">
                   <td style="padding: 12px 0; font-weight: 600; color: #475569;">Hastane</td>
-                  <td style="padding: 12px 0; color: #0f172a;">${sanitized.hospitalName}</td>
+                  <td style="padding: 12px 0; color: #0f172a;">${sanitized.organizationName}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #e2e8f0;">
                   <td style="padding: 12px 0; font-weight: 600; color: #475569;">Personel Sayisi</td>

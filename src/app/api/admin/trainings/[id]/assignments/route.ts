@@ -279,7 +279,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
       smgPoints: training.smgPoints,
       isCompulsory: training.isCompulsory,
     },
-    hospitalName: training.organization.name,
+    organizationName: training.organization.name,
     brandColor: training.organization.brandColor,
     maxAttempts: parsed.data.maxAttempts,
     assignedByName,
@@ -302,7 +302,7 @@ async function sendAssignmentEmails(params: {
     smgPoints: number | null
     isCompulsory: boolean
   }
-  hospitalName: string
+  organizationName: string
   brandColor: string | null
   maxAttempts: number
   assignedByName: string | null
@@ -324,7 +324,7 @@ async function sendAssignmentEmails(params: {
           const staffName = [r.firstName, r.lastName].filter(Boolean).join(' ') || r.email
           const html = trainingAssignedEmail({
             staffName,
-            organizationName: params.hospitalName,
+            organizationName: params.organizationName,
             brandColor: params.brandColor,
             trainingTitle: params.training.title,
             trainingDescription: params.training.description,
@@ -340,7 +340,7 @@ async function sendAssignmentEmails(params: {
           await sendEmail({
             organizationId: params.organizationId,
             to: r.email,
-            subject: `${params.hospitalName} · Yeni eğitim atandı: ${params.training.title}`,
+            subject: `${params.organizationName} · Yeni eğitim atandı: ${params.training.title}`,
             html,
           })
         }),

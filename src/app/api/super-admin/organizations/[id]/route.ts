@@ -6,7 +6,7 @@ import { updateOrganizationSchema } from '@/lib/validations'
 export const GET = withSuperAdminRoute<{ id: string }>(async ({ params }) => {
   const { id } = params
 
-  const hospital = await prisma.organization.findUnique({
+  const organization = await prisma.organization.findUnique({
     where: { id },
     include: {
       subscription: { include: { plan: true } },
@@ -28,9 +28,9 @@ export const GET = withSuperAdminRoute<{ id: string }>(async ({ params }) => {
     },
   })
 
-  if (!hospital) return errorResponse('Hospital not found', 404)
+  if (!organization) return errorResponse('Organizasyon bulunamadı', 404)
 
-  const { users, ...rest } = hospital
+  const { users, ...rest } = organization
   const admins = users.map(u => ({
     id: u.id,
     name: `${u.firstName} ${u.lastName}`.trim(),
@@ -52,9 +52,9 @@ export const PATCH = withSuperAdminRoute<{ id: string }>(async ({ request, param
   if (!parsed.success) return errorResponse(parsed.error.message)
 
   const oldData = await prisma.organization.findUnique({ where: { id } })
-  if (!oldData) return errorResponse('Hospital not found', 404)
+  if (!oldData) return errorResponse('Organizasyon bulunamadı', 404)
 
-  const hospital = await prisma.organization.update({
+  const organization = await prisma.organization.update({
     where: { id },
     data: parsed.data,
   })
@@ -64,17 +64,17 @@ export const PATCH = withSuperAdminRoute<{ id: string }>(async ({ request, param
     entityType: 'organization',
     entityId: id,
     oldData,
-    newData: hospital,
+    newData: organization,
   })
 
-  return jsonResponse(hospital)
+  return jsonResponse(organization)
 })
 
 export const DELETE = withSuperAdminRoute<{ id: string }>(async ({ request, params, audit }) => {
   const { id } = params
 
   const oldData = await prisma.organization.findUnique({ where: { id } })
-  if (!oldData) return errorResponse('Hospital not found', 404)
+  if (!oldData) return errorResponse('Organizasyon bulunamadı', 404)
 
   // Count all cascading data — caller must explicitly confirm deletion
   const { searchParams } = new URL(request.url)

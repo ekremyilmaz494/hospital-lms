@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useFetch } from '@/hooks/use-fetch';
 
-interface RecentHospital {
+interface RecentOrganization {
   id: string;
   name: string;
   code: string;
@@ -26,7 +26,7 @@ interface ExpiringSubscription {
 }
 
 interface DashboardListsData {
-  recentHospitals: RecentHospital[];
+  recentOrganizations: RecentOrganization[];
   expiringSubscriptions: ExpiringSubscription[];
 }
 
@@ -45,7 +45,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 export function DashboardLists() {
   const { data, isLoading, error } = useFetch<DashboardListsData>('/api/super-admin/dashboard');
 
-  const recentHospitals = data?.recentHospitals ?? [];
+  const recentOrganizations = data?.recentOrganizations ?? [];
   const expiringSubscriptions = data?.expiringSubscriptions ?? [];
 
   if (isLoading) {
@@ -58,7 +58,7 @@ export function DashboardLists() {
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {/* Recent Hospitals */}
+      {/* Recent Organizations */}
       <div
         className="rounded-xl border p-5"
         style={{
@@ -82,7 +82,7 @@ export function DashboardLists() {
             </h3>
           </div>
           <Link
-            href="/super-admin/hospitals"
+            href="/super-admin/organizations"
             className="flex items-center gap-1 text-xs font-semibold"
             style={{ color: 'var(--color-primary)', transition: 'opacity var(--transition-fast)' }}
           >
@@ -90,13 +90,13 @@ export function DashboardLists() {
           </Link>
         </div>
 
-        {recentHospitals.length === 0 ? (
+        {recentOrganizations.length === 0 ? (
           <div className="flex items-center justify-center h-24"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>
         ) : (
           <div className="space-y-3">
-            {recentHospitals.map((hospital, idx) => (
+            {recentOrganizations.map((organization, idx) => (
               <div
-                key={hospital.id}
+                key={organization.id}
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors duration-150 hover:bg-[var(--color-surface-hover)]"
               >
                 {/* Rank Badge */}
@@ -112,24 +112,24 @@ export function DashboardLists() {
                 <Avatar className="h-9 w-9 shrink-0">
                   <AvatarFallback
                     className="text-xs font-semibold text-white"
-                    style={{ background: planColors[hospital.plan] || 'var(--color-primary)' }}
+                    style={{ background: planColors[organization.plan] || 'var(--color-primary)' }}
                   >
-                    {hospital.name?.slice(0, 2).toUpperCase() ?? ''}
+                    {organization.name?.slice(0, 2).toUpperCase() ?? ''}
                   </AvatarFallback>
                 </Avatar>
 
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                    {hospital.name}
+                    {organization.name}
                   </p>
                   <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    {hospital.code}
+                    {organization.code}
                   </p>
                 </div>
 
                 <div className="text-right">
                   <p className="text-sm font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>
-                    {hospital.staffCount ?? 0}
+                    {organization.staffCount ?? 0}
                   </p>
                   <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>personel</p>
                 </div>

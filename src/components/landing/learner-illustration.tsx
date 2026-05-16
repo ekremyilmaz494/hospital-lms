@@ -1,5 +1,5 @@
 /**
- * Minimal hospital staff at a laptop — taking an online training.
+ * Minimal organization staff at a laptop — taking an online training.
  * Line-art style, transparent background. Animated: eye blinks,
  * hand subtle movement on trackpad, breathing, head sway.
  */
@@ -264,7 +264,7 @@ export function LearnerIllustration({ className }: Props) {
       {/* Video scene background */}
       <rect x="118" y="230" width="184" height="84" rx="3" fill={DARK} />
 
-      {/* Abstract "hospital scene" in video */}
+      {/* Abstract "organization scene" in video */}
       <ellipse cx="210" cy="268" rx="70" ry="22" fill={BRAND} opacity="0.18" />
 
       {/* Play button — softly pulsing */}

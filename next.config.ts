@@ -94,6 +94,12 @@ const nextConfig: NextConfig = {
       destination: '/admin/trainings/attempt-requests',
       permanent: true,
     },
+    // Sektör-agnostik refactor (Faz 1): super-admin altındaki "hospitals"
+    // route'u "organizations"a taşındı. Eski bookmark/API client'lar için 308.
+    { source: '/super-admin/hospitals', destination: '/super-admin/organizations', permanent: true },
+    { source: '/super-admin/hospitals/:path*', destination: '/super-admin/organizations/:path*', permanent: true },
+    { source: '/api/super-admin/hospitals', destination: '/api/super-admin/organizations', permanent: true },
+    { source: '/api/super-admin/hospitals/:path*', destination: '/api/super-admin/organizations/:path*', permanent: true },
   ],
   headers: async () => [
     {

@@ -15,15 +15,15 @@ export const GET = withSuperAdminRoute(async () => {
     if (cached) return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 
     const [
-      hospitalCount,
-      activeHospitalCount,
+      organizationCount,
+      activeOrganizationCount,
       totalUsers,
       totalStaff,
       totalTrainings,
       totalAssignments,
       passedAssignments,
       subscriptions,
-      recentHospitals,
+      recentOrganizations,
       recentLogs,
     ] = await Promise.all([
       prisma.organization.count(),
@@ -63,7 +63,7 @@ export const GET = withSuperAdminRoute(async () => {
 
     // Stats cards
     const stats = [
-      { title: 'Toplam Hastane', value: hospitalCount, icon: 'Building2', accentColor: 'var(--color-primary)', trend: { value: activeHospitalCount, label: 'aktif', isPositive: true } },
+      { title: 'Toplam Organizasyon', value: organizationCount, icon: 'Building2', accentColor: 'var(--color-primary)', trend: { value: activeOrganizationCount, label: 'aktif', isPositive: true } },
       { title: 'Toplam Kullanıcı', value: totalUsers, icon: 'Users', accentColor: 'var(--color-info)', trend: { value: totalStaff, label: 'personel', isPositive: true } },
       { title: 'Aktif Abonelik', value: activeSubscriptions, icon: 'CreditCard', accentColor: 'var(--color-success)', trend: { value: trialSubscriptions, label: 'deneme', isPositive: true } },
       { title: 'Toplam Eğitim', value: totalTrainings, icon: 'GraduationCap', accentColor: 'var(--color-accent)', trend: { value: completionRate, label: '% başarı', isPositive: completionRate >= 50 } },
@@ -86,11 +86,11 @@ export const GET = withSuperAdminRoute(async () => {
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
 
     const monthlyRaw = await prisma.$queryRaw<
-      { month_name: string; hastane: bigint; personel: bigint }[]
+      { month_name: string; organizasyon: bigint; personel: bigint }[]
     >`
       SELECT
         to_char(gs.month, 'Mon') AS month_name,
-        COALESCE(o.cnt, 0)::bigint AS hastane,
+        COALESCE(o.cnt, 0)::bigint AS organizasyon,
         COALESCE(u.cnt, 0)::bigint AS personel
       FROM generate_series(
         date_trunc('month', ${sixMonthsAgo}::timestamptz),
@@ -114,12 +114,12 @@ export const GET = withSuperAdminRoute(async () => {
 
     const monthlyData = monthlyRaw.map((row) => ({
       month: row.month_name,
-      hastane: Number(row.hastane),
+      organizasyon: Number(row.organizasyon),
       personel: Number(row.personel),
     }))
 
-    // Recent hospitals formatted
-    const formattedHospitals = recentHospitals.map(h => ({
+    // Recent organizations formatted
+    const formattedOrganizations = recentOrganizations.map(h => ({
       id: h.id,
       name: h.name,
       code: h.code,
@@ -162,7 +162,7 @@ export const GET = withSuperAdminRoute(async () => {
     const alert = suspendedCount > 0 ? {
       message: `${suspendedCount} hastane askıya alındı`,
       actionLabel: 'Görüntüle',
-      actionHref: '/super-admin/hospitals',
+      actionHref: '/super-admin/organizations',
       variant: 'warning',
     } : expiredSubscriptions > 0 ? {
       message: `${expiredSubscriptions} aboneliğin süresi doldu`,
@@ -176,12 +176,12 @@ export const GET = withSuperAdminRoute(async () => {
       alert,
       monthlyData,
       subscriptionData,
-      recentHospitals: formattedHospitals,
+      recentOrganizations: formattedOrganizations,
       expiringSubscriptions,
       recentActivity,
       platformOverview: {
-        hospitalCount,
-        activeHospitalCount,
+        organizationCount,
+        activeOrganizationCount,
         suspendedCount,
         totalUsers,
         totalStaff,

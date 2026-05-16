@@ -20,7 +20,7 @@ import { UploadManagerProvider } from '@/components/admin/upload-manager';
 import { UploadManagerWidget } from '@/components/admin/upload-manager-widget';
 
 const roleLabels: Record<string, string> = {
-  admin: 'Hastane Admin',
+  admin: 'Organizasyon Admin',
   super_admin: 'Süper Admin',
   staff: 'Personel',
 };
@@ -97,8 +97,8 @@ export default function AdminLayout({
           <AdminSidebar
             navGroups={adminNav}
             collapsed={sidebarCollapsed}
-            orgName={branding?.orgName || user?.department || 'Klinova LMS'}
-            orgCode={branding?.orgCode || 'Hastane Yönetici'}
+            orgName={branding?.orgName || user?.department || 'KlinoVax LMS'}
+            orgCode={branding?.orgCode || 'Organizasyon Yöneticisi'}
             orgLogoUrl={branding?.orgLogoUrl ?? undefined}
             userName={fullName}
             userRole={displayRole}

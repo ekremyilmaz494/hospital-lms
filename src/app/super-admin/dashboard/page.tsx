@@ -36,7 +36,7 @@ interface DashboardStat {
   trend?: { value: number; label: string; isPositive: boolean };
 }
 
-interface RecentHospital {
+interface RecentOrganization {
   id: string;
   name: string;
   code: string;
@@ -66,8 +66,8 @@ interface RecentActivity {
 }
 
 interface PlatformOverview {
-  hospitalCount: number;
-  activeHospitalCount: number;
+  organizationCount: number;
+  activeOrganizationCount: number;
   suspendedCount: number;
   totalUsers: number;
   totalStaff: number;
@@ -80,9 +80,9 @@ interface PlatformOverview {
 interface DashboardData {
   stats: DashboardStat[];
   alert?: { message: string; actionLabel: string; actionHref: string; variant: string };
-  monthlyData: { month: string; hastane: number; personel: number }[];
+  monthlyData: { month: string; organizasyon: number; personel: number }[];
   subscriptionData: { plan: string; aktif: number; trial: number; suresiDoldu: number }[];
-  recentHospitals: RecentHospital[];
+  recentOrganizations: RecentOrganization[];
   expiringSubscriptions: ExpiringSubscription[];
   recentActivity: RecentActivity[];
   platformOverview: PlatformOverview;
@@ -91,7 +91,7 @@ interface DashboardData {
 const iconMap: Record<string, LucideIcon> = { Building2, CreditCard, Users, GraduationCap, TrendingUp, AlertTriangle };
 
 const quickActions = [
-  { label: 'Yeni Hastane', icon: Plus, href: '/super-admin/hospitals/new', color: 'var(--color-primary)' },
+  { label: 'Yeni Organizasyon', icon: Plus, href: '/super-admin/organizations/new', color: 'var(--color-primary)' },
   { label: 'Abonelikler', icon: CreditCard, href: '/super-admin/subscriptions', color: 'var(--color-accent)' },
   { label: 'Raporlar', icon: BarChart3, href: '/super-admin/reports', color: 'var(--color-info)' },
   { label: 'Denetim Kayıtları', icon: Shield, href: '/super-admin/audit-logs', color: 'var(--color-success)' },
@@ -131,7 +131,7 @@ function ActiveUsersWidget() {
 
   const segments = [
     { label: 'Super Admin', count: byRole.super_admin, color: 'var(--color-accent)' },
-    { label: 'Hastane Admin', count: byRole.admin, color: 'var(--color-primary)' },
+    { label: 'Organizasyon Admin', count: byRole.admin, color: 'var(--color-primary)' },
     { label: 'Personel', count: byRole.staff, color: 'var(--color-info)' },
   ]
 
@@ -184,7 +184,7 @@ export default function SuperAdminDashboard() {
   const alert = data?.alert;
   const monthlyData = data?.monthlyData ?? [];
   const subscriptionData = data?.subscriptionData ?? [];
-  const recentHospitals = data?.recentHospitals ?? [];
+  const recentOrganizations = data?.recentOrganizations ?? [];
   const expiringSubscriptions = data?.expiringSubscriptions ?? [];
   const recentActivity = data?.recentActivity ?? [];
   const overview = data?.platformOverview;
@@ -199,7 +199,7 @@ export default function SuperAdminDashboard() {
   return (
     <div className="space-y-6">
       <BlurFade delay={0.01}>
-        <PageHeader title="Platform Dashboard" subtitle="Tüm hastanelerin genel durumu" />
+        <PageHeader title="Platform Dashboard" subtitle="Tüm organizasyonların genel durumu" />
       </BlurFade>
 
       {/* Alert Banner */}
@@ -327,8 +327,8 @@ export default function SuperAdminDashboard() {
               </div>
               <div className="space-y-4">
                 {[
-                  { label: 'Aktif Hastane', value: overview.activeHospitalCount, total: overview.hospitalCount, color: 'var(--color-success)' },
-                  { label: 'Askıya Alınan', value: overview.suspendedCount, total: overview.hospitalCount, color: 'var(--color-error)' },
+                  { label: 'Aktif Organizasyon', value: overview.activeOrganizationCount, total: overview.organizationCount, color: 'var(--color-success)' },
+                  { label: 'Askıya Alınan', value: overview.suspendedCount, total: overview.organizationCount, color: 'var(--color-error)' },
                   { label: 'Başarı Oranı', value: overview.completionRate, total: 100, color: 'var(--color-primary)', suffix: '%' },
                 ].map(item => (
                   <div key={item.label}>
@@ -360,7 +360,7 @@ export default function SuperAdminDashboard() {
         </BlurFade>
       )}
 
-      {/* Recent Hospitals + Expiring Subscriptions */}
+      {/* Recent Organizations + Expiring Subscriptions */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <BlurFade delay={0.13}>
           <div className="rounded-2xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
@@ -369,24 +369,24 @@ export default function SuperAdminDashboard() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--color-primary-light)' }}>
                   <Building2 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
                 </div>
-                <h3 className="text-[15px] font-bold">Son Kayıt Olan Hastaneler</h3>
+                <h3 className="text-[15px] font-bold">Son Kayıt Olan Organizasyonlar</h3>
               </div>
-              <Link href="/super-admin/hospitals" className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
+              <Link href="/super-admin/organizations" className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
                 Tümünü Gör <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
 
-            {recentHospitals.length === 0 ? (
+            {recentOrganizations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl mb-3" style={{ background: 'var(--color-bg)' }}>
                   <Building2 className="h-6 w-6" style={{ color: 'var(--color-text-muted)' }} />
                 </div>
-                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz hastane kaydı yok</p>
+                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Henüz organizasyon kaydı yok</p>
               </div>
             ) : (
               <div className="space-y-2">
-                {recentHospitals.map((hospital, idx) => (
-                  <Link key={hospital.id} href={`/super-admin/hospitals/${hospital.id}`}>
+                {recentOrganizations.map((organization, idx) => (
+                  <Link key={organization.id} href={`/super-admin/organizations/${organization.id}`}>
                     <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors duration-150" style={{ cursor: 'pointer' }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-hover)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
@@ -395,23 +395,23 @@ export default function SuperAdminDashboard() {
                         {idx + 1}
                       </div>
                       <Avatar className="h-9 w-9 shrink-0">
-                        <AvatarFallback className="text-xs font-semibold text-white" style={{ background: planColors[hospital.plan] || 'var(--color-primary)' }}>
-                          {hospital.name?.slice(0, 2).toUpperCase() ?? ''}
+                        <AvatarFallback className="text-xs font-semibold text-white" style={{ background: planColors[organization.plan] || 'var(--color-primary)' }}>
+                          {organization.name?.slice(0, 2).toUpperCase() ?? ''}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="truncate text-sm font-semibold">{hospital.name}</p>
+                        <p className="truncate text-sm font-semibold">{organization.name}</p>
                         <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                          <span className="font-mono">{hospital.code}</span>
+                          <span className="font-mono">{organization.code}</span>
                           <span>·</span>
-                          <span>{hospital.registeredAt}</span>
+                          <span>{organization.registeredAt}</span>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: `${planColors[hospital.plan] ?? 'var(--color-info)'}15`, color: planColors[hospital.plan] ?? 'var(--color-info)' }}>
-                          {hospital.plan}
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: `${planColors[organization.plan] ?? 'var(--color-info)'}15`, color: planColors[organization.plan] ?? 'var(--color-info)' }}>
+                          {organization.plan}
                         </span>
-                        <p className="text-[11px] mt-0.5 font-mono" style={{ color: 'var(--color-text-muted)' }}>{hospital.staffCount} personel</p>
+                        <p className="text-[11px] mt-0.5 font-mono" style={{ color: 'var(--color-text-muted)' }}>{organization.staffCount} personel</p>
                       </div>
                     </div>
                   </Link>

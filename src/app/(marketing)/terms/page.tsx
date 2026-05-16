@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Kullanim Sartlari | Hastane LMS",
-  description: "Hastane LMS platformu kullanim sartlari ve kosullari.",
+  title: `Kullanim Sartlari | ${BRAND.fullName}`,
+  description: `${BRAND.fullName} platformu kullanim sartlari ve kosullari.`,
 };
 
 const LAST_UPDATED = "5 Nisan 2026";
@@ -30,7 +31,7 @@ export default function TermsPage() {
             1. Hizmet Tanimi
           </h2>
           <p>
-            Hastane LMS (&quot;Platform&quot;), saglik kuruluslari bunyesinde calisan personelin
+            {BRAND.fullName} (&quot;Platform&quot;), kurumlar bunyesinde calisan personelin
             mesleki egitim, sinav ve sertifikasyon sureclerini dijital ortamda yonetmek
             amaciyla sunulan bir bulut tabanli ogrenme yonetim sistemidir. Platform,
             egitim iceriklerinin olusturulmasi, atanmasi, takip edilmesi ve raporlanmasi
@@ -74,7 +75,7 @@ export default function TermsPage() {
           </h2>
           <p>
             Platform uzerindeki tum yazilim, tasarim, logo, icerik ve egitim materyalleri
-            Hastane LMS ve/veya ilgili icerik saglayicilarinin fikri mulkiyetindedir.
+            {BRAND.fullName} ve/veya ilgili icerik saglayicilarinin fikri mulkiyetindedir.
             Bu materyaller, onceden yazili izin alinmaksizin kopyalanamaz, dagitilmaz,
             degistirilemez veya ticari amacla kullanilamaz. Kullanicilar tarafindan platforma
             yuklenen icerikler uzerindeki haklar, ilgili organizasyona aittir.
@@ -103,10 +104,10 @@ export default function TermsPage() {
             5. Hizmet Seviyesi
           </h2>
           <p>
-            Hastane LMS, aylik %99,5 erisim orani hedeflemektedir. Planli bakim
+            {BRAND.fullName}, aylik %99,5 erisim orani hedeflemektedir. Planli bakim
             calismalari, en az 48 saat onceden kullanicilara bildirilir. Mucbir sebepler
             (dogal afet, siber saldiri, altyapi saglayici kaynakli kesintiler vb.)
-            nedeniyle olusan hizmet kesintilerinden Hastane LMS sorumlu tutulamaz.
+            nedeniyle olusan hizmet kesintilerinden {BRAND.fullName} sorumlu tutulamaz.
           </p>
         </section>
 
@@ -121,7 +122,7 @@ export default function TermsPage() {
               Fesih bildirimi en az 30 gun onceden yazili olarak yapilmalidir.
             </li>
             <li>
-              Kullanim sartlarinin ihlali halinde, Hastane LMS ilgili hesabi veya
+              Kullanim sartlarinin ihlali halinde, {BRAND.fullName} ilgili hesabi veya
               organizasyonu onceden bildirimde bulunmaksizin askiya alma veya feshetme
               hakkini sakli tutar.
             </li>
@@ -139,8 +140,8 @@ export default function TermsPage() {
             7. Sorumluluk Sinirlamasi
           </h2>
           <p>
-            Hastane LMS, platformun kullanimindan kaynaklanan dolayli, ozel, arizi veya
-            cezai zararlardan sorumlu degildir. Hastane LMS&apos;in toplam sorumlulugu,
+            {BRAND.fullName}, platformun kullanimindan kaynaklanan dolayli, ozel, arizi veya
+            cezai zararlardan sorumlu degildir. {BRAND.fullName}&apos;in toplam sorumlulugu,
             her halukarda ilgili organizasyonun son 12 ayda odedigi abonelik bedelini
             asamaz. Platform uzerinden sunulan egitim icerikleri bilgilendirme amacli olup,
             tibbi tavsiye niteliginde degildir.
@@ -165,7 +166,7 @@ export default function TermsPage() {
             9. Degisiklik Hakki
           </h2>
           <p>
-            Hastane LMS, bu kullanim sartlarini onceden bildirimde bulunarak degistirme
+            {BRAND.fullName}, bu kullanim sartlarini onceden bildirimde bulunarak degistirme
             hakkini sakli tutar. Onemli degisiklikler, yururluge girmesinden en az 15 gun
             once platform uzerinden ve/veya e-posta yoluyla kullanicilara bildirilir.
             Degisikliklerin yururluge girmesinden sonra platformu kullanmaya devam etmeniz,
@@ -186,7 +187,7 @@ export default function TermsPage() {
           </p>
           <ul className="mt-3 space-y-1">
             <li>
-              <strong>E-posta:</strong> destek@hastane-lms.com
+              <strong>E-posta:</strong> {BRAND.supportEmail}
             </li>
             <li>
               <strong>Telefon:</strong> +90 850 000 0000

@@ -7,7 +7,7 @@ export const POST = withSuperAdminRoute<{ id: string }>(async ({ request, params
 
   const body = await parseBody<{ reason?: string }>(request)
 
-  const hospital = await prisma.organization.update({
+  const organization = await prisma.organization.update({
     where: { id },
     data: {
       isSuspended: true,
@@ -23,13 +23,13 @@ export const POST = withSuperAdminRoute<{ id: string }>(async ({ request, params
     newData: { reason: body?.reason },
   })
 
-  return jsonResponse(hospital)
+  return jsonResponse(organization)
 })
 
 export const DELETE = withSuperAdminRoute<{ id: string }>(async ({ params, audit }) => {
   const { id } = params
 
-  const hospital = await prisma.organization.update({
+  const organization = await prisma.organization.update({
     where: { id },
     data: {
       isSuspended: false,
@@ -44,5 +44,5 @@ export const DELETE = withSuperAdminRoute<{ id: string }>(async ({ params, audit
     entityId: id,
   })
 
-  return jsonResponse(hospital)
+  return jsonResponse(organization)
 })

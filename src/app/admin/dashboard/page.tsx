@@ -376,7 +376,7 @@ export default function AdminDashboard() {
               {greeting}, <span style={{ color: K.PRIMARY }}>{firstName}</span>
             </h1>
             <p className="k-page-subtitle">
-              Bu hafta {user?.department || 'hastanenizde'} eğitim ve uyum durumuna genel bir bakış.
+              Bu hafta {user?.department || 'kurumunuzda'} eğitim ve uyum durumuna genel bir bakış.
             </p>
           </div>
         </header>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type React from "react";
 import Link from "next/link";
+import { BRAND } from "@/lib/brand";
 import {
   BookOpen,
   BarChart3,
@@ -155,7 +156,7 @@ export function FeaturesSection() {
               Platform Özellikleri
             </p>
             <h2 className="text-2xl sm:text-3xl font-black" style={{ color: "#1a3a28" }}>
-              Neden Hastane LMS?
+              Neden {BRAND.fullName}?
             </h2>
           </div>
           <p

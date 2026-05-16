@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { createClient } from '@/lib/supabase/client';
+import { BRAND } from '@/lib/brand';
 import dynamic from 'next/dynamic';
 
 const BlurFade = dynamic(
@@ -135,7 +136,7 @@ export default function ForgotPasswordPage() {
                   color: GOLD, marginTop: 3, textTransform: 'uppercase',
                 }}
               >
-                Hospital Suite
+                Suite
               </span>
             </div>
           </div>
@@ -272,7 +273,7 @@ export default function ForgotPasswordPage() {
                     </label>
                     <Input
                       type="email"
-                      placeholder="ornek@hastane.com"
+                      placeholder="ornek@kurum.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       autoComplete="email"
@@ -330,8 +331,8 @@ export default function ForgotPasswordPage() {
         {/* Footer */}
         <BlurFade delay={0.32} duration={0.4}>
           <div className="mt-6 flex items-center justify-between ed-mono text-[10px] tracking-[0.25em]" style={{ color: INK_SOFT }}>
-            <span>© 2026 · KLINOVA</span>
-            <span style={{ color: GOLD }}>HOSPITAL SUITE</span>
+            <span>© {BRAND.legal.copyrightYear} · {BRAND.name.toUpperCase()}</span>
+            <span style={{ color: GOLD }}>{BRAND.name.toUpperCase()} SUITE</span>
           </div>
         </BlurFade>
       </div>

@@ -18,12 +18,14 @@ self.addEventListener('push', (event: PushEvent) => {
     payload = { body: event.data.text() };
   }
 
-  const title = payload.title ?? 'Devakent Hastanesi';
+  // Fallback başlığı sektör-agnostik: server normalde payload.title ile org.name gönderir.
+  // Bu fallback yalnız malformed payload durumunda devreye girer.
+  const title = payload.title ?? 'Bildirim';
   const options: NotificationOptions = {
     body:    payload.body ?? '',
     icon:    '/icons/icon-192.png',
     badge:   '/icons/icon-192.png',
-    tag:     'hastane-lms-notification',
+    tag:     'klinovax-lms-notification',
     data:    { url: payload.url ?? '/staff/dashboard' },
     requireInteraction: false,
   };

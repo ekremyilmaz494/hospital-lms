@@ -22,7 +22,7 @@ interface ReportStat {
   trend?: { value: number; label: string; isPositive: boolean };
 }
 
-interface HospitalComparison {
+interface OrganizationComparison {
   name: string;
   tamamlanma: number;
   basari: number;
@@ -36,7 +36,7 @@ interface RevenueEntry {
 
 interface ReportsData {
   overviewStats: ReportStat[];
-  hospitalComparison: HospitalComparison[];
+  organizationComparison: OrganizationComparison[];
   subscriptionRevenue: RevenueEntry[];
 }
 
@@ -58,7 +58,7 @@ export default function ReportsPage() {
   }
 
   const overviewStats = data?.overviewStats ?? [];
-  const hospitalComparison = data?.hospitalComparison ?? [];
+  const organizationComparison = data?.organizationComparison ?? [];
   const subscriptionRevenue = data?.subscriptionRevenue ?? [];
 
   return (
@@ -81,13 +81,13 @@ export default function ReportsPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
-        <ChartCard title="Hastane Karşılaştırması" icon={<BarChart3 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />} className="lg:col-span-4">
+        <ChartCard title="Organizasyon Karşılaştırması" icon={<BarChart3 className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />} className="lg:col-span-4">
           <div className="h-[300px]">
-            {hospitalComparison.length === 0 ? (
+            {organizationComparison.length === 0 ? (
               <div className="flex items-center justify-center h-full"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>
             ) : (
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <BarChart data={hospitalComparison} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                <BarChart data={organizationComparison} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
                   <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />

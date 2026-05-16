@@ -22,7 +22,7 @@ export const GET = withStaffRoute(async ({ dbUser }) => {
     lastName: profile.lastName,
     email: profile.email,
     phone: profile.phone ?? '',
-    hospital: profile.organization?.name ?? '',
+    organization: profile.organization?.name ?? '',
     department: profile.departmentRel?.name ?? '',
     title: profile.title ?? '',
     avatarUrl: profile.avatarUrl ?? '',

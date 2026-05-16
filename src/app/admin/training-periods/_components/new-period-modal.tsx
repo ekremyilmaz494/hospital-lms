@@ -134,7 +134,7 @@ export function NewPeriodModal({ open, onClose }: NewPeriodModalProps) {
             <div>
               <DialogTitle>Yeni Eğitim Dönemi</DialogTitle>
               <DialogDescription>
-                Hastane için yeni bir takvim yılı dönemi oluşturun.
+                Organizasyon için yeni bir takvim yılı dönemi oluşturun.
               </DialogDescription>
             </div>
           </div>

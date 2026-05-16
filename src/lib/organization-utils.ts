@@ -6,10 +6,10 @@
 /**
  * Host header'dan subdomain çıkarır.
  *
- * Örnekler:
- *  - "memorial-ankara.hastanelms.com" -> "memorial-ankara"
- *  - "hastanelms.com" -> null
- *  - "www.hastanelms.com" -> null
+ * Örnekler (baseDomain = "klinovax.com"):
+ *  - "devakent.klinovax.com" -> "devakent"
+ *  - "klinovax.com" -> null
+ *  - "www.klinovax.com" -> null
  *  - "localhost:3000" -> null
  */
 export function extractSubdomain(host: string, baseDomain: string): string | null {
@@ -38,7 +38,7 @@ export function extractSubdomain(host: string, baseDomain: string): string | nul
 }
 
 /**
- * Hastane adından URL-safe slug üretir.
+ * Organizasyon adından URL-safe slug üretir.
  * Türkçe karakterleri transliterate eder.
  */
 export function slugify(text: string): string {

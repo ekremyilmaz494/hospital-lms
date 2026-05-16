@@ -275,7 +275,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
     const hintFor = (error: string): string => {
       const e = error.toLowerCase();
       if (e.includes('zaten kayıtlı') || e.includes('zaten mevcut')) return 'Bu e-posta zaten sistemde var. Personeller listesinde kontrol edin veya farklı e-posta kullanın.';
-      if (e.includes('geçersiz e-posta') || e.includes('türkçe karakter') || e.includes('invalid')) return 'E-posta adresini kontrol edin. "ali@hastane.com" gibi Türkçe karakter içermeyen bir format olmalı.';
+      if (e.includes('geçersiz e-posta') || e.includes('türkçe karakter') || e.includes('invalid')) return 'E-posta adresini kontrol edin. "ali@kurum.com" gibi Türkçe karakter içermeyen bir format olmalı.';
       if (e.includes('şifre')) return 'Şifre en az 8 karakter; büyük harf, küçük harf, rakam ve özel karakter içermeli. Boş bırakırsanız sistem üretir.';
       if (e.includes('alt departman') && e.includes('altında değil')) return 'Yazdığınız alt departman, seçilen üst departmanın altında değil. "Alt Departmanlar" sayfasındaki "Üst > Alt" kombinasyonlarını kontrol edin.';
       if (e.includes('alt departman bulunamadı')) return 'Bu alt departman sistemde yok. /admin/staff sayfasından oluşturun veya Excel\'de doğru adı yazın.';

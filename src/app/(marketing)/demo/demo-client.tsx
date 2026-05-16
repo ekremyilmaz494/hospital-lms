@@ -35,7 +35,7 @@ type FormState = {
   lastName: string;
   email: string;
   phone: string;
-  hospitalName: string;
+  organizationName: string;
   staffCount: string;
   message: string;
 };
@@ -46,7 +46,7 @@ export function DemoClient() {
     lastName: "",
     email: "",
     phone: "",
-    hospitalName: "",
+    organizationName: "",
     staffCount: "",
     message: "",
   });
@@ -245,7 +245,7 @@ export function DemoClient() {
                     required
                     value={form.email}
                     onChange={handleChange}
-                    placeholder="ornek@hastane.com"
+                    placeholder="ornek@kurum.com"
                     className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
                     style={{
                       borderColor: "var(--color-border)",
@@ -278,15 +278,15 @@ export function DemoClient() {
               <div className="grid sm:grid-cols-2 gap-5 mb-5">
                 <div>
                   <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                    Hastane Adi <span style={{ color: "#dc2626" }}>*</span>
+                    Organizasyon Adi <span style={{ color: "#dc2626" }}>*</span>
                   </label>
                   <input
                     type="text"
-                    name="hospitalName"
+                    name="organizationName"
                     required
-                    value={form.hospitalName}
+                    value={form.organizationName}
                     onChange={handleChange}
-                    placeholder="Hastane adiniz"
+                    placeholder="Organizasyon adiniz"
                     className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
                     style={{
                       borderColor: "var(--color-border)",

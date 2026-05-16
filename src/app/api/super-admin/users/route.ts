@@ -4,7 +4,7 @@ import { jsonResponse, errorResponse, parseBody, getOrgUrl } from '@/lib/api-hel
 import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createUserSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
-import { sendHospitalWelcomeEmail, sendStaffWelcomeEmail } from '@/lib/email'
+import { sendOrganizationWelcomeEmail, sendStaffWelcomeEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 
 export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
@@ -100,7 +100,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
     where: { id: parsed.data.organizationId },
     select: { name: true, brandColor: true, slug: true },
   })
-  const hospitalName = org?.name ?? ''
+  const organizationName = org?.name ?? ''
   const brandColor = org?.brandColor ?? null
   // Doğrudan tenant subdomain'i — apex redirect adımı atlanır.
   // org.slug null ise getOrgUrl apex'e fallback eder (legacy kayıt için defansif).
@@ -110,9 +110,9 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   let emailSent = true
   try {
     if (parsed.data.role === 'admin') {
-      await sendHospitalWelcomeEmail({
+      await sendOrganizationWelcomeEmail({
         to: parsed.data.email,
-        organizationName: hospitalName,
+        organizationName: organizationName,
         brandColor,
         loginUrl,
         tempPassword,
@@ -122,7 +122,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       await sendStaffWelcomeEmail({
         to: parsed.data.email,
         staffName: fullName,
-        organizationName: hospitalName,
+        organizationName: organizationName,
         brandColor,
         tempPassword,
         loginUrl,

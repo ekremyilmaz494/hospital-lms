@@ -58,8 +58,8 @@ function CredentialRow({ icon, label, value, copyLabel }: CredentialRowProps) {
 }
 
 interface NewAdminModalProps {
-  hospitalId: string;
-  hospitalName: string;
+  organizationId: string;
+  organizationName: string;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -75,7 +75,7 @@ interface CreatedAdmin {
 
 const isValidTcFormat = (val: string) => /^\d{11}$/.test(val);
 
-export function NewAdminModal({ hospitalId, hospitalName, onClose, onSaved }: NewAdminModalProps) {
+export function NewAdminModal({ organizationId, organizationName, onClose, onSaved }: NewAdminModalProps) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<CreatedAdmin | null>(null);
@@ -111,7 +111,7 @@ export function NewAdminModal({ hospitalId, hospitalName, onClose, onSaved }: Ne
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           role: 'admin',
-          organizationId: hospitalId,
+          organizationId: organizationId,
           firstName: form.ad.trim(),
           lastName: form.soyad.trim(),
           email: form.email.trim(),
@@ -148,7 +148,7 @@ export function NewAdminModal({ hospitalId, hospitalName, onClose, onSaved }: Ne
   const copyAll = () => {
     if (!created) return;
     const text = [
-      `Hastane: ${hospitalName}`,
+      `Organizasyon: ${organizationName}`,
       `Yönetici: ${created.fullName}`,
       `E-posta: ${created.email}`,
       `TC Kimlik No: ${created.tcKimlik}`,
@@ -162,8 +162,8 @@ export function NewAdminModal({ hospitalId, hospitalName, onClose, onSaved }: Ne
     <PremiumModal
       isOpen
       onClose={() => { if (!saving) onClose(); }}
-      eyebrow="Hastane Admin Kaydı"
-      title={created ? `${created.fullName} oluşturuldu` : `${hospitalName} için yeni admin`}
+      eyebrow="Organizasyon Admin Kaydı"
+      title={created ? `${created.fullName} oluşturuldu` : `${organizationName} için yeni admin`}
       subtitle={created ? 'Aşağıdaki bilgileri güvenli bir kanaldan yöneticiye iletin.' : 'Sınırsız sayıda admin ekleyebilirsiniz. TC ve geçici şifre kayıt sonrası gösterilecektir.'}
       size="lg"
       disableEscape={saving}
@@ -270,7 +270,7 @@ export function NewAdminModal({ hospitalId, hospitalName, onClose, onSaved }: Ne
                      style={{ ...fieldStyle('tc'), fontFamily: 'var(--font-mono)' }} />
             </Field>
             <Field label="E-posta *" error={errors.email}>
-              <Input type="email" placeholder="admin@hastane.com" className="h-10" autoComplete="email"
+              <Input type="email" placeholder="admin@kurum.com" className="h-10" autoComplete="email"
                      value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
                      style={fieldStyle('email')} />
             </Field>

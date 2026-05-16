@@ -10,7 +10,7 @@ interface SettingsData {
   defaultPassingScore: number;
   defaultMaxAttempts: number;
   defaultExamDuration: number;
-  hospitalName: string;
+  organizationName: string;
   logoUrl: string;
   email: string;
   phone: string;
@@ -58,7 +58,7 @@ interface Props {
 const inputClass = 'h-12 rounded-xl text-[13px] transition-shadow duration-200 focus:ring-2 focus:ring-[var(--k-primary)]/20';
 const inputStyle = { background: 'var(--k-surface-hover)', borderColor: 'var(--k-border)' };
 
-export default function HospitalTab({ settings, setSettings }: Props) {
+export default function OrganizationTab({ settings, setSettings }: Props) {
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -67,15 +67,15 @@ export default function HospitalTab({ settings, setSettings }: Props) {
         </h2>
 
         <p className="text-[13px] mt-1" style={{ color: 'var(--k-text-muted)' }}>
-          Hastanenizin temel bilgilerini ve iletişim detaylarını yönetin.
+          Kurumunuzun temel bilgilerini ve iletişim detaylarını yönetin.
         </p>
       </div>
 
       <div className="space-y-6">
-        <Field label="Hastane Adı" icon={Building2}>
+        <Field label="Organizasyon Adı" icon={Building2}>
           <Input
-            value={settings.hospitalName}
-            onChange={(e) => setSettings({ hospitalName: e.target.value })}
+            value={settings.organizationName}
+            onChange={(e) => setSettings({ organizationName: e.target.value })}
             className={inputClass}
             style={inputStyle}
           />
@@ -100,7 +100,7 @@ export default function HospitalTab({ settings, setSettings }: Props) {
                 type="email"
                 value={settings.email ?? ''}
                 onChange={(e) => setSettings({ email: e.target.value })}
-                placeholder="info@hastane.com"
+                placeholder="info@kurum.com"
                 className={inputClass}
                 style={{ ...inputStyle, background: 'var(--k-surface)' }}
               />
@@ -125,7 +125,7 @@ export default function HospitalTab({ settings, setSettings }: Props) {
             <Textarea
               value={settings.address ?? ''}
               onChange={(e) => setSettings({ address: e.target.value })}
-              placeholder="Hastane adresi..."
+              placeholder="Organizasyon adresi..."
               rows={2}
               className="rounded-xl resize-none text-[13px]"
               style={{ ...inputStyle, background: 'var(--k-surface)' }}

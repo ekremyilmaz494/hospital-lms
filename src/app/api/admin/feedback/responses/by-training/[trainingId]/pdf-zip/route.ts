@@ -152,7 +152,7 @@ export const GET = withAdminRoute<{ trainingId: string }>(async ({ params, dbUse
     }
 
     // Hastane logosu — eğitim için bir kez
-    const hospitalLogoDataUrl = await resolveOrgLogoDataUrl(training.organization?.logoUrl)
+    const organizationLogoDataUrl = await resolveOrgLogoDataUrl(training.organization?.logoUrl)
 
     // ZIP build
     const zip = new JSZip()
@@ -212,7 +212,7 @@ export const GET = withAdminRoute<{ trainingId: string }>(async ({ params, dbUse
           isPassed: response.isPassed,
           overallScore,
           submittedDate: fmtDateTR(response.submittedAt),
-          hospitalLogoDataUrl,
+          organizationLogoDataUrl,
           ministryLogoDataUrl,
         }
 

@@ -124,7 +124,7 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId, audi
       }
     })
 
-    const orgName = org?.name ?? 'Hastane'
+    const orgName = org?.name ?? 'Organizasyon'
     const dateStr = new Date().toISOString().slice(0, 10)
     const dateLabel = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })
 

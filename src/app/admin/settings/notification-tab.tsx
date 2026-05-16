@@ -8,7 +8,7 @@ interface SettingsData {
   defaultPassingScore: number;
   defaultMaxAttempts: number;
   defaultExamDuration: number;
-  hospitalName: string;
+  organizationName: string;
   logoUrl: string;
   email: string;
   phone: string;

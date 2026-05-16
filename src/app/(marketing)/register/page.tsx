@@ -22,8 +22,8 @@ import { BlurFade } from '@/components/ui/blur-fade'
 /* ── Zod-free client-side validation (mirrors selfRegisterSchema) ── */
 
 interface FormData {
-  hospitalName: string
-  hospitalCode: string
+  organizationName: string
+  organizationCode: string
   address: string
   phone: string
   firstName: string
@@ -38,19 +38,19 @@ interface FieldErrors {
 }
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/
-const HOSPITAL_CODE_REGEX = /^[a-z0-9-]+$/
+const ORGANIZATION_CODE_REGEX = /^[a-z0-9-]+$/
 
 function validateStep1(data: FormData): FieldErrors {
   const errors: FieldErrors = {}
-  if (!data.hospitalName || data.hospitalName.length < 2) {
-    errors.hospitalName = 'Hastane adi en az 2 karakter olmalidir'
+  if (!data.organizationName || data.organizationName.length < 2) {
+    errors.organizationName = 'Organizasyon adi en az 2 karakter olmalidir'
   }
-  if (!data.hospitalCode || data.hospitalCode.length < 3) {
-    errors.hospitalCode = 'Hastane kodu en az 3 karakter olmalidir'
-  } else if (data.hospitalCode.length > 20) {
-    errors.hospitalCode = 'Hastane kodu en fazla 20 karakter olabilir'
-  } else if (!HOSPITAL_CODE_REGEX.test(data.hospitalCode)) {
-    errors.hospitalCode = 'Sadece kucuk harf, rakam ve tire kullanin'
+  if (!data.organizationCode || data.organizationCode.length < 3) {
+    errors.organizationCode = 'Organizasyon kodu en az 3 karakter olmalidir'
+  } else if (data.organizationCode.length > 20) {
+    errors.organizationCode = 'Organizasyon kodu en fazla 20 karakter olabilir'
+  } else if (!ORGANIZATION_CODE_REGEX.test(data.organizationCode)) {
+    errors.organizationCode = 'Sadece kucuk harf, rakam ve tire kullanin'
   }
   if (data.address && data.address.length > 500) {
     errors.address = 'Adres en fazla 500 karakter olabilir'
@@ -135,8 +135,8 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<FieldErrors>({})
 
   const [form, setForm] = useState<FormData>({
-    hospitalName: '',
-    hospitalCode: '',
+    organizationName: '',
+    organizationCode: '',
     address: '',
     phone: '',
     firstName: '',
@@ -152,12 +152,12 @@ export default function RegisterPage() {
     setApiError('')
   }
 
-  /** Auto-generate hospital code from name */
-  function handleHospitalNameChange(value: string) {
-    update('hospitalName', value)
-    if (!form.hospitalCode || form.hospitalCode === slugify(form.hospitalName)) {
+  /** Auto-generate organization code from name */
+  function handleOrganizationNameChange(value: string) {
+    update('organizationName', value)
+    if (!form.organizationCode || form.organizationCode === slugify(form.organizationName)) {
       const code = slugify(value)
-      setForm((prev) => ({ ...prev, hospitalCode: code }))
+      setForm((prev) => ({ ...prev, organizationCode: code }))
     }
   }
 
@@ -193,8 +193,8 @@ export default function RegisterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          hospitalName: form.hospitalName,
-          hospitalCode: form.hospitalCode,
+          organizationName: form.organizationName,
+          organizationCode: form.organizationCode,
           address: form.address || undefined,
           phone: form.phone || undefined,
           firstName: form.firstName,
@@ -286,7 +286,7 @@ export default function RegisterPage() {
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>
-              Hastanenizi Kaydedin
+              Organizasyonunuzu Kaydedin
             </h1>
             <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
               30 gun ucretsiz deneyin — kredi karti gerekmez
@@ -303,7 +303,7 @@ export default function RegisterPage() {
                 {step > 1 ? <CheckCircle2 className="w-4 h-4" /> : '1'}
               </div>
               <span className="text-sm font-medium" style={{ color: step >= 1 ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
-                Hastane Bilgileri
+                Organizasyon Bilgileri
               </span>
             </div>
             <div
@@ -345,7 +345,7 @@ export default function RegisterPage() {
             )}
 
             <form onSubmit={handleSubmit}>
-              {/* ── Step 1: Hospital Info ── */}
+              {/* ── Step 1: Organization Info ── */}
               {step === 1 && (
                 <div className="space-y-5">
                   <div className="flex items-center gap-3 mb-2">
@@ -357,43 +357,43 @@ export default function RegisterPage() {
                     </div>
                     <div>
                       <h2 className="font-bold" style={{ color: 'var(--color-text-primary)' }}>
-                        Hastane Bilgileri
+                        Organizasyon Bilgileri
                       </h2>
                       <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                        Hastanenizin temel bilgilerini girin
+                        Organizasyonunuzun temel bilgilerini girin
                       </p>
                     </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="hospitalName" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                      Hastane Adi *
+                    <Label htmlFor="organizationName" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                      Organizasyon Adi *
                     </Label>
                     <Input
-                      id="hospitalName"
-                      placeholder="ornek: Ankara Sehir Hastanesi"
-                      value={form.hospitalName}
-                      onChange={(e) => handleHospitalNameChange(e.target.value)}
+                      id="organizationName"
+                      placeholder="ornek: Devakent Hastanesi"
+                      value={form.organizationName}
+                      onChange={(e) => handleOrganizationNameChange(e.target.value)}
                       className="mt-1.5"
                     />
-                    {errors.hospitalName && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.hospitalName}</p>}
+                    {errors.organizationName && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.organizationName}</p>}
                   </div>
 
                   <div>
-                    <Label htmlFor="hospitalCode" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                      Hastane Kodu *
+                    <Label htmlFor="organizationCode" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                      Organizasyon Kodu *
                     </Label>
                     <Input
-                      id="hospitalCode"
+                      id="organizationCode"
                       placeholder="ornek: ankara-sehir"
-                      value={form.hospitalCode}
-                      onChange={(e) => update('hospitalCode', e.target.value.toLowerCase())}
+                      value={form.organizationCode}
+                      onChange={(e) => update('organizationCode', e.target.value.toLowerCase())}
                       className="mt-1.5 font-mono"
                     />
                     <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
                       Kucuk harf, rakam ve tire (-) kullanilabilir. 3-20 karakter.
                     </p>
-                    {errors.hospitalCode && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.hospitalCode}</p>}
+                    {errors.organizationCode && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.organizationCode}</p>}
                   </div>
 
                   <div>
@@ -402,7 +402,7 @@ export default function RegisterPage() {
                     </Label>
                     <Input
                       id="address"
-                      placeholder="Hastane adresi (istege bagli)"
+                      placeholder="Organizasyon adresi (istege bagli)"
                       value={form.address}
                       onChange={(e) => update('address', e.target.value)}
                       className="mt-1.5"
@@ -451,7 +451,7 @@ export default function RegisterPage() {
                         Yonetici Hesabi
                       </h2>
                       <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                        Hastane yoneticisi olarak giris yapacak hesabi olusturun
+                        Organizasyon yoneticisi olarak giris yapacak hesabi olusturun
                       </p>
                     </div>
                   </div>
@@ -492,7 +492,7 @@ export default function RegisterPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="ornek@hastane.gov.tr"
+                      placeholder="ornek@kurum.gov.tr"
                       value={form.email}
                       onChange={(e) => update('email', e.target.value)}
                       className="mt-1.5"

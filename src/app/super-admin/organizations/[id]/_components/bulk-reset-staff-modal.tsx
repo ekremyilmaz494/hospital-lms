@@ -29,14 +29,14 @@ interface BulkResetResponse {
 export function BulkResetStaffModal({
   open,
   onClose,
-  hospitalId,
-  hospitalName,
+  organizationId,
+  organizationName,
   staffCount,
 }: {
   open: boolean;
   onClose: () => void;
-  hospitalId: string;
-  hospitalName: string;
+  organizationId: string;
+  organizationName: string;
   staffCount: number;
 }) {
   const { toast } = useToast();
@@ -57,10 +57,10 @@ export function BulkResetStaffModal({
   };
 
   const handleSubmit = async () => {
-    if (confirmText.trim() !== hospitalName) return;
+    if (confirmText.trim() !== organizationName) return;
     setStep('processing');
     try {
-      const res = await fetch(`/api/super-admin/hospitals/${hospitalId}/staff/bulk-reset-passwords`, {
+      const res = await fetch(`/api/super-admin/organizations/${organizationId}/staff/bulk-reset-passwords`, {
         method: 'POST',
       });
       const body = await res.json().catch(() => ({}));
@@ -85,7 +85,7 @@ export function BulkResetStaffModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organizationId: hospitalId,
+          organizationId: organizationId,
           maskMode: 'full',
           items: data.items.map(i => ({
             fullName: i.fullName,
@@ -105,7 +105,7 @@ export function BulkResetStaffModal({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const safeName = hospitalName.replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 40);
+      const safeName = organizationName.replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 40);
       link.download = `${safeName}-personel-giris-bilgileri-${Date.now()}.pdf`;
       document.body.appendChild(link);
       link.click();
@@ -135,7 +135,7 @@ export function BulkResetStaffModal({
             <DialogTitle>Tüm Personel Şifresini Sıfırla</DialogTitle>
           </div>
           <DialogDescription>
-            <span className="font-semibold">{hospitalName}</span> hastanesindeki{' '}
+            <span className="font-semibold">{organizationName}</span> organizasyonundaki{' '}
             <span className="font-semibold">{staffCount} aktif personelin</span> şifresi yenilenecek.
             Mevcut tüm oturumlar kapatılır; her personel için profesyonel bir PDF üretilir.
             Admin ve süper admin hesapları etkilenmez.
@@ -156,23 +156,23 @@ export function BulkResetStaffModal({
 
             <div className="space-y-1.5">
               <Label className="text-[13px] font-semibold">
-                Onaylamak için hastane adını yazın:{' '}
-                <span className="font-mono" style={{ color: 'var(--color-error)' }}>{hospitalName}</span>
+                Onaylamak için organizasyon adını yazın:{' '}
+                <span className="font-mono" style={{ color: 'var(--color-error)' }}>{organizationName}</span>
               </Label>
               <input
                 type="text"
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
-                placeholder={hospitalName}
+                placeholder={organizationName}
                 className="w-full rounded-xl border px-3 py-2 text-[13px] outline-none"
                 style={{
                   background: 'var(--color-bg)',
-                  borderColor: confirmText && confirmText !== hospitalName ? 'var(--color-error)' : 'var(--color-border)',
+                  borderColor: confirmText && confirmText !== organizationName ? 'var(--color-error)' : 'var(--color-border)',
                   color: 'var(--color-text-primary)',
                 }}
               />
-              {confirmText && confirmText !== hospitalName && (
-                <p className="text-[11px]" style={{ color: 'var(--color-error)' }}>Hastane adı eşleşmiyor</p>
+              {confirmText && confirmText !== organizationName && (
+                <p className="text-[11px]" style={{ color: 'var(--color-error)' }}>Organizasyon adı eşleşmiyor</p>
               )}
             </div>
 
@@ -186,7 +186,7 @@ export function BulkResetStaffModal({
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={confirmText.trim() !== hospitalName}
+                disabled={confirmText.trim() !== organizationName}
                 className="rounded-xl px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-40 inline-flex items-center gap-2"
                 style={{ background: 'var(--color-error)' }}
               >

@@ -55,7 +55,7 @@ export default function PhoneSetupPage() {
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Telefon Numaranızı Girin</h1>
             <p className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
-              Hastaneniz SMS ile giriş doğrulaması kullanıyor. Devam etmek için cep telefonu numaranızı kaydedin.
+              Kurumunuz SMS ile giriş doğrulaması kullanıyor. Devam etmek için cep telefonu numaranızı kaydedin.
             </p>
           </div>
         </BlurFade>

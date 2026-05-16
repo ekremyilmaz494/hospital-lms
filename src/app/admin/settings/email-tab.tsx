@@ -222,7 +222,7 @@ export default function EmailTab() {
             <Input
               value={data.emailDisplayName}
               onChange={(e) => setData({ ...data, emailDisplayName: e.target.value })}
-              placeholder="Örn. Acıbadem Hastanesi"
+              placeholder="Örn. Kurumunuzun Adı"
               maxLength={100}
               className={inputClass}
               style={inputStyle}
@@ -238,7 +238,7 @@ export default function EmailTab() {
               type="email"
               value={data.emailReplyTo}
               onChange={(e) => setData({ ...data, emailReplyTo: e.target.value })}
-              placeholder="ik@hastane.com"
+              placeholder="ik@kurum.com"
               maxLength={320}
               className={inputClass}
               style={inputStyle}

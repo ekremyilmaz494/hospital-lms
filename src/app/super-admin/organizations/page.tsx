@@ -27,7 +27,7 @@ import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
-interface HospitalRaw {
+interface OrganizationRaw {
   id: string;
   name: string;
   code: string;
@@ -44,8 +44,8 @@ interface HospitalRaw {
   _count: { users: number; trainings: number };
 }
 
-interface HospitalsResponse {
-  hospitals: HospitalRaw[];
+interface OrganizationsResponse {
+  organizations: OrganizationRaw[];
   total: number;
   page: number;
   limit: number;
@@ -61,11 +61,11 @@ const planColors: Record<string, { bg: string; text: string; accent: string }> =
 type StatusFilter = 'all' | 'active' | 'suspended';
 
 interface SuspendTarget {
-  hospital: HospitalRaw;
+  organization: OrganizationRaw;
   mode: 'suspend' | 'activate';
 }
 
-export default function HospitalsPage() {
+export default function OrganizationsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [search, setSearch] = useState('');
@@ -79,12 +79,12 @@ export default function HospitalsPage() {
   // limit=500: API safePagination max'ı 500'dür. Stat sayaçları client-side hesaplandığı
   // için tüm hastaneleri çekmek gerekir — 500'ü aşan org sayısına ulaştığımızda pagination
   // eklenmeli. Hard-coded 100 silent truncation yaratıyordu.
-  const { data, isLoading, error, refetch } = useFetch<HospitalsResponse>('/api/super-admin/hospitals?limit=500');
+  const { data, isLoading, error, refetch } = useFetch<OrganizationsResponse>('/api/super-admin/organizations?limit=500');
 
-  const allHospitals = data?.hospitals ?? [];
+  const allOrganizations = data?.organizations ?? [];
 
   // Client-side filtering
-  const filtered = allHospitals.filter(h => {
+  const filtered = allOrganizations.filter(h => {
     const matchesSearch = !search ||
       h.name.toLowerCase().includes(search.toLowerCase()) ||
       h.code.toLowerCase().includes(search.toLowerCase());
@@ -96,12 +96,12 @@ export default function HospitalsPage() {
   });
 
   // Stats
-  const totalCount = allHospitals.length;
-  const activeCount = allHospitals.filter(h => h.isActive && !h.isSuspended).length;
-  const suspendedCount = allHospitals.filter(h => h.isSuspended).length;
-  const totalStaff = allHospitals.reduce((sum, h) => sum + h._count.users, 0);
+  const totalCount = allOrganizations.length;
+  const activeCount = allOrganizations.filter(h => h.isActive && !h.isSuspended).length;
+  const suspendedCount = allOrganizations.filter(h => h.isSuspended).length;
+  const totalStaff = allOrganizations.reduce((sum, h) => sum + h._count.users, 0);
 
-  const getStatus = (h: HospitalRaw) => {
+  const getStatus = (h: OrganizationRaw) => {
     if (h.isSuspended) return { label: 'Askıda', color: 'var(--color-warning)', bg: 'var(--color-warning-bg)' };
     if (!h.isActive) return { label: 'Pasif', color: 'var(--color-text-muted)', bg: 'var(--color-bg)' };
     if (h.subscription?.status === 'trial') return { label: 'Deneme', color: 'var(--color-info)', bg: 'var(--color-info-bg)' };
@@ -110,8 +110,8 @@ export default function HospitalsPage() {
   };
 
   // G3.1 — Open the modal (does NOT call fetch directly)
-  const openSuspendModal = (hospital: HospitalRaw) => {
-    setSuspendTarget({ hospital, mode: hospital.isSuspended ? 'activate' : 'suspend' });
+  const openSuspendModal = (organization: OrganizationRaw) => {
+    setSuspendTarget({ organization, mode: organization.isSuspended ? 'activate' : 'suspend' });
     setSuspendReason('');
     setConfirmText('');
   };
@@ -125,15 +125,15 @@ export default function HospitalsPage() {
   // G3.1 — Called after user has confirmed in the modal
   const handleSuspendConfirm = async () => {
     if (!suspendTarget) return;
-    const { hospital, mode } = suspendTarget;
+    const { organization, mode } = suspendTarget;
 
     // Type-to-confirm guard for suspend
-    if (mode === 'suspend' && confirmText.trim() !== hospital.name.trim()) return;
+    if (mode === 'suspend' && confirmText.trim() !== organization.name.trim()) return;
 
     setIsSubmitting(true);
     try {
       if (mode === 'suspend') {
-        const res = await fetch(`/api/super-admin/hospitals/${hospital.id}/suspend`, {
+        const res = await fetch(`/api/super-admin/organizations/${organization.id}/suspend`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ reason: suspendReason.trim() || null }),
@@ -142,16 +142,16 @@ export default function HospitalsPage() {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || 'Askıya alma başarısız');
         }
-        toast('Hastane askıya alındı', 'success');
+        toast('Organizasyon askıya alındı', 'success');
       } else {
-        const res = await fetch(`/api/super-admin/hospitals/${hospital.id}/suspend`, {
+        const res = await fetch(`/api/super-admin/organizations/${organization.id}/suspend`, {
           method: 'DELETE',
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || 'Aktif etme başarısız');
         }
-        toast('Hastane aktif edildi', 'success');
+        toast('Organizasyon aktif edildi', 'success');
       }
       closeSuspendModal();
       refetch();
@@ -175,9 +175,9 @@ export default function HospitalsPage() {
     <div className="space-y-6">
       <BlurFade delay={0.01}>
         <PageHeader
-          title="Hastane Yönetimi"
-          subtitle="Tüm hastaneleri görüntüle ve yönet"
-          action={{ label: 'Yeni Hastane', icon: Plus, href: '/super-admin/hospitals/new' }}
+          title="Organizasyon Yönetimi"
+          subtitle="Tüm organizasyonları görüntüle ve yönet"
+          action={{ label: 'Yeni Organizasyon', icon: Plus, href: '/super-admin/organizations/new' }}
         />
       </BlurFade>
 
@@ -185,7 +185,7 @@ export default function HospitalsPage() {
       <BlurFade delay={0.03}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
-            { label: 'Toplam Hastane', value: totalCount, icon: Building2, color: 'var(--color-primary)' },
+            { label: 'Toplam Organizasyon', value: totalCount, icon: Building2, color: 'var(--color-primary)' },
             { label: 'Aktif', value: activeCount, icon: CheckCircle, color: 'var(--color-success)' },
             { label: 'Askıda', value: suspendedCount, icon: AlertTriangle, color: 'var(--color-warning)' },
             { label: 'Toplam Personel', value: totalStaff, icon: Users, color: 'var(--color-info)' },
@@ -240,7 +240,7 @@ export default function HospitalsPage() {
           <div className="relative max-w-sm flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
             <Input
-              placeholder="Hastane ara (isim veya kod)..."
+              placeholder="Organizasyon ara (isim veya kod)..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-10"
@@ -250,42 +250,42 @@ export default function HospitalsPage() {
         </div>
       </BlurFade>
 
-      {/* Hospital Cards */}
+      {/* Organization Cards */}
       <BlurFade delay={0.07}>
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border py-16" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl mb-4" style={{ background: 'var(--color-bg)' }}>
               <Building2 className="h-7 w-7" style={{ color: 'var(--color-text-muted)' }} />
             </div>
-            <p className="text-[15px] font-bold mb-1">Hastane bulunamadı</p>
+            <p className="text-[15px] font-bold mb-1">Organizasyon bulunamadı</p>
             <p className="text-[13px] mb-4" style={{ color: 'var(--color-text-muted)' }}>
-              {search ? 'Arama kriterlerinizi değiştirmeyi deneyin' : 'Henüz hastane kaydı oluşturulmamış'}
+              {search ? 'Arama kriterlerinizi değiştirmeyi deneyin' : 'Henüz organizasyon kaydı oluşturulmamış'}
             </p>
             {!search && (
-              <Link href="/super-admin/hospitals/new">
+              <Link href="/super-admin/organizations/new">
                 <Button className="gap-2 rounded-xl text-white font-semibold" style={{ background: 'var(--color-primary)' }}>
-                  <Plus className="h-4 w-4" /> İlk Hastaneyi Ekle
+                  <Plus className="h-4 w-4" /> İlk Organizasyonu Ekle
                 </Button>
               </Link>
             )}
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map((hospital, idx) => {
-              const status = getStatus(hospital);
-              const plan = hospital.subscription?.plan?.name ?? 'Yok';
+            {filtered.map((organization, idx) => {
+              const status = getStatus(organization);
+              const plan = organization.subscription?.plan?.name ?? 'Yok';
               const pc = planColors[plan] ?? { bg: 'var(--color-info-bg)', text: 'var(--color-info)', accent: 'var(--color-info)' };
-              const createdDate = new Date(hospital.createdAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+              const createdDate = new Date(organization.createdAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
               return (
                 <div
-                  key={hospital.id}
+                  key={organization.id}
                   className="group relative rounded-2xl border overflow-hidden transition-transform duration-200 hover:-translate-y-0.5"
                   style={{
                     background: 'var(--color-surface)',
-                    borderColor: hospital.isSuspended ? 'var(--color-warning)' : 'var(--color-border)',
+                    borderColor: organization.isSuspended ? 'var(--color-warning)' : 'var(--color-border)',
                     boxShadow: 'var(--shadow-sm)',
-                    opacity: hospital.isSuspended ? 0.85 : 1,
+                    opacity: organization.isSuspended ? 0.85 : 1,
                   }}
                 >
                   {/* Left accent bar */}
@@ -295,24 +295,24 @@ export default function HospitalsPage() {
                     {/* Avatar */}
                     <Avatar className="h-12 w-12 shrink-0 transition-transform duration-200 group-hover:scale-105">
                       <AvatarFallback className="text-sm font-bold text-white" style={{ background: `linear-gradient(135deg, ${pc.accent}, ${pc.accent}cc)` }}>
-                        {hospital.name.slice(0, 2).toUpperCase()}
+                        {organization.name.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-[15px] font-bold truncate">{hospital.name}</h3>
+                        <h3 className="text-[15px] font-bold truncate">{organization.name}</h3>
                         <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}>
-                          {hospital.code}
+                          {organization.code}
                         </span>
                       </div>
                       <div className="flex items-center gap-4 text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
                         <span className="flex items-center gap-1">
-                          <Users className="h-3.5 w-3.5" /> {hospital._count.users} personel
+                          <Users className="h-3.5 w-3.5" /> {organization._count.users} personel
                         </span>
                         <span className="flex items-center gap-1">
-                          <GraduationCap className="h-3.5 w-3.5" /> {hospital._count.trainings} eğitim
+                          <GraduationCap className="h-3.5 w-3.5" /> {organization._count.trainings} eğitim
                         </span>
                         <span className="font-mono">{createdDate}</span>
                       </div>
@@ -338,19 +338,19 @@ export default function HospitalsPage() {
                         <MoreHorizontal className="h-5 w-5" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push(`/super-admin/hospitals/${hospital.id}`)}>
+                        <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push(`/super-admin/organizations/${organization.id}`)}>
                           <Eye className="h-4 w-4" /> Detay Görüntüle
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push(`/super-admin/hospitals/${hospital.id}/edit`)}>
+                        <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push(`/super-admin/organizations/${organization.id}/edit`)}>
                           <Edit className="h-4 w-4" /> Düzenle
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="gap-2 cursor-pointer"
-                          style={{ color: hospital.isSuspended ? 'var(--color-success)' : 'var(--color-error)' }}
-                          onClick={() => openSuspendModal(hospital)}
+                          style={{ color: organization.isSuspended ? 'var(--color-success)' : 'var(--color-error)' }}
+                          onClick={() => openSuspendModal(organization)}
                         >
-                          {hospital.isSuspended ? (
+                          {organization.isSuspended ? (
                             <><CheckCircle className="h-4 w-4" /> Aktif Et</>
                           ) : (
                             <><Ban className="h-4 w-4" /> Askıya Al</>
@@ -370,7 +370,7 @@ export default function HospitalsPage() {
       {filtered.length > 0 && (
         <div className="text-center">
           <p className="text-[12px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
-            {filtered.length} / {totalCount} hastane gösteriliyor
+            {filtered.length} / {totalCount} organizasyon gösteriliyor
           </p>
         </div>
       )}
@@ -392,13 +392,13 @@ export default function HospitalsPage() {
                     }
                   </div>
                   <DialogTitle>
-                    {suspendTarget.mode === 'suspend' ? 'Hastaneyi Askıya Al' : 'Hastaneyi Aktif Et'}
+                    {suspendTarget.mode === 'suspend' ? 'Organizasyonu Askıya Al' : 'Organizasyonu Aktif Et'}
                   </DialogTitle>
                 </div>
                 <DialogDescription>
                   {suspendTarget.mode === 'suspend'
-                    ? `"${suspendTarget.hospital.name}" askıya alındığında bu hastane adminleri ve personeli sisteme erişemez.`
-                    : `"${suspendTarget.hospital.name}" aktif edilecek ve kullanıcılar sisteme tekrar erişebilecek.`}
+                    ? `"${suspendTarget.organization.name}" askıya alındığında bu organizasyon adminleri ve personeli sisteme erişemez.`
+                    : `"${suspendTarget.organization.name}" aktif edilecek ve kullanıcılar sisteme tekrar erişebilecek.`}
                 </DialogDescription>
               </DialogHeader>
 
@@ -425,28 +425,28 @@ export default function HospitalsPage() {
                     {/* Type-to-confirm */}
                     <div className="space-y-1.5">
                       <Label className="text-[13px] font-semibold">
-                        Onaylamak için hastane adını yazın:{' '}
+                        Onaylamak için organizasyon adını yazın:{' '}
                         <span className="font-mono" style={{ color: 'var(--color-error)' }}>
-                          {suspendTarget.hospital.name.trim()}
+                          {suspendTarget.organization.name.trim()}
                         </span>
                       </Label>
                       <input
                         type="text"
                         value={confirmText}
                         onChange={(e) => setConfirmText(e.target.value)}
-                        placeholder={suspendTarget.hospital.name.trim()}
+                        placeholder={suspendTarget.organization.name.trim()}
                         className="w-full rounded-xl border px-3 py-2 text-[13px] outline-none"
                         style={{
                           background: 'var(--color-bg)',
-                          borderColor: confirmText && confirmText.trim() !== suspendTarget.hospital.name.trim()
+                          borderColor: confirmText && confirmText.trim() !== suspendTarget.organization.name.trim()
                             ? 'var(--color-error)'
                             : 'var(--color-border)',
                           color: 'var(--color-text-primary)',
                         }}
                       />
-                      {confirmText && confirmText.trim() !== suspendTarget.hospital.name.trim() && (
+                      {confirmText && confirmText.trim() !== suspendTarget.organization.name.trim() && (
                         <p className="text-[11px]" style={{ color: 'var(--color-error)' }}>
-                          Hastane adı eşleşmiyor
+                          Organizasyon adı eşleşmiyor
                         </p>
                       )}
                     </div>
@@ -460,7 +460,7 @@ export default function HospitalsPage() {
                   >
                     <Shield className="h-4 w-4 shrink-0" style={{ color: 'var(--color-success)' }} />
                     <p className="text-[12px]" style={{ color: 'var(--color-success)' }}>
-                      Bu hastane {suspendTarget.hospital._count.users} kullanıcıya sahip. Aktif etme sonrası tümü sisteme erişebilir.
+                      Bu organizasyon {suspendTarget.organization._count.users} kullanıcıya sahip. Aktif etme sonrası tümü sisteme erişebilir.
                     </p>
                   </div>
                 )}
@@ -479,7 +479,7 @@ export default function HospitalsPage() {
                   onClick={handleSuspendConfirm}
                   disabled={
                     isSubmitting ||
-                    (suspendTarget.mode === 'suspend' && confirmText.trim() !== suspendTarget.hospital.name.trim())
+                    (suspendTarget.mode === 'suspend' && confirmText.trim() !== suspendTarget.organization.name.trim())
                   }
                   className="rounded-xl px-4 py-2 text-[13px] font-semibold text-white transition-opacity duration-150 disabled:opacity-40"
                   style={{

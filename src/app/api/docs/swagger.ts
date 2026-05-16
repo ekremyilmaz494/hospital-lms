@@ -13,13 +13,13 @@ export const openApiSpec = {
     title: `${BRAND.fullName} API`,
     version: '1.0.0',
     description:
-      'Hastane Personel Egitim ve Sinav Yonetim Sistemi (LMS) REST API dokumantasyonu.\n\n' +
+      'Personel Egitim ve Sinav Yonetim Sistemi (LMS) REST API dokumantasyonu.\n\n' +
       '## Kimlik Dogrulama\n' +
       'API, Supabase JWT token ile Bearer Authentication kullanir.\n' +
       'Giris yaptiktan sonra donen `access_token` degerini `Authorization: Bearer <token>` header\'i ile gonderin.\n\n' +
       '## Roller\n' +
-      '- **super_admin** — Platform yonetimi (tum hastaneler)\n' +
-      '- **admin** — Hastane yonetimi (kendi organizasyonu)\n' +
+      '- **super_admin** — Platform yonetimi (tum organizasyonlar)\n' +
+      '- **admin** — Organizasyon yonetimi (kendi organizasyonu)\n' +
       '- **staff** — Personel (kendi egitim ve sinavlari)\n\n' +
       '## Multi-Tenant\n' +
       'Tum veriler `organizationId` ile izole edilmistir. Her kullanici sadece kendi organizasyonunun verilerine erisebilir.',
@@ -34,7 +34,7 @@ export const openApiSpec = {
   // ────────────────────────────────────────────────────────────────────────────
   tags: [
     { name: 'Auth', description: 'Kimlik dogrulama, kayit ve MFA islemleri' },
-    { name: 'Admin', description: 'Hastane admin paneli genel islemleri' },
+    { name: 'Admin', description: 'Organizasyon admin paneli genel islemleri' },
     { name: 'Admin: Personel', description: 'Personel CRUD ve toplu import islemleri' },
     { name: 'Admin: Egitim', description: 'Egitim olusturma, guncelleme ve atama islemleri' },
     { name: 'Admin: Departman', description: 'Departman yonetimi' },
@@ -46,7 +46,7 @@ export const openApiSpec = {
     { name: 'Admin: Denetim', description: 'Denetim kayitlari, uyum raporu ve yetkinlik matrisi' },
     { name: 'Personel', description: 'Personel paneli — egitimler, sertifikalar, profil' },
     { name: 'Sinav', description: 'Sinav baslat, cevap kaydet, sinavi bitir' },
-    { name: 'Super Admin', description: 'Platform yonetimi — hastaneler, abonelikler, raporlar' },
+    { name: 'Super Admin', description: 'Platform yonetimi — organizasyonlar, abonelikler, raporlar' },
     { name: 'Sistem', description: 'Saglik kontrolu ve cron islemleri' },
   ],
 
@@ -95,8 +95,8 @@ export const openApiSpec = {
 
     '/auth/register': {
       post: {
-        summary: 'Yeni hastane kaydi (self-registration)',
-        description: 'Yeni bir hastane organizasyonu ve admin kullanici olusturur. 30 gunluk ucretsiz deneme surumu baslatilir. Rate limiting: IP basina 3/saat, e-posta basina 1/24 saat.',
+        summary: 'Yeni organizasyon kaydi (self-registration)',
+        description: 'Yeni bir organizasyon ve admin kullanici olusturur. 30 gunluk ucretsiz deneme surumu baslatilir. Rate limiting: IP basina 3/saat, e-posta basina 1/24 saat.',
         tags: ['Auth'],
         requestBody: {
           required: true,
@@ -1005,45 +1005,45 @@ export const openApiSpec = {
     '/super-admin/dashboard': {
       get: {
         summary: 'Platform dashboard',
-        description: 'Tum platformun ozet istatistiklerini dondurur: toplam hastane, kullanici, egitim, gelir bilgileri.',
+        description: 'Tum platformun ozet istatistiklerini dondurur: toplam organizasyon, kullanici, egitim, gelir bilgileri.',
         tags: ['Super Admin'],
         security: [{ bearer: [] }],
         responses: { 200: { description: 'Platform istatistikleri' } },
       },
     },
 
-    '/super-admin/hospitals': {
+    '/super-admin/organizations': {
       get: {
-        summary: 'Hastane listesi',
-        description: 'Platformdaki tum hastaneleri (organizasyonlari) listeler.',
+        summary: 'Organizasyon listesi',
+        description: 'Platformdaki tum organizasyonlari (organizasyonlari) listeler.',
         tags: ['Super Admin'],
         security: [{ bearer: [] }],
-        responses: { 200: { description: 'Hastane listesi' } },
+        responses: { 200: { description: 'Organizasyon listesi' } },
       },
       post: {
-        summary: 'Yeni hastane olustur',
-        description: 'Platforma yeni bir hastane organizasyonu ekler.',
+        summary: 'Yeni organizasyon olustur',
+        description: 'Platforma yeni bir organizasyon ekler.',
         tags: ['Super Admin'],
         security: [{ bearer: [] }],
-        responses: { 201: { description: 'Hastane olusturuldu' } },
+        responses: { 201: { description: 'Organizasyon olusturuldu' } },
       },
     },
 
-    '/super-admin/hospitals/{id}': {
+    '/super-admin/organizations/{id}': {
       get: {
-        summary: 'Hastane detay',
-        description: 'Belirtilen hastanenin detayli bilgilerini dondurur.',
+        summary: 'Organizasyon detay',
+        description: 'Belirtilen organizasyonun detayli bilgilerini dondurur.',
         tags: ['Super Admin'],
         security: [{ bearer: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
-        responses: { 200: { description: 'Hastane detay bilgisi' }, 404: { description: 'Hastane bulunamadi' } },
+        responses: { 200: { description: 'Organizasyon detay bilgisi' }, 404: { description: 'Organizasyon bulunamadi' } },
       },
       patch: {
-        summary: 'Hastane guncelle',
+        summary: 'Organizasyon guncelle',
         tags: ['Super Admin'],
         security: [{ bearer: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
-        responses: { 200: { description: 'Hastane guncellendi' } },
+        responses: { 200: { description: 'Organizasyon guncellendi' } },
       },
     },
 
@@ -1157,7 +1157,7 @@ export const openApiSpec = {
         type: 'object',
         required: ['email', 'password'],
         properties: {
-          email: { type: 'string', format: 'email', description: 'E-posta adresi', example: 'kullanici@hastane.com' },
+          email: { type: 'string', format: 'email', description: 'E-posta adresi', example: 'kullanici@kurum.com' },
           password: { type: 'string', format: 'password', description: 'Sifre (min 8 karakter)' },
         },
       },
@@ -1181,10 +1181,10 @@ export const openApiSpec = {
 
       RegisterRequest: {
         type: 'object',
-        required: ['hospitalName', 'hospitalCode', 'firstName', 'lastName', 'email', 'password'],
+        required: ['organizationName', 'organizationCode', 'firstName', 'lastName', 'email', 'password'],
         properties: {
-          hospitalName: { type: 'string', description: 'Hastane adi', example: 'Ornek Devlet Hastanesi' },
-          hospitalCode: { type: 'string', description: 'Benzersiz hastane kodu', example: 'ODH-001' },
+          organizationName: { type: 'string', description: 'Organizasyon adi', example: 'Ornek Organizasyon' },
+          organizationCode: { type: 'string', description: 'Benzersiz organizasyon kodu', example: 'ODH-001' },
           address: { type: 'string', description: 'Adres (opsiyonel)' },
           phone: { type: 'string', description: 'Telefon (opsiyonel)' },
           firstName: { type: 'string', description: 'Yonetici adi', example: 'Ahmet' },

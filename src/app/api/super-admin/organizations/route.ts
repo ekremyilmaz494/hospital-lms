@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody, safePagination, getOrgUrl } from '@/lib/api-helpers'
 import { withSuperAdminRoute } from '@/lib/api-handler'
-import { createHospitalWithAdminSchema } from '@/lib/validations'
+import { createOrganizationWithAdminSchema } from '@/lib/validations'
 import { sendInvitationEmail, sendStaffWelcomeEmail } from '@/lib/email'
 import { TRAINING_CATEGORIES } from '@/lib/training-categories'
 import { slugify } from '@/lib/organization'
@@ -32,7 +32,7 @@ export const GET = withSuperAdminRoute(async ({ request }) => {
   if (status === 'active') where.isActive = true
   if (status === 'suspended') where.isSuspended = true
 
-  const [hospitals, total] = await Promise.all([
+  const [organizations, total] = await Promise.all([
     prisma.organization.findMany({
       where,
       include: {
@@ -54,11 +54,11 @@ export const GET = withSuperAdminRoute(async ({ request }) => {
     prisma.organization.count({ where }),
   ])
 
-  return jsonResponse({ hospitals, total, page, limit, totalPages: Math.ceil(total / limit) }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
+  return jsonResponse({ organizations, total, page, limit, totalPages: Math.ceil(total / limit) }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
 })
 
 /**
- * POST /api/super-admin/hospitals
+ * POST /api/super-admin/organizations
  *
  * Yeni hastane oluştur ve Esas Yönetici davet linki gönder.
  *
@@ -73,17 +73,17 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   const body = await parseBody(request)
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
-  const parsed = createHospitalWithAdminSchema.safeParse(body)
+  const parsed = createOrganizationWithAdminSchema.safeParse(body)
   if (!parsed.success) {
     const friendly = parsed.error.issues.map((i) => {
       const field = i.path.join('.')
       if (field === 'email' || field === 'adminEmail') {
         return field === 'adminEmail'
           ? 'Yönetici e-posta adresi geçersiz. Türkçe karakter (ş, ç, ğ, ü, ö, ı, İ) kullanmayın.'
-          : 'Hastane e-posta adresi geçersiz. Türkçe karakter (ş, ç, ğ, ü, ö, ı, İ) kullanmayın.'
+          : 'Organizasyon e-posta adresi geçersiz. Türkçe karakter (ş, ç, ğ, ü, ö, ı, İ) kullanmayın.'
       }
-      if (field === 'name') return 'Hastane adı zorunludur'
-      if (field === 'code') return 'Hastane kodu zorunludur'
+      if (field === 'name') return 'Organizasyon adı zorunludur'
+      if (field === 'code') return 'Organizasyon kodu zorunludur'
       if (field === 'adminFirstName') return 'Yönetici adı zorunludur'
       if (field === 'adminLastName') return 'Yönetici soyadı zorunludur'
       if (field === 'phone') return 'Geçerli bir telefon numarası girin'
@@ -126,7 +126,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   }
 
   // 1) Transaction: Organization + Subscription + TrainingCategory
-  const hospital = await prisma.$transaction(async (tx) => {
+  const organization = await prisma.$transaction(async (tx) => {
     const org = await tx.organization.create({
       data: {
         ...orgData,
@@ -199,20 +199,20 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
         firstName: adminFirstName,
         lastName: adminLastName,
         role: 'admin',
-        organizationId: hospital.id,
+        organizationId: organization.id,
         mustChangePassword: true,
         tcKimlik: adminTcKimlik,
         tcAddedByUserId: dbUser.id,
       })
     } catch (err) {
-      // Hospital yarattık ama owner User yaratamadık — manuel müdahale gerek
-      logger.error('hospital-create', 'Esas Yönetici User yaratılamadı (hospital orphan kaldı)', {
-        hospitalId: hospital.id,
+      // Organizasyon yarattık ama owner User yaratamadık — manuel müdahale gerek
+      logger.error('organization-create', 'Esas Yönetici User yaratılamadı (organization orphan kaldı)', {
+        organizationId: organization.id,
         adminEmail,
         error: err instanceof Error ? err.message : err,
       })
       if (err instanceof AuthUserError || err instanceof DbUserError) {
-        return errorResponse(`Hastane oluşturuldu fakat yönetici hesabı açılamadı: ${err.safeMessage}`, 500)
+        return errorResponse(`Organizasyon oluşturuldu fakat yönetici hesabı açılamadı: ${err.safeMessage}`, 500)
       }
       throw err
     }
@@ -221,17 +221,17 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
 
     // Esas Yönetici (org owner) işaretle — Organization.ownerUserId set et
     await prisma.organization.update({
-      where: { id: hospital.id },
+      where: { id: organization.id },
       data: { ownerUserId: ownerUser.id },
     })
 
     await audit({
       action: 'create',
       entityType: 'organization',
-      entityId: hospital.id,
+      entityId: organization.id,
       newData: {
-        hospitalName: orgData.name,
-        hospitalCode: orgData.code,
+        organizationName: orgData.name,
+        organizationCode: orgData.code,
         adminEmail: adminEmail ?? null,
         ownerUserId: ownerUser.id,
         mode: 'direct',
@@ -251,16 +251,16 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
           organizationName: orgData.name,
           brandColor: null,
           tempPassword: effectivePassword,
-          loginUrl: `${getOrgUrl(hospital.slug)}/auth/login`,
+          loginUrl: `${getOrgUrl(organization.slug)}/auth/login`,
         })
         welcomeEmailSent = true
       } catch (err) {
-        logger.warn('hospital-create', `Hoş geldiniz maili gönderilemedi: ${adminEmail}`, err instanceof Error ? err.message : err)
+        logger.warn('organization-create', `Hoş geldiniz maili gönderilemedi: ${adminEmail}`, err instanceof Error ? err.message : err)
       }
     }
 
     return jsonResponse({
-      ...hospital,
+      ...organization,
       ownerUserId: ownerUser.id,
       mode: 'direct',
       emailSent: welcomeEmailSent,
@@ -286,7 +286,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       phone: null,
       title: null,
       role: 'admin',
-      organizationId: hospital.id,
+      organizationId: organization.id,
       invitedByUserId: dbUser.id,
       setAsOwner: true,
       expiresAt,
@@ -299,10 +299,10 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   await audit({
     action: 'create',
     entityType: 'organization',
-    entityId: hospital.id,
+    entityId: organization.id,
     newData: {
-      hospitalName: orgData.name,
-      hospitalCode: orgData.code,
+      organizationName: orgData.name,
+      organizationCode: orgData.code,
       adminEmail,
       invitationId: invitation.id,
       mode: 'invite',
@@ -314,7 +314,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
 
   // Davet linki tenant subdomain'ine gönderilir — accept sonrası kullanıcı
   // doğrudan kendi hastanesinin admin panel'ine yönlenir.
-  const inviteUrl = buildInvitationUrl(getOrgUrl(hospital.slug), raw)
+  const inviteUrl = buildInvitationUrl(getOrgUrl(organization.slug), raw)
   let emailSent = true
   try {
     emailSent = await sendInvitationEmail({
@@ -329,14 +329,14 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
     })
   } catch (emailErr) {
     emailSent = false
-    logger.error('hospital-create', 'Davet maili gönderilemedi', {
+    logger.error('organization-create', 'Davet maili gönderilemedi', {
       adminEmail,
       error: (emailErr as Error).message,
     })
   }
 
   return jsonResponse({
-    ...hospital,
+    ...organization,
     mode: 'invite',
     invitationId: invitation.id,
     invitationExpiresAt: expiresAt,

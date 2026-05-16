@@ -180,7 +180,7 @@ export default function MobileLayout({
               </Label>
               <Input
                 type="email"
-                placeholder="ornek@hastane.com"
+                placeholder="ornek@kurum.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"

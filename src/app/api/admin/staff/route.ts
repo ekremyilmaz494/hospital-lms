@@ -381,7 +381,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     try {
       emailSent = await sendInvitationEmail({
         to: resolvedEmail,
-        organizationName: orgForInvite?.name ?? 'Hastane',
+        organizationName: orgForInvite?.name ?? 'Organizasyon',
         brandColor: orgForInvite?.brandColor ?? null,
         inviteUrl,
         inviterName: `${dbUser.firstName} ${dbUser.lastName}`,
@@ -484,7 +484,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       await sendStaffWelcomeEmail({
         to: user.email,
         staffName: `${user.firstName} ${user.lastName}`,
-        organizationName: org?.name ?? 'Hastane',
+        organizationName: org?.name ?? 'Organizasyon',
         brandColor: org?.brandColor ?? null,
         tempPassword: effectivePassword,
         // Personel doğrudan kendi hastane subdomain'ine yönlenir

@@ -50,7 +50,7 @@ const PLANS: Plan[] = [
     icon: Building2,
     price: "5.999",
     period: "/ay",
-    desc: "Buyuyen hastaneler icin gelismis ozellikler ve oncelikli destek.",
+    desc: "Buyuyen kurumlar icin gelismis ozellikler ve oncelikli destek.",
     features: [
       "500 personele kadar",
       "50 GB depolama",
@@ -72,13 +72,13 @@ const PLANS: Plan[] = [
     icon: Crown,
     price: "Ozel Fiyat",
     period: "",
-    desc: "Buyuk hastane zincirleri ve saglik gruplarfi icin tamamen ozellestirilebilir cozum.",
+    desc: "Buyuk kurum zincirleri ve gruplar icin tamamen ozellestirilebilir cozum.",
     features: [
       "Sinirsiz personel",
       "Sinirsiz depolama",
       "Tum Profesyonel ozellikleri",
       "AI Icerik Studyosu",
-      "Coklu hastane yonetimi",
+      "Coklu organizasyon yonetimi",
       "Ozel entegrasyonlar",
       "SLA garantisi",
       "7/24 telefon destegi",
@@ -104,7 +104,7 @@ const COMPARISON_FEATURES = [
   { feature: "Raporlama", starter: "Temel", pro: "Gelismis", enterprise: "Gelismis + Ozel" },
   { feature: "API Erisimi", starter: false, pro: true, enterprise: true },
   { feature: "White-label", starter: false, pro: true, enterprise: true },
-  { feature: "Coklu Hastane", starter: false, pro: false, enterprise: true },
+  { feature: "Coklu Organizasyon", starter: false, pro: false, enterprise: true },
   { feature: "Destek", starter: "E-posta", pro: "Oncelikli", enterprise: "7/24 + Ozel YN" },
 ];
 
@@ -129,7 +129,7 @@ export function PricingClient() {
             Fiyatlandirma
           </p>
           <h1 className="text-3xl lg:text-4xl font-black mb-4" style={{ color: "var(--color-text-primary)" }}>
-            Hastanenize Uygun Plan Secin
+            Kurumunuza Uygun Plan Secin
           </h1>
           <p className="text-base leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
             Tum planlar 14 gunluk ucretsiz deneme icermektedir. Kredi karti gerekmez.

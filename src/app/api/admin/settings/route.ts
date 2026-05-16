@@ -4,7 +4,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
 
 const settingsSchema = z.object({
-  hospitalName: z.string().min(1).max(255).optional(),
+  organizationName: z.string().min(1).max(255).optional(),
   logoUrl: z.string().url().optional().or(z.literal('')),
   email: z.string().email().optional(),
   phone: z.string().max(20).optional(),
@@ -18,7 +18,7 @@ const settingsSchema = z.object({
   loginBannerUrl: z.string().url().optional().or(z.literal('')),
 })
 
-// GET /api/admin/settings — Hastane ayarlarını getir
+// GET /api/admin/settings — Organizasyon ayarlarını getir
 export const GET = withAdminRoute(async ({ organizationId }) => {
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
@@ -29,7 +29,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     defaultPassingScore: org?.defaultPassingScore ?? 70,
     defaultMaxAttempts: org?.defaultMaxAttempts ?? 3,
     defaultExamDuration: org?.defaultExamDuration ?? 30,
-    hospitalName: org?.name ?? '',
+    organizationName: org?.name ?? '',
     logoUrl: org?.logoUrl ?? '',
     email: org?.email ?? '',
     phone: org?.phone ?? '',
@@ -42,7 +42,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }, { requireOrganization: true, strict: true })
 
-// PUT /api/admin/settings — Hastane ayarlarını güncelle
+// PUT /api/admin/settings — Organizasyon ayarlarını güncelle
 export const PUT = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await request.json().catch(() => null)
   if (!body) return errorResponse('Invalid body')
@@ -50,14 +50,14 @@ export const PUT = withAdminRoute(async ({ request, organizationId, audit }) => 
   const parsed = settingsSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const { hospitalName, logoUrl, email, phone, address, sessionTimeout, defaultPassingScore, defaultMaxAttempts, defaultExamDuration, brandColor, secondaryColor, loginBannerUrl } = parsed.data
+  const { organizationName, logoUrl, email, phone, address, sessionTimeout, defaultPassingScore, defaultMaxAttempts, defaultExamDuration, brandColor, secondaryColor, loginBannerUrl } = parsed.data
 
   const oldOrg = await prisma.organization.findUnique({ where: { id: organizationId } })
 
   const updated = await prisma.organization.update({
     where: { id: organizationId },
     data: {
-      ...(hospitalName !== undefined && { name: hospitalName }),
+      ...(organizationName !== undefined && { name: organizationName }),
       ...(logoUrl !== undefined && { logoUrl }),
       ...(email !== undefined && { email }),
       ...(phone !== undefined && { phone }),
@@ -81,7 +81,7 @@ export const PUT = withAdminRoute(async ({ request, organizationId, audit }) => 
   })
 
   return jsonResponse({
-    hospitalName: updated.name,
+    organizationName: updated.name,
     logoUrl: updated.logoUrl ?? '',
     email: updated.email ?? '',
     phone: updated.phone ?? '',

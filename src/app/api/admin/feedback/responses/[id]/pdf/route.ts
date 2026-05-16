@@ -175,7 +175,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
       : null
 
     // Hostane logosu (var olan helper, fallback davranışı zaten içinde)
-    const hospitalLogoDataUrl = await resolveOrgLogoDataUrl(response.training.organization?.logoUrl)
+    const organizationLogoDataUrl = await resolveOrgLogoDataUrl(response.training.organization?.logoUrl)
 
     // Anonim yanıt: katılımcı satırı boş bırakılır (kullanıcının kararı —
     // "Anonim" etiketi değil, hücre boş kalsın).
@@ -205,7 +205,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
       overallScore,
       submittedDate: fmtDateTR(response.submittedAt),
 
-      hospitalLogoDataUrl,
+      organizationLogoDataUrl,
       ministryLogoDataUrl,
     }
 

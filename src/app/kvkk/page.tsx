@@ -19,7 +19,7 @@ const sections = [
     icon: Shield,
     title: '1. Veri Sorumlusu',
     content:
-      'Klinova Hospital Suite olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan amaçlar doğrultusunda ve kanuna uygun olarak işlemekteyiz.',
+      'KlinoVax Suite olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan amaçlar doğrultusunda ve kanuna uygun olarak işlemekteyiz.',
   },
   {
     icon: Database,
@@ -234,7 +234,7 @@ export default function KVKKPage() {
         <BlurFade delay={0.6}>
           <div className="mt-12 text-center">
             <p className="text-xs" style={{ color: INK_SOFT }}>
-              Son güncelleme: Nisan 2026 &middot; &copy; 2026 Klinova Hospital Suite
+              Son güncelleme: Nisan 2026 &middot; &copy; 2026 KlinoVax Suite
             </p>
           </div>
         </BlurFade>

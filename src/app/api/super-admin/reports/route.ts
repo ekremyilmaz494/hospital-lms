@@ -4,11 +4,11 @@ import { withSuperAdminRoute } from '@/lib/api-handler'
 
 export const GET = withSuperAdminRoute(async () => {
   const [
-    hospitalCount,
+    organizationCount,
     userCount,
     trainingCount,
     activeSubscriptions,
-    recentHospitals,
+    recentOrganizations,
     monthlyGrowth,
   ] = await Promise.all([
     prisma.organization.count(),
@@ -20,7 +20,7 @@ export const GET = withSuperAdminRoute(async () => {
       take: 5,
       include: { _count: { select: { users: true } } },
     }),
-    // Monthly hospital registrations (last 12 months)
+    // Monthly organization registrations (last 12 months)
     prisma.$queryRaw<{ month: string; count: bigint }[]>`
       SELECT to_char(created_at, 'YYYY-MM') as month, count(*)::bigint as count
       FROM organizations
@@ -31,8 +31,8 @@ export const GET = withSuperAdminRoute(async () => {
   ])
 
   return jsonResponse({
-    stats: { hospitalCount, userCount, trainingCount, activeSubscriptions },
-    recentHospitals,
+    stats: { organizationCount, userCount, trainingCount, activeSubscriptions },
+    recentOrganizations,
     monthlyGrowth: monthlyGrowth.map(r => ({ month: r.month, count: Number(r.count) })),
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 })

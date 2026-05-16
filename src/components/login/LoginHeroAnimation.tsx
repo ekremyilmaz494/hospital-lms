@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useContext, createContext } from 'react';
+import { BRAND } from '@/lib/brand';
 
 // ── Palette (matches existing login K palette) ──────────────────────────
 const LP = {
@@ -386,12 +387,12 @@ function EmeraldTagline({ cx, cy }: { cx: number; cy: number }) {
         letterSpacing: '0.38em', textTransform: 'uppercase' as const,
         color: `rgba(167,243,208,${0.85 * eased})`,
         whiteSpace: 'nowrap',
-      }}>Yeni Nesil · Klinik · Akademi</div>
+      }}>Yeni Nesil · Eğitim · Akademi</div>
       <div style={{
         fontFamily: LP.editorial, fontSize: 11, fontStyle: 'italic',
         letterSpacing: '0.06em',
         color: `rgba(110,231,183,${0.7 * eased})`,
-      }}>— Klinik Eğitim Sistemi —</div>
+      }}>— Personel Eğitim Sistemi —</div>
     </div>
   );
 }
@@ -495,7 +496,7 @@ function FeatureCards({ t }: { t: number }) {
               backdropFilter: 'blur(10px)', borderRadius: 11,
             }}>
               {[
-                { value: '120+', label: 'HASTANE' },
+                { value: '120+', label: 'KURUM' },
                 { value: '50K+', label: 'PERSONEL' },
                 { value: '99.9%', label: 'UPTIME' },
               ].map((s, i) => (
@@ -610,7 +611,7 @@ const LoginHeroContent = React.forwardRef<HTMLDivElement, { dims: { w: number; h
                 background: `linear-gradient(90deg, ${LP.mint}, ${LP.mintPale})`,
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text', marginTop: 2,
-              }}>Hospital Suite</div>
+              }}>Suite</div>
             </div>
           </div>
         )}
@@ -650,7 +651,7 @@ const LoginHeroContent = React.forwardRef<HTMLDivElement, { dims: { w: number; h
                 background: `linear-gradient(90deg, ${LP.mint}, ${LP.mintPale})`,
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
-              }}>Hospital LMS · v2.0</span>
+              }}>{BRAND.fullName} · v2.0</span>
             </div>
           </>
         )}
