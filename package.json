@@ -7,7 +7,7 @@
     "dev": "next dev --turbopack",
     "dev:webpack": "node scripts/predev.js && next dev --webpack",
     "dev:clean": "rm -rf .next .next.nosync '.next 2' '.next.nosync 2' && pnpm predev && next dev --turbopack",
-    "build": "prisma migrate deploy && prisma generate && next build",
+    "build": "node scripts/prisma-migrate-prod-only.js && prisma generate && next build",
     "build:prod": "node scripts/validate-env.js && pnpm build",
     "postinstall": "prisma generate",
     "start": "next start",
