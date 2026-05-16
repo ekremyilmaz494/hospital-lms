@@ -82,7 +82,7 @@ async function main() {
     overallScore: (5 + 4 + 5 + 3 + 4 + 5 + 5 + 4) / 8,
     submittedDate: '14.05.2026',
 
-    hospitalLogoDataUrl: hospitalLogo,
+    organizationLogoDataUrl: hospitalLogo,
     ministryLogoDataUrl: ministryLogo,
   }
 
