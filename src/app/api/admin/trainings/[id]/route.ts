@@ -7,6 +7,7 @@ import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { updateTrainingSchema } from '@/lib/validations'
 import { resolveTrainingVideoUrl } from '@/lib/training-video-url'
+import { toEndOfDayUTC } from '@/lib/date-helpers'
 import {
   ATTEMPT_TERMINAL_STATUSES,
   ASSIGNMENT_TERMINAL_STATUSES,
@@ -167,14 +168,16 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
   const existing = await prisma.training.findFirst({ where: { id, organizationId: orgId } })
   if (!existing) return errorResponse('Training not found', 404)
 
-  // B5.5 — Güncelleme sırasında bitiş tarihi geçmişte olamaz
-  if (parsed.data.endDate && new Date(parsed.data.endDate) < new Date()) {
+  // B5.5 — Güncelleme sırasında bitiş tarihi geçmişte olamaz (end-of-day mantığı)
+  if (parsed.data.endDate && toEndOfDayUTC(parsed.data.endDate) < new Date()) {
     return errorResponse('Bitiş tarihi geçmişte olamaz', 400)
   }
 
   const data: Record<string, unknown> = { ...parsed.data }
   if (parsed.data.startDate) data.startDate = new Date(parsed.data.startDate)
-  if (parsed.data.endDate) data.endDate = new Date(parsed.data.endDate)
+  // endDate'i hep gün sonuna normalize et — admin "16 Mayıs" girdiğinde
+  // o günün sonuna kadar geçerli kalsın.
+  if (parsed.data.endDate) data.endDate = toEndOfDayUTC(parsed.data.endDate)
 
   const training = await prisma.training.update({ where: { id, organizationId: orgId }, data })
 

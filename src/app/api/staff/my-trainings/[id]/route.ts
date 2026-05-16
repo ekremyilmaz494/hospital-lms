@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { logActivity } from '@/lib/activity-logger'
+import { isEndDatePassed } from '@/lib/date-helpers'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -173,8 +174,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
   // Son deneme puanı (retry banner'da gösterilecek)
   const lastAttemptScore = latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : undefined
 
-  // Eğitim süresi dolmuş mu?
-  const isExpired = t.endDate ? new Date() > new Date(t.endDate) : false
+  // Eğitim süresi dolmuş mu? End-of-day mantığı: "16 Mayıs" son tarihliyse 16 May
+  // 23:59:59'a kadar açık. Eski kayıtlar 00:00:00 ile saklanmış olabilir.
+  const isExpired = isEndDatePassed(t.endDate)
   // Henüz açılmamış mı? Başlangıç tarihi gelmemişse personel detayda
   // "Başla" butonu disabled olur ve banner gösterilir.
   const isNotStarted = t.startDate ? new Date() < new Date(t.startDate) : false

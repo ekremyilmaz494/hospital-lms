@@ -8,6 +8,7 @@ import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { invalidateOrgCache, checkRateLimit } from '@/lib/redis'
 import { getOrCreateActivePeriodForAssignment } from '@/lib/training-periods'
 import { logger } from '@/lib/logger'
+import { toEndOfDayUTC } from '@/lib/date-helpers'
 
 /**
  * Transaction içinde atılan, kullanıcı-yüzlü hata mesajı taşıyan sentinel error.
@@ -52,7 +53,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
     }
   }
 
-  if (new Date(parsed.data.endDate) < new Date()) {
+  if (toEndOfDayUTC(parsed.data.endDate) < new Date()) {
     return errorResponse('Bitiş tarihi geçmişte olamaz', 400)
   }
 
@@ -109,7 +110,8 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
           ...trainingData,
           feedbackMandatory: trainingData.feedbackMandatory ?? inheritedFeedbackMandatory,
           startDate: new Date(trainingData.startDate),
-          endDate: new Date(trainingData.endDate),
+          // endDate gün sonuna normalize (POST /api/admin/trainings ile aynı semantik)
+          endDate: toEndOfDayUTC(trainingData.endDate),
           complianceDeadline: trainingData.complianceDeadline ? new Date(trainingData.complianceDeadline) : null,
           publishStatus: 'published',
           isActive: true,

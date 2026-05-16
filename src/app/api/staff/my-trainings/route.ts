@@ -4,6 +4,7 @@ import { withStaffRoute } from '@/lib/api-handler'
 import { calculateTrainingProgress } from '@/lib/training-progress'
 import { logger } from '@/lib/logger'
 import { findActivePeriod } from '@/lib/training-periods'
+import { toEndOfDayUTC } from '@/lib/date-helpers'
 
 export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) => {
   try {
@@ -105,11 +106,14 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
         postExamCompleted: latestAttempt?.postExamCompletedAt != null,
       })
 
-      // Days left until deadline
+      // Days left until deadline — end-of-day mantığı: "16 Mayıs" son tarihliyse
+      // 16 May 23:59:59'a kadar geçerli. Eski kayıtlar 00:00:00 ile saklanmış
+      // olabilir, normalize ederek dürüst gün sayısı veriyoruz.
       const deadline = t.endDate
       let daysLeft: number | undefined
       if (deadline) {
-        const diff = deadline.getTime() - now.getTime()
+        const eod = toEndOfDayUTC(deadline)
+        const diff = eod.getTime() - now.getTime()
         daysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
       }
 
