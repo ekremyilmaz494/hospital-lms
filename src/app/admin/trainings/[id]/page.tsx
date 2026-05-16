@@ -5,8 +5,16 @@ import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft, GraduationCap, Users, TrendingUp, Clock, Edit, Play, BarChart3,
   FileText, RotateCcw, Download, Eye, Video, CheckCircle2, XCircle, Timer,
-  ChevronRight, Award, PenLine, FileDown, MessageSquare, Search, X
+  ChevronRight, Award, PenLine, FileDown, MessageSquare, Search, X, MoreHorizontal,
+  Loader2,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { PageLoading } from '@/components/shared/page-loading';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -145,105 +153,148 @@ export default function TrainingDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.back()}
-            className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, color: K.TEXT_SECONDARY }}
+      {/* Header — tek bütün card: breadcrumb satırı / hero title + meta / action footer.
+          Eski layout uzun başlıkta dikey yığılıp butonları sağa sıkıştırıyordu;
+          burada title ile actions farklı satırlarda yer aldığı için sıkışma yok. */}
+      <div
+        className="overflow-hidden rounded-2xl"
+        style={{ background: K.SURFACE, border: `1px solid ${K.BORDER}`, boxShadow: K.SHADOW_CARD }}
+      >
+        {/* Üst satır: geri + breadcrumb · status pill */}
+        <div className="flex items-center justify-between px-6 pt-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              onClick={() => router.back()}
+              aria-label="Geri"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-stone-100"
+              style={{ background: K.SURFACE, border: `1px solid ${K.BORDER_LIGHT}`, color: K.TEXT_SECONDARY }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <nav className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>
+              <span>Eğitimler</span>
+              {training.category ? (
+                <>
+                  <ChevronRight className="h-3 w-3 shrink-0" />
+                  <span className="truncate" style={{ color: K.TEXT_SECONDARY }}>{training.category}</span>
+                </>
+              ) : null}
+            </nav>
+          </div>
+          <span
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            style={{ background: K.SUCCESS_BG, color: K.PRIMARY }}
           >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold tracking-tight" style={{ fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}>
-                {training.title}
-              </h2>
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold"
-                style={{ background: K.SUCCESS_BG, color: K.PRIMARY }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: K.SUCCESS }} />
-                {training.status ?? 'Aktif'}
-              </span>
-            </div>
-            <p className="mt-1 text-sm" style={{ color: K.TEXT_MUTED }}>
-              {training.category} • Baraj: {training.passingScore}% • {training.maxAttempts} deneme hakkı • {training.examDuration} dk sınav
-            </p>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: K.SUCCESS }} />
+            {training.status ?? 'Aktif'}
+          </span>
+        </div>
+
+        {/* Hero: büyük başlık (en fazla 2 satır) + meta chip cluster */}
+        <div className="px-6 pt-5 pb-6">
+          <h1
+            className="text-[26px] font-bold leading-[1.2] tracking-tight md:text-[30px]"
+            style={{ fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+            title={training.title}
+          >
+            {training.title}
+          </h1>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {training.category ? <MetaChip icon={GraduationCap} label={training.category} /> : null}
+            <MetaChip icon={Award} label={`Baraj %${training.passingScore}`} />
+            <MetaChip icon={RotateCcw} label={`${training.maxAttempts} deneme`} />
+            {training.examDuration ? <MetaChip icon={Clock} label={`${training.examDuration} dk sınav`} /> : null}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="gap-2 rounded-xl"
-            style={ghostBtnStyle}
-            disabled={downloadingCompletion === 'pdf'}
-            onClick={async () => {
-              setDownloadingCompletion('pdf');
-              try {
-                const res = await fetch(`/api/admin/trainings/${id}/completion-report`);
-                if (!res.ok) throw new Error('Rapor oluşturulamadı');
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'tamamlama_raporu.pdf';
-                a.click();
-                URL.revokeObjectURL(url);
-              } catch { toast('PDF raporu indirilemedi', 'error'); }
-              finally { setDownloadingCompletion(null); }
-            }}
-          >
-            <FileDown className="h-4 w-4" /> {downloadingCompletion === 'pdf' ? 'Hazırlanıyor...' : 'PDF Rapor'}
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2 rounded-xl"
-            style={ghostBtnStyle}
-            disabled={downloadingCompletion === 'excel'}
-            onClick={async () => {
-              setDownloadingCompletion('excel');
-              try {
-                const res = await fetch(`/api/admin/trainings/${id}/completion-report/excel`);
-                if (!res.ok) throw new Error('Rapor oluşturulamadı');
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'tamamlama_raporu.xlsx';
-                a.click();
-                URL.revokeObjectURL(url);
-              } catch { toast('Excel raporu indirilemedi', 'error'); }
-              finally { setDownloadingCompletion(null); }
-            }}
-          >
-            <Download className="h-4 w-4" /> {downloadingCompletion === 'excel' ? 'Hazırlanıyor...' : 'Excel Rapor'}
-          </Button>
-          <Button variant="outline" className="gap-2 rounded-xl" style={ghostBtnStyle} onClick={() => router.push(`/admin/feedback-forms/responses?trainingId=${id}`)}>
-            <MessageSquare className="h-4 w-4" /> Geri Bildirimler
-          </Button>
-          <Button variant="outline" className="gap-2 rounded-xl" style={ghostBtnStyle} onClick={() => router.push(`/admin/trainings/${id}/edit`)}>
-            <Edit className="h-4 w-4" /> Düzenle
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2 rounded-xl"
-            style={ghostBtnStyle}
-            disabled={!hasPlayableContent}
-            title={hasPlayableContent ? 'Bitiş tarihine kadar tamamlamayan personeller için yeni tarihle 2. atama aç' : 'Atama için en az bir video veya ses içeriği eklenmelidir.'}
-            onClick={() => setReassignModalOpen(true)}
-          >
-            <RotateCcw className="h-4 w-4" /> Tamamlamayanları Yeniden Ata
-          </Button>
+
+        {/* Action footer: secondary + primary actions */}
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 px-6 py-4"
+          style={{ borderTop: `1px solid ${K.BORDER_LIGHT}`, background: K.BG }}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 rounded-lg font-medium"
+              style={ghostBtnStyle}
+              onClick={() => router.push(`/admin/trainings/${id}/edit`)}
+            >
+              <Edit className="h-4 w-4" /> Düzenle
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors hover:bg-stone-50"
+                style={{ ...ghostBtnStyle, border: `1px solid ${K.BORDER}` }}
+              >
+                <MoreHorizontal className="h-4 w-4" /> Diğer İşlemler
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[240px]">
+                <DropdownMenuItem
+                  disabled={downloadingCompletion === 'pdf'}
+                  onSelect={async () => {
+                    setDownloadingCompletion('pdf');
+                    try {
+                      const res = await fetch(`/api/admin/trainings/${id}/completion-report`);
+                      if (!res.ok) throw new Error('Rapor oluşturulamadı');
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'tamamlama_raporu.pdf';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch { toast('PDF raporu indirilemedi', 'error'); }
+                    finally { setDownloadingCompletion(null); }
+                  }}
+                >
+                  {downloadingCompletion === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                  <span>{downloadingCompletion === 'pdf' ? 'PDF hazırlanıyor…' : 'PDF Rapor indir'}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={downloadingCompletion === 'excel'}
+                  onSelect={async () => {
+                    setDownloadingCompletion('excel');
+                    try {
+                      const res = await fetch(`/api/admin/trainings/${id}/completion-report/excel`);
+                      if (!res.ok) throw new Error('Rapor oluşturulamadı');
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'tamamlama_raporu.xlsx';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch { toast('Excel raporu indirilemedi', 'error'); }
+                    finally { setDownloadingCompletion(null); }
+                  }}
+                >
+                  {downloadingCompletion === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  <span>{downloadingCompletion === 'excel' ? 'Excel hazırlanıyor…' : 'Excel Rapor indir'}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push(`/admin/feedback-forms/responses?trainingId=${id}`)}>
+                  <MessageSquare className="h-4 w-4" />
+                  <span>Geri bildirimler</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={!hasPlayableContent}
+                  onSelect={() => setReassignModalOpen(true)}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Tamamlamayanları yeniden ata</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           <Button
             onClick={() => setAssignModalOpen(true)}
             disabled={!hasPlayableContent}
             title={hasPlayableContent ? undefined : 'Atama için en az bir video veya ses içeriği eklenmelidir.'}
-            className="gap-2 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              background: hasPlayableContent ? K.PRIMARY : K.TEXT_MUTED,
-            }}
+            className="gap-2 rounded-lg font-semibold text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: hasPlayableContent ? K.PRIMARY : K.TEXT_MUTED }}
           >
             <Users className="h-4 w-4" /> Personel Ata
           </Button>
@@ -791,5 +842,21 @@ export default function TrainingDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function MetaChip({ icon: Icon, label }: { icon: typeof GraduationCap; label: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+      style={{
+        background: K.SURFACE,
+        border: `1px solid ${K.BORDER_LIGHT}`,
+        color: K.TEXT_SECONDARY,
+      }}
+    >
+      <Icon className="h-3.5 w-3.5" style={{ color: K.TEXT_MUTED }} />
+      {label}
+    </span>
   );
 }
