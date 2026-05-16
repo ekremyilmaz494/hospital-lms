@@ -110,9 +110,14 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
   // 3. DONE: passed or all attempts exhausted
 
   const isFresh = !latestAttempt
-  const isActive = !isFresh && latestAttempt.status !== 'completed'
+  const isActive = !isFresh && latestAttempt.status !== 'completed' && latestAttempt.status !== 'expired'
   const isRetryPending = !isFresh && latestAttempt.status === 'completed' &&
     latestAttempt.isPassed !== true &&
+    assignment.currentAttempt < assignment.maxAttempts
+  // Cron 'expired' işaretlemişse (eğitim süresi doldu veya 24h stale) kullanıcının
+  // hâlâ deneme hakkı varsa "Yeniden dene" CTA'sını göster — aksi halde detayda
+  // takılıp ne yapacağını anlamıyor (RADYASYON 2026-05-16 incident).
+  const isExpiredRetryable = !isFresh && latestAttempt.status === 'expired' &&
     assignment.currentAttempt < assignment.maxAttempts
 
   // ═══ DETERMINE STEP PROGRESS ═══
@@ -202,7 +207,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     preExamCompleted,
     videosCompleted,
     postExamCompleted,
-    needsRetry: isRetryPending,
+    needsRetry: isRetryPending || isExpiredRetryable,
     videos: t.videos.map(v => ({
       id: v.id,
       title: v.title,

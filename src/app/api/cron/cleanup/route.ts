@@ -5,6 +5,7 @@ import { deleteObject, downloadBuffer } from '@/lib/s3'
 import { decryptBackup } from '@/lib/backup-crypto'
 import { logger } from '@/lib/logger'
 import { ATTEMPT_TERMINAL_STATUSES, type AttemptStatus, type AssignmentStatus } from '@/lib/exam-state-machine'
+import { toEndOfDayUTC } from '@/lib/date-helpers'
 import type { UserRole } from '@/types/database'
 
 // State machine ile uyumlu: EXPIRE event'inin toplu (updateMany) hali.
@@ -33,12 +34,24 @@ export async function GET(request: Request) {
     },
   })
 
-  // 2. Clean up stale exam attempts (stuck in non-completed state for 24h+)
-  // State machine ile uyumlu: EXPIRE event'inin toplu hali (terminal olmayan tüm attempt'ler).
+  // 2. Clean up stale exam attempts.
+  // ÖNCEKİ TASARIM (problematik): 24 saatten eski tüm non-terminal attempt'leri
+  // expire ediyordu. Personel ön sınavı pazartesi yapıp videoları çarşamba bitirmek
+  // isterse cron salı 03:00'da attempt'i kapatıyor, kullanıcı geri dönünce eğitim
+  // hâlâ açıkken "süresi doldu" görüyordu (RADYASYON 2026-05-16 incident, 8 personel).
+  //
+  // YENİ TASARIM: Sadece eğitimi gerçekten süresi dolan veya assignment'sız
+  // (standalone) attempt'leri expire et. Aktif eğitim deneme süresinde olan
+  // kullanıcının yarım kalan attempt'i dokunulmaz.
+  //
+  // - training.endDate < end-of-day(now) ise expire et (her attempt training'e
+  //   bağlı; assignment'lı veya standalone fark etmez — ikisinde de training
+  //   relation NOT NULL).
+  const nowEod = toEndOfDayUTC(new Date())
   const staleAttemptsList = await prisma.examAttempt.findMany({
     where: {
       status: { in: ATTEMPT_NON_TERMINAL_STATUSES },
-      createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      training: { endDate: { lt: nowEod } },
     },
     select: { id: true, assignmentId: true },
   })
