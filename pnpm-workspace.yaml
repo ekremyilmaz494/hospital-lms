@@ -1,3 +1,7 @@
+packages:
+  - 'apps/*'
+  - 'tenants/*'
+
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

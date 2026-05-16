@@ -1,0 +1,19 @@
+{
+  "name": "@tenants/devakent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Özel Devakent Hastanesi — tenant-spesifik seed scripts, branding asset'leri ve verification SQL'leri.",
+  "scripts": {
+    "seed:test-users": "tsx scripts/seed-devakent-test-users.ts",
+    "seed:ey-fr-03": "tsx scripts/seed-devakent-ey-fr-03-draft.ts",
+    "set:instructor": "tsx scripts/set-devakent-instructor.ts",
+    "verify": "tsx scripts/verify-devakent.ts",
+    "cleanup:test-users": "tsx scripts/cleanup-devakent-test-users.ts"
+  },
+  "dependencies": {
+    "web": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}
