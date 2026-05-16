@@ -264,7 +264,7 @@ export default function SuperAdminContentLibraryPage() {
 
       <PageHeader
         title="İçerik Kütüphanesi"
-        subtitle="Hastanelere sunulan hazır eğitim içerikleri"
+        subtitle="Organizasyonlara sunulan hazır eğitim içerikleri"
         badge={`${allItems.length} içerik`}
         action={{ label: 'Yeni İçerik Ekle', icon: Plus, onClick: () => setShowAddModal(true) }}
       />

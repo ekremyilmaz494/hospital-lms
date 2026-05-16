@@ -331,7 +331,7 @@ export function welcomeEmail(name: string, email: string, resetLink: string) {
  * Super Admin tarafından hastane oluşturulduğunda admin kullanıcıya gönderilen hoş geldiniz e-postası.
  * Geçici şifre içerir ve ilk girişte şifre değiştirme zorunluluğunu belirtir.
  */
-export async function sendHospitalWelcomeEmail(params: {
+export async function sendOrganizationWelcomeEmail(params: {
   to: string
   organizationName: string
   loginUrl: string

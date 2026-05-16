@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger'
+import { BRAND } from '@/lib/brand'
 import type { SmsProvider, SmsSendResult } from './types'
 
 /**
@@ -67,7 +68,7 @@ async function sendOtp(params: { phone: string; code: string }): Promise<SmsSend
     }
   }
 
-  const message = `Hastane LMS doğrulama kodunuz: ${params.code}. Kod 5 dakika geçerlidir. Bu kodu kimseyle paylaşmayın.`
+  const message = `${BRAND.fullName} doğrulama kodunuz: ${params.code}. Kod 5 dakika geçerlidir. Bu kodu kimseyle paylaşmayın.`
 
   // Dev/test fallback: credential yoksa console'a bas
   if (isMockMode()) {

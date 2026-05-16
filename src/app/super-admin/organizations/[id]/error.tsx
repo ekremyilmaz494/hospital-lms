@@ -3,7 +3,7 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function HospitalEditError({
+export default function OrganizationDetailError({
   error,
   reset,
 }: {
@@ -28,7 +28,7 @@ export default function HospitalEditError({
         </div>
         <h2 className="mb-2 text-lg font-bold">Bir hata oluştu</h2>
         <p className="mb-6 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-          {error.message || 'Hastane düzenleme formu yüklenirken beklenmeyen bir hata oluştu.'}
+          {error.message || 'Organizasyon bilgileri yüklenirken beklenmeyen bir hata oluştu.'}
         </p>
         <Button
           onClick={reset}

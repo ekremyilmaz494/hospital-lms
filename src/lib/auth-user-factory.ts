@@ -217,7 +217,7 @@ export async function createAuthUser(params: CreateAuthUserParams): Promise<Crea
   }
 }
 
-// ── Yardimci: app_metadata guncelleme (hospital olusturma icin) ──
+// ── Yardimci: app_metadata guncelleme (organization olusturma icin) ──
 
 /**
  * Mevcut auth user'in app_metadata'sini gunceller (retry ile).

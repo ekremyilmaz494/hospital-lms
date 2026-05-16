@@ -10,10 +10,10 @@ const fromEnv = (key: string): string | undefined => {
 export const BRAND = {
   name: fromEnv('NEXT_PUBLIC_BRAND_NAME') ?? 'KlinoVax',
   fullName: fromEnv('NEXT_PUBLIC_BRAND_FULL_NAME') ?? 'KlinoVax Operasyon Platformu',
-  shortDesc: fromEnv('NEXT_PUBLIC_BRAND_SHORT_DESC') ?? 'Sağlık kurumları için operasyon platformu',
+  shortDesc: fromEnv('NEXT_PUBLIC_BRAND_SHORT_DESC') ?? 'Kurumlar için personel eğitim ve operasyon platformu',
   longDesc:
     fromEnv('NEXT_PUBLIC_BRAND_LONG_DESC') ??
-    'Personel eğitiminden sertifika doğrulamaya, performans raporlamasından KVKK uyumuna — sağlık kurumlarınız için uçtan uca otomasyon.',
+    'Personel eğitiminden sertifika doğrulamaya, performans raporlamasından KVKK uyumuna — kurumunuz için uçtan uca otomasyon.',
   domain: fromEnv('NEXT_PUBLIC_BRAND_DOMAIN') ?? 'klinovax.com',
   /** SES SendEmail "From" address — DKIM imzalı domain'den çıkmalı. */
   fromAddress: fromEnv('SES_FROM_EMAIL') ?? 'noreply@klinovax.com',

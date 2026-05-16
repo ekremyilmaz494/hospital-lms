@@ -58,12 +58,12 @@ export const superAdminNav: NavGroup[] = [
     label: 'MÜŞTERİ YÖNETİMİ',
     items: [
       {
-        title: 'Hastaneler',
-        href: '/super-admin/hospitals',
+        title: 'Organizasyonlar',
+        href: '/super-admin/organizations',
         icon: Building2,
         children: [
-          { title: 'Hastane Listesi', href: '/super-admin/hospitals' },
-          { title: 'Yeni Hastane', href: '/super-admin/hospitals/new' },
+          { title: 'Organizasyon Listesi', href: '/super-admin/organizations' },
+          { title: 'Yeni Organizasyon', href: '/super-admin/organizations/new' },
         ],
       },
       { title: 'Abonelikler', href: '/super-admin/subscriptions', icon: CreditCard },

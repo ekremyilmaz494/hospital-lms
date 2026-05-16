@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Star, ArrowRight } from "lucide-react";
+import { BRAND } from "@/lib/brand";
 
 export function TestimonialsSection() {
   return (
@@ -127,9 +128,9 @@ export function TestimonialsSection() {
               {
                 title: "İletişim",
                 items: [
-                  "destek@hastane-lms.com",
-                  "+90 850 000 0000",
-                  "Ankara, Türkiye",
+                  BRAND.supportEmail,
+                  BRAND.contact.phone,
+                  BRAND.contact.city,
                 ],
               },
             ].map(({ title, items }) => (
@@ -157,7 +158,7 @@ export function TestimonialsSection() {
             style={{ borderColor: "rgba(255,255,255,0.08)" }}
           >
             <p className="text-xs" style={{ color: "#6dba92" }}>
-              © 2026 Hastane LMS Platformu. Tüm hakları saklıdır.
+              © {BRAND.legal.copyrightYear} {BRAND.fullName}. Tüm hakları saklıdır.
             </p>
             <Link
               href="/kvkk"

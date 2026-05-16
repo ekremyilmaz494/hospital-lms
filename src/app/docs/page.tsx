@@ -152,7 +152,7 @@ export default function ApiDocsPage() {
             {BRAND.fullName} API
             <span className="badge">v1.0.0</span>
           </h1>
-          <p>Hastane Personel Egitim ve Sinav Yonetim Sistemi — REST API Dokumantasyonu</p>
+          <p>Personel Egitim ve Sinav Yonetim Sistemi — REST API Dokumantasyonu</p>
         </div>
 
         <div id="swagger-ui">

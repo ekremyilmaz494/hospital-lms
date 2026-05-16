@@ -70,7 +70,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   })
 
   const pdfBuffer = await buildStaffCredentialsPdf({
-    organizationName: org?.name ?? 'Hastane',
+    organizationName: org?.name ?? 'Organizasyon',
     generatedAt,
     generatedBy: `${dbUser.firstName} ${dbUser.lastName}`,
     items: items.map(i => ({

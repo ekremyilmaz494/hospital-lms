@@ -115,11 +115,11 @@ describe('Rol Bazlı Erişim Kontrolü — Güvenlik Matrisi', () => {
       expect(res.status).toBe(403)
     })
 
-    it('GET /api/super-admin/hospitals → 403', async () => {
+    it('GET /api/super-admin/organizations → 403', async () => {
       mockAuth('staff')
-      const { GET } = await import('@/app/api/super-admin/hospitals/route')
-      const res = await GET(new Request('http://localhost/api/super-admin/hospitals'))
-      record('staff', '/api/super-admin/hospitals', 403, res.status)
+      const { GET } = await import('@/app/api/super-admin/organizations/route')
+      const res = await GET(new Request('http://localhost/api/super-admin/organizations'))
+      record('staff', '/api/super-admin/organizations', 403, res.status)
       expect(res.status).toBe(403)
     })
   })
@@ -127,11 +127,11 @@ describe('Rol Bazlı Erişim Kontrolü — Güvenlik Matrisi', () => {
   // ── ADMIN → Super-admin endpoint'leri (403 beklenir) ──
 
   describe('ADMIN → Super-admin endpoint\'leri (403 beklenir)', () => {
-    it('GET /api/super-admin/hospitals → 403', async () => {
+    it('GET /api/super-admin/organizations → 403', async () => {
       mockAuth('admin')
-      const { GET } = await import('@/app/api/super-admin/hospitals/route')
-      const res = await GET(new Request('http://localhost/api/super-admin/hospitals'))
-      record('admin', '/api/super-admin/hospitals', 403, res.status)
+      const { GET } = await import('@/app/api/super-admin/organizations/route')
+      const res = await GET(new Request('http://localhost/api/super-admin/organizations'))
+      record('admin', '/api/super-admin/organizations', 403, res.status)
       expect(res.status).toBe(403)
     })
 

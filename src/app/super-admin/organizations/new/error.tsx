@@ -3,7 +3,7 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function NewHospitalError({
+export default function NewOrganizationError({
   error,
   reset,
 }: {

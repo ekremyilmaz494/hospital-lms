@@ -9,7 +9,7 @@ const bodySchema = z.object({
 }).strict()
 
 /**
- * POST /api/super-admin/hospitals/:id/transfer-ownership
+ * POST /api/super-admin/organizations/:id/transfer-ownership
  *
  * Esas Yönetici devri — yalnız super_admin yetkisindedir.
  * - newOwnerUserId bu org'a ait, role='admin', aktif user olmak zorunda

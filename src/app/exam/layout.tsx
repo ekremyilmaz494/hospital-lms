@@ -4,7 +4,7 @@ import { BRAND } from '@/lib/brand';
 
 export const metadata: Metadata = {
   title: `Sinav | ${BRAND.fullName}`,
-  description: 'Hastane personeli egitim sinav modulu',
+  description: 'Personel egitim sinav modulu',
 };
 
 /** Sinav layout - fullscreen, sidebar yok */

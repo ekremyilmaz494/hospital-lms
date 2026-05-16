@@ -346,7 +346,7 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
               error={errors.email}
               hint={!errors.email ? 'Opsiyonel — boşsa personel TC + şifreyle giriş yapar.' : undefined}
             >
-              <Input type="email" placeholder="ornek@hastane.com" className="h-10" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} style={fieldStyle('email')} />
+              <Input type="email" placeholder="ornek@kurum.com" className="h-10" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} style={fieldStyle('email')} />
             </Field>
             <Field label="Şifre" error={errors.sifre} hint={!errors.sifre ? 'Boş bırakın — sistem üretip personele iletir.' : undefined}>
               <Input type="password" placeholder="Boş bırakın — sistem üretir" className="h-10" value={form.sifre} onChange={(e) => setForm(f => ({ ...f, sifre: e.target.value }))} style={fieldStyle('sifre')} />

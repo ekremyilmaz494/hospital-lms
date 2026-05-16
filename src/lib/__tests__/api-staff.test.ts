@@ -108,7 +108,7 @@ describe('Personel CRUD islemleri', () => {
           id: 'staff-1',
           firstName: 'Ahmet',
           lastName: 'Yilmaz',
-          email: 'ahmet@hospital.com',
+          email: 'ahmet@organization.com',
           tcNo: '12345678901',
           departmentId: 'dept-1',
           title: 'Hemsire',
@@ -150,7 +150,7 @@ describe('Personel CRUD islemleri', () => {
       mockDeptFindFirst.mockResolvedValue({ name: 'Dahiliye' })
       mockUserCreate.mockResolvedValue({
         id: 'new-staff-uuid',
-        email: 'yeni@hospital.com',
+        email: 'yeni@organization.com',
         firstName: 'Yeni',
         lastName: 'Personel',
         role: 'staff',

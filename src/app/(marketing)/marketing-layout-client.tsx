@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { BRAND } from "@/lib/brand";
 
 /* ------------------------------------------------------------------ */
 /*  Navigation config                                                   */
@@ -57,10 +58,10 @@ function MarketingHeader() {
               className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-sm"
               style={{ background: "linear-gradient(135deg, #0d9668, #065f46)" }}
             >
-              H
+              {BRAND.name.charAt(0)}
             </div>
             <span className="font-bold text-[15px] tracking-tight" style={{ color: "#0f172a" }}>
-              Hastane<span style={{ color: "#0d9668" }}>LMS</span>
+              {BRAND.name}<span style={{ color: "#0d9668" }}> LMS</span>
             </span>
           </Link>
 
@@ -204,9 +205,9 @@ function MarketingFooter() {
     {
       title: "Iletisim",
       links: [
-        { label: "destek@hastane-lms.com", href: "mailto:destek@hastane-lms.com" },
-        { label: "+90 850 000 0000", href: "tel:+908500000000" },
-        { label: "Ankara, Turkiye", href: "/contact" },
+        { label: BRAND.supportEmail, href: `mailto:${BRAND.supportEmail}` },
+        { label: BRAND.contact.phone, href: `tel:${BRAND.contact.phone.replace(/\s+/g, '')}` },
+        { label: BRAND.contact.city, href: "/contact" },
       ],
     },
   ];
@@ -251,7 +252,7 @@ function MarketingFooter() {
               H
             </div>
             <p className="text-xs" style={{ color: "#94a3b8" }}>
-              &copy; 2026 Hastane LMS. Tum haklari saklidir.
+              &copy; {BRAND.legal.copyrightYear} {BRAND.fullName}. Tum haklari saklidir.
             </p>
           </div>
           <div className="flex items-center gap-4">

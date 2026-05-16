@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Gizlilik Politikasi | Hastane LMS",
-  description:
-    "Hastane LMS gizlilik politikasi - KVKK uyumlu kisisel verilerin korunmasi.",
+  title: `Gizlilik Politikasi | ${BRAND.fullName}`,
+  description: `${BRAND.fullName} gizlilik politikasi - KVKK uyumlu kisisel verilerin korunmasi.`,
 };
+
+const KVKK_EMAIL = `kvkk@${BRAND.domain}`;
 
 const LAST_UPDATED = "5 Nisan 2026";
 
@@ -42,7 +44,7 @@ export default function PrivacyPage() {
               <strong>Adres:</strong> Ankara, Turkiye
             </li>
             <li>
-              <strong>E-posta:</strong> kvkk@hastane-lms.com
+              <strong>E-posta:</strong> {KVKK_EMAIL}
             </li>
             <li>
               <strong>Telefon:</strong> +90 850 000 0000
@@ -232,8 +234,8 @@ export default function PrivacyPage() {
           </ul>
           <p className="mt-3">
             Haklarinizi kullanmak icin{" "}
-            <a href="mailto:kvkk@hastane-lms.com" className="underline" style={{ color: "#0d9668" }}>
-              kvkk@hastane-lms.com
+            <a href={`mailto:${KVKK_EMAIL}`} className="underline" style={{ color: "#0d9668" }}>
+              {KVKK_EMAIL}
             </a>{" "}
             adresine yazili basvuruda bulunabilir veya platform uzerindeki KVKK basvuru
             formunu kullanabilirsiniz. Basvurulariniz en gec 30 gun icerisinde
@@ -275,7 +277,7 @@ export default function PrivacyPage() {
             9. VERBIS Kayit Bilgileri
           </h2>
           <p>
-            6698 sayili Kanun&apos;un 16. maddesi uyarinca, Hastane LMS Veri Sorumlusu olarak
+            6698 sayili Kanun&apos;un 16. maddesi uyarinca, {BRAND.fullName} Veri Sorumlusu olarak
             Veri Sorumlulari Sicil Bilgi Sistemi&apos;ne (VERBIS) kayitlidir.
           </p>
           <ul className="mt-3 space-y-1">
@@ -317,10 +319,10 @@ export default function PrivacyPage() {
           </p>
           <ul className="mt-3 space-y-1">
             <li>
-              <strong>Veri Sorumlusu Irtibat Kisisi:</strong> kvkk@hastane-lms.com
+              <strong>Veri Sorumlusu Irtibat Kisisi:</strong> {KVKK_EMAIL}
             </li>
             <li>
-              <strong>Genel Destek:</strong> destek@hastane-lms.com
+              <strong>Genel Destek:</strong> {BRAND.supportEmail}
             </li>
             <li>
               <strong>Telefon:</strong> +90 850 000 0000

@@ -20,6 +20,7 @@ const LoginHeroAnimation = dynamic(
   { ssr: false }
 );
 import { createClient } from '@/lib/supabase/client';
+import { BRAND } from '@/lib/brand';
 import { useAuthStore } from '@/store/auth-store';
 import { getRolePath } from '@/lib/route-helpers';
 
@@ -472,7 +473,7 @@ function LoginForm() {
                   </label>
                   <Input
                     type="text"
-                    placeholder="ornek@hastane.com veya 11 haneli TC"
+                    placeholder="ornek@kurum.com veya 11 haneli TC"
                     value={identifier}
                     onChange={(e) => {
                       // Sayı + nokta + @ + harf izinli — TC yazılırken sayıya kısıtlama yok,
@@ -494,7 +495,7 @@ function LoginForm() {
                     <div className="flex items-start gap-2 mb-3">
                       <Building2 className="h-4 w-4 shrink-0 mt-0.5" style={{ color: K.WARNING }} />
                       <div className="text-[12px] leading-relaxed" style={{ color: K.TEXT_PRIMARY }}>
-                        <strong>Bu TC birden fazla hastanede kayıtlı.</strong> Hangi hastaneye giriş yapmak istiyorsunuz?
+                        <strong>Bu TC birden fazla organizasyonda kayıtlı.</strong> Hangi organizasyona giriş yapmak istiyorsunuz?
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -629,7 +630,7 @@ function LoginForm() {
           <BlurFade delay={0.14} duration={0.25}>
             <div className="mt-6 flex items-center justify-between ed-mono text-[10px] tracking-[0.25em] lg:hidden" style={{ color: K.TEXT_MUTED }}>
               <span>© 2026</span>
-              <span style={{ color: K.PRIMARY }}>HOSPITAL LMS</span>
+              <span style={{ color: K.PRIMARY }}>{BRAND.name.toUpperCase()} LMS</span>
             </div>
           </BlurFade>
         </div>

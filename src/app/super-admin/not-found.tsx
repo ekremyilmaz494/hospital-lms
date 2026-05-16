@@ -26,7 +26,7 @@ export default function SuperAdminNotFound() {
               <Home className="h-4 w-4" /> Dashboard
             </Button>
           </Link>
-          <Link href="/super-admin/hospitals">
+          <Link href="/super-admin/organizations">
             <Button variant="outline" className="gap-2" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}>
               <ArrowLeft className="h-4 w-4" /> Hastaneler
             </Button>

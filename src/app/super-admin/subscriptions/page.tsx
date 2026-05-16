@@ -19,11 +19,11 @@ interface Plan {
   limits: { staff: number | null; trainings: number | null; storage: number };
   features: string[];
   color: string;
-  hospitals: number;
+  organizations: number;
   popular?: boolean;
 }
 
-interface HospitalSubscription {
+interface SubscriptionRow {
   name: string;
   code: string;
   plan: string;
@@ -34,7 +34,7 @@ interface HospitalSubscription {
 
 interface SubscriptionsData {
   plans: Plan[];
-  hospitalSubscriptions: HospitalSubscription[];
+  organizationSubscriptions: SubscriptionRow[];
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -94,13 +94,13 @@ export default function SubscriptionsPage() {
   }
 
   const plans = data?.plans ?? [];
-  const hospitalSubscriptions = data?.hospitalSubscriptions ?? [];
+  const organizationSubscriptions = data?.organizationSubscriptions ?? [];
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Abonelik & Lisans Yönetimi"
-        subtitle="Planları yönetin ve hastane aboneliklerini takip edin"
+        subtitle="Planları yönetin ve organizasyon aboneliklerini takip edin"
         action={{ label: 'Yeni Plan', icon: Plus, onClick: openCreate }}
       />
 
@@ -138,7 +138,7 @@ export default function SubscriptionsPage() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold">{plan.name}</h3>
-                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{plan.hospitals ?? 0} hastane kullanıyor</span>
+                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{plan.organizations ?? 0} organizasyon kullanıyor</span>
                   </div>
                 </div>
 
@@ -197,19 +197,19 @@ export default function SubscriptionsPage() {
         </div>
       )}
 
-      {/* Hospital Subscriptions Table */}
+      {/* Organization Subscriptions Table */}
       <div className="rounded-xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
         <h3 className="mb-4 text-base font-bold">
-          Hastane Abonelik Durumları
+          Organizasyon Abonelik Durumları
         </h3>
-        {hospitalSubscriptions.length === 0 ? (
+        {organizationSubscriptions.length === 0 ? (
           <div className="flex items-center justify-center h-32"><div className="text-sm" style={{color:'var(--color-text-muted)'}}>Henüz veri yok</div></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Hastane</th>
+                  <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Organizasyon</th>
                   <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Plan</th>
                   <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Durum</th>
                   <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Faturalama</th>
@@ -217,7 +217,7 @@ export default function SubscriptionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {hospitalSubscriptions.map((sub) => {
+                {organizationSubscriptions.map((sub) => {
                   const status = statusMap[sub.status] ?? statusMap.active;
                   return (
                     <tr key={sub.code} style={{ borderBottom: '1px solid var(--color-border)' }}>

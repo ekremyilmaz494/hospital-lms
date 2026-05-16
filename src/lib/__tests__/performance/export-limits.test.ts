@@ -35,7 +35,7 @@ function generateMockStaff(count: number) {
     id: `user-${i}`,
     firstName: `Ad${i}`,
     lastName: `Soyad${i}`,
-    email: `staff${i}@hospital.com`,
+    email: `staff${i}@organization.com`,
     tcNo: null,
     title: 'Hemşire',
     isActive: true,

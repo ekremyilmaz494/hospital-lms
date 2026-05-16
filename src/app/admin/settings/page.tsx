@@ -13,7 +13,7 @@ import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
 const tabLoading = () => <div className="h-64 animate-pulse rounded-lg m-8" style={{ background: 'var(--k-surface-hover)' }} />;
-const HospitalTab = dynamic(() => import('./hospital-tab'), { ssr: false, loading: tabLoading });
+const OrganizationTab = dynamic(() => import('./organization-tab'), { ssr: false, loading: tabLoading });
 const NotificationTab = dynamic(() => import('./notification-tab'), { ssr: false, loading: tabLoading });
 const BrandingTab = dynamic(() => import('./branding-tab'), { ssr: false, loading: tabLoading });
 const EmailTab = dynamic(() => import('./email-tab'), { ssr: false, loading: tabLoading });
@@ -22,7 +22,7 @@ interface SettingsData {
   defaultPassingScore: number;
   defaultMaxAttempts: number;
   defaultExamDuration: number;
-  hospitalName: string;
+  organizationName: string;
   logoUrl: string;
   email: string;
   phone: string;
@@ -42,7 +42,7 @@ const defaultSettings: SettingsData = {
   defaultPassingScore: 70,
   defaultMaxAttempts: 3,
   defaultExamDuration: 30,
-  hospitalName: '',
+  organizationName: '',
   logoUrl: '',
   email: '',
   phone: '',
@@ -59,7 +59,7 @@ const defaultSettings: SettingsData = {
 };
 
 const tabs = [
-  { id: 'hospital', label: 'Kurum', icon: Building2 },
+  { id: 'organization', label: 'Kurum', icon: Building2 },
   { id: 'branding', label: 'Marka', icon: Palette },
   { id: 'notifications', label: 'Bildirimler', icon: Bell },
   { id: 'email', label: 'E-posta', icon: Mail },
@@ -74,7 +74,7 @@ export default function AdminSettingsPage() {
   const [formData, setFormData] = useState<SettingsData | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>('hospital');
+  const [activeTab, setActiveTab] = useState<TabId>('organization');
 
   useEffect(() => {
     if (data) setFormData({ ...defaultSettings, ...data });
@@ -209,7 +209,7 @@ export default function AdminSettingsPage() {
               boxShadow: 'var(--k-shadow-sm)',
             }}
           >
-            {activeTab === 'hospital' && <HospitalTab {...tabProps} />}
+            {activeTab === 'organization' && <OrganizationTab {...tabProps} />}
             {activeTab === 'branding' && <BrandingTab {...tabProps} />}
             {activeTab === 'notifications' && <NotificationTab {...tabProps} />}
             {activeTab === 'email' && <EmailTab />}

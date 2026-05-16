@@ -308,7 +308,7 @@ export default function EditStaffPage() {
                 value={formData.email}
                 onChange={(e) => update('email', e.target.value)}
                 autoComplete="email"
-                placeholder="ornek@hastane.com"
+                placeholder="ornek@kurum.com"
                 className="se-input"
                 style={inputStyle(errors.email)}
               />

@@ -131,7 +131,7 @@ export const KlinovaMark: React.FC<KlinovaMarkProps> = ({
               textTransform: "uppercase",
             }}
           >
-            Hospital Suite
+            Suite
           </span>
         )}
       </div>

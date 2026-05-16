@@ -78,7 +78,7 @@ export interface FeedbackDrawData {
   submittedDate: string
 
   // Logolar (base64 data URLs)
-  hospitalLogoDataUrl?: string | null
+  organizationLogoDataUrl?: string | null
   ministryLogoDataUrl?: string | null
 }
 
@@ -349,7 +349,7 @@ export function drawFeedbackPage(doc: jsPDF, data: FeedbackDrawData) {
 
   // Sol logo hücresi
   doc.rect(MARGIN, y, logoColW, headerH)
-  drawLogoIntoCell(doc, data.hospitalLogoDataUrl, MARGIN, y, logoColW, headerH, 'HASTANE LOGO')
+  drawLogoIntoCell(doc, data.organizationLogoDataUrl, MARGIN, y, logoColW, headerH, 'HASTANE LOGO')
 
   // Orta başlık hücresi
   doc.rect(MARGIN + logoColW, y, titleColW, headerH)

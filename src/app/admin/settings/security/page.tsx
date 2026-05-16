@@ -91,7 +91,7 @@ export default function SecuritySettingsPage() {
           </h1>
         </div>
         <p className="text-sm" style={{ color: K.TEXT_MUTED }}>
-          Hastanenizin giriş güvenliği politikalarını yönetin.
+          Kurumunuzun giriş güvenliği politikalarını yönetin.
         </p>
       </div>
 

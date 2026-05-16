@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Loader2,
 } from "lucide-react";
+import { BRAND } from "@/lib/brand";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -58,7 +59,7 @@ export function ContactClient() {
           lastName: "-",
           email: form.email,
           phone: "-",
-          hospitalName: form.subject,
+          organizationName: form.subject,
           staffCount: "-",
           message: `[ILETISIM FORMU] ${form.message}`,
         }),
@@ -136,13 +137,13 @@ export function ContactClient() {
               {
                 icon: Mail,
                 title: "E-posta",
-                value: "destek@hastane-lms.com",
+                value: BRAND.supportEmail,
                 desc: "Is gunleri 09:00 - 18:00 arasi yanit",
               },
               {
                 icon: Phone,
                 title: "Telefon",
-                value: "+90 850 000 0000",
+                value: BRAND.contact.phone,
                 desc: "Pazartesi - Cuma, 09:00 - 18:00",
               },
               {
@@ -230,7 +231,7 @@ export function ContactClient() {
                     required
                     value={form.email}
                     onChange={handleChange}
-                    placeholder="ornek@hastane.com"
+                    placeholder="ornek@kurum.com"
                     className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
                     style={{
                       borderColor: "var(--color-border)",

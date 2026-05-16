@@ -174,7 +174,7 @@ export default function ContentModal({ onClose, onSuccess, editing }: AddModalPr
               <span className="pointer-events-none inline-block h-5 w-5 translate-x-0 rounded-full bg-white shadow ring-0 transition-transform"
                 style={{ transform: form.isActive ? 'translateX(20px)' : 'translateX(0)' }} />
             </button>
-            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{form.isActive ? 'Aktif — hastaneler görebilir' : 'Pasif — gizli'}</span>
+            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{form.isActive ? 'Aktif — organizasyonlar görebilir' : 'Pasif — gizli'}</span>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

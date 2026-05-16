@@ -127,7 +127,7 @@ export default function SettingsPage() {
               <h3 className="text-lg font-bold">E-posta Gönderimi</h3>
             </div>
             <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-              E-posta gönderimi platform tarafından AWS SES üzerinden yönetilmektedir. Per-tenant SMTP konfigürasyonu artık desteklenmemektedir; gönderici adı ve yanıt adresi her hastane kendi ayarlar sayfasından düzenleyebilir.
+              E-posta gönderimi platform tarafından AWS SES üzerinden yönetilmektedir. Per-tenant SMTP konfigürasyonu artık desteklenmemektedir; gönderici adı ve yanıt adresi her organizasyon kendi ayarlar sayfasından düzenleyebilir.
             </p>
           </div>
         </div>

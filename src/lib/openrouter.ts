@@ -80,7 +80,7 @@ function createClient(customApiKey?: string | null): OpenAI {
     defaultHeaders: {
       // OpenRouter rankings için opsiyonel ama önerilen
       'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://klinovax.com',
-      'X-Title': 'Klinovax Hospital LMS',
+      'X-Title': 'KlinoVax LMS',
     },
   });
 }

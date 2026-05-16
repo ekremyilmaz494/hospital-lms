@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return errorResponse(parsed.error.issues.map(i => i.message).join(', '))
   }
 
-  const { hospitalName, hospitalCode, address, phone, firstName, lastName, email, password } = parsed.data
+  const { organizationName, organizationCode, address, phone, firstName, lastName, email, password } = parsed.data
 
   // Email bazlı rate limit: 1 istek / 24 saat
   const emailAllowed = await checkRateLimit(`register:email:${email.toLowerCase()}`, 1, 86400)
@@ -31,11 +31,11 @@ export async function POST(request: Request) {
 
   // Kod ve email benzersizlik kontrolleri — paralel
   const [existingOrg, existingUser] = await Promise.all([
-    prisma.organization.findUnique({ where: { code: hospitalCode } }),
+    prisma.organization.findUnique({ where: { code: organizationCode } }),
     prisma.user.findUnique({ where: { email } }),
   ])
 
-  if (existingOrg) return errorResponse('Bu hastane kodu zaten kullanılıyor')
+  if (existingOrg) return errorResponse('Bu organizasyon kodu zaten kullanılıyor')
   if (existingUser) return errorResponse('Bu e-posta adresi zaten kayıtlı')
 
   // En ucuz aktif planı bul (trial için)
@@ -50,8 +50,8 @@ export async function POST(request: Request) {
     // Organization oluştur — setupCompleted: false
     org = await prisma.organization.create({
       data: {
-        name: hospitalName,
-        code: hospitalCode,
+        name: organizationName,
+        code: organizationCode,
         address: address || null,
         phone: phone || null,
         email,
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
       action: 'self_register',
       entityType: 'organization',
       entityId: org.id,
-      newData: { hospitalName, hospitalCode, email },
+      newData: { organizationName, organizationCode, email },
       request,
     })
 
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       await sendSelfRegistrationEmail({
         to: email,
         adminName: `${firstName} ${lastName}`,
-        organizationName: hospitalName,
+        organizationName: organizationName,
         // Doğrudan tenant subdomain login link'i — slug yoksa apex fallback
         orgSlug: org.slug,
       })
@@ -125,14 +125,14 @@ export async function POST(request: Request) {
       logger.error('Register', 'Hos geldiniz e-postasi gonderilemedi', (err as Error).message)
     }
 
-    logger.info('Register', 'Yeni hastane kaydi (self-service)', { orgId: org.id, hospitalName, email })
+    logger.info('Register', 'Yeni organizasyon kaydi (self-service)', { orgId: org.id, organizationName, email })
 
     return jsonResponse({
       success: true,
       emailSent,
       message: emailSent
-        ? 'Hastane başarıyla oluşturuldu. Lütfen e-postanızı kontrol ederek hesabınızı doğrulayın.'
-        : 'Hastane oluşturuldu ancak e-posta gönderilemedi. Lütfen yöneticinize başvurun.',
+        ? 'Organizasyon başarıyla oluşturuldu. Lütfen e-postanızı kontrol ederek hesabınızı doğrulayın.'
+        : 'Organizasyon oluşturuldu ancak e-posta gönderilemedi. Lütfen yöneticinize başvurun.',
     }, 201)
   } catch (err) {
     if (org) await prisma.organization.delete({ where: { id: org.id } }).catch(() => {})

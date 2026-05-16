@@ -535,7 +535,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     where: { id: orgId },
     select: { name: true, slug: true, brandColor: true },
   })
-  const hospitalName = org?.name ?? 'Hastane'
+  const organizationName = org?.name ?? 'Organizasyon'
   const brandColor = org?.brandColor ?? null
   // Toplu yüklenen personel doğrudan kendi hastane subdomain'ine yönlenir
   const loginUrl = `${getOrgUrl(org?.slug)}/auth/login`
@@ -679,7 +679,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
           sendStaffWelcomeEmail({
             to: row.email,
             staffName: `${row.firstName} ${row.lastName}`,
-            organizationName: hospitalName,
+            organizationName: organizationName,
             brandColor,
             tempPassword,
             loginUrl,

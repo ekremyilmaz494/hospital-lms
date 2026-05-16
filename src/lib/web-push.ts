@@ -1,9 +1,10 @@
 import webPush from 'web-push'
+import { BRAND } from '@/lib/brand'
 
 // VAPID yapılandırması — sunucu başladığında bir kez set edilir
 if (process.env.NEXT_PUBLIC_VAPID_KEY && process.env.VAPID_PRIVATE_KEY) {
   webPush.setVapidDetails(
-    `mailto:${process.env.SMTP_FROM ?? 'admin@hastanelms.com'}`,
+    `mailto:${process.env.SMTP_FROM ?? BRAND.supportEmail}`,
     process.env.NEXT_PUBLIC_VAPID_KEY,
     process.env.VAPID_PRIVATE_KEY,
   )

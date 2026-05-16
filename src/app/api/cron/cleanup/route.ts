@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, certificateExpiryReminderEmail, overdueTrainingReminderEmail } from '@/lib/email'
+import { BRAND } from '@/lib/brand'
 import { deleteObject, downloadBuffer } from '@/lib/s3'
 import { decryptBackup } from '@/lib/backup-crypto'
 import { logger } from '@/lib/logger'
@@ -228,7 +229,7 @@ export async function GET(request: Request) {
           html: `<p>Sayın ${admin.firstName} ${admin.lastName},</p>
 <p><strong>${sub.organization.name}</strong> kurumunuzun aboneliği <strong>${daysLeft} gün</strong> içinde sona erecektir.</p>
 <p>Hizmet kesintisi yaşamamak için aboneliğinizi yenilemenizi öneririz.</p>
-<p>İletişim: <a href="mailto:${process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? 'destek@hastanelms.com'}">${process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? 'destek@hastanelms.com'}</a></p>`,
+<p>İletişim: <a href="mailto:${BRAND.supportEmail}">${BRAND.supportEmail}</a></p>`,
         })
         subscriptionWarningsSent++
 

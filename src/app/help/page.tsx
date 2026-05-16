@@ -75,8 +75,8 @@ const contacts: {
   icon: LucideIcon; label: string; value: string; href?: string;
   tone: { ink: string; bg: string; soft: string };
 }[] = [
-  { icon: Mail,       label: 'E-posta',       value: 'destek@hastanelms.com',     href: 'mailto:destek@hastanelms.com', tone: { ink: '#1f3a7a', bg: '#eef2fb', soft: '#2c55b8' } },
-  { icon: Phone,      label: 'Telefon',       value: '0850 123 45 67',             href: 'tel:+908501234567',           tone: { ink: '#0a7a47', bg: '#eaf6ef', soft: '#0a7a47' } },
+  { icon: Mail,       label: 'E-posta',       value: BRAND.supportEmail,           href: `mailto:${BRAND.supportEmail}`, tone: { ink: '#1f3a7a', bg: '#eef2fb', soft: '#2c55b8' } },
+  { icon: Phone,      label: 'Telefon',       value: BRAND.contact.phone,          href: `tel:${BRAND.contact.phone.replace(/\s+/g, '')}`,           tone: { ink: '#0a7a47', bg: '#eaf6ef', soft: '#0a7a47' } },
   { icon: Headphones, label: 'Canlı destek',  value: 'Hafta içi 09:00 - 18:00',                                          tone: { ink: '#6a4e11', bg: '#fef6e7', soft: '#b4820b' } },
 ];
 

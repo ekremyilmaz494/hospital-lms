@@ -75,7 +75,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       tc: '10000000146',
       departman: exampleRoot,
       altDepartman: exampleAlt, // alt departman varsa örnek olarak doldur
-      email: 'ayse.yilmaz@hastane.com',
+      email: 'ayse.yilmaz@kurum.com',
       sifre: 'Geçici1234!',
       telefon: '05551234567',
       unvan: 'Hemşire',
@@ -85,7 +85,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       tc: '11111111110',
       departman: rootDeptNames[1] || exampleRoot,
       altDepartman: '', // alt departman opsiyonel — boşsa parent'a atanır
-      email: 'mehmet.demir@hastane.com',
+      email: 'mehmet.demir@kurum.com',
       sifre: 'Klinov2026!',
       telefon: '05559876543',
       unvan: 'Doktor',
@@ -95,7 +95,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       tc: '12345678950',
       departman: rootDeptNames[2] || rootDeptNames[0] || exampleRoot,
       altDepartman: '',
-      email: 'fatma.kaya@hastane.com',
+      email: 'fatma.kaya@kurum.com',
       sifre: '', // şifre boş → sistem geçici şifre üretir
       telefon: '',
       unvan: 'Başhemşire',

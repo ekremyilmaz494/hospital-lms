@@ -50,11 +50,11 @@ export const GET = withSuperAdminRoute(async () => {
         storage:   p.maxStorageGb,
       },
       features: Array.isArray(p.features) ? (p.features as string[]) : [],
-      hospitals: p._count.subscriptions,
+      organizations: p._count.subscriptions,
     }
   })
 
-  const hospitalSubscriptions = rawSubs.map(s => ({
+  const organizationSubscriptions = rawSubs.map(s => ({
     name:      s.organization.name,
     code:      s.organization.code,
     plan:      s.plan.name,
@@ -65,7 +65,7 @@ export const GET = withSuperAdminRoute(async () => {
     billing:   s.billingCycle === 'monthly' ? 'Aylık' : s.billingCycle === 'annual' ? 'Yıllık' : '-',
   }))
 
-  return jsonResponse({ plans, hospitalSubscriptions }, 200, {
+  return jsonResponse({ plans, organizationSubscriptions }, 200, {
     'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
   })
 })

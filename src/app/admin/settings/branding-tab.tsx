@@ -11,7 +11,7 @@ interface SettingsData {
   defaultPassingScore: number;
   defaultMaxAttempts: number;
   defaultExamDuration: number;
-  hospitalName: string;
+  organizationName: string;
   logoUrl: string;
   email: string;
   phone: string;
@@ -288,7 +288,7 @@ function ImageUploadZone({ value, onChange, type, maxSizeMB, hint, aspectLabel }
 
 /* ─── Live Preview ─── */
 function LoginPreview({ settings }: { settings: SettingsData }) {
-  const { brandColor, secondaryColor, logoUrl, loginBannerUrl, hospitalName } = settings;
+  const { brandColor, secondaryColor, logoUrl, loginBannerUrl, organizationName } = settings;
 
   return (
     <div
@@ -322,7 +322,7 @@ function LoginPreview({ settings }: { settings: SettingsData }) {
                 </div>
               )}
               <span className="text-[10px] font-semibold text-white/90">
-                {hospitalName || BRAND.fullName}
+                {organizationName || BRAND.fullName}
               </span>
             </div>
             <p className="text-[8px] uppercase tracking-wider font-semibold" style={{ color: secondaryColor }}>

@@ -22,7 +22,7 @@ interface ProfileData {
   lastName: string;
   email: string;
   phone: string;
-  hospital: string;
+  organization: string;
   department: string;
   title: string;
   avatarUrl: string;
@@ -293,7 +293,7 @@ export default function ProfilePage() {
                         {profile.department}
                       </span>
                     )}
-                    {profile?.hospital && (
+                    {profile?.organization && (
                       <span
                         className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-semibold tracking-[0.14em] uppercase"
                         style={{
@@ -303,7 +303,7 @@ export default function ProfilePage() {
                         }}
                       >
                         <Building2 className="h-3 w-3" />
-                        {profile.hospital}
+                        {profile.organization}
                       </span>
                     )}
                   </div>

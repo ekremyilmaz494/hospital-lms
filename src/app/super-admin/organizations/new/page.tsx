@@ -17,8 +17,8 @@ type Mode = 'invite' | 'direct';
 
 interface SuccessState {
   mode: Mode;
-  hospitalId: string;
-  hospitalName: string;
+  organizationId: string;
+  organizationName: string;
   ownerEmail: string;
   ownerFullName: string;
   ownerTc?: string;
@@ -27,7 +27,7 @@ interface SuccessState {
   emailSent: boolean;
 }
 
-export default function NewHospitalPage() {
+export default function NewOrganizationPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -80,7 +80,7 @@ export default function NewHospitalPage() {
     if (mode === 'direct' && adminPassword) body.adminPassword = adminPassword;
 
     try {
-      const res = await fetch('/api/super-admin/hospitals', {
+      const res = await fetch('/api/super-admin/organizations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -92,8 +92,8 @@ export default function NewHospitalPage() {
       const created = await res.json();
       setSuccess({
         mode: created.mode ?? mode,
-        hospitalId: created.id,
-        hospitalName: String(body.name ?? ''),
+        organizationId: created.id,
+        organizationName: String(body.name ?? ''),
         ownerEmail: String(body.adminEmail ?? ''),
         ownerFullName: `${body.adminFirstName} ${body.adminLastName}`.trim(),
         ownerTc: created.adminTcKimlik ?? normalizeTcKimlik(tcRaw),
@@ -127,7 +127,7 @@ export default function NewHospitalPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           // Super admin → kendi orgId yok, hangi hastane için ürettiği body'de zorunlu
-          organizationId: success.hospitalId,
+          organizationId: success.organizationId,
           items: [{
             fullName: success.ownerFullName,
             tcKimlik: success.ownerTc,
@@ -167,12 +167,12 @@ export default function NewHospitalPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push('/super-admin/hospitals')}
+            onClick={() => router.push('/super-admin/organizations')}
             style={{ color: 'var(--color-text-secondary)' }}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <PageHeader title="Hastane Oluşturuldu" subtitle={success.hospitalName} />
+          <PageHeader title="Organizasyon Oluşturuldu" subtitle={success.organizationName} />
         </div>
 
         <div className="rounded-xl border p-6 max-w-3xl"
@@ -271,15 +271,15 @@ export default function NewHospitalPage() {
           <div className="flex gap-2 mt-4">
             <Button
               variant="outline"
-              onClick={() => router.push(`/super-admin/hospitals/${success.hospitalId}`)}
+              onClick={() => router.push(`/super-admin/organizations/${success.organizationId}`)}
             >
-              Hastane Detayına Git
+              Organizasyon Detayına Git
             </Button>
             <Button
               variant="ghost"
-              onClick={() => router.push('/super-admin/hospitals')}
+              onClick={() => router.push('/super-admin/organizations')}
             >
-              Hastane Listesine Dön
+              Organizasyon Listesine Dön
             </Button>
           </div>
         </div>
@@ -298,7 +298,7 @@ export default function NewHospitalPage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <PageHeader title="Yeni Hastane Ekle" subtitle="Hastane bilgilerini girin ve admin hesabı oluşturun" />
+        <PageHeader title="Yeni Organizasyon Ekle" subtitle="Organizasyon bilgilerini girin ve admin hesabı oluşturun" />
       </div>
 
       {saveError && (
@@ -309,7 +309,7 @@ export default function NewHospitalPage() {
 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Hospital Info */}
+          {/* Organization Info */}
           <div
             className="rounded-xl border p-6"
             style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}
@@ -319,24 +319,24 @@ export default function NewHospitalPage() {
                 <Building2 className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
               </div>
               <h3 className="text-lg font-bold">
-                Hastane Bilgileri
+                Organizasyon Bilgileri
               </h3>
             </div>
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label style={{ color: 'var(--color-text-secondary)' }}>Hastane Adı *</Label>
+                  <Label style={{ color: 'var(--color-text-secondary)' }}>Organizasyon Adı *</Label>
                   <Input name="name" placeholder="Devakent Hastanesi" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
                 </div>
                 <div>
-                  <Label style={{ color: 'var(--color-text-secondary)' }}>Hastane Kodu *</Label>
+                  <Label style={{ color: 'var(--color-text-secondary)' }}>Organizasyon Kodu *</Label>
                   <Input name="code" placeholder="DEV001" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }} />
                 </div>
               </div>
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Adres</Label>
-                <Input name="address" placeholder="Hastane adresi..." className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                <Input name="address" placeholder="Organizasyon adresi..." className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -345,7 +345,7 @@ export default function NewHospitalPage() {
                 </div>
                 <div>
                   <Label style={{ color: 'var(--color-text-secondary)' }}>E-posta</Label>
-                  <Input name="email" placeholder="info@hastane.com" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                  <Input name="email" placeholder="info@kurum.com" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
                 </div>
               </div>
             </div>
@@ -424,7 +424,7 @@ export default function NewHospitalPage() {
                 <Label style={{ color: 'var(--color-text-secondary)' }}>
                   E-posta{mode === 'invite' ? ' *' : ''}
                 </Label>
-                <Input name="adminEmail" placeholder="admin@hastane.com" type="email" autoComplete="email" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                <Input name="adminEmail" placeholder="admin@kurum.com" type="email" autoComplete="email" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
                 {mode === 'direct' && (
                   <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
                     Boş bırakılabilir — e-posta olmadan da hesap oluşturulur.
@@ -526,7 +526,7 @@ export default function NewHospitalPage() {
             style={{ background: 'var(--color-primary)', transition: 'background var(--transition-fast), transform var(--transition-fast)' }}
           >
             <Save className="h-4 w-4" />
-            {saving ? 'Oluşturuluyor...' : (mode === 'invite' ? 'Hastane Oluştur (Davet)' : 'Hastane Oluştur (Şifreyle)')}
+            {saving ? 'Oluşturuluyor...' : (mode === 'invite' ? 'Organizasyon Oluştur (Davet)' : 'Organizasyon Oluştur (Şifreyle)')}
           </Button>
         </div>
       </form>

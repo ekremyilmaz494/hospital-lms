@@ -507,7 +507,7 @@ export default function HisIntegrationsPage() {
               type="url"
               value={form.baseUrl}
               onChange={e => setForm(p => ({ ...p, baseUrl: e.target.value }))}
-              placeholder="https://his.hastane.com/api/v1/staff"
+              placeholder="https://his.kurum.com/api/v1/staff"
             />
           </div>
 
@@ -612,7 +612,7 @@ export default function HisIntegrationsPage() {
                   type="url"
                   value={form.tokenUrl}
                   onChange={e => setForm(p => ({ ...p, tokenUrl: e.target.value }))}
-                  placeholder="https://his.hastane.com/oauth/token"
+                  placeholder="https://his.kurum.com/oauth/token"
                 />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

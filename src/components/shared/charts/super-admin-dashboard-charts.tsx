@@ -26,7 +26,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 const PIE_COLORS = ['var(--color-success)', 'var(--color-info)', 'var(--color-error)', 'var(--color-warning)']
 
 interface MonthlyTrendProps {
-  data: { month: string; hastane: number; personel: number }[]
+  data: { month: string; organizasyon: number; personel: number }[]
 }
 
 export function MonthlyTrendChart({ data }: MonthlyTrendProps) {
@@ -42,7 +42,7 @@ export function MonthlyTrendChart({ data }: MonthlyTrendProps) {
     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
       <AreaChart data={data} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
         <defs>
-          <linearGradient id="gradHospital" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="gradOrganization" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.2} />
             <stop offset="95%" stopColor="var(--color-accent)" stopOpacity={0} />
           </linearGradient>
@@ -56,7 +56,7 @@ export function MonthlyTrendChart({ data }: MonthlyTrendProps) {
         <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
         <Tooltip content={<CustomTooltip />} />
         <Legend wrapperStyle={{ fontSize: '12px', fontFamily: 'var(--font-body)', color: 'var(--color-text-secondary)' }} />
-        <Area type="monotone" dataKey="hastane" name="Hastane" stroke="var(--color-accent)" strokeWidth={2.5} fill="url(#gradHospital)" />
+        <Area type="monotone" dataKey="organizasyon" name="Organizasyon" stroke="var(--color-accent)" strokeWidth={2.5} fill="url(#gradOrganization)" />
         <Area type="monotone" dataKey="personel" name="Personel" stroke="var(--color-primary)" strokeWidth={2.5} fill="url(#gradPersonel)" />
       </AreaChart>
     </ResponsiveContainer>
