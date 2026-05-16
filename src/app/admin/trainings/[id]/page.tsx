@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft, GraduationCap, Users, TrendingUp, Clock, Edit, Play, BarChart3,
@@ -107,6 +107,21 @@ export default function TrainingDetailPage() {
   const [resetting, setResetting] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
   const [staffStatusFilter, setStaffStatusFilter] = useState<StaffStatusFilter>('all');
+
+  // Personel tablosu sticky header — içerik header altına girince subtle
+  // box-shadow ile elevation cue ver. Scroll cue yoksa header "düz" hisseder.
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
+  const [headerStuck, setHeaderStuck] = useState(false);
+  useEffect(() => {
+    const el = stickyHeaderRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setHeaderStuck(entry.intersectionRatio < 1),
+      { threshold: [1], rootMargin: '-1px 0px 0px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Hooks early return'lerden ÖNCE çağrılmalı (React Rules of Hooks). training
   // henüz yüklenmediğinde boş array üzerinde hesap döner; yüklendiğinde gerçek
@@ -225,7 +240,7 @@ export default function TrainingDetailPage() {
 
             <DropdownMenu>
               <DropdownMenuTrigger
-                className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors hover:bg-stone-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-[background,box-shadow] duration-150 ease-out hover:bg-[color-mix(in_srgb,var(--color-text-primary,#000)_5%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0d9668)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg,#f1f5f9)]"
                 style={{ ...ghostBtnStyle, border: `1px solid ${K.BORDER}` }}
               >
                 <MoreHorizontal className="h-4 w-4" /> Diğer İşlemler
@@ -233,7 +248,7 @@ export default function TrainingDetailPage() {
               <DropdownMenuContent align="start" className="min-w-[240px]">
                 <DropdownMenuItem
                   disabled={downloadingCompletion === 'pdf'}
-                  onSelect={async () => {
+                  onClick={async () => {
                     setDownloadingCompletion('pdf');
                     try {
                       const res = await fetch(`/api/admin/trainings/${id}/completion-report`);
@@ -254,7 +269,7 @@ export default function TrainingDetailPage() {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={downloadingCompletion === 'excel'}
-                  onSelect={async () => {
+                  onClick={async () => {
                     setDownloadingCompletion('excel');
                     try {
                       const res = await fetch(`/api/admin/trainings/${id}/completion-report/excel`);
@@ -273,14 +288,14 @@ export default function TrainingDetailPage() {
                   {downloadingCompletion === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   <span>{downloadingCompletion === 'excel' ? 'Excel hazırlanıyor…' : 'Excel Rapor indir'}</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => router.push(`/admin/feedback-forms/responses?trainingId=${id}`)}>
+                <DropdownMenuItem onClick={() => router.push(`/admin/feedback-forms/responses?trainingId=${id}`)}>
                   <MessageSquare className="h-4 w-4" />
                   <span>Geri bildirimler</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   disabled={!hasPlayableContent}
-                  onSelect={() => setReassignModalOpen(true)}
+                  onClick={() => setReassignModalOpen(true)}
                 >
                   <RotateCcw className="h-4 w-4" />
                   <span>Tamamlamayanları yeniden ata</span>
@@ -563,16 +578,30 @@ export default function TrainingDetailPage() {
                         </div>
                       )}
                     </div>
-                    {/* Header Row */}
-                    <div className="grid items-center px-4 py-2 mb-1" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 60px 60px 95px 75px 90px 90px', gap: '8px', color: K.TEXT_MUTED, background: K.BG, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}>
-                      <span className="text-[11px] font-semibold uppercase tracking-wide">Personel</span>
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center">Deneme</span>
-                      <span className="text-[11px] font-semibold uppercase tracking-wide">İlerleme</span>
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center">Ön Sınav</span>
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center">Son Sınav</span>
-                      <span className="text-[11px] font-semibold uppercase tracking-wide">Durum</span>
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center">Tarih</span>
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center">İmza</span>
+                    {/* Header Row — sticky: içerik altına girince subtle shadow ile elevation cue */}
+                    <div
+                      ref={stickyHeaderRef}
+                      data-stuck={headerStuck || undefined}
+                      className="grid items-center px-4 py-2 mb-1 transition-[box-shadow] duration-150 ease-out data-[stuck]:shadow-[0_4px_12px_-4px_rgba(0,0,0,0.06)]"
+                      style={{
+                        gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 72px 72px 95px 75px 90px 90px',
+                        gap: '8px',
+                        color: K.TEXT_MUTED,
+                        background: K.BG,
+                        borderBottom: `1px solid ${K.BORDER_LIGHT}`,
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 10,
+                      }}
+                    >
+                      <span className="text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap">Personel</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center whitespace-nowrap">Deneme</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap">İlerleme</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center whitespace-nowrap">Ön Sınav</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center whitespace-nowrap">Son Sınav</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap">Durum</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center whitespace-nowrap">Tarih</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center whitespace-nowrap">İmza</span>
                       <span />
                     </div>
                     {/* Data Rows */}
@@ -587,7 +616,7 @@ export default function TrainingDetailPage() {
                         const st = statusMap[s.status] || statusMap.assigned;
                         const StatusIcon = st.icon;
                         return (
-                          <div key={s.assignmentId} className="grid items-center px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 60px 60px 95px 75px 90px 90px', gap: '8px', background: K.SURFACE, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
+                          <div key={s.assignmentId} className="grid items-center px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 72px 72px 95px 75px 90px 90px', gap: '8px', background: K.SURFACE, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE; }}
                           >
