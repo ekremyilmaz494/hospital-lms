@@ -69,15 +69,19 @@ const statusMap: Record<string, { label: string; bg: string; text: string; icon:
   assigned: { label: 'Atandı', bg: K.INFO_BG, text: '#1d4ed8', icon: Users },
 };
 
-type StaffStatusFilter = 'all' | 'passed' | 'failed' | 'in_progress' | 'assigned';
+type StaffStatusFilter = 'all' | 'completed' | 'incomplete';
 
 const STATUS_FILTERS: { value: StaffStatusFilter; label: string }[] = [
   { value: 'all', label: 'Tümü' },
-  { value: 'passed', label: 'Geçti' },
-  { value: 'failed', label: 'Geçmedi' },
-  { value: 'in_progress', label: 'Tamamlamadı' },
-  { value: 'assigned', label: 'Başlamadı' },
+  { value: 'completed', label: 'Tamamladı' },
+  { value: 'incomplete', label: 'Tamamlamadı' },
 ];
+
+// "Tamamladı" sınava giren ve sonuçlanan herkesi kapsar (geçti + kaldı);
+// "Tamamlamadı" hâlâ devam edenler ile hiç başlamayanları birleştirir.
+// Stat kartlarındaki "TAMAMLAYAN" sayısının semantiği ile aynı.
+const COMPLETED_STATUSES = new Set(['passed', 'failed']);
+const INCOMPLETE_STATUSES = new Set(['in_progress', 'assigned']);
 
 export default function TrainingDetailPage() {
   const router = useRouter();
@@ -96,6 +100,20 @@ export default function TrainingDetailPage() {
   const [staffSearch, setStaffSearch] = useState('');
   const [staffStatusFilter, setStaffStatusFilter] = useState<StaffStatusFilter>('all');
 
+  // Hooks early return'lerden ÖNCE çağrılmalı (React Rules of Hooks). training
+  // henüz yüklenmediğinde boş array üzerinde hesap döner; yüklendiğinde gerçek
+  // sayımı verir — render iterasyonları arasında hook sırası sabit kalır.
+  const assignedStaff = training?.assignedStaff ?? [];
+  const statusCounts = useMemo(() => {
+    let completed = 0;
+    let incomplete = 0;
+    for (const s of assignedStaff) {
+      if (COMPLETED_STATUSES.has(s.status)) completed += 1;
+      else if (INCOMPLETE_STATUSES.has(s.status)) incomplete += 1;
+    }
+    return { completed, incomplete };
+  }, [assignedStaff]);
+
   if (!id) {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: K.TEXT_MUTED }}>Eğitim bulunamadı</div></div>;
   }
@@ -112,14 +130,6 @@ export default function TrainingDetailPage() {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: K.TEXT_MUTED }}>Eğitim bulunamadı</div></div>;
   }
 
-  const assignedStaff = training.assignedStaff ?? [];
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { passed: 0, failed: 0, in_progress: 0, assigned: 0 };
-    for (const s of assignedStaff) {
-      if (counts[s.status] !== undefined) counts[s.status] += 1;
-    }
-    return counts;
-  }, [assignedStaff]);
   const trainingVideos = training.videos ?? [];
   const trainingQuestions = training.questions ?? [];
   // PDF içerikler son sınava geçişi tetiklemez — atama ancak en az 1 video/ses varsa yapılabilir
@@ -409,7 +419,11 @@ export default function TrainingDetailPage() {
                   const q = staffSearch.trim().toLocaleLowerCase('tr');
                   const byStatus = staffStatusFilter === 'all'
                     ? assignedStaff
-                    : assignedStaff.filter(s => s.status === staffStatusFilter);
+                    : assignedStaff.filter(s =>
+                        staffStatusFilter === 'completed'
+                          ? COMPLETED_STATUSES.has(s.status)
+                          : INCOMPLETE_STATUSES.has(s.status)
+                      );
                   const filteredStaff = q
                     ? byStatus.filter(s => {
                         const statusLabel = (statusMap[s.status] ?? statusMap.assigned).label.toLocaleLowerCase('tr');
@@ -429,13 +443,14 @@ export default function TrainingDetailPage() {
                         const isActive = staffStatusFilter === f.value;
                         const count = f.value === 'all'
                           ? assignedStaff.length
-                          : statusCounts[f.value] ?? 0;
+                          : f.value === 'completed'
+                            ? statusCounts.completed
+                            : statusCounts.incomplete;
                         const palette = f.value === 'all'
                           ? { bg: K.SURFACE_HOVER, text: K.TEXT_PRIMARY, activeBg: K.TEXT_PRIMARY, activeText: '#ffffff' }
-                          : (() => {
-                              const m = statusMap[f.value] ?? statusMap.assigned;
-                              return { bg: K.SURFACE, text: K.TEXT_SECONDARY, activeBg: m.bg, activeText: m.text };
-                            })();
+                          : f.value === 'completed'
+                            ? { bg: K.SURFACE, text: K.TEXT_SECONDARY, activeBg: K.SUCCESS_BG, activeText: K.PRIMARY }
+                            : { bg: K.SURFACE, text: K.TEXT_SECONDARY, activeBg: K.WARNING_BG, activeText: '#b45309' };
                         return (
                           <button
                             key={f.value}
