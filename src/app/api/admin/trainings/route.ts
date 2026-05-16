@@ -10,6 +10,7 @@ import type { AssignmentStatus } from '@/lib/exam-state-machine'
 import { getOrCreateActivePeriodForAssignment } from '@/lib/training-periods'
 import { sendExpoPushToMany } from '@/lib/expo-push'
 import { logger } from '@/lib/logger'
+import { toEndOfDayUTC } from '@/lib/date-helpers'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
@@ -107,7 +108,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     }
   }
 
-  if (new Date(parsed.data.endDate) < new Date()) {
+  // Validation: end-of-day mantığı — bugün son tarih seçilirse "geçmişte" sayılmaz.
+  if (toEndOfDayUTC(parsed.data.endDate) < new Date()) {
     return errorResponse('Bitiş tarihi geçmişte olamaz', 400)
   }
 
@@ -141,7 +143,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
           // Client gönderdiyse onu kullan, yoksa aktif form mirasını al.
           feedbackMandatory: trainingData.feedbackMandatory ?? inheritedFeedbackMandatory,
           startDate: new Date(trainingData.startDate),
-          endDate: new Date(trainingData.endDate),
+          // endDate'i gün sonuna normalize et — "16 Mayıs" girildiyse 16 May
+          // 23:59:59 UTC olarak kaydet ki personel o günün sonuna kadar erişebilsin.
+          endDate: toEndOfDayUTC(trainingData.endDate),
           complianceDeadline: trainingData.complianceDeadline ? new Date(trainingData.complianceDeadline) : null,
           organizationId: organizationId,
           createdById: dbUser.id,

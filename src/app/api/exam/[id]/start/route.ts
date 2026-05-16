@@ -7,6 +7,7 @@ import { logActivity } from '@/lib/activity-logger'
 import { getPendingMandatoryFeedback } from '@/lib/feedback-helpers'
 import { isTrainingAccessible } from '@/lib/training-helpers'
 import { advancePastVideosIfNoneRequired } from '@/lib/exam-helpers'
+import { isEndDatePassed } from '@/lib/date-helpers'
 import {
   attemptNextStatus,
   assignmentNextStatus,
@@ -72,12 +73,14 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     )
   }
 
-  // Egitim tarih araligi kontrolu
+  // Egitim tarih araligi kontrolu — endDate'i gün sonu olarak yorumla (eski kayıtlarda
+  // 00:00:00 olarak saklanmış olabilir; "16 Mayıs son" girilen eğitim o günün sonuna
+  // kadar açık kalsın).
   const now = new Date()
   if (now < new Date(assignment.training.startDate)) {
     return errorResponse('Bu eğitim henüz başlanmamış.', 403)
   }
-  if (now > new Date(effectiveDueDate)) {
+  if (isEndDatePassed(effectiveDueDate, now)) {
     return errorResponse('Bu eğitimin süresi dolmuş.', 403)
   }
 
