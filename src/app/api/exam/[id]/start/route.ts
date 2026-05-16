@@ -90,12 +90,16 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Maksimum deneme sayısına ulaştınız')
   }
 
-  // Mevcut aktif attempt varsa dogrudan don — rate limit gereksiz
+  // Mevcut aktif attempt varsa dogrudan don — rate limit gereksiz.
+  // 'expired' attempt'i resume etme — cron tarafından kapatılmış olabilir
+  // (ör. eğitim süresi doldu veya 24h stale). Resume yerine yeni attempt
+  // yaratılır (currentAttempt < maxAttempts ise). Aksi halde kullanıcı
+  // expired attempt'le videos page'e atılıp redirect döngüsüne girer.
   const existing = await prisma.examAttempt.findFirst({
     where: {
       assignmentId,
       userId: dbUser.id,
-      status: { not: 'completed' },
+      status: { notIn: ['completed', 'expired'] },
     },
     include: { videoProgress: true },
   })

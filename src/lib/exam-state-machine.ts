@@ -229,8 +229,19 @@ export function isAttemptInPhase(
 export type ExamRoute = 'pre-exam' | 'videos' | 'post-exam' | 'transition' | 'my-trainings'
 
 export function attemptPhaseRedirect(status: AttemptStatus, currentRoute: ExamRoute): ExamRoute | null {
-  // Terminal: her halükarda my-trainings'e dön
-  if (status === 'completed' || status === 'expired') {
+  // 'completed' kesin terminal — listeye dön.
+  if (status === 'completed') {
+    return currentRoute === 'my-trainings' ? null : 'my-trainings'
+  }
+  // 'expired' artık terminal değil: kullanıcının deneme hakkı kalmış olabilir
+  // (cron 24h pencere veya endDate-passed sebebiyle kapatmış olabilir).
+  // Listeye atmak yerine detay sayfasına yönlendir — orada needsRetry true
+  // ise "Yeniden dene" CTA'sı gösteriliyor, kullanıcı yeni attempt başlatabilir.
+  // (my-trainings sayfasında detaya girmek için ek tıklama gerekiyor; aynı
+  // route oldukları için tek tıkla detaya iletecek hedef yok — bu redirect
+  // sonrası kullanıcı eğitim listesinde card'a tıklayıp detaya girer ve
+  // "Yeniden dene" CTA'sını görür.)
+  if (status === 'expired') {
     return currentRoute === 'my-trainings' ? null : 'my-trainings'
   }
   // Aktif phase'in route'u zaten doğru mu?
