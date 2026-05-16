@@ -1,7 +1,11 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# ─────────────────────────────────────────────────────────────
+# Monorepo (Faz 2): apps/web + tenants/* workspace'leri
+# ─────────────────────────────────────────────────────────────
+
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -9,28 +13,30 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.pnpm-store/
 
 # testing
-/coverage
+coverage/
 
-# next.js
-/.next/
-/.next.nosync/
-/.next-build-*/
-/out/
+# next.js (root + tüm workspace'lerde)
+.next/
+.next.nosync/
+.next-build-*/
+out/
+.turbo/
 
 # next-pwa / Serwist build artifacts (her build'de hash değişir)
 # 2026-05-11: public/sw.js artık kill-switch SW olarak commit edildi — eski
 # next-pwa cache'lerini temizler ve kendini unregister eder. PWA disabled
 # olduğu için build bu dosyayı overwrite etmez. Diğer worker pattern'leri
 # (workbox/swe-worker/worker-) gelecekte tekrar PWA açılırsa diye gitignored kalır.
-/public/sw.js.map
-/public/swe-worker-*.js
-/public/swe-worker-*.js.map
-/public/workbox-*.js
-/public/workbox-*.js.map
-/public/worker-*.js
-/public/worker-*.js.map
+apps/web/public/sw.js.map
+apps/web/public/swe-worker-*.js
+apps/web/public/swe-worker-*.js.map
+apps/web/public/workbox-*.js
+apps/web/public/workbox-*.js.map
+apps/web/public/worker-*.js
+apps/web/public/worker-*.js.map
 
 # production
 /build
@@ -57,18 +63,21 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/src/generated/prisma
+apps/web/src/generated/prisma/
 
 # Uploaded files (dev only)
-/public/uploads/
+apps/web/public/uploads/
 
 # Screenshots (dev only)
 /screenshots/
+apps/web/screenshots/
 
 # Playwright
 /take-screenshots.mjs
-/playwright-report
-/test-results
+playwright-report/
+apps/web/playwright-report/
+test-results/
+apps/web/test-results/
 /.playwright
 
 /packages/**/dist/
@@ -103,9 +112,18 @@ tmp-test-users-credentials.txt
 tmp-seed-log.txt
 .env*.local
 
+# Devakent snapshot baseline'ları (refactor öncesi/sonrası diff için lokal)
+.devakent-snapshot-*.json
+/snapshots/
+
 # Lokal admin yardımcı scriptleri (plaintext credential içerebilir, repoya gitmemeli)
+# Faz 2 monorepo: apps/web/scripts/ altına da uygula
 scripts/create-super-admin.mjs
 scripts/fix-super-admin-kvkk.mjs
+scripts/seed-auth-users.mjs
+apps/web/scripts/create-super-admin.mjs
+apps/web/scripts/fix-super-admin-kvkk.mjs
+apps/web/scripts/seed-auth-users.mjs
 
 # Yerel binary/rapor dosyaları (proje dizini geçici sahnesi olarak kullanılınca biriken artıklar)
 *.dmg

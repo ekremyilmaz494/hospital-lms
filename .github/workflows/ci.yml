@@ -42,34 +42,35 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm prisma generate
+        run: pnpm --filter web exec prisma generate
 
       - name: Migration drift check (schema.prisma ↔ migrations senkron mu?)
         env:
           SHADOW_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_shadow  # secret-scanner-disable-line
         run: |
-          pnpm prisma migrate diff \
+          pnpm --filter web exec prisma migrate diff \
             --from-migrations ./prisma/migrations \
             --to-schema ./prisma/schema.prisma \
             --exit-code
         # Prisma 7: shadow DB URL prisma.config.ts'te SHADOW_DATABASE_URL env'inden okunur.
+        # --filter web ile CWD apps/web'e geçer, prisma/migrations + schema yolları doğru çözülür.
         # exit 0 = drift yok, exit 2 = drift var (PR bloklanır)
         # Drift varsa: pnpm db:migrate dev --name <açıklayıcı-isim> çalıştır
 
       - name: TypeScript check
-        run: pnpm tsc --noEmit
+        run: pnpm --filter web exec tsc --noEmit
 
       - name: Lint
         run: pnpm lint
 
       - name: Editorial palette guard
-        run: bash scripts/editorial-palette-guard.sh
+        run: bash apps/web/scripts/editorial-palette-guard.sh
 
       - name: Unit tests
         run: pnpm test
 
       - name: Build
-        run: pnpm build --webpack
+        run: pnpm --filter web build --webpack
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
@@ -99,13 +100,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm prisma generate
+        run: pnpm --filter web exec prisma generate
 
       - name: Install Playwright (chromium only)
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Build
-        run: pnpm build --webpack
+        run: pnpm --filter web build --webpack
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -129,7 +130,7 @@ jobs:
         run: npx wait-on http://localhost:3000 --timeout 90000
 
       - name: Setup E2E test users
-        run: pnpm tsx scripts/setup-e2e-users.ts
+        run: pnpm --filter web exec tsx scripts/setup-e2e-users.ts
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -157,5 +158,5 @@ jobs:
         if: always()
         with:
           name: playwright-report
-          path: playwright-report/
+          path: apps/web/playwright-report/
           retention-days: 7
