@@ -480,7 +480,7 @@ export default function TrainingDetailPage() {
           <AnimatePresence mode="wait">
             {/* Staff Tab */}
             {activeTab === 'staff' && (
-              <motion.div key="staff" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+              <motion.div key="staff" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
                 {assignedStaff.length > 0 ? (() => {
                   const q = staffSearch.trim().toLocaleLowerCase('tr');
                   const byStatus = staffStatusFilter === 'all'
@@ -582,7 +582,7 @@ export default function TrainingDetailPage() {
                     <div
                       ref={stickyHeaderRef}
                       data-stuck={headerStuck || undefined}
-                      className="grid items-center px-4 py-2 mb-1 transition-[box-shadow] duration-150 ease-out data-[stuck]:shadow-[0_4px_12px_-4px_rgba(0,0,0,0.06)]"
+                      className="grid items-center px-4 py-3 mb-1 transition-[box-shadow] duration-150 ease-out data-[stuck]:shadow-[0_4px_12px_-4px_rgba(0,0,0,0.06)]"
                       style={{
                         gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 72px 72px 95px 75px 90px 90px',
                         gap: '8px',
