@@ -487,10 +487,13 @@ export default function StaffNotificationsPage() {
           <EditorialEmptyState hasFilters={hasAnyFilter} onClearFilters={clearAllFilters} />
         ) : (
           <div className="relative mt-10 pb-8">
-            {/* Vertical spine — fixed at 14px across breakpoints for clean alignment */}
+            {/* Vertical spine — mobile'da daha dar (left-[10px]/22px column),
+                sm+ orijinal (left-[14px]/30px). Mobile'da sol spine kolonu
+                30px alıp sağ tarafı sıkıştırıyordu — kart sağ kenara yapışık
+                gözüküyordu. */}
             <div
               aria-hidden="true"
-              className="absolute bottom-0 left-[14px] top-0 w-[2px]"
+              className="absolute bottom-0 left-[10px] sm:left-[14px] top-0 w-[2px]"
               style={{ backgroundColor: INK }}
             />
 
@@ -501,8 +504,7 @@ export default function StaffNotificationsPage() {
                 <section key={bucket} className="relative mb-10 last:mb-0">
                   {/* Day row — explicit grid (Tailwind 4 arbitrary cols can be flaky, use inline) */}
                   <header
-                    className="grid items-center gap-3 md:gap-4"
-                    style={{ gridTemplateColumns: '30px max-content 1fr max-content' }}
+                    className="grid items-center gap-2 sm:gap-3 md:gap-4 grid-cols-[22px_max-content_1fr_max-content] sm:grid-cols-[30px_max-content_1fr_max-content]"
                   >
                     <div className="relative flex h-4 items-center justify-center">
                       <span
@@ -660,8 +662,7 @@ function NotificationEntry({
 
   return (
     <li
-      className="grid items-start gap-3 md:gap-4"
-      style={{ gridTemplateColumns: '30px 1fr' }}
+      className="grid items-start gap-2 sm:gap-3 md:gap-4 grid-cols-[22px_1fr] sm:grid-cols-[30px_1fr]"
     >
       {/* Spine column — cream mask covers spine, connector dot on top */}
       <div className="relative flex justify-center pt-5">
@@ -690,7 +691,7 @@ function NotificationEntry({
           borderLeftColor: unread ? m.ink : (selected ? INK : RULE),
         }}
       >
-        <div className="flex gap-4 p-4 sm:p-5">
+        <div className="flex gap-3 p-3 sm:gap-4 sm:p-5">
           {/* Checkbox */}
           <div className="pt-0.5">
             <Checkbox
