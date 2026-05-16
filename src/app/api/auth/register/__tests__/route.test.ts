@@ -88,7 +88,7 @@ describe('POST /api/auth/register', () => {
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data.error).toBe('Bu hastane kodu zaten kullanılıyor')
+    expect(data.error).toBe('Bu organizasyon kodu zaten kullanılıyor')
   })
 
   it('returns 400 when email already registered', async () => {
