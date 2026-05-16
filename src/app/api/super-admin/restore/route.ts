@@ -351,7 +351,10 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
           data: backupData.auditLogs as NonNullable<Parameters<typeof tx.auditLog.createMany>[0]>['data'],
         })
       }
-    }, { timeout: 120_000 }) // 2 minute timeout for large restores
+    }, {
+      timeout: 120_000, // 2 minute tx body — büyük kurumlarda delete+createMany akışı için
+      maxWait: 10_000,  // 10s connection wait — prod'da pool tıkalıysa hızlı patlayıp 503 dön
+    })
 
     // ── Audit log ──
     await createAuditLog({

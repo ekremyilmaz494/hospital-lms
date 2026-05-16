@@ -7,6 +7,22 @@
  * `subscription`, `auditLogs`, `organizationId`, `schemaVersion`
  * alanları eksikti — bu da local fallback'ten alınan yedeklerin
  * restore sırasında bozulmasına yol açıyordu.
+ *
+ * ──────────────────────────────────────────────────────────────────
+ * YENİ PRİSMA MODELİ EKLERSEN — OKU
+ * ──────────────────────────────────────────────────────────────────
+ * Bu dosya 12 üst-düzey alan + Training içinde 3 nested alan yedekler.
+ * schema.prisma'ya yeni model eklediğinde:
+ *
+ *  1) Per-org veri mi tutuyor? → Aşağıdaki Promise.all + return objesine ekle,
+ *     `BACKUP_SCHEMA_VERSION`'ı bir artır, restore route'un
+ *     `BackupData` interface + `isValidBackupData` + delete-then-create
+ *     bloklarını güncelle.
+ *  2) Global veya kasıtlı dışarıda mı? → `__tests__/snapshot.test.ts` içinde
+ *     `INTENTIONALLY_EXCLUDED` listesine ekle ve neden olduğunu yorumla.
+ *
+ * Eklemeyi UNUTMAK = restore sonrası sessiz veri kaybı. `snapshot.test.ts`
+ * drift guard'ı PR'ı bloklar; bu yorumu okuyup geçtiysen testi de okumuşsundur.
  */
 import { prisma } from '@/lib/prisma'
 
