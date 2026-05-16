@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { getAttemptStatus } from '@/lib/exam-helpers'
 import { resolveTrainingVideoUrl, resolveTrainingDocumentUrl } from '@/lib/training-video-url'
+import { logger } from '@/lib/logger'
 import type { AttemptStatus, AssignmentStatus } from '@/lib/exam-state-machine'
 
 export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
@@ -201,10 +202,46 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     lastPositionSeconds = currentPage
     isCompleted = body.completed === true || currentPage >= totalPages
   } else {
-    // Video: mevcut davranış
-    watchedSeconds = Math.min(Math.max(Math.round(body.watchedTime ?? body.position ?? 0), 0), video.durationSeconds)
-    lastPositionSeconds = Math.min(Math.max(Math.round(body.position ?? 0), 0), video.durationSeconds)
-    isCompleted = body.completed === true || watchedSeconds >= video.durationSeconds
+    // Video: body.completed'i KALDIR, sadece watchedSeconds güven (anti-cheat).
+    // Personel native controls ile ileri sarıp completion field'ı set etse bile
+    // server-side hesaplama 80% eşiğini uygular.
+    const requestedWatched = Math.min(
+      Math.max(Math.round(body.watchedTime ?? body.position ?? 0), 0),
+      video.durationSeconds,
+    )
+
+    // Geri sarma protection — videos/progress/route.ts'teki davranışı kopyala
+    const existing = await prisma.videoProgress.findUnique({
+      where: { attemptId_videoId: { attemptId: attempt.id, videoId: body.videoId } },
+    })
+    watchedSeconds = existing
+      ? Math.max(requestedWatched, existing.watchedSeconds)
+      : requestedWatched
+
+    // İzleme hızı denetimi — wall-clock delta'sından %150 fazla artmasın.
+    // Heartbeat aralığı mobile'da 5sn; 7.5sn watch + 5sn buffer = ~12.5sn max delta.
+    if (existing) {
+      const wallDelta = (Date.now() - existing.updatedAt.getTime()) / 1000
+      const requestedDelta = watchedSeconds - existing.watchedSeconds
+      const maxDelta = wallDelta * 1.5 + 5
+      if (requestedDelta > maxDelta) {
+        logger.warn('VideoProgress', 'Suspicious watch rate', {
+          attemptId: attempt.id,
+          videoId: body.videoId,
+          requestedDelta,
+          maxDelta,
+        })
+        watchedSeconds = existing.watchedSeconds + Math.floor(maxDelta)
+      }
+    }
+
+    lastPositionSeconds = Math.min(
+      Math.max(Math.round(body.position ?? 0), 0),
+      video.durationSeconds,
+    )
+    // 80% kural — /videos/progress ile aynı eşik
+    const MIN_WATCH_PERCENT = 0.80
+    isCompleted = watchedSeconds >= (video.durationSeconds * MIN_WATCH_PERCENT)
   }
 
   // Upsert video progress

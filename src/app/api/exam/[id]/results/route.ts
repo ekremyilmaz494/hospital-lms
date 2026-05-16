@@ -15,6 +15,8 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
   const { id } = params
 
   // attemptId veya assignmentId ile dene; her iki durumda da org + ownership zorunlu.
+  // attemptNumber + assignment.maxAttempts + training.maxAttempts: attemptsRemaining
+  // hesabı için submit/route.ts:243-246 ile aynı mantık.
   let attempt = await prisma.examAttempt.findFirst({
     where: {
       id,
@@ -27,7 +29,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
       isPassed: true,
       status: true,
       postExamScore: true,
-      training: { select: { passingScore: true } },
+      attemptNumber: true,
+      training: { select: { passingScore: true, maxAttempts: true } },
+      assignment: { select: { maxAttempts: true } },
     },
   })
   if (!attempt) {
@@ -44,7 +48,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
         isPassed: true,
         status: true,
         postExamScore: true,
-        training: { select: { passingScore: true } },
+        attemptNumber: true,
+        training: { select: { passingScore: true, maxAttempts: true } },
+        assignment: { select: { maxAttempts: true } },
       },
       orderBy: { attemptNumber: 'desc' },
     })
@@ -55,6 +61,13 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     return errorResponse('Sınav henüz tamamlanmadı', 400)
   }
 
+  // attemptsRemaining: submit/route.ts:243-246 ile birebir aynı mantık.
+  // Passed olduysa kalan deneme önemsiz (0). Aksi halde tavan - mevcut numara.
+  const effectiveMaxAttempts = attempt.assignment.maxAttempts ?? attempt.training.maxAttempts
+  const attemptsRemaining = attempt.isPassed
+    ? 0
+    : Math.max(0, effectiveMaxAttempts - attempt.attemptNumber)
+
   // Başarısızsa soru detaylarını döndürme (anti-cheating)
   if (!attempt.isPassed) {
     return jsonResponse(
@@ -62,6 +75,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
         isPassed: false,
         score: attempt.postExamScore !== null ? Number(attempt.postExamScore) : 0,
         passingScore: attempt.training.passingScore,
+        attemptsRemaining,
         results: null,
       },
       200,
@@ -110,6 +124,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
       isPassed: true,
       score: attempt.postExamScore !== null ? Number(attempt.postExamScore) : 0,
       passingScore: attempt.training.passingScore,
+      attemptsRemaining,
       results,
     },
     200,
