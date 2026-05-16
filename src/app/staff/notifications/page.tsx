@@ -258,10 +258,10 @@ export default function StaffNotificationsPage() {
 
   return (
     <div
-      className="-mx-4 -my-4 md:-mx-8 md:-my-8"
-      style={{ backgroundColor: CREAM, minHeight: 'calc(100dvh - 64px)' }}
+      className="-mx-4 -my-4 overflow-x-hidden md:-mx-8 md:-my-8"
+      style={{ backgroundColor: CREAM, minWidth: 0, minHeight: 'calc(100dvh - 64px)' }}
     >
-      <div className="px-6 pt-6 pb-24 sm:px-10 lg:px-16">
+      <div className="px-4 pt-6 pb-24 sm:px-10 lg:px-16">
         {/* ═══════════════ MASTHEAD ═══════════════ */}
         <header
           className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b pb-5"
@@ -285,7 +285,7 @@ export default function StaffNotificationsPage() {
 
         {/* ═══════════════ CONTROL STRIP ═══════════════ */}
         <div
-          className="sticky top-0 z-20 -mx-6 mt-0 border-b bg-[var(--stripe-bg)] px-6 py-3 backdrop-blur sm:-mx-10 sm:px-10 lg:-mx-16 lg:px-16"
+          className="sticky top-0 z-20 -mx-4 mt-0 border-b bg-[var(--stripe-bg)] px-4 py-3 backdrop-blur sm:-mx-10 sm:px-10 lg:-mx-16 lg:px-16"
           style={{
             ['--stripe-bg' as string]: 'rgba(250,247,242,0.92)',
             borderColor: RULE,
@@ -564,11 +564,14 @@ export default function StaffNotificationsPage() {
             }}
           >
             <div
-              className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-5 py-3"
+              className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:px-5"
               style={{
                 backgroundColor: INK,
                 color: CREAM,
-                boxShadow: `8px 8px 0 ${GOLD}`,
+                // Mobil viewport'larda 8px sağa-aşağı offset shadow yatay scroll'a sebep
+                // oluyordu (overflow-x-hidden outer'ı şimdi yakalıyor ama yine de küçük
+                // viewport'larda görsel zorlamayı azaltıyoruz).
+                boxShadow: `4px 4px 0 ${GOLD}`,
               }}
             >
               <div className="flex items-center gap-3">
@@ -719,13 +722,13 @@ function NotificationEntry({
               </div>
 
               <time
-                className="text-[10px] tabular-nums"
+                className="shrink-0 text-[10px] tabular-nums"
                 dateTime={n.createdAt}
                 title={`${formatLongDate(n.createdAt)} · ${formatExactTime(n.createdAt)}`}
                 style={{ color: INK_SOFT, fontFamily: FONT_MONO }}
               >
                 {formatRelativeTime(n.createdAt)}
-                <span className="opacity-60"> · {formatExactTime(n.createdAt)}</span>
+                <span className="hidden opacity-60 sm:inline"> · {formatExactTime(n.createdAt)}</span>
               </time>
             </div>
 

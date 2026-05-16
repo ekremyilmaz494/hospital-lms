@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bell, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/use-auth';
+import { useFetch } from '@/hooks/use-fetch';
 import { useNotificationStore } from '@/store/notification-store';
 import { getNotificationTypeMeta } from '@/lib/notification-types';
 
@@ -54,24 +55,78 @@ function formatRelativeTime(dateStr: string): string {
   return `${days} gün önce`;
 }
 
+interface BellApiPayload {
+  notifications: Array<{
+    id: string;
+    title: string;
+    message: string;
+    type: string;
+    isRead: boolean;
+    createdAt: string;
+  }>;
+  unreadCount: number;
+}
+
 export function NotificationBell({
   notifications: propNotifications,
   unreadCount: propUnreadCount,
 }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
-  const { isAdmin, isSuperAdmin, isStaff } = useAuth();
+  const { isAdmin, isSuperAdmin, isStaff, user } = useAuth();
   const store = useNotificationStore();
+  const setStoreNotifications = useNotificationStore((s) => s.setNotifications);
 
-  const notifications: NotificationItem[] = propNotifications ?? store.notifications.map((n) => ({
-    id: n.id,
-    title: n.title,
-    message: n.message,
-    time: formatRelativeTime(n.createdAt),
-    isRead: n.isRead,
-    type: n.type,
-  }));
+  // Bell open olunca veya kullanıcı oturum açtığında /api/staff/notifications'ı çek.
+  // Endpoint role-agnostic (withStaffRoute admin+staff+super_admin'e açık), kullanıcı
+  // KENDİ bildirimlerini görür. Eski davranış: hiçbir yerden setNotifications
+  // çağrılmadığı için store hep boştu — bell "Henüz bildirim yok" gösteriyordu.
+  const shouldFetch = !propNotifications && !!user;
+  const { data, refetch } = useFetch<BellApiPayload>(shouldFetch ? '/api/staff/notifications' : null);
 
-  const count = propUnreadCount ?? (propNotifications ? propNotifications.filter((n) => !n.isRead).length : store.unreadCount);
+  // API yanıtı geldiğinde realtime store'unu da hydrate et — diğer ekranlar (örn.
+  // staff/notifications sayfası) tutarlı sayım görsün.
+  useEffect(() => {
+    if (!data?.notifications) return;
+    setStoreNotifications(
+      data.notifications.map((n) => ({
+        id: n.id,
+        userId: user?.id ?? '',
+        organizationId: null,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        isRead: n.isRead,
+        createdAt: n.createdAt,
+        relatedTrainingId: null,
+      })),
+    );
+  }, [data, setStoreNotifications, user?.id]);
+
+  // Popover ilk açıldığında stale veriyi background'da tazele.
+  useEffect(() => {
+    if (open && shouldFetch) void refetch();
+  }, [open, shouldFetch, refetch]);
+
+  const notifications: NotificationItem[] = useMemo(() => {
+    if (propNotifications) return propNotifications;
+    // En güncel kaynak: data (taze API) → düşmezse store (realtime + persist'ten
+    // hidrate). Map ile UI tipine indir.
+    const source = data?.notifications?.length
+      ? data.notifications
+      : store.notifications;
+    return source.slice(0, 8).map((n) => ({
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      time: formatRelativeTime(n.createdAt),
+      isRead: n.isRead,
+      type: n.type,
+    }));
+  }, [propNotifications, data, store.notifications]);
+
+  const count = propUnreadCount
+    ?? data?.unreadCount
+    ?? (propNotifications ? propNotifications.filter((n) => !n.isRead).length : store.unreadCount);
   const notificationsHref = (isAdmin || isSuperAdmin) ? '/admin/notifications' : isStaff ? '/staff/notifications' : '/auth/login';
 
   return (
