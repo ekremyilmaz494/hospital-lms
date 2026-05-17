@@ -7,7 +7,6 @@ import {
   useReducedMotion,
 } from "framer-motion";
 import {
-  ArrowRight,
   Play,
   Star,
   TrendingUp,
@@ -314,7 +313,7 @@ export function HeroSection() {
         >
           <Link
             prefetch={false}
-            href="/auth/login"
+            href="#tanitim"
             className="inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 rounded-full text-sm font-black uppercase tracking-wide shadow-lg hover:scale-105"
             style={{
               backgroundColor: "var(--landing-accent)",
@@ -323,24 +322,8 @@ export function HeroSection() {
               transition: "transform 240ms var(--landing-ease-spring)",
             }}
           >
-            Demo Talep Et <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link
-            prefetch={false}
-            href="/auth/login"
-            className="inline-flex items-center gap-2 text-sm font-semibold hover:opacity-60"
-            style={{
-              color: "var(--landing-ink)",
-              transition: "opacity 180ms var(--landing-ease)",
-            }}
-          >
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center border-2"
-              style={{ borderColor: "var(--landing-ink)" }}
-            >
-              <Play className="w-3 h-3 ml-0.5" />
-            </div>
-            Süreci İzle
+            <Play className="w-4 h-4 ml-0.5" />
+            Tanıtımı İzle
           </Link>
         </motion.div>
 
