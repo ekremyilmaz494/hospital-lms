@@ -39,7 +39,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
 
   const name = preset?.name ?? BRAND.fullName
   const shortName = preset?.shortName ?? BRAND.name
-  const iconSrc = preset?.icon ?? '/icons/icon-192.png'
+  const iconSrc = preset?.icon ?? '/apple-touch-icon.png'
 
   return {
     name,

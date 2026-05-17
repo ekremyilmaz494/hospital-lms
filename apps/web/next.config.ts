@@ -66,7 +66,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     proxyClientMaxBodySize: '512mb',
-    optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion', 'date-fns', '@tanstack/react-table', '@tiptap/react', 'react-pdf'],
+    optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion', 'date-fns', '@tanstack/react-table', '@tiptap/react', 'react-pdf', 'gsap', '@gsap/react', 'lenis'],
     // View Transitions API — landing ↔ login arasında smooth crossfade.
     // Desteklenmeyen tarayıcılarda (eski Safari) browser default navigation'a düşer.
     viewTransition: true,
@@ -127,7 +127,7 @@ const nextConfig: NextConfig = {
             "font-src 'self' data:",
             // unpkg.com: ffmpeg-core.wasm fetch
             "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://unpkg.com",
-            "media-src 'self' https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
+            "media-src 'self' data: https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             "frame-src 'self' https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             // blob:: ffmpeg.wasm internal worker'i blob URL'den olusturuyor
             "worker-src 'self' blob:",

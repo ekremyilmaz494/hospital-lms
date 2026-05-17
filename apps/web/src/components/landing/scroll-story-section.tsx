@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion, useScroll, useTransform, useReducedMotion, useMotionValueEvent } from "framer-motion";
 import type { PlayerRef } from "@remotion/player";
 import { ArrowRight } from "lucide-react";
-import { STORY_CHAPTER_LEN, STORY_DURATION } from "@/remotion/story/StoryComposition";
+import { STORY_DURATION } from "@/remotion/story/StoryComposition";
 import { useMobile } from "@/hooks/use-mobile";
 
 const StoryPlayer = dynamic(
@@ -111,14 +111,14 @@ export function ScrollStorySection() {
 
   return (
     <section
-      id="nasil-calisir"
+      id="surec"
       ref={sectionRef}
-      className="relative"
+      className="relative overflow-x-hidden"
       style={{
         height: disableScrollStory ? "auto" : "400vh",
-        backgroundColor: "#f5f0e6",
+        backgroundColor: "var(--landing-surface)",
       }}
-      aria-label="Devakent LMS nasıl çalışır"
+      aria-label={`${"KlinoVax"} nasıl çalışır — atama, izleme, sınav, sertifika`}
     >
       {/* Ambient blobs — parallax */}
       <motion.div
@@ -166,7 +166,7 @@ export function ScrollStorySection() {
               className="text-2xl sm:text-3xl font-black leading-[1.05] tracking-tight"
               style={{ color: "#1a3a28" }}
             >
-              Dört adımda hastane eğitim{" "}
+              Dört adımda kurumsal eğitim{" "}
               <span style={{ color: "var(--brand-600)" }}>döngüsü.</span>
             </h2>
           </div>

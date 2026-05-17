@@ -164,6 +164,32 @@
   --k-sidebar-w: 252px;
   --k-sidebar-w-collapsed: 72px;
   --k-topbar-h: 64px;
+
+  /* ══ LANDING PALETTE (sektör-agnostik editorial marketing) ══
+     Scope: yalnızca `/` (landing) ve `(marketing)` route group.
+     Admin/staff/exam panelleri --k-* / --ed-* token'larını kullanmaya devam eder. */
+  --landing-bg: #fafaf9;                 /* page bg, login ile aynı (geçiş flash yok) */
+  --landing-surface: #f5f0e6;            /* warm beige section */
+  --landing-surface-deep: #ede7d9;       /* alternate section */
+  --landing-ink: #1a3a28;                /* olive primary text */
+  --landing-ink-soft: #4a7060;           /* secondary text */
+  --landing-ink-muted: #6dba92;          /* tertiary on-dark text */
+  --landing-brand: #0d9668;              /* emerald accent */
+  --landing-brand-deep: #1a3a28;         /* deep brand gradient stop */
+  --landing-accent: #f59e0b;             /* amber CTA */
+  --landing-accent-deep: #d97706;        /* amber hover */
+  --landing-rule: rgba(26, 58, 40, 0.08);
+  --landing-rule-strong: rgba(26, 58, 40, 0.18);
+  --landing-shadow-soft: 0 8px 32px rgba(26, 58, 40, 0.08);
+  --landing-shadow-card: 0 20px 40px -18px rgba(26, 58, 40, 0.18);
+  --landing-shadow-spotlight: 0 30px 60px -20px rgba(26, 58, 40, 0.45);
+  --landing-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --landing-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Sektör accent renkleri — Sağlık (emerald) + Üretim (slate-amber) */
+  --landing-sector-health: #0d9668;
+  --landing-sector-health-soft: rgba(13, 150, 104, 0.12);
+  --landing-sector-industry: #b45309;
+  --landing-sector-industry-soft: rgba(180, 83, 9, 0.12);
 }
 
 .dark {

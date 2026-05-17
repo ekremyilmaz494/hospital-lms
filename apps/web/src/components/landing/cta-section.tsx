@@ -88,23 +88,23 @@ export function CtaSection() {
             className="text-xs font-bold tracking-widest uppercase mb-4"
             style={{ color: "#0d9668" }}
           >
-            İhtiyacınız Olan Her Şey
+            Klinik Disiplinde Kurumsal Eğitim
           </p>
           <h2 className="text-2xl sm:text-3xl font-black text-white leading-tight mb-5 sm:mb-6">
-            Sağlıklı Personel,
+            Eğitimli Personel,
             <br />
-            <span style={{ color: "#0d9668" }}>Güçlü Hastane.</span>
+            <span style={{ color: "#0d9668" }}>Güçlü Kurum.</span>
           </h2>
           <p className="text-sm leading-relaxed mb-5 sm:mb-8" style={{ color: "#6dba92" }}>
-            Video eğitimden sertifikaya, raporlamadan bildirimlere — tüm
-            eğitim altyapısı tek platformda.
+            Video eğitimden sertifikaya, raporlamadan bildirimlere — sağlık
+            merkezinden üretim hattına aynı disiplinde tek platform.
           </p>
 
           {/* Feature bullets */}
           <ul className="space-y-2.5 mb-5 sm:mb-8">
             {[
-              "7/24 kesintisiz erişim",
-              "KVKK & GDPR uyumlu güvenli altyapı",
+              "7/24 kesintisiz erişim · web & mobil",
+              "KVKK & ISO 45001 uyumlu güvenli altyapı",
               "Otomatik sertifika & QR doğrulama",
             ].map((item) => (
               <li key={item} className="flex items-center gap-2.5 text-sm" style={{ color: "#a0d4b8" }}>
@@ -116,14 +116,15 @@ export function CtaSection() {
 
           <Link
             prefetch={false} href="/auth/login"
-            className="inline-flex items-center gap-2 w-fit px-7 py-3.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105"
+            className="inline-flex items-center gap-2 w-fit px-7 py-3.5 rounded-full text-sm font-black uppercase tracking-wide hover:scale-105"
             style={{
               backgroundColor: "#f59e0b",
               color: "#1a3a28",
               boxShadow: "0 8px 24px rgba(245,158,11,0.3)",
+              transition: "transform 220ms var(--landing-ease-spring)",
             }}
           >
-            Hemen Başlayın <ArrowRight className="w-4 h-4" />
+            Demo Talep Et <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </div>
