@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { motion, useScroll, useTransform, useReducedMotion, useMotionValueEvent } from "framer-motion";
 import type { PlayerRef } from "@remotion/player";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, UserPlus, PlayCircle, ClipboardCheck, Award, type LucideIcon } from "lucide-react";
 import { STORY_DURATION } from "@/remotion/story/StoryComposition";
 import { useMobile } from "@/hooks/use-mobile";
 
@@ -30,6 +30,7 @@ type Chapter = {
   title: string;
   desc: string;
   stats: { label: string; value: string }[];
+  Icon: LucideIcon;
 };
 
 const CHAPTERS: Chapter[] = [
@@ -41,6 +42,7 @@ const CHAPTERS: Chapter[] = [
       { label: "Ortalama atama süresi", value: "< 2 dk" },
       { label: "Bildirim kanalı", value: "E-posta + Uygulama" },
     ],
+    Icon: UserPlus,
   },
   {
     tag: "02 — İzleme",
@@ -50,6 +52,7 @@ const CHAPTERS: Chapter[] = [
       { label: "Video altyapısı", value: "AWS CloudFront" },
       { label: "Doğrulama", value: "Frame-level" },
     ],
+    Icon: PlayCircle,
   },
   {
     tag: "03 — Sınav",
@@ -59,6 +62,7 @@ const CHAPTERS: Chapter[] = [
       { label: "Soru tipi", value: "Çoktan seçmeli" },
       { label: "Kopya önleme", value: "Randomize + timer" },
     ],
+    Icon: ClipboardCheck,
   },
   {
     tag: "04 — Sertifika",
@@ -68,6 +72,7 @@ const CHAPTERS: Chapter[] = [
       { label: "Format", value: "PDF + QR" },
       { label: "Geçerlilik", value: "Otomatik takip" },
     ],
+    Icon: Award,
   },
 ];
 
@@ -93,20 +98,26 @@ export function ScrollStorySection() {
   const headerOpacity = useTransform(scrollYProgress, [0, 0.92, 1], [1, 1, 0]);
   const scrollHintOpacity = useTransform(scrollYProgress, [0, 0.05], [1, 0]);
 
-  // Drive the Remotion player frame from scroll progress
+  // Chapter 1'in panel enter spring'i frame ~30'da settle olur. Scroll progress
+  // 0'da Player frame 0 olursa kullanıcı boş kart görür — bu yüzden mapping'i
+  // frame 35'ten başlatıyoruz (her chapter'ın "okunabilir" orta bölümü).
+  const SETTLED_START = 35;
+
   useMotionValueEvent(scrollYProgress, "change", (latest) => {
     const clamped = Math.max(0, Math.min(1, latest));
-    const targetFrame = Math.floor(clamped * (STORY_DURATION - 1));
+    const targetFrame = Math.floor(
+      SETTLED_START + clamped * (STORY_DURATION - 1 - SETTLED_START),
+    );
     playerRef.current?.seekTo(targetFrame);
 
-    const chapter = Math.min(3, Math.floor(clamped * 4));
+    const chapter = Math.min(3, Math.floor(targetFrame / 135));
     if (chapter !== activeChapter) setActiveChapter(chapter);
   });
 
-  // Set initial frame on mount
+  // Set initial frame on mount — chapter 1 zaten görünür halde gözükmeli
   useEffect(() => {
     playerRef.current?.pause();
-    playerRef.current?.seekTo(0);
+    playerRef.current?.seekTo(SETTLED_START);
   }, []);
 
   return (
@@ -115,7 +126,7 @@ export function ScrollStorySection() {
       ref={sectionRef}
       className="relative overflow-x-hidden"
       style={{
-        height: disableScrollStory ? "auto" : "400vh",
+        height: disableScrollStory ? "auto" : "320vh",
         backgroundColor: "var(--landing-surface)",
       }}
       aria-label={`${"KlinoVax"} nasıl çalışır — atama, izleme, sınav, sertifika`}
@@ -163,84 +174,126 @@ export function ScrollStorySection() {
               Nasıl Çalışır
             </p>
             <h2
-              className="text-2xl sm:text-3xl font-black leading-[1.05] tracking-tight"
+              className="text-[28px] sm:text-3xl font-black leading-[1.05] tracking-tight"
               style={{ color: "#1a3a28" }}
             >
               Dört adımda kurumsal eğitim{" "}
               <span style={{ color: "var(--brand-600)" }}>döngüsü.</span>
             </h2>
+            <p
+              className="mt-3 text-sm leading-relaxed"
+              style={{ color: "#4a7060" }}
+            >
+              Atama, izleme, sınav, sertifika — KlinoVax akışını adım adım.
+            </p>
           </div>
 
-          <div className="space-y-4">
-            {CHAPTERS.map((c, i) => (
-              <motion.div
-                key={c.tag}
-                initial={{ opacity: 0, y: shouldReduce ? 0 : 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{ duration: 0.55, ease: EASE, delay: i * 0.05 }}
-                className="relative rounded-3xl p-5 sm:p-6"
-                style={{
-                  backgroundColor: "rgba(255,255,255,0.85)",
-                  border: "1px solid rgba(26,58,40,0.08)",
-                  boxShadow: "0 12px 28px -18px rgba(26,58,40,0.25)",
-                }}
-              >
-                <div
-                  className="inline-flex items-center gap-2 text-[10px] font-black tracking-[0.2em] uppercase px-3 py-1 rounded-full mb-4"
-                  style={{
-                    backgroundColor: "rgba(13,150,104,0.1)",
-                    color: "var(--brand-600)",
-                    border: "1px solid rgba(13,150,104,0.25)",
-                  }}
-                >
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ backgroundColor: "var(--brand-600)" }}
-                  />
-                  {c.tag}
-                </div>
-                <h3
-                  className="text-xl sm:text-2xl font-black leading-[1.1] tracking-tight mb-3"
-                  style={{ color: "#1a3a28" }}
-                >
-                  {c.title}
-                </h3>
-                <p
-                  className="text-sm leading-relaxed mb-4"
-                  style={{ color: "#4a7060" }}
-                >
-                  {c.desc}
-                </p>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {c.stats.map((s) => (
+          {/* Step rail — sol kenarda dikey bağlayıcı çizgi */}
+          <div className="relative">
+            <div
+              aria-hidden
+              className="absolute left-[27px] top-3 bottom-3 w-px"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgba(13,150,104,0.35) 0%, rgba(13,150,104,0.1) 100%)",
+              }}
+            />
+
+            <div className="space-y-4">
+              {CHAPTERS.map((c, i) => {
+                const Icon = c.Icon;
+                const stepNumber = String(i + 1).padStart(2, "0");
+                return (
+                  <motion.div
+                    key={c.tag}
+                    initial={{ opacity: 0, x: shouldReduce ? 0 : -16 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, margin: "-40px" }}
+                    transition={{ duration: 0.5, ease: EASE, delay: i * 0.06 }}
+                    className="relative pl-16"
+                  >
+                    {/* Numbered icon disk */}
                     <div
-                      key={s.label}
-                      className="p-3 rounded-2xl"
+                      className="absolute left-0 top-0 w-[55px] h-[55px] rounded-2xl flex flex-col items-center justify-center shadow-md"
                       style={{
-                        backgroundColor: "rgba(13,150,104,0.06)",
-                        border: "1px solid rgba(13,150,104,0.12)",
+                        background:
+                          "linear-gradient(135deg, var(--brand-600) 0%, #1a3a28 100%)",
+                        color: "#f5f0e6",
+                        boxShadow:
+                          "0 8px 20px -8px rgba(13,150,104,0.55), 0 0 0 4px var(--landing-surface)",
+                      }}
+                    >
+                      <Icon className="w-4 h-4" strokeWidth={2.4} />
+                      <span
+                        className="text-[9px] font-black tracking-widest font-mono mt-0.5"
+                        style={{ color: "rgba(245,240,230,0.7)" }}
+                      >
+                        {stepNumber}
+                      </span>
+                    </div>
+
+                    <div
+                      className="rounded-2xl p-5"
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.92)",
+                        border: "1px solid rgba(26,58,40,0.08)",
+                        boxShadow: "0 12px 28px -18px rgba(26,58,40,0.25)",
                       }}
                     >
                       <p
-                        className="text-[9px] font-black tracking-widest uppercase mb-1"
+                        className="text-[10px] font-black tracking-[0.2em] uppercase mb-2"
+                        style={{ color: "var(--brand-600)" }}
+                      >
+                        {c.tag.split(" — ")[1]}
+                      </p>
+                      <h3
+                        className="text-[19px] font-black leading-[1.15] tracking-tight mb-2"
+                        style={{ color: "#1a3a28" }}
+                      >
+                        {c.title}
+                      </h3>
+                      <p
+                        className="text-[13px] leading-relaxed mb-4"
                         style={{ color: "#4a7060" }}
                       >
-                        {s.label}
+                        {c.desc}
                       </p>
-                      <p className="text-[13px] font-black leading-tight" style={{ color: "#1a3a28" }}>
-                        {s.value}
-                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {c.stats.map((s) => (
+                          <div
+                            key={s.label}
+                            className="p-2.5 rounded-xl"
+                            style={{
+                              backgroundColor: "rgba(13,150,104,0.06)",
+                              border: "1px solid rgba(13,150,104,0.12)",
+                            }}
+                          >
+                            <p
+                              className="text-[9px] font-black tracking-widest uppercase mb-1"
+                              style={{ color: "#4a7060" }}
+                            >
+                              {s.label}
+                            </p>
+                            <p
+                              className="text-[12px] font-black leading-tight"
+                              style={{ color: "#1a3a28" }}
+                            >
+                              {s.value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </motion.div>
-            ))}
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mt-10 text-center">
             <Link
-              prefetch={false} href="/auth/login"
+              prefetch={false}
+              href="/auth/login"
               className="inline-flex items-center justify-center gap-2 px-7 h-12 rounded-full text-sm font-black uppercase tracking-wide"
               style={{
                 backgroundColor: "#f59e0b",
@@ -384,17 +437,20 @@ export function ScrollStorySection() {
                       const rect = section.getBoundingClientRect();
                       const sectionTop = window.scrollY + rect.top;
                       const sectionHeight = section.offsetHeight - window.innerHeight;
-                      const target = sectionTop + sectionHeight * (i / 4) + 10;
+                      // Her chapter section'ın 1/4'üne denk gelir; ortasına
+                      // gitmek için 0.5 offset + ufak yumuşatma payı
+                      const target = sectionTop + sectionHeight * ((i + 0.15) / 4);
                       window.scrollTo({ top: target, behavior: shouldReduce ? "auto" : "smooth" });
                     }}
                     className="group flex items-center gap-2 cursor-pointer"
                   >
                     <div
-                      className="h-[3px] rounded-full transition-all duration-300"
+                      className="h-[3px] rounded-full"
                       style={{
                         width: i === activeChapter ? 36 : 16,
                         backgroundColor:
                           i <= activeChapter ? "#1a3a28" : "rgba(26,58,40,0.18)",
+                        transition: "width 300ms var(--landing-ease), background-color 300ms var(--landing-ease)",
                       }}
                     />
                   </button>

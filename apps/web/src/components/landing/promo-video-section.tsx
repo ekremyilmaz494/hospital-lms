@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Play, Pause, Volume2, VolumeX, ShieldCheck } from "lucide-react";
 
@@ -10,47 +10,105 @@ const EASE = [0.22, 1, 0.36, 1] as const;
  * Tanıtım video bölümü. Henüz video dosyası yüklenmemişse placeholder kart
  * gösterir; dosya `/public/promo/klinovax-tanitim.mp4` olarak eklenince
  * `VIDEO_SRC` aktif olur ve gerçek video oynatılır.
- *
- * Yükleme talimatı:
- *   1. Tanıtım video dosyasını H.264 MP4 olarak hazırla (30-60s, 1080p, <15MB).
- *   2. `apps/web/public/promo/klinovax-tanitim.mp4` olarak kaydet.
- *   3. (Opsiyonel) İlk frame'i poster.jpg olarak `public/promo/poster.jpg`'e koy.
- *   4. `VIDEO_SRC` constant'ını `/promo/klinovax-tanitim.mp4` yap.
  */
 const VIDEO_SRC: string | null = "/promo/klinovax-tanitim.mp4";
 const POSTER_SRC = "/brand/klinova-hero-preview.png";
 
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export function PromoVideoSection() {
   const shouldReduce = useReducedMotion();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isInView, setIsInView] = useState(false);
+  const [hasAutoplayed, setHasAutoplayed] = useState(false);
 
   useEffect(() => {
-    if (!VIDEO_SRC || shouldReduce) return;
     const v = videoRef.current;
     if (!v) return;
-    v.play().catch(() => setIsPlaying(false));
-  }, [shouldReduce]);
+    const handleTime = () => setCurrentTime(v.currentTime);
+    const handleMeta = () => setDuration(v.duration);
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    v.addEventListener("timeupdate", handleTime);
+    v.addEventListener("loadedmetadata", handleMeta);
+    v.addEventListener("durationchange", handleMeta);
+    v.addEventListener("play", handlePlay);
+    v.addEventListener("pause", handlePause);
+    v.addEventListener("ended", handlePause);
+    return () => {
+      v.removeEventListener("timeupdate", handleTime);
+      v.removeEventListener("loadedmetadata", handleMeta);
+      v.removeEventListener("durationchange", handleMeta);
+      v.removeEventListener("play", handlePlay);
+      v.removeEventListener("pause", handlePause);
+      v.removeEventListener("ended", handlePause);
+    };
+  }, []);
 
-  const togglePlay = () => {
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setIsInView(entry.isIntersecting),
+      { threshold: 0.5 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (v.paused) {
-      v.play();
-      setIsPlaying(true);
+    if (!isInView && !v.paused) {
+      v.pause();
+    }
+  }, [isInView]);
+
+  useEffect(() => {
+    if (!VIDEO_SRC || shouldReduce || !isInView || hasAutoplayed) return;
+    const v = videoRef.current;
+    if (!v) return;
+    v.play()
+      .then(() => setHasAutoplayed(true))
+      .catch(() => setIsPlaying(false));
+  }, [shouldReduce, isInView, hasAutoplayed]);
+
+  const togglePlay = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused || v.ended) {
+      v.play().catch(() => {});
     } else {
       v.pause();
-      setIsPlaying(false);
     }
-  };
+  }, []);
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
     v.muted = !v.muted;
     setIsMuted(v.muted);
-  };
+  }, []);
+
+  const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const t = Number(e.target.value);
+    v.currentTime = t;
+    setCurrentTime(t);
+  }, []);
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <section
@@ -107,6 +165,7 @@ export function PromoVideoSection() {
         </motion.div>
 
         <motion.div
+          ref={containerRef}
           initial={{ opacity: 0, y: shouldReduce ? 0 : 24, scale: 0.98 }}
           whileInView={{ opacity: 1, y: 0, scale: 1 }}
           viewport={{ once: true, margin: "-80px" }}
@@ -126,56 +185,129 @@ export function PromoVideoSection() {
                 src={VIDEO_SRC}
                 poster={POSTER_SRC}
                 muted={isMuted}
-                loop
                 playsInline
-                preload="none"
-                className="absolute inset-0 w-full h-full object-cover"
+                preload="metadata"
+                onClick={togglePlay}
+                className="absolute inset-0 w-full h-full object-cover cursor-pointer"
                 aria-label="KlinoVax platform tanıtım videosu"
               />
+
               <div
                 aria-hidden
-                className="absolute inset-0 pointer-events-none"
+                className="absolute inset-x-0 bottom-0 h-32 pointer-events-none"
                 style={{
                   background:
-                    "linear-gradient(180deg, transparent 60%, rgba(10,24,16,0.45) 100%)",
+                    "linear-gradient(180deg, transparent 0%, rgba(10,24,16,0.55) 60%, rgba(10,24,16,0.85) 100%)",
                 }}
               />
 
-              <div className="absolute bottom-4 sm:bottom-6 right-4 sm:right-6 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={toggleMute}
-                  className="w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center backdrop-blur-md"
-                  style={{
-                    backgroundColor: "rgba(255,255,255,0.18)",
-                    border: "1px solid rgba(255,255,255,0.3)",
-                    color: "white",
-                  }}
-                  aria-label={isMuted ? "Sesi aç" : "Sesi kapat"}
-                >
-                  {isMuted ? (
-                    <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" />
-                  ) : (
-                    <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                  )}
-                </button>
+              {!isPlaying && (
                 <button
                   type="button"
                   onClick={togglePlay}
-                  className="w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center"
-                  style={{
-                    backgroundColor: "var(--landing-accent)",
-                    color: "var(--landing-ink)",
-                    boxShadow: "0 6px 20px rgba(245,158,11,0.4)",
-                  }}
-                  aria-label={isPlaying ? "Duraklat" : "Oynat"}
+                  className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
+                  style={{ backgroundColor: "rgba(10,24,16,0.18)" }}
+                  aria-label="Oynat"
                 >
-                  {isPlaying ? (
-                    <Pause className="w-4 h-4 sm:w-5 sm:h-5" />
-                  ) : (
-                    <Play className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5" />
-                  )}
+                  <motion.span
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.25, ease: EASE }}
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center"
+                    style={{
+                      backgroundColor: "var(--landing-accent)",
+                      color: "var(--landing-ink)",
+                      boxShadow: "0 14px 44px rgba(245,158,11,0.55)",
+                    }}
+                  >
+                    <Play
+                      className="w-8 h-8 sm:w-10 sm:h-10 ml-1"
+                      strokeWidth={2.4}
+                    />
+                  </motion.span>
                 </button>
+              )}
+
+              <div className="absolute inset-x-0 bottom-0 z-20 px-4 sm:px-5 pb-4 sm:pb-5 pt-3 flex flex-col gap-2.5">
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 0}
+                  step={0.1}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full h-1.5 rounded-full appearance-none cursor-pointer outline-none
+                    [&::-webkit-slider-thumb]:appearance-none
+                    [&::-webkit-slider-thumb]:w-3.5
+                    [&::-webkit-slider-thumb]:h-3.5
+                    [&::-webkit-slider-thumb]:rounded-full
+                    [&::-webkit-slider-thumb]:bg-white
+                    [&::-webkit-slider-thumb]:shadow-[0_2px_8px_rgba(0,0,0,0.4)]
+                    [&::-webkit-slider-thumb]:cursor-pointer
+                    [&::-moz-range-thumb]:w-3.5
+                    [&::-moz-range-thumb]:h-3.5
+                    [&::-moz-range-thumb]:rounded-full
+                    [&::-moz-range-thumb]:bg-white
+                    [&::-moz-range-thumb]:border-0
+                    [&::-moz-range-thumb]:shadow-[0_2px_8px_rgba(0,0,0,0.4)]
+                    [&::-moz-range-thumb]:cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, var(--landing-accent) 0%, var(--landing-accent) ${progress}%, rgba(255,255,255,0.28) ${progress}%, rgba(255,255,255,0.28) 100%)`,
+                  }}
+                  aria-label="Video ilerleme"
+                />
+
+                <div className="flex items-center justify-between gap-3">
+                  <span
+                    className="text-xs sm:text-sm font-mono tabular-nums font-semibold"
+                    style={{ color: "white" }}
+                  >
+                    {formatTime(currentTime)} / {formatTime(duration)}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMute();
+                      }}
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center backdrop-blur-md cursor-pointer"
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.18)",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        color: "white",
+                      }}
+                      aria-label={isMuted ? "Sesi aç" : "Sesi kapat"}
+                    >
+                      {isMuted ? (
+                        <VolumeX className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                      ) : (
+                        <Volume2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePlay();
+                      }}
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center cursor-pointer"
+                      style={{
+                        backgroundColor: "var(--landing-accent)",
+                        color: "var(--landing-ink)",
+                        boxShadow: "0 4px 12px rgba(245,158,11,0.4)",
+                      }}
+                      aria-label={isPlaying ? "Duraklat" : "Oynat"}
+                    >
+                      {isPlaying ? (
+                        <Pause className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                      ) : (
+                        <Play className="w-4 h-4 sm:w-[18px] sm:h-[18px] ml-0.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             </>
           ) : (
