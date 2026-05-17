@@ -3,9 +3,14 @@ import withPWAInit from "@ducanh2912/next-pwa";
 import { withSentryConfig } from '@sentry/nextjs';
 import path from "node:path";
 
-// Parent dizinde (Desktop/deva-project) alakasız bir package.json + node_modules var.
-// Pin'lemezsek Next/Turbopack root'u oraya kaydırıp tailwindcss'i kaybediyor.
-const projectRoot = path.resolve(".");
+// Monorepo root (apps/web'in iki üstü). Turbopack workspace boundary'sini ve
+// outputFileTracingRoot'u burası belirler. pnpm workspaces'te node_modules/.pnpm
+// monorepo köküne yazılır; turbopack.root apps/web olursa symlink'lenmiş paketler
+// "dışarıda" sayılıp `next/package.json` resolve edilemez (Vercel build hatası).
+// Local dev'de pnpm --filter web dev CWD'yi apps/web yapar → '..' '..' = repo root.
+// Eski not (Desktop/deva-project parent issue): artık geçerli değil çünkü apps/web
+// gerçek bir monorepo içinde, parent'ta legit pnpm-workspace.yaml var.
+const projectRoot = path.resolve("..", "..");
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
