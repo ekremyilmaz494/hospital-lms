@@ -24,6 +24,7 @@ import { BlurFade } from '@/components/ui/blur-fade'
 interface FormData {
   organizationName: string
   organizationCode: string
+  sector: string
   address: string
   phone: string
   firstName: string
@@ -32,6 +33,16 @@ interface FormData {
   password: string
   passwordConfirm: string
 }
+
+// Faz 3: Sektör seçenekleri — register form için Türkçe label'larla.
+// Backend Sector enum'ı ile birebir aynı value'lar (healthcare/manufacturing/...).
+const SECTOR_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'healthcare', label: 'Sağlık (Hastane, Klinik)' },
+  { value: 'manufacturing', label: 'Üretim (Fabrika, Sanayi)' },
+  { value: 'education', label: 'Eğitim (Okul, Kurs)' },
+  { value: 'retail', label: 'Perakende (Mağaza, Zincir)' },
+  { value: 'other', label: 'Diğer / Genel' },
+]
 
 interface FieldErrors {
   [key: string]: string | undefined
@@ -51,6 +62,9 @@ function validateStep1(data: FormData): FieldErrors {
     errors.organizationCode = 'Organizasyon kodu en fazla 20 karakter olabilir'
   } else if (!ORGANIZATION_CODE_REGEX.test(data.organizationCode)) {
     errors.organizationCode = 'Sadece kucuk harf, rakam ve tire kullanin'
+  }
+  if (!data.sector || !SECTOR_OPTIONS.some((o) => o.value === data.sector)) {
+    errors.sector = 'Sektör seçimi zorunludur'
   }
   if (data.address && data.address.length > 500) {
     errors.address = 'Adres en fazla 500 karakter olabilir'
@@ -137,6 +151,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState<FormData>({
     organizationName: '',
     organizationCode: '',
+    sector: '',
     address: '',
     phone: '',
     firstName: '',
@@ -195,6 +210,7 @@ export default function RegisterPage() {
         body: JSON.stringify({
           organizationName: form.organizationName,
           organizationCode: form.organizationCode,
+          sector: form.sector,
           address: form.address || undefined,
           phone: form.phone || undefined,
           firstName: form.firstName,
@@ -394,6 +410,35 @@ export default function RegisterPage() {
                       Kucuk harf, rakam ve tire (-) kullanilabilir. 3-20 karakter.
                     </p>
                     {errors.organizationCode && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.organizationCode}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="sector" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                      Sektör *
+                    </Label>
+                    <select
+                      id="sector"
+                      value={form.sector}
+                      onChange={(e) => update('sector', e.target.value)}
+                      className="mt-1.5 w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none"
+                      style={{
+                        borderColor: errors.sector ? '#dc2626' : 'var(--color-border)',
+                        color: 'var(--color-text-primary)',
+                      }}
+                    >
+                      <option value="" disabled>
+                        Bir sektör seçin…
+                      </option>
+                      {SECTOR_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+                      Sektör seçimi platform içindeki menüleri ve özellikleri belirler.
+                    </p>
+                    {errors.sector && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.sector}</p>}
                   </div>
 
                   <div>

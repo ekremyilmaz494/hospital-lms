@@ -1,5 +1,6 @@
 import { z } from 'zod/v4'
 import { isValidTcKimlik, normalizeTcKimlik } from './tc'
+import { Sector } from '@/generated/prisma/enums'
 
 // ── Self-Service Kayıt ──
 export const selfRegisterSchema = z.object({
@@ -8,6 +9,9 @@ export const selfRegisterSchema = z.object({
     .min(3, 'Organizasyon kodu en az 3 karakter olmalıdır')
     .max(20, 'Organizasyon kodu en fazla 20 karakter olabilir')
     .regex(/^[a-z0-9-]+$/, 'Organizasyon kodu sadece küçük harf, rakam ve tire içerebilir'),
+  // Faz 3 (2026-05-17): Sektör seçimi zorunlu — register formundaki dropdown'la
+  // doldurulur. DB default 'healthcare' korunuyor ama public registration explicit.
+  sector: z.enum(Sector, { error: () => 'Geçerli bir sektör seçin' }),
   address: z.string().max(500, 'Adres en fazla 500 karakter olabilir').optional(),
   phone: z.string().max(20, 'Telefon en fazla 20 karakter olabilir').optional(),
   firstName: z.string().min(2, 'Ad en az 2 karakter olmalıdır').max(100, 'Ad en fazla 100 karakter olabilir'),

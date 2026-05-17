@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return errorResponse(parsed.error.issues.map(i => i.message).join(', '))
   }
 
-  const { organizationName, organizationCode, address, phone, firstName, lastName, email, password } = parsed.data
+  const { organizationName, organizationCode, sector, address, phone, firstName, lastName, email, password } = parsed.data
 
   // Email bazlı rate limit: 1 istek / 24 saat
   const emailAllowed = await checkRateLimit(`register:email:${email.toLowerCase()}`, 1, 86400)
@@ -52,6 +52,7 @@ export async function POST(request: Request) {
       data: {
         name: organizationName,
         code: organizationCode,
+        sector,
         address: address || null,
         phone: phone || null,
         email,
