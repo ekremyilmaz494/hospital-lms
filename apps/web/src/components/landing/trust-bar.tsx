@@ -1,16 +1,16 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { Stethoscope, Factory, Users, GraduationCap, Award, Building2 } from "lucide-react";
+import { Stethoscope, Users, GraduationCap, Award, Building2 } from "lucide-react";
 import { NumberTicker } from "@/components/ui/number-ticker";
 
 const LOGO_MARKS = [
-  { sector: "health" as const, name: "Devakent Hastanesi", short: "DK" },
-  { sector: "health" as const, name: "Atlas Klinik", short: "AT" },
-  { sector: "health" as const, name: "Mavi Eczane", short: "ME" },
-  { sector: "industry" as const, name: "Hedef Üretim", short: "HÜ" },
-  { sector: "industry" as const, name: "Volt Endüstri", short: "VE" },
-  { sector: "industry" as const, name: "Akış Lojistik", short: "AL" },
+  { name: "Devakent Hastanesi", short: "DK" },
+  { name: "Atlas Klinik", short: "AT" },
+  { name: "Mavi Eczane", short: "ME" },
+  { name: "Lila Tıp Merkezi", short: "LT" },
+  { name: "Demir Diş Polikliniği", short: "DD" },
+  { name: "Yeşilköy Eczanesi", short: "YE" },
 ];
 
 const STATS = [
@@ -42,7 +42,7 @@ export function TrustBar() {
             className="text-[10px] sm:text-[11px] font-black tracking-[0.24em] uppercase"
             style={{ color: "var(--landing-ink-soft)" }}
           >
-            Sağlıktan üretime, klinik disiplinde
+Türkiye&apos;nin sağlık kurumları
           </p>
         </motion.div>
 
@@ -71,11 +71,8 @@ export function TrustBar() {
             className="flex gap-3 sm:gap-4 w-max"
           >
             {duplicated.map((mark, i) => {
-              const Icon = mark.sector === "health" ? Stethoscope : Factory;
-              const accent =
-                mark.sector === "health"
-                  ? "var(--landing-sector-health)"
-                  : "var(--landing-sector-industry)";
+              const Icon = Stethoscope;
+              const accent = "var(--landing-sector-health)";
               return (
                 <div
                   key={`${mark.name}-${i}`}
@@ -106,7 +103,7 @@ export function TrustBar() {
                       style={{ color: accent }}
                     >
                       <Icon className="w-3 h-3" strokeWidth={2.4} />
-                      {mark.sector === "health" ? "Sağlık" : "Üretim"}
+                      Sağlık
                     </span>
                   </div>
                 </div>

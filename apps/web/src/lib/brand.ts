@@ -13,10 +13,10 @@ const supportEmail = fromEnv('SUPPORT_EMAIL') ?? 'destek@klinovax.com'
 export const BRAND = {
   name: fromEnv('NEXT_PUBLIC_BRAND_NAME') ?? 'KlinoVax',
   fullName: fromEnv('NEXT_PUBLIC_BRAND_FULL_NAME') ?? 'KlinoVax Eğitim Platformu',
-  shortDesc: fromEnv('NEXT_PUBLIC_BRAND_SHORT_DESC') ?? 'Klinik disiplinli kurumsal personel eğitim platformu',
+  shortDesc: fromEnv('NEXT_PUBLIC_BRAND_SHORT_DESC') ?? 'Sağlık kurumları için klinik disiplinli personel eğitim platformu',
   longDesc:
     fromEnv('NEXT_PUBLIC_BRAND_LONG_DESC') ??
-    'Sağlıktan üretime, her sektör için klinik disiplinde personel eğitimi: atama, video, sınav, sertifika, KVKK & ISO 45001 uyum raporlaması — kurumunuza özel uçtan uca otomasyon.',
+    'Hastane, klinik ve eczaneler için klinik disiplinde personel eğitimi: atama, video, sınav, sertifika, KVKK uyum raporlaması — kurumunuza özel uçtan uca otomasyon.',
   domain: fromEnv('NEXT_PUBLIC_BRAND_DOMAIN') ?? 'klinovax.com',
   /** SES SendEmail "From" address — DKIM imzalı domain'den çıkmalı. */
   fromAddress: fromEnv('SES_FROM_EMAIL') ?? 'noreply@klinovax.com',

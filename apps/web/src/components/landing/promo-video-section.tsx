@@ -92,9 +92,9 @@ export function PromoVideoSection() {
             className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-[1.1]"
             style={{ color: "var(--landing-ink)" }}
           >
-            90 saniyede{" "}
+            Bir bakışta{" "}
             <span style={{ color: "var(--landing-brand)" }}>
-              KlinoVax süreci.
+              KlinoVax.
             </span>
           </h2>
           <p
@@ -199,15 +199,8 @@ export function PromoVideoSection() {
             Gerçek dashboard
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: "var(--landing-accent)" }}
-            />
-            90 saniye
-          </span>
-          <span className="inline-flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5" />
-            KVKK & ISO 45001 demosu
+            KVKK demosu
           </span>
         </motion.div>
       </div>
