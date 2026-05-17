@@ -51,6 +51,8 @@ function createRequest(body: unknown) {
 const validBody = {
   organizationName: 'Ankara Hastanesi',
   organizationCode: 'ankara-hastanesi',
+  // Faz 3 (2026-05-17): sector enum zorunlu hâle geldi
+  sector: 'healthcare',
   email: 'admin@ankara.com',
   password: 'SecurePass123!',
   firstName: 'Ahmet',
