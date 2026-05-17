@@ -281,8 +281,7 @@ export function ScrollStorySection() {
                 className="text-3xl md:text-4xl xl:text-[2.75rem] font-black leading-[1.05] tracking-tight"
                 style={{ color: "#1a3a28", maxWidth: 640 }}
               >
-                Dört ekranda anlatılan hikâye.
-                <span style={{ color: "var(--brand-600)" }}> Kaydırmaya başlayın.</span>
+                <span style={{ color: "var(--brand-600)" }}>Kaydırmaya başlayın.</span>
               </h2>
             </div>
             <div

@@ -10,15 +10,11 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 const FAQS = [
   {
     q: "Hangi kurumlar kullanabilir?",
-    a: "Personeli olan her kurum — hastane, klinik, eczane, üretim fabrikası, lojistik deposu, perakende mağaza zinciri, otel & F&B işletmesi. Multi-tenant mimari sayesinde her kurumun verisi izole alanda saklanır, sektör-spesifik eğitim katalogları açılabilir.",
+    a: "Hastane, klinik, eczane gibi sağlık kurumları için tasarlandı. Multi-tenant mimari sayesinde her kurumun verisi izole alanda saklanır, kuruma özel eğitim katalogları açılabilir.",
   },
   {
     q: "Sağlık kurumları için hangi eğitim setleri hazır?",
-    a: "Hijyen & Enfeksiyon Kontrolü, CPR & Acil Müdahale, Hasta Güvenliği, KVKK, JCI uyum protokolleri, Tıbbi Atık, İlaç Güvenliği gibi sağlık-zorunlu modüller hazır şablon olarak gelir. Kendi içeriklerinizi de yükleyebilirsiniz.",
-  },
-  {
-    q: "Üretim & fabrika için hangi eğitimler var?",
-    a: "İSG Temel Modülü, ISO 45001 İş Sağlığı & Güvenliği, Forklift Operatörlüğü, Yüksekte Çalışma, Acil Tahliye, Yangın Müdahale, Kimyasal Madde Güvenliği gibi sanayi-zorunlu eğitimler hazır. SCORM içerik aktarımı desteklenir.",
+    a: "Hijyen & Enfeksiyon Kontrolü, CPR & Acil Müdahale, Hasta Güvenliği, KVKK, Tıbbi Atık & Steril Süreç, İlaç Güvenliği gibi sağlık-zorunlu modüller hazır şablon olarak gelir. Kendi içeriklerinizi de yükleyebilirsiniz.",
   },
   {
     q: "Personel eğitimleri nasıl atanır?",
@@ -30,7 +26,7 @@ const FAQS = [
   },
   {
     q: "Sertifikalar nasıl doğrulanır?",
-    a: "Başarılı sınav sonrası otomatik üretilen sertifikada benzersiz QR kod yer alır. Bu QR kod kamerayla okunduğunda sertifika kayıtla anlık eşleşir; sahte sertifika basımı engellenir, denetimde saniyeler içinde doğrulanır. ISO 45001 ve JCI denetimlerine uyumlu rapor formatı.",
+    a: "Başarılı sınav sonrası otomatik üretilen sertifikada benzersiz QR kod yer alır. Bu QR kod kamerayla okunduğunda sertifika kayıtla anlık eşleşir; sahte sertifika basımı engellenir, denetimde saniyeler içinde doğrulanır.",
   },
   {
     q: "Verilerimiz nerede saklanır, KVKK uyumu nasıl?",

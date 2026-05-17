@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
   motion,
@@ -16,12 +15,10 @@ import {
   Award,
   Bell,
   Stethoscope,
-  Factory,
   ShieldCheck,
-  HardHat,
 } from "lucide-react";
 
-type Sector = "health" | "industry";
+type Sector = "health";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -58,23 +55,6 @@ const SECTOR_CONFIG: Record<
     notification: { title: "Sertifika Kazanıldı!", person: "Hijyen Eğitimi — Ayşe K." },
     quote: { initials: "Dr", text: "Personelimiz artık çok daha hazırlıklı!" },
     bgGradient: "linear-gradient(145deg, #1a3a28 0%, #0d2010 100%)",
-  },
-  industry: {
-    label: "Üretim",
-    Icon: Factory,
-    accent: "var(--landing-sector-industry)",
-    headline: "İSG, ISO 45001, Forklift Operatörlüğü",
-    badge: "Aktif Eğitim",
-    badgeTone: "● Vardiya Eğitimi",
-    activeTraining: "İSG Temel Modülü & Acil Tahliye",
-    badgeIcon: HardHat,
-    stats: [
-      { label: "Uyum Oranı", value: "%97", icon: TrendingUp, color: "#fbbf24" },
-      { label: "Operatör", value: "342", icon: Users, color: "#f59e0b" },
-    ],
-    notification: { title: "ISO 45001 Yenilendi!", person: "Forklift Sertifikası — Mehmet K." },
-    quote: { initials: "İSG", text: "Saha vardiya eğitimi artık 4 günden 1 güne indi." },
-    bgGradient: "linear-gradient(145deg, #2d1f0c 0%, #1a1206 100%)",
   },
 };
 
@@ -269,17 +249,16 @@ const HEADLINE_WORDS = [
   "disiplinli",
   "kurumsal",
   "eğitim.",
-  "Tek",
-  "platform,",
-  "her",
-  "sektör.",
+  "Sağlık",
+  "ekibinize",
+  "özel.",
 ];
 
 const HIGHLIGHT_INDICES = new Set([0, 1]);
 
 export function HeroSection() {
   const shouldReduce = useReducedMotion();
-  const [sector, setSector] = useState<Sector>("health");
+  const sector: Sector = "health";
 
   return (
     <section
@@ -287,59 +266,6 @@ export function HeroSection() {
       className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-16 xl:py-24 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center"
     >
       <div>
-        <motion.div
-          initial={{ opacity: 0, y: shouldReduce ? 0 : 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: EASE }}
-          className="inline-flex items-center gap-1 p-1 rounded-full border mb-7"
-          style={{
-            borderColor: "var(--landing-rule)",
-            backgroundColor: "var(--landing-surface)",
-          }}
-          role="tablist"
-          aria-label="Sektör seçin"
-        >
-          {(Object.keys(SECTOR_CONFIG) as Sector[]).map((key) => {
-            const cfg = SECTOR_CONFIG[key];
-            const Icon = cfg.Icon;
-            const isActive = sector === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => setSector(key)}
-                className="relative inline-flex items-center gap-2 px-4 py-2 text-xs font-black tracking-[0.16em] uppercase rounded-full cursor-pointer"
-                style={{
-                  color: isActive ? "white" : "var(--landing-ink-soft)",
-                  transition: "color 220ms var(--landing-ease)",
-                }}
-              >
-                {isActive &&
-                  (shouldReduce ? (
-                    <div
-                      className="absolute inset-0 rounded-full"
-                      style={{ backgroundColor: cfg.accent }}
-                    />
-                  ) : (
-                    <motion.div
-                      layoutId="sector-pill"
-                      className="absolute inset-0 rounded-full"
-                      style={{ backgroundColor: cfg.accent }}
-                      transition={{ duration: 0.4, ease: EASE }}
-                    />
-                  ))}
-                <Icon
-                  className="w-3.5 h-3.5 relative z-10"
-                  strokeWidth={2.4}
-                />
-                <span className="relative z-10">{cfg.label}</span>
-              </button>
-            );
-          })}
-        </motion.div>
-
         <h1
           className="text-[2rem] sm:text-[2.75rem] xl:text-[3.5rem] font-black leading-[1.04] mb-5 sm:mb-6 tracking-tight"
           style={{ color: "var(--landing-ink)" }}

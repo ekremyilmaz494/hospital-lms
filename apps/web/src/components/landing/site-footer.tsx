@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Stethoscope, Factory } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 
 const COLUMNS = [
@@ -12,13 +12,6 @@ const COLUMNS = [
       { label: "Süreç", href: "#sureç" },
       { label: "Güvenlik & KVKK", href: "#guvenlik" },
       { label: "SSS", href: "#sss" },
-    ],
-  },
-  {
-    title: "Sektörler",
-    items: [
-      { label: "Sağlık", href: "#sektor-health", icon: Stethoscope },
-      { label: "Üretim & Lojistik", href: "#sektor-industry", icon: Factory },
     ],
   },
 ] as const;
@@ -62,8 +55,8 @@ export function SiteFooter() {
               className="text-xs leading-relaxed mb-5 max-w-[260px]"
               style={{ color: "var(--landing-ink-muted)" }}
             >
-              Klinik disiplinli kurumsal personel eğitim platformu. Sağlıktan
-              üretime, her sektör için.
+              Sağlık kurumları için klinik disiplinli personel eğitim
+              platformu.
             </p>
 
             <form
@@ -99,24 +92,20 @@ export function SiteFooter() {
             <div key={col.title}>
               <h4 className="font-bold text-white text-sm mb-4">{col.title}</h4>
               <ul className="space-y-2.5">
-                {col.items.map((item) => {
-                  const Icon = "icon" in item ? item.icon : null;
-                  return (
-                    <li key={item.label}>
-                      <a
-                        href={item.href}
-                        className="text-sm hover:text-white inline-flex items-center gap-2"
-                        style={{
-                          color: "var(--landing-ink-muted)",
-                          transition: "color 160ms var(--landing-ease)",
-                        }}
-                      >
-                        {Icon && <Icon className="w-3.5 h-3.5" />}
-                        {item.label}
-                      </a>
-                    </li>
-                  );
-                })}
+                {col.items.map((item) => (
+                  <li key={item.label}>
+                    <a
+                      href={item.href}
+                      className="text-sm hover:text-white inline-flex items-center gap-2"
+                      style={{
+                        color: "var(--landing-ink-muted)",
+                        transition: "color 160ms var(--landing-ease)",
+                      }}
+                    >
+                      {item.label}
+                    </a>
+                  </li>
+                ))}
               </ul>
             </div>
           ))}

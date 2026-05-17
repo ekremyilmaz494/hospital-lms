@@ -7,13 +7,10 @@ import { useGSAP } from "@gsap/react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Stethoscope,
-  HardHat,
   ShieldCheck,
   HeartPulse,
   ClipboardCheck,
   Award,
-  Flame,
-  Truck,
   AlertTriangle,
 } from "lucide-react";
 import { useMobile } from "@/hooks/use-mobile";
@@ -34,7 +31,7 @@ type Card = {
 };
 
 type Panel = {
-  key: "health" | "industry";
+  key: "health";
   tag: string;
   Icon: typeof Stethoscope;
   title: string;
@@ -48,10 +45,10 @@ type Panel = {
 const PANELS: Panel[] = [
   {
     key: "health",
-    tag: "Sektör 01 — Sağlık",
+    tag: "Sağlık Eğitim Setleri",
     Icon: Stethoscope,
-    title: "Klinik kalite, JCI denetimine hazır.",
-    desc: "Hastane, klinik ve eczanelere özel zorunlu eğitim modülleri. KVKK, Sağlık Bakanlığı ve JCI uyum paketleri ile tek tıkla atama.",
+    title: "Klinik kalite, sağlık ekibine hazır.",
+    desc: "Hastane, klinik ve eczanelere özel zorunlu eğitim modülleri. KVKK ve Sağlık Bakanlığı uyum paketleri ile tek tıkla atama.",
     accent: "var(--landing-sector-health)",
     accentSoft: "var(--landing-sector-health-soft)",
     bgGradient:
@@ -79,52 +76,11 @@ const PANELS: Panel[] = [
         Icon: ClipboardCheck,
       },
       {
-        title: "JCI Akreditasyon",
-        desc: "Joint Commission International standartları, denetim öncesi hazırlık ve doküman.",
-        duration: "6 saat",
+        title: "Tıbbi Atık & Steril Süreç",
+        desc: "Sağlık Bakanlığı protokolleri, atık ayrıştırma, sterilizasyon adımları, kontaminasyon önleme.",
+        duration: "3 saat",
         badge: { label: "Zorunlu", tone: "required" },
         Icon: Award,
-      },
-    ],
-  },
-  {
-    key: "industry",
-    tag: "Sektör 02 — Üretim & Lojistik",
-    Icon: HardHat,
-    title: "Saha disiplini, ISO 45001 uyumlu.",
-    desc: "Fabrika, depo ve saha personeline yönelik İSG, kalite ve operasyonel eğitimler. Vardiya-uyumlu mobil erişim, SCORM içerik aktarımı.",
-    accent: "var(--landing-sector-industry)",
-    accentSoft: "var(--landing-sector-industry-soft)",
-    bgGradient:
-      "linear-gradient(145deg, #2a1c0a 0%, #1a1206 100%)",
-    cards: [
-      {
-        title: "İSG Temel Modülü",
-        desc: "6331 sayılı İSG Kanunu, risk değerlendirmesi, KKD kullanımı — yıllık tekrar zorunlu.",
-        duration: "8 saat",
-        badge: { label: "Zorunlu", tone: "required" },
-        Icon: ShieldCheck,
-      },
-      {
-        title: "ISO 45001 İş Sağlığı & Güvenliği",
-        desc: "Yönetim sistemi standardı, dokümantasyon, iç denetim — tedarikçi onayı için kritik.",
-        duration: "5 saat",
-        badge: { label: "Sertifikalı", tone: "new" },
-        Icon: Award,
-      },
-      {
-        title: "Forklift & Saha Operatörlüğü",
-        desc: "Pratik + teorik forklift sertifikası, yüksekte çalışma, kapalı alan güvenliği.",
-        duration: "10 saat",
-        badge: { label: "Popüler", tone: "popular" },
-        Icon: Truck,
-      },
-      {
-        title: "Acil Tahliye & Yangın",
-        desc: "Yangın söndürücü tipleri, tahliye senaryoları, ilk yardım entegrasyonu — yıllık tatbikat.",
-        duration: "4 saat",
-        badge: { label: "Zorunlu", tone: "required" },
-        Icon: Flame,
       },
     ],
   },
@@ -132,7 +88,7 @@ const PANELS: Panel[] = [
 
 const BADGE_STYLES: Record<
   Card["badge"]["tone"],
-  { bg: string; fg: string; Icon: typeof Flame }
+  { bg: string; fg: string; Icon: typeof AlertTriangle }
 > = {
   required: { bg: "var(--landing-accent)", fg: "var(--landing-ink)", Icon: AlertTriangle },
   new: { bg: "var(--landing-brand)", fg: "white", Icon: Award },
@@ -144,7 +100,7 @@ export function IndustryShowcase() {
   const trackRef = useRef<HTMLDivElement>(null);
   const shouldReduce = useReducedMotion();
   const isMobile = useMobile();
-  const disablePin = isMobile || shouldReduce;
+  const disablePin = isMobile || shouldReduce || PANELS.length < 2;
 
   useGSAP(
     () => {
@@ -182,7 +138,7 @@ export function IndustryShowcase() {
         backgroundColor: "var(--landing-bg)",
         minHeight: disablePin ? "auto" : "100vh",
       }}
-      aria-label="Sektörler — sağlık ve üretim"
+      aria-label="Sağlık eğitim setleri"
     >
       {/* Mobil / reduced motion → vertical stack */}
       {disablePin && (
@@ -198,13 +154,13 @@ export function IndustryShowcase() {
               className="text-[10px] font-black tracking-[0.24em] uppercase mb-3"
               style={{ color: "var(--landing-brand)" }}
             >
-              Sektörler
+              Eğitim Setleri
             </p>
             <h2
               className="text-2xl sm:text-3xl font-black leading-[1.1] tracking-tight"
               style={{ color: "var(--landing-ink)" }}
             >
-              Her sektör için{" "}
+              Sağlık ekibinize{" "}
               <span style={{ color: "var(--landing-brand)" }}>
                 hazır eğitim seti.
               </span>
@@ -243,7 +199,6 @@ export function IndustryShowcase() {
             ))}
           </div>
 
-          <ProgressIndicator />
         </div>
       )}
     </section>
@@ -445,26 +400,3 @@ function TrainingCard({
   );
 }
 
-function ProgressIndicator() {
-  return (
-    <div
-      className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3 px-5 py-2.5 rounded-full"
-      style={{
-        backgroundColor: "rgba(255,255,255,0.85)",
-        backdropFilter: "blur(10px)",
-        border: "1px solid var(--landing-rule)",
-      }}
-    >
-      <span
-        className="w-1.5 h-1.5 rounded-full animate-pulse"
-        style={{ backgroundColor: "var(--landing-brand)" }}
-      />
-      <span
-        className="text-[10px] font-black tracking-[0.2em] uppercase"
-        style={{ color: "var(--landing-ink)" }}
-      >
-        Kaydır → 2 sektör
-      </span>
-    </div>
-  );
-}

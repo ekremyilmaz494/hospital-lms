@@ -3,37 +3,19 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, Menu, X, Stethoscope, Factory } from "lucide-react";
+import { ChevronRight, Menu, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 
 const PRIMARY_NAV = [
   { label: "Özellikler", href: "#ozellikler" },
-  { label: "Sektörler", href: "#sektorler" },
+  { label: "Sağlık", href: "#sektorler" },
   { label: "Süreç", href: "#surec" },
   { label: "SSS", href: "#sss" },
 ];
 
-const SECTOR_LINKS = [
-  {
-    key: "health",
-    label: "Sağlık",
-    sub: "Hastane, klinik, eczane",
-    icon: Stethoscope,
-    accent: "var(--landing-sector-health)",
-  },
-  {
-    key: "industry",
-    label: "Üretim & Lojistik",
-    sub: "Fabrika, depo, saha",
-    icon: Factory,
-    accent: "var(--landing-sector-industry)",
-  },
-] as const;
-
 export function SiteNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [sectorOpen, setSectorOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -88,87 +70,7 @@ export function SiteNav() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-7">
-          <div
-            className="relative"
-            onMouseEnter={() => setSectorOpen(true)}
-            onMouseLeave={() => setSectorOpen(false)}
-          >
-            <button
-              type="button"
-              aria-haspopup="true"
-              aria-expanded={sectorOpen}
-              onClick={() => setSectorOpen((v) => !v)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setSectorOpen(false);
-              }}
-              className="text-sm font-semibold hover:opacity-70 flex items-center gap-1"
-              style={{ color: "var(--landing-ink)" }}
-            >
-              Sektörler
-              <ChevronRight
-                className="w-3.5 h-3.5"
-                style={{
-                  transform: sectorOpen ? "rotate(90deg)" : "rotate(0deg)",
-                  transition: "transform 180ms var(--landing-ease)",
-                }}
-              />
-            </button>
-            <AnimatePresence>
-              {sectorOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                  className="absolute top-full left-1/2 -translate-x-1/2 pt-3"
-                >
-                  <div
-                    className="w-[340px] max-w-[calc(100vw-32px)] rounded-2xl p-2 shadow-2xl"
-                    style={{
-                      backgroundColor: "var(--landing-bg)",
-                      border: "1px solid var(--landing-rule)",
-                      boxShadow: "var(--landing-shadow-card)",
-                    }}
-                  >
-                    {SECTOR_LINKS.map((s) => {
-                      const Icon = s.icon;
-                      return (
-                        <a
-                          key={s.key}
-                          href={`#sektor-${s.key}`}
-                          className="flex items-start gap-3 p-3 rounded-xl hover:bg-black/[0.03]"
-                          style={{ transition: "background-color 160ms var(--landing-ease)" }}
-                        >
-                          <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: s.accent, color: "white" }}
-                          >
-                            <Icon className="w-5 h-5" strokeWidth={2.2} />
-                          </div>
-                          <div>
-                            <p
-                              className="text-sm font-bold"
-                              style={{ color: "var(--landing-ink)" }}
-                            >
-                              {s.label}
-                            </p>
-                            <p
-                              className="text-xs mt-0.5"
-                              style={{ color: "var(--landing-ink-soft)" }}
-                            >
-                              {s.sub}
-                            </p>
-                          </div>
-                        </a>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {PRIMARY_NAV.filter((n) => n.label !== "Sektörler").map(({ label, href }) => (
+          {PRIMARY_NAV.map(({ label, href }) => (
             <a
               key={label}
               href={href}
@@ -230,37 +132,7 @@ export function SiteNav() {
               boxShadow: "var(--landing-shadow-card)",
             }}
           >
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {SECTOR_LINKS.map((s) => {
-                const Icon = s.icon;
-                return (
-                  <a
-                    key={s.key}
-                    href={`#sektor-${s.key}`}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2 p-2.5 rounded-xl"
-                    style={{
-                      backgroundColor: "color-mix(in srgb, " + s.accent + " 8%, transparent)",
-                    }}
-                  >
-                    <div
-                      className="w-7 h-7 rounded-md flex items-center justify-center text-white"
-                      style={{ backgroundColor: s.accent }}
-                    >
-                      <Icon className="w-4 h-4" strokeWidth={2.2} />
-                    </div>
-                    <span
-                      className="text-xs font-bold"
-                      style={{ color: "var(--landing-ink)" }}
-                    >
-                      {s.label}
-                    </span>
-                  </a>
-                );
-              })}
-            </div>
-
-            {PRIMARY_NAV.filter((n) => n.label !== "Sektörler").map(({ label, href }) => (
+            {PRIMARY_NAV.map(({ label, href }) => (
               <a
                 key={label}
                 href={href}
