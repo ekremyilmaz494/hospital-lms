@@ -25,6 +25,7 @@ import {
   UserCog,
   type LucideIcon,
 } from 'lucide-react';
+import type { Sector } from '@/generated/prisma/enums';
 
 export interface NavItem {
   title: string;
@@ -34,11 +35,31 @@ export interface NavItem {
   badge?: string;
   /** true → yalnızca Organization.ownerUserId === current user'a görünür */
   ownerOnly?: boolean;
+  /**
+   * Hangi sektörlerde gösterilsin. `undefined` → tüm sektörler (default).
+   * Faz 3 sektör-agnostik refactor: sağlık-spesifik regülasyon kalemleri
+   * (SMG, SKS uyum) sadece healthcare org'larda görünür.
+   */
+  sectors?: Sector[];
 }
 
 export interface NavGroup {
   label?: string;
   items: NavItem[];
+}
+
+/**
+ * Sektör-spesifik nav item'larını filtrele.
+ * `sectors` tanımsız → tüm sektörlerde görünür (default).
+ * Boş kalan group'lar (filtre sonrası 0 item) listeden düşer.
+ */
+export function filterNavBySector(groups: NavGroup[], sector: Sector): NavGroup[] {
+  return groups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((it) => !it.sectors || it.sectors.includes(sector)),
+    }))
+    .filter((g) => g.items.length > 0);
 }
 
 // Geliştirme aşamasındaki modüller — müşteriye (demo/prod) kapalı.
@@ -140,6 +161,7 @@ export const adminNav: NavGroup[] = [
         title: 'SMG Takibi',
         href: '/admin/smg',
         icon: Star,
+        sectors: ['healthcare'],
         children: [
           { title: 'Genel Bakış', href: '/admin/smg' },
           { title: 'SKS Denetim Raporu', href: '/admin/smg/inspection' },
@@ -150,7 +172,7 @@ export const adminNav: NavGroup[] = [
   {
     label: 'UYUM & RAPORLAMA',
     items: [
-      { title: 'Uyum Raporu', href: '/admin/compliance', icon: ShieldCheck },
+      { title: 'Uyum Raporu', href: '/admin/compliance', icon: ShieldCheck, sectors: ['healthcare'] },
       { title: 'Etkinlik Analizi', href: '/admin/effectiveness', icon: TrendingUp },
       {
         title: 'Geri Bildirim',
@@ -196,7 +218,7 @@ export const staffNav: NavGroup[] = [
       { title: 'Dashboard', href: '/staff/dashboard', icon: LayoutDashboard },
       { title: 'Eğitimlerim', href: '/staff/my-trainings', icon: BookOpen },
       { title: 'Sertifikalarım', href: '/staff/certificates', icon: Award },
-      { title: 'SMG Puanlarım', href: '/staff/smg', icon: Star },
+      { title: 'SMG Puanlarım', href: '/staff/smg', icon: Star, sectors: ['healthcare'] },
       { title: 'Takvim', href: '/staff/calendar', icon: Calendar },
       { title: 'Bildirimler', href: '/staff/notifications', icon: Bell },
       { title: 'Geri Bildirimler', href: '/staff/feedback', icon: MessageSquare },

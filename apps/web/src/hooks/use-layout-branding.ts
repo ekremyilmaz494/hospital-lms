@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import type { Sector } from '@/generated/prisma/enums'
 
 /** Authenticated layout'larda organizasyon branding bilgileri */
 export interface LayoutBranding {
@@ -13,14 +14,16 @@ export interface LayoutBranding {
   ownerUserId: string | null
   /** Plan-bazlı admin limiti */
   maxAdmins: number
+  /** Organizasyon sektörü — sidebar/feature filtreleri için */
+  sector: Sector
 }
 
 /**
  * Authenticated kullanicilar icin organizasyon branding'ini ceker.
  * CSS custom property'leri (--brand-primary, --brand-secondary) dinamik olarak gunceller.
  */
-// v3: ownerUserId backfill sonrası tüm istemcileri zorla yenilemek için bump
-const CACHE_KEY = 'org-branding:v3'
+// v4: sector eklendi (Faz 3) — eski cache invalidate
+const CACHE_KEY = 'org-branding:v4'
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 dakika
 
 function applyBrandingVars(b: LayoutBranding) {
@@ -64,6 +67,7 @@ export function useLayoutBranding() {
           secondaryColor: data.secondaryColor ?? '#3B82F6',
           ownerUserId: data.ownerUserId ?? null,
           maxAdmins: typeof data.maxAdmins === 'number' ? data.maxAdmins : 5,
+          sector: (data.sector as Sector | undefined) ?? 'healthcare',
         }
         setBranding(b)
         applyBrandingVars(b)

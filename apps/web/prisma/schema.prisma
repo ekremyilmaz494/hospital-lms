@@ -18,6 +18,22 @@ enum UserRole {
   @@map("user_role")
 }
 
+// Tenant'ın hizmet verdiği sektör. Faz 3 (2026-05-17): String'den enum'a çevrildi.
+// healthcare = sağlık (default — geriye dönük uyum, Devakent dahil)
+// other      = belirsiz/genel (fallback; bilinmeyen sektörden gelen yeni org'lar)
+// Yeni sektör eklemek için: bu enum'a değer ekle + Postgres ALTER TYPE migration.
+// Sektör DÜŞÜRME (enum'dan değer çıkarma) destructive ve önerilmez — orphan satır
+// kalırsa migration patlar. Orta vade silinmesi gereken sektör 'other' altına merge.
+enum Sector {
+  healthcare
+  manufacturing
+  education
+  retail
+  other
+
+  @@map("sector")
+}
+
 // ── ABONELIK PLANLARI ──
 model SubscriptionPlan {
   id                     String   @id @default(uuid()) @db.Uuid
@@ -96,9 +112,10 @@ model Organization {
   emailEnabled     Boolean @default(true) @map("email_enabled")
 
   // Çok-sektörlü SaaS desteği. Faz 1 default'u "healthcare" — Devakent vb.
-  // mevcut tenant'ları kırmamak için geriye dönük uyum. Faz 3'te sektör seçim
-  // UI eklenince default kaldırılıp explicit zorunluluk olacak.
-  sector String @default("healthcare") @map("sector") @db.VarChar(50)
+  // Faz 3 (2026-05-17): String → Sector enum (CAST migration). Default 'healthcare'
+  // backward-compat için tutuldu — register form sector picker explicit zorunluyor,
+  // ama legacy create() çağrıları kırılmasın diye DB default duruyor.
+  sector Sector @default(healthcare) @map("sector")
 
   // OpenRouter (AI soru üretimi) — org-specific custom API key (encrypted, opsiyonel)
   openrouterApiKeyEncrypted String? @map("openrouter_api_key_encrypted") @db.Text

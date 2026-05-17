@@ -18,8 +18,8 @@ export async function GET() {
     }
 
     const userId = session.user.id
-    // v2: ownerUserId + maxAdmins eklendi (2026-05-05) — eski cache invalidate
-    const cacheKey = `org-branding:v2:${userId}`
+    // v3: sector enum eklendi (2026-05-17, Faz 3) — eski cache invalidate
+    const cacheKey = `org-branding:v3:${userId}`
 
     // Redis cache — branding nadiren değişir (10 dk TTL)
     const cached = await getCached<object>(cacheKey)
@@ -43,6 +43,7 @@ export async function GET() {
             secondaryColor: true,
             ownerUserId: true,
             maxAdmins: true,
+            sector: true,
           },
         },
       },

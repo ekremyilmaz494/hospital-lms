@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppSidebar } from '@/components/layouts/sidebar/app-sidebar';
 import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
-import { staffNav } from '@/components/layouts/sidebar/sidebar-config';
+import { staffNav, filterNavBySector } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
 import { useLayoutBranding } from '@/hooks/use-layout-branding';
 import { useMobile } from '@/hooks/use-mobile';
@@ -61,6 +61,10 @@ export default function StaffLayout({
   if (isLoading) return <LayoutSkeleton variant="staff" />;
   if (!user) return null;
 
+  // Sektör-filtreli nav: branding yüklenmediyse tüm staffNav fallback.
+  // (Devakent staff'ı zaten SMG Puanlarım'ı görür → flicker yok)
+  const filteredStaffNav = branding ? filterNavBySector(staffNav, branding.sector) : staffNav;
+
   // Editorial sistemde staff zemini cream paper. Diğer paneller (admin/super-admin)
   // kendi layout'larında stone neutrals kullanıyor — buradaki değişiklik onları etkilemez.
   return (
@@ -74,7 +78,7 @@ export default function StaffLayout({
         {/* Sidebar: sadece md ve üzerinde göster */}
         <div className="hidden md:block">
           <AppSidebar
-            navGroups={staffNav}
+            navGroups={filteredStaffNav}
             collapsed={sidebarCollapsed}
             onToggleCollapse={toggleSidebar}
             orgName={branding?.orgName || user?.department || ''}

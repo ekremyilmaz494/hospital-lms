@@ -7,7 +7,7 @@ import { AdminSidebar } from '@/components/layouts/admin/admin-sidebar';
 import { AdminTopbar } from '@/components/layouts/admin/admin-topbar';
 import { MobileSidebarDrawer } from '@/components/layouts/mobile-sidebar-drawer';
 import { MobileBottomNav, type MobileBottomNavItem } from '@/components/layouts/mobile-bottom-nav';
-import { adminNav } from '@/components/layouts/sidebar/sidebar-config';
+import { adminNav, filterNavBySector } from '@/components/layouts/sidebar/sidebar-config';
 import { LayoutDashboard, Users as UsersIcon, GraduationCap, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useLayoutBranding } from '@/hooks/use-layout-branding';
@@ -87,6 +87,10 @@ export default function AdminLayout({
 
   const sidebarWidth = sidebarCollapsed ? 72 : 252;
 
+  // Sektör-filtreli nav: branding henüz yüklenmediyse tüm adminNav fallback
+  // (Devakent gibi healthcare org'lar zaten tüm öğeleri görür → flicker yok).
+  const filteredAdminNav = branding ? filterNavBySector(adminNav, branding.sector) : adminNav;
+
   return (
     <TooltipProvider>
       <UploadManagerProvider>
@@ -95,7 +99,7 @@ export default function AdminLayout({
         {/* Sidebar: sadece md ve üzerinde göster */}
         <div className="hidden md:block">
           <AdminSidebar
-            navGroups={adminNav}
+            navGroups={filteredAdminNav}
             collapsed={sidebarCollapsed}
             orgName={branding?.orgName || user?.department || 'KlinoVax LMS'}
             orgCode={branding?.orgCode || 'Organizasyon Yöneticisi'}
