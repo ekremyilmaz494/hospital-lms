@@ -3,11 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { motion, useScroll, useTransform, useReducedMotion, useMotionValueEvent } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { PlayerRef } from "@remotion/player";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
 import { ArrowRight, UserPlus, PlayCircle, ClipboardCheck, Award, type LucideIcon } from "lucide-react";
 import { STORY_DURATION } from "@/remotion/story/StoryComposition";
 import { useMobile } from "@/hooks/use-mobile";
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
 const StoryPlayer = dynamic(
   () => import("./story-player").then((m) => m.StoryPlayer),
@@ -78,6 +85,13 @@ const CHAPTERS: Chapter[] = [
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
+// Chapter 1'in panel enter spring'i frame ~30'da settle olur. Scroll progress
+// 0'da Player frame 0 olursa kullanıcı boş kart görür — bu yüzden mapping'i
+// frame 35'ten başlatıyoruz (her chapter'ın "okunabilir" orta bölümü).
+const SETTLED_START = 35;
+// GSAP pin distance: ~2.2 viewport. Her chapter ~0.55 viewport scroll.
+const PIN_DISTANCE_VH = 2.2;
+
 export function ScrollStorySection() {
   const sectionRef = useRef<HTMLElement>(null);
   const playerRef = useRef<PlayerRef>(null);
@@ -86,56 +100,65 @@ export function ScrollStorySection() {
   const isMobile = useMobile();
   const disableScrollStory = shouldReduce || isMobile;
 
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ["start start", "end end"],
-  });
+  // GSAP ScrollTrigger ile pin + scrub. Framer Motion useScroll Lenis ile sync
+  // olmuyor — IndustryShowcase'de proven GSAP pattern'ini birebir uygula.
+  useGSAP(
+    () => {
+      if (disableScrollStory) return;
+      const section = sectionRef.current;
+      if (!section) return;
 
-  // Smooth parallax shifts for background shapes
-  const blobY = useTransform(scrollYProgress, [0, 1], [0, shouldReduce ? 0 : -200]);
-  const blobY2 = useTransform(scrollYProgress, [0, 1], [0, shouldReduce ? 0 : 150]);
-  // Header stays fully visible throughout — only fades out near the very end as user leaves the section
-  const headerOpacity = useTransform(scrollYProgress, [0, 0.92, 1], [1, 1, 0]);
-  const scrollHintOpacity = useTransform(scrollYProgress, [0, 0.05], [1, 0]);
+      const ctx = gsap.context(() => {
+        ScrollTrigger.create({
+          trigger: section,
+          start: "top top",
+          end: () => `+=${window.innerHeight * PIN_DISTANCE_VH}`,
+          pin: true,
+          scrub: 1,
+          anticipatePin: 1,
+          invalidateOnRefresh: true,
+          onUpdate: (self) => {
+            const clamped = Math.max(0, Math.min(1, self.progress));
+            const targetFrame = Math.floor(
+              SETTLED_START + clamped * (STORY_DURATION - 1 - SETTLED_START),
+            );
+            playerRef.current?.seekTo(targetFrame);
+            const chapter = Math.min(3, Math.floor(targetFrame / 135));
+            setActiveChapter((prev) => (chapter !== prev ? chapter : prev));
+          },
+        });
+      }, section);
 
-  // Chapter 1'in panel enter spring'i frame ~30'da settle olur. Scroll progress
-  // 0'da Player frame 0 olursa kullanıcı boş kart görür — bu yüzden mapping'i
-  // frame 35'ten başlatıyoruz (her chapter'ın "okunabilir" orta bölümü).
-  const SETTLED_START = 35;
+      return () => ctx.revert();
+    },
+    { dependencies: [disableScrollStory] },
+  );
 
-  useMotionValueEvent(scrollYProgress, "change", (latest) => {
-    const clamped = Math.max(0, Math.min(1, latest));
-    const targetFrame = Math.floor(
-      SETTLED_START + clamped * (STORY_DURATION - 1 - SETTLED_START),
-    );
-    playerRef.current?.seekTo(targetFrame);
-
-    const chapter = Math.min(3, Math.floor(targetFrame / 135));
-    if (chapter !== activeChapter) setActiveChapter(chapter);
-  });
-
-  // Set initial frame on mount — chapter 1 zaten görünür halde gözükmeli
+  // Mount'ta Player'ı SETTLED_START'a getir — ScrollTrigger ilk update'ten
+  // önce kullanıcı görürse boş kart bug'ı tekrarlamasın.
   useEffect(() => {
     playerRef.current?.pause();
     playerRef.current?.seekTo(SETTLED_START);
   }, []);
 
+  const headerVisible = activeChapter < 3;
+  const scrollHintVisible = activeChapter === 0;
+
   return (
     <section
       id="surec"
       ref={sectionRef}
-      className="relative overflow-x-hidden"
+      className="relative"
       style={{
-        height: disableScrollStory ? "auto" : "320vh",
         backgroundColor: "var(--landing-surface)",
+        overflowX: "clip",
       }}
-      aria-label={`${"KlinoVax"} nasıl çalışır — atama, izleme, sınav, sertifika`}
+      aria-label="KlinoVax nasıl çalışır — atama, izleme, sınav, sertifika"
     >
-      {/* Ambient blobs — parallax */}
-      <motion.div
+      {/* Ambient blobs — static (parallax kaldırıldı, GSAP scrub ile çakışmasın) */}
+      <div
         aria-hidden
         style={{
-          y: blobY,
           position: "absolute",
           top: "10%",
           left: "5%",
@@ -147,10 +170,9 @@ export function ScrollStorySection() {
           pointerEvents: "none",
         }}
       />
-      <motion.div
+      <div
         aria-hidden
         style={{
-          y: blobY2,
           position: "absolute",
           top: "60%",
           right: "5%",
@@ -307,21 +329,24 @@ export function ScrollStorySection() {
         </div>
       )}
 
-      {/* ── DESKTOP: sticky scroll story ── */}
+      {/* ── DESKTOP: GSAP pinned scroll story ── */}
       <div
-        className={isMobile ? "hidden" : disableScrollStory ? "" : "sticky top-0"}
+        className={isMobile ? "hidden" : ""}
         style={{
-          height: disableScrollStory ? "auto" : "100vh",
           display: isMobile ? "none" : "flex",
+          minHeight: disableScrollStory ? "auto" : "100vh",
           alignItems: "center",
           paddingBlock: disableScrollStory ? "56px" : "0",
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
           {/* Section header */}
-          <motion.div
-            style={{ opacity: shouldReduce ? 1 : headerOpacity }}
+          <div
             className="flex items-end justify-between mb-10 lg:mb-14"
+            style={{
+              opacity: headerVisible ? 1 : 0,
+              transition: "opacity 400ms var(--landing-ease)",
+            }}
           >
             <div>
               <p
@@ -347,7 +372,7 @@ export function ScrollStorySection() {
               />
               Scroll etkileşimli
             </div>
-          </motion.div>
+          </div>
 
           {/* Content grid */}
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-10 xl:gap-16 items-center">
@@ -436,10 +461,9 @@ export function ScrollStorySection() {
                       if (!section) return;
                       const rect = section.getBoundingClientRect();
                       const sectionTop = window.scrollY + rect.top;
-                      const sectionHeight = section.offsetHeight - window.innerHeight;
-                      // Her chapter section'ın 1/4'üne denk gelir; ortasına
-                      // gitmek için 0.5 offset + ufak yumuşatma payı
-                      const target = sectionTop + sectionHeight * ((i + 0.15) / 4);
+                      // GSAP pin distance = window.innerHeight * PIN_DISTANCE_VH
+                      const distance = window.innerHeight * PIN_DISTANCE_VH;
+                      const target = sectionTop + distance * ((i + 0.15) / 4);
                       window.scrollTo({ top: target, behavior: shouldReduce ? "auto" : "smooth" });
                     }}
                     className="group flex items-center gap-2 cursor-pointer"
@@ -473,7 +497,8 @@ export function ScrollStorySection() {
                 className="mt-8"
               >
                 <Link
-                  prefetch={false} href="/auth/login"
+                  prefetch={false}
+                  href="/auth/login"
                   className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full text-sm font-black uppercase tracking-wide transition-transform hover:scale-105"
                   style={{
                     backgroundColor: "#f59e0b",
@@ -486,7 +511,7 @@ export function ScrollStorySection() {
               </motion.div>
             </div>
 
-            {/* Right: Sticky player */}
+            {/* Right: Player */}
             <div className="relative">
               <div
                 className="rounded-3xl overflow-hidden"
@@ -516,10 +541,14 @@ export function ScrollStorySection() {
             </div>
           </div>
 
-          {/* Scroll hint — only at start */}
-          <motion.div
-            style={{ opacity: scrollHintOpacity }}
+          {/* Scroll hint — only at start (chapter 0) */}
+          <div
             className="absolute bottom-10 left-1/2 -translate-x-1/2 hidden lg:flex flex-col items-center gap-2"
+            style={{
+              opacity: scrollHintVisible ? 1 : 0,
+              transition: "opacity 400ms var(--landing-ease)",
+              pointerEvents: scrollHintVisible ? "auto" : "none",
+            }}
             aria-hidden
           >
             <span
@@ -540,7 +569,7 @@ export function ScrollStorySection() {
                 }}
               />
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
 
