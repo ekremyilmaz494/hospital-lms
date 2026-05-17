@@ -19,13 +19,16 @@ export function LandingMotionProvider({
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Touch device'larda Lenis'i hiç kurma — native momentum scroll daha
+    // doğal hissediyor. `pointer: coarse` mobile + tablet'i yakalar (width
+    // bazlı detect iPad Pro'yu desktop sanma riski taşır).
+    if (window.matchMedia("(pointer: coarse)").matches) return;
 
     const lenis = new Lenis({
       duration: 1.1,
       easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
       wheelMultiplier: 1,
-      touchMultiplier: 1.0,
     });
 
     let rafId = 0;
