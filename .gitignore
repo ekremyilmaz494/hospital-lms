@@ -128,3 +128,7 @@ apps/web/scripts/seed-auth-users.mjs
 # Yerel binary/rapor dosyaları (proje dizini geçici sahnesi olarak kullanılınca biriken artıklar)
 *.dmg
 tamamlama_raporu.pdf
+
+# Repo köküne bırakılan büyük orijinal medya — optimize edilmiş hali
+# apps/web/public/promo/ altında commit'li. Orijinal lokal arşivde kalsın.
+/Klinovax__*.mp4
