@@ -8,6 +8,7 @@ const PUBLIC_ROUTES = [
   '/kvkk',
   '/pricing',
   '/demo',
+  '/sectors/',
   '/contact',
   '/auth/login',
   '/auth/callback',
