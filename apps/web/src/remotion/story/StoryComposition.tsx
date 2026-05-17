@@ -251,7 +251,7 @@ export const StoryComposition: React.FC = () => {
             fontWeight: 900,
           }}
         >
-          D
+          K
         </div>
         <span
           style={{
@@ -262,7 +262,7 @@ export const StoryComposition: React.FC = () => {
             color: DARK,
           }}
         >
-          Devakent
+          KlinoVax
         </span>
       </div>
     </AbsoluteFill>

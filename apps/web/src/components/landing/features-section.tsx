@@ -130,7 +130,7 @@ const categoryFeatures: Record<string, Feature[]> = {
     {
       icon: Lock,
       title: "Rol Tabanlı Erişim",
-      desc: "Super Admin, Hastane Admin ve Personel rolleri. Her rol sadece kendi verisini görür.",
+      desc: "Süper Yönetici, Kurum Yöneticisi ve Personel rolleri. Her rol sadece kendi verisini görür.",
       badge: "RLS",
     },
     {
@@ -156,7 +156,7 @@ export function FeaturesSection() {
               Platform Özellikleri
             </p>
             <h2 className="text-2xl sm:text-3xl font-black" style={{ color: "#1a3a28" }}>
-              Neden {BRAND.fullName}?
+              Neden {BRAND.name}?
             </h2>
           </div>
           <p
