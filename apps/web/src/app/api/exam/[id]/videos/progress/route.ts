@@ -50,6 +50,12 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   const finalWatchedSeconds = existing
     ? Math.max(safeWatchedSeconds, existing.watchedSeconds)
     : safeWatchedSeconds
+  // lastPositionSeconds için de geri-gitme koruması — stale sendBeacon (network
+  // gecikmesi sonrası gelen pagehide) yüksek pozisyonu sıfırlamasın. Resume
+  // bug'ı bu olmadan iki yazımın race'inde yine ortaya çıkar.
+  const finalLastPosition = existing
+    ? Math.max(safeLastPosition, existing.lastPositionSeconds)
+    : safeLastPosition
 
   // Minimum %80 izleme zorunlu — 1 saniye açıp kapatma engellenir
   const MIN_WATCH_PERCENT = 0.80
@@ -63,13 +69,13 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       userId: dbUser.id,
       watchedSeconds: finalWatchedSeconds,
       totalSeconds: video.durationSeconds,
-      lastPositionSeconds: safeLastPosition,
+      lastPositionSeconds: finalLastPosition,
       isCompleted,
       ...(isCompleted && { completedAt: new Date() }),
     },
     update: {
       watchedSeconds: finalWatchedSeconds,
-      lastPositionSeconds: safeLastPosition,
+      lastPositionSeconds: finalLastPosition,
       isCompleted,
       ...(isCompleted && { completedAt: new Date() }),
     },

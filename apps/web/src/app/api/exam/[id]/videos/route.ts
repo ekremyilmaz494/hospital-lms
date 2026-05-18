@@ -235,10 +235,19 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       }
     }
 
-    lastPositionSeconds = Math.min(
+    const requestedPosition = Math.min(
       Math.max(Math.round(body.position ?? 0), 0),
       video.durationSeconds,
     )
+    // Stale beacon koruması: geç gelen pagehide/unmount sendBeacon (network gecikmesi
+    // sonrası) yüksek bir pozisyonu geri sarmasın. watchedSeconds zaten Math.max ile
+    // korunuyor; lastPositionSeconds için de aynı garantiyi ver. Aksi halde:
+    //   t=0: kullanıcı 60s izledi → sendBeacon(pos=60) gönderildi, network'te bekliyor
+    //   t=1: kullanıcı dönüp 90s'e kadar izledi → POST(pos=90) önce vardı
+    //   t=2: gecikmiş sendBeacon vardı → pos=60'a düşürdü → resume 90 yerine 60'tan
+    lastPositionSeconds = existing
+      ? Math.max(requestedPosition, existing.lastPositionSeconds)
+      : requestedPosition
     // 80% kural — /videos/progress ile aynı eşik
     const MIN_WATCH_PERCENT = 0.80
     isCompleted = watchedSeconds >= (video.durationSeconds * MIN_WATCH_PERCENT)

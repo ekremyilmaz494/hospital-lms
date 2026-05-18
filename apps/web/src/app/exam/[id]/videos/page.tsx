@@ -313,18 +313,26 @@ export default function VideoPlayerPage() {
 
   useEffect(() => {
     if (isReview || !isPlaying || !currentVideo) return;
-    // `currentTime` deps'e EKLENMEZ — 250ms'de bir güncellendiği için interval'i sürekli
-    // resetler, 15sn timer hiç ateşlenmez. Pozisyonu canlı kaynaktan (videoRef) oku.
+    // Deps'e ne `currentTime` ne de `currentVideo` (obje) EKLENMEZ:
+    //   - `currentTime` 250ms'de bir setState ile değişir.
+    //   - `currentVideo` her render'da `videosData = rawVideos.map(...)` çıktısından
+    //     yeni obje referansı alır (içeriği aynı olsa bile).
+    // Her ikisi de interval'i sürekli resetler → 15sn timer hiç ateşlenmez,
+    // server lastPosition güncellenemez (PR #137 yarım kalmıştı). Sadece kararlı
+    // değişkenleri (id, isPlaying) deps'e koy; çalışma zamanı pozisyonunu
+    // canlı kaynaktan (videoRef) oku.
+    const videoId = currentVideo.id;
     const heartbeat = setInterval(() => {
       const time = videoRef.current?.currentTime ?? 0;
       fetch(`/api/exam/${id}/videos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoId: currentVideo.id, watchedTime: time, position: time }),
+        body: JSON.stringify({ videoId, watchedTime: time, position: time }),
       }).catch(() => setHeartbeatErrors(prev => prev + 1));
     }, 15000);
     return () => clearInterval(heartbeat);
-  }, [isPlaying, currentVideo?.id, id, isReview, currentVideo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, currentVideo?.id, id, isReview]);
 
   useEffect(() => {
     const flushPosition = () => {
@@ -356,7 +364,10 @@ export default function VideoPlayerPage() {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pagehide', handlePageHide);
     };
-  }, [currentVideo, id, isReview]);
+    // `currentVideo` (obje) deps'e EKLENMEZ — videosData.map() her render yeni ref
+    // üretir, listener'lar gereksiz yere add/remove edilir. .id stabil string.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentVideo?.id, id, isReview]);
 
   useEffect(() => {
     const pos = currentVideo?.lastPosition ?? 0;
@@ -381,10 +392,19 @@ export default function VideoPlayerPage() {
     window.addEventListener('pagehide', saveOnExit);
     window.addEventListener('beforeunload', saveOnExit);
     return () => {
+      // SPA navigation (router.back / router.push / Link tıkı) pagehide veya
+      // beforeunload tetiklemez — sadece component unmount fırlar. Heartbeat
+      // de devre dışı kaldığı sürece (bkz. dep churn yorumu) flush'sız çıkış
+      // kullanıcının tüm ilerlemesini sıfırlar. Cleanup içinde bir kez daha
+      // sendBeacon at; server tarafı lastPositionSeconds geri-gitme koruması
+      // sayesinde tekrar yazım sorun çıkarmaz.
+      saveOnExit();
       window.removeEventListener('pagehide', saveOnExit);
       window.removeEventListener('beforeunload', saveOnExit);
     };
-  }, [currentVideo?.id, id, isReview, currentVideo]);
+    // `currentVideo` (obje) deps'e EKLENMEZ — yeni ref'le re-mount listener trashing yapar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentVideo?.id, id, isReview]);
 
   useEffect(() => {
     if (isReview) return;
