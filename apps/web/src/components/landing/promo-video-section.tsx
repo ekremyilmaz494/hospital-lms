@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Play, Pause, Volume2, VolumeX, ShieldCheck } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  SkipBack,
+  SkipForward,
+  ShieldCheck,
+} from "lucide-react";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -35,16 +43,22 @@ export function PromoVideoSection() {
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    // Tek otorite imperatif: video element'in muted'ı state'ten DEĞİL, mount'ta
+    // bizim set ettiğimizden ve toggleMute'tan gelir. volumechange listener'ı
+    // UI ikonunu element ile senkron tutar.
+    v.muted = true;
     const handleTime = () => setCurrentTime(v.currentTime);
     const handleMeta = () => setDuration(v.duration);
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
+    const handleVolume = () => setIsMuted(v.muted);
     v.addEventListener("timeupdate", handleTime);
     v.addEventListener("loadedmetadata", handleMeta);
     v.addEventListener("durationchange", handleMeta);
     v.addEventListener("play", handlePlay);
     v.addEventListener("pause", handlePause);
     v.addEventListener("ended", handlePause);
+    v.addEventListener("volumechange", handleVolume);
     return () => {
       v.removeEventListener("timeupdate", handleTime);
       v.removeEventListener("loadedmetadata", handleMeta);
@@ -52,6 +66,7 @@ export function PromoVideoSection() {
       v.removeEventListener("play", handlePlay);
       v.removeEventListener("pause", handlePause);
       v.removeEventListener("ended", handlePause);
+      v.removeEventListener("volumechange", handleVolume);
     };
   }, []);
 
@@ -60,7 +75,7 @@ export function PromoVideoSection() {
     if (!el) return;
     const obs = new IntersectionObserver(
       ([entry]) => setIsInView(entry.isIntersecting),
-      { threshold: 0.5 },
+      { threshold: 0.25 },
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -106,6 +121,15 @@ export function PromoVideoSection() {
     const t = Number(e.target.value);
     v.currentTime = t;
     setCurrentTime(t);
+  }, []);
+
+  const skipBy = useCallback((delta: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const max = v.duration || 0;
+    const next = Math.max(0, Math.min(max, v.currentTime + delta));
+    v.currentTime = next;
+    setCurrentTime(next);
   }, []);
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -184,7 +208,7 @@ export function PromoVideoSection() {
                 ref={videoRef}
                 src={VIDEO_SRC}
                 poster={POSTER_SRC}
-                muted={isMuted}
+                muted
                 playsInline
                 preload="metadata"
                 onClick={togglePlay}
@@ -237,16 +261,21 @@ export function PromoVideoSection() {
                   value={currentTime}
                   onChange={handleSeek}
                   onClick={(e) => e.stopPropagation()}
-                  className="w-full h-1.5 rounded-full appearance-none cursor-pointer outline-none
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="w-full h-2 sm:h-1.5 rounded-full appearance-none cursor-pointer outline-none
                     [&::-webkit-slider-thumb]:appearance-none
-                    [&::-webkit-slider-thumb]:w-3.5
-                    [&::-webkit-slider-thumb]:h-3.5
+                    [&::-webkit-slider-thumb]:w-5
+                    [&::-webkit-slider-thumb]:h-5
+                    sm:[&::-webkit-slider-thumb]:w-3.5
+                    sm:[&::-webkit-slider-thumb]:h-3.5
                     [&::-webkit-slider-thumb]:rounded-full
                     [&::-webkit-slider-thumb]:bg-white
                     [&::-webkit-slider-thumb]:shadow-[0_2px_8px_rgba(0,0,0,0.4)]
                     [&::-webkit-slider-thumb]:cursor-pointer
-                    [&::-moz-range-thumb]:w-3.5
-                    [&::-moz-range-thumb]:h-3.5
+                    [&::-moz-range-thumb]:w-5
+                    [&::-moz-range-thumb]:h-5
+                    sm:[&::-moz-range-thumb]:w-3.5
+                    sm:[&::-moz-range-thumb]:h-3.5
                     [&::-moz-range-thumb]:rounded-full
                     [&::-moz-range-thumb]:bg-white
                     [&::-moz-range-thumb]:border-0
@@ -285,6 +314,38 @@ export function PromoVideoSection() {
                       ) : (
                         <Volume2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                       )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        skipBy(-10);
+                      }}
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center backdrop-blur-md cursor-pointer"
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.18)",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        color: "white",
+                      }}
+                      aria-label="10 saniye geri sar"
+                    >
+                      <SkipBack className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        skipBy(10);
+                      }}
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center backdrop-blur-md cursor-pointer"
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.18)",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        color: "white",
+                      }}
+                      aria-label="10 saniye ileri sar"
+                    >
+                      <SkipForward className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                     </button>
                     <button
                       type="button"

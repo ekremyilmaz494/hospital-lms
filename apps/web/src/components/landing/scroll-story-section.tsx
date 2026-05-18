@@ -98,40 +98,46 @@ export function ScrollStorySection() {
   const [activeChapter, setActiveChapter] = useState(0);
   const shouldReduce = useReducedMotion();
   const isMobile = useMobile();
-  const disableScrollStory = shouldReduce || isMobile;
 
-  // GSAP ScrollTrigger ile pin + scrub. Framer Motion useScroll Lenis ile sync
-  // olmuyor — IndustryShowcase'de proven GSAP pattern'ini birebir uygula.
+  // GSAP ScrollTrigger ile pin + scrub. `gsap.matchMedia` kullanıyoruz çünkü
+  // React state'ine bağlı useGSAP cleanup'ı (önceki implementasyon) mobilde
+  // hidrasyon penceresinde pin'i kuruyor, sonra revert ediyor — ama inline
+  // padding/transform kalıntıları DOM'da kalıp scroll'u yutuyordu (kullanıcı
+  // raporu: ikinci chapter'dan sonra ekran donuyor). matchMedia gerçek
+  // viewport'u okur, mobilde pin HİÇ kurulmaz.
   useGSAP(
     () => {
-      if (disableScrollStory) return;
       const section = sectionRef.current;
       if (!section) return;
 
-      const ctx = gsap.context(() => {
-        ScrollTrigger.create({
-          trigger: section,
-          start: "top top",
-          end: () => `+=${window.innerHeight * PIN_DISTANCE_VH}`,
-          pin: true,
-          scrub: 1,
-          anticipatePin: 1,
-          invalidateOnRefresh: true,
-          onUpdate: (self) => {
-            const clamped = Math.max(0, Math.min(1, self.progress));
-            const targetFrame = Math.floor(
-              SETTLED_START + clamped * (STORY_DURATION - 1 - SETTLED_START),
-            );
-            playerRef.current?.seekTo(targetFrame);
-            const chapter = Math.min(3, Math.floor(targetFrame / 135));
-            setActiveChapter((prev) => (chapter !== prev ? chapter : prev));
-          },
-        });
-      }, section);
+      const mm = gsap.matchMedia();
+      mm.add(
+        "(min-width: 768px) and (prefers-reduced-motion: no-preference)",
+        () => {
+          ScrollTrigger.create({
+            trigger: section,
+            start: "top top",
+            end: () => `+=${window.innerHeight * PIN_DISTANCE_VH}`,
+            pin: true,
+            scrub: 1,
+            anticipatePin: 1,
+            invalidateOnRefresh: true,
+            onUpdate: (self) => {
+              const clamped = Math.max(0, Math.min(1, self.progress));
+              const targetFrame = Math.floor(
+                SETTLED_START + clamped * (STORY_DURATION - 1 - SETTLED_START),
+              );
+              playerRef.current?.seekTo(targetFrame);
+              const chapter = Math.min(3, Math.floor(targetFrame / 135));
+              setActiveChapter((prev) => (chapter !== prev ? chapter : prev));
+            },
+          });
+        },
+      );
 
-      return () => ctx.revert();
+      return () => mm.revert();
     },
-    { dependencies: [disableScrollStory] },
+    { dependencies: [] },
   );
 
   // Mount'ta Player'ı SETTLED_START'a getir — ScrollTrigger ilk update'ten
@@ -334,9 +340,9 @@ export function ScrollStorySection() {
         className={isMobile ? "hidden" : ""}
         style={{
           display: isMobile ? "none" : "flex",
-          minHeight: disableScrollStory ? "auto" : "100vh",
+          minHeight: shouldReduce ? "auto" : "100vh",
           alignItems: "center",
-          paddingBlock: disableScrollStory ? "56px" : "0",
+          paddingBlock: shouldReduce ? "56px" : "0",
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
