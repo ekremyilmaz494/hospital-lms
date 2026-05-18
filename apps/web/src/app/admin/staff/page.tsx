@@ -274,7 +274,12 @@ export default function StaffPage() {
     },
   ], [departmentMap, refetch, selectedDeptColor]);
 
-  if (isLoading) {
+  // Sadece initial mount'ta (henüz hiç veri yokken) tam sayfa loading göster.
+  // Arama/sayfalama/filtre değişimlerinde data hâlâ var, isLoading true olabilir
+  // ama background fetch sırasında tabloyu eski veriyle göstermeye devam ederiz —
+  // aksi halde her input tuşunda PageLoading flash'ı "sayfa yenileniyor" hissi
+  // yaratır (kullanıcı raporu: arama input'una yazınca sayfa kendini yeniliyor).
+  if (isLoading && !data) {
     return <PageLoading />;
   }
 
@@ -749,6 +754,7 @@ export default function StaffPage() {
 
           <div className="k-card p-5">
             <DataTable
+              key={`dept-${selectedDept}`}
               columns={columns}
               data={filteredStaff}
               searchKey="name"
@@ -768,6 +774,7 @@ export default function StaffPage() {
       {activeView === 'all' && (
         <div className="k-card p-5">
           <DataTable
+            key="all-staff"
             columns={columns}
             data={allStaff}
             searchKey="name"

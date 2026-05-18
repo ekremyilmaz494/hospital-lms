@@ -187,7 +187,12 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
         fetchData(true);
       }
     } else {
-      setData(null);
+      // keepPreviousData davranışı: URL değişiminde eski veriyi STALE olarak
+      // ekranda tutuyoruz, yeni fetch arka planda çalışır. setData(null)
+      // yapmıyoruz çünkü search/sayfalama/filtre gibi sık-tetiklenen URL
+      // değişimlerinde tablonun "boş" flash'lanması "sayfa yenileniyor"
+      // hissi yaratıyor. İlk mount'ta data zaten useState(null) ile null
+      // başlar — no-op risk yok.
       fetchData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
