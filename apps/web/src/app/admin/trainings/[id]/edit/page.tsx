@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BlurFade } from '@/components/ui/blur-fade';
-import { useFetch } from '@/hooks/use-fetch';
+import { useFetch, invalidateFetchCache } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 
@@ -133,6 +133,9 @@ export default function EditTrainingPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || 'Kayıt başarısız');
       }
+      // Detail + liste cache'i invalide et — redirect sonrası useFetch eski endDate'i
+      // göstermesin ("save yaptım ama eski tarih döndü" bug'ı).
+      invalidateFetchCache('/api/admin/trainings');
       setSaved(true);
       setTimeout(() => router.push(`/admin/trainings/${id}`), 1000);
     } catch (err) {
