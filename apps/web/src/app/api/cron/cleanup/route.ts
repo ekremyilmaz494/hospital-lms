@@ -58,10 +58,16 @@ export async function GET(request: Request) {
   })
 
   if (staleAttemptsList.length > 0) {
-    // Mark attempts as expired with explicit score=0 to avoid null confusion in reports
+    // 'expired' status zaten "kullanıcı sınavı vermedi" demek; postExamScore=0 +
+    // postExamCompletedAt yazımı semantik olarak yanlış (alanlar "kullanıcı son
+    // sınava girip 0 aldı" gibi okunuyor) ve dahil oldukları frontend hesabı
+    // bozuyordu — staff detail page'i "Aşama TAMAM" gösteriyor ve CTA gizleniyordu
+    // (2026-05-17 Devakent RADYASYON incident, 6 personel kilitlendi).
+    // Raporlama tarafında zaten status='expired' filtresi kullanılıyor; score
+    // alanlarına dokunmaya gerek yok.
     await prisma.examAttempt.updateMany({
       where: { id: { in: staleAttemptsList.map(a => a.id) } },
-      data: { status: 'expired', isPassed: false, postExamScore: 0, postExamCompletedAt: new Date() },
+      data: { status: 'expired', isPassed: false },
     })
 
     // Update related TrainingAssignment statuses — filter out null (standalone exam attempts have no assignment)

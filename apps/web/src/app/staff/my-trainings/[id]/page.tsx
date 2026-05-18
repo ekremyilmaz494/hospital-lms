@@ -46,6 +46,9 @@ interface TrainingDetail {
   videosCompleted: boolean;
   postExamCompleted: boolean;
   needsRetry?: boolean;
+  /** Cron eğitim süresi geçince attempt'i 'expired' işaretledi ama kullanıcının
+   *  hâlâ deneme hakkı var. Retry-pending'den farklı UX (banner mesajı + CTA). */
+  isExpiredRetryable?: boolean;
 }
 
 export default function TrainingDetailPage() {
@@ -344,8 +347,24 @@ export default function TrainingDetailPage() {
         />
       )}
 
-      {/* Retry banner */}
-      {isRetry && training.status !== 'failed' && !training.isExpired && (
+      {/* Expired-but-retryable banner — cron expire'ı sonrası admin süreyi uzattığında
+          (veya yeni cron BUG-1 fix sonrası score'a dokunmadığında) "süresi doldu"
+          mesajı yerine doğru bilgilendirme. */}
+      {training.isExpiredRetryable && !training.isExpired && (
+        <EditorialBanner
+          tone="warning"
+          icon={RefreshCw}
+          title="Önceki süre dolmuştu — şimdi tekrar açıldı"
+          description={
+            training.preExamCompleted
+              ? `Eğitim süresi dolduğu için önceki denemeniz iptal oldu. Kaldığınız yerden devam edebilir, videoları izleyip son sınava girebilirsiniz. (${training.currentAttempt}/${training.maxAttempts} hak)`
+              : `Eğitim süresi dolduğu için önceki denemeniz iptal oldu. Ön sınavı tamamlayıp eğitime devam edebilirsiniz. (${training.currentAttempt}/${training.maxAttempts} hak)`
+          }
+        />
+      )}
+
+      {/* Retry banner — gerçek "failed → yeni deneme" senaryosu */}
+      {isRetry && !training.isExpiredRetryable && training.status !== 'failed' && !training.isExpired && (
         <EditorialBanner
           tone="warning"
           icon={RefreshCw}

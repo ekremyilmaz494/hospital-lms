@@ -179,7 +179,58 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
   // o günün sonuna kadar geçerli kalsın.
   if (parsed.data.endDate) data.endDate = toEndOfDayUTC(parsed.data.endDate)
 
-  const training = await prisma.training.update({ where: { id, organizationId: orgId }, data })
+  // 2026-05-17 Devakent incident: admin endDate uzatıyor ama cron'un bogus
+  // expire ettiği attempt'ler ve assignment'lar geri açılmıyordu → 6 personel
+  // kilitli kaldı. Şimdi PATCH eski endDate geçmiş + yeni endDate gelecek ise,
+  // cron-expire attempt'lerini orijinal aşamalarına geri al (signed olmayanları).
+  const isExtendingExpiredTraining =
+    parsed.data.endDate &&
+    existing.endDate &&
+    toEndOfDayUTC(existing.endDate) < new Date() &&
+    toEndOfDayUTC(parsed.data.endDate) > new Date()
+
+  const [training] = await prisma.$transaction(async (tx) => {
+    const updated = await tx.training.update({ where: { id, organizationId: orgId }, data })
+
+    if (isExtendingExpiredTraining) {
+      // Sadece cron'un yazdığı bogus expired'ları revive et — gerçekten
+      // sınava girip 0 alanları (postExamStartedAt dolu) dokunma.
+      // Status'ü gerçek aşamadan (pre_exam_completed_at / videos_completed_at)
+      // türet — raw SQL CASE WHEN (Prisma updateMany aynı kolondan koşullu set yapamaz).
+      await tx.$executeRaw`
+        UPDATE exam_attempts
+        SET status = CASE
+              WHEN pre_exam_completed_at IS NULL THEN 'pre_exam'
+              WHEN videos_completed_at IS NULL THEN 'watching_videos'
+              ELSE 'post_exam'
+            END,
+            post_exam_completed_at = NULL,
+            post_exam_score = NULL,
+            is_passed = false
+        WHERE training_id = ${id}::uuid
+          AND status = 'expired'
+          AND post_exam_score = 0
+          AND signed_at IS NULL
+          AND post_exam_completed_at IS NOT NULL
+          AND post_exam_started_at IS NULL
+      `
+      // Revive edilen attempt'lerin assignment'larını 'in_progress'e döndür.
+      await tx.$executeRaw`
+        UPDATE training_assignments
+        SET status = 'in_progress'
+        WHERE training_id = ${id}::uuid
+          AND status = 'assigned'
+          AND id IN (
+            SELECT DISTINCT assignment_id FROM exam_attempts
+            WHERE training_id = ${id}::uuid
+              AND status IN ('pre_exam','watching_videos','post_exam')
+              AND assignment_id IS NOT NULL
+          )
+      `
+    }
+
+    return [updated]
+  })
 
   await audit({
     action: 'update',

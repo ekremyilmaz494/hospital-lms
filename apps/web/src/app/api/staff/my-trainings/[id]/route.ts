@@ -44,6 +44,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
           postExamScore: true,
           preExamCompletedAt: true,
           videosCompletedAt: true,
+          postExamStartedAt: true,
           postExamCompletedAt: true,
           videoProgress: { select: { videoId: true, isCompleted: true } },
         },
@@ -64,7 +65,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
         training: {
           include: {
             videos: {
-              select: { id: true, title: true, durationSeconds: true, sortOrder: true },
+              select: { id: true, title: true, durationSeconds: true, sortOrder: true, contentType: true },
               orderBy: { sortOrder: 'asc' },
             },
           },
@@ -78,6 +79,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
             postExamScore: true,
             preExamCompletedAt: true,
             videosCompletedAt: true,
+            postExamStartedAt: true,
             postExamCompletedAt: true,
             videoProgress: { select: { videoId: true, isCompleted: true } },
           },
@@ -138,6 +140,24 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     preExamCompleted = true    // 2+ denemede ön sınav atlanır
     videosCompleted = false    // videolar sıfırdan izlenmeli
     postExamCompleted = false  // son sınav tekrar girilmeli
+  } else if (isExpiredRetryable) {
+    // Cron expired etti ama personelin hâlâ deneme hakkı var. Step'leri kullanıcının
+    // GERÇEK ilerlemesine göre hesapla — final 'else' branch'ına düşmesini engelle
+    // (aksi halde hepsi TAMAM görünüp CTA gizleniyordu, 2026-05-17 Devakent incident).
+    currentAttempt = assignment.currentAttempt
+    preExamCompleted = latestAttempt.preExamCompletedAt !== null
+    const attemptVideoProgress = new Map(
+      (latestAttempt.videoProgress ?? []).map(vp => [vp.videoId, vp])
+    )
+    const requiredVideos = t.videos.filter(v => v.contentType !== 'pdf')
+    videosCompleted = requiredVideos.length === 0 ||
+      (latestAttempt.videosCompletedAt !== null) ||
+      requiredVideos.every(v => attemptVideoProgress.get(v.id)?.isCompleted === true)
+    // ÖNEMLİ: cron'un yazdığı bogus post_exam_completed_at'a güvenme — gerçek
+    // tamamlama için postExamStartedAt da dolu olmalı. Yeni cron (BUG-1 fix sonrası)
+    // bu alanlara dokunmaz ama eski expired veriler bogus tarih taşır.
+    postExamCompleted = latestAttempt.postExamCompletedAt !== null &&
+                       latestAttempt.postExamStartedAt !== null
   } else if (isActive) {
     // Active attempt in progress
     currentAttempt = assignment.currentAttempt
@@ -151,7 +171,10 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     videosCompleted = requiredVideos.length === 0 ||
       (latestAttempt.videosCompletedAt !== null) ||
       requiredVideos.every(v => attemptVideoProgress.get(v.id)?.isCompleted === true)
-    postExamCompleted = latestAttempt.postExamCompletedAt !== null
+    // postExamStartedAt çift kontrolü: cron'un legacy verisinde postExamCompletedAt
+    // bogus dolu olabilir (started=null ise gerçek tamamlama değildir).
+    postExamCompleted = latestAttempt.postExamCompletedAt !== null &&
+                       latestAttempt.postExamStartedAt !== null
   } else {
     // Passed or all attempts exhausted
     currentAttempt = assignment.currentAttempt
@@ -207,7 +230,13 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     preExamCompleted,
     videosCompleted,
     postExamCompleted,
-    needsRetry: isRetryPending || isExpiredRetryable,
+    // needsRetry: frontend retry-flow (pre-exam atla, 2-step) için bayrak.
+    // isExpiredRetryable + pre-exam yarıda kalmış kullanıcı için needsRetry=false:
+    // bu kullanıcı yeni retry değil, attempt'in pre-exam'ına devam etmeli (3-step normal flow).
+    needsRetry: isRetryPending || (isExpiredRetryable && preExamCompleted),
+    // Banner ayrımı için: isRetryPending = "kullanıcı sınavdan kaldı, yeni deneme bekliyor",
+    // isExpiredRetryable = "süre doldu, cron expire etti, hâlâ deneme hakkı var" — farklı UX mesajları.
+    isExpiredRetryable,
     videos: t.videos.map(v => ({
       id: v.id,
       title: v.title,
