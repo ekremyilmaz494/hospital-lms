@@ -50,7 +50,13 @@ export default function PreExamPage() {
     if (!confirmed) return;
     let cancelled = false;
 
-    type StartAttemptBody = { id?: string; status?: string; examOnly?: boolean; error?: string };
+    type StartAttemptBody = {
+      id?: string;
+      status?: string;
+      examOnly?: boolean;
+      error?: string;
+      pendingFeedback?: { trainingId: string; trainingTitle: string; attemptId: string };
+    };
     async function startAttempt(): Promise<{ res: Response; body: StartAttemptBody }> {
       for (let i = 0; i < 2; i++) {
         try {
@@ -79,6 +85,18 @@ export default function PreExamPage() {
     async function initExam() {
       try {
         const { res: startRes, body: attempt } = await startAttempt();
+
+        // Zorunlu geri bildirim kilidi — backend 423 + pendingFeedback döner.
+        // Banner görmemiş kullanıcı (derin link / eski sekme) bekleyen feedback'e otomatik gider.
+        if (startRes.status === 423 && attempt?.pendingFeedback) {
+          const { trainingId, trainingTitle, attemptId: pendingAttemptId } = attempt.pendingFeedback;
+          toast(
+            `"${trainingTitle}" eğitiminin zorunlu geri bildirimini doldurmadan başka eğitime başlayamazsınız.`,
+            'warning',
+          );
+          router.replace(`/exam/${trainingId}/feedback?attemptId=${pendingAttemptId}`);
+          return;
+        }
 
         if (!startRes.ok) {
           if (!cancelled) setError(attempt?.error || 'Sınav başlatılamadı');
@@ -147,7 +165,7 @@ export default function PreExamPage() {
 
     initExam();
     return () => { cancelled = true; };
-  }, [id, router, confirmed]);
+  }, [id, router, confirmed, toast]);
 
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return;

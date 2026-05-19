@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { Play, Award, CheckCircle2, ArrowRight, Check, X, Clock } from 'lucide-react';
+import { useToast } from '@/components/shared/toast';
 
 interface QuestionResult {
   questionText: string;
@@ -17,6 +18,7 @@ function TransitionContent() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
 
   const from = searchParams.get('from') ?? 'pre';
   const score = searchParams.get('score');
@@ -47,6 +49,16 @@ function TransitionContent() {
     fetch(`/api/exam/${id}/start`, { method: 'POST' })
       .then(async res => {
         const data = await res.json().catch(() => null);
+        // Zorunlu geri bildirim kilidi — bekleyen feedback varsa kullanıcıya bildir ve feedback sayfasına gönder.
+        if (res.status === 423 && data?.pendingFeedback) {
+          const { trainingId, trainingTitle, attemptId: pendingAttemptId } = data.pendingFeedback;
+          toast(
+            `"${trainingTitle}" eğitiminin zorunlu geri bildirimini doldurmadan başka eğitime başlayamazsınız.`,
+            'warning',
+          );
+          router.replace(`/exam/${trainingId}/feedback?attemptId=${pendingAttemptId}`);
+          return;
+        }
         if (res.ok) {
           // Videos page cift POST atmasin — 5s pencere
           try { sessionStorage.setItem(`exam-start-${id}`, String(Date.now())); } catch { /* ignore */ }
@@ -67,7 +79,7 @@ function TransitionContent() {
       .catch(() => {
         if (isVideosToPost) setPassedGuardChecked(true);
       });
-  }, [id, isPreToVideos, isVideosToPost, router]);
+  }, [id, isPreToVideos, isVideosToPost, router, toast]);
 
   // Countdown devre dışı — kullanıcı manuel butonla geçer (hazır hissetmeden sınava
   // itilmesin diye). Yapı (state/ref/useEffect) korundu çünkü tamamen silmek

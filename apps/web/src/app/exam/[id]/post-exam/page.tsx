@@ -67,6 +67,16 @@ export default function PostExamPage() {
       .then(async (res) => {
         const attempt = await res.json();
         if (cancelled) return;
+        // Zorunlu geri bildirim kilidi — bekleyen feedback varsa kullanıcıya bildir ve feedback sayfasına gönder.
+        if (res.status === 423 && attempt?.pendingFeedback) {
+          const { trainingId, trainingTitle, attemptId: pendingAttemptId } = attempt.pendingFeedback;
+          toast(
+            `"${trainingTitle}" eğitiminin zorunlu geri bildirimini doldurmadan başka eğitime başlayamazsınız.`,
+            'warning',
+          );
+          router.replace(`/exam/${trainingId}/feedback?attemptId=${pendingAttemptId}`);
+          return;
+        }
         if (!res.ok) {
           setStartError(attempt?.error || 'Sınav başlatılamadı');
           setPhaseChecked(true);
@@ -92,7 +102,7 @@ export default function PostExamPage() {
         }
       });
     return () => { cancelled = true; };
-  }, [id, router]);
+  }, [id, router, toast]);
 
   useEffect(() => {
     if (!attemptId) return;

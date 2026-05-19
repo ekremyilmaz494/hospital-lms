@@ -18,6 +18,7 @@ const AudioPlayer = dynamic(
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { attemptPhaseRedirect, type AttemptStatus } from '@/lib/exam-state-machine';
+import { useToast } from '@/components/shared/toast';
 
 interface VideoItem {
   id: string;
@@ -48,6 +49,7 @@ export default function VideoPlayerPage() {
   const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const isReview = searchParams.get('mode') === 'review';
+  const { toast } = useToast();
 
   const [startReady, setStartReady] = useState(isReview);
   const [startError, setStartError] = useState<string | null>(null);
@@ -64,8 +66,18 @@ export default function VideoPlayerPage() {
     startCalled.current = true;
     fetch(`/api/exam/${id}/start`, { method: 'POST' })
       .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        // Zorunlu geri bildirim kilidi — bekleyen feedback varsa kullanıcıya bildir ve feedback sayfasına gönder.
+        if (res.status === 423 && data?.pendingFeedback) {
+          const { trainingId, trainingTitle, attemptId: pendingAttemptId } = data.pendingFeedback;
+          toast(
+            `"${trainingTitle}" eğitiminin zorunlu geri bildirimini doldurmadan başka eğitime başlayamazsınız.`,
+            'warning',
+          );
+          router.replace(`/exam/${trainingId}/feedback?attemptId=${pendingAttemptId}`);
+          return;
+        }
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
           setStartError(data?.error || 'Sınav başlatılamadı');
           return;
         }
@@ -73,7 +85,7 @@ export default function VideoPlayerPage() {
         setStartReady(true);
       })
       .catch(() => setStartError('Sınav başlatılamadı. Lütfen tekrar deneyin.'));
-  }, [id, isReview]);
+  }, [id, isReview, router, toast]);
 
   const videosUrl = startReady ? `/api/exam/${id}/videos${isReview ? '?mode=review' : ''}` : null;
   const { data, isLoading, error } = useFetch<VideosResponse>(videosUrl);
