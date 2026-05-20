@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// Bu testler ağır Next.js API route grafiklerini `await import()` ile soğuk
+// yükler — ilk import (cold module cache) 5s'lik varsayılan limiti aşabilir.
+// Mantık değil, import gecikmesi sorunu; dosyaya geniş timeout veriyoruz.
+vi.setConfig({ testTimeout: 20000 })
+
 vi.mock('@/lib/api-helpers', () => ({
   getAuthUser: vi.fn(),
   requireRole: vi.fn((role: string, allowed: string[]) => {

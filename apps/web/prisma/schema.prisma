@@ -57,6 +57,7 @@ model SubscriptionPlan {
   hasBulkImport          Boolean  @default(false) @map("has_bulk_import")
   hasCustomCertificates  Boolean  @default(false) @map("has_custom_certificates")
   createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   subscriptions OrganizationSubscription[]
 
@@ -207,6 +208,7 @@ model Payment {
   errorMessage         String?   @map("error_message") @db.Text
   paidAt               DateTime? @map("paid_at") @db.Timestamptz
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   subscription OrganizationSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
   invoice      Invoice?
@@ -240,6 +242,7 @@ model Invoice {
   issuedAt       DateTime  @default(now()) @map("issued_at") @db.Timestamptz
   sentAt         DateTime? @map("sent_at") @db.Timestamptz
   paidAt         DateTime? @map("paid_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   payment      Payment                  @relation(fields: [paymentId], references: [id])
   subscription OrganizationSubscription @relation(fields: [subscriptionId], references: [id])
@@ -465,6 +468,7 @@ model TrainingVideo {
   fileSizeBytes   BigInt?  @map("file_size_bytes")
   sortOrder       Int      @default(0) @map("sort_order")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   training      Training        @relation(fields: [trainingId], references: [id], onDelete: Cascade)
   videoProgress VideoProgress[]
@@ -482,6 +486,7 @@ model Question {
   points       Int      @default(10)
   sortOrder    Int      @default(0) @map("sort_order")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   training    Training         @relation(fields: [trainingId], references: [id], onDelete: Cascade)
   options     QuestionOption[]
@@ -493,11 +498,13 @@ model Question {
 
 // ── ŞIKLAR ──
 model QuestionOption {
-  id         String  @id @default(uuid()) @db.Uuid
-  questionId String  @map("question_id") @db.Uuid
-  optionText String  @map("option_text") @db.Text
-  isCorrect  Boolean @default(false) @map("is_correct")
-  sortOrder  Int     @default(0) @map("sort_order")
+  id         String   @id @default(uuid()) @db.Uuid
+  questionId String   @map("question_id") @db.Uuid
+  optionText String   @map("option_text") @db.Text
+  isCorrect  Boolean  @default(false) @map("is_correct")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   question    Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
   examAnswers ExamAnswer[]
@@ -508,20 +515,20 @@ model QuestionOption {
 
 // ── EĞİTİM ATAMALARI ──
 model TrainingAssignment {
-  id                  String    @id @default(uuid()) @db.Uuid
-  trainingId          String    @map("training_id") @db.Uuid
-  userId              String    @map("user_id") @db.Uuid
+  id                   String    @id @default(uuid()) @db.Uuid
+  trainingId           String    @map("training_id") @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
   // Denormalize: training.organizationId'den doldurulur. Cross-tenant query
   // guard'larını tek alana indirir (training join'i olmadan filter).
-  organizationId      String    @map("organization_id") @db.Uuid
-  periodId            String?   @map("period_id") @db.Uuid
-  status              String    @default("assigned") @db.VarChar(30)
-  currentAttempt      Int       @default(0) @map("current_attempt")
-  maxAttempts         Int       @default(3) @map("max_attempts")
-  originalMaxAttempts Int       @default(3) @map("original_max_attempts")
-  assignedById        String?   @map("assigned_by") @db.Uuid
-  assignedAt          DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
-  completedAt         DateTime? @map("completed_at") @db.Timestamptz
+  organizationId       String    @map("organization_id") @db.Uuid
+  periodId             String?   @map("period_id") @db.Uuid
+  status               String    @default("assigned") @db.VarChar(30)
+  currentAttempt       Int       @default(0) @map("current_attempt")
+  maxAttempts          Int       @default(3) @map("max_attempts")
+  originalMaxAttempts  Int       @default(3) @map("original_max_attempts")
+  assignedById         String?   @map("assigned_by") @db.Uuid
+  assignedAt           DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  completedAt          DateTime? @map("completed_at") @db.Timestamptz
   // Tekrar atama (2. tur) — aynı eğitim + aynı dönem içinde 1, 2, 3 ... round.
   // round=1 = orijinal atama; round=2+ = admin tarafından açılan takip turu.
   round                Int       @default(1) @map("round")
@@ -532,15 +539,16 @@ model TrainingAssignment {
   reassignmentReason   String?   @map("reassignment_reason") @db.VarChar(20)
   // Önceki turun id'si — denetim zinciri.
   previousAssignmentId String?   @map("previous_assignment_id") @db.Uuid
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  training             Training             @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  user                 User                 @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
-  organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assignedBy           User?                @relation("AssignedByUser", fields: [assignedById], references: [id])
-  period               TrainingPeriod?      @relation(fields: [periodId], references: [id], onDelete: SetNull)
-  previousAssignment   TrainingAssignment?  @relation("AssignmentRounds", fields: [previousAssignmentId], references: [id], onDelete: SetNull)
-  nextRounds           TrainingAssignment[] @relation("AssignmentRounds")
-  examAttempts         ExamAttempt[]
+  training           Training             @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  user               User                 @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedBy         User?                @relation("AssignedByUser", fields: [assignedById], references: [id])
+  period             TrainingPeriod?      @relation(fields: [periodId], references: [id], onDelete: SetNull)
+  previousAssignment TrainingAssignment?  @relation("AssignmentRounds", fields: [previousAssignmentId], references: [id], onDelete: SetNull)
+  nextRounds         TrainingAssignment[] @relation("AssignmentRounds")
+  examAttempts       ExamAttempt[]
 
   @@unique([trainingId, userId, periodId, round])
   @@index([userId], map: "idx_assignments_user")
@@ -577,6 +585,7 @@ model ExamAttempt {
   signatureIp         String?   @map("signature_ip") @db.VarChar(45)
   signatureMethod     String?   @map("signature_method") @db.VarChar(20)
   organizationId      String    @map("organization_id") @db.Uuid
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   assignment       TrainingAssignment        @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   user             User                      @relation(fields: [userId], references: [id])
@@ -639,6 +648,7 @@ model ExamAnswer {
   isCorrect        Boolean? @map("is_correct")
   examPhase        String   @map("exam_phase") @db.VarChar(10)
   answeredAt       DateTime @default(now()) @map("answered_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   attempt        ExamAttempt     @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   question       Question        @relation(fields: [questionId], references: [id])
@@ -660,6 +670,7 @@ model VideoProgress {
   isCompleted         Boolean   @default(false) @map("is_completed")
   lastPositionSeconds Int       @default(0) @map("last_position_seconds")
   completedAt         DateTime? @map("completed_at") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   attempt ExamAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
@@ -692,6 +703,7 @@ model Notification {
   relatedTrainingId String?  @map("related_training_id") @db.Uuid
   isRead            Boolean  @default(false) @map("is_read")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   sender          User?         @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
@@ -751,6 +763,7 @@ model DbBackup {
   status         String   @default("completed") @db.VarChar(20)
   createdById    String?  @map("created_by") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization? @relation(fields: [organizationId], references: [id])
 
@@ -770,6 +783,7 @@ model Certificate {
   revocationReason String?   @map("revocation_reason") @db.VarChar(500)
   organizationId   String?   @map("organization_id") @db.Uuid
   periodId         String?   @map("period_id") @db.Uuid
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user         User            @relation(fields: [userId], references: [id], onDelete: Restrict)
   training     Training        @relation(fields: [trainingId], references: [id], onDelete: Restrict)
@@ -821,6 +835,7 @@ model KvkkRequest {
   respondedById  String?   @map("responded_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   completedAt    DateTime? @map("completed_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization @relation(fields: [organizationId], references: [id])
   user         User         @relation("KvkkRequester", fields: [userId], references: [id])
@@ -863,6 +878,7 @@ model DepartmentTrainingRule {
   organizationId String   @map("organization_id") @db.Uuid
   isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   training   Training   @relation(fields: [trainingId], references: [id], onDelete: Cascade)
@@ -891,6 +907,7 @@ model SmgActivity {
   approvedAt      DateTime? @map("approved_at") @db.Timestamptz
   rejectionReason String?   @map("rejection_reason") @db.VarChar(500)
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user         User         @relation("UserSmgActivities", fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -914,6 +931,7 @@ model SmgPeriod {
   requiredPoints Int      @map("required_points")
   isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   targets      SmgTarget[]
@@ -952,6 +970,7 @@ model SmgTarget {
   userId         String?  @map("user_id") @db.Uuid
   requiredPoints Int      @map("required_points")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization @relation("SmgTargetOrg", fields: [organizationId], references: [id], onDelete: Cascade, map: "smg_targets_org_fkey")
   period       SmgPeriod    @relation(fields: [periodId], references: [id], onDelete: Cascade, map: "smg_targets_period_fkey")
@@ -981,6 +1000,7 @@ model ContentLibrary {
   isActive       Boolean  @default(true) @map("is_active")
   createdById    String?  @map("created_by") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   // AI İçerik alanları
   contentType    String?  @map("content_type") @db.VarChar(30) // video | audio | pdf | quiz | flashcards | report | infographic
   s3Key          String?  @map("s3_key") @db.Text
@@ -1010,6 +1030,7 @@ model OrganizationContentLibrary {
   contentLibraryId String   @map("content_library_id") @db.Uuid
   installedAt      DateTime @default(now()) @map("installed_at") @db.Timestamptz
   installedBy      String?  @map("installed_by") @db.Uuid
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   contentLibrary ContentLibrary @relation(fields: [contentLibraryId], references: [id], onDelete: Cascade)
@@ -1056,6 +1077,7 @@ model SyncLog {
   errors           Json      @default("[]")
   startedAt        DateTime  @default(now()) @map("started_at") @db.Timestamptz
   completedAt      DateTime? @map("completed_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   integration  HisIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
@@ -1078,6 +1100,7 @@ model CompetencyForm {
   periodEnd      DateTime @map("period_end") @db.Date
   isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   categories   CompetencyCategory[]
@@ -1088,11 +1111,13 @@ model CompetencyForm {
 }
 
 model CompetencyCategory {
-  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  formId String @map("form_id") @db.Uuid
-  name   String @db.VarChar(255)
-  weight Int    @default(0)
-  order  Int    @default(0)
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  formId    String   @map("form_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  weight    Int      @default(0)
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   form  CompetencyForm   @relation(fields: [formId], references: [id], onDelete: Cascade)
   items CompetencyItem[]
@@ -1102,11 +1127,13 @@ model CompetencyCategory {
 }
 
 model CompetencyItem {
-  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  categoryId  String  @map("category_id") @db.Uuid
-  text        String  @db.VarChar(500)
-  description String? @db.Text
-  order       Int     @default(0)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  text        String   @db.VarChar(500)
+  description String?  @db.Text
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   category CompetencyCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   answers  CompetencyAnswer[]
@@ -1127,6 +1154,7 @@ model CompetencyEvaluation {
   overallScore  Decimal?  @map("overall_score") @db.Decimal(4, 2)
   completedAt   DateTime? @map("completed_at") @db.Timestamptz
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   form      CompetencyForm     @relation(fields: [formId], references: [id], onDelete: Cascade)
   subject   User               @relation("EvaluationSubject", fields: [subjectId], references: [id], onDelete: Cascade)
@@ -1141,11 +1169,13 @@ model CompetencyEvaluation {
 }
 
 model CompetencyAnswer {
-  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  evaluationId String  @map("evaluation_id") @db.Uuid
-  itemId       String  @map("item_id") @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  evaluationId String   @map("evaluation_id") @db.Uuid
+  itemId       String   @map("item_id") @db.Uuid
   score        Int
-  comment      String? @db.Text
+  comment      String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   evaluation CompetencyEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
   item       CompetencyItem       @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -1163,6 +1193,7 @@ model PushSubscription {
   p256dh    String   @db.Text
   auth      String   @db.Text
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1184,6 +1215,7 @@ model ExpoPushToken {
   deviceName String?  @map("device_name") @db.VarChar(100)
   lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1215,6 +1247,7 @@ model ExpoPushTicket {
   errorDetails String?   @map("error_details") @db.Text
   sentAt       DateTime  @default(now()) @map("sent_at") @db.Timestamptz
   receiptAt    DateTime? @map("receipt_at") @db.Timestamptz
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1269,6 +1302,7 @@ model AccreditationReport {
   findings              Json     @default("[]")
   reportUrl             String?  @map("report_url") @db.Text
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   generatedByUser User         @relation(fields: [generatedBy], references: [id], onDelete: Restrict)
@@ -1289,6 +1323,7 @@ model TrainingCategory {
   order          Int      @default(0)
   isDefault      Boolean  @default(false) @map("is_default")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -1317,11 +1352,13 @@ model QuestionBank {
 }
 
 model QuestionBankOption {
-  id             String  @id @default(uuid()) @db.Uuid
-  questionBankId String  @map("question_bank_id") @db.Uuid
-  text           String  @db.Text
-  isCorrect      Boolean @map("is_correct")
+  id             String   @id @default(uuid()) @db.Uuid
+  questionBankId String   @map("question_bank_id") @db.Uuid
+  text           String   @db.Text
+  isCorrect      Boolean  @map("is_correct")
   order          Int
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   question QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
 
@@ -1337,27 +1374,27 @@ model QuestionBankOption {
 // ──────────────────────────────────────────────────────────────
 
 model TrainingFeedbackForm {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  title          String   @default("Eğitim Değerlendirme Anket Formu") @db.VarChar(255)
-  description    String?  @db.Text
-  documentCode   String?  @default("EY.FR.40") @map("document_code") @db.VarChar(50)
-  isActive       Boolean  @default(false) @map("is_active")
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  title          String    @default("Eğitim Değerlendirme Anket Formu") @db.VarChar(255)
+  description    String?   @db.Text
+  documentCode   String?   @default("EY.FR.40") @map("document_code") @db.VarChar(50)
+  isActive       Boolean   @default(false) @map("is_active")
   // Bu form aktive edildiğinde tüm eğitimlerde feedback zorunluluğunu nasıl
   // ayarlayacağı: true → tüm Training.feedbackMandatory=true (sertifika gating
   // çalışır), false → tüm Training.feedbackMandatory=false (form opsiyonel).
-  isMandatory    Boolean  @default(true) @map("is_mandatory")
+  isMandatory    Boolean   @default(true) @map("is_mandatory")
   // Yanıt verilmiş ama artık kullanılmayan formlar arşive alınır — silmek
   // istenir ama yanıt geçmişi (FK: TrainingFeedbackResponse.formId) korunur.
   // Liste UI'sı default arşivsizleri gösterir.
-  isArchived     Boolean  @default(false) @map("is_archived")
+  isArchived     Boolean   @default(false) @map("is_archived")
   // PDF header'da gösterilen sabit doküman metadata'sı.
   // Form snapshot'a otomatik kopyalanır → submit anındaki değerler korunur.
   publishedAt    DateTime? @map("published_at") @db.Timestamptz
   revisionNumber Int       @default(0) @map("revision_number")
   revisionDate   DateTime? @map("revision_date") @db.Timestamptz
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   categories   TrainingFeedbackCategory[]
@@ -1370,10 +1407,12 @@ model TrainingFeedbackForm {
 }
 
 model TrainingFeedbackCategory {
-  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  formId String @map("form_id") @db.Uuid
-  name   String @db.VarChar(255)
-  order  Int    @default(0)
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  formId    String   @map("form_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   form  TrainingFeedbackForm   @relation(fields: [formId], references: [id], onDelete: Cascade)
   items TrainingFeedbackItem[]
@@ -1383,13 +1422,15 @@ model TrainingFeedbackCategory {
 }
 
 model TrainingFeedbackItem {
-  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  categoryId   String  @map("category_id") @db.Uuid
-  text         String  @db.VarChar(500)
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId   String   @map("category_id") @db.Uuid
+  text         String   @db.VarChar(500)
   // likert_5 (1-5) | yes_partial_no (1=Evet, 2=Kısmen, 3=Hayır) | text (serbest metin)
-  questionType String  @default("likert_5") @map("question_type") @db.VarChar(20)
-  isRequired   Boolean @default(true) @map("is_required")
-  order        Int     @default(0)
+  questionType String   @default("likert_5") @map("question_type") @db.VarChar(20)
+  isRequired   Boolean  @default(true) @map("is_required")
+  order        Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   category TrainingFeedbackCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   answers  TrainingFeedbackAnswer[]
@@ -1411,6 +1452,7 @@ model TrainingFeedbackResponse {
   // Submit anındaki form yapısının donmuş kopyası (categories + items).
   // Admin sonradan form'u düzenlese bile detay sayfası geçmişi korur.
   formSnapshot   Json?    @map("form_snapshot") @db.JsonB
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   form         TrainingFeedbackForm     @relation(fields: [formId], references: [id], onDelete: Restrict)
   attempt      ExamAttempt              @relation(fields: [attemptId], references: [id], onDelete: Cascade)
@@ -1425,15 +1467,17 @@ model TrainingFeedbackResponse {
 }
 
 model TrainingFeedbackAnswer {
-  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  responseId   String  @map("response_id") @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  responseId   String   @map("response_id") @db.Uuid
   // Item silinse bile cevap korunur (SetNull). Analytics ve detay sayfası
   // itemSnapshot'tan okur — tarihsel bütünlük bozulmaz.
-  itemId       String? @map("item_id") @db.Uuid
+  itemId       String?  @map("item_id") @db.Uuid
   // Cevap verildiği andaki item metadata (text, questionType, categoryName).
-  itemSnapshot Json?   @map("item_snapshot") @db.JsonB
+  itemSnapshot Json?    @map("item_snapshot") @db.JsonB
   score        Int?
-  textAnswer   String? @map("text_answer") @db.Text
+  textAnswer   String?  @map("text_answer") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   response TrainingFeedbackResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
   item     TrainingFeedbackItem?    @relation(fields: [itemId], references: [id], onDelete: SetNull)

@@ -97,6 +97,9 @@ export function NotificationBell({
         type: n.type,
         isRead: n.isRead,
         createdAt: n.createdAt,
+        // Bell payload'ı updatedAt taşımıyor; store görüntüleme amaçlı —
+        // createdAt makul fallback (bildirim nadiren güncellenir).
+        updatedAt: n.createdAt,
         relatedTrainingId: null,
       })),
     );
