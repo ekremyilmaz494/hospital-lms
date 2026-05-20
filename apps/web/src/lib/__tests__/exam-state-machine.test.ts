@@ -250,13 +250,26 @@ describe('isAttemptInPhase', () => {
 })
 
 describe('attemptPhaseRedirect', () => {
-  it('completed → my-trainings (zaten oradaysa null)', () => {
-    expect(attemptPhaseRedirect('completed', 'pre-exam')).toBe('my-trainings')
-    expect(attemptPhaseRedirect('completed', 'my-trainings')).toBe(null)
+  it('completed → my-training-detail (kullanıcı sertifika/passed UI veya yeni deneme CTA görsün)', () => {
+    expect(attemptPhaseRedirect('completed', 'pre-exam')).toBe('my-training-detail')
+    expect(attemptPhaseRedirect('completed', 'videos')).toBe('my-training-detail')
+    expect(attemptPhaseRedirect('completed', 'post-exam')).toBe('my-training-detail')
   })
 
-  it('expired → my-trainings', () => {
-    expect(attemptPhaseRedirect('expired', 'videos')).toBe('my-trainings')
+  it('completed + zaten my-training-detail → null (kal)', () => {
+    expect(attemptPhaseRedirect('completed', 'my-training-detail')).toBe(null)
+  })
+
+  it('expired → my-training-detail (isExpiredRetryable banner + Yeniden dene CTA orada)', () => {
+    expect(attemptPhaseRedirect('expired', 'videos')).toBe('my-training-detail')
+    expect(attemptPhaseRedirect('expired', 'pre-exam')).toBe('my-training-detail')
+  })
+
+  it('terminal status iken my-trainings (liste) currentRoute olarak verilirse hâlâ detaya yönlendirir', () => {
+    // Liste sayfasında oturan kullanıcıyı detaya çekmek bağlam kaybı yaratmaz —
+    // detay sayfası terminal durumda da anlamlı bir UI gösteriyor.
+    expect(attemptPhaseRedirect('completed', 'my-trainings')).toBe('my-training-detail')
+    expect(attemptPhaseRedirect('expired', 'my-trainings')).toBe('my-training-detail')
   })
 
   it('pre_exam route ile pre_exam status → null (kal)', () => {

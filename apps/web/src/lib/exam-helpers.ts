@@ -86,6 +86,44 @@ export async function getAttemptStatus(id: string, userId: string, userOrgId: st
   return attempt
 }
 
+/**
+ * Frontend phase guard için kullan. Aktif (non-terminal) bir attempt varsa onu
+ * döner; yoksa latest attempt'e (terminal dahil) düşer. start POST'tan sonra
+ * yaratılan taze attempt'i, eski tamamlanmış/expired bir attempt'in arkasına
+ * gizlemez — bu olmadan frontend `attemptPhaseRedirect` terminal status okuyup
+ * kullanıcıyı yanlışlıkla redirect ediyordu (2026-05-20 Devakent incident).
+ */
+export async function getActiveOrLatestAttemptStatus(id: string, userId: string, userOrgId: string) {
+  const orgGuard = { training: { organizationId: userOrgId } }
+  const select = {
+    id: true,
+    status: true,
+    preExamCompletedAt: true,
+    videosCompletedAt: true,
+    postExamCompletedAt: true,
+  }
+  // Not: `as const` koyma — Prisma `notIn` mutable string[] bekliyor.
+  const activeFilter = { status: { notIn: ['completed', 'expired'] } }
+
+  let active = await prisma.examAttempt.findFirst({
+    where: { assignmentId: id, userId, ...orgGuard, ...activeFilter },
+    orderBy: { attemptNumber: 'desc' },
+    select,
+  })
+
+  if (!active) {
+    active = await prisma.examAttempt.findFirst({
+      where: { trainingId: id, userId, ...orgGuard, ...activeFilter },
+      orderBy: { attemptNumber: 'desc' },
+      select,
+    })
+  }
+
+  if (active) return active
+
+  return getAttemptStatus(id, userId, userOrgId)
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    Soru subset seçimi — questions ve submit route'ları aynı kümeyi görmeli.
    Aksi halde randomQuestionCount aktifken kullanıcı 5 soru görür, submit

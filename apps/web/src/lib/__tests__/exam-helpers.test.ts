@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getAttemptWithPhaseCheck, getAttemptStatus } from '../exam-helpers'
+import {
+  getAttemptWithPhaseCheck,
+  getAttemptStatus,
+  getActiveOrLatestAttemptStatus,
+} from '../exam-helpers'
 
 // Prisma mock — gerçek DB'ye istek atmadan test
 const mockFindFirst = vi.fn()
@@ -127,5 +131,86 @@ describe('getAttemptStatus', () => {
     const result = await getAttemptStatus('uuid-yok', 'user-uuid-1', ORG)
 
     expect(result).toBeNull()
+  })
+})
+
+describe('getActiveOrLatestAttemptStatus', () => {
+  // Bu helper'ın amacı: eski terminal attempt (latest attemptNumber) frontend
+  // phase guard'ı redirect'e tetiklemesin diye, var olan aktif attempt'i öne
+  // çıkarmak. 2026-05-20 Devakent incident: personel ön sınavı tamamlayıp
+  // çıkmış, watching_videos durumunda yeni attempt başlattı, ama backend GET
+  // /api/exam/[id]/videos eski completed attempt'i döndürünce frontend
+  // attemptPhaseRedirect → my-trainings → "video sayfası anlık eğitime atıyor".
+
+  it('aktif attempt varsa onu döner (eski completed attempt göz ardı edilir)', async () => {
+    const activeAttempt = {
+      id: 'attempt-2',
+      status: 'watching_videos',
+      preExamCompletedAt: new Date('2026-05-19T10:00:00'),
+      videosCompletedAt: null,
+      postExamCompletedAt: null,
+    }
+    // İlk findFirst çağrısı (active, assignmentId) → aktif attempt bulundu
+    mockFindFirst.mockResolvedValueOnce(activeAttempt)
+
+    const result = await getActiveOrLatestAttemptStatus('assignment-uuid-1', 'user-uuid-1', ORG)
+
+    expect(result?.id).toBe('attempt-2')
+    expect(result?.status).toBe('watching_videos')
+    // Aktif bulunduğunda 2. (trainingId) fallback'e VE getAttemptStatus'a düşmemeli
+    expect(mockFindFirst).toHaveBeenCalledTimes(1)
+
+    const callArgs = mockFindFirst.mock.calls[0][0] as {
+      where: { status?: { notIn?: readonly string[] } }
+    }
+    expect(callArgs.where.status?.notIn).toEqual(['completed', 'expired'])
+  })
+
+  it('aktif attempt yoksa terminal latest attempt\'e düşer (frontend redirect tetiklemesi için doğru)', async () => {
+    // 1: aktif assignmentId arama → null
+    mockFindFirst.mockResolvedValueOnce(null)
+    // 2: aktif trainingId fallback → null
+    mockFindFirst.mockResolvedValueOnce(null)
+    // 3: getAttemptStatus → assignmentId ile latest (terminal) attempt
+    const terminalAttempt = {
+      id: 'attempt-1',
+      status: 'completed',
+      preExamCompletedAt: new Date('2026-05-15T10:00:00'),
+      videosCompletedAt: new Date('2026-05-15T11:00:00'),
+      postExamCompletedAt: new Date('2026-05-15T12:00:00'),
+    }
+    mockFindFirst.mockResolvedValueOnce(terminalAttempt)
+
+    const result = await getActiveOrLatestAttemptStatus('assignment-uuid-1', 'user-uuid-1', ORG)
+
+    expect(result?.id).toBe('attempt-1')
+    expect(result?.status).toBe('completed')
+  })
+
+  it('hiçbir attempt yoksa null döner', async () => {
+    mockFindFirst.mockResolvedValue(null)
+
+    const result = await getActiveOrLatestAttemptStatus('uuid-yok', 'user-uuid-1', ORG)
+
+    expect(result).toBeNull()
+  })
+
+  it('assignmentId ile aktif yoksa trainingId ile aktif aranır', async () => {
+    // 1: assignmentId + active filter → null
+    mockFindFirst.mockResolvedValueOnce(null)
+    // 2: trainingId + active filter → bulundu
+    const activeViaTraining = {
+      id: 'attempt-3',
+      status: 'pre_exam',
+      preExamCompletedAt: null,
+      videosCompletedAt: null,
+      postExamCompletedAt: null,
+    }
+    mockFindFirst.mockResolvedValueOnce(activeViaTraining)
+
+    const result = await getActiveOrLatestAttemptStatus('training-uuid-1', 'user-uuid-1', ORG)
+
+    expect(result?.id).toBe('attempt-3')
+    expect(mockFindFirst).toHaveBeenCalledTimes(2)
   })
 })

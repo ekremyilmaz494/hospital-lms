@@ -84,9 +84,12 @@ export default function PostExamPage() {
         }
         const redirect = attemptPhaseRedirect(attempt.status as AttemptStatus, 'post-exam');
         if (redirect) {
-          const path = redirect === 'my-trainings'
-            ? '/staff/my-trainings'
-            : `/exam/${id}/${redirect}`;
+          const path =
+            redirect === 'my-trainings'
+              ? '/staff/my-trainings'
+              : redirect === 'my-training-detail'
+                ? `/staff/my-trainings/${id}`
+                : `/exam/${id}/${redirect}`;
           router.replace(path);
           return;
         }

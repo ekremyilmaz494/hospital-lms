@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
-import { getAttemptStatus } from '@/lib/exam-helpers'
+import { getActiveOrLatestAttemptStatus } from '@/lib/exam-helpers'
 import { resolveTrainingVideoUrl, resolveTrainingDocumentUrl } from '@/lib/training-video-url'
 import { logger } from '@/lib/logger'
 import type { AttemptStatus, AssignmentStatus } from '@/lib/exam-state-machine'
@@ -13,8 +13,11 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
   const url = new URL(request.url)
   const isReview = url.searchParams.get('mode') === 'review'
 
-  // Phase guard: check attempt status for video access
-  const attemptInfo = await getAttemptStatus(id, dbUser.id, organizationId)
+  // Phase guard: aktif (non-terminal) attempt'in status'üne bak. Latest attempt'i
+  // okumak yetmiyor — start POST taze attempt yarattıktan sonra higher
+  // attemptNumber'a sahip eski completed/expired attempt frontend'i terminal
+  // redirect'e tetikleyebiliyordu (2026-05-20 Devakent incident).
+  const attemptInfo = await getActiveOrLatestAttemptStatus(id, dbUser.id, organizationId)
   const attemptStatus = attemptInfo?.status ?? null
   // Videos accessible during watching_videos, post_exam (read-only), and completed phases
   // Only block during pre_exam (hasn't finished pre-exam yet).

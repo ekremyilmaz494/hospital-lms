@@ -225,24 +225,26 @@ export function isAttemptInPhase(
 /**
  * Yanlış phase'de olan kullanıcıyı nereye redirect etmeli? (Frontend phase guard)
  * `null` döndürürse "burada kalabilir" demektir.
+ *
+ * `my-training-detail` çağıran sayfada `/staff/my-trainings/${id}` olarak yorumlanır;
+ * `my-trainings` ise düz `/staff/my-trainings` (liste) olur.
  */
-export type ExamRoute = 'pre-exam' | 'videos' | 'post-exam' | 'transition' | 'my-trainings'
+export type ExamRoute =
+  | 'pre-exam'
+  | 'videos'
+  | 'post-exam'
+  | 'transition'
+  | 'my-trainings'
+  | 'my-training-detail'
 
 export function attemptPhaseRedirect(status: AttemptStatus, currentRoute: ExamRoute): ExamRoute | null {
-  // 'completed' kesin terminal — listeye dön.
-  if (status === 'completed') {
-    return currentRoute === 'my-trainings' ? null : 'my-trainings'
-  }
-  // 'expired' artık terminal değil: kullanıcının deneme hakkı kalmış olabilir
-  // (cron 24h pencere veya endDate-passed sebebiyle kapatmış olabilir).
-  // Listeye atmak yerine detay sayfasına yönlendir — orada needsRetry true
-  // ise "Yeniden dene" CTA'sı gösteriliyor, kullanıcı yeni attempt başlatabilir.
-  // (my-trainings sayfasında detaya girmek için ek tıklama gerekiyor; aynı
-  // route oldukları için tek tıkla detaya iletecek hedef yok — bu redirect
-  // sonrası kullanıcı eğitim listesinde card'a tıklayıp detaya girer ve
-  // "Yeniden dene" CTA'sını görür.)
-  if (status === 'expired') {
-    return currentRoute === 'my-trainings' ? null : 'my-trainings'
+  // Terminal status'lerde (completed/expired) kullanıcıyı liste sayfasına atmak
+  // bağlam kaybettiriyor — "Yeniden dene" CTA'sını veya sertifika/başarı UI'ını
+  // göremiyor, neden buraya geldiğini anlamıyor (2026-05-20 Devakent şikayeti).
+  // Bunun yerine eğitim detayına yönlendir; orada my-trainings/[id] backend'i
+  // isRetryPending/isExpiredRetryable/passed branch'larında doğru CTA'yı verir.
+  if (status === 'completed' || status === 'expired') {
+    return currentRoute === 'my-training-detail' ? null : 'my-training-detail'
   }
   // Aktif phase'in route'u zaten doğru mu?
   const expectedRoute: ExamRoute = ({
