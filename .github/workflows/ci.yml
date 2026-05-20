@@ -43,6 +43,11 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter web exec prisma generate
 
+      - name: Script guard check (yıkıcı scriptlerde production guard var mı?)
+        # 2026-05-20 incident sonrası: guard'sız bir wipe-*/seed-* scripti merge edilemez.
+        # Lint'ten ÖNCE konumlandı — hızlı, bağımsız Node kontrolü.
+        run: node apps/web/scripts/check-script-guards.mjs
+
       - name: Migration drift check (schema.prisma ↔ migrations senkron mu?)
         env:
           SHADOW_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_shadow  # secret-scanner-disable-line
@@ -64,10 +69,6 @@ jobs:
 
       - name: Editorial palette guard
         run: bash apps/web/scripts/editorial-palette-guard.sh
-
-      - name: Script guard check (yıkıcı scriptlerde production guard var mı?)
-        # 2026-05-20 incident sonrası: guard'sız bir wipe-*/seed-* scripti merge edilemez.
-        run: node apps/web/scripts/check-script-guards.mjs
 
       - name: Unit tests
         run: pnpm test
