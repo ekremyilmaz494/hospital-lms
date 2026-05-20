@@ -8,6 +8,7 @@ import {
   safePagination,
 } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 import { createStandaloneExamSchema } from '@/lib/validations'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import { getCached, setCached, invalidateByPrefix } from '@/lib/redis'
@@ -34,10 +35,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   }
 
   if (search) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
-    ]
+    // Türkçe-duyarlı arama (bkz. turkishSearchIds)
+    where.id = { in: await turkishSearchIds('trainings', ['title', 'description'], search, organizationId) }
   }
   if (category) where.category = category
 

@@ -129,18 +129,13 @@ describe('Personel CRUD islemleri', () => {
       expect(where.role).toBe('staff')
     })
 
-    it('arama parametresi adi, soyadi ve emailde arar', () => {
-      const search = 'ahmet'
-      const where = {
-        organizationId: ORG_ID,
-        role: 'staff',
-        OR: [
-          { firstName: { contains: search, mode: 'insensitive' } },
-          { lastName: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
-        ],
-      }
-      expect(where.OR).toHaveLength(3)
+    it('arama Türkçe-duyarlı id ön-filtresi (turkishSearchIds) ile yapılır', () => {
+      // Postgres lower('İ') → 'i̇' (combining dot) ürettiğinden ILIKE Türkçe
+      // büyük harfleri katlayamaz; arama artık where.OR yerine turkishSearchIds()
+      // ile eşleşen id'leri çıkarıp where.id = { in } kullanır.
+      const matchedIds = ['user-1', 'user-2']
+      const where = { organizationId: ORG_ID, role: 'staff', id: { in: matchedIds } }
+      expect(where.id.in).toEqual(matchedIds)
     })
   })
 

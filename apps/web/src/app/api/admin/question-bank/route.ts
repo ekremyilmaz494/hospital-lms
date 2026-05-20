@@ -6,6 +6,7 @@ import {
   safePagination,
 } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 import { createQuestionBankSchema } from '@/lib/validations'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
@@ -19,7 +20,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   }
 
   if (search) {
-    where.text = { contains: search, mode: 'insensitive' }
+    // Türkçe-duyarlı arama (bkz. turkishSearchIds)
+    where.id = { in: await turkishSearchIds('question_bank', ['text'], search, organizationId) }
   }
   if (category) where.category = category
   if (difficulty) where.difficulty = difficulty

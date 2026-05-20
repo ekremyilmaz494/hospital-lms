@@ -2,6 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 import { createTrainingBodySchema } from '@/lib/validations'
 import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
@@ -29,10 +30,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     }
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ]
+      // Türkçe-duyarlı arama (bkz. turkishSearchIds)
+      where.id = { in: await turkishSearchIds('trainings', ['title', 'description'], search, orgId) }
     }
     if (category) where.category = category
     if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'

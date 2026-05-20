@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { jsPDF } from 'jspdf'
@@ -183,6 +184,12 @@ async function generateCertificatesPdf(request: Request, orgId: string, orgName:
 
   const now = new Date()
 
+  // Türkçe-duyarlı arama: certificateCode ASCII olduğundan ILIKE yeterli;
+  // personel ad/soyad/email araması turkishSearchIds ile yapılır.
+  const matchedUserIds = search
+    ? await turkishSearchIds('users', ['first_name', 'last_name', 'email'], search, orgId)
+    : []
+
   const certificates = await prisma.certificate.findMany({
     where: {
       training: {
@@ -193,9 +200,7 @@ async function generateCertificatesPdf(request: Request, orgId: string, orgName:
       ...(search && {
         OR: [
           { certificateCode: { contains: search, mode: 'insensitive' as const } },
-          { user: { firstName: { contains: search, mode: 'insensitive' as const } } },
-          { user: { lastName: { contains: search, mode: 'insensitive' as const } } },
-          { user: { email: { contains: search, mode: 'insensitive' as const } } },
+          { user: { id: { in: matchedUserIds } } },
         ],
       }),
     },

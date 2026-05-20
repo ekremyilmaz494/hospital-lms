@@ -1,15 +1,17 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 import { createCompetencyFormSchema } from '@/lib/validations'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
   const { page, limit, skip, search } = safePagination(searchParams)
 
-  const where = {
-    organizationId,
-    ...(search ? { title: { contains: search, mode: 'insensitive' as const } } : {}),
+  const where: Record<string, unknown> = { organizationId }
+  if (search) {
+    // Türkçe-duyarlı arama (bkz. turkishSearchIds)
+    where.id = { in: await turkishSearchIds('competency_forms', ['title'], search, organizationId) }
   }
 
   const [forms, total] = await Promise.all([
