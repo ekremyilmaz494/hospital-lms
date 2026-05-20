@@ -35,7 +35,10 @@ const { prismaMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
-vi.mock('@/lib/exam-helpers', () => ({ getAttemptStatus: vi.fn() }))
+vi.mock('@/lib/exam-helpers', () => ({
+  getAttemptStatus: vi.fn(),
+  getActiveOrLatestAttemptStatus: vi.fn(),
+}))
 vi.mock('@/lib/training-video-url', () => ({
   resolveTrainingVideoUrl: vi.fn().mockResolvedValue(''),
   resolveTrainingDocumentUrl: vi.fn().mockResolvedValue(''),

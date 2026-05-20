@@ -411,9 +411,12 @@ export default function VideoPlayerPage() {
     if (!data?.attemptStatus) return;
     const redirect = attemptPhaseRedirect(data.attemptStatus as AttemptStatus, 'videos');
     if (redirect) {
-      const path = redirect === 'my-trainings'
-        ? '/staff/my-trainings'
-        : `/exam/${id}/${redirect}`;
+      const path =
+        redirect === 'my-trainings'
+          ? '/staff/my-trainings'
+          : redirect === 'my-training-detail'
+            ? `/staff/my-trainings/${id}`
+            : `/exam/${id}/${redirect}`;
       router.replace(path);
     }
   }, [data?.attemptStatus, id, router, isReview]);
@@ -438,7 +441,17 @@ export default function VideoPlayerPage() {
     );
   }
 
-  if (!isReview && (data?.attemptStatus === 'pre_exam' || data?.attemptStatus === 'completed')) return <PageLoading />;
+  // attemptPhaseRedirect bu status'lerde redirect tetikliyor — bir tick boyunca
+  // boş içerik yerine loading göster; aksi halde "render → effect → replace"
+  // arasında 1-2 frame video player iskeleti flash ediyor.
+  if (
+    !isReview &&
+    (data?.attemptStatus === 'pre_exam' ||
+      data?.attemptStatus === 'post_exam' ||
+      data?.attemptStatus === 'completed' ||
+      data?.attemptStatus === 'expired')
+  )
+    return <PageLoading />;
 
   if (videosData.length === 0) {
     return (
