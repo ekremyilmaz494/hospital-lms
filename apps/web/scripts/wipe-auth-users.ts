@@ -1,6 +1,8 @@
 import { prisma } from '../src/lib/prisma'
+import { assertNotProduction } from './_guard'
 
 async function main() {
+  assertNotProduction('wipe-auth-users')
   console.log('[1/5] Script başladı, prisma client yüklendi')
 
   const dryRun = !process.argv.includes('--execute')
