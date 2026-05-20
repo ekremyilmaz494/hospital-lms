@@ -3,17 +3,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 /**
  * Staff My-Trainings Detail — step completion + needsRetry sözleşmesi.
  *
- * **KÖK NEDEN** (2026-05-17 Devakent RADYASYON incident):
- * `latestAttempt.status === 'expired'` durumunda backend final `else` branch'ına
- * düşüyor → preExamCompleted/videosCompleted/postExamCompleted hepsi `true` →
- * frontend `allDone=true` → CTA gizleniyor → personel sınava devam edemiyor.
+ * **KÖK NEDEN** (2026-05-20 Devakent ÖZGÜR ÜNVER incident):
+ * `isExpiredRetryable` durumu (cron attempt'i expire etti, hak kaldı) süresi dolan
+ * denemenin ilerlemesini okuyordu → aşama "TAMAM" görünürken video listesi "%0"
+ * gösteriyordu (üç katman üç farklı yanıt veriyordu).
  *
- * Bu test serisi, `isExpiredRetryable` durumunun GERÇEK ilerlemeye göre flag
- * döndürdüğünü ve frontend'in retry/normal akışına doğru yönlendirildiğini
- * (needsRetry koşullu) doğrular.
+ * **KARAR:** `isExpiredRetryable` artık `isRetryPending` ile aynı — temiz retry.
+ * Süresi dolan denemenin video/son-sınav ilerlemesi TAŞINMAZ; personel sıfırdan
+ * başlar. Bu, start route'un zaten yaptığı "yeni attempt aç" davranışıyla hizalanır.
+ *
+ * Bu test serisi yeni sözleşmeyi doğrular: expired-retryable durumda videos/post
+ * her zaman false, preExamCompleted yalnızca requirePreExamOnRetry'e bağlı.
  */
 
-const { prismaMock } = vi.hoisted(() => ({
+const { prismaMock, isEndDatePassedMock } = vi.hoisted(() => ({
   prismaMock: {
     trainingAssignment: {
       findFirst: vi.fn(),
@@ -31,12 +34,13 @@ const { prismaMock } = vi.hoisted(() => ({
       findFirst: vi.fn().mockResolvedValue(null),
     },
   },
+  isEndDatePassedMock: vi.fn().mockReturnValue(false),
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
 vi.mock('@/lib/activity-logger', () => ({ logActivity: vi.fn() }))
 vi.mock('@/lib/date-helpers', () => ({
-  isEndDatePassed: vi.fn().mockReturnValue(false),
+  isEndDatePassed: isEndDatePassedMock,
   toEndOfDayUTC: (d: Date | string) => new Date(d),
 }))
 
@@ -71,7 +75,11 @@ function detailRequest(): Request {
 
 function makeAssignment(
   latestAttemptOverrides: Record<string, unknown> = {},
-  extra: { feedbackMandatory?: boolean; originalMaxAttempts?: number } = {},
+  extra: {
+    feedbackMandatory?: boolean
+    originalMaxAttempts?: number
+    requirePreExamOnRetry?: boolean
+  } = {},
 ) {
   return {
     id: ASSIGNMENT_ID,
@@ -80,6 +88,7 @@ function makeAssignment(
     currentAttempt: 1,
     maxAttempts: 3,
     originalMaxAttempts: extra.originalMaxAttempts ?? 3,
+    dueDate: null,
     training: {
       id: 'training-1',
       title: 'Test Eğitim',
@@ -90,6 +99,7 @@ function makeAssignment(
       startDate: new Date('2026-05-01'),
       endDate: new Date('2026-05-20'),
       examOnly: false,
+      requirePreExamOnRetry: extra.requirePreExamOnRetry ?? false,
       feedbackMandatory: extra.feedbackMandatory ?? false,
       videos: [
         { id: 'video-1', title: 'Video 1', durationSeconds: 300, sortOrder: 0, contentType: 'video' },
@@ -115,47 +125,82 @@ function makeAssignment(
 
 beforeEach(() => {
   vi.clearAllMocks()
+  isEndDatePassedMock.mockReturnValue(false)
 })
 
-describe('Staff my-trainings detail — isExpiredRetryable regression (Devakent incident)', () => {
-  it('expired + pre-exam yarıda → step flag\'leri TAMAM gösterMEZ (kullanıcı kilitli kalmaz)', async () => {
-    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(makeAssignment())
+describe('Staff my-trainings detail — isExpiredRetryable temiz-retry sözleşmesi', () => {
+  it('expired + requirePreExamOnRetry=false → preExam true (retry\'da atlanır), videos/post false, needsRetry true', async () => {
+    // Süresi dolan denemede video tamamlanmış OLSA bile (videosCompletedAt + isCompleted dolu)
+    // ilerleme TAŞINMAZ — yeni deneme sıfırdan başlar.
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(makeAssignment({
+      preExamCompletedAt: new Date('2026-05-14T06:42:18Z'),
+      preExamScore: 70,
+      videosCompletedAt: new Date('2026-05-15T10:00:00Z'),
+      videoProgress: [{ videoId: 'video-1', isCompleted: true }],
+    }, { requirePreExamOnRetry: false }))
 
     const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
 
-    // KRİTİK: hepsi false olmalı — aksi halde frontend allDone=true → CTA gizlenir
+    // Retry'da ön sınav atlanır → preExamCompleted=true. Videolar/son sınav SIFIRDAN.
+    expect(body.preExamCompleted).toBe(true)
+    expect(body.videosCompleted).toBe(false)
+    expect(body.postExamCompleted).toBe(false)
+    expect(body.isExpiredRetryable).toBe(true)
+    // 2-step retry akışı (Videoları İzle CTA)
+    expect(body.needsRetry).toBe(true)
+    // Yeni deneme numarası: assignment.currentAttempt(1) + 1
+    expect(body.currentAttempt).toBe(2)
+  })
+
+  it('expired — eski denemenin tamamlanmış video ilerlemesi video listesine SIZMAZ (aşama/%0 çelişkisi yok)', async () => {
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(makeAssignment({
+      preExamCompletedAt: new Date('2026-05-14T06:42:18Z'),
+      videosCompletedAt: new Date('2026-05-15T10:00:00Z'),
+      videoProgress: [{ videoId: 'video-1', isCompleted: true }],
+    }, { requirePreExamOnRetry: false }))
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    const body = await res.json()
+
+    // KRİTİK: video listesindeki HER video completed:false — aksi halde detay sayfası
+    // "AŞAMA TAMAM" + "%0 TAMAMLANDI" çelişkisini gösterir.
+    expect(body.videos).toHaveLength(1)
+    expect(body.videos.every((v: { completed: boolean }) => v.completed === false)).toBe(true)
+    expect(body.videosCompleted).toBe(false)
+  })
+
+  it('expired + requirePreExamOnRetry=true → preExam false (baştan), videos/post false, needsRetry false (3-step)', async () => {
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(makeAssignment({
+      preExamCompletedAt: new Date('2026-05-14T06:42:18Z'),
+      preExamScore: 70,
+      videoProgress: [{ videoId: 'video-1', isCompleted: true }],
+    }, { requirePreExamOnRetry: true }))
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    const body = await res.json()
+
+    // requirePreExamOnRetry=true → yeni deneme pre_exam'dan başlar, 3-step normal akış
     expect(body.preExamCompleted).toBe(false)
     expect(body.videosCompleted).toBe(false)
     expect(body.postExamCompleted).toBe(false)
     expect(body.isExpiredRetryable).toBe(true)
-    // Pre-exam yapılmadıysa needsRetry FALSE — normal 3-step akış (Ön Sınava Başla CTA)
     expect(body.needsRetry).toBe(false)
   })
 
-  it('expired + pre-exam DONE + video yarıda → preExam true, videos/post false, needsRetry true', async () => {
+  it('expired + eğitim süresi GERÇEKTEN dolmuş (effectiveDueDate geçmiş) → isExpiredRetryable false', async () => {
+    // start route bu durumda 403 döner; detay "tekrar dene" CTA'sı göstermemeli.
+    isEndDatePassedMock.mockReturnValue(true)
     prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(makeAssignment({
       preExamCompletedAt: new Date('2026-05-14T06:42:18Z'),
-      preExamScore: 70,
-      videosCompletedAt: null,
-      // bogus cron alanları yine var
-      postExamCompletedAt: new Date('2026-05-17T03:24:44Z'),
-      postExamScore: 0,
-      postExamStartedAt: null,
-      videoProgress: [{ videoId: 'video-1', isCompleted: false }],
     }))
 
     const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
     const body = await res.json()
 
-    expect(body.preExamCompleted).toBe(true)
-    expect(body.videosCompleted).toBe(false)
-    // Bogus postExamCompletedAt dolu olsa bile postExamStartedAt=null → completed false
-    expect(body.postExamCompleted).toBe(false)
-    expect(body.isExpiredRetryable).toBe(true)
-    // Pre-exam yapıldıysa needsRetry TRUE — 2-step retry akışı (Videoları İzle CTA)
-    expect(body.needsRetry).toBe(true)
+    expect(body.isExpiredRetryable).toBe(false)
+    expect(body.isExpired).toBe(true)
   })
 
   it('active watching_videos attempt (revive sonrası) → expected aktif flag\'ler', async () => {

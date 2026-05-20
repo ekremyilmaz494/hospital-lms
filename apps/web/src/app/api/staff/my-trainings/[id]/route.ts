@@ -105,6 +105,14 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
   const t = assignment.training
   const latestAttempt = assignment.examAttempts[0] // only attempt fetched (desc take:1)
 
+  // Per-atama dueDate (2. tur override) varsa training.endDate yerine onu kullan —
+  // api/exam/[id]/start route'u ile AYNI mantık (effectiveDueDate). Aksi halde detay
+  // "tekrar dene" CTA'sı gösterir ama start route 403 "süresi dolmuş" döndürüp ölü
+  // ekran yaratır (tarih tutarsızlığı bug'ı). End-of-day mantığı: "16 Mayıs" son
+  // tarihliyse 16 May 23:59:59'a kadar açık.
+  const effectiveDueDate = assignment.dueDate ?? t.endDate
+  const isExpired = isEndDatePassed(effectiveDueDate)
+
   // ═══ EY.FR.40 — eğitime özel gönüllü geri bildirim durumu ═══
   // latestAttempt feedback'i TETİKLEYEN attempt olmayabilir (örn. attempt 2 passed,
   // sonra admin ek hak verdi, attempt 4 in_progress). feedback/status ve
@@ -148,8 +156,11 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
   // Cron 'expired' işaretlemişse (eğitim süresi doldu veya 24h stale) kullanıcının
   // hâlâ deneme hakkı varsa "Yeniden dene" CTA'sını göster — aksi halde detayda
   // takılıp ne yapacağını anlamıyor (RADYASYON 2026-05-16 incident).
+  // GERÇEKTEN süresi dolmuş eğitimde (effectiveDueDate geçmiş) retry gösterme:
+  // start route nasılsa 403 döndürür, bunun yerine isExpired banner'ı gösterilir.
   const isExpiredRetryable = !isFresh && latestAttempt.status === 'expired' &&
-    assignment.currentAttempt < assignment.maxAttempts
+    assignment.currentAttempt < assignment.maxAttempts &&
+    !isExpired
 
   // ═══ DETERMINE STEP PROGRESS ═══
   let currentAttempt: number
@@ -170,23 +181,18 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     videosCompleted = false    // videolar sıfırdan izlenmeli
     postExamCompleted = false  // son sınav tekrar girilmeli
   } else if (isExpiredRetryable) {
-    // Cron expired etti ama personelin hâlâ deneme hakkı var. Step'leri kullanıcının
-    // GERÇEK ilerlemesine göre hesapla — final 'else' branch'ına düşmesini engelle
-    // (aksi halde hepsi TAMAM görünüp CTA gizleniyordu, 2026-05-17 Devakent incident).
-    currentAttempt = assignment.currentAttempt
-    preExamCompleted = latestAttempt.preExamCompletedAt !== null
-    const attemptVideoProgress = new Map(
-      (latestAttempt.videoProgress ?? []).map(vp => [vp.videoId, vp])
-    )
-    const requiredVideos = t.videos.filter(v => v.contentType !== 'pdf')
-    videosCompleted = requiredVideos.length === 0 ||
-      (latestAttempt.videosCompletedAt !== null) ||
-      requiredVideos.every(v => attemptVideoProgress.get(v.id)?.isCompleted === true)
-    // ÖNEMLİ: cron'un yazdığı bogus post_exam_completed_at'a güvenme — gerçek
-    // tamamlama için postExamStartedAt da dolu olmalı. Yeni cron (BUG-1 fix sonrası)
-    // bu alanlara dokunmaz ama eski expired veriler bogus tarih taşır.
-    postExamCompleted = latestAttempt.postExamCompletedAt !== null &&
-                       latestAttempt.postExamStartedAt !== null
+    // Cron expired etti ama personelin hâlâ deneme hakkı var. KARAR (2026-05-20):
+    // süresi dolan denemenin video/son-sınav ilerlemesi TAŞINMAZ — personel sıfırdan
+    // başlar (isRetryPending ile aynı). start route zaten expired attempt'i resume
+    // etmeyip yeni attempt açtığı için detay sayfası o davranışla hizalanır. Eski
+    // mantık expired attempt'in ilerlemesini okuyup "aşama TAMAM + video %0" çelişkisi
+    // yaratıyordu (Devakent ÖZGÜR ÜNVER incident, 2026-05-20).
+    currentAttempt = assignment.currentAttempt + 1
+    // requirePreExamOnRetry=false → yeni deneme watching_videos'tan başlar (ön sınav
+    // atlanır, 2 adımlı retry). true → pre_exam'dan başlar (3 adımlı normal akış).
+    preExamCompleted = t.requirePreExamOnRetry !== true
+    videosCompleted = false
+    postExamCompleted = false
   } else if (isActive) {
     // Active attempt in progress
     currentAttempt = assignment.currentAttempt
@@ -231,9 +237,6 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
   // Son deneme puanı (retry banner'da gösterilecek)
   const lastAttemptScore = latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : undefined
 
-  // Eğitim süresi dolmuş mu? End-of-day mantığı: "16 Mayıs" son tarihliyse 16 May
-  // 23:59:59'a kadar açık. Eski kayıtlar 00:00:00 ile saklanmış olabilir.
-  const isExpired = isEndDatePassed(t.endDate)
   // Henüz açılmamış mı? Başlangıç tarihi gelmemişse personel detayda
   // "Başla" butonu disabled olur ve banner gösterilir.
   const isNotStarted = t.startDate ? new Date() < new Date(t.startDate) : false
@@ -260,8 +263,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     videosCompleted,
     postExamCompleted,
     // needsRetry: frontend retry-flow (pre-exam atla, 2-step) için bayrak.
-    // isExpiredRetryable + pre-exam yarıda kalmış kullanıcı için needsRetry=false:
-    // bu kullanıcı yeni retry değil, attempt'in pre-exam'ına devam etmeli (3-step normal flow).
+    // isExpiredRetryable'da preExamCompleted = (requirePreExamOnRetry !== true) olduğu
+    // için bu formül: requirePreExamOnRetry=false → needsRetry=true (2-step retry),
+    // true → needsRetry=false (3-step normal akış, ön sınav baştan izlenir).
     needsRetry: isRetryPending || (isExpiredRetryable && preExamCompleted),
     // Banner ayrımı için: isRetryPending = "kullanıcı sınavdan kaldı, yeni deneme bekliyor",
     // isExpiredRetryable = "süre doldu, cron expire etti, hâlâ deneme hakkı var" — farklı UX mesajları.
