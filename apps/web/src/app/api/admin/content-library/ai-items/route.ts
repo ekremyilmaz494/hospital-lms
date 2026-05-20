@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 
 /**
  * GET /api/admin/content-library/ai-items
@@ -29,7 +30,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   }
 
   if (search) {
-    where.title = { contains: search, mode: 'insensitive' }
+    // Türkçe-duyarlı arama (bkz. turkishSearchIds)
+    where.id = { in: await turkishSearchIds('content_library', ['title'], search, organizationId) }
   }
 
   const items = await prisma.contentLibrary.findMany({

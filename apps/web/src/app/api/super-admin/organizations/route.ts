@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody, safePagination, getOrgUrl } from '@/lib/api-helpers'
 import { withSuperAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 import { createOrganizationWithAdminSchema } from '@/lib/validations'
 import { sendInvitationEmail, sendStaffWelcomeEmail } from '@/lib/email'
 import { TRAINING_CATEGORIES } from '@/lib/training-categories'
@@ -24,10 +25,8 @@ export const GET = withSuperAdminRoute(async ({ request }) => {
 
   const where: Record<string, unknown> = {}
   if (search) {
-    where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { code: { contains: search, mode: 'insensitive' } },
-    ]
+    // Türkçe-duyarlı arama (bkz. turkishSearchIds)
+    where.id = { in: await turkishSearchIds('organizations', ['name', 'code'], search) }
   }
   if (status === 'active') where.isActive = true
   if (status === 'suspended') where.isSuspended = true

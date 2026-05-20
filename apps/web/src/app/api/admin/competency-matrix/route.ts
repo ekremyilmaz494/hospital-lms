@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 import { checkRateLimit, withCache } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -24,10 +25,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const staffWhere: Record<string, unknown> = { organizationId: orgId, role: 'staff', isActive: true }
   if (departmentId) staffWhere.departmentId = departmentId
   if (search) {
-    staffWhere.OR = [
-      { firstName: { contains: search, mode: 'insensitive' } },
-      { lastName: { contains: search, mode: 'insensitive' } },
-    ]
+    // Türkçe-duyarlı arama (bkz. turkishSearchIds)
+    staffWhere.id = { in: await turkishSearchIds('users', ['first_name', 'last_name'], search, orgId) }
   }
 
   const cacheKey = `cache:${orgId}:competency:${page}:${limit}:${search}:${departmentId || ''}`

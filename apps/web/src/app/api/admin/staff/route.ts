@@ -2,6 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody, safePagination, ApiError, getOrgUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 import { createStaffSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
@@ -39,12 +40,10 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     }
 
     if (search) {
-      where.OR = [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { title: { contains: search, mode: 'insensitive' } },
-      ]
+      // Türkçe-duyarlı arama (Postgres lower('İ') → 'i̇' sorunu; bkz. turkishSearchIds)
+      where.id = {
+        in: await turkishSearchIds('users', ['first_name', 'last_name', 'email', 'title'], search, orgId),
+      }
     }
     if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 

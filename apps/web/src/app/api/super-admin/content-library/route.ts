@@ -6,6 +6,7 @@ import {
   safePagination,
 } from '@/lib/api-helpers'
 import { withSuperAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 import { createContentLibrarySchema } from '@/lib/validations'
 
 /** GET /api/super-admin/content-library — tüm içerikleri listele */
@@ -19,10 +20,8 @@ export const GET = withSuperAdminRoute(async ({ request }) => {
   const where: Record<string, unknown> = {}
 
   if (search) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
-    ]
+    // Türkçe-duyarlı arama (bkz. turkishSearchIds)
+    where.id = { in: await turkishSearchIds('content_library', ['title', 'description'], search) }
   }
   if (category) where.category = category
   if (difficulty) where.difficulty = difficulty

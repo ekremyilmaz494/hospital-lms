@@ -5,6 +5,7 @@ import {
   safePagination,
 } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { turkishSearchIds } from '@/lib/turkish-search'
 import {
   getUploadUrl,
   getStreamUrl,
@@ -37,8 +38,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   }
   if (category) where.category = category
   if (search) {
-    // Title-based case-insensitive arama — DB tarafında daralt
-    where.title = { contains: search, mode: 'insensitive' }
+    // Türkçe-duyarlı arama (bkz. turkishSearchIds) — platform + kurum içeriği birlikte
+    where.id = { in: await turkishSearchIds('content_library', ['title'], search) }
   }
 
   // 1. dalga: paginate liste, total, kurumun installed ID seti, ve org-genelinde
