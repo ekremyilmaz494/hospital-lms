@@ -170,12 +170,18 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     // SELECT FOR UPDATE ile row-level lock — concurrent race condition önlenir
     await tx.$queryRaw`SELECT id FROM training_assignments WHERE id = ${assignmentId}::uuid FOR UPDATE`
 
-    // Double-check inside transaction (lock ile güvenli)
+    // Double-check inside transaction (lock ile güvenli). Filter outer check
+    // (line ~98) ile AYNI olmalı: 'expired' attempt'i resume etme — cron
+    // expire ettiyse yeni attempt açılır. Aksi halde frontend
+    // `attemptStatus='expired'` görüp `attemptPhaseRedirect` ile detay sayfasına
+    // atılır, kullanıcı "Videoları İzle"ye basıp tekrar buraya gelir → sonsuz
+    // döngü (2026-05-20 Devakent ÖZGÜR ÜNVER incident; PR #165 sonrası
+    // detay-sayfası redirect'i doğru ama bu transaction bug'ı tetikliyordu).
     const existingInTx = await tx.examAttempt.findFirst({
       where: {
         assignmentId,
         userId: dbUser.id,
-        status: { not: 'completed' },
+        status: { notIn: ['completed', 'expired'] },
       },
       include: { videoProgress: true },
     })
