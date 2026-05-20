@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { logActivity } from '@/lib/activity-logger'
 import { isEndDatePassed } from '@/lib/date-helpers'
+import { isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -103,6 +104,34 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
 
   const t = assignment.training
   const latestAttempt = assignment.examAttempts[0] // only attempt fetched (desc take:1)
+
+  // ═══ EY.FR.40 — eğitime özel gönüllü geri bildirim durumu ═══
+  // latestAttempt feedback'i TETİKLEYEN attempt olmayabilir (örn. attempt 2 passed,
+  // sonra admin ek hak verdi, attempt 4 in_progress). feedback/status ve
+  // getAllPendingFeedback ile aynı kural: TÜM completed attempt'leri tara, ilk
+  // tetikleyeni seç. organizationId filtresi form sorgusunda; diğer iki sorgu
+  // trainingId: t.id ile zaten org-doğrulanmış bir eğitime kapsanır.
+  const [activeFeedbackForm, priorFeedback, completedAttempts] = await Promise.all([
+    prisma.trainingFeedbackForm.findFirst({
+      where: { organizationId, isActive: true, isArchived: false },
+      select: { id: true },
+    }),
+    prisma.trainingFeedbackResponse.findFirst({
+      where: { trainingId: t.id, attempt: { userId: dbUser.id } },
+      select: { submittedAt: true },
+    }),
+    prisma.examAttempt.findMany({
+      where: { trainingId: t.id, userId: dbUser.id, status: 'completed' },
+      select: { id: true, status: true, isPassed: true, attemptNumber: true },
+      orderBy: { postExamCompletedAt: 'desc' },
+    }),
+  ])
+
+  const triggeringAttempt = completedAttempts.find(a =>
+    isAttemptFeedbackTriggered(a, assignment.originalMaxAttempts),
+  )
+  const feedbackFormActive = activeFeedbackForm !== null
+  const feedbackSubmitted = priorFeedback !== null
 
   // ═══ STATE DETECTION ═══
   // 4 possible states:
@@ -237,6 +266,17 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     // Banner ayrımı için: isRetryPending = "kullanıcı sınavdan kaldı, yeni deneme bekliyor",
     // isExpiredRetryable = "süre doldu, cron expire etti, hâlâ deneme hakkı var" — farklı UX mesajları.
     isExpiredRetryable,
+    // EY.FR.40 — detay sayfasındaki "Geri Bildirim" bölümü için.
+    feedback: {
+      formActive: feedbackFormActive,
+      mandatory: t.feedbackMandatory === true,
+      submitted: feedbackSubmitted,
+      submittedAt: priorFeedback?.submittedAt
+        ? priorFeedback.submittedAt.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : null,
+      canSubmit: feedbackFormActive && !feedbackSubmitted && triggeringAttempt != null,
+      attemptId: triggeringAttempt?.id ?? null,
+    },
     videos: t.videos.map(v => ({
       id: v.id,
       title: v.title,
