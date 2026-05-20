@@ -1,11 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu, Search, User, LogOut } from 'lucide-react';
+import { Menu, User, LogOut } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
-import { NotificationBell } from '@/components/shared/notification-bell';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -36,7 +34,6 @@ export function AdminTopbar({
 }: AdminTopbarProps) {
   const router = useRouter();
   const { user } = useAuthStore();
-  const [searchValue, setSearchValue] = useState('');
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -56,21 +53,7 @@ export function AdminTopbar({
         <Menu size={18} />
       </button>
 
-      <div className="k-topbar-search">
-        <Search size={15} aria-hidden />
-        <input
-          type="search"
-          placeholder="Eğitim, personel veya sayfa ara…"
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
-          aria-label="Arama"
-        />
-        <kbd aria-hidden>⌘K</kbd>
-      </div>
-
       <div className="k-topbar-actions">
-        <NotificationBell />
-
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label="Kullanıcı menüsü"
@@ -165,53 +148,6 @@ export function AdminTopbar({
           color: var(--k-text-primary);
         }
         /* Hamburger her viewport'ta gösterilir — mobilde drawer aç, desktop'ta collapse toggle */
-
-        .k-topbar-search {
-          position: relative;
-          flex: 1;
-          max-width: 420px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          height: 38px;
-          padding: 0 14px;
-          background: var(--k-bg);
-          border: 1px solid var(--k-border);
-          border-radius: var(--k-radius-ctrl);
-          color: var(--k-text-muted);
-          transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
-        }
-        .k-topbar-search:focus-within {
-          border-color: var(--k-primary);
-          background: var(--k-surface);
-          box-shadow: 0 0 0 3px color-mix(in srgb, var(--k-primary) 14%, transparent);
-        }
-        .k-topbar-search input {
-          flex: 1;
-          background: transparent;
-          border: none;
-          outline: none;
-          font-size: 13px;
-          color: var(--k-text-primary);
-          font-family: inherit;
-        }
-        .k-topbar-search input::placeholder {
-          color: var(--k-text-muted);
-        }
-        .k-topbar-search kbd {
-          font-family: var(--font-mono, monospace);
-          font-size: 10.5px;
-          padding: 3px 6px;
-          border-radius: 5px;
-          background: var(--k-surface-hover);
-          color: var(--k-text-muted);
-          border: 1px solid var(--k-border);
-        }
-        @media (max-width: 640px) {
-          .k-topbar-search {
-            display: none;
-          }
-        }
 
         .k-topbar-actions {
           display: flex;
