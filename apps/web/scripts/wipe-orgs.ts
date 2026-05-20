@@ -1,4 +1,5 @@
 import { prisma } from '../src/lib/prisma'
+import { assertNotProduction } from './_guard'
 
 /**
  * Tüm organizasyonları + ilgili veriyi temizler. Sadece test ortamı için.
@@ -13,6 +14,7 @@ import { prisma } from '../src/lib/prisma'
  *   - _prisma_migrations (migration history)
  */
 async function main() {
+  assertNotProduction('wipe-orgs')
   const dryRun = !process.argv.includes('--execute')
 
   const orgs = await prisma.organization.findMany({

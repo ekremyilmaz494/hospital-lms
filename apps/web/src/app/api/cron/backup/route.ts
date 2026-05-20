@@ -51,7 +51,7 @@ export async function GET(request: Request) {
       // organizasyon başına yüzlerce MB yapabilir; 90 gün regülatif açıdan yeterli.
       const auditLogCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
 
-      const [organization, subscription, users, departments, trainings, assignments, attempts, examAnswers, videoProgress, notifications, certificates, auditLogs] = await Promise.all([
+      const [organization, subscription, users, departments, trainings, assignments, attempts, examAnswers, videoProgress, notifications, certificates, auditLogs, authUsers] = await Promise.all([
         prisma.organization.findUnique({ where: { id: org.id } }),
         prisma.organizationSubscription.findUnique({ where: { organizationId: org.id } }),
         prisma.user.findMany({ where: { organizationId: org.id } }),
@@ -67,6 +67,18 @@ export async function GET(request: Request) {
         prisma.notification.findMany({ where: { organizationId: org.id } }),
         prisma.certificate.findMany({ where: { training: { organizationId: org.id } } }),
         prisma.auditLog.findMany({ where: { organizationId: org.id, createdAt: { gte: auditLogCutoff } } }),
+        // auth.users — Supabase Auth tablosu. KRİTİK: parola hash'leri (encrypted_password)
+        // SADECE burada saklanır; public şemasında parola yoktur. 2026-05-20 incident'inde
+        // yedek bu tabloyu içermiyordu → DB wipe + restore sonrası tüm personelin parolası
+        // geri yüklenemedi ve hastane sisteme kilitlendi. Bu blok o açığı kapatır.
+        prisma.$queryRaw<Array<Record<string, unknown>>>`
+          SELECT au.id, au.email, au.encrypted_password, au.email_confirmed_at,
+                 au.phone, au.created_at, au.updated_at,
+                 au.raw_user_meta_data, au.raw_app_meta_data
+          FROM auth.users au
+          JOIN public.users pu ON pu.id = au.id
+          WHERE pu.organization_id = ${org.id}::uuid
+        `,
       ])
 
       // Not: Yedek dosyası restore için ham veri içerir. KVKK koruması
@@ -85,10 +97,13 @@ export async function GET(request: Request) {
         notifications,
         certificates,
         auditLogs,
+        // Supabase Auth kullanıcıları (parola hash'leri dahil) — restore için kritik.
+        authUsers,
         exportedAt: new Date().toISOString(),
         organizationId: org.id,
         organizationName: org.name,
-        schemaVersion: 2,
+        // schemaVersion 3: authUsers eklendi (2026-05-20 incident sonrası).
+        schemaVersion: 3,
       }
 
       const jsonBlob = JSON.stringify(backupData)
