@@ -8,6 +8,9 @@ import { BRAND } from '@/lib/brand'
 import { sendExpoPushToMany } from '@/lib/expo-push'
 import { z } from 'zod/v4'
 
+// perf-check: no-cache-invalidation — Bildirimler Redis'te cache'lenmiyor;
+// staff/admin listeleri HTTP Cache-Control ile kısa süre cache'lenir.
+
 const sendNotificationSchema = z.object({
   title: z.string().min(1, 'Başlık zorunludur').max(500),
   message: z.string().min(1, 'Mesaj zorunludur').max(5000),
@@ -87,12 +90,15 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   }
 
   // Bildirimleri toplu oluştur — senderId admin paneli "Gönderdiklerim"
-  // filtresi için doldurulur (sistem bildirimleri NULL kalır)
+  // filtresi için doldurulur (sistem bildirimleri NULL kalır).
+  // batchId: tek gönderim = tek UUID; admin listesi bunla tek karta gruplar.
+  const batchId = crypto.randomUUID()
   const notifResult = await prisma.notification.createMany({
     data: validUsers.map(u => ({
       userId: u.id,
       organizationId,
       senderId: dbUser.id,
+      batchId,
       title,
       message,
       type,
@@ -137,7 +143,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   await audit({
     action: 'notification.bulk_send',
     entityType: 'notification',
+    entityId: batchId,
     newData: {
+      batchId,
       title,
       type,
       recipientCount: validUsers.length,
@@ -149,6 +157,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   logger.info('NotifSend', 'Toplu bildirim gonderildi', {
     orgId: organizationId,
+    batchId,
     recipientCount: validUsers.length,
     notificationsCreated: notifResult.count,
     emailsSent,
@@ -157,6 +166,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   return jsonResponse({
     success: true,
+    batchId,
     notificationsCreated: notifResult.count,
     emailsSent,
     emailsFailed,

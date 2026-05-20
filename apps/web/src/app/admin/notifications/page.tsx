@@ -3,31 +3,41 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
-  Bell, BellOff, Send, Check, CheckCircle,
+  Bell, BellOff, Send, Check, CheckCircle, CheckCircle2,
   Filter, Clock, Inbox, Trash2, X, Users, UserMinus, Building2, Loader2, ChevronRight,
-  BookOpen,
+  BookOpen, Eye, AlertTriangle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BlurFade } from '@/components/ui/blur-fade';
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 import { getNotificationTypeMeta } from '@/lib/notification-types';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
+import { RecipientsModal } from './_components/recipients-modal';
 
-interface Notification {
-  id: string;
+/** Admin "Gönderdiklerim" listesinde bir gönderim = bir batch.
+ * Backend N alıcı satırını batchId üzerinden tek karta indirger. Legacy
+ * (eski) satırlarda batchId NULL olduğunda backend `id`'yi fallback olarak
+ * batchId yerine koyar ve `isLegacy: true` döner — DELETE rotası buna göre seçilir. */
+interface NotificationBatch {
+  batchId: string;
+  isLegacy: boolean;
   title: string;
   message: string;
   type: string;
   createdAt: string;
-  isRead: boolean;
+  recipientCount: number;
+  readCount: number;
   relatedTrainingId: string | null;
 }
 
 interface AdminNotificationsResponse {
-  notifications: Notification[];
+  notifications: NotificationBatch[];
   total: number;
   page: number;
   limit: number;
@@ -70,18 +80,29 @@ export default function NotificationsPage() {
   const { data, isLoading, error, refetch } = useFetch<AdminNotificationsResponse>('/api/admin/notifications');
   const [filter, setFilter] = useState<FilterType>('all');
   const [dismissing, setDismissing] = useState<string | null>(null);
+  // "Alıcıları gör" modali — açık batch'in kimliği + başlık/tip (modal başlığı için).
+  const [recipientsModal, setRecipientsModal] = useState<
+    { batchId: string; title: string; type: string } | null
+  >(null);
+  // Silme onay modali — batch silme N kişiyi etkilediği için onay zorunlu.
+  const [deleteTarget, setDeleteTarget] = useState<
+    { batchId: string; title: string; recipientCount: number } | null
+  >(null);
 
   // Yeni bildirim geldiğinde liste tazelensin — bell zaten store'a ekliyor,
   // ama bu sayfanın kendi listesi useFetch'in cache'inden geliyor; refetch ile senkronize tut.
   useRealtimeNotifications();
 
-  const handleDelete = async (notifId: string) => {
-    setDismissing(notifId);
+  // Bir gönderimin (batch) tüm alıcı satırlarını siler. Batch endpoint'i hem
+  // gerçek batchId hem legacy `id` fallback'ini çözer — tek rota yeterli.
+  const handleDelete = async (batchId: string) => {
+    setDismissing(batchId);
     try {
-      const res = await fetch(`/api/admin/notifications/${notifId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/notifications/batch/${batchId}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast('Bildirim silindi', 'success');
+      setDeleteTarget(null);
       refetch();
     } catch {
       toast('Bildirim silinemedi', 'error');
@@ -303,11 +324,12 @@ export default function NotificationsPage() {
     );
   }
 
-  const notifications: Notification[] = data?.notifications ?? [];
+  const notifications: NotificationBatch[] = data?.notifications ?? [];
 
   const filtered = notifications.filter(n => {
     if (filter === 'all') return true;
-    if (filter === 'unread') return !n.isRead;
+    // "Okunmamış" = bu gönderimi henüz okumayan en az bir alıcı var.
+    if (filter === 'unread') return n.readCount < n.recipientCount;
     return n.type === filter;
   });
 
@@ -424,9 +446,23 @@ export default function NotificationsPage() {
               {filtered.map((n, i) => {
                 const meta = getNotificationTypeMeta(n.type);
                 const Icon = meta.icon;
-                const isDismissing = dismissing === n.id;
+                const isDismissing = dismissing === n.batchId;
+                const readPct = n.recipientCount > 0
+                  ? Math.round((n.readCount / n.recipientCount) * 100)
+                  : 0;
+                const allRead = n.recipientCount > 0 && n.readCount === n.recipientCount;
+                const fullDate = (() => {
+                  try {
+                    return new Date(n.createdAt).toLocaleString('tr-TR', {
+                      day: '2-digit', month: 'long', year: 'numeric',
+                      hour: '2-digit', minute: '2-digit',
+                    });
+                  } catch {
+                    return n.createdAt;
+                  }
+                })();
                 return (
-                  <BlurFade key={n.id} delay={0.08 + i * 0.03}>
+                  <BlurFade key={n.batchId} delay={0.08 + i * 0.03}>
                     <div
                       className="group relative flex items-start gap-4 rounded-xl border p-5 transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--k-bg)_50%,var(--k-surface))]"
                       style={{
@@ -448,17 +484,6 @@ export default function NotificationsPage() {
                         }}
                       >
                         <Icon className="h-5 w-5" style={{ color: meta.ink }} />
-                        {!n.isRead && (
-                          <span
-                            aria-label="Okunmamış"
-                            className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2"
-                            style={{
-                              background: meta.ink,
-                              // @ts-expect-error — Tailwind 4 supports CSS vars as ring color via inline style
-                              '--tw-ring-color': 'var(--k-surface)',
-                            }}
-                          />
-                        )}
                       </div>
 
                       {/* Content */}
@@ -476,7 +501,7 @@ export default function NotificationsPage() {
                           >
                             {meta.label}
                           </span>
-                          {!n.isRead && (
+                          {n.readCount === 0 && (
                             <span
                               className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
                               style={{
@@ -489,18 +514,67 @@ export default function NotificationsPage() {
                           )}
                         </div>
                         <p
-                          className="text-[13px] leading-relaxed"
+                          className="text-[13px] leading-relaxed line-clamp-2"
                           style={{ color: 'var(--k-text-secondary)' }}
                         >
                           {n.message}
                         </p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <div className="flex items-center gap-1.5">
+
+                        {/* Meta — alıcı sayısı · okunma · zaman damgası */}
+                        <div className="flex items-center gap-2.5 mt-2.5 flex-wrap">
+                          {/* Alıcı sayısı */}
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                            style={{
+                              background: 'color-mix(in srgb, var(--k-primary) 9%, transparent)',
+                              color: 'var(--k-primary)',
+                            }}
+                          >
+                            <Users className="h-3 w-3" />
+                            {n.recipientCount} kişi
+                          </span>
+
+                          {/* Okunma ilerlemesi */}
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                            style={{
+                              background: allRead
+                                ? 'color-mix(in srgb, #059669 13%, transparent)'
+                                : 'color-mix(in srgb, var(--k-text-muted) 13%, transparent)',
+                              color: allRead ? '#047857' : 'var(--k-text-muted)',
+                            }}
+                            title={`%${readPct} okudu`}
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            {n.readCount} / {n.recipientCount} okudu
+                          </span>
+
+                          {/* Mini progress bar */}
+                          <span
+                            aria-hidden="true"
+                            className="h-1.5 w-16 overflow-hidden rounded-full"
+                            style={{ background: 'color-mix(in srgb, var(--k-border) 70%, transparent)' }}
+                          >
+                            <span
+                              className="block h-full rounded-full transition-[width] duration-300"
+                              style={{
+                                width: `${readPct}%`,
+                                background: allRead ? '#10b981' : meta.ink,
+                              }}
+                            />
+                          </span>
+
+                          {/* Zaman damgası — relative görünür, tam tarih tooltip'te */}
+                          <span
+                            className="inline-flex items-center gap-1.5"
+                            title={fullDate}
+                          >
                             <Clock className="h-3 w-3" style={{ color: 'var(--k-text-muted)' }} />
                             <span className="text-[11px] font-mono" style={{ color: 'var(--k-text-muted)' }}>
                               {timeAgo(n.createdAt)}
                             </span>
-                          </div>
+                          </span>
+
                           {n.relatedTrainingId && (
                             <Link
                               href={`/admin/trainings/${n.relatedTrainingId}`}
@@ -516,7 +590,21 @@ export default function NotificationsPage() {
                       </div>
 
                       {/* Actions — always visible on touch, faded on desktop until hover */}
-                      <div className="flex items-center gap-1 shrink-0 opacity-60 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+                      <div className="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+                        <button
+                          className="inline-flex h-11 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold cursor-pointer transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--k-primary)_10%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+                          style={{
+                            color: 'var(--k-primary)',
+                            // @ts-expect-error — focus ring uses theme token
+                            '--tw-ring-color': 'var(--k-primary)',
+                          }}
+                          title="Alıcıları gör"
+                          aria-label="Alıcıları gör"
+                          onClick={() => setRecipientsModal({ batchId: n.batchId, title: n.title, type: n.type })}
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span className="hidden sm:inline">Alıcılar</span>
+                        </button>
                         <button
                           className="flex h-11 w-11 items-center justify-center rounded-lg cursor-pointer transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--k-error)_12%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                           style={{
@@ -526,10 +614,14 @@ export default function NotificationsPage() {
                           }}
                           title="Bildirimi sil"
                           aria-label="Bildirimi sil"
-                          disabled={dismissing === n.id}
-                          onClick={() => handleDelete(n.id)}
+                          disabled={dismissing === n.batchId}
+                          onClick={() => setDeleteTarget({
+                            batchId: n.batchId,
+                            title: n.title,
+                            recipientCount: n.recipientCount,
+                          })}
                         >
-                          {dismissing === n.id
+                          {dismissing === n.batchId
                             ? <Loader2 className="h-4 w-4 animate-spin" />
                             : <Trash2 className="h-4 w-4" />}
                         </button>
@@ -1078,6 +1170,73 @@ export default function NotificationsPage() {
           </div>
         </div>
       )}
+
+      {/* ── Alıcı Detay Modali ── */}
+      {recipientsModal && (
+        <RecipientsModal
+          batchId={recipientsModal.batchId}
+          title={recipientsModal.title}
+          type={recipientsModal.type}
+          onClose={() => setRecipientsModal(null)}
+        />
+      )}
+
+      {/* ── Silme Onay Modali ── batch silme N personeli etkilediği için onaylı */}
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+      >
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <div className="flex items-start gap-3">
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                style={{
+                  background: 'color-mix(in srgb, var(--k-error) 13%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--k-error) 22%, transparent)',
+                }}
+              >
+                <AlertTriangle className="h-5 w-5" style={{ color: 'var(--k-error)' }} />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle>Bildirimi sil</DialogTitle>
+                <DialogDescription className="mt-1">
+                  {deleteTarget && (
+                    <>
+                      <span className="font-semibold" style={{ color: 'var(--k-text-primary)' }}>
+                        “{deleteTarget.title}”
+                      </span>{' '}
+                      bildirimi <strong>{deleteTarget.recipientCount} personelin</strong> hesabından
+                      kaldırılacak. Bu işlem geri alınamaz.
+                    </>
+                  )}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(null)}
+              className="k-btn k-btn-ghost"
+            >
+              İptal
+            </button>
+            <button
+              type="button"
+              disabled={dismissing !== null}
+              onClick={() => { if (deleteTarget) handleDelete(deleteTarget.batchId); }}
+              className="k-btn"
+              style={{ background: 'var(--k-error)', color: '#fff' }}
+            >
+              {dismissing !== null
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Trash2 className="h-4 w-4" />}
+              Sil
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
