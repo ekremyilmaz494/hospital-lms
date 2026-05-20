@@ -20,6 +20,15 @@ const { prismaMock } = vi.hoisted(() => ({
     },
     examAttempt: {
       findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    // EY.FR.40 geri bildirim — route Promise.all içinde her zaman çağırır.
+    // Base mock'lar null/[] döner → feedback.formActive=false (mevcut testler etkilenmez).
+    trainingFeedbackForm: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    trainingFeedbackResponse: {
+      findFirst: vi.fn().mockResolvedValue(null),
     },
   },
 }))
@@ -60,13 +69,17 @@ function detailRequest(): Request {
   return new Request(`http://localhost/api/staff/my-trainings/${ASSIGNMENT_ID}`)
 }
 
-function makeAssignment(latestAttemptOverrides: Record<string, unknown> = {}) {
+function makeAssignment(
+  latestAttemptOverrides: Record<string, unknown> = {},
+  extra: { feedbackMandatory?: boolean; originalMaxAttempts?: number } = {},
+) {
   return {
     id: ASSIGNMENT_ID,
     userId: 'staff-1',
     status: 'in_progress',
     currentAttempt: 1,
     maxAttempts: 3,
+    originalMaxAttempts: extra.originalMaxAttempts ?? 3,
     training: {
       id: 'training-1',
       title: 'Test Eğitim',
@@ -77,6 +90,7 @@ function makeAssignment(latestAttemptOverrides: Record<string, unknown> = {}) {
       startDate: new Date('2026-05-01'),
       endDate: new Date('2026-05-20'),
       examOnly: false,
+      feedbackMandatory: extra.feedbackMandatory ?? false,
       videos: [
         { id: 'video-1', title: 'Video 1', durationSeconds: 300, sortOrder: 0, contentType: 'video' },
       ],
@@ -184,5 +198,113 @@ describe('Staff my-trainings detail — isExpiredRetryable regression (Devakent 
 
     // Bogus completedAt dolu ama startedAt null → completion sayılmaz
     expect(body.postExamCompleted).toBe(false)
+  })
+})
+
+describe('Staff my-trainings detail — geri bildirim (EY.FR.40) bölümü', () => {
+  it('org\'da aktif form yok → feedback.formActive false (durum d, kart gizli)', async () => {
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(makeAssignment())
+    // trainingFeedbackForm.findFirst → base mock null
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+
+    expect(body.feedback.formActive).toBe(false)
+    expect(body.feedback.canSubmit).toBe(false)
+    expect(body.feedback.submitted).toBe(false)
+  })
+
+  it('aktif form + tamamlanmış deneme yok → canSubmit false, attemptId null (durum c)', async () => {
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(makeAssignment())
+    prismaMock.trainingFeedbackForm.findFirst.mockResolvedValueOnce({ id: 'form-1' })
+    // examAttempt.findMany → base mock []
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    const body = await res.json()
+
+    expect(body.feedback.formActive).toBe(true)
+    expect(body.feedback.canSubmit).toBe(false)
+    expect(body.feedback.attemptId).toBeNull()
+    expect(body.feedback.submitted).toBe(false)
+  })
+
+  it('aktif form + tetikleyen passed deneme → canSubmit true, attemptId doğru (durum b)', async () => {
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(makeAssignment())
+    prismaMock.trainingFeedbackForm.findFirst.mockResolvedValueOnce({ id: 'form-1' })
+    prismaMock.examAttempt.findMany.mockResolvedValueOnce([
+      { id: 'attempt-2', status: 'completed', isPassed: true, attemptNumber: 2 },
+    ])
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    const body = await res.json()
+
+    expect(body.feedback.canSubmit).toBe(true)
+    expect(body.feedback.attemptId).toBe('attempt-2')
+  })
+
+  it('bu eğitim için önceki geri bildirim var → submitted true, submittedAt formatlı, canSubmit false (durum a)', async () => {
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(makeAssignment())
+    prismaMock.trainingFeedbackForm.findFirst.mockResolvedValueOnce({ id: 'form-1' })
+    prismaMock.trainingFeedbackResponse.findFirst.mockResolvedValueOnce({
+      submittedAt: new Date('2026-05-18T09:00:00Z'),
+    })
+    prismaMock.examAttempt.findMany.mockResolvedValueOnce([
+      { id: 'attempt-1', status: 'completed', isPassed: true, attemptNumber: 1 },
+    ])
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    const body = await res.json()
+
+    expect(body.feedback.submitted).toBe(true)
+    expect(body.feedback.submittedAt).toBe('18.05.2026')
+    // Zaten gönderilmişse tekrar doldurulamaz.
+    expect(body.feedback.canSubmit).toBe(false)
+  })
+
+  it('feedbackMandatory true → feedback.mandatory true', async () => {
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(
+      makeAssignment({}, { feedbackMandatory: true }),
+    )
+    prismaMock.trainingFeedbackForm.findFirst.mockResolvedValueOnce({ id: 'form-1' })
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    const body = await res.json()
+
+    expect(body.feedback.mandatory).toBe(true)
+  })
+
+  it('cycle dışı deneme (attemptNumber > originalMaxAttempts) atlanır, ilk tetikleyen seçilir', async () => {
+    // attempt-4: cycle dışı (4 > 3) → tetiklenmez. attempt-2: passed, cycle içi → tetiklenir.
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(
+      makeAssignment({}, { originalMaxAttempts: 3 }),
+    )
+    prismaMock.trainingFeedbackForm.findFirst.mockResolvedValueOnce({ id: 'form-1' })
+    prismaMock.examAttempt.findMany.mockResolvedValueOnce([
+      { id: 'attempt-4', status: 'completed', isPassed: false, attemptNumber: 4 },
+      { id: 'attempt-2', status: 'completed', isPassed: true, attemptNumber: 2 },
+    ])
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    const body = await res.json()
+
+    expect(body.feedback.canSubmit).toBe(true)
+    expect(body.feedback.attemptId).toBe('attempt-2')
+  })
+
+  it('ara başarısız deneme (attemptNumber < originalMaxAttempts) tetiklemez → canSubmit false', async () => {
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(
+      makeAssignment({}, { originalMaxAttempts: 3 }),
+    )
+    prismaMock.trainingFeedbackForm.findFirst.mockResolvedValueOnce({ id: 'form-1' })
+    prismaMock.examAttempt.findMany.mockResolvedValueOnce([
+      { id: 'attempt-1', status: 'completed', isPassed: false, attemptNumber: 1 },
+    ])
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    const body = await res.json()
+
+    expect(body.feedback.canSubmit).toBe(false)
+    expect(body.feedback.attemptId).toBeNull()
   })
 })

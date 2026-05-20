@@ -13,6 +13,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowLeft, Video, FileQuestion, CheckCircle2, Clock, Play, Target,
   Calendar, Award, ChevronRight, Lock, AlertTriangle, RefreshCw, Send,
+  MessageSquareText,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
@@ -49,6 +50,22 @@ interface TrainingDetail {
   /** Cron eğitim süresi geçince attempt'i 'expired' işaretledi ama kullanıcının
    *  hâlâ deneme hakkı var. Retry-pending'den farklı UX (banner mesajı + CTA). */
   isExpiredRetryable?: boolean;
+  /** EY.FR.40 — eğitime özel geri bildirim bölümü durumu. API eski sürümdeyse
+   *  alan gelmeyebilir → bölüm sessizce gizlenir. */
+  feedback?: {
+    /** Org'da aktif (yayında) bir geri bildirim formu var mı? */
+    formActive: boolean;
+    /** Eğitim için geri bildirim zorunlu mu? */
+    mandatory: boolean;
+    /** Kullanıcı bu eğitim için zaten geri bildirim gönderdi mi? */
+    submitted: boolean;
+    /** Gönderim tarihi (tr-TR formatlı) — yalnızca submitted ise dolu. */
+    submittedAt: string | null;
+    /** Şu an form doldurulabilir mi? (tetikleyen tamamlanmış deneme var + gönderilmemiş) */
+    canSubmit: boolean;
+    /** Geri bildirim formuna bağlanacak tetikleyen deneme id'si. */
+    attemptId: string | null;
+  };
 }
 
 export default function TrainingDetailPage() {
@@ -607,8 +624,8 @@ export default function TrainingDetailPage() {
             border: `1px solid ${INK}`,
             transition: 'background-color 200ms ease, transform 220ms ease',
           }}
-          onMouseEnter={e => { e.currentTarget.style.backgroundColor = OLIVE; }}
-          onMouseLeave={e => { e.currentTarget.style.backgroundColor = INK; }}
+          onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.backgroundColor = OLIVE; }}
+          onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.backgroundColor = INK; }}
         >
           <div className="flex min-w-0 items-center gap-3">
             <span
@@ -878,6 +895,11 @@ export default function TrainingDetailPage() {
           </div>
         </section>
       )}
+
+      {/* ───── Geri bildirim (EY.FR.40) ───── */}
+      {training.feedback?.formActive && (
+        <FeedbackSection feedback={training.feedback} trainingId={training.id} />
+      )}
     </>,
   );
 }
@@ -1080,6 +1102,220 @@ function StepRow({
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * Geri bildirim (EY.FR.40) bölümü — eğitim detay sayfasında.
+ * 4 durum: (a) gönderildi, (b) doldurulabilir, (c) henüz açık değil, (d) gizli.
+ * `formActive=false` ise çağıran taraf zaten render etmez; yine de defansif kontrol var.
+ */
+function FeedbackSection({
+  feedback, trainingId,
+}: {
+  feedback: NonNullable<TrainingDetail['feedback']>;
+  trainingId: string;
+}) {
+  // Durum (d): org'da aktif form yok — bölüm hiç render edilmez.
+  if (!feedback.formActive) return null;
+
+  const MONO = 'var(--font-jetbrains-mono), ui-monospace, monospace';
+  const SERIF = 'var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif';
+
+  // "Zorunlu" rozeti — renk tek sinyal değil: ikon + "ZORUNLU" metni de taşır (a11y).
+  const mandatoryBadge = feedback.mandatory ? (
+    <span
+      className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.12em] leading-none"
+      style={{ color: '#b3261e', backgroundColor: '#fdf5f2', fontFamily: MONO }}
+    >
+      <AlertTriangle className="h-2.5 w-2.5" />
+      ZORUNLU
+    </span>
+  ) : null;
+
+  return (
+    <section className="mt-12">
+      {/* Bölüm başlığı */}
+      <header
+        className="grid items-end gap-4 pb-3"
+        style={{ gridTemplateColumns: '40px 1fr', borderBottom: `3px solid ${GOLD}` }}
+      >
+        <span
+          className="text-[13px] font-semibold tracking-[0.2em]"
+          style={{ color: GOLD, fontFamily: MONO }}
+        >
+          ¶
+        </span>
+        <div>
+          <h2
+            className="text-[20px] leading-tight font-semibold tracking-[-0.02em]"
+            style={{ fontFamily: SERIF }}
+          >
+            Geri bildirim
+          </h2>
+          <p
+            className="mt-0.5 text-[10px] uppercase tracking-[0.16em]"
+            style={{ color: INK_SOFT, fontFamily: MONO }}
+          >
+            Eğitim değerlendirme formu · EY.FR.40
+          </p>
+        </div>
+      </header>
+
+      {feedback.submitted ? (
+        /* ── Durum (a): gönderildi — onay + tarih ── */
+        <div
+          className="mt-5 grid items-start gap-4 p-6"
+          style={{
+            gridTemplateColumns: '6px 52px 1fr',
+            backgroundColor: '#f7fcf8',
+            borderTop: `1px solid #bfe0cb`,
+            borderRight: `1px solid #bfe0cb`,
+            borderBottom: `1px solid #bfe0cb`,
+            borderRadius: '4px',
+          }}
+        >
+          <span style={{ backgroundColor: OLIVE, alignSelf: 'stretch', borderRadius: '2px' }} />
+          <div
+            className="flex items-center justify-center"
+            style={{ width: 52, height: 52, backgroundColor: '#eaf6ef', borderRadius: '2px' }}
+          >
+            <CheckCircle2 className="h-6 w-6" style={{ color: OLIVE }} />
+          </div>
+          <div>
+            <p
+              className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+              style={{ color: OLIVE, fontFamily: MONO }}
+            >
+              Geri bildirim alındı
+            </p>
+            <h3
+              className="mt-1 text-[20px] font-semibold tracking-[-0.01em]"
+              style={{ color: INK, fontFamily: SERIF }}
+            >
+              Geri bildiriminiz alındı
+            </h3>
+            <p className="mt-1 text-[13px] leading-relaxed" style={{ color: INK_SOFT }}>
+              Bu eğitim için değerlendirme formunu tamamladınız. Katkınız için teşekkürler.
+            </p>
+            {feedback.submittedAt && (
+              <p
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums"
+                style={{ color: OLIVE, fontFamily: MONO }}
+              >
+                GÖNDERİM · {feedback.submittedAt}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : feedback.canSubmit ? (
+        /* ── Durum (b): doldurulabilir — CTA + (zorunluysa) rozet ── */
+        <div
+          className="mt-5 flex flex-col gap-4 p-5 sm:grid sm:items-center"
+          style={{
+            backgroundColor: CARD_BG,
+            border: `1px solid ${RULE}`,
+            borderLeft: `4px solid ${feedback.mandatory ? GOLD : OLIVE}`,
+            borderRadius: '4px',
+            gridTemplateColumns: '44px 1fr max-content',
+          }}
+        >
+          <div className="flex items-start gap-3 sm:contents">
+            <div
+              className="flex items-center justify-center shrink-0"
+              style={{
+                width: 44, height: 44,
+                backgroundColor: feedback.mandatory ? 'rgba(201, 169, 97, 0.14)' : '#eaf6ef',
+                borderRadius: '2px',
+              }}
+            >
+              <MessageSquareText
+                className="h-5 w-5"
+                style={{ color: feedback.mandatory ? GOLD : OLIVE }}
+              />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p
+                  className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                  style={{ color: feedback.mandatory ? '#b4820b' : OLIVE, fontFamily: MONO }}
+                >
+                  Geri bildirim
+                </p>
+                {mandatoryBadge}
+              </div>
+              <h3
+                className="mt-1 text-[16px] font-semibold tracking-[-0.01em]"
+                style={{ color: INK, fontFamily: SERIF }}
+              >
+                {feedback.mandatory
+                  ? 'Bu eğitim için geri bildiriminiz bekleniyor'
+                  : 'Bu eğitimi değerlendirin'}
+              </h3>
+              <p className="mt-1 text-[12px] leading-snug" style={{ color: INK_SOFT }}>
+                {feedback.mandatory
+                  ? 'Bu eğitim için geri bildirim zorunludur. Formu doldurmadan yeni bir eğitime başlayamazsınız.'
+                  : 'Görüşleriniz eğitim kalitemizi geliştirir. Dilerseniz değerlendirme formunu doldurabilirsiniz.'}
+              </p>
+            </div>
+          </div>
+          <Link
+            href={`/exam/${trainingId}/feedback${feedback.attemptId ? `?attemptId=${feedback.attemptId}` : ''}`}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: CREAM, backgroundColor: INK, borderRadius: '2px', fontFamily: MONO }}
+          >
+            <Send className="h-3.5 w-3.5" style={{ color: GOLD }} />
+            Geri Bildirim Ver
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      ) : (
+        /* ── Durum (c): henüz açık değil — bilgilendirme ── */
+        <div
+          className="mt-5 grid items-start gap-4 p-5"
+          style={{
+            gridTemplateColumns: '44px 1fr',
+            backgroundColor: '#ffffff',
+            border: `1px solid ${RULE}`,
+            borderLeft: `2px solid ${RULE}`,
+            borderRadius: '4px',
+          }}
+        >
+          <div
+            className="flex items-center justify-center shrink-0"
+            style={{
+              width: 44, height: 44,
+              backgroundColor: CREAM,
+              border: `1px solid ${RULE}`,
+              borderRadius: '2px',
+            }}
+          >
+            <Lock className="h-4 w-4" style={{ color: INK_SOFT }} />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p
+                className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: INK_SOFT, fontFamily: MONO }}
+              >
+                Geri bildirim
+              </p>
+              {mandatoryBadge}
+            </div>
+            <h3
+              className="mt-1 text-[16px] font-semibold tracking-[-0.01em]"
+              style={{ color: INK, fontFamily: SERIF }}
+            >
+              Geri bildirim henüz açık değil
+            </h3>
+            <p className="mt-1 text-[12px] leading-snug" style={{ color: INK_SOFT }}>
+              Geri bildirim formu, eğitimi tamamlayıp sınavı bitirdikten sonra açılır.
+              {feedback.mandatory ? ' Bu eğitim için geri bildirim zorunludur.' : ''}
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
