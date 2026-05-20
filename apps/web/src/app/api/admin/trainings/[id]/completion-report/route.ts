@@ -6,7 +6,8 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
-import { fetchLogoAsDataUrl, mimeToPdfFormat } from '@/lib/pdf/helpers/logo'
+import { mimeToPdfFormat } from '@/lib/pdf/helpers/logo'
+import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
 import { BRAND } from '@/lib/brand'
 
 function formatDate(d: Date | string | null | undefined): string {
@@ -102,7 +103,9 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
   const W = doc.internal.pageSize.getWidth()
   const H = doc.internal.pageSize.getHeight()
   const orgName = training.organization?.name ?? BRAND.fullName
-  const logoDataUrl = await fetchLogoAsDataUrl(training.organization?.logoUrl)
+  // Sertifika PDF'i ile aynı kaynak: org logoUrl varsa onu, yoksa
+  // public/logos/devakent.png fallback'ini kullanır (cert-logo helper).
+  const logoDataUrl = await resolveOrgLogoDataUrl(training.organization?.logoUrl)
 
   // ── HEADER ──────────────────────────────────────────────
   // Restrained executive layout:
@@ -124,51 +127,71 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
   doc.setFillColor(...PRIMARY)
   doc.rect(0, HDR_H, W, 0.6, 'F')
 
-  // ── Logo / monogram tile (white card, single restrained shape) ──
+  // ── Logo / monogram tile (white card) ──
+  // Tile, logonun gerçek en-boy oranına göre boyutlanır: geniş bir logo asla
+  // kareye sıkıştırılıp ezilmez. Logo yoksa kompakt kare monogram tile kalır.
   const tileX = 12
   const tileY = 8
-  const tileSize = 28
-  doc.setFillColor(...WHITE)
-  doc.roundedRect(tileX, tileY, tileSize, tileSize, 2, 2, 'F')
+  const TILE_PAD = 3
+  let tileW = 28
+  let tileH = 28
 
-  let logoRendered = false
+  // Logoyu çizmeden önce ölç → tile'ı orantılı boyutla (çekiştirme yok).
+  let logoFit: { url: string; fmt: 'PNG' | 'JPEG'; w: number; h: number } | null = null
   if (logoDataUrl) {
     try {
-      const fmt = mimeToPdfFormat(logoDataUrl)
-      const pad = 3
-      doc.addImage(
-        logoDataUrl,
-        fmt,
-        tileX + pad,
-        tileY + pad,
-        tileSize - pad * 2,
-        tileSize - pad * 2,
-        undefined,
-        'FAST'
-      )
-      logoRendered = true
+      const props = doc.getImageProperties(logoDataUrl)
+      tileH = 24
+      const maxLogoH = tileH - TILE_PAD * 2 // 18mm
+      const maxLogoW = 42                   // başlık metnine yer bırakmak için üst sınır
+      const scale = Math.min(maxLogoW / props.width, maxLogoH / props.height)
+      const w = props.width * scale
+      const h = props.height * scale
+      tileW = Math.max(28, w + TILE_PAD * 2)
+      logoFit = { url: logoDataUrl, fmt: mimeToPdfFormat(logoDataUrl), w, h }
     } catch {
-      // ignore — fall through to monogram
+      // ölçülemedi (örn. SVG) → monogram fallback'e düş
+      logoFit = null
     }
   }
-  if (!logoRendered) {
+
+  doc.setFillColor(...WHITE)
+  doc.roundedRect(tileX, tileY, tileW, tileH, 2, 2, 'F')
+
+  if (logoFit) {
+    try {
+      // Tile içine ortalanmış, oranı korunmuş yerleşim
+      doc.addImage(
+        logoFit.url,
+        logoFit.fmt,
+        tileX + (tileW - logoFit.w) / 2,
+        tileY + (tileH - logoFit.h) / 2,
+        logoFit.w,
+        logoFit.h,
+        undefined,
+        'FAST',
+      )
+    } catch {
+      logoFit = null
+    }
+  }
+  if (!logoFit) {
     doc.setTextColor(...PRIMARY_DK)
     doc.setFont(TURKISH_FONT_FAMILY, 'bold')
     doc.setFontSize(18)
-    doc.text(orgName.charAt(0).toUpperCase(), tileX + tileSize / 2, tileY + tileSize / 2 + 2.8, {
+    doc.text(orgName.charAt(0).toUpperCase(), tileX + tileW / 2, tileY + tileH / 2 + 2.8, {
       align: 'center',
     })
   }
 
   // ── Hairline vertical divider between logo and title ──
-  doc.setDrawColor(255, 255, 255)
   // jsPDF's GState API isn't exposed in our jspdf typings; emulate transparency via mid-tone draw color
   doc.setLineWidth(0.2)
   doc.setDrawColor(120, 180, 150)
-  doc.line(tileX + tileSize + 6, tileY + 2, tileX + tileSize + 6, tileY + tileSize - 2)
+  doc.line(tileX + tileW + 6, tileY + 2, tileX + tileW + 6, tileY + tileH - 2)
 
   // ── Eyebrow (small uppercase report kind) ──
-  const textX = tileX + tileSize + 11
+  const textX = tileX + tileW + 11
   doc.setTextColor(245, 200, 120) // soft gold for hierarchy
   doc.setFont(TURKISH_FONT_FAMILY, 'bold')
   doc.setFontSize(7)
@@ -347,15 +370,17 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
     const st       = STATUS_MAP[a.status] ?? STATUS_MAP.assigned
     const score    = attempt?.postExamScore != null ? `%${Number(attempt.postExamScore)}` : '—'
     const compDate = formatDate(a.completedAt ?? attempt?.postExamCompletedAt)
-    const sigField = a.status === 'passed' ? '' : 'X'
+    // '' → eğitimi tamamlayan personel (yeşil onay işareti çizilir)
+    // 'X' → başarısız / devam eden personel
+    const onayMark = a.status === 'passed' ? '' : 'X'
 
-    return [String(i + 1), name, dept, userTitle, st.label, score, compDate, sigField]
+    return [String(i + 1), name, dept, userTitle, st.label, score, compDate, onayMark]
   })
 
   autoTable(doc, {
     startY: tableHeaderY + 8,
     margin: { left: 10, right: 10 },
-    head: [['#', 'Ad Soyad', 'Departman', 'Ünvan', 'Durum', 'Puan', 'Tarih', 'İmza']],
+    head: [['#', 'Ad Soyad', 'Departman', 'Ünvan', 'Durum', 'Puan', 'Tarih', 'Onay']],
     body: rows,
     styles: {
       font: TURKISH_FONT_FAMILY,
@@ -409,17 +434,20 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
       }
     },
     didDrawCell(data) {
-      if (data.section === 'body' && data.column.index === 7) {
-        const val = String(data.cell.raw)
-        if (val === '') {
-          const boxW = Math.min(data.cell.width - 4, 20)
-          const boxH = Math.min(data.cell.height - 3, 7)
-          const bx = data.cell.x + (data.cell.width - boxW) / 2
-          const by = data.cell.y + (data.cell.height - boxH) / 2
-          doc.setDrawColor(180, 180, 180)
-          doc.setLineWidth(0.3)
-          doc.rect(bx, by, boxW, boxH, 'S')
-        }
+      // Eğitimi tamamlayan personel: imza kutusu yerine yeşil onay rozeti.
+      if (data.section === 'body' && data.column.index === 7 && String(data.cell.raw) === '') {
+        const cx = data.cell.x + data.cell.width / 2
+        const cy = data.cell.y + data.cell.height / 2
+        // Yumuşak yeşil rozet zemini
+        doc.setFillColor(...SUCCESS_BG)
+        doc.circle(cx, cy, 3.2, 'F')
+        // Tik işareti — iki segmentli, yuvarlak uçlu vektör çizim
+        doc.setDrawColor(...PRIMARY)
+        doc.setLineWidth(0.8)
+        doc.setLineCap('round')
+        doc.line(cx - 1.7, cy + 0.15, cx - 0.55, cy + 1.4)
+        doc.line(cx - 0.55, cy + 1.4, cx + 2.0, cy - 1.45)
+        doc.setLineCap('butt') // sonraki hücre kenarlıkları etkilenmesin
       }
     },
   })
@@ -431,8 +459,8 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
     doc.setFont(TURKISH_FONT_FAMILY, 'normal')
     doc.setFontSize(7)
     doc.setTextColor(...TEXT_MUT)
-    doc.text('* "İmza" sütunu yalnızca başarılı personel tarafından imzalanmak üzere boş bırakılmıştır.', 10, noteY)
-    doc.text('  Başarısız veya devam eden personel için "X" işareti konulmuştur.', 10, noteY + 4)
+    doc.text('* "Onay" sütununda eğitimi başarıyla tamamlayan personel yeşil onay işareti ile gösterilir.', 10, noteY)
+    doc.text('  Başarısız veya eğitimi devam eden personel için "X" işareti kullanılır.', 10, noteY + 4)
   }
 
   // ── PAGE FOOTER ─────────────────────────────────────────
