@@ -25,6 +25,7 @@
     "db:seed": "node scripts/seed-demo.js",
     "seed:smg": "tsx scripts/seed-smg-categories.ts",
     "validate:env": "node scripts/validate-env.js",
+    "check:guards": "node scripts/check-script-guards.mjs",
     "env:pull": "pnpm dlx vercel env pull .env.local --environment=development --yes",
     "env:pull:prod": "pnpm dlx vercel env pull .env.local --environment=production --yes",
     "predeploy": "node scripts/validate-env.js",

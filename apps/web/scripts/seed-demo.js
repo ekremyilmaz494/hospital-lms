@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 require('dotenv').config({ path: '.env' });
+
+// PRODUCTION KORUMASI — seed-demo demo kurum/kullanıcı yaratır; prod'da çalışırsa
+// canlı veriyi kirletir. Sadece yeni/yerel ortam içindir.
+require('./_guard.cjs').assertNotProduction('seed-demo');
+
 const { createClient } = require('@supabase/supabase-js');
 const { Client } = require('pg');
 

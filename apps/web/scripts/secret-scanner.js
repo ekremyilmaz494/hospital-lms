@@ -22,8 +22,8 @@ for (const file of files) {
     // Sadece mevcut dosyaları kontrol et
     if (!fs.existsSync(file)) continue;
     
-    // .env.example gibi şablon dosyalarını atla
-    if (file.includes('.env.example') || file.includes('secret-scanner.js')) continue;
+    // .env.example / .env.local.example gibi şablon dosyalarını atla
+    if (file.includes('.env.example') || file.includes('.env.local.example') || file.includes('secret-scanner.js')) continue;
 
     const content = fs.readFileSync(file, 'utf-8');
     const lines = content.split('\n');
@@ -38,7 +38,11 @@ for (const file of files) {
         if (pattern.regex.test(line)) {
           // Eğer pattern bulursa ama bu bir environment variable kullanımı ise (process.env) atla
           if (line.includes('process.env.')) continue;
-          
+
+          // localhost/127.0.0.1 bağlantı string'leri secret değildir — yerel
+          // geliştirme varsayılanı (local Supabase, docs örnekleri). Yanlış pozitif.
+          if (pattern.name === 'Database URL' && /(127\.0\.0\.1|localhost)/.test(line)) continue;
+
           hasSecrets = true;
           console.error(`🚨 [SECRET_DETECTED: ${pattern.name}] in ${file}:${i + 1}`);
           const snippet = line.length > 100 ? line.substring(0, 100) + '...' : line;

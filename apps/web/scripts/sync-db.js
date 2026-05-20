@@ -8,6 +8,18 @@ require('dotenv').config({ path: '.env.local' });
 require('dotenv').config({ path: '.env' });
 
 const { execSync } = require('child_process');
+const { isProductionTarget } = require('./_guard.cjs');
+
+// PRODUCTION KORUMASI — sync-db `predev`'de her `pnpm dev`'de çalışır. Laptoptan
+// prod'a migration deploy etmek YASAK (2026-05-20 incident). Burada abort
+// ETMİYORUZ (dev yine başlasın); sadece prod'a migrate'i atlıyoruz.
+// Prod migration'ı yalnızca Vercel build'inde (prisma-migrate-prod-only.js) çalışır.
+const prodRef = isProductionTarget();
+if (prodRef) {
+  console.warn(`[sync-db] ⚠ Prod tespit edildi (${prodRef}) — migrate deploy ATLANDI.`);
+  console.warn('[sync-db]   Laptoptan prod şeması değiştirilmez; dev normal başlıyor.');
+  process.exit(0);
+}
 
 const directUrl = process.env.DIRECT_URL;
 if (!directUrl) {

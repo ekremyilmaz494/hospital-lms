@@ -41,6 +41,11 @@ async function setup() {
   }
 
   require('dotenv').config({ path: ENV_PATH });
+
+  // PRODUCTION KORUMASI — setup.js `prisma db push --accept-data-loss` çalıştırır;
+  // production'a karşı çalışırsa veri kaybı yaratır. Sadece yeni/yerel ortam içindir.
+  require('./_guard.cjs').assertNotProduction('setup');
+
   log(1, TOTAL, 'Ortam degiskenleri kontrol ediliyor...');
 
   // ── 2. Validate required env vars ──
