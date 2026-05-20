@@ -208,6 +208,10 @@ export default function TrainingDetailPage() {
   const videos = training.videos ?? [];
   const completedVideos = videos.filter(v => v.completed).length;
   const videoProgress = videos.length > 0 ? Math.round((completedVideos / videos.length) * 100) : 0;
+  // İlk tamamlanmamış videonun index'i — "İZLE" butonu yalnızca buna takılır.
+  // completedVideos sayısına güvenmek kırılgan: ilerleme bitişik değilse (örn. 2.
+  // video tamamlandı, 1. tamamlanmadı) hiçbir videoya isNext atanmaz, buton kaybolur.
+  const firstIncompleteVideoIdx = videos.findIndex(v => !v.completed);
 
   // Tek doğruluk kaynağı — list ekranlarıyla aynı helper.
   const { completedSteps, totalSteps, percent: overallProgress, isRetry, isExamOnly } =
@@ -364,18 +368,19 @@ export default function TrainingDetailPage() {
         />
       )}
 
-      {/* Expired-but-retryable banner — cron expire'ı sonrası admin süreyi uzattığında
-          (veya yeni cron BUG-1 fix sonrası score'a dokunmadığında) "süresi doldu"
-          mesajı yerine doğru bilgilendirme. */}
+      {/* Expired-but-retryable banner — cron attempt'i expire etti, personelin hâlâ
+          deneme hakkı var. Süresi dolan denemenin ilerlemesi taşınmaz; personel
+          sıfırdan başlar. Banner metni bunu dürüstçe söyler (eski "kaldığınız yerden
+          devam edebilirsiniz" metni yanıltıcıydı — ilerleme korunmuyor). */}
       {training.isExpiredRetryable && !training.isExpired && (
         <EditorialBanner
           tone="warning"
           icon={RefreshCw}
-          title="Önceki süre dolmuştu — şimdi tekrar açıldı"
+          title="Önceki deneme süresi doldu — yeni hak tanımlandı"
           description={
             training.preExamCompleted
-              ? `Eğitim süresi dolduğu için önceki denemeniz iptal oldu. Kaldığınız yerden devam edebilir, videoları izleyip son sınava girebilirsiniz. (${training.currentAttempt}/${training.maxAttempts} hak)`
-              : `Eğitim süresi dolduğu için önceki denemeniz iptal oldu. Ön sınavı tamamlayıp eğitime devam edebilirsiniz. (${training.currentAttempt}/${training.maxAttempts} hak)`
+              ? `Önceki denemenizin süresi dolduğu için iptal oldu. Yeni deneme hakkıyla baştan başlayacaksınız — videoları yeniden izleyip son sınava gireceksiniz. (${training.currentAttempt}/${training.maxAttempts} hak)`
+              : `Önceki denemenizin süresi dolduğu için iptal oldu. Yeni deneme hakkıyla baştan başlayacaksınız — ön sınav, videolar ve son sınavı yeniden tamamlayacaksınız. (${training.currentAttempt}/${training.maxAttempts} hak)`
           }
         />
       )}
@@ -490,7 +495,7 @@ export default function TrainingDetailPage() {
             }}
           >
             {videos.map((v, i, arr) => {
-              const isNext = !v.completed && i === completedVideos;
+              const isNext = !v.completed && i === firstIncompleteVideoIdx;
               const isLocked = !v.completed && !isNext;
               return (
                 <li

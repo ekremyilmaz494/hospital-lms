@@ -17,9 +17,17 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
   const attemptInfo = await getAttemptStatus(id, dbUser.id, organizationId)
   const attemptStatus = attemptInfo?.status ?? null
   // Videos accessible during watching_videos, post_exam (read-only), and completed phases
-  // Only block during pre_exam (hasn't finished pre-exam yet)
+  // Only block during pre_exam (hasn't finished pre-exam yet).
+  // 403 yerine 200 + attemptStatus dön: frontend phase guard (attemptPhaseRedirect)
+  // kullanıcıyı pre-exam'e yönlendirir. 403 dönülürse videos sayfası `data` null
+  // kalır, ölü "İçerik yüklenemedi" ekranı gösterir ve guard hiç çalışamaz.
+  // videos:[] boş gönderilir — pre-exam'i bitirmemiş kullanıcıya video URL'i sızmaz.
   if (!isReview && attemptStatus === 'pre_exam') {
-    return errorResponse('Önce ön sınavı tamamlamalısınız', 403)
+    return jsonResponse(
+      { trainingTitle: '', attemptStatus: 'pre_exam', videos: [] },
+      200,
+      { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' },
+    )
   }
 
   // id can be a trainingId — find the training and user's assignment
