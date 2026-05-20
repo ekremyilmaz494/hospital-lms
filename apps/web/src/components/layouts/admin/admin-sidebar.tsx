@@ -30,11 +30,13 @@ const TEXT_PRIMARY = '#1c1917';
 const TEXT_SECONDARY = '#44403c';
 const TEXT_MUTED = '#78716c';
 
+/** orgLogoUrl boşsa kullanılan varsayılan kurum logosu (public/ altında). */
+const DEFAULT_ORG_LOGO = '/devakent-logo.svg';
+
 export const AdminSidebar = memo(function AdminSidebar({
   navGroups,
   collapsed = false,
   orgName = 'Klinova LMS',
-  orgCode = 'Hastane Yönetici',
   orgLogoUrl,
   userName = 'Kullanıcı',
   userRole = 'Admin',
@@ -75,40 +77,37 @@ export const AdminSidebar = memo(function AdminSidebar({
     >
       {/* Brand */}
       <div
-        className="flex items-center gap-3 border-b shrink-0"
+        className="flex items-center border-b shrink-0"
         style={{
-          padding: collapsed ? '18px 10px' : '18px 18px',
+          padding: collapsed ? '0 10px' : '0 16px',
           height: 64,
           borderColor: BORDER,
-          justifyContent: collapsed ? 'center' : 'flex-start',
+          justifyContent: 'center',
           transition: 'padding 320ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
-        <div
-          className="flex items-center justify-center rounded-[10px] shrink-0 text-white font-bold"
-          style={{
-            width: 36,
-            height: 36,
-            fontSize: 15,
-            background: PRIMARY,
-            boxShadow: `0 2px 6px ${PRIMARY}50`,
-          }}
-        >
-          {orgLogoUrl ? (
-            <Image src={orgLogoUrl} alt="" width={36} height={36} className="rounded-[10px]" />
-          ) : (
+        {collapsed ? (
+          /* Daraltılmış sidebar: kompakt monogram — geniş yatay logo 72px'e sığmaz */
+          <div
+            className="flex items-center justify-center rounded-[10px] shrink-0 text-white font-bold"
+            style={{
+              width: 36,
+              height: 36,
+              fontSize: 15,
+              background: PRIMARY,
+              boxShadow: `0 2px 6px ${PRIMARY}50`,
+            }}
+          >
             <span>{(orgName[0] ?? 'K').toUpperCase()}</span>
-          )}
-        </div>
-        {!collapsed && (
-          <div className="flex flex-col min-w-0 flex-1 leading-tight">
-            <strong className="text-[13.5px] font-bold truncate" style={{ color: TEXT_PRIMARY, letterSpacing: '-0.01em' }}>
-              {orgName}
-            </strong>
-            <small className="text-[11px] font-medium" style={{ color: TEXT_MUTED }}>
-              {orgCode}
-            </small>
           </div>
+        ) : (
+          /* Açık sidebar: tam yatay kurum logosu — en-boy oranı korunur (çekiştirme yok) */
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={orgLogoUrl || DEFAULT_ORG_LOGO}
+            alt={orgName}
+            style={{ height: 36, width: 'auto', objectFit: 'contain' }}
+          />
         )}
       </div>
 

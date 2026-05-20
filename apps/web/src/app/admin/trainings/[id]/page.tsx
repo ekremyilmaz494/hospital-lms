@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft, GraduationCap, Users, TrendingUp, Clock, Edit, Play, BarChart3,
   FileText, RotateCcw, Download, Eye, Video, CheckCircle2, XCircle, Timer,
-  ChevronRight, Award, PenLine, FileDown, MessageSquare, Search, X, MoreHorizontal,
+  ChevronRight, Award, FileDown, MessageSquare, Search, X, MoreHorizontal,
   Loader2,
 } from 'lucide-react';
 import {
@@ -63,9 +63,8 @@ interface TrainingDetail {
   passedCount: number;
   failedCount: number;
   avgScore: number;
-  signedCount: number;
   status: string;
-  assignedStaff: { assignmentId: string; userId: string; name: string; department: string; attempt: number; progress: number; preScore: number | null; postScore: number | null; status: string; completedAt: string; signedAt: string | null; signatureMethod: string | null }[];
+  assignedStaff: { assignmentId: string; userId: string; name: string; department: string; attempt: number; progress: number; preScore: number | null; postScore: number | null; status: string; completedAt: string }[];
   videos: { id: string; title: string; videoUrl: string; duration: string; order: number; contentType: string }[];
   questions: { id: string; text: string; points: number; options: { id: string; text: string; isCorrect: boolean; order: number }[] }[];
 }
@@ -383,13 +382,12 @@ export default function TrainingDetailPage() {
       </p>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard title="Atanan" value={training.assignedCount ?? 0} icon={Users} accentColor={K.INFO} />
         <StatCard title="Tamamlayan" value={training.completedCount ?? 0} icon={TrendingUp} accentColor={K.PRIMARY} />
         <StatCard title="Başarılı" value={training.passedCount ?? 0} icon={GraduationCap} accentColor={K.SUCCESS} />
         <StatCard title="Başarısız" value={training.failedCount ?? 0} icon={GraduationCap} accentColor={K.ERROR} />
         <StatCard title="Ort. Puan" value={training.avgScore ?? 0} icon={BarChart3} accentColor={K.ACCENT} />
-        <StatCard title="İmzalanan" value={`${training.signedCount ?? 0}/${training.passedCount ?? 0}`} icon={PenLine} accentColor={K.PRIMARY} />
       </div>
 
       {/* Tabs Section */}
@@ -584,7 +582,7 @@ export default function TrainingDetailPage() {
                       data-stuck={headerStuck || undefined}
                       className="grid items-center px-4 py-3 mb-1 transition-[box-shadow] duration-150 ease-out data-[stuck]:shadow-[0_4px_12px_-4px_rgba(0,0,0,0.06)]"
                       style={{
-                        gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 72px 72px 95px 75px 90px 90px',
+                        gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 72px 72px 95px 75px 90px',
                         gap: '8px',
                         color: K.TEXT_MUTED,
                         background: K.BG,
@@ -601,7 +599,6 @@ export default function TrainingDetailPage() {
                       <span className="text-[11px] font-semibold uppercase tracking-wide text-center whitespace-nowrap">Son Sınav</span>
                       <span className="text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap">Durum</span>
                       <span className="text-[11px] font-semibold uppercase tracking-wide text-center whitespace-nowrap">Tarih</span>
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-center whitespace-nowrap">İmza</span>
                       <span />
                     </div>
                     {/* Data Rows */}
@@ -616,7 +613,7 @@ export default function TrainingDetailPage() {
                         const st = statusMap[s.status] || statusMap.assigned;
                         const StatusIcon = st.icon;
                         return (
-                          <div key={s.assignmentId} className="grid items-center px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 72px 72px 95px 75px 90px 90px', gap: '8px', background: K.SURFACE, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
+                          <div key={s.assignmentId} className="grid items-center px-4 py-3 group" style={{ gridTemplateColumns: 'minmax(140px, 2fr) 55px minmax(70px, 1fr) 72px 72px 95px 75px 90px', gap: '8px', background: K.SURFACE, borderBottom: `1px solid ${K.BORDER_LIGHT}` }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = K.SURFACE_HOVER; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = K.SURFACE; }}
                           >
@@ -648,21 +645,6 @@ export default function TrainingDetailPage() {
                             </div>
                             {/* Tarih */}
                             <p className="text-xs font-medium text-center" style={{ fontFamily: 'var(--font-mono)', color: K.TEXT_SECONDARY }}>{s.completedAt ? new Date(s.completedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</p>
-                            {/* İmza */}
-                            <div className="text-center">
-                              {s.signedAt ? (
-                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: K.SUCCESS_BG, color: K.PRIMARY }}>
-                                  <CheckCircle2 className="h-3 w-3" />
-                                  {new Date(s.signedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}
-                                </span>
-                              ) : s.status === 'passed' ? (
-                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: K.WARNING_BG, color: '#b45309' }}>
-                                  Bekleniyor
-                                </span>
-                              ) : (
-                                <span className="text-xs" style={{ color: K.TEXT_MUTED }}>—</span>
-                              )}
-                            </div>
                             {/* Actions */}
                             <div className="flex justify-end">
                               {s.status === 'failed' && (
