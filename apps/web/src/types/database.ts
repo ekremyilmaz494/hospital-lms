@@ -116,6 +116,7 @@ export interface SubscriptionPlan {
   features: string[];
   isActive: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface OrganizationSubscription {
@@ -167,6 +168,7 @@ export interface TrainingVideo {
   durationSeconds: number;
   sortOrder: number;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface Question {
@@ -176,6 +178,8 @@ export interface Question {
   questionType: string;
   points: number;
   sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
   options: QuestionOption[];
 }
 
@@ -185,6 +189,8 @@ export interface QuestionOption {
   optionText: string;
   isCorrect: boolean;
   sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TrainingAssignment {
@@ -197,6 +203,7 @@ export interface TrainingAssignment {
   assignedById: string | null;
   assignedAt: string;
   completedAt: string | null;
+  updatedAt: string;
 }
 
 export interface ExamAttempt {
@@ -215,6 +222,7 @@ export interface ExamAttempt {
   isPassed: boolean;
   status: ExamAttemptStatus;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface Notification {
@@ -227,6 +235,7 @@ export interface Notification {
   relatedTrainingId: string | null;
   isRead: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface AuditLog {
@@ -251,6 +260,7 @@ export interface Certificate {
   certificateCode: string;
   issuedAt: string;
   expiresAt: string | null;
+  updatedAt: string;
 }
 
 export interface VideoProgress {
@@ -263,6 +273,7 @@ export interface VideoProgress {
   isCompleted: boolean;
   lastPositionSeconds: number;
   completedAt: string | null;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -281,6 +292,7 @@ export interface Payment {
   errorMessage: string | null;
   paidAt: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface Invoice {
@@ -300,6 +312,7 @@ export interface Invoice {
   periodStart: string;
   periodEnd: string;
   issuedAt: string;
+  updatedAt: string;
 }
 
 export interface ExamAnswer {
@@ -310,6 +323,7 @@ export interface ExamAnswer {
   isCorrect: boolean | null;
   examPhase: ExamPhase;
   answeredAt: string;
+  updatedAt: string;
 }
 
 export interface DbBackup {
@@ -321,6 +335,7 @@ export interface DbBackup {
   status: string;
   createdById: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface KvkkRequest {
@@ -334,6 +349,7 @@ export interface KvkkRequest {
   respondedById: string | null;
   createdAt: string;
   completedAt: string | null;
+  updatedAt: string;
 }
 
 export interface ScormAttempt {
@@ -360,6 +376,7 @@ export interface DepartmentTrainingRule {
   organizationId: string;
   isActive: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 // ── HIS Entegrasyon Tipleri ──
@@ -395,6 +412,7 @@ export interface SyncLog {
   errors: Array<{ externalId: string; error: string }>;
   startedAt: string;
   completedAt: string | null;
+  updatedAt: string;
 }
 
 // ── SORU BANKASI TİPLERİ ──
@@ -420,6 +438,8 @@ export interface QuestionBankOption {
   text: string;
   isCorrect: boolean;
   order: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SyncResult {
