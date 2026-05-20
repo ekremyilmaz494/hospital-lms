@@ -682,6 +682,10 @@ model Notification {
   // atama, cron, abonelik) tarafından üretilenlerde NULL kalır. Admin
   // bildirim panelinde sadece kendi gönderdiklerini görmek için filtre.
   senderId          String?  @map("sender_id") @db.Uuid
+  // Admin manuel gönderiminde aynı UUID, tüm alıcı satırlarına yazılır.
+  // Sistem bildirimleri (sınav/atama/cron/abonelik) NULL kalır.
+  // Admin panel listesi bu kolonla "gönderim başına tek kart" olarak gruplar.
+  batchId           String?  @map("batch_id") @db.Uuid
   title             String   @db.VarChar(500)
   message           String   @db.Text
   type              String   @db.VarChar(50)
@@ -701,6 +705,9 @@ model Notification {
   @@index([organizationId, createdAt], map: "idx_notifications_org_date")
   // Admin "Gönderdiklerim" listesinde senderId + org filtresi
   @@index([senderId, createdAt], map: "idx_notifications_sender_date")
+  // Batch grouping (admin "Gönderdiklerim" listesi + batch detay endpoint'i)
+  @@index([batchId], map: "idx_notifications_batch")
+  @@index([senderId, batchId, createdAt], map: "idx_notifications_sender_batch")
   @@map("notifications")
 }
 
