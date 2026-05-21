@@ -42,7 +42,7 @@ export const FEEDBACK_FORM_TEMPLATES: FeedbackFormTemplate[] = [
   {
     key: 'ey-fr-03-lms',
     label: 'EY.FR.03 — Online Eğitim Değerlendirme (Önerilen)',
-    description: 'LMS / online eğitim odaklı 8 soruluk değerlendirme — sistem kullanımı, teknik kalite, genel deneyim.',
+    description: 'LMS / online eğitim odaklı 15 soruluk değerlendirme — sistem kullanımı, teknik kalite, eğitmen, eğitim içeriği, genel deneyim.',
     defaultTitle: 'Eğitim Değerlendirme Anket Formu',
     defaultDescription: 'Online eğitim sonrası personelin doldurduğu standart değerlendirme.',
     documentCode: 'EY.FR.03',
@@ -69,8 +69,27 @@ export const FEEDBACK_FORM_TEMPLATES: FeedbackFormTemplate[] = [
         ],
       },
       {
-        name: 'GENEL DEĞERLENDİRME',
+        name: 'EĞİTMEN',
         order: 2,
+        items: [
+          { text: 'Verdiği eğitim konusundaki bilgi ve tecrübesi', questionType: 'likert_5', isRequired: true, order: 0 },
+          { text: 'Anlatımı', questionType: 'likert_5', isRequired: true, order: 1 },
+          { text: 'İletişim konusundaki başarısı', questionType: 'likert_5', isRequired: true, order: 2 },
+        ],
+      },
+      {
+        name: 'EĞİTİM İÇERİĞİ',
+        order: 3,
+        items: [
+          { text: 'Programda ele alınan konuların işimle ilgisi', questionType: 'likert_5', isRequired: true, order: 0 },
+          { text: 'Eğitim notları', questionType: 'likert_5', isRequired: true, order: 1 },
+          { text: 'Eğitim süresi', questionType: 'likert_5', isRequired: true, order: 2 },
+          { text: 'Eğitimin içeriği', questionType: 'likert_5', isRequired: true, order: 3 },
+        ],
+      },
+      {
+        name: 'GENEL DEĞERLENDİRME',
+        order: 4,
         items: [
           { text: 'Sanal eğitim sistemi zaman açısından kolaylık sağladı', questionType: 'likert_5', isRequired: true, order: 0 },
           { text: 'Gelecekte bu yöntemle eğitim almaya devam etmek isterim', questionType: 'likert_5', isRequired: true, order: 1 },
