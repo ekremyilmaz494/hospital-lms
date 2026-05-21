@@ -45,10 +45,12 @@ dolaştı; ayrıca uygulamanın kullandığı rol `auth.users`'ı silebiliyordu.
   → Reset database password. Yeni değeri yalnızca Vercel env'ine yaz.
 - [ ] **`service_role` key'i rotate et** — Settings → API → service_role → roll.
   Vercel'de güncelle. (Eski key'ler env dosyalarında dolaştı.)
-- [ ] **Yıkıcı yetkiyi daralt** — SQL Editor'de uygulamanın günlük kullandığı
-  rolden `auth.users` üzerindeki `DELETE`/`TRUNCATE` yetkisini al; yıkıcı işlem
-  yalnızca ayrı bir "break-glass" rolünde kalsın. (auth şeması Supabase yönetir —
-  uygulama rolünün auth tablolarına yazma ihtiyacı yoktur.)
+- [ ] **Yıkıcı yetkiyi daralt** — `apps/web/supabase-least-privilege.sql` hazır:
+  `postgres` rolünden auth şeması üzerindeki `DELETE`/`TRUNCATE`/`UPDATE`
+  yetkisini alır. ÖNCE local Supabase'de (P0.1) çalıştır + ADIM 2 ile doğrula,
+  SONRA Supabase Dashboard → SQL Editor'de prod'a uygula. Yıkıcı işlem yalnızca
+  "break-glass" rolünde (`supabase_auth_admin`) kalır. (auth şemasını Supabase
+  yönetir — uygulama rolünün auth tablolarına yazma ihtiyacı yoktur.)
 - [ ] `CRON_SECRET`, `BACKUP_ENCRYPTION_KEY` gibi diğer sırların da env
   dosyalarında dolaşıp dolaşmadığını gözden geçir; şüpheliyse rotate et.
 
