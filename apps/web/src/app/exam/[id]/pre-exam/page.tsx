@@ -4,7 +4,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Clock, ChevronRight, AlertTriangle, LogOut, Shield, Timer, Ban, Lock, ArrowLeft } from 'lucide-react';
 import { PageLoading } from '@/components/shared/page-loading';
+import { ExamTabLocked } from '@/components/exam/exam-tab-locked';
 import { useToast } from '@/components/shared/toast';
+import { useExamTabLock } from '@/hooks/use-exam-tab-lock';
 import { attemptPhaseRedirect, type AttemptStatus } from '@/lib/exam-state-machine';
 
 interface Option {
@@ -42,9 +44,11 @@ export default function PreExamPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
-  const [, setAttemptId] = useState<string | null>(null);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const { toast } = useToast();
+  // Çoklu sekme kilidi — aynı denemenin iki sekmede cevaplanıp birbirini ezmesini önler.
+  const { status: tabLockStatus } = useExamTabLock(attemptId);
 
   useEffect(() => {
     if (!confirmed) return;
@@ -438,6 +442,8 @@ export default function PreExamPage() {
       </div>
     );
   }
+
+  if (tabLockStatus === 'blocked') return <ExamTabLocked />;
 
   if (isLoading) return <PageLoading />;
 

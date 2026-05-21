@@ -151,6 +151,19 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       }
     })
 
+  // E-1 gözlemlenebilirlik: sınav sırasında soru silindi/değiştirildiyse personelin
+  // kayıtlı cevabı questionMap'te bulunamaz ve sessizce düşer. Skorlama davranışı
+  // (görülmemiş soru = yanlış) kasıtlı korunur — ama admin'in eğitimi sınav ortasında
+  // düzenlediğini fark edebilmesi için iz bırak.
+  const droppedAnswers = sourceAnswers.filter(a => !questionMap.has(a.questionId))
+  if (droppedAnswers.length > 0) {
+    logger.warn('Exam Submit', 'Answers dropped — questions changed mid-exam', {
+      attemptId: attempt.id,
+      phase,
+      droppedQuestionIds: droppedAnswers.map(a => a.questionId),
+    })
+  }
+
   // Cevaplanmamış soruları da toplam puana ekle (yanlış sayılır)
   const answeredIds = new Set(sourceAnswers.map(a => a.questionId))
   for (const q of questions) {
@@ -334,7 +347,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       action: isPassed ? 'exam.passed' : 'exam.failed',
       entityType: 'exam_attempt',
       entityId: attempt.id,
-      newData: { score, isPassed, trainingId: attempt.trainingId, tabSwitchCount, suspicious },
+      newData: { score, isPassed, trainingId: attempt.trainingId, tabSwitchCount, suspicious, questionsChangedMidExam: droppedAnswers.length > 0 },
     }),
     logActivity({
       userId: dbUser.id,

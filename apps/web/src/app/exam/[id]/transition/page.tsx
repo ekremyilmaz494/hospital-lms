@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { Play, Award, CheckCircle2, ArrowRight, Check, X, Clock } from 'lucide-react';
 import { useToast } from '@/components/shared/toast';
@@ -30,6 +30,7 @@ function TransitionContent() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const navigatedRef = useRef(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
+  const [resultsState, setResultsState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const [feedbackRequired, setFeedbackRequired] = useState(false);
   const [feedbackMandatory, setFeedbackMandatory] = useState(false);
 
@@ -106,6 +107,27 @@ function TransitionContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft]);
 
+  /**
+   * Soru analizini DB'den yükler (fallback yolu — sayfa yenilendi / sessionStorage boş).
+   * Retry butonu da bunu çağırır. Dönen `AbortController` ile çağıran iptal edebilir.
+   */
+  const loadResults = useCallback((): AbortController | undefined => {
+    if (!attemptIdParam) return undefined;
+    setResultsState('loading');
+    const controller = new AbortController();
+    fetch(`/api/exam/${attemptIdParam}/results`, { signal: controller.signal })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(d => {
+        if (Array.isArray(d?.results)) setQuestionResults(d.results as QuestionResult[]);
+        setResultsState('loaded');
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        setResultsState('error');
+      });
+    return controller;
+  }, [attemptIdParam]);
+
   useEffect(() => {
     if (!isPostResult) return;
     // 1) Fast path: submit sonrası sessionStorage'da tazeyken oku
@@ -114,23 +136,18 @@ function TransitionContent() {
       if (stored) {
         setQuestionResults(JSON.parse(stored) as QuestionResult[]);
         sessionStorage.removeItem(`exam-results-${id}`);
+        setResultsState('loaded');
         return;
       }
     } catch { /* ignore */ }
 
-    // 2) Fallback: sayfa yenilendi ya da telefon kapanıp açıldı → DB'den replay
-    //    Sadece geçen kullanıcı için endpoint detay döndürür (anti-cheating).
+    // 2) Fallback: sayfa yenilendi ya da telefon kapanıp açıldı → DB'den replay.
+    //    Sadece geçen kullanıcı için endpoint detay döndürür (anti-cheating);
+    //    başarısız denemede analiz beklenmez, sessiz kalınır (idle).
     if (passed !== 'true' || !attemptIdParam) return;
-    let cancelled = false;
-    fetch(`/api/exam/${attemptIdParam}/results`)
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => {
-        if (cancelled || !d || !Array.isArray(d.results)) return;
-        setQuestionResults(d.results as QuestionResult[]);
-      })
-      .catch(() => { /* sessiz — ekranda skor kartı yeterli */ });
-    return () => { cancelled = true; };
-  }, [isPostResult, id, passed, attemptIdParam]);
+    const controller = loadResults();
+    return () => controller?.abort();
+  }, [isPostResult, id, passed, attemptIdParam, loadResults]);
 
   useEffect(() => {
     if (!isPostResult || !attemptIdParam) return;
@@ -228,6 +245,22 @@ function TransitionContent() {
                 <div className="tr-notice tr-notice-err">
                   <h4>Tüm deneme hakların tükendi</h4>
                   <p>Yeni bir deneme için eğitim yöneticine başvur.</p>
+                </div>
+              )}
+
+              {isPassed && questionResults.length === 0 && resultsState === 'loading' && (
+                <p className="tr-results-status">Soru analizi yükleniyor…</p>
+              )}
+              {isPassed && questionResults.length === 0 && resultsState === 'error' && (
+                <div className="tr-notice tr-notice-amber">
+                  <h4>Soru analizi yüklenemedi</h4>
+                  <p>
+                    Bağlantı sorunu nedeniyle soru dökümü getirilemedi — puanın yukarıda
+                    doğru görünüyor.
+                    <button type="button" onClick={() => loadResults()} className="tr-retry">
+                      Tekrar dene
+                    </button>
+                  </p>
                 </div>
               )}
 
@@ -567,6 +600,26 @@ function TransitionContent() {
           }
           .tr-notice-amber p { color: var(--k-warning); }
           .tr-notice-err p { color: var(--k-error); opacity: 0.85; }
+
+          .tr-results-status {
+            font-family: var(--font-display, system-ui);
+            font-size: 12px;
+            color: var(--k-text-muted);
+            text-align: center;
+            margin: 0;
+          }
+          .tr-retry {
+            display: inline;
+            margin-left: 6px;
+            padding: 0;
+            background: none;
+            border: none;
+            color: inherit;
+            font: inherit;
+            font-weight: 700;
+            text-decoration: underline;
+            cursor: pointer;
+          }
 
           .tr-cta {
             display: inline-flex;
