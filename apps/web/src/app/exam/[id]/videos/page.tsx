@@ -18,6 +18,7 @@ const AudioPlayer = dynamic(
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { attemptPhaseRedirect, type AttemptStatus } from '@/lib/exam-state-machine';
+import { postWithRetry, type ExamPostResult, type ExamPostResultKind } from '@/lib/exam-fetch';
 import { useToast } from '@/components/shared/toast';
 
 interface VideoItem {
@@ -281,7 +282,88 @@ export default function VideoPlayerPage() {
     }
   }, [isMixed, currentMediaIdx, mediaItems.length, currentVideoIdx, videosData.length, changeVideo]);
 
-  const [heartbeatErrors, setHeartbeatErrors] = useState(0);
+  // Kayıt durumu: 'idle' = sorun yok, 'error' = retry'lar tükendi (ilerleme kaydedilemiyor).
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'error'>('idle');
+  // Kalıcı hata (eğitim/içerik silinmiş, oturum bitmiş) — tam ekran modal tetikler.
+  const [fatalError, setFatalError] = useState<{ title: string; message: string } | null>(null);
+  const fatalHandledRef = useRef(false);
+
+  /**
+   * Video POST'unun kalıcı (retry edilemez) hatalarını tek noktada karşılar:
+   * oturum bitti → login; faz geçersiz/içerik silinmiş → tam ekran bilgilendirme.
+   */
+  const handleVideoPostFailure = useCallback((kind: ExamPostResultKind) => {
+    if (fatalHandledRef.current) return;
+    fatalHandledRef.current = true;
+    videoRef.current?.pause();
+    if (kind === 'session-expired') {
+      // Oturum doldu — use-fetch.ts ile aynı loop-guard'lı login redirect.
+      if (typeof window !== 'undefined') {
+        const now = Date.now();
+        const last = Number(sessionStorage.getItem('auth_redirect_at') || '0');
+        const count = Number(sessionStorage.getItem('auth_redirect_count') || '0');
+        if (now - last < 30000 && count >= 1) {
+          sessionStorage.removeItem('auth_redirect_count');
+          setFatalError({ title: 'Oturum doğrulanamadı', message: 'Lütfen sayfayı yenileyip tekrar giriş yapın.' });
+          return;
+        }
+        sessionStorage.setItem('auth_redirect_count', String(now - last < 30000 ? count + 1 : 1));
+        sessionStorage.setItem('auth_redirect_at', String(now));
+        window.location.href = '/auth/login?reason=session_expired';
+      }
+      return;
+    }
+    if (kind === 'content-gone') {
+      setFatalError({
+        title: 'İçerik bulunamadı',
+        message: 'Bu eğitim içeriği artık mevcut değil. Lütfen eğitim sayfasına dönün.',
+      });
+    } else {
+      // phase-invalid (400) + locked (423): attempt artık video izleme fazında değil.
+      setFatalError({
+        title: 'Eğitim oturumu geçersiz',
+        message: 'Bu eğitim oturumu artık geçerli değil. Eğitim güncellenmiş veya süresi dolmuş olabilir.',
+      });
+    }
+  }, []);
+
+  /**
+   * Tüm video ilerleme POST'larının tek geçiş noktası: backoff'lu retry (geçici hata),
+   * HTTP kodu sınıflandırması ve kayıt durumu göstergesi burada toplanır.
+   */
+  const postVideoProgress = useCallback(
+    async (
+      body: Record<string, unknown>,
+      opts?: { signal?: AbortSignal },
+    ): Promise<ExamPostResult<{ allVideosCompleted?: boolean }>> => {
+      const result = await postWithRetry<{ allVideosCompleted?: boolean }>(
+        `/api/exam/${id}/videos`,
+        body,
+        { signal: opts?.signal },
+      );
+      if (opts?.signal?.aborted) return result; // abort sessiz — durum güncellemesi yok
+      if (result.kind === 'ok') {
+        setSaveStatus('idle');
+      } else if (result.kind === 'transient') {
+        setSaveStatus('error');
+      } else {
+        handleVideoPostFailure(result.kind);
+      }
+      return result;
+    },
+    [id, handleVideoPostFailure],
+  );
+
+  /** Video duraklatıldığında mevcut pozisyonu hemen kaydeder (A-2: pause + uyku kaybı). */
+  const flushVideoPosition = useCallback(() => {
+    if (isReview || fatalHandledRef.current) return;
+    const video = videoRef.current;
+    const time = video?.currentTime ?? 0;
+    // Doğal bitişte handleVideoEnded zaten POST atıyor; video değiştirirken time=0
+    // gelen pause'u da ele — çift POST ve sıfır pozisyon yazımı önlenir.
+    if (!currentVideo || time <= 0 || video?.ended) return;
+    postVideoProgress({ videoId: currentVideo.id, watchedTime: time, position: time });
+  }, [isReview, currentVideo, postVideoProgress]);
 
   const handleVideoEnded = useCallback(() => {
     setIsPlaying(false);
@@ -304,24 +386,23 @@ export default function VideoPlayerPage() {
       return;
     }
 
-    fetch(`/api/exam/${id}/videos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoId: currentVideo.id, watchedTime: duration, position: duration, completed: true }),
-    }).then(res => {
-      if (!res.ok) throw new Error('Server error');
-    }).catch(() => {
-      setLocalCompleted(prev => { const next = new Set(prev); next.delete(currentVideo.id); return next; });
-      videosRef.current = vids;
-      setHeartbeatErrors(prev => prev + 1);
+    postVideoProgress({
+      videoId: currentVideo.id, watchedTime: duration, position: duration, completed: true,
+    }).then(result => {
+      if (result.kind === 'ok') {
+        // Navigasyon yalnızca başarılı kayıttan sonra — kalıcı hatada modal açılır.
+        if (remainingIncomplete === 0 || (isLastVideo && vids.filter(v => !v.completed).length <= 1)) {
+          setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
+        } else if (!isLastVideo) {
+          setTimeout(() => goToNextVideo(), 1500);
+        }
+      } else if (result.kind === 'transient') {
+        // Geçici hata — iyimser tamamlamayı geri al, kullanıcı tekrar deneyebilsin.
+        setLocalCompleted(prev => { const next = new Set(prev); next.delete(currentVideo.id); return next; });
+        videosRef.current = vids;
+      }
     });
-
-    if (remainingIncomplete === 0 || (isLastVideo && vids.filter(v => !v.completed).length <= 1)) {
-      setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
-    } else if (!isLastVideo) {
-      setTimeout(() => goToNextVideo(), 1500);
-    }
-  }, [currentVideo, id, duration, currentVideoIdx, goToNextVideo, router, isMixed, currentMediaIdx, mediaItems.length, isReview]);
+  }, [currentVideo, id, duration, currentVideoIdx, goToNextVideo, router, isMixed, currentMediaIdx, mediaItems.length, isReview, postVideoProgress]);
 
   useEffect(() => {
     if (isReview || !isPlaying || !currentVideo) return;
@@ -334,17 +415,20 @@ export default function VideoPlayerPage() {
     // değişkenleri (id, isPlaying) deps'e koy; çalışma zamanı pozisyonunu
     // canlı kaynaktan (videoRef) oku.
     const videoId = currentVideo.id;
+    // AbortController: video duraklatılınca/unmount olunca bekleyen retry'lar iptal olur.
+    const controller = new AbortController();
     const heartbeat = setInterval(() => {
       const time = videoRef.current?.currentTime ?? 0;
-      fetch(`/api/exam/${id}/videos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoId, watchedTime: time, position: time }),
-      }).catch(() => setHeartbeatErrors(prev => prev + 1));
+      postVideoProgress({ videoId, watchedTime: time, position: time }, { signal: controller.signal });
     }, 15000);
-    return () => clearInterval(heartbeat);
+    return () => {
+      clearInterval(heartbeat);
+      controller.abort();
+    };
+    // currentVideo (obje) deps'e EKLENMEZ — her render yeni ref üretir, 15sn timer
+    // hiç ateşlenmez. postVideoProgress useCallback ile stabil, churn yaratmaz.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, currentVideo?.id, id, isReview]);
+  }, [isPlaying, currentVideo?.id, id, isReview, postVideoProgress]);
 
   useEffect(() => {
     const flushPosition = () => {
@@ -453,6 +537,27 @@ export default function VideoPlayerPage() {
     );
   }
 
+  // Çalışma anında kalıcı hata (eğitim/içerik silinmiş, oturum bitmiş) — POST 4xx döndü.
+  if (fatalError) {
+    return (
+      <div className="vd-page-empty">
+        <div className="vd-page-empty-icon"><AlertTriangle className="h-6 w-6" /></div>
+        <h2>{fatalError.title}</h2>
+        <p>{fatalError.message}</p>
+        <button onClick={() => router.replace(`/staff/my-trainings/${id}`)} className="vd-page-empty-link">
+          ← Eğitim Sayfasına Dön
+        </button>
+        <style>{`
+          .vd-page-empty { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; gap: 10px; max-width: 420px; margin: 0 auto; }
+          .vd-page-empty-icon { width: 56px; height: 56px; border-radius: 4px; background: var(--k-error-bg); color: var(--k-error); display: flex; align-items: center; justify-content: center; }
+          .vd-page-empty h2 { font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; font-size: 20px; color: var(--ed-ink); margin: 0; }
+          .vd-page-empty p { font-size: 13px; color: var(--ed-ink-soft); margin: 0; }
+          .vd-page-empty-link { background: none; border: none; color: var(--ed-ink); font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+        `}</style>
+      </div>
+    );
+  }
+
   // attemptPhaseRedirect bu status'lerde redirect tetikliyor — bir tick boyunca
   // boş içerik yerine loading göster; aksi halde "render → effect → replace"
   // arasında 1-2 frame video player iskeleti flash ediyor.
@@ -504,9 +609,9 @@ export default function VideoPlayerPage() {
 
   return (
     <div className="vd-root">
-      {heartbeatErrors >= 3 && (
+      {saveStatus === 'error' && (
         <div className="vd-heartbeat-err">
-          Bağlantı sorunu: İlerlemen kaydedilemeyebilir. İnternet bağlantını kontrol et.
+          İlerlemen kaydedilemiyor — internet bağlantını kontrol et. Bağlantı gelince otomatik kaydedilir.
         </div>
       )}
       {!orientationHintDismissed && (
@@ -563,33 +668,24 @@ export default function VideoPlayerPage() {
                 pageCount={activePdf.pageCount}
                 onPageChange={(page) => {
                   if (isReview) return;
-                  fetch(`/api/exam/${id}/videos`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ videoId: activePdf.id, currentPage: page }),
-                  }).catch(() => setHeartbeatErrors(prev => prev + 1));
+                  postVideoProgress({ videoId: activePdf.id, currentPage: page });
                 }}
                 onComplete={() => {
                   const vids = videosRef.current;
                   setLocalCompleted(prev => new Set(prev).add(activePdf.id));
                   videosRef.current = vids.map(v => v.id === activePdf.id ? { ...v, completed: true } : v);
                   if (isReview) return;
-                  fetch(`/api/exam/${id}/videos`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ videoId: activePdf.id, currentPage: activePdf.pageCount ?? 1, completed: true }),
-                  }).then(async res => {
-                    if (!res.ok) throw new Error('Server error');
-                    const data = await res.json();
-                    if (data.allVideosCompleted) {
-                      setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
-                    } else if (currentPdfIdx < pdfItems.length - 1) {
-                      setTimeout(() => setCurrentPdfIdx(currentPdfIdx + 1), 1200);
+                  postVideoProgress({ videoId: activePdf.id, currentPage: activePdf.pageCount ?? 1, completed: true }).then(result => {
+                    if (result.kind === 'ok') {
+                      if (result.data?.allVideosCompleted) {
+                        setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
+                      } else if (currentPdfIdx < pdfItems.length - 1) {
+                        setTimeout(() => setCurrentPdfIdx(currentPdfIdx + 1), 1200);
+                      }
+                    } else if (result.kind === 'transient') {
+                      setLocalCompleted(prev => { const next = new Set(prev); next.delete(activePdf.id); return next; });
+                      videosRef.current = vids;
                     }
-                  }).catch(() => {
-                    setLocalCompleted(prev => { const next = new Set(prev); next.delete(activePdf.id); return next; });
-                    videosRef.current = vids;
-                    setHeartbeatErrors(prev => prev + 1);
                   });
                 }}
               />
@@ -607,31 +703,22 @@ export default function VideoPlayerPage() {
                   lastPosition={currentVideo.lastPosition}
                   onProgress={(watchedTime, position) => {
                     if (isReview) return;
-                    fetch(`/api/exam/${id}/videos`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ videoId: currentVideo.id, watchedTime, position }),
-                    }).catch(() => setHeartbeatErrors(prev => prev + 1));
+                    postVideoProgress({ videoId: currentVideo.id, watchedTime, position });
                   }}
                   onComplete={() => {
                     const vids = videosRef.current;
                     setLocalCompleted(prev => new Set(prev).add(currentVideo.id));
                     videosRef.current = vids.map(v => v.id === currentVideo.id ? { ...v, completed: true } : v);
                     if (isReview) return;
-                    fetch(`/api/exam/${id}/videos`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ videoId: currentVideo.id, watchedTime: currentVideo.duration, position: currentVideo.duration, completed: true }),
-                    }).then(async res => {
-                      if (!res.ok) throw new Error('Server error');
-                      const data = await res.json();
-                      if (data.allVideosCompleted) {
-                        setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
+                    postVideoProgress({ videoId: currentVideo.id, watchedTime: currentVideo.duration, position: currentVideo.duration, completed: true }).then(result => {
+                      if (result.kind === 'ok') {
+                        if (result.data?.allVideosCompleted) {
+                          setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
+                        }
+                      } else if (result.kind === 'transient') {
+                        setLocalCompleted(prev => { const next = new Set(prev); next.delete(currentVideo.id); return next; });
+                        videosRef.current = vids;
                       }
-                    }).catch(() => {
-                      setLocalCompleted(prev => { const next = new Set(prev); next.delete(currentVideo.id); return next; });
-                      videosRef.current = vids;
-                      setHeartbeatErrors(prev => prev + 1);
                     });
                   }}
                 />
@@ -643,31 +730,22 @@ export default function VideoPlayerPage() {
                   pageCount={currentVideo.pageCount}
                   onPageChange={(page) => {
                     if (isReview) return;
-                    fetch(`/api/exam/${id}/videos`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ videoId: currentVideo.id, currentPage: page }),
-                    }).catch(() => setHeartbeatErrors(prev => prev + 1));
+                    postVideoProgress({ videoId: currentVideo.id, currentPage: page });
                   }}
                   onComplete={() => {
                     const vids = videosRef.current;
                     setLocalCompleted(prev => new Set(prev).add(currentVideo.id));
                     videosRef.current = vids.map(v => v.id === currentVideo.id ? { ...v, completed: true } : v);
                     if (isReview) return;
-                    fetch(`/api/exam/${id}/videos`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ videoId: currentVideo.id, currentPage: currentVideo.pageCount ?? 1, completed: true }),
-                    }).then(async res => {
-                      if (!res.ok) throw new Error('Server error');
-                      const data = await res.json();
-                      if (data.allVideosCompleted) {
-                        setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
+                    postVideoProgress({ videoId: currentVideo.id, currentPage: currentVideo.pageCount ?? 1, completed: true }).then(result => {
+                      if (result.kind === 'ok') {
+                        if (result.data?.allVideosCompleted) {
+                          setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
+                        }
+                      } else if (result.kind === 'transient') {
+                        setLocalCompleted(prev => { const next = new Set(prev); next.delete(currentVideo.id); return next; });
+                        videosRef.current = vids;
                       }
-                    }).catch(() => {
-                      setLocalCompleted(prev => { const next = new Set(prev); next.delete(currentVideo.id); return next; });
-                      videosRef.current = vids;
-                      setHeartbeatErrors(prev => prev + 1);
                     });
                   }}
                 />
@@ -706,7 +784,7 @@ export default function VideoPlayerPage() {
                         }
                       }}
                       onPlay={() => { setIsPlaying(true); setIsBuffering(false); }}
-                      onPause={() => setIsPlaying(false)}
+                      onPause={() => { setIsPlaying(false); flushVideoPosition(); }}
                       onPlaying={() => setIsBuffering(false)}
                       onEnded={handleVideoEnded}
                       onWaiting={() => {

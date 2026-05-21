@@ -212,4 +212,21 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       expect(prismaMock.videoProgress.upsert).not.toHaveBeenCalled()
     })
   })
+
+  describe('içerik silinme guard (E-2)', () => {
+    it('video silinmişse 404 döner — frontend bunu "içerik bulunamadı" olarak ayırt eder', async () => {
+      // Admin videoyu sınav ortasında sildi → trainingVideo.findUnique null.
+      prismaMock.trainingVideo.findUnique.mockResolvedValue(null)
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 30, position: 30 }),
+        { params: Promise.resolve({ id: 'assignment-1' }) },
+      )
+
+      expect(res.status).toBe(404)
+      const body = await res.json()
+      expect(body.error).toContain('bulunamadı')
+      expect(prismaMock.videoProgress.upsert).not.toHaveBeenCalled()
+    })
+  })
 })

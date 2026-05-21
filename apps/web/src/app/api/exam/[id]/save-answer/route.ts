@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { withStaffRoute } from '@/lib/api-handler'
+import { logger } from '@/lib/logger'
 
 /** Auto-save a single exam answer (called on each answer selection) */
 export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
@@ -55,6 +56,16 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       if (ageMs > GRACE_MS) {
         return errorResponse('Bu sorunun cevabı kilitlendi, değiştirilemez', 423)
       }
+    }
+    // Gözlemlenebilirlik: aynı soruya ~2sn içinde farklı bir cevap gelmesi, sınavın
+    // birden fazla sekmede açık olduğuna işaret edebilir (frontend tab-lock'a rağmen).
+    const sinceLastMs = Date.now() - new Date(existing.answeredAt).getTime()
+    if (sinceLastMs < 2_000 && existing.selectedOptionId !== body.selectedOptionId) {
+      logger.warn('SaveAnswer', 'Rapid answer overwrite — possible concurrent tab', {
+        attemptId: attempt.id,
+        questionId: body.questionId,
+        examPhase: body.examPhase,
+      })
     }
     await prisma.examAnswer.update({
       where: { id: existing.id },

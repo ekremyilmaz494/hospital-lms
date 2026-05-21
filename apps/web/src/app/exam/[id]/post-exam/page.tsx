@@ -4,7 +4,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Clock, ChevronRight, AlertTriangle, Lock, LogOut } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
+import { useExamTabLock } from '@/hooks/use-exam-tab-lock';
 import { PageLoading } from '@/components/shared/page-loading';
+import { ExamTabLocked } from '@/components/exam/exam-tab-locked';
 import { useToast } from '@/components/shared/toast';
 import { attemptPhaseRedirect, type AttemptStatus } from '@/lib/exam-state-machine';
 
@@ -47,6 +49,8 @@ export default function PostExamPage() {
   const [isExamOnly, setIsExamOnly] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Çoklu sekme kilidi — aynı denemenin iki sekmede cevaplanıp birbirini ezmesini önler.
+  const { status: tabLockStatus } = useExamTabLock(attemptId);
 
   useEffect(() => {
     if (examData?.questions) {
@@ -246,6 +250,8 @@ export default function PostExamPage() {
   }, [id, answers, examData, router, attemptId, tabSwitchCount]);
 
   handleFinishRef.current = handleFinish;
+
+  if (tabLockStatus === 'blocked') return <ExamTabLocked />;
 
   if (isLoading || !phaseChecked) return <PageLoading />;
 

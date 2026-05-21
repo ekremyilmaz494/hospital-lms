@@ -198,7 +198,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   if (!attempt) return errorResponse('Aktif video izleme aşaması bulunamadı', 400)
 
   const video = await prisma.trainingVideo.findUnique({ where: { id: body.videoId } })
-  if (!video) return errorResponse('Video not found', 404)
+  if (!video) return errorResponse('Video içeriği bulunamadı', 404)
 
   const isPdfContent = video.contentType === 'pdf'
   let watchedSeconds: number
