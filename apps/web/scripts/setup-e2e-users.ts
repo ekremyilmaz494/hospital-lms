@@ -8,6 +8,7 @@
  * Kullanım: pnpm tsx scripts/setup-e2e-users.ts
  */
 import 'dotenv/config'
+import { assertNotProduction } from './_guard'
 // .env.local'i de yükle (prisma import etmeden önce)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: '.env.local', override: true })
@@ -18,6 +19,11 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'product
   console.error('❌ E2E setup production ortamında çalıştırılamaz. NODE_ENV=development ile çalıştırın.')
   process.exit(1)
 }
+
+// PRODUCTION KORUMASI — NODE_ENV kontrolü zayıftır (NODE_ENV=test iken bile
+// DATABASE_URL prod projesine bakabilir). Bağlantı ref'ini doğrudan tarar.
+// CI bilinçli olarak --i-understand-production geçer (ci.yml e2e job).
+assertNotProduction('setup-e2e-users')
 
 // Erken hata: createAuthUser Supabase Admin client'ı kullanır; service role anahtarı
 // yoksa "supabaseKey is required" stack'iyle çöker (CI'da bu hata sebeple görüldü).

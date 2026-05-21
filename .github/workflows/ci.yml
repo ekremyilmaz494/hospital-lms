@@ -43,6 +43,11 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter web exec prisma generate
 
+      - name: Script guard check (yıkıcı scriptlerde production guard var mı?)
+        # 2026-05-20 incident sonrası: guard'sız bir wipe-*/seed-* scripti merge edilemez.
+        # Lint'ten ÖNCE konumlandı — hızlı, bağımsız Node kontrolü.
+        run: node apps/web/scripts/check-script-guards.mjs
+
       - name: Migration drift check (schema.prisma ↔ migrations senkron mu?)
         env:
           SHADOW_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_shadow  # secret-scanner-disable-line
@@ -128,7 +133,10 @@ jobs:
         run: npx wait-on http://localhost:3000 --timeout 90000
 
       - name: Setup E2E test users
-        run: pnpm --filter web exec tsx scripts/setup-e2e-users.ts
+        # --i-understand-production: E2E secret'ları henüz prod projesine bakıyor.
+        # Guard'ın bilinçli override'ı — CI kontrollü ortam. TODO: e2e'yi ayrı
+        # staging DB'ye taşı (incident önleme planı P0.1 / P1).
+        run: pnpm --filter web exec tsx scripts/setup-e2e-users.ts --i-understand-production
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
