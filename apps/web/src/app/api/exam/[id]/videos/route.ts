@@ -162,11 +162,17 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
     }
   }))
 
-  return jsonResponse({
-    trainingTitle: training.title,
-    attemptStatus,
-    videos: videoList,
-  })
+  // Video listesi izleme ilerlemesini (completed/lastPosition) içerir; aktif
+  // izleme sırasında değişir → kısa cache. pre_exam dalıyla aynı süre.
+  return jsonResponse(
+    {
+      trainingTitle: training.title,
+      attemptStatus,
+      videos: videoList,
+    },
+    200,
+    { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' },
+  )
 }, { requireOrganization: true })
 
 /** POST — Update video progress (heartbeat + completion) */
