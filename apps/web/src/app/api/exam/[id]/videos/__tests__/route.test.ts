@@ -21,6 +21,7 @@ const { prismaMock } = vi.hoisted(() => ({
     examAttempt: {
       findFirst: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     trainingVideo: {
       findUnique: vi.fn(),
@@ -108,6 +109,7 @@ beforeEach(() => {
 
   prismaMock.trainingVideo.findMany.mockResolvedValue([{ id: VIDEO_ID }])
   prismaMock.videoProgress.count.mockResolvedValue(0)
+  prismaMock.examAttempt.updateMany.mockResolvedValue({ count: 1 })
   prismaMock.videoProgress.upsert.mockImplementation((args: { update: Record<string, unknown> }) =>
     Promise.resolve({ id: 'progress-1', ...args.update }),
   )
@@ -227,6 +229,91 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       const body = await res.json()
       expect(body.error).toContain('bulunamadı')
       expect(prismaMock.videoProgress.upsert).not.toHaveBeenCalled()
+    })
+  })
+
+  /**
+   * Plan Faz 1, Adım 2 — durationSeconds güvenilmez olduğunda tamamlanma kapısı.
+   * Kök neden: video süresi yüklemede ölçülmüyordu; durationSeconds=0 iken
+   * `0 >= 0*0.80` her POST'ta true olup videoyu anında "tamamlandı" sayıyor,
+   * personeli video ortasında akıştan atıyordu. Bu testler hem 0-süre güvenli
+   * yolunu hem de normal (%80) yolun bozulmadığını kilitler.
+   */
+  describe('durationSeconds güvenilmez — tamamlanma kapısı (Plan Faz 1, Adım 2)', () => {
+    it('durationSeconds=0 + heartbeat (completed yok) → tamamlanmaz, ilerleme 0\'a clamp edilmez', async () => {
+      prismaMock.trainingVideo.findUnique.mockResolvedValue({
+        id: VIDEO_ID, durationSeconds: 0, contentType: 'video', pageCount: null,
+      })
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null)
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 120, position: 120 }),
+        { params: Promise.resolve({ id: 'assignment-1' }) },
+      )
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.allVideosCompleted).toBe(false)
+      const upsertArgs = prismaMock.videoProgress.upsert.mock.calls[0][0] as {
+        create: Record<string, unknown>
+      }
+      // Süre 0 olsa bile watched 0'a clamp EDİLMEZ — gerçek ilerleme korunur.
+      expect(upsertArgs.create.watchedSeconds).toBe(120)
+      expect(upsertArgs.create.isCompleted).toBe(false)
+      expect(prismaMock.examAttempt.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('durationSeconds=0 + completed:true (doğal bitiş) → tamamlanır', async () => {
+      prismaMock.trainingVideo.findUnique.mockResolvedValue({
+        id: VIDEO_ID, durationSeconds: 0, contentType: 'video', pageCount: null,
+      })
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null)
+      prismaMock.videoProgress.count.mockResolvedValue(1)
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 120, position: 120, completed: true }),
+        { params: Promise.resolve({ id: 'assignment-1' }) },
+      )
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.allVideosCompleted).toBe(true)
+      const upsertArgs = prismaMock.videoProgress.upsert.mock.calls[0][0] as {
+        create: Record<string, unknown>
+      }
+      expect(upsertArgs.create.isCompleted).toBe(true)
+    })
+
+    it('durationSeconds=300 (güvenilir) + %80 izleme → tamamlanır (regresyon: normal yol)', async () => {
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null)
+      prismaMock.videoProgress.count.mockResolvedValue(1)
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 240, position: 240 }),
+        { params: Promise.resolve({ id: 'assignment-1' }) },
+      )
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.allVideosCompleted).toBe(true)
+    })
+
+    it('durationSeconds=300 + completed:true ama izleme %80 altı → tamamlanmaz (anti-cheat korunur)', async () => {
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null)
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 30, position: 30, completed: true }),
+        { params: Promise.resolve({ id: 'assignment-1' }) },
+      )
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.allVideosCompleted).toBe(false)
+      const upsertArgs = prismaMock.videoProgress.upsert.mock.calls[0][0] as {
+        create: Record<string, unknown>
+      }
+      // Güvenilir sürede body.completed yok sayılır — server-side %80 hesabı uygulanır.
+      expect(upsertArgs.create.isCompleted).toBe(false)
     })
   })
 })

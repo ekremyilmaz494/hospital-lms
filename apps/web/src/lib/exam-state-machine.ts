@@ -37,6 +37,8 @@
  *
  *   Her non-terminal state'ten EXPIRED'a transition mümkün
  *   (admin training delete VEYA cron cleanup 24h+).
+ *   [pre_exam | post_exam] → COMPLETED ayrıca TIMEOUT ile mümkün
+ *   (sınav süresi doldu; deneme completed+failed sayılır, hak yanar).
  *
  * ──────────────────────────────────────────────────────────────────────
  * TRAINING ASSIGNMENT (atama bazlı):
@@ -85,6 +87,8 @@ export type AttemptEvent =
   | { type: 'PRE_EXAM_SUBMITTED' }
   | { type: 'VIDEOS_COMPLETED' }
   | { type: 'POST_EXAM_SUBMITTED' }
+  /** Sınav süresi doldu — pre/post fazındaki attempt completed+failed olur. */
+  | { type: 'TIMEOUT' }
   | { type: 'EXPIRE' }
 
 export type AssignmentEvent =
@@ -148,6 +152,16 @@ export function attemptNextStatus(
   if (event.type === 'POST_EXAM_SUBMITTED') {
     if (current !== 'post_exam') {
       return { ok: false, reason: `post_exam değil (${current}), post-exam submit kabul edilmez` }
+    }
+    return { ok: true, next: 'completed' }
+  }
+
+  if (event.type === 'TIMEOUT') {
+    // Sınav süresi doldu. EXPIRE'dan farkı: EXPIRE = terkedilmiş/stale attempt
+    // (cron 24h+, admin training delete) → `expired`. TIMEOUT = kullanıcı sınava
+    // girdi ama süre bitti → `completed` (deneme harcandı, isPassed=false route'ta).
+    if (current !== 'pre_exam' && current !== 'post_exam') {
+      return { ok: false, reason: `Sınav fazında değil (${current}), timeout kabul edilmez` }
     }
     return { ok: true, next: 'completed' }
   }
@@ -289,6 +303,8 @@ export function postEventRoute(event: AttemptEvent): ExamRoute {
       return 'transition' // → post-exam
     case 'POST_EXAM_SUBMITTED':
       return 'transition' // → my-trainings (sonuç + feedback)
+    case 'TIMEOUT':
+      return 'my-trainings' // süre doldu — eğitim listesine dön
     case 'EXPIRE':
       return 'my-trainings'
     default: {

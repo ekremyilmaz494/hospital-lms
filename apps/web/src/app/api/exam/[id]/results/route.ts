@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
+import { getEffectiveExamQuestions } from '@/lib/exam-helpers'
 
 /**
  * Post-exam soru bazlı sonuç dökümü — transition result ekranı için replay kaynağı.
@@ -30,7 +31,16 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
       status: true,
       postExamScore: true,
       attemptNumber: true,
-      training: { select: { passingScore: true, maxAttempts: true } },
+      training: {
+        select: {
+          passingScore: true,
+          maxAttempts: true,
+          // getEffectiveExamQuestions için — submit ile aynı subset hesabı.
+          examOnly: true,
+          randomizeQuestions: true,
+          randomQuestionCount: true,
+        },
+      },
       assignment: { select: { maxAttempts: true } },
     },
   })
@@ -49,7 +59,16 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
         status: true,
         postExamScore: true,
         attemptNumber: true,
-        training: { select: { passingScore: true, maxAttempts: true } },
+        training: {
+        select: {
+          passingScore: true,
+          maxAttempts: true,
+          // getEffectiveExamQuestions için — submit ile aynı subset hesabı.
+          examOnly: true,
+          randomizeQuestions: true,
+          randomQuestionCount: true,
+        },
+      },
         assignment: { select: { maxAttempts: true } },
       },
       orderBy: { attemptNumber: 'desc' },
@@ -83,12 +102,15 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     )
   }
 
-  // Submit response'uyla birebir aynı şekil için eğitimin TÜM sorularını çek, examAnswer'ı
-  // left-join olarak kullan. Boş bırakılan sorular selectedOptionText=null gelmeli; aksi halde
-  // transition ekranındaki "atlanmış" sayacı ve soru sırası submit anındakiyle tutarsız olur.
-  const [questions, answers] = await Promise.all([
+  // Submit response'uyla birebir aynı şekil + AYNI soru kümesi. examOnly +
+  // randomQuestionCount aktifken kullanıcı alt-küme görür; results TÜM soruları
+  // dökerse transition ekranındaki soru sayısı/sırası submit'le tutarsız olur.
+  // getEffectiveExamQuestions Fisher-Yates seed shuffle kullanır ve giriş
+  // sırasına bağımlıdır → findMany `orderBy: sortOrder` ŞART.
+  const [allQuestions, answers] = await Promise.all([
     prisma.question.findMany({
       where: { trainingId: attempt.trainingId },
+      orderBy: { sortOrder: 'asc' },
       select: {
         id: true,
         sortOrder: true,
@@ -101,6 +123,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
       select: { questionId: true, selectedOptionId: true },
     }),
   ])
+
+  // submit/route.ts ile aynı seed (attempt.id + 'post') → birebir aynı subset/sıra.
+  const questions = getEffectiveExamQuestions(allQuestions, attempt.training, attempt.id, 'post')
 
   const answerByQuestion = new Map(answers.map(a => [a.questionId, a.selectedOptionId]))
 

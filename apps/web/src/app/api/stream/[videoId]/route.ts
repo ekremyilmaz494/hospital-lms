@@ -27,7 +27,10 @@ export const GET = withStaffRoute<{ videoId: string }>(
     if (!video) throw new ApiError('İçerik bulunamadı', 404)
     if (video.training.organizationId !== organizationId) throw new ApiError('Yetkisiz', 403)
 
-    const key = video.videoKey || video.documentKey || video.videoUrl
+    // Canonical key kaynakları yalnız videoKey/documentKey. Ham `videoUrl`'ye
+    // fallback YOK — upload artığıdır, S3 Key olarak kullanılırsa NoSuchKey üretir
+    // (CLAUDE.md "Video URL Kuralı"; resolveTrainingVideoUrl de aynı sözleşmede).
+    const key = video.videoKey || video.documentKey
     if (!key || key.startsWith('/uploads')) {
       throw new ApiError('Dosya S3\'te bulunamadı', 404)
     }

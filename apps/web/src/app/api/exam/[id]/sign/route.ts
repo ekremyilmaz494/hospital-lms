@@ -8,7 +8,7 @@ interface SignBody {
 }
 
 /** POST /api/exam/[id]/sign — Personel sınav sonucu dijital imzası */
-export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, audit }) => {
+export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
   const { id: attemptId } = params
 
   const body = await parseBody<SignBody>(request)
@@ -32,9 +32,11 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Onay imzası "ACKNOWLEDGED" değerinde olmalıdır', 400)
   }
 
-  // Attempt'i bul — userId eşleşmeli
+  // Attempt'i bul — userId + organizationId eşleşmeli.
+  // (CLAUDE.md: her DB sorgusunda organizationId filtresi zorunlu — burada
+  // userId zaten sahipliği garantiliyor; organizationId savunma katmanı.)
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser.id },
+    where: { id: attemptId, userId: dbUser.id, organizationId },
     select: { id: true, isPassed: true, signedAt: true, trainingId: true },
   })
 
@@ -49,10 +51,13 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   const signatureIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
   const signedAt = new Date()
 
-  await prisma.examAttempt.update({
-    where: { id: attemptId },
+  // Atomik çift-imza koruması — yalnız henüz imzalanmamışken güncelle.
+  // findFirst'teki signedAt kontrolü ile update arasındaki yarışı kapatır.
+  const signed = await prisma.examAttempt.updateMany({
+    where: { id: attemptId, userId: dbUser.id, organizationId, signedAt: null },
     data: { signedAt, signatureData, signatureIp, signatureMethod },
   })
+  if (signed.count === 0) return errorResponse('Zaten imzalandı', 409)
 
   await audit({
     action: 'sign',

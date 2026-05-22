@@ -144,7 +144,12 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
           .map((v, idx) => {
             let url = v.url
             let ct = v.contentType || 'video'
-            let duration = v.durationSeconds || (ct === 'video' ? 300 : 0)
+            // Tahmini default (eski `|| 300`) KALDIRILDI: yanlış 300 sn süre,
+            // exam %80 tamamlanma eşiğini bozup personeli video ortasında
+            // "tamamlandı" sayıyordu. Süre yoksa 0 yazılır; exam route
+            // durationSeconds<=0'ı doğal-bitiş sinyaliyle güvenli ele alır.
+            // Video süresi artık upload sırasında ölçülüyor (upload-manager.tsx).
+            let duration = v.durationSeconds ?? 0
             const docKey = v.documentKey ?? null
             const pgCount = v.pageCount ?? null
             let videoTitle = v.title
@@ -165,7 +170,11 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
             return {
               trainingId: t.id,
               title: videoTitle || defaultTitle,
-              videoUrl: url,
+              // CLAUDE.md Video URL Kuralı: videoUrl upload artığıdır, kanonik
+              // kaynak videoKey'dir. Eskiden ham `url` İKİ alana da yazılıyordu;
+              // resolveTrainingVideoUrl videoKey'den signed URL üretir, videoUrl
+              // boş kalır. (Plan Faz 1, Adım 3.)
+              videoUrl: '',
               videoKey: url,
               durationSeconds: duration,
               contentType: ct,

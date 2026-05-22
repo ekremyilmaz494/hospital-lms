@@ -41,6 +41,18 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Yetkisiz erişim', 403)
   }
 
+  // Soru + şık üyelik doğrulaması — tek sorgu hem questionId'nin bu denemenin
+  // eğitimine ait olduğunu hem de selectedOptionId'nin o soruya ait olduğunu
+  // teyit eder. Aksi halde başka eğitim/soru ID'leriyle junk examAnswer kaydı
+  // yazılabilir (cross-training cevap kirliliği).
+  const question = await prisma.question.findFirst({
+    where: { id: body.questionId, trainingId: attempt.trainingId },
+    select: { options: { where: { id: body.selectedOptionId }, select: { id: true } } },
+  })
+  if (!question || question.options.length === 0) {
+    return errorResponse('Soru veya seçenek bu sınava ait değil', 400)
+  }
+
   // Upsert answer (attemptId + questionId + examPhase)
   const existing = await prisma.examAnswer.findFirst({
     where: { attemptId: attempt.id, questionId: body.questionId, examPhase: body.examPhase },

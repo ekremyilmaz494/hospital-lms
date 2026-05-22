@@ -142,6 +142,41 @@ describe('attemptNextStatus — EXPIRE', () => {
 })
 
 // ════════════════════════════════════════════════════════════════════
+// ATTEMPT — TIMEOUT (sınav süresi doldu — timer route'u kullanır)
+// ════════════════════════════════════════════════════════════════════
+
+describe('attemptNextStatus — TIMEOUT', () => {
+  it.each(['pre_exam', 'post_exam'] as const)(
+    '%s → completed (süre doldu, deneme harcandı)',
+    (status) => {
+      expect(attemptNextStatus(status, { type: 'TIMEOUT' })).toEqual({
+        ok: true, next: 'completed',
+      })
+    },
+  )
+
+  it('watching_videos → timeout reddedilir (video fazında timer yok)', () => {
+    expect(attemptNextStatus('watching_videos', { type: 'TIMEOUT' }).ok).toBe(false)
+  })
+
+  it.each(['completed', 'expired'] as const)(
+    'terminal (%s) → timeout reddedilir',
+    (status) => {
+      expect(attemptNextStatus(status, { type: 'TIMEOUT' }).ok).toBe(false)
+    },
+  )
+
+  it('TIMEOUT completed üretir, EXPIRE ise expired — ikisi farklı semantik', () => {
+    // TIMEOUT = sınava girilip süre doldu (completed+failed).
+    // EXPIRE  = stale/terkedilmiş attempt (expired). Karıştırılmamalı.
+    const timeout = attemptNextStatus('post_exam', { type: 'TIMEOUT' })
+    const expire = attemptNextStatus('post_exam', { type: 'EXPIRE' })
+    expect(timeout).toEqual({ ok: true, next: 'completed' })
+    expect(expire).toEqual({ ok: true, next: 'expired' })
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════
 // ASSIGNMENT
 // ════════════════════════════════════════════════════════════════════
 
@@ -320,6 +355,10 @@ describe('postEventRoute', () => {
 
   it('EXPIRE → my-trainings', () => {
     expect(postEventRoute({ type: 'EXPIRE' })).toBe('my-trainings')
+  })
+
+  it('TIMEOUT → my-trainings', () => {
+    expect(postEventRoute({ type: 'TIMEOUT' })).toBe('my-trainings')
   })
 })
 

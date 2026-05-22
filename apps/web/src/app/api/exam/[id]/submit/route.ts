@@ -60,7 +60,31 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   }
 
   if (!attempt) return errorResponse('Aktif sınav denemesi bulunamadı. Sınavı yeniden başlatın.', 404)
-  if (attempt.status === 'completed') return errorResponse('Bu deneme zaten tamamlanmış', 400)
+
+  // ── Idempotent replay ────────────────────────────────────────────────────
+  // Çift submit (çift tıklama, retry, ağ tekrarı) 400 yerine KAYITLI sonucu
+  // dönmeli — aksi halde sonuç ekranı sahte "zaten tamamlanmış" hatası gösterir.
+  // Eski `status==='completed' → 400`, alttaki `alreadyScored` idempotency
+  // bloğunu faz guard'ları yüzünden tamamen ulaşılamaz (ölü kod) bırakıyordu.
+  if (attempt.status === 'completed') {
+    const eff = attempt.assignment.maxAttempts ?? attempt.training.maxAttempts
+    return jsonResponse({
+      phase: 'post',
+      score: attempt.postExamScore !== null ? Number(attempt.postExamScore) : 0,
+      isPassed: attempt.isPassed ?? false,
+      passingScore: attempt.training.passingScore,
+      attemptsRemaining: attempt.isPassed ? 0 : Math.max(0, eff - attempt.attemptNumber),
+    })
+  }
+  // Pre-exam zaten gönderilmiş (status pre_exam'dan ilerlemiş) ve client yine
+  // 'pre' submit ediyorsa kayıtlı pre skorunu idempotent dön.
+  if (
+    parsed.data.phase === 'pre' &&
+    attempt.status !== 'pre_exam' &&
+    attempt.preExamScore !== null
+  ) {
+    return jsonResponse({ phase: 'pre', score: Number(attempt.preExamScore), nextStep: 'videos' })
+  }
 
   // Phase transition validation — ensure attempt status matches the submitted phase
   const attemptStatus = attempt.status as AttemptStatus
@@ -191,37 +215,29 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
         })
     : undefined
 
-  // Idempotency: eger bu faz icin skor zaten hesaplanmissa tekrar isleme
-  const alreadyScored = phase === 'pre' ? attempt.preExamScore !== null : attempt.postExamScore !== null
-  if (alreadyScored) {
-    if (phase === 'pre') {
-      return jsonResponse({ phase: 'pre', score: Number(attempt.preExamScore), nextStep: 'videos' })
-    }
-    return jsonResponse({ phase: 'post', score: Number(attempt.postExamScore), isPassed: attempt.isPassed, passingScore: attempt.training.passingScore })
-  }
-
-  // Onceden auto-save ile kaydedilmis cevaplari sil ve yenilerini yaz
-  await prisma.examAnswer.deleteMany({
-    where: { attemptId: attempt.id, examPhase: phase }
-  })
-
-  // Save final answers with isCorrect
-  if (validAnswers.length > 0) {
-    await prisma.examAnswer.createMany({ data: validAnswers })
-  }
-
-  // Update attempt based on phase — atomic status guard prevents double-submit race condition
+  // ── Skor yazımı — TEK transaction ────────────────────────────────────────
+  // Eskiden examAnswer.deleteMany / createMany / examAttempt.updateMany ayrı
+  // await'lerdi: deleteMany ile createMany arasında bir çökme personelin
+  // cevaplarını kalıcı siliyordu. Artık hepsi tek transaction'da.
+  // CAS (status-filtreli updateMany) transaction'ın İLK adımı — yarışı
+  // kaybeden eşzamanlı istek hiçbir yazma yapmadan (raced=true) çıkar.
   if (phase === 'pre') {
     const preTransition = attemptNextStatus(attemptStatus, { type: 'PRE_EXAM_SUBMITTED' })
     if (!preTransition.ok) {
       return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
     }
-    const updated = await prisma.examAttempt.updateMany({
-      where: { id: attempt.id, status: 'pre_exam' satisfies AttemptStatus },
-      data: { preExamScore: score, preExamCompletedAt: new Date(), status: preTransition.next },
+    const raced = await prisma.$transaction(async (tx) => {
+      const updated = await tx.examAttempt.updateMany({
+        where: { id: attempt.id, status: 'pre_exam' satisfies AttemptStatus },
+        data: { preExamScore: score, preExamCompletedAt: new Date(), status: preTransition.next },
+      })
+      if (updated.count === 0) return true // yarış kaybedildi — yazma yapma
+      await tx.examAnswer.deleteMany({ where: { attemptId: attempt.id, examPhase: phase } })
+      if (validAnswers.length > 0) await tx.examAnswer.createMany({ data: validAnswers })
+      return false
     })
-    if (updated.count === 0) {
-      // Concurrent request already processed this submission
+    if (raced) {
+      // Eşzamanlı istek zaten işledi — kayıtlı skoru idempotent dön.
       return jsonResponse({ phase: 'pre', score: Number(attempt.preExamScore ?? score), nextStep: 'videos' })
     }
     await clearExamTimer(attempt.id)
@@ -243,16 +259,6 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
   }
 
-  const updated = await prisma.examAttempt.updateMany({
-    where: { id: attempt.id, status: 'post_exam' satisfies AttemptStatus },
-    data: { postExamScore: score, postExamCompletedAt: new Date(), isPassed, status: postTransition.next },
-  })
-  if (updated.count === 0) {
-    // Concurrent request already completed this attempt
-    return jsonResponse({ phase: 'post', score: Number(attempt.postExamScore ?? score), isPassed: attempt.isPassed ?? isPassed, passingScore: attempt.training.passingScore })
-  }
-
-  // Timer + assignment update: her ikisi updateMany'den bağımsız, parallel çalışabilir
   const effectiveMaxAttempts = attempt.assignment.maxAttempts ?? attempt.training.maxAttempts
   const assignmentEvent = isPassed
     ? ({ type: 'POST_EXAM_PASSED' } as const)
@@ -265,16 +271,33 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Atama durumu güncellenemedi: geçersiz durum geçişi', 400)
   }
 
-  await Promise.all([
-    clearExamTimer(attempt.id),
-    prisma.trainingAssignment.update({
+  // Skor + cevaplar + assignment durumu TEK transaction'da: biri başarısız
+  // olursa hepsi geri alınır — attempt 'completed' ama assignment durumu
+  // eski kalmaz. CAS ilk adım: yarışı kaybeden istek yazma yapmaz.
+  const raced = await prisma.$transaction(async (tx) => {
+    const updated = await tx.examAttempt.updateMany({
+      where: { id: attempt.id, status: 'post_exam' satisfies AttemptStatus },
+      data: { postExamScore: score, postExamCompletedAt: new Date(), isPassed, status: postTransition.next },
+    })
+    if (updated.count === 0) return true
+    await tx.examAnswer.deleteMany({ where: { attemptId: attempt.id, examPhase: phase } })
+    if (validAnswers.length > 0) await tx.examAnswer.createMany({ data: validAnswers })
+    await tx.trainingAssignment.update({
       where: { id: attempt.assignmentId },
       data: {
         status: assignmentTransition.next,
         ...(isPassed && { completedAt: new Date() }),
       },
-    }),
-  ])
+    })
+    return false
+  })
+  if (raced) {
+    // Eşzamanlı istek zaten tamamladı — kayıtlı sonucu idempotent dön.
+    return jsonResponse({ phase: 'post', score: Number(attempt.postExamScore ?? score), isPassed: attempt.isPassed ?? isPassed, passingScore: attempt.training.passingScore })
+  }
+
+  // Redis timer — transaction dışında (Prisma transaction'a giremez).
+  await clearExamTimer(attempt.id)
 
   const tabSwitchCount = parsed.data.tabSwitchCount ?? 0
   const suspicious = tabSwitchCount >= 3
