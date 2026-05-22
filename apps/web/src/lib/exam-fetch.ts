@@ -14,7 +14,9 @@
 /**
  * Bir POST yanıtının anlamı:
  * - `ok`              — başarılı (2xx, 204 dahil).
- * - `transient`       — geçici hata: ağ kopması, abort, 5xx, 429. Retry edilebilir.
+ * - `transient`       — geçici hata: ağ kopması, DNS, 5xx, 429. Retry edilebilir.
+ * - `aborted`         — istek iptal edildi (controller.abort veya tarayıcı iptali).
+ *                       Bir hata DEĞİL: retry edilmez, kullanıcıya bildirilmez.
  * - `session-expired` — 401: oturum doldu. Login'e yönlendirilmeli.
  * - `phase-invalid`   — 400: attempt artık beklenen fazda değil (silinmiş/expire/ilerlemiş).
  * - `content-gone`    — 404: istenen içerik (video/soru) artık mevcut değil.
@@ -23,6 +25,7 @@
 export type ExamPostResultKind =
   | 'ok'
   | 'transient'
+  | 'aborted'
   | 'session-expired'
   | 'phase-invalid'
   | 'content-gone'
@@ -42,6 +45,21 @@ export function isFatalExamPostKind(kind: ExamPostResultKind): boolean {
 }
 
 /**
+ * Bir hata nesnesinin bir `fetch` iptali (`AbortError`) olup olmadığını söyler.
+ *
+ * Hem `DOMException` (tarayıcı `fetch`'i) hem de bazı runtime'ların düz `Error`
+ * olarak fırlattığı `AbortError`'u kapsar — tek ölçüt `name === 'AbortError'`.
+ */
+function isAbortError(input: unknown): boolean {
+  return (
+    typeof input === 'object' &&
+    input !== null &&
+    'name' in input &&
+    (input as { name?: unknown }).name === 'AbortError'
+  )
+}
+
+/**
  * Bir `fetch` sonucunu (`Response`) veya `fetch`'in fırlattığı hatayı `ExamPostResultKind`'e
  * çevirir.
  *
@@ -49,8 +67,14 @@ export function isFatalExamPostKind(kind: ExamPostResultKind): boolean {
  * @returns İsteğin anlamlı sınıfı.
  */
 export function classifyExamPostResult(input: Response | unknown): ExamPostResultKind {
-  // fetch throw etti → ağ kopması / abort / DNS — her durumda geçici kabul edilir.
-  if (!(input instanceof Response)) return 'transient'
+  if (!(input instanceof Response)) {
+    // fetch throw etti. İPTAL (AbortError) ile GERÇEK ağ hatası ayrı sınıflardır:
+    // iptal — duraklatma/sayfa geçişi/sekme değişimi sonucu bizim ya da tarayıcının
+    // isteği öldürmesi — bir bağlantı sorunu değildir, retry edilmez ve kullanıcıya
+    // "internetini kontrol et" gösterilmez. Yalnız gerçek ağ kopması 'transient'tır.
+    if (isAbortError(input)) return 'aborted'
+    return 'transient'
+  }
 
   const status = input.status
   if (status >= 200 && status < 300) return 'ok'
@@ -115,6 +139,7 @@ function withJitter(base: number): number {
  *
  * Davranış:
  * - Başarılı (2xx) → `{ kind: 'ok', data }` (204'te `data: null`).
+ * - İptal (AbortError) → retry YAPILMADAN hemen `{ kind: 'aborted' }` döner.
  * - Kalıcı hata (401/400/404/423) → retry YAPILMADAN hemen döner.
  * - Geçici hata (ağ/5xx/429) → `backoff` ile `retries` kez tekrar; tükenince `transient` döner.
  *
@@ -135,7 +160,9 @@ export async function postWithRetry<T = unknown>(
   let lastTransient: ExamPostResult<T> = { kind: 'transient', status: null, data: null }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    if (signal?.aborted) return lastTransient
+    // Signal zaten abort olmuşsa istek hiç gönderilmez — bu bir hata değil,
+    // 'aborted' döner ki çağıran kullanıcıya banner göstermesin.
+    if (signal?.aborted) return { kind: 'aborted', status: null, data: null }
 
     let kind: ExamPostResultKind
     let status: number | null = null
@@ -160,6 +187,11 @@ export async function postWithRetry<T = unknown>(
         ? ((await res.json().catch(() => null)) as T | null)
         : null
       return { kind, status, data }
+    }
+
+    // İptal edilen istek — retry edilmez, çağırana sessizce 'aborted' döner.
+    if (kind === 'aborted') {
+      return { kind, status: null, data: null }
     }
 
     if (isFatalExamPostKind(kind)) {
