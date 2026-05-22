@@ -84,6 +84,17 @@ export function AudioPlayer({
     }
   }, [onComplete])
 
+  // İlerlemeyi hemen kaydet — video oynatıcının flushVideoPosition deseni.
+  // Heartbeat 15sn'de bir; pause/sekme gizleme/sayfa kapanması anlarında bu
+  // çağrılmazsa son ≤15sn ilerleme kaybolur. onProgress parent'a iletir; parent
+  // review modunda zaten no-op yapar (ekstra review kontrolü gerekmez).
+  const flushProgress = useCallback(() => {
+    const audio = audioRef.current
+    if (audio && audio.currentTime > 0) {
+      onProgress(audio.currentTime, lastAllowedTime.current)
+    }
+  }, [onProgress])
+
   const togglePlay = useCallback(() => {
     const audio = audioRef.current
     if (!audio) return
@@ -118,16 +129,33 @@ export function AudioPlayer({
     }
   }, [isMuted])
 
-  // Sekme degistiginde sesi durdur — personel baska sekmede oyalanmasin
+  // Sekme degistiginde sesi durdur — personel baska sekmede oyalanmasin.
+  // Durdurduktan sonra ilerlemeyi hemen flush et (heartbeat'i bekleme).
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.hidden && audioRef.current && !audioRef.current.paused) {
-        audioRef.current.pause()
+      if (document.hidden) {
+        if (audioRef.current && !audioRef.current.paused) {
+          audioRef.current.pause()
+        }
+        flushProgress()
       }
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
+  }, [flushProgress])
+
+  // Sayfa kapatma / arka plana atma — pagehide (iOS Safari, bfcache uyumlu) ve
+  // beforeunload anlarında ilerlemeyi flush et. Component unmount'ında da çağrılır:
+  // SPA navigasyonu (router.push / Link tıkı) pagehide tetiklemez.
+  useEffect(() => {
+    window.addEventListener('pagehide', flushProgress)
+    window.addEventListener('beforeunload', flushProgress)
+    return () => {
+      flushProgress()
+      window.removeEventListener('pagehide', flushProgress)
+      window.removeEventListener('beforeunload', flushProgress)
+    }
+  }, [flushProgress])
 
   // Heartbeat — 15 saniyede bir onProgress çağır
   useEffect(() => {
@@ -253,7 +281,7 @@ export function AudioPlayer({
           onEnded={handleEnded}
           onSeeking={handleSeeking}
           onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
+          onPause={() => { setIsPlaying(false); flushProgress() }}
         />
       </div>
 

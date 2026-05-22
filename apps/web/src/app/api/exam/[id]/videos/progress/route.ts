@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { updateVideoProgressSchema } from '@/lib/validations'
 import { checkRateLimit } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 import { attemptNextStatus, type AttemptStatus } from '@/lib/exam-state-machine'
 
 /** Update video watch progress */
@@ -39,17 +40,45 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   })
   if (!video) return errorResponse('Video bulunamadı veya bu sınava ait değil', 404)
 
+  // Duvar-saati tavanı (K1 yansıması) — videos/route.ts ile aynı anti-cheat.
+  // İstemci watchedSeconds'ı doğrudan gönderiyor; tavan olmadan ilk POST'ta tam
+  // süre gönderip videoyu tek seferde tamamlatabilir. preExamCompletedAt'tan bu
+  // yana geçen gerçek süreyi %150 + 30sn tolerans ile cap'liyoruz. preExam henüz
+  // bitmemişse (null) yalnız 30sn izin verilir.
+  const maxWatchable = attempt.preExamCompletedAt
+    ? ((Date.now() - new Date(attempt.preExamCompletedAt).getTime()) / 1000) * 1.5 + 30
+    : 30
+  const wallCappedWatchedSeconds = Math.min(parsed.data.watchedSeconds, Math.floor(maxWatchable))
+
   // watchedSeconds & lastPositionSeconds: video suresiyle sinirla
-  const safeWatchedSeconds = Math.min(parsed.data.watchedSeconds, video.durationSeconds)
+  const safeWatchedSeconds = Math.min(wallCappedWatchedSeconds, video.durationSeconds)
   const safeLastPosition = Math.min(Math.max(parsed.data.lastPositionSeconds, 0), video.durationSeconds)
 
   // Onceki ilerlemeyi kontrol et (geri sarma engelleme)
   const existing = await prisma.videoProgress.findUnique({ // perf-check-disable-line
     where: { attemptId_videoId: { attemptId, videoId: body.videoId } },
   })
-  const finalWatchedSeconds = existing
+  let finalWatchedSeconds = existing
     ? Math.max(safeWatchedSeconds, existing.watchedSeconds)
     : safeWatchedSeconds
+
+  // İzleme hızı denetimi — videos/route.ts'teki desenle aynı. watchedSeconds
+  // mevcut değerden, son güncellemeden bu yana geçen duvar-saati süresinin
+  // %150'sinden + 5sn buffer'dan fazla artamaz (heartbeat jitter toleransı).
+  if (existing) {
+    const wallDelta = (Date.now() - existing.updatedAt.getTime()) / 1000
+    const requestedDelta = finalWatchedSeconds - existing.watchedSeconds
+    const maxDelta = wallDelta * 1.5 + 5
+    if (requestedDelta > maxDelta) {
+      logger.warn('VideoProgress', 'Suspicious watch rate', {
+        attemptId,
+        videoId: body.videoId,
+        requestedDelta,
+        maxDelta,
+      })
+      finalWatchedSeconds = existing.watchedSeconds + Math.floor(maxDelta)
+    }
+  }
   // lastPositionSeconds için de geri-gitme koruması — stale sendBeacon (network
   // gecikmesi sonrası gelen pagehide) yüksek pozisyonu sıfırlamasın. Resume
   // bug'ı bu olmadan iki yazımın race'inde yine ortaya çıkar.
@@ -57,9 +86,16 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     ? Math.max(safeLastPosition, existing.lastPositionSeconds)
     : safeLastPosition
 
-  // Minimum %80 izleme zorunlu — 1 saniye açıp kapatma engellenir
-  const MIN_WATCH_PERCENT = 0.80
-  const isCompleted = finalWatchedSeconds >= (video.durationSeconds * MIN_WATCH_PERCENT)
+  // Minimum %95 izleme zorunlu — videos/route.ts ile aynı eşik.
+  const MIN_WATCH_PERCENT = 0.95
+  // Sıfır süre koruması: durationSeconds<=0 (ölçülememiş eski/bozuk kayıt) iken
+  // 0 >= 0*0.95 her POST'ta true olup videoyu ilk istekte tamamlardı. Süre
+  // güvenilir değilse tamamlanma verilmez — bu route'ta açık bir bitiş sinyali
+  // (onended) yok, dolayısıyla durationSeconds<=0 iken isCompleted=false kalır.
+  const hasReliableDuration = video.durationSeconds > 0
+  const isCompleted = hasReliableDuration
+    ? finalWatchedSeconds >= (video.durationSeconds * MIN_WATCH_PERCENT)
+    : false
 
   const progress = await prisma.videoProgress.upsert({ // perf-check-disable-line
     where: { attemptId_videoId: { attemptId, videoId: body.videoId } },
@@ -82,19 +118,22 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   })
 
   // Check if all videos are completed
-  const [allVideos, completedVideos] = await Promise.all([
-    prisma.trainingVideo.findMany({
-      where: { trainingId: attempt.trainingId },
-      select: { id: true },
-    }),
-    prisma.videoProgress.count({
-      where: { attemptId, isCompleted: true },
-    }),
-  ])
+  // PDF içerikler opsiyoneldir — son sınava geçiş yalnızca video/ses tamamlanma
+  // şartına bağlı (videos/route.ts ile aynı). PDF'leri sayıma katma. completedVideos
+  // sayımı da yalnız bu non-PDF video kümesine scope'lanır (PDF tamamlanması
+  // sayıma sızıp transition'ı erken tetiklemesin).
+  const allVideos = await prisma.trainingVideo.findMany({
+    where: { trainingId: attempt.trainingId, contentType: { not: 'pdf' } },
+    select: { id: true },
+  })
 
   if (allVideos.length === 0) {
     return errorResponse('Bu eğitime henüz video eklenmemiş.')
   }
+
+  const completedVideos = await prisma.videoProgress.count({
+    where: { attemptId, isCompleted: true, videoId: { in: allVideos.map(v => v.id) } },
+  })
 
   const allDone = completedVideos >= allVideos.length
 
