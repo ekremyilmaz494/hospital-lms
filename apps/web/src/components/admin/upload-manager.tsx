@@ -168,21 +168,30 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         } catch { /* ignore — sayfa sayısı opsiyonel */ }
       }
 
-      // Audio süresi tespiti
+      // Video/ses süresi tespiti — sınav video tamamlanma kapısı (%80 izleme)
+      // bu süreye dayanır. Eskiden YALNIZ 'audio' ölçülüyordu; 'video' süresi
+      // ölçülmeden kaydolup downstream tahmini default'lar (publish → 300 sn)
+      // tamamlanma eşiğini bozuyordu — personel video ortasında "tamamlandı"
+      // sayılıp akıştan atılıyordu. (Plan Faz 1, Adım 1.)
       let durationSeconds: number | undefined;
-      if (kind === 'audio') {
+      if (kind === 'audio' || kind === 'video') {
         try {
           durationSeconds = await new Promise<number>((resolve, reject) => {
             const url = URL.createObjectURL(file);
-            const audio = new Audio(url);
-            audio.onloadedmetadata = () => {
-              const d = Math.round(audio.duration);
+            const media: HTMLMediaElement = kind === 'video'
+              ? document.createElement('video')
+              : new Audio();
+            media.preload = 'metadata';
+            media.onloadedmetadata = () => {
+              const d = Math.round(media.duration);
               URL.revokeObjectURL(url);
-              resolve(Number.isFinite(d) ? d : 0);
+              // Sonlu ve pozitif değilse 0 dön — downstream guard 0'ı güvenli ele alır.
+              resolve(Number.isFinite(d) && d > 0 ? d : 0);
             };
-            audio.onerror = () => { URL.revokeObjectURL(url); reject(new Error('audio meta')); };
+            media.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`${kind} meta`)); };
+            media.src = url;
           });
-        } catch { /* ignore */ }
+        } catch { /* ignore — süre opsiyonel; downstream guard 0'ı ele alır */ }
       }
 
       if (canceledIds.current.has(uploadId)) return; // PDF/audio meta tespiti sırasında iptal de mümkün

@@ -4,7 +4,7 @@ import { withStaffRoute } from '@/lib/api-handler'
 import { getActiveOrLatestAttemptStatus } from '@/lib/exam-helpers'
 import { resolveTrainingVideoUrl, resolveTrainingDocumentUrl } from '@/lib/training-video-url'
 import { logger } from '@/lib/logger'
-import type { AttemptStatus, AssignmentStatus } from '@/lib/exam-state-machine'
+import { attemptNextStatus, type AttemptStatus, type AssignmentStatus } from '@/lib/exam-state-machine'
 
 export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
   const { id } = params
@@ -213,12 +213,20 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     lastPositionSeconds = currentPage
     isCompleted = body.completed === true || currentPage >= totalPages
   } else {
-    // Video: body.completed'i KALDIR, sadece watchedSeconds güven (anti-cheat).
-    // Personel native controls ile ileri sarıp completion field'ı set etse bile
-    // server-side hesaplama 80% eşiğini uygular.
+    // Video tamamlanma kapısı %80 izleme eşiğine dayanır; eşik video süresinden
+    // hesaplanır. Süre GÜVENİLİR ise (durationSeconds>0) eski davranış aynen
+    // korunur: body.completed yok sayılır, server-side %80 hesabı uygulanır
+    // (anti-cheat). Süre GÜVENİLMEZSE (durationSeconds<=0 — ölçülememiş eski/bozuk
+    // kayıt) 0*0.8=0 eşiği videoyu İLK POST'ta "tamamlandı" sayıp personeli
+    // akıştan atıyordu; bu durumda tamamlanma yalnız doğal bitiş sinyaliyle
+    // (onended → completed:true) verilir ve ilerleme 0'a clamp edilmez.
+    // (Plan Faz 1, Adım 2.)
+    const hasReliableDuration = video.durationSeconds > 0
+    const durationCap = hasReliableDuration ? video.durationSeconds : Number.MAX_SAFE_INTEGER
+
     const requestedWatched = Math.min(
       Math.max(Math.round(body.watchedTime ?? body.position ?? 0), 0),
-      video.durationSeconds,
+      durationCap,
     )
 
     // Geri sarma protection — videos/progress/route.ts'teki davranışı kopyala
@@ -248,7 +256,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
 
     const requestedPosition = Math.min(
       Math.max(Math.round(body.position ?? 0), 0),
-      video.durationSeconds,
+      durationCap,
     )
     // Stale beacon koruması: geç gelen pagehide/unmount sendBeacon (network gecikmesi
     // sonrası) yüksek bir pozisyonu geri sarmasın. watchedSeconds zaten Math.max ile
@@ -259,9 +267,12 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     lastPositionSeconds = existing
       ? Math.max(requestedPosition, existing.lastPositionSeconds)
       : requestedPosition
-    // 80% kural — /videos/progress ile aynı eşik
+    // %80 kural — yalnız güvenilir süre varsa (/videos/progress ile aynı eşik).
+    // Süre yoksa doğal bitiş sinyalini (onended → body.completed) tek ölçüt al.
     const MIN_WATCH_PERCENT = 0.80
-    isCompleted = watchedSeconds >= (video.durationSeconds * MIN_WATCH_PERCENT)
+    isCompleted = hasReliableDuration
+      ? watchedSeconds >= (video.durationSeconds * MIN_WATCH_PERCENT)
+      : body.completed === true
   }
 
   // Upsert video progress
@@ -300,11 +311,17 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     })
 
     if (requiredVideos.length > 0 && completedCount >= requiredVideos.length) {
-      await prisma.examAttempt.update({
-        where: { id: attempt.id },
-        data: { videosCompletedAt: new Date(), status: 'post_exam', postExamStartedAt: new Date() },
+      // State machine ile doğrula: watching_videos → post_exam (VIDEOS_COMPLETED).
+      const transition = attemptNextStatus(attempt.status as AttemptStatus, { type: 'VIDEOS_COMPLETED' })
+      if (!transition.ok) return errorResponse(transition.reason, 400)
+      // Atomik guard: yalnız hâlâ watching_videos iken güncelle. Doğrudan update
+      // yerine status-filtreli updateMany — cron expire ya da başka bir POST
+      // attempt'i terminal/post_exam yaptıysa geri açma (/videos/progress deseni).
+      const advanced = await prisma.examAttempt.updateMany({
+        where: { id: attempt.id, status: 'watching_videos' satisfies AttemptStatus },
+        data: { videosCompletedAt: new Date(), status: transition.next, postExamStartedAt: new Date() },
       })
-      return jsonResponse({ progress: true, allVideosCompleted: true })
+      return jsonResponse({ progress: true, allVideosCompleted: advanced.count > 0 })
     }
   }
 
