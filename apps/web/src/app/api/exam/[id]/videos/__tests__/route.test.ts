@@ -568,11 +568,14 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
   })
 
   /**
-   * Y4 — read-compute-write race koruması. Route artık $transaction +
-   * pg_advisory_xact_lock kullanır.
+   * Y4 — read-compute-write race koruması. Route progress yazımını tek bir
+   * $transaction içinde yapar (find + compute + upsert atomik). Eski
+   * pg_advisory_xact_lock ham sorgusu Supabase'de P2010 fırlatıp endpoint'i
+   * tamamen 500'e düşürdüğü için kaldırıldı; geri-gitme koruması Math.max
+   * guard'larında.
    */
   describe('Y4 — atomik progress yazımı', () => {
-    it('progress yazımı $transaction içinde yapılır ve advisory lock alınır', async () => {
+    it('progress yazımı $transaction içinde yapılır', async () => {
       prismaMock.videoProgress.findUnique.mockResolvedValue(null)
 
       const res = await POST(
@@ -582,8 +585,6 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
 
       expect(res.status).toBe(200)
       expect(prismaMock.$transaction).toHaveBeenCalledOnce()
-      // advisory lock SELECT'i transaction içinde çalışmalı.
-      expect(prismaMock.$queryRaw).toHaveBeenCalled()
     })
   })
 })
