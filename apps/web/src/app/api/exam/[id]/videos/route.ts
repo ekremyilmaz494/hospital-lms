@@ -228,23 +228,27 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
 
   const isPdfContent = video.contentType === 'pdf'
 
-  // Y4 — read-compute-write race koruması. videoProgress satırını oku +
-  // hesapla + yaz adımları atomik değildi; eşzamanlı iki POST düşük
-  // watchedSeconds/lastPositionSeconds'ı sonradan yazıp ilerlemeyi geriye
-  // düşürebilirdi (Math.max sadece TEK request içinde korur, race'te değil).
-  // Çözüm: tüm read-compute-write'ı $transaction'a al ve attemptId+videoId
-  // üzerinden transaction-scoped advisory lock ile serileştir. Advisory lock,
-  // satır henüz yokken bile (ilk POST) seri çalışmayı garanti eder —
-  // SELECT FOR UPDATE eksik satırda hiçbir şey kilitlemez. Lock transaction
-  // sonunda otomatik bırakılır.
+  // Y4 — read-compute-write race koruması. Tüm read-compute-write tek bir
+  // $transaction içinde yapılır; aşağıdaki Math.max guard'ları
+  // watchedSeconds/lastPositionSeconds'ın geriye gitmesini engeller.
+  //
+  // NOT (P0 düzeltmesi — 2026-05-22): Burada eskiden `tx.$queryRaw` ile
+  // `pg_advisory_xact_lock` çağrılıp transaction-scoped bir advisory lock
+  // alınıyordu. O ham SQL, Supabase + Prisma driver-adapter ortamında HER
+  // POST'ta P2010 "Raw query failed" fırlatıp /api/exam/[id]/videos
+  // endpoint'ini tamamen 500'e düşürdü — personelin video ilerlemesi hiç
+  // kaydedilemedi. Advisory lock kaldırıldı. Kalan koruma yeterli:
+  //   - $transaction find+upsert'i atomik tutar.
+  //   - Math.max guard'ları ilerlemeyi geri gitmekten korur (nadir bir
+  //     race'te değer birkaç saniye bayatlayabilir; sonraki 15sn heartbeat
+  //     düzeltir).
+  //   - isCompleted bir kez true olunca upsert update spread'i onu asla
+  //     geri almaz (yalnız `&& { isCompleted: true }` ekler).
+  // Cross-request serileştirme ileride gerçekten gerekirse `$queryRaw` ile
+  // DEĞİL — void sonucu deserialize edilmediği için — `$executeRaw` ile
+  // eklenmeli ve Supabase'de doğrulanmalı.
   const { isCompleted } = await prisma.$transaction(async (tx) => {
-    // attemptId + videoId çiftine özgü transaction-scoped advisory lock.
-    // hashtext() her UUID metnini int4'e çevirir; pg_advisory_xact_lock(int4,int4)
-    // bu iki anahtarla satırı serileştirir.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${activeAttempt.id}), hashtext(${body.videoId}))`
-
-    // Lock alındıktan SONRA mevcut ilerlemeyi oku — bu okuma artık yarış
-    // kaybedemez; aynı çift için başka bir transaction sıraya girer.
+    // Mevcut ilerlemeyi oku — hesaplama ve yazımla aynı transaction içinde.
     const existing = await tx.videoProgress.findUnique({
       where: { attemptId_videoId: { attemptId: activeAttempt.id, videoId: body.videoId } },
     })
@@ -354,8 +358,8 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       nextCompleted = body.completed === true && watchedEnoughToComplete
     }
 
-    // Upsert video progress — lock altında, atomik. Eşzamanlı POST'lar sıraya
-    // girip her biri en güncel existing'i gördüğü için ilerleme geriye düşmez.
+    // Upsert video progress — $transaction içinde, atomik. Math.max guard'ları
+    // (yukarıda) eşzamanlı yazımlarda ilerlemenin geriye gitmesini engeller.
     await tx.videoProgress.upsert({
       where: { attemptId_videoId: { attemptId: activeAttempt.id, videoId: body.videoId } },
       create: {
