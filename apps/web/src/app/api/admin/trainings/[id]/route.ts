@@ -192,6 +192,27 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
   const [training] = await prisma.$transaction(async (tx) => {
     const updated = await tx.training.update({ where: { id, organizationId: orgId }, data })
 
+    // maxAttempts değiştiyse, atanmış personellere de propagate et — ancak
+    // yalnız bireysel hak verilmemiş atamalara. Invariant: bireysel hibe yolları
+    // (attempt-requests, reset-attempt, assignments modal) maxAttempts'ı
+    // artırır ama originalMaxAttempts'ı dokunmaz; iki kolon eşitse "henüz
+    // dokunulmamış" demektir. Aksi halde admin'in bireysel verdiği hakları
+    // sessizce yutardık. originalMaxAttempts'ı da güncellemek gerekir; aksi
+    // halde reset-attempt formülü (currentAttempt + originalMaxAttempts) eski
+    // baseline'la çalışır.
+    // updateMany iki kolon karşılaştıramadığı için $executeRaw — void sonucu
+    // için $queryRaw KULLANMA (P2010 fırlatır, 7caa9550 hotfix'inde yaşandı).
+    if (typeof parsed.data.maxAttempts === 'number' && parsed.data.maxAttempts !== existing.maxAttempts) {
+      await tx.$executeRaw`
+        UPDATE training_assignments
+        SET max_attempts = ${parsed.data.maxAttempts},
+            original_max_attempts = ${parsed.data.maxAttempts}
+        WHERE training_id = ${id}::uuid
+          AND organization_id = ${orgId}::uuid
+          AND max_attempts = original_max_attempts
+      `
+    }
+
     if (isExtendingExpiredTraining) {
       // Sadece cron'un yazdığı bogus expired'ları revive et — gerçekten
       // sınava girip 0 alanları (postExamStartedAt dolu) dokunma.

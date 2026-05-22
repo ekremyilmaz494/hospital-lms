@@ -174,3 +174,103 @@ describe('Admin PATCH /api/admin/trainings/[id] — expired attempt revive (Deva
     vi.useRealTimers()
   })
 })
+
+/**
+ * maxAttempts cascade — admin Training.maxAttempts'ı düzenleyince zaten
+ * atanmış personelin TrainingAssignment.maxAttempts'ı da güncellenmeli (snapshot
+ * bug'ı). Cascade YALNIZ "bireysel hak verilmemiş" atamalara (max == original)
+ * uygulanır; attempt-requests/reset-attempt/assignments ile özel hak almış
+ * kullanıcılarda iki kolon ayrışır ve SQL WHERE koşulu onları korur.
+ */
+describe('Admin PATCH /api/admin/trainings/[id] — maxAttempts cascade', () => {
+  it('maxAttempts 3→4 → cascade UPDATE training_assignments tetiklenir', async () => {
+    prismaMock.training.findFirst.mockResolvedValueOnce({
+      id: 'training-1',
+      organizationId: 'org-1',
+      endDate: new Date('2026-05-30T23:59:59Z'),
+      maxAttempts: 3,
+    })
+
+    vi.setSystemTime(new Date('2026-05-22T10:00:00Z'))
+
+    const res = await PATCH(
+      patchRequest({ maxAttempts: 4 }),
+      { params: Promise.resolve({ id: 'training-1' }) },
+    )
+
+    expect(res.status).toBe(200)
+    expect(prismaMock.$executeRaw).toHaveBeenCalledTimes(1)
+    const sqlParts = prismaMock.$executeRaw.mock.calls[0][0] as string[] | { join: () => string }
+    const sql = Array.isArray(sqlParts) ? sqlParts.join(' ') : String(sqlParts)
+    expect(sql).toMatch(/UPDATE training_assignments/)
+    expect(sql).toMatch(/SET max_attempts =/)
+    expect(sql).toMatch(/original_max_attempts =/)
+    // Bireysel hak verilmiş atamaları koruma şartı:
+    expect(sql).toMatch(/max_attempts = original_max_attempts/)
+    // Cross-tenant koruma:
+    expect(sql).toMatch(/organization_id =/)
+
+    vi.useRealTimers()
+  })
+
+  it('maxAttempts payload\'da yok → cascade tetiklenmez', async () => {
+    prismaMock.training.findFirst.mockResolvedValueOnce({
+      id: 'training-1',
+      organizationId: 'org-1',
+      endDate: new Date('2026-05-30T23:59:59Z'),
+      maxAttempts: 3,
+    })
+
+    vi.setSystemTime(new Date('2026-05-22T10:00:00Z'))
+
+    await PATCH(
+      patchRequest({ title: 'Sadece başlık değişti' }),
+      { params: Promise.resolve({ id: 'training-1' }) },
+    )
+
+    expect(prismaMock.$executeRaw).not.toHaveBeenCalled()
+
+    vi.useRealTimers()
+  })
+
+  it('maxAttempts aynı kaldı (3→3) → cascade tetiklenmez', async () => {
+    prismaMock.training.findFirst.mockResolvedValueOnce({
+      id: 'training-1',
+      organizationId: 'org-1',
+      endDate: new Date('2026-05-30T23:59:59Z'),
+      maxAttempts: 3,
+    })
+
+    vi.setSystemTime(new Date('2026-05-22T10:00:00Z'))
+
+    await PATCH(
+      patchRequest({ maxAttempts: 3 }),
+      { params: Promise.resolve({ id: 'training-1' }) },
+    )
+
+    expect(prismaMock.$executeRaw).not.toHaveBeenCalled()
+
+    vi.useRealTimers()
+  })
+
+  it('maxAttempts + endDate uzatımı birlikte → her ikisi de tetiklenir (cascade + revive)', async () => {
+    prismaMock.training.findFirst.mockResolvedValueOnce({
+      id: 'training-1',
+      organizationId: 'org-1',
+      endDate: new Date('2026-05-16T23:59:59Z'),
+      maxAttempts: 3,
+    })
+
+    vi.setSystemTime(new Date('2026-05-18T10:00:00Z'))
+
+    await PATCH(
+      patchRequest({ endDate: new Date('2026-05-25T23:59:59Z').toISOString(), maxAttempts: 5 }),
+      { params: Promise.resolve({ id: 'training-1' }) },
+    )
+
+    // 1 cascade UPDATE + 2 revive (exam_attempts, training_assignments).
+    expect(prismaMock.$executeRaw).toHaveBeenCalledTimes(3)
+
+    vi.useRealTimers()
+  })
+})

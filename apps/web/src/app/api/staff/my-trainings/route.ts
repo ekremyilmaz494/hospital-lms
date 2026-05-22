@@ -131,7 +131,11 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
         category: t.category ?? '',
         status: a.status,
         attempt: (a as unknown as { _count: { examAttempts: number } })._count.examAttempts,
-        maxAttempts: t.maxAttempts,
+        // Atama-tabanlı oku: bireysel hibe edilmiş hakları (attempt-requests /
+        // reset-attempt) yansıtmak ve detay endpoint (assignment.maxAttempts)
+        // ile tutarlı olmak için. Training.maxAttempts edit cascade'i atama
+        // satırlarını da günceller (apps/web/src/app/api/admin/trainings/[id]/route.ts).
+        maxAttempts: a.maxAttempts,
         startDate: t.startDate ? t.startDate.toLocaleDateString('tr-TR') : null,
         isNotStarted,
         deadline: deadline ? deadline.toLocaleDateString('tr-TR') : '',
