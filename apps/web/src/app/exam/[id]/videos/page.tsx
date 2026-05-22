@@ -164,7 +164,10 @@ export default function VideoPlayerPage() {
   const activeMedia = mediaItems[currentMediaIdx >= 0 ? currentMediaIdx : 0];
   const activePdf = pdfItems[currentPdfIdx >= 0 ? currentPdfIdx : 0];
   const currentVideo = isMixed ? activeMedia : singleCurrent;
-  const allCompleted = videosData.length > 0 && videosData.every((v) => v.completed);
+  // O5: PDF içerikleri son sınava geçiş için OPSİYONEL — sunucu da öyle sayıyor.
+  // "Son Sınava Git" gating'i yalnız video/ses içeriğine (mediaItems) bağlı.
+  // Boş mediaItems → every() true döner (yalnızca PDF olan eğitimde sınav açık).
+  const allCompleted = mediaItems.every((v) => v.completed);
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const togglePlay = useCallback(() => {
@@ -484,8 +487,9 @@ export default function VideoPlayerPage() {
         navigator.sendBeacon(`/api/exam/${id}/videos`, blob);
       }
     };
-    // iOS Safari'de beforeunload sıklıkla tetiklenmez; pagehide daha güvenilir.
-    window.addEventListener('pagehide', saveOnExit);
+    // D1: `pagehide` flush'ı yukarıdaki effect'te (handlePageHide → flushPosition)
+    // zaten kayıtlı — burada tekrar kaydetmek mükerrer sendBeacon yaratırdı.
+    // Burada yalnız `beforeunload` ve SPA-unmount cleanup flush'ı kalır.
     window.addEventListener('beforeunload', saveOnExit);
     return () => {
       // SPA navigation (router.back / router.push / Link tıkı) pagehide veya
@@ -495,7 +499,6 @@ export default function VideoPlayerPage() {
       // sendBeacon at; server tarafı lastPositionSeconds geri-gitme koruması
       // sayesinde tekrar yazım sorun çıkarmaz.
       saveOnExit();
-      window.removeEventListener('pagehide', saveOnExit);
       window.removeEventListener('beforeunload', saveOnExit);
     };
     // `currentVideo` (obje) deps'e EKLENMEZ — yeni ref'le re-mount listener trashing yapar.
@@ -605,6 +608,30 @@ export default function VideoPlayerPage() {
 
   if (!currentVideo) return null;
 
+  // Y2: resolveTrainingVideoUrl() S3/CloudFront imzalama hatası veya eksik
+  // videoKey durumunda '' döner. Boş `src` ile <video>/<AudioPlayer>/<PdfViewer>
+  // render edilirse: boş src `error` event'i fırlatmaz → onError çalışmaz →
+  // hata UI'ı görünmez → onLoadedMetadata hiç tetiklenmez → personel kalıcı takılır.
+  // Oynatıcıyı render etmeden ÖNCE açık bir hata durumu göster.
+  // PDF'in ayrı `documentUrl`'üne dokunulmaz — yalnız ana `url` boşsa engellenir.
+  if (!currentVideo.url) {
+    return (
+      <div className="vd-page-empty">
+        <div className="vd-page-empty-icon"><AlertTriangle className="h-6 w-6" /></div>
+        <h2>İçerik şu anda yüklenemiyor</h2>
+        <p>Bu içeriğe şu anda erişilemiyor. Lütfen daha sonra tekrar deneyin.</p>
+        <button onClick={() => router.back()} className="vd-page-empty-link">← Geri Dön</button>
+        <style>{`
+          .vd-page-empty { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; gap: 10px; max-width: 420px; margin: 0 auto; }
+          .vd-page-empty-icon { width: 56px; height: 56px; border-radius: 4px; background: var(--k-error-bg); color: var(--k-error); display: flex; align-items: center; justify-content: center; }
+          .vd-page-empty h2 { font-family: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", serif; font-size: 20px; color: var(--ed-ink); margin: 0; }
+          .vd-page-empty p { font-size: 13px; color: var(--ed-ink-soft); margin: 0; }
+          .vd-page-empty-link { background: none; border: none; color: var(--ed-ink); font-family: var(--font-display, system-ui); font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+        `}</style>
+      </div>
+    );
+  }
+
   const completedCount = videosData.filter(v => v.completed).length;
 
   return (
@@ -696,6 +723,7 @@ export default function VideoPlayerPage() {
             {currentVideo.contentType === 'audio' ? (
               <div className="vd-audio-wrap">
                 <AudioPlayer
+                  key={currentVideo.id}
                   src={currentVideo.url}
                   documentUrl={currentVideo.documentUrl}
                   title={currentVideo.title}

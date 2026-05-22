@@ -2,7 +2,13 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { startExamTimer, resumeExamTimer, getExamTimeRemaining, isExamExpired } from '@/lib/redis'
-import { attemptNextStatus, attemptStatusToExamPhase, type AttemptStatus } from '@/lib/exam-state-machine'
+import {
+  attemptNextStatus,
+  attemptStatusToExamPhase,
+  assignmentNextStatus,
+  type AttemptStatus,
+  type AssignmentStatus,
+} from '@/lib/exam-state-machine'
 import { logger } from '@/lib/logger'
 
 // Süresi dolmuş attempt'i (pre/post) completed+failed yapar ve assignment durumunu günceller.
@@ -14,7 +20,7 @@ async function autoCompleteExpiredAttempt(attemptId: string, userId: string) {
       id: true,
       status: true,
       assignmentId: true,
-      assignment: { select: { currentAttempt: true, maxAttempts: true } },
+      assignment: { select: { status: true, currentAttempt: true, maxAttempts: true } },
     },
   })
   if (!expired) return
@@ -24,18 +30,43 @@ async function autoCompleteExpiredAttempt(attemptId: string, userId: string) {
   const transition = attemptNextStatus(expired.status as AttemptStatus, { type: 'TIMEOUT' })
   if (!transition.ok) return
 
-  // Atomik guard: yalnız hâlâ pre/post_exam iken kapat — submit ya da başka bir
-  // recovery yolu attempt'i bu arada tamamladıysa terminal sonucu ezme.
-  const closed = await prisma.examAttempt.updateMany({
-    where: { id: expired.id, status: { in: ['pre_exam', 'post_exam'] } },
-    data: { status: transition.next, postExamCompletedAt: new Date(), isPassed: false },
-  })
-  if (closed.count === 0) return
+  // Assignment durumu da state machine'den türetilir — elle 'failed'/'in_progress'
+  // hesaplamak yerine POST_EXAM_FAILED transition'ı. attemptsRemaining eşdeğeri:
+  // hak bittiyse 0 (→ failed), kaldıysa kalan deneme sayısı (>0 → in_progress).
+  const { currentAttempt, maxAttempts } = expired.assignment
+  const attemptsRemaining = currentAttempt >= maxAttempts ? 0 : maxAttempts - currentAttempt
+  const assignmentTransition = assignmentNextStatus(
+    expired.assignment.status as AssignmentStatus,
+    { type: 'POST_EXAM_FAILED', attemptsRemaining },
+  )
 
-  const newStatus = expired.assignment.currentAttempt >= expired.assignment.maxAttempts ? 'failed' : 'in_progress'
-  await prisma.trainingAssignment.update({
-    where: { id: expired.assignmentId },
-    data: { status: newStatus },
+  // Attempt kapanışı + assignment güncellemesi TEK transaction'da — biri başarılı
+  // olup diğeri çökerse tutarsız durum kalmasın (atomiklik).
+  await prisma.$transaction(async (tx) => {
+    // Atomik guard: yalnız hâlâ pre/post_exam iken kapat — submit ya da başka bir
+    // recovery yolu attempt'i bu arada tamamladıysa terminal sonucu ezme.
+    const closed = await tx.examAttempt.updateMany({
+      where: { id: expired.id, status: { in: ['pre_exam', 'post_exam'] } },
+      data: { status: transition.next, postExamCompletedAt: new Date(), isPassed: false },
+    })
+    if (closed.count === 0) return
+
+    // Assignment beklenmedik biçimde in_progress değilse (ör. zaten terminal) durum
+    // güncellemesini atla — attempt kapanışı yine de geçerli kalsın (throw etme).
+    if (!assignmentTransition.ok) {
+      logger.warn('Exam Timer', 'assignment transition skipped on auto-complete', {
+        attemptId: expired.id,
+        assignmentId: expired.assignmentId,
+        currentAssignmentStatus: expired.assignment.status,
+        reason: assignmentTransition.reason,
+      })
+      return
+    }
+
+    await tx.trainingAssignment.update({
+      where: { id: expired.assignmentId },
+      data: { status: assignmentTransition.next },
+    })
   })
 }
 
