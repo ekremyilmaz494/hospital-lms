@@ -12,7 +12,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *      süre iddiası, attempt watching_videos'a gireli geçen gerçek süreye
  *      clamp'lenmeli; video tek istekte "tamamlandı" olamaz.
  *
- *   3. Y1 — tamamlanma eşiği %95 (video bitmeden son sınava geçilemez).
+ *   3. Tamamlanma yalnız doğal bitişle: heartbeat değil, frontend onEnded →
+ *      POST { completed:true } + anti-cheat izleme alt sınırı (%90).
  *
  *   4. Y3 — body.videoId bu attempt'in eğitimine ait değilse 404.
  *
@@ -311,7 +312,7 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
 
       expect(res.status).toBe(200)
       const body = await res.json()
-      // 300sn video, %95 eşik = 285sn; 45 << 285 → tamamlanmaz.
+      // completed bayrağı yok + K1 izleme 45sn'e clamp → tamamlanmaz.
       expect(body.allVideosCompleted).toBe(false)
       const watched = writtenWatched()
       expect(watched).toBeLessThanOrEqual(45)
@@ -392,24 +393,19 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
   })
 
   /**
-   * Y1 — tamamlanma eşiği %95.
-   * Ürün kararı: video bitmeden son sınava geçilemez. Eski eşik %80'di.
+   * Tamamlanma — DOĞAL BİTİŞ (onended) zorunlu.
+   * Ürün kararı: personel videonun TAMAMINI izlemeden son sınava geçemez.
+   * Heartbeat POST'ları (completed bayrağı yok) hiçbir izleme oranında
+   * tamamlama tetikleyemez; tamamlanma yalnız frontend onEnded →
+   * POST { completed: true } ile + anti-cheat izleme alt sınırıyla verilir.
    */
-  describe('Y1 — %95 tamamlanma eşiği', () => {
-    it('300sn video, 270sn izleme (%90) → tamamlanmaz (eski %80 eşiğinde tamamlanırdı)', async () => {
-      // preExamCompletedAt yeterince eski → K1 tavanı 270'i etkilemez.
-      prismaMock.examAttempt.findFirst.mockResolvedValue({
-        id: ATTEMPT_ID,
-        userId: 'staff-1',
-        trainingId: 'training-1',
-        status: 'watching_videos',
-        assignmentId: 'assignment-1',
-        preExamCompletedAt: new Date(Date.now() - 60 * 60 * 1000),
-      })
+  describe('tamamlanma — doğal bitiş (onended) zorunlu', () => {
+    it('heartbeat (completed yok), %97 izlense bile → tamamlanmaz; yalnız onended tamamlar', async () => {
       prismaMock.videoProgress.findUnique.mockResolvedValue(null)
 
       const res = await POST(
-        progressRequest({ videoId: VIDEO_ID, watchedTime: 270, position: 270 }),
+        // 290/300 = %97 — eski %95 eşiğini geçerdi; completed bayrağı yok → tamamlanmaz.
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 290, position: 290 }),
         { params: Promise.resolve({ id: 'assignment-1' }) },
       )
 
@@ -420,20 +416,12 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       expect(prismaMock.examAttempt.updateMany).not.toHaveBeenCalled()
     })
 
-    it('300sn video, 285sn izleme (%95) → tamamlanır', async () => {
-      prismaMock.examAttempt.findFirst.mockResolvedValue({
-        id: ATTEMPT_ID,
-        userId: 'staff-1',
-        trainingId: 'training-1',
-        status: 'watching_videos',
-        assignmentId: 'assignment-1',
-        preExamCompletedAt: new Date(Date.now() - 60 * 60 * 1000),
-      })
+    it('onended (completed:true) + tam izleme → tamamlanır', async () => {
       prismaMock.videoProgress.findUnique.mockResolvedValue(null)
       prismaMock.videoProgress.count.mockResolvedValue(1)
 
       const res = await POST(
-        progressRequest({ videoId: VIDEO_ID, watchedTime: 285, position: 285 }),
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 300, position: 300, completed: true }),
         { params: Promise.resolve({ id: 'assignment-1' }) },
       )
 
@@ -441,6 +429,37 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       const body = await res.json()
       expect(body.allVideosCompleted).toBe(true)
       expect(writtenCreate().isCompleted).toBe(true)
+    })
+
+    it('onended (completed:true) + izleme anti-cheat alt sınırının üstünde (%95) → tamamlanır', async () => {
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null)
+      prismaMock.videoProgress.count.mockResolvedValue(1)
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 285, position: 285, completed: true }),
+        { params: Promise.resolve({ id: 'assignment-1' }) },
+      )
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.allVideosCompleted).toBe(true)
+      expect(writtenCreate().isCompleted).toBe(true)
+    })
+
+    it('onended (completed:true) ama izleme alt sınırın (%90) altında → tamamlanmaz (sahte-tamamlama engeli)', async () => {
+      // body.completed:true taklit eden doğrudan POST: 100/300 = %33 izleme.
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null)
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 100, position: 100, completed: true }),
+        { params: Promise.resolve({ id: 'assignment-1' }) },
+      )
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.allVideosCompleted).toBe(false)
+      expect(writtenCreate().isCompleted).toBe(false)
+      expect(prismaMock.examAttempt.updateMany).not.toHaveBeenCalled()
     })
   })
 
@@ -504,7 +523,7 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       expect(writtenCreate().isCompleted).toBe(true)
     })
 
-    it('durationSeconds=300 + completed:true ama izleme %95 altı → tamamlanmaz (anti-cheat korunur)', async () => {
+    it('durationSeconds=300 + completed:true ama izleme anti-cheat alt sınırı (%90) altı → tamamlanmaz', async () => {
       prismaMock.videoProgress.findUnique.mockResolvedValue(null)
 
       const res = await POST(
@@ -515,7 +534,7 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.allVideosCompleted).toBe(false)
-      // Güvenilir sürede body.completed yok sayılır — server-side eşik hesabı uygulanır.
+      // onended (completed:true) gelse de izlenen süre alt sınırın (300*0.9=270) altında → tamamlanmaz.
       expect(writtenCreate().isCompleted).toBe(false)
     })
   })

@@ -263,14 +263,10 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       nextPosition = existing ? Math.max(currentPage, existing.lastPositionSeconds) : currentPage
       nextCompleted = body.completed === true || currentPage >= totalPages
     } else {
-      // Video tamamlanma kapısı izleme eşiğine dayanır; eşik video süresinden
-      // hesaplanır. Süre GÜVENİLİR ise (durationSeconds>0) eski davranış aynen
-      // korunur: body.completed yok sayılır, server-side eşik hesabı uygulanır
-      // (anti-cheat). Süre GÜVENİLMEZSE (durationSeconds<=0 — ölçülememiş
-      // eski/bozuk kayıt) 0*eşik=0 videoyu İLK POST'ta "tamamlandı" sayıp
-      // personeli akıştan atıyordu; bu durumda tamamlanma yalnız doğal bitiş
-      // sinyaliyle (onended → completed:true) verilir ve ilerleme 0'a clamp
-      // edilmez. (Plan Faz 1, Adım 2.)
+      // Süre GÜVENİLİR mi? (durationSeconds>0 — ölçülmüş veya backfill'lenmiş
+      // kayıt). Güvenilmez süre (<=0 — ölçülememiş eski kayıt) izlenen saniyeyi
+      // 0'a clamp'leyip videoyu sahte "tamamlandı" yapardı; bu durumda
+      // durationCap sınırsız bırakılır, ilerleme 0'a düşürülmez. (Plan Faz 1.)
       const hasReliableDuration = video.durationSeconds > 0
       const durationCap = hasReliableDuration ? video.durationSeconds : Number.MAX_SAFE_INTEGER
 
@@ -326,13 +322,36 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       nextPosition = existing
         ? Math.max(requestedPosition, existing.lastPositionSeconds)
         : requestedPosition
-      // %95 kural — video bitmeden son sınava geçilemez (ürün kararı, Y1).
-      // Yalnız güvenilir süre varsa uygulanır. Süre yoksa doğal bitiş
-      // sinyalini (onended → body.completed) tek ölçüt al.
-      const MIN_WATCH_PERCENT = 0.95
-      nextCompleted = hasReliableDuration
-        ? nextWatched >= (video.durationSeconds * MIN_WATCH_PERCENT)
-        : body.completed === true
+      // ── Video tamamlanma kapısı — DOĞAL BİTİŞ (onended) ZORUNLU ───────────
+      // Tamamlanma YALNIZ video doğal sonuna ulaşınca verilir: frontend
+      // <video> onEnded → POST { completed: true }. İzleme YÜZDESİ tek başına
+      // tamamlama TETİKLEMEZ — personel videonun TAMAMINI izlemeden son sınava
+      // geçemez (ürün kararı). 15sn'lik heartbeat POST'ları `completed`
+      // göndermez; yalnız watchedSeconds/lastPosition günceller.
+      //
+      // NEDEN (Şikayet #1 — personel akıştan atılıyor): Yüzde eşiği (eski %80,
+      // sonra %95) bir HEARTBEAT ile video bitmeden tetiklenebiliyordu →
+      // attempt watching_videos'tan post_exam'e geçiyor → kullanıcı izlemeye
+      // devam ederken sonraki heartbeat artık watching_videos attempt
+      // bulamayıp 400 alıyor → frontend "Eğitim oturumu geçersiz" tam ekran
+      // modalını açıp personeli atıyordu. Tamamlamayı tek kesin ana (onended)
+      // sabitlemek bu yarışı kökten kaldırır: onended → completed → post_exam
+      // ile frontend AYNI anda transition'a gider; geride post_exam attempt'e
+      // çarpacak heartbeat kalmaz (heartbeat interval onended → isPlaying=false
+      // ile zaten temizlenir).
+      //
+      // ANTI-CHEAT: body.completed:true taklit eden doğrudan POST'u engelle.
+      // K1 duvar-saati tavanı + izleme-hızı denetimi nextWatched'i gerçekten
+      // geçen süreye sabitliyor; tamamlama ek olarak izlenen sürenin videonun
+      // büyük kısmını kapsamasını ister. Bu bir tamamlanma EŞİĞİ DEĞİL —
+      // sahte-tamamlama alt sınırıdır; %90 oranı ölçülen oynatıcı süresi ile
+      // DB durationSeconds arasındaki küçük sapmaya pay bırakır. Süre
+      // güvenilmezse (durationSeconds<=0) alt sınır uygulanamaz; onended tek
+      // ölçüt olur.
+      const ANTI_CHEAT_WATCH_FLOOR = 0.9
+      const watchedEnoughToComplete =
+        !hasReliableDuration || nextWatched >= video.durationSeconds * ANTI_CHEAT_WATCH_FLOOR
+      nextCompleted = body.completed === true && watchedEnoughToComplete
     }
 
     // Upsert video progress — lock altında, atomik. Eşzamanlı POST'lar sıraya
