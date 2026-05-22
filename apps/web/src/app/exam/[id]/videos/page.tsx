@@ -291,6 +291,21 @@ export default function VideoPlayerPage() {
   const [fatalError, setFatalError] = useState<{ title: string; message: string } | null>(null);
   const fatalHandledRef = useRef(false);
 
+  // Çevrimiçi durumu — kayıt hatası banner'ının metnini belirler. "İnternetini
+  // kontrol et" suçlaması YALNIZ tarayıcı kesin offline (navigator.onLine === false)
+  // iken gösterilir; aksi halde arıza sunucu/geçici olabilir, kullanıcıyı suçlama.
+  const [isOnline, setIsOnline] = useState(true);
+  useEffect(() => {
+    const sync = () => setIsOnline(navigator.onLine);
+    sync();
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    return () => {
+      window.removeEventListener('online', sync);
+      window.removeEventListener('offline', sync);
+    };
+  }, []);
+
   /**
    * Video POST'unun kalıcı (retry edilemez) hatalarını tek noktada karşılar:
    * oturum bitti → login; faz geçersiz/içerik silinmiş → tam ekran bilgilendirme.
@@ -344,9 +359,13 @@ export default function VideoPlayerPage() {
         body,
         { signal: opts?.signal },
       );
-      if (opts?.signal?.aborted) return result; // abort sessiz — durum güncellemesi yok
       if (result.kind === 'ok') {
         setSaveStatus('idle');
+      } else if (result.kind === 'aborted') {
+        // İstek iptal edildi: video duraklatma, sonraki içeriğe geçiş veya sayfa
+        // değişimi. Bu bir KAYIT HATASI DEĞİL — DevTools'ta `(canceled)` görünür.
+        // İlerleme bir sonraki heartbeat ya da lastPosition koruması ile yine
+        // yazılır. saveStatus'a dokunma: yanlış "internet" banner'ını tetikleme.
       } else if (result.kind === 'transient') {
         setSaveStatus('error');
       } else {
@@ -638,7 +657,9 @@ export default function VideoPlayerPage() {
     <div className="vd-root">
       {saveStatus === 'error' && (
         <div className="vd-heartbeat-err">
-          İlerlemen kaydedilemiyor — internet bağlantını kontrol et. Bağlantı gelince otomatik kaydedilir.
+          {isOnline
+            ? 'İlerlemen kaydedilirken bir gecikme oldu — otomatik yeniden denenecek, sayfada kalman yeterli.'
+            : 'İlerlemen kaydedilemiyor — internet bağlantını kontrol et. Bağlantı gelince otomatik kaydedilir.'}
         </div>
       )}
       {!orientationHintDismissed && (

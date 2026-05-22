@@ -39,10 +39,17 @@ describe('classifyExamPostResult', () => {
     expect(classifyExamPostResult(mkRes(429))).toBe('transient')
   })
 
-  it('fetch throw (ağ hatası / abort) → transient', () => {
+  it('gerçek ağ hatası → transient', () => {
     expect(classifyExamPostResult(new TypeError('Failed to fetch'))).toBe('transient')
-    expect(classifyExamPostResult(new DOMException('aborted', 'AbortError'))).toBe('transient')
     expect(classifyExamPostResult(undefined)).toBe('transient')
+  })
+
+  it('AbortError (iptal) → aborted — ağ hatasından ayrılır', () => {
+    // Tarayıcı fetch'i AbortError'u DOMException olarak fırlatır.
+    expect(classifyExamPostResult(new DOMException('aborted', 'AbortError'))).toBe('aborted')
+    // Bazı runtime'lar düz Error olarak fırlatır — tek ölçüt name === 'AbortError'.
+    const plainAbort = Object.assign(new Error('aborted'), { name: 'AbortError' })
+    expect(classifyExamPostResult(plainAbort)).toBe('aborted')
   })
 })
 
@@ -54,9 +61,10 @@ describe('isFatalExamPostKind', () => {
     expect(isFatalExamPostKind('locked')).toBe(true)
   })
 
-  it('ok ve transient fatal değil', () => {
+  it('ok, transient ve aborted fatal değil', () => {
     expect(isFatalExamPostKind('ok')).toBe(false)
     expect(isFatalExamPostKind('transient')).toBe(false)
+    expect(isFatalExamPostKind('aborted')).toBe(false)
   })
 })
 
@@ -140,12 +148,22 @@ describe('postWithRetry', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('aborted signal → fetch çağrılmadan transient döner', async () => {
+  it('aborted signal → fetch çağrılmadan aborted döner', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
     const controller = new AbortController()
     controller.abort()
     const result = await postWithRetry('/api/x', {}, { signal: controller.signal })
-    expect(result.kind).toBe('transient')
+    expect(result.kind).toBe('aborted')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('fetch AbortError fırlatırsa → aborted, retry YAPILMAZ', async () => {
+    // İptal edilen istek geçici hata DEĞİL — banner göstermemek için retry'sız döner.
+    const fetchMock = mockFetchSequence([new DOMException('aborted', 'AbortError')])
+    const promise = postWithRetry('/api/x', {}, { retries: 2, backoff: [10, 20] })
+    await vi.runAllTimersAsync()
+    const result = await promise
+    expect(result.kind).toBe('aborted')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
