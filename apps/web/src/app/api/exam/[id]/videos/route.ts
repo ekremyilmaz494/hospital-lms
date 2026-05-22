@@ -131,12 +131,15 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
     orderBy: { sortOrder: 'asc' },
   })
 
-  // BUG B-2 FIX: Sadece aktif (tamamlanmamış) denemenin video ilerlemesini getir
+  // BUG B-2 FIX: Sadece aktif (tamamlanmamış) denemenin video ilerlemesini getir.
+  // expired'i de hariç tut — kardeş kodlarla (getActiveOrLatestAttemptStatus,
+  // start/route.ts) tutarlı. Aksi halde cron expire sonrası eski attempt'in
+  // videoProgress'i yüklenir → yanlış saniyeden resume.
   const activeAttempt = await prisma.examAttempt.findFirst({
     where: {
       userId: dbUser.id,
       trainingId: training.id,
-      status: { not: 'completed' },
+      status: { notIn: ['completed', 'expired'] satisfies AttemptStatus[] },
     },
     orderBy: { attemptNumber: 'desc' },
     select: { id: true },
@@ -285,9 +288,12 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       // ilerlemeyle max alınmadan ÖNCE uygulanan ek bir MUTLAK tavan: attempt
       // watching_videos'a girdiğinden bu yana geçen gerçek süreden (preExam
       // tamamlandı işareti) fazla izleme iddiası kabul edilmez.
-      const maxWatchable = activeAttempt.preExamCompletedAt
-        ? ((Date.now() - new Date(activeAttempt.preExamCompletedAt).getTime()) / 1000) * 1.5 + 30
-        : 30
+      // preExamCompletedAt boşsa attempt.createdAt'a düş — sabit 30sn tavanı,
+      // baştan sona izlenmiş videoyu "asla tamamlanamaz" yapardı (savunmacı
+      // fallback; mevcut akışlarda preExamCompletedAt watching_videos'a girişte
+      // dolduruluyor, ama invariant kod katmanında zorlanmıyor).
+      const baseTime = activeAttempt.preExamCompletedAt ?? activeAttempt.createdAt
+      const maxWatchable = ((Date.now() - new Date(baseTime).getTime()) / 1000) * 1.5 + 30
       requestedWatched = Math.min(requestedWatched, Math.floor(maxWatchable))
 
       // Geri sarma protection — Math.max ile mevcut ilerleme korunur; K1 cap'i

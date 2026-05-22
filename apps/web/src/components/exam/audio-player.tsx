@@ -37,6 +37,12 @@ export function AudioPlayer({
   const audioRef = useRef<HTMLAudioElement>(null)
   const lastAllowedTime = useRef(lastPosition ?? 0)
   const completedRef = useRef(false)
+  // Heartbeat effect onProgress'i deps'e koyarsa: page.tsx <AudioPlayer onProgress={(...)=>...} />
+  // her render'da yeni inline arrow üretir, page ~250ms'de currentTime state ile yeniden
+  // render olduğundan setInterval 15sn'ye hiç ulaşamaz. Ref ile son referansı tut,
+  // effect'in deps'inden çıkar (video player heartbeat'iyle aynı yaklaşım).
+  const onProgressRef = useRef(onProgress)
+  useEffect(() => { onProgressRef.current = onProgress })
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -157,17 +163,19 @@ export function AudioPlayer({
     }
   }, [flushProgress])
 
-  // Heartbeat — 15 saniyede bir onProgress çağır
+  // Heartbeat — 15 saniyede bir onProgress çağır. onProgress deps'e EKLENMEZ
+  // (yukarıdaki onProgressRef yorumuna bak); aksi halde interval 15sn'ye hiç
+  // ulaşamaz. Çalışma zamanı en güncel referansı ref'ten oku.
   useEffect(() => {
     if (!isPlaying) return
     const heartbeat = setInterval(() => {
       const audio = audioRef.current
       if (audio) {
-        onProgress(audio.currentTime, lastAllowedTime.current)
+        onProgressRef.current(audio.currentTime, lastAllowedTime.current)
       }
     }, 15000)
     return () => clearInterval(heartbeat)
-  }, [isPlaying, onProgress])
+  }, [isPlaying])
 
   const progressPercent = audioDuration > 0 ? (currentTime / audioDuration) * 100 : 0
 

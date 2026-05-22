@@ -320,7 +320,11 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       expect(prismaMock.examAttempt.updateMany).not.toHaveBeenCalled()
     })
 
-    it('preExamCompletedAt yoksa tavan 30sn — ilk POST tam süre iddiası 30\'a clamp', async () => {
+    it('preExamCompletedAt yoksa createdAt fallback — ilk POST tam süre iddiası geçen-süre tavanına clamp', async () => {
+      // Önceki davranış: preExamCompletedAt boşsa tavan sabit 30sn → baştan
+      // sona izlenmiş video "asla tamamlanamaz" tuzağı. Yeni davranış: createdAt'a
+      // düş, gerçek geçen süreyi tavan olarak kullan. Attempt 10sn önce
+      // yaratıldı → maxWatchable = 10*1.5 + 30 = 45.
       prismaMock.examAttempt.findFirst.mockResolvedValue({
         id: ATTEMPT_ID,
         userId: 'staff-1',
@@ -328,6 +332,7 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
         status: 'watching_videos',
         assignmentId: 'assignment-1',
         preExamCompletedAt: null,
+        createdAt: new Date(Date.now() - 10 * 1000),
       })
       prismaMock.videoProgress.findUnique.mockResolvedValue(null)
 
@@ -337,7 +342,7 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       )
 
       expect(res.status).toBe(200)
-      expect(writtenWatched()).toBeLessThanOrEqual(30)
+      expect(writtenWatched()).toBeLessThanOrEqual(45)
       expect(writtenCreate().isCompleted).toBe(false)
     })
 
