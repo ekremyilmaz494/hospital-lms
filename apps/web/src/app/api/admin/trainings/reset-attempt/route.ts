@@ -25,12 +25,21 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       return errorResponse(transition.reason, 400)
     }
 
-    // Deneme hakkını sıfırla — status'u tekrar 'assigned' yap, currentAttempt'i sıfırla
+    // Deneme hakkını yenile — `currentAttempt: 0` YAPMA. Eski examAttempt satırları
+    // (attemptNumber 1..N) dururken start route `newAttemptNumber = currentAttempt+1`
+    // → 1 üretir ve `@@unique([assignmentId, attemptNumber])` ihlal edilir; start
+    // transaction'ı 500 döner, personel sınava HİÇ giremez.
+    // Çözüm: attempt-requests onayıyla AYNI model — maxAttempts'i artırarak taze
+    // bir deneme seti ver. currentAttempt'e ve eski attempt geçmişine dokunulmaz
+    // (denetim/raporlama korunur); yeni attemptNumber'lar N+1'den devam eder.
+    const freshAttempts = assignment.originalMaxAttempts ?? assignment.maxAttempts ?? 3
+    const newMaxAttempts = assignment.currentAttempt + freshAttempts
+
     await prisma.trainingAssignment.update({
       where: { id: assignment.id },
       data: {
         status: transition.next,
-        currentAttempt: 0,
+        maxAttempts: newMaxAttempts,
         completedAt: null,
       },
     })
@@ -39,17 +48,25 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       action: 'reset_attempt',
       entityType: 'training_assignment',
       entityId: assignment.id,
-      oldData: { status: assignment.status, currentAttempt: assignment.currentAttempt },
-      newData: { status: 'assigned', currentAttempt: 0 },
+      oldData: {
+        status: assignment.status,
+        maxAttempts: assignment.maxAttempts,
+        currentAttempt: assignment.currentAttempt,
+      },
+      newData: { status: transition.next, maxAttempts: newMaxAttempts },
     })
 
-    logger.info('Admin Trainings', 'Deneme hakkı sıfırlandı', {
+    logger.info('Admin Trainings', 'Deneme hakkı yenilendi', {
       assignmentId: assignment.id,
       staff: `${assignment.user.firstName} ${assignment.user.lastName}`,
       training: assignment.training.title,
+      newMaxAttempts,
     })
 
-    return jsonResponse({ success: true, message: `${assignment.user.firstName} ${assignment.user.lastName} için deneme hakkı sıfırlandı` })
+    return jsonResponse({
+      success: true,
+      message: `${assignment.user.firstName} ${assignment.user.lastName} için yeni deneme hakkı verildi`,
+    })
   } catch (err) {
     logger.error('Admin Trainings', 'Deneme hakkı sıfırlama başarısız', err)
     return errorResponse('Deneme hakkı sıfırlanamadı', 500)
