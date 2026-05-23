@@ -180,7 +180,8 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
           items: [{
             fullName: success.fullName,
             tcKimlik: success.tcKimlik,
-            email: success.email,
+            // '—' UI sentinel'ı (e-posta boş bırakıldığında gösterim için); API'ye null geçir.
+            email: success.email && success.email !== '—' ? success.email : null,
             tempPassword: success.tempPassword,
             department: success.department ?? null,
             title: success.title ?? null,
