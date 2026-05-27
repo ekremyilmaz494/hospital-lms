@@ -12,6 +12,17 @@ interface UseFetchResult<T> {
 interface UseFetchOptions {
   /** Polling interval in milliseconds. Pass 0 or omit to disable. */
   interval?: number;
+  /**
+   * Opt-in 401 handler. Return `true` (sync or async) to indicate the caller
+   * handled the auth error — useFetch will then skip the forced
+   * `/auth/login` redirect and only set a Turkish error message.
+   * Return `false`/`undefined`/throw → falls back to the default redirect.
+   *
+   * Use case: mid-exam (`/exam/[id]/*`) — losing the session shouldn't
+   * silently throw the user out of an attempt; show an inline retry modal
+   * instead. (See plan: FAZ 2.A8)
+   */
+  onAuthError?: () => boolean | Promise<boolean>;
 }
 
 // In-memory cache: URL → { data, timestamp }
@@ -56,6 +67,11 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
   urlRef.current = normalizedUrl;
 
   const forceRef = useRef(false);
+
+  // FAZ 2.A8 — opt-in 401 handler kept in a ref so fetchData stays referentially
+  // stable across renders (changing onAuthError shouldn't invalidate the callback).
+  const onAuthErrorRef = useRef(options?.onAuthError);
+  onAuthErrorRef.current = options?.onAuthError;
 
   const fetchData = useCallback(async (background = false) => {
     const currentUrl = urlRef.current;
@@ -124,6 +140,20 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
         // 401 = session expired → login'e yönlendir (agresif loop korumalı)
         // 403 = authenticated ama yetkisiz → login'e yönlendirME, hata mesajı göster
         if (msg.includes('401') || msg.includes('Unauthorized')) {
+          // FAZ 2.A8 — opt-in handler chance to suppress the forced redirect
+          // (e.g. mid-exam: show inline retry modal instead of throwing user out).
+          const handler = onAuthErrorRef.current;
+          if (handler) {
+            try {
+              const handled = await handler();
+              if (handled) {
+                setError('Oturum doğrulanamadı. Lütfen tekrar giriş yapın.');
+                return;
+              }
+            } catch {
+              // Caller threw → fall through to default redirect behaviour.
+            }
+          }
           if (typeof window !== 'undefined') {
             // Loop koruması: 30 saniye içinde 2+ redirect → döngü tespit, durdur
             const now = Date.now();
@@ -181,7 +211,7 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
     const existing = cache.get(normalizedUrl);
     if (existing) {
       // Aynı data reference'ı koruyarak gereksiz re-render önle
-      setData(prev => prev === existing.data ? prev : existing.data as T);
+      setData((prev) => (prev === existing.data ? prev : (existing.data as T)));
       setIsLoading(false);
       if (Date.now() - existing.ts > STALE_TIME) {
         fetchData(true);
