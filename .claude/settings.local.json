@@ -47,7 +47,8 @@
       "WebFetch(domain:fibr.ai)",
       "WebFetch(domain:swipepages.com)",
       "Bash(gh run *)",
-      "Bash(pnpm tsc *)"
+      "Bash(pnpm tsc *)",
+      "mcp__882fd9f0-0d75-465c-9c67-810c5be65ae7__video_analysis_status"
     ]
   }
 }
