@@ -1,99 +1,99 @@
-import Link from "next/link";
-import { FeatureStat } from "./feature-stat";
-import { Footer } from "./footer";
+import Link from 'next/link';
+import { FeatureStat } from './feature-stat';
+import { Footer } from './footer';
 
 type Module = { title: string; desc: string };
 
 // Modüller temaya göre 4 sinematik bölüme dağıtılır (3D model o bölümdeyken
 // ilgili modüller yanında belirir). Tek-blok "Yönetim Merkezi" grid'i kaldırıldı.
 const MODULES_EGITIM: Module[] = [
-  { title: "Eğitim Sihirbazı", desc: "Video, doküman ve sınav tek akışta." },
-  { title: "Soru Bankası", desc: "Havuzda topla, sınavlarda tekrar kullan." },
-  { title: "Sınav Otomasyonu", desc: "Ön/son sınav, otomatik geçti-kaldı." },
-  { title: "Medya Kütüphanesi", desc: "Tüm içerik tek merkezde, güvenli erişim." },
-  { title: "Eğitim Dönemleri", desc: "Periyodik eğitimi takvime bağla, tekrarlat." },
+  { title: 'Eğitim Sihirbazı', desc: 'Video, doküman ve sınav tek akışta.' },
+  { title: 'Soru Bankası', desc: 'Havuzda topla, sınavlarda tekrar kullan.' },
+  { title: 'Sınav Otomasyonu', desc: 'Ön/son sınav, otomatik geçti-kaldı.' },
+  { title: 'Medya Kütüphanesi', desc: 'Tüm içerik tek merkezde, güvenli erişim.' },
+  { title: 'Eğitim Dönemleri', desc: 'Periyodik eğitimi takvime bağla, tekrarlat.' },
 ];
 const MODULES_UYUM: Module[] = [
-  { title: "KVKK Uyum Raporu", desc: "Denetime hazır çıktı, anında dışa aktar." },
-  { title: "SMG / SKS Takibi", desc: "Hizmet içi eğitim ve denetim uyumu." },
-  { title: "Etkinlik Analizi", desc: "Eğitimin gerçek etkisini ölç, zayıfı gör." },
-  { title: "Sertifikalar", desc: "Otomatik üretim, geçerlilik takibi, PDF." },
-  { title: "İşlem Geçmişi (Audit)", desc: "Değiştirilemez kayıt, tam izlenebilirlik." },
+  { title: 'KVKK Uyum Raporu', desc: 'Denetime hazır çıktı, anında dışa aktar.' },
+  { title: 'SMG / SKS Takibi', desc: 'Hizmet içi eğitim ve denetim uyumu.' },
+  { title: 'Etkinlik Analizi', desc: 'Eğitimin gerçek etkisini ölç, zayıfı gör.' },
+  { title: 'Sertifikalar', desc: 'Otomatik üretim, geçerlilik takibi, PDF.' },
+  { title: 'İşlem Geçmişi (Audit)', desc: 'Değiştirilemez kayıt, tam izlenebilirlik.' },
 ];
 const MODULES_KURUM: Module[] = [
-  { title: "Personel Yönetimi", desc: "Toplu içe aktarma; birim ve role göre düzenleme." },
-  { title: "Yetkinlik Matrisi", desc: "Kim neyi tamamladı, kimde eksik var — tek tabloda." },
-  { title: "Toplu Eğitim Atama", desc: "Yüzlerce personele role göre tek tıkla atama." },
+  { title: 'Personel Yönetimi', desc: 'Toplu içe aktarma; birim ve role göre düzenleme.' },
+  { title: 'Yetkinlik Matrisi', desc: 'Kim neyi tamamladı, kimde eksik var — tek tabloda.' },
+  { title: 'Toplu Eğitim Atama', desc: 'Yüzlerce personele role göre tek tıkla atama.' },
 ];
 const MODULES_ERISIM: Module[] = [
-  { title: "Mobil Uygulama", desc: "Eğitimi telefondan tamamla, sertifikayı indir." },
-  { title: "Bildirimler", desc: "Otomatik hatırlatma, duyuru, son tarih uyarısı." },
-  { title: "Geri Bildirim Formları", desc: "Form editörü, yanıt toplama, analitik." },
+  { title: 'Mobil Uygulama', desc: 'Eğitimi telefondan tamamla, sertifikayı indir.' },
+  { title: 'Bildirimler', desc: 'Otomatik hatırlatma, duyuru, son tarih uyarısı.' },
+  { title: 'Geri Bildirim Formları', desc: 'Form editörü, yanıt toplama, analitik.' },
 ];
 
 // Tam genişlik "platform" showcase bandı (sinematik akıştan sonra, telefonsuz alan).
 const SHOWCASE: { img: string; title: string; desc: string }[] = [
   {
-    img: "/landing-3d/egitim.svg",
-    title: "Eğitim & Sınav",
-    desc: "Video, doküman ve otomatik sınavı tek akışta oluştur, ata, ölç.",
+    img: '/landing-3d/egitim.svg',
+    title: 'Eğitim & Sınav',
+    desc: 'Video, doküman ve otomatik sınavı tek akışta oluştur, ata, ölç.',
   },
   {
-    img: "/landing-3d/showcase-mobil.svg",
-    title: "Mobil Erişim",
-    desc: "Personel telefonundan tamamlar; yönetici canlı ilerlemeyi izler.",
+    img: '/landing-3d/showcase-mobil.svg',
+    title: 'Mobil Erişim',
+    desc: 'Personel telefonundan tamamlar; yönetici canlı ilerlemeyi izler.',
   },
   {
-    img: "/landing-3d/sertifika.svg",
-    title: "Sertifika & Başarı",
-    desc: "Otomatik sertifika üretimi, geçerlilik takibi ve PDF indirme.",
+    img: '/landing-3d/sertifika.svg',
+    title: 'Sertifika & Başarı',
+    desc: 'Otomatik sertifika üretimi, geçerlilik takibi ve PDF indirme.',
   },
 ];
 
 // §5 sağ alan — KlinoVax'ı sıradan LMS'lerden ayıran farklar (küçük spot illüstrasyon).
 const DIFFERENTIATORS: { img: string; title: string; desc: string }[] = [
   {
-    img: "/landing-3d/diff-video.svg",
-    title: "İleri-sarma kilidi",
-    desc: "Personel videoyu atlayamaz; gerçek izleme süresi ölçülür.",
+    img: '/landing-3d/diff-video.svg',
+    title: 'İleri-sarma kilidi',
+    desc: 'Personel videoyu atlayamaz; gerçek izleme süresi ölçülür.',
   },
   {
-    img: "/landing-3d/diff-rapor.svg",
-    title: "Denetime hazır uyum",
-    desc: "KVKK, SKS ve hizmet içi eğitim raporları tek tıkla.",
+    img: '/landing-3d/diff-rapor.svg',
+    title: 'Denetime hazır uyum',
+    desc: 'KVKK, SKS ve hizmet içi eğitim raporları tek tıkla.',
   },
   {
-    img: "/landing-3d/diff-saglik.svg",
-    title: "Sağlığa özel",
-    desc: "Hastane iş akışına göre tasarım; verileriniz tamamen izole.",
+    img: '/landing-3d/diff-saglik.svg',
+    title: 'Sağlığa özel',
+    desc: 'Hastane iş akışına göre tasarım; verileriniz tamamen izole.',
   },
 ];
 
 // Sık sorulan sorular (sayfa altı, native <details> akordeon).
 const FAQ: { q: string; a: string }[] = [
   {
-    q: "KlinoVax tam olarak nedir?",
-    a: "Hastane, klinik ve eczaneler için uçtan uca personel eğitim ve sınav platformudur. Eğitim oluşturma, atama, video izleme, sınav, sertifika ve denetim raporlamasını tek panelde toplar.",
+    q: 'KlinoVax tam olarak nedir?',
+    a: 'Hastane, klinik ve eczaneler için uçtan uca personel eğitim ve sınav platformudur. Eğitim oluşturma, atama, video izleme, sınav, sertifika ve denetim raporlamasını tek panelde toplar.',
   },
   {
-    q: "Kurulum ve personel aktarımı ne kadar sürer?",
-    a: "Kurulum için sunucu yönetimi gerekmez; bulut tabanlıdır. Personeli Excel ile toplu içe aktarabilir, birim ve rollere göre dakikalar içinde eğitim atamaya başlayabilirsiniz.",
+    q: 'Kurulum ve personel aktarımı ne kadar sürer?',
+    a: 'Kurulum için sunucu yönetimi gerekmez; bulut tabanlıdır. Personeli Excel ile toplu içe aktarabilir, birim ve rollere göre dakikalar içinde eğitim atamaya başlayabilirsiniz.',
   },
   {
-    q: "Verilerimiz güvende mi? KVKK uyumlu mu?",
-    a: "Evet. Her kurumun verisi tamamen izole edilir; veriler şifreli saklanır ve tüm kritik işlemler değiştirilemez şekilde kayda alınır. KVKK ve hizmet içi eğitim denetimlerine hazır raporlar üretilir.",
+    q: 'Verilerimiz güvende mi? KVKK uyumlu mu?',
+    a: 'Evet. Her kurumun verisi tamamen izole edilir; veriler şifreli saklanır ve tüm kritik işlemler değiştirilemez şekilde kayda alınır. KVKK ve hizmet içi eğitim denetimlerine hazır raporlar üretilir.',
   },
   {
-    q: "Mevcut eğitim içeriklerimizi yükleyebilir miyiz?",
-    a: "Evet. Video ve dokümanlarınızı medya kütüphanesine yükleyip eğitim akışlarınıza ekleyebilir, soru bankasıyla kendi sınavlarınızı oluşturabilirsiniz.",
+    q: 'Mevcut eğitim içeriklerimizi yükleyebilir miyiz?',
+    a: 'Evet. Video ve dokümanlarınızı medya kütüphanesine yükleyip eğitim akışlarınıza ekleyebilir, soru bankasıyla kendi sınavlarınızı oluşturabilirsiniz.',
   },
   {
-    q: "Personel eğitimleri telefondan tamamlayabilir mi?",
-    a: "Evet. Personel eğitimi mobil cihazından izleyip sınavını olur, sertifikasını anında indirir. Videolarda ileri sarma kapalıdır; gerçek izleme süresi ölçülür.",
+    q: 'Personel eğitimleri telefondan tamamlayabilir mi?',
+    a: 'Evet. Personel eğitimi mobil cihazından izleyip sınavını olur, sertifikasını anında indirir. Videolarda ileri sarma kapalıdır; gerçek izleme süresi ölçülür.',
   },
   {
-    q: "Birden fazla hastane/şube yönetebilir miyiz?",
-    a: "Evet. Çok-kurumlu yapıda her şube kendi personeli, eğitimi ve raporuyla tamamen ayrı çalışır; tümünü tek yönetim panelinden izleyebilirsiniz.",
+    q: 'Birden fazla hastane/şube yönetebilir miyiz?',
+    a: 'Evet. Çok-kurumlu yapıda her şube kendi personeli, eğitimi ve raporuyla tamamen ayrı çalışır; tümünü tek yönetim panelinden izleyebilirsiniz.',
   },
 ];
 
@@ -103,12 +103,7 @@ function ModuleList({ items }: { items: Module[] }) {
     <ul className="l3d-modules">
       {items.map((m) => (
         <li key={m.title} className="l3d-module">
-          <svg
-            className="l3d-module-ico"
-            viewBox="0 0 16 16"
-            fill="none"
-            aria-hidden="true"
-          >
+          <svg className="l3d-module-ico" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path
               d="M3.5 8.5l3 3 6-7"
               stroke="currentColor"
@@ -148,9 +143,8 @@ export function ScrollSections() {
               hazır.
             </h1>
             <p className="l3d-lead" data-hero-text>
-              Zorunlu eğitimleri oluşturun, personele atayın ve tamamlanmayı
-              otomatik izleyin. Video, sınav, sertifika ve denetim raporu — hepsi
-              tek panelde.
+              Zorunlu eğitimleri oluşturun, personele atayın ve tamamlanmayı otomatik izleyin.
+              Video, sınav, sertifika ve denetim raporu — hepsi tek panelde.
             </p>
             <div className="l3d-cta-row" data-hero-text>
               <Link href="/demo" className="l3d-cta">
@@ -178,9 +172,8 @@ export function ScrollSections() {
               sistem yürütsün.
             </h2>
             <p className="l3d-lead">
-              Video, doküman ve sınavı tek akışta hazırlayın. İleri sarma kapalı,
-              izleme süresi gerçek — personel eğitimi gerçekten tamamlar, “izlemiş
-              gibi” yapamaz.
+              Video, doküman ve sınavı tek akışta hazırlayın. İleri sarma kapalı, izleme süresi
+              gerçek — personel eğitimi gerçekten tamamlar, “izlemiş gibi” yapamaz.
             </p>
             <ModuleList items={MODULES_EGITIM} />
           </div>
@@ -197,8 +190,8 @@ export function ScrollSections() {
               her an hazır.
             </h2>
             <p className="l3d-lead">
-              Tamamlanma oranları, sertifika geçerlilikleri ve KVKK uyum raporları
-              tek tıkla. Değiştirilemez işlem kayıtlarıyla tam izlenebilirlik.
+              Tamamlanma oranları, sertifika geçerlilikleri ve KVKK uyum raporları tek tıkla.
+              Değiştirilemez işlem kayıtlarıyla tam izlenebilirlik.
             </p>
             <ModuleList items={MODULES_UYUM} />
           </div>
@@ -227,10 +220,9 @@ export function ScrollSections() {
               olmadan eğitin.
             </h2>
             <p className="l3d-lead">
-              Eğitim için personeli salonda toplamaya, işini bırakıp gelmesini
-              beklemeye gerek yok — mesai kaybı olmaz. Herkes kendi vardiyasında
-              tamamlar; siz birim ve role göre toplu atar, kimde eksik kaldığını
-              yetkinlik matrisinde tek tabloda görürsünüz.
+              Eğitim için personeli salonda toplamaya, işini bırakıp gelmesini beklemeye gerek yok —
+              mesai kaybı olmaz. Herkes kendi vardiyasında tamamlar; siz birim ve role göre toplu
+              atar, kimde eksik kaldığını yetkinlik matrisinde tek tabloda görürsünüz.
             </p>
             <ModuleList items={MODULES_KURUM} />
           </div>
@@ -254,9 +246,8 @@ export function ScrollSections() {
               her cihazdan.
             </h2>
             <p className="l3d-lead">
-              Personel eğitimini telefonundan tamamlar, sertifikasını anında
-              indirir. Yöneticiler ilerlemeyi ve geri bildirimi gerçek zamanlı
-              görür.
+              Personel eğitimini telefonundan tamamlar, sertifikasını anında indirir. Yöneticiler
+              ilerlemeyi ve geri bildirimi gerçek zamanlı görür.
             </p>
             <ModuleList items={MODULES_ERISIM} />
           </div>
@@ -272,12 +263,7 @@ export function ScrollSections() {
               {DIFFERENTIATORS.map((d) => (
                 <li key={d.title} className="l3d-diff-item">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={d.img}
-                    alt=""
-                    aria-hidden="true"
-                    className="l3d-diff-ico"
-                  />
+                  <img src={d.img} alt="" aria-hidden="true" className="l3d-diff-ico" />
                   <span className="l3d-diff-text">
                     <span className="l3d-diff-h">{d.title}</span>
                     <span className="l3d-diff-d">{d.desc}</span>
@@ -298,20 +284,18 @@ export function ScrollSections() {
               kullanılıyor.
             </h2>
             <p className="l3d-lead">
-              Özel Konya Devakent Hastanesi, personel eğitiminden denetim
-              raporlamasına kadar uçtan uca KlinoVax kullanıyor.
+              Özel Devakent Hastanesi, personel eğitiminden denetim raporlamasına kadar uçtan uca
+              KlinoVax kullanıyor.
             </p>
             <div className="l3d-trust-row">
               <span className="l3d-trust-label">GÜVENİYOR</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logos/devakent.png"
-                alt="Özel Konya Devakent Hastanesi"
+                alt="Özel Devakent Hastanesi"
                 className="l3d-trust-logo"
               />
-              <span className="l3d-trust-name">
-                Özel Konya Devakent Hastanesi
-              </span>
+              <span className="l3d-trust-name">Özel Devakent Hastanesi</span>
             </div>
           </div>
         </section>
@@ -327,12 +311,7 @@ export function ScrollSections() {
           {SHOWCASE.map((c) => (
             <li key={c.title} className="l3d-showcase-card">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={c.img}
-                alt=""
-                aria-hidden="true"
-                className="l3d-showcase-img"
-              />
+              <img src={c.img} alt="" aria-hidden="true" className="l3d-showcase-img" />
               <span className="l3d-showcase-card-title">{c.title}</span>
               <span className="l3d-showcase-card-desc">{c.desc}</span>
             </li>
