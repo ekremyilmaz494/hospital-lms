@@ -20,9 +20,9 @@ const MODULES_UYUM: Module[] = [
   { title: "İşlem Geçmişi (Audit)", desc: "Değiştirilemez kayıt, tam izlenebilirlik." },
 ];
 const MODULES_KURUM: Module[] = [
-  { title: "Personel Yönetimi", desc: "Toplu içe aktarma, rol ve birim ataması." },
-  { title: "Yetkinlik Matrisi", desc: "Kim neyi tamamladı, kimde eksik var." },
-  { title: "Çok-Kurumlu Yönetim", desc: "Tamamen izole veriyle sınırsız kurum." },
+  { title: "Personel Yönetimi", desc: "Toplu içe aktarma; birim ve role göre düzenleme." },
+  { title: "Yetkinlik Matrisi", desc: "Kim neyi tamamladı, kimde eksik var — tek tabloda." },
+  { title: "Toplu Eğitim Atama", desc: "Yüzlerce personele role göre tek tıkla atama." },
 ];
 const MODULES_ERISIM: Module[] = [
   { title: "Mobil Uygulama", desc: "Eğitimi telefondan tamamla, sertifikayı indir." },
@@ -64,7 +64,35 @@ const DIFFERENTIATORS: { img: string; title: string; desc: string }[] = [
   {
     img: "/landing-3d/diff-saglik.svg",
     title: "Sağlığa özel",
-    desc: "Hastane iş akışına göre; çok-kurumlu, tam veri izolasyonu.",
+    desc: "Hastane iş akışına göre tasarım; verileriniz tamamen izole.",
+  },
+];
+
+// Sık sorulan sorular (sayfa altı, native <details> akordeon).
+const FAQ: { q: string; a: string }[] = [
+  {
+    q: "KlinoVax tam olarak nedir?",
+    a: "Hastane, klinik ve eczaneler için uçtan uca personel eğitim ve sınav platformudur. Eğitim oluşturma, atama, video izleme, sınav, sertifika ve denetim raporlamasını tek panelde toplar.",
+  },
+  {
+    q: "Kurulum ve personel aktarımı ne kadar sürer?",
+    a: "Kurulum için sunucu yönetimi gerekmez; bulut tabanlıdır. Personeli Excel ile toplu içe aktarabilir, birim ve rollere göre dakikalar içinde eğitim atamaya başlayabilirsiniz.",
+  },
+  {
+    q: "Verilerimiz güvende mi? KVKK uyumlu mu?",
+    a: "Evet. Her kurumun verisi tamamen izole edilir; veriler şifreli saklanır ve tüm kritik işlemler değiştirilemez şekilde kayda alınır. KVKK ve hizmet içi eğitim denetimlerine hazır raporlar üretilir.",
+  },
+  {
+    q: "Mevcut eğitim içeriklerimizi yükleyebilir miyiz?",
+    a: "Evet. Video ve dokümanlarınızı medya kütüphanesine yükleyip eğitim akışlarınıza ekleyebilir, soru bankasıyla kendi sınavlarınızı oluşturabilirsiniz.",
+  },
+  {
+    q: "Personel eğitimleri telefondan tamamlayabilir mi?",
+    a: "Evet. Personel eğitimi mobil cihazından izleyip sınavını olur, sertifikasını anında indirir. Videolarda ileri sarma kapalıdır; gerçek izleme süresi ölçülür.",
+  },
+  {
+    q: "Birden fazla hastane/şube yönetebilir miyiz?",
+    a: "Evet. Çok-kurumlu yapıda her şube kendi personeli, eğitimi ve raporuyla tamamen ayrı çalışır; tümünü tek yönetim panelinden izleyebilirsiniz.",
   },
 ];
 
@@ -111,15 +139,17 @@ export function ScrollSections() {
         <section id="hero" data-section="hero" className="l3d-section">
           <div className="l3d-copy l3d-copy-hero">
             <span className="l3d-eyebrow" data-hero-text>
-              PERSONELİNİZ HER ZAMAN
+              HASTANELER İÇİN EĞİTİM PLATFORMU
             </span>
             <h1 className="l3d-headline" data-hero-text>
-              Hazır.
+              Her zaman
+              <br />
+              hazır.
             </h1>
             <p className="l3d-lead" data-hero-text>
-              Eğitimi siz oluşturun, personele atayın; ileri-sarmasız video ve
-              otomatik sınavla ölçün, sertifikalandırın ve denetime hazır
-              raporlayın — hepsi tek yönetim panelinde.
+              Zorunlu eğitimleri oluşturun, personele atayın ve tamamlanmayı
+              otomatik izleyin. Video, sınav, sertifika ve denetim raporu — hepsi
+              tek panelde.
             </p>
             <div className="l3d-cta-row" data-hero-text>
               <Link href="/demo" className="l3d-cta">
@@ -140,16 +170,16 @@ export function ScrollSections() {
         <section id="egitim" data-section="closeup" className="l3d-section">
           <div className="l3d-copy l3d-copy-right l3d-step">
             <span className="l3d-step-num">01</span>
-            <span className="l3d-eyebrow">EĞİTİM & DEĞERLENDİRME</span>
+            <span className="l3d-eyebrow">EĞİTİM YÖNETİMİ</span>
             <h2 className="l3d-headline-md">
-              Siz kurgular,
+              Eğitimi siz tasarlayın,
               <br />
-              sistem uygular.
+              sistem yürütsün.
             </h2>
             <p className="l3d-lead">
-              Eğitim sihirbazıyla video, doküman ve sınavı dakikalar içinde
-              hazırlayın. İleri-sarma kilidi ve otomatik geçti-kaldı — personel
-              izlemiş gibi yapamaz, gerçekten öğrenir.
+              Video, doküman ve sınavı tek akışta hazırlayın. İleri sarma kapalı,
+              izleme süresi gerçek — personel eğitimi gerçekten tamamlar, “izlemiş
+              gibi” yapamaz.
             </p>
             <ModuleList items={MODULES_EGITIM} />
           </div>
@@ -161,13 +191,13 @@ export function ScrollSections() {
             <span className="l3d-step-num">02</span>
             <span className="l3d-eyebrow">UYUM & RAPORLAMA</span>
             <h2 className="l3d-headline-md">
-              Denetim anına
+              Denetime
               <br />
-              her zaman hazır.
+              her an hazır.
             </h2>
             <p className="l3d-lead">
-              Uyum raporları, etkinlik analizi, sertifika geçerlilikleri ve
-              değiştirilemez işlem geçmişi — Excel beklemeden, tek tıkla.
+              Tamamlanma oranları, sertifika geçerlilikleri ve KVKK uyum raporları
+              tek tıkla. Değiştirilemez işlem kayıtlarıyla tam izlenebilirlik.
             </p>
             <ModuleList items={MODULES_UYUM} />
           </div>
@@ -189,15 +219,16 @@ export function ScrollSections() {
         <section id="olcek" data-section="top" className="l3d-section">
           <div className="l3d-copy l3d-copy-left l3d-step">
             <span className="l3d-step-num">03</span>
-            <span className="l3d-eyebrow">KURUM & PERSONEL</span>
+            <span className="l3d-eyebrow">PERSONEL YÖNETİMİ</span>
             <h2 className="l3d-headline-md">
-              Kurumunuzla
+              Personeli yönetin,
               <br />
-              birlikte ölçeklenir.
+              eksiği görün.
             </h2>
             <p className="l3d-lead">
-              Tek hastaneden hastane zincirine. Kurum-bazlı tamamen izole veriyle
-              her şube kendi personeli, eğitimi ve raporuyla çalışır.
+              Personeli birim ve role göre düzenleyin, eğitimleri toplu atayın.
+              Yetkinlik matrisinde kimin neyi tamamladığını, kimde eksik kaldığını
+              tek tabloda görün.
             </p>
             <ModuleList items={MODULES_KURUM} />
           </div>
@@ -214,16 +245,16 @@ export function ScrollSections() {
         <section id="erisim" data-section="back" className="l3d-section">
           <div className="l3d-copy l3d-copy-left l3d-step">
             <span className="l3d-step-num">04</span>
-            <span className="l3d-eyebrow">ERİŞİM & İLETİŞİM</span>
+            <span className="l3d-eyebrow">MOBİL ERİŞİM</span>
             <h2 className="l3d-headline-md">
-              Vardiyada, evde,
+              Her yerden,
               <br />
-              serviste.
+              her cihazdan.
             </h2>
             <p className="l3d-lead">
               Personel eğitimini telefonundan tamamlar, sertifikasını anında
-              indirir. Yönetici canlı ilerlemeyi ve geri bildirimi panelden
-              gerçek zamanlı izler.
+              indirir. Yöneticiler ilerlemeyi ve geri bildirimi gerçek zamanlı
+              görür.
             </p>
             <ModuleList items={MODULES_ERISIM} />
           </div>
@@ -260,14 +291,13 @@ export function ScrollSections() {
           <div className="l3d-copy l3d-copy-left l3d-copy-guven">
             <span className="l3d-eyebrow">REFERANS</span>
             <h2 className="l3d-headline-md">
-              Sahalarda,
+              Sahada
               <br />
-              her gün.
+              kullanılıyor.
             </h2>
             <p className="l3d-lead">
               Özel Konya Devakent Hastanesi, personel eğitiminden denetim
-              raporlamasına kadar uçtan uca KlinoVax kullanıyor — vizyon, sahada
-              işliyor.
+              raporlamasına kadar uçtan uca KlinoVax kullanıyor.
             </p>
             <div className="l3d-trust-row">
               <span className="l3d-trust-label">GÜVENİYOR</span>
@@ -308,12 +338,30 @@ export function ScrollSections() {
         </ul>
       </section>
 
+      {/* Sık sorulan sorular — native <details> akordeon (client JS gerektirmez) */}
+      <section className="l3d-faq" aria-label="Sık sorulan sorular">
+        <div className="l3d-faq-head">
+          <span className="l3d-eyebrow">SIK SORULAN SORULAR</span>
+          <h2 className="l3d-showcase-title">Aklınızdaki sorular</h2>
+        </div>
+        <ul className="l3d-faq-list">
+          {FAQ.map((f) => (
+            <li key={f.q} className="l3d-faq-item">
+              <details className="l3d-faq-details">
+                <summary className="l3d-faq-q">
+                  <span>{f.q}</span>
+                  <span className="l3d-faq-icon" aria-hidden="true" />
+                </summary>
+                <p className="l3d-faq-a">{f.a}</p>
+              </details>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <footer className="l3d-footer">
         <div className="l3d-footer-brand-col">
           <span className="l3d-footer-brand">© KlinoVax · Eğitim Platformu</span>
-          <span className="l3d-footer-credit">
-            3D model: MajdyModels · CC BY 4.0
-          </span>
         </div>
         <nav className="l3d-footer-links">
           <Link href="/privacy">Gizlilik</Link>
