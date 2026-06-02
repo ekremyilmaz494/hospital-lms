@@ -69,7 +69,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 }
 
 function Field({ label, hint, icon: Icon, children }: {
-  label: string; hint?: string; icon: React.ElementType; children: React.ReactNode;
+  label: string; hint?: string; icon: LucideIcon; children: React.ReactNode;
 }) {
   return (
     <div>
