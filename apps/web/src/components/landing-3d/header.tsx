@@ -4,14 +4,13 @@ import Link from "next/link";
 export function Header() {
   return (
     <header className="l3d-header">
-      <Link href="/" className="l3d-logo">
+      <Link href="/landing-3d" className="l3d-logo">
         KlinoVax
       </Link>
 
       <nav className="l3d-nav">
-        <a href="#egitim">Eğitim</a>
-        <a href="#kanit">Kanıt</a>
-        <Link href="/pricing">Fiyatlandırma</Link>
+        <Link href="/landing-3d#egitim">Eğitim</Link>
+        <Link href="/landing-3d#kanit">Kanıt</Link>
         <Link href="/contact">İletişim</Link>
       </nav>
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FeatureStat } from "./feature-stat";
+import { Footer } from "./footer";
 
 type Module = { title: string; desc: string };
 
@@ -221,14 +222,15 @@ export function ScrollSections() {
             <span className="l3d-step-num">03</span>
             <span className="l3d-eyebrow">PERSONEL YÖNETİMİ</span>
             <h2 className="l3d-headline-md">
-              Personeli yönetin,
+              Mesai kaybı
               <br />
-              eksiği görün.
+              olmadan eğitin.
             </h2>
             <p className="l3d-lead">
-              Personeli birim ve role göre düzenleyin, eğitimleri toplu atayın.
-              Yetkinlik matrisinde kimin neyi tamamladığını, kimde eksik kaldığını
-              tek tabloda görün.
+              Eğitim için personeli salonda toplamaya, işini bırakıp gelmesini
+              beklemeye gerek yok — mesai kaybı olmaz. Herkes kendi vardiyasında
+              tamamlar; siz birim ve role göre toplu atar, kimde eksik kaldığını
+              yetkinlik matrisinde tek tabloda görürsünüz.
             </p>
             <ModuleList items={MODULES_KURUM} />
           </div>
@@ -339,7 +341,7 @@ export function ScrollSections() {
       </section>
 
       {/* Sık sorulan sorular — native <details> akordeon (client JS gerektirmez) */}
-      <section className="l3d-faq" aria-label="Sık sorulan sorular">
+      <section id="sss" className="l3d-faq" aria-label="Sık sorulan sorular">
         <div className="l3d-faq-head">
           <span className="l3d-eyebrow">SIK SORULAN SORULAR</span>
           <h2 className="l3d-showcase-title">Aklınızdaki sorular</h2>
@@ -359,17 +361,7 @@ export function ScrollSections() {
         </ul>
       </section>
 
-      <footer className="l3d-footer">
-        <div className="l3d-footer-brand-col">
-          <span className="l3d-footer-brand">© KlinoVax · Eğitim Platformu</span>
-        </div>
-        <nav className="l3d-footer-links">
-          <Link href="/privacy">Gizlilik</Link>
-          <Link href="/kvkk">KVKK</Link>
-          <Link href="/terms">Kullanım Şartları</Link>
-          <Link href="/contact">İletişim</Link>
-        </nav>
-      </footer>
+      <Footer />
     </>
   );
 }

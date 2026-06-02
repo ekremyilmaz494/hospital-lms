@@ -79,6 +79,8 @@ const nextConfig: NextConfig = {
       : {}),
   },
   redirects: async () => [
+    // Ana sayfa artık 3D landing. Eski `/` landing emekli (yönlendirme).
+    { source: '/', destination: '/landing-3d', permanent: false },
     {
       source: '/admin/media-library',
       destination: '/admin/content-library',
@@ -91,7 +93,7 @@ const nextConfig: NextConfig = {
     },
     // Eski /marketing/* URL'leri root marketing route group'una taşındı.
     // Eski bookmark/SEO için 301 redirect.
-    { source: '/marketing', destination: '/', permanent: true },
+    { source: '/marketing', destination: '/landing-3d', permanent: true },
     { source: '/marketing/:path*', destination: '/:path*', permanent: true },
     // Ek hak talepleri sınav değil, eğitim assignment life-cycle'ına ait.
     {

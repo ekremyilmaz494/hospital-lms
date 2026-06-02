@@ -7,7 +7,7 @@ const PUBLIC_ROUTES = [
   '/',
   '/landing-3d',
   '/kvkk',
-  '/pricing',
+  '/pricing', // route silindi; public kalsın ki login'e değil temiz 404'e düşsün
   '/demo',
   '/sectors/',
   '/contact',
