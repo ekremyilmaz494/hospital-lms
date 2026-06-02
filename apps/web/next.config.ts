@@ -1,7 +1,7 @@
-import type { NextConfig } from "next";
-import withPWAInit from "@ducanh2912/next-pwa";
+import type { NextConfig } from 'next';
+import withPWAInit from '@ducanh2912/next-pwa';
 import { withSentryConfig } from '@sentry/nextjs';
-import path from "node:path";
+import path from 'node:path';
 
 // Monorepo root (apps/web'in iki üstü). Turbopack workspace boundary'sini ve
 // outputFileTracingRoot'u burası belirler. pnpm workspaces'te node_modules/.pnpm
@@ -10,7 +10,7 @@ import path from "node:path";
 // Local dev'de pnpm --filter web dev CWD'yi apps/web yapar → '..' '..' = repo root.
 // Eski not (Desktop/deva-project parent issue): artık geçerli değil çünkü apps/web
 // gerçek bir monorepo içinde, parent'ta legit pnpm-workspace.yaml var.
-const projectRoot = path.resolve("..", "..");
+const projectRoot = path.resolve('..', '..');
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -22,10 +22,10 @@ if (process.env.NODE_ENV === 'production' && !process.env.CI) {
   if (!supabaseUrl.includes(expectedRef)) {
     throw new Error(
       `\n\n🚨 NEXT_PUBLIC_SUPABASE_URL yanlış Supabase projesine işaret ediyor!\n` +
-      `   Beklenen ref: ${expectedRef} (Frankfurt eu-central-1)\n` +
-      `   Mevcut URL:   ${supabaseUrl || '(boş)'}\n` +
-      `   → Vercel Environment Variables'ı kontrol edin.\n` +
-      `   → Doğru URL: https://${expectedRef}.supabase.co\n\n`
+        `   Beklenen ref: ${expectedRef} (Frankfurt eu-central-1)\n` +
+        `   Mevcut URL:   ${supabaseUrl || '(boş)'}\n` +
+        `   → Vercel Environment Variables'ı kontrol edin.\n` +
+        `   → Doğru URL: https://${expectedRef}.supabase.co\n\n`
     );
   }
 }
@@ -38,14 +38,14 @@ if (process.env.NODE_ENV === 'production' && !process.env.CI) {
 // dosyayı overwrite etmesini engelliyoruz. Wrapper'ı tamamen sökme + paket
 // kaldırma sonraki temizlik PR'ında yapılacak.
 const withPWA = withPWAInit({
-  dest: "public",
+  dest: 'public',
   disable: true,
 });
 
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
-  serverExternalPackages: ["remotion", "@remotion/cli"],
+  serverExternalPackages: ['remotion', '@remotion/cli'],
   turbopack: {
     root: projectRoot,
   },
@@ -54,7 +54,8 @@ const nextConfig: NextConfig = {
   // Dev+darwin'de distDir'i .next.nosync yapıp iCloud eviction'ı engelliyoruz.
   // Vercel (Linux + prod) ve CI koşulu geçer, klasik .next kullanılır.
   // NEXT_DIST_DIR env override'ı isteğe bağlı (ör. RAM disk testi için).
-  distDir: process.env.NEXT_DIST_DIR ??
+  distDir:
+    process.env.NEXT_DIST_DIR ??
     (process.env.NODE_ENV === 'development' && process.platform === 'darwin'
       ? '.next.nosync'
       : '.next'),
@@ -66,7 +67,19 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     proxyClientMaxBodySize: '512mb',
-    optimizePackageImports: ['recharts', '@radix-ui/react-icons', 'lucide-react', 'framer-motion', 'date-fns', '@tanstack/react-table', '@tiptap/react', 'react-pdf', 'gsap', '@gsap/react', 'lenis'],
+    optimizePackageImports: [
+      'recharts',
+      '@radix-ui/react-icons',
+      'lucide-react',
+      'framer-motion',
+      'date-fns',
+      '@tanstack/react-table',
+      '@tiptap/react',
+      'react-pdf',
+      'gsap',
+      '@gsap/react',
+      'lenis',
+    ],
     // View Transitions API — landing ↔ login arasında smooth crossfade.
     // Desteklenmeyen tarayıcılarda (eski Safari) browser default navigation'a düşer.
     viewTransition: true,
@@ -101,10 +114,26 @@ const nextConfig: NextConfig = {
     },
     // Sektör-agnostik refactor (Faz 1): super-admin altındaki "hospitals"
     // route'u "organizations"a taşındı. Eski bookmark/API client'lar için 308.
-    { source: '/super-admin/hospitals', destination: '/super-admin/organizations', permanent: true },
-    { source: '/super-admin/hospitals/:path*', destination: '/super-admin/organizations/:path*', permanent: true },
-    { source: '/api/super-admin/hospitals', destination: '/api/super-admin/organizations', permanent: true },
-    { source: '/api/super-admin/hospitals/:path*', destination: '/api/super-admin/organizations/:path*', permanent: true },
+    {
+      source: '/super-admin/hospitals',
+      destination: '/super-admin/organizations',
+      permanent: true,
+    },
+    {
+      source: '/super-admin/hospitals/:path*',
+      destination: '/super-admin/organizations/:path*',
+      permanent: true,
+    },
+    {
+      source: '/api/super-admin/hospitals',
+      destination: '/api/super-admin/organizations',
+      permanent: true,
+    },
+    {
+      source: '/api/super-admin/hospitals/:path*',
+      destination: '/api/super-admin/organizations/:path*',
+      permanent: true,
+    },
   ],
   headers: async () => [
     {
@@ -126,21 +155,32 @@ const nextConfig: NextConfig = {
             "img-src 'self' data: https: blob:",
             "font-src 'self' data:",
             // unpkg.com: ffmpeg-core.wasm fetch
-            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://unpkg.com",
+            // blob:: three.js GLTFLoader gömülü GLB texture'larını blob URL'den fetch eder
+            "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://unpkg.com",
             "media-src 'self' data: https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             "frame-src 'self' https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             // blob:: ffmpeg.wasm internal worker'i blob URL'den olusturuyor
             "worker-src 'self' blob:",
             "manifest-src 'self'",
             "frame-ancestors 'none'",
-          ].join('; ')
+          ].join('; '),
         },
       ],
     },
     {
       source: '/_next/static/(.*)',
       headers: [
-        { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        {
+          key: 'Cache-Control',
+          // Turbopack dev chunk adları path-stable (hash'siz). Prod'da hash'li
+          // olduğu için immutable güvenli; dev'de immutable, kod değişince
+          // tarayıcının eski chunk'ı tutup "module factory not available"
+          // hatası vermesine yol açıyor → dev'de revalidate zorunlu.
+          value:
+            process.env.NODE_ENV === 'development'
+              ? 'no-store, must-revalidate'
+              : 'public, max-age=31536000, immutable',
+        },
       ],
     },
     {

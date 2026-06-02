@@ -1,26 +1,11 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import {
-  Mail,
-  Phone,
-  MapPin,
-  Send,
-  CheckCircle,
-  Loader2,
-} from "lucide-react";
-import { BRAND } from "@/lib/brand";
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.08, duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
-  }),
-};
+import { useState } from 'react';
+import Link from 'next/link';
+import { Mail, Phone, MapPin, Send, CheckCircle, Loader2 } from 'lucide-react';
+import { BRAND } from '@/lib/brand';
+import { Header } from '@/components/landing-3d/header';
+import { Footer } from '@/components/landing-3d/footer';
 
 type FormState = {
   name: string;
@@ -29,12 +14,20 @@ type FormState = {
   message: string;
 };
 
+const INPUT_STYLE: React.CSSProperties = {
+  borderColor: 'var(--landing-rule)',
+  backgroundColor: 'var(--landing-bg)',
+  color: 'var(--landing-ink)',
+  fontFamily: 'var(--font-body)',
+};
+
+/** İletişim sayfası — landing-3d tasarım dili (l3d header/footer + --landing-* token). */
 export function ContactClient() {
   const [form, setForm] = useState<FormState>({
-    name: "",
-    email: "",
-    subject: "",
-    message: "",
+    name: '',
+    email: '',
+    subject: '',
+    message: '',
   });
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -51,16 +44,17 @@ export function ContactClient() {
     setError(null);
 
     try {
-      const res = await fetch("/api/public/demo-request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      // Backend korunur: iletişim formu demo-request endpoint'ine düşer.
+      const res = await fetch('/api/public/demo-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           firstName: form.name,
-          lastName: "-",
+          lastName: '-',
           email: form.email,
-          phone: "-",
+          phone: '-',
           organizationName: form.subject,
-          staffCount: "-",
+          staffCount: '-',
           message: `[ILETISIM FORMU] ${form.message}`,
         }),
       });
@@ -68,254 +62,263 @@ export function ContactClient() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Bir hata olustu. Lutfen tekrar deneyin.");
+        setError(data.error || 'Bir hata oluştu. Lütfen tekrar deneyin.');
         return;
       }
 
       setSubmitted(true);
     } catch {
-      setError("Baglanti hatasi. Lutfen tekrar deneyin.");
+      setError('Bağlantı hatası. Lütfen tekrar deneyin.');
     } finally {
       setLoading(false);
     }
   }
 
-  if (submitted) {
-    return (
-      <div className="py-20 lg:py-28">
-        <div className="max-w-lg mx-auto px-6 text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ backgroundColor: "rgba(13,150,104,0.1)" }}
-            >
-              <CheckCircle className="w-8 h-8" style={{ color: "#0d9668" }} />
-            </div>
-            <h2 className="text-2xl font-black mb-3" style={{ color: "var(--color-text-primary)" }}>
-              Mesajiniz Iletildi!
-            </h2>
-            <p className="text-base leading-relaxed mb-8" style={{ color: "var(--color-text-secondary)" }}>
-              En kisa surede size geri donus yapacagiz.
-            </p>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white"
-              style={{ backgroundColor: "#0d9668" }}
-            >
-              Ana Sayfaya Don
-            </Link>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="py-16 lg:py-24">
-      <div className="max-w-7xl mx-auto px-6">
-        {/* Header */}
-        <div className="text-center max-w-2xl mx-auto mb-14">
-          <p className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: "#0d9668" }}>
-            Iletisim
-          </p>
-          <h1 className="text-3xl lg:text-4xl font-black mb-4" style={{ color: "var(--color-text-primary)" }}>
-            Bize Ulasin
-          </h1>
-          <p className="text-base leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
-            Sorulariniz, onerileriniz veya isbirligi talepleriniz icin bizimle iletisime gecin.
-          </p>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Contact info cards */}
-          <div className="space-y-5">
-            {[
-              {
-                icon: Mail,
-                title: "E-posta",
-                value: BRAND.supportEmail,
-                desc: "Is gunleri 09:00 - 18:00 arasi yanit",
-              },
-              {
-                icon: Phone,
-                title: "Telefon",
-                value: BRAND.contact.phone,
-                desc: "Pazartesi - Cuma, 09:00 - 18:00",
-              },
-              {
-                icon: MapPin,
-                title: "Adres",
-                value: "Ankara, Turkiye",
-                desc: "Cankaya, Ankara 06690",
-              },
-            ].map(({ icon: Icon, title, value, desc }, i) => (
-              <motion.div
-                key={title}
-                initial="hidden"
-                animate="visible"
-                variants={fadeUp}
-                custom={i}
-                className="rounded-2xl border p-6"
-                style={{
-                  backgroundColor: "var(--color-surface)",
-                  borderColor: "var(--color-border)",
-                }}
-              >
-                <div className="flex items-start gap-4">
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: "rgba(13,150,104,0.08)" }}
-                  >
-                    <Icon className="w-5 h-5" style={{ color: "#0d9668" }} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold mb-0.5" style={{ color: "var(--color-text-primary)" }}>
-                      {title}
-                    </p>
-                    <p className="text-sm font-medium" style={{ color: "#0d9668" }}>
-                      {value}
-                    </p>
-                    <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
-                      {desc}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Contact form */}
-          <div className="lg:col-span-2">
-            <motion.form
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.15 }}
-              onSubmit={handleSubmit}
-              className="rounded-2xl border p-8"
+    <div className="l3d-page" style={{ minHeight: '100vh' }}>
+      <Header />
+      <main style={{ paddingTop: '132px', paddingBottom: '96px' }}>
+        <div className="mx-auto max-w-6xl px-6">
+          {/* Başlık */}
+          <div className="mx-auto mb-12 max-w-2xl text-center lg:mb-16">
+            <span className="l3d-eyebrow">İLETİŞİM</span>
+            <h1
+              className="mt-3 mb-4 font-bold"
               style={{
-                backgroundColor: "var(--color-surface)",
-                borderColor: "var(--color-border)",
+                fontFamily: 'var(--font-display)',
+                fontSize: 'clamp(34px, 5vw, 56px)',
+                lineHeight: 1.02,
+                letterSpacing: '-0.03em',
+                color: 'var(--landing-ink)',
               }}
             >
-              <div className="grid sm:grid-cols-2 gap-5 mb-5">
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                    Ad Soyad <span style={{ color: "#dc2626" }}>*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    value={form.name}
-                    onChange={handleChange}
-                    placeholder="Adiniz Soyadiniz"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
-                    style={{
-                      borderColor: "var(--color-border)",
-                      backgroundColor: "var(--color-bg)",
-                      color: "var(--color-text-primary)",
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                    E-posta <span style={{ color: "#dc2626" }}>*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    value={form.email}
-                    onChange={handleChange}
-                    placeholder="ornek@kurum.com"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
-                    style={{
-                      borderColor: "var(--color-border)",
-                      backgroundColor: "var(--color-bg)",
-                      color: "var(--color-text-primary)",
-                    }}
-                  />
-                </div>
+              Bize ulaşın
+            </h1>
+            <p
+              className="text-base leading-relaxed"
+              style={{ color: 'var(--landing-ink-soft)', fontFamily: 'var(--font-body)' }}
+            >
+              Sorularınız, önerileriniz veya iş birliği talepleriniz için bizimle iletişime geçin.
+            </p>
+          </div>
+
+          {submitted ? (
+            <div className="mx-auto max-w-lg py-10 text-center">
+              <div
+                className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full"
+                style={{ backgroundColor: 'rgba(13,150,104,0.12)' }}
+              >
+                <CheckCircle className="h-8 w-8" style={{ color: 'var(--landing-brand)' }} />
               </div>
-
-              <div className="mb-5">
-                <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                  Konu <span style={{ color: "#dc2626" }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  name="subject"
-                  required
-                  value={form.subject}
-                  onChange={handleChange}
-                  placeholder="Mesajinizin konusu"
-                  className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
-                  style={{
-                    borderColor: "var(--color-border)",
-                    backgroundColor: "var(--color-bg)",
-                    color: "var(--color-text-primary)",
-                  }}
-                />
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                  Mesaj <span style={{ color: "#dc2626" }}>*</span>
-                </label>
-                <textarea
-                  name="message"
-                  rows={5}
-                  required
-                  value={form.message}
-                  onChange={handleChange}
-                  placeholder="Mesajinizi yazin..."
-                  className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668] resize-none"
-                  style={{
-                    borderColor: "var(--color-border)",
-                    backgroundColor: "var(--color-bg)",
-                    color: "var(--color-text-primary)",
-                  }}
-                />
-              </div>
-
-              {error && (
-                <div
-                  className="rounded-xl px-4 py-3 text-sm mb-5"
-                  style={{ backgroundColor: "rgba(220,38,38,0.08)", color: "#dc2626" }}
-                >
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white transition-transform hover:scale-[1.02] disabled:opacity-60 disabled:hover:scale-100 cursor-pointer"
+              <h2
+                className="mb-3 text-2xl font-bold"
+                style={{ fontFamily: 'var(--font-display)', color: 'var(--landing-ink)' }}
+              >
+                Mesajınız iletildi!
+              </h2>
+              <p
+                className="mb-8 text-base leading-relaxed"
+                style={{ color: 'var(--landing-ink-soft)' }}
+              >
+                En kısa sürede size geri dönüş yapacağız.
+              </p>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white"
                 style={{
-                  backgroundColor: "#0d9668",
-                  boxShadow: "0 8px 24px rgba(13,150,104,0.25)",
+                  backgroundColor: 'var(--landing-brand)',
+                  fontFamily: 'var(--font-display)',
                 }}
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Gonderiliyor...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Mesaj Gonder
-                  </>
-                )}
-              </button>
-            </motion.form>
-          </div>
+                Ana sayfaya dön
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-3 lg:gap-8">
+              {/* İletişim bilgileri */}
+              <div className="space-y-5">
+                {[
+                  {
+                    icon: Mail,
+                    title: 'E-posta',
+                    value: BRAND.supportEmail,
+                    desc: 'İş günleri 09:00 - 18:00 arası yanıt',
+                  },
+                  {
+                    icon: Phone,
+                    title: 'Telefon',
+                    value: BRAND.contact.phone,
+                    desc: 'Pazartesi - Cuma, 09:00 - 18:00',
+                  },
+                  {
+                    icon: MapPin,
+                    title: 'Adres',
+                    value: BRAND.contact.city,
+                    desc: 'Türkiye',
+                  },
+                ].map(({ icon: Icon, title, value, desc }) => (
+                  <div
+                    key={title}
+                    className="rounded-2xl border p-6"
+                    style={{
+                      backgroundColor: 'var(--landing-surface)',
+                      borderColor: 'var(--landing-rule)',
+                    }}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl"
+                        style={{ backgroundColor: 'rgba(13,150,104,0.1)' }}
+                      >
+                        <Icon className="h-5 w-5" style={{ color: 'var(--landing-brand)' }} />
+                      </div>
+                      <div>
+                        <p
+                          className="mb-0.5 text-sm font-bold"
+                          style={{ fontFamily: 'var(--font-display)', color: 'var(--landing-ink)' }}
+                        >
+                          {title}
+                        </p>
+                        <p
+                          className="text-sm font-medium"
+                          style={{ color: 'var(--landing-brand)' }}
+                        >
+                          {value}
+                        </p>
+                        <p className="mt-1 text-xs" style={{ color: 'var(--landing-ink-soft)' }}>
+                          {desc}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Form */}
+              <div className="lg:col-span-2">
+                <form
+                  onSubmit={handleSubmit}
+                  className="rounded-2xl border p-6 sm:p-8"
+                  style={{
+                    backgroundColor: 'var(--landing-surface)',
+                    borderColor: 'var(--landing-rule)',
+                  }}
+                >
+                  <div className="mb-5 grid gap-5 sm:grid-cols-2">
+                    <div>
+                      <label
+                        className="mb-1.5 block text-sm font-medium"
+                        style={{ color: 'var(--landing-ink)' }}
+                      >
+                        Ad Soyad <span style={{ color: '#dc2626' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        required
+                        value={form.name}
+                        onChange={handleChange}
+                        placeholder="Adınız Soyadınız"
+                        className="w-full rounded-xl border px-4 py-3 text-sm transition-colors outline-none focus:border-[#0d9668]"
+                        style={INPUT_STYLE}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="mb-1.5 block text-sm font-medium"
+                        style={{ color: 'var(--landing-ink)' }}
+                      >
+                        E-posta <span style={{ color: '#dc2626' }}>*</span>
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        required
+                        value={form.email}
+                        onChange={handleChange}
+                        placeholder="ornek@kurum.com"
+                        className="w-full rounded-xl border px-4 py-3 text-sm transition-colors outline-none focus:border-[#0d9668]"
+                        style={INPUT_STYLE}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-5">
+                    <label
+                      className="mb-1.5 block text-sm font-medium"
+                      style={{ color: 'var(--landing-ink)' }}
+                    >
+                      Konu <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="subject"
+                      required
+                      value={form.subject}
+                      onChange={handleChange}
+                      placeholder="Mesajınızın konusu"
+                      className="w-full rounded-xl border px-4 py-3 text-sm transition-colors outline-none focus:border-[#0d9668]"
+                      style={INPUT_STYLE}
+                    />
+                  </div>
+
+                  <div className="mb-6">
+                    <label
+                      className="mb-1.5 block text-sm font-medium"
+                      style={{ color: 'var(--landing-ink)' }}
+                    >
+                      Mesaj <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <textarea
+                      name="message"
+                      rows={5}
+                      required
+                      value={form.message}
+                      onChange={handleChange}
+                      placeholder="Mesajınızı yazın..."
+                      className="w-full resize-none rounded-xl border px-4 py-3 text-sm transition-colors outline-none focus:border-[#0d9668]"
+                      style={INPUT_STYLE}
+                    />
+                  </div>
+
+                  {error && (
+                    <div
+                      className="mb-5 rounded-xl px-4 py-3 text-sm"
+                      style={{ backgroundColor: 'rgba(220,38,38,0.08)', color: '#dc2626' }}
+                    >
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full py-3.5 text-sm font-bold text-white transition-transform hover:scale-[1.02] disabled:opacity-60 disabled:hover:scale-100"
+                    style={{
+                      backgroundColor: 'var(--landing-brand)',
+                      fontFamily: 'var(--font-display)',
+                      boxShadow: '0 8px 24px rgba(13,150,104,0.25)',
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Gönderiliyor...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" />
+                        Mesaj Gönder
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      </main>
+      <Footer />
     </div>
   );
 }

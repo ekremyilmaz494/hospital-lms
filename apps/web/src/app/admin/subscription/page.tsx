@@ -169,11 +169,11 @@ export default function SubscriptionPage() {
             Platformun tüm özelliklerine erişmek için bir plan seçin.
           </p>
           <Link
-            href="/pricing"
+            href="/contact"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white"
             style={{ backgroundColor: K.PRIMARY }}
           >
-            Planları İncele <ArrowUpRight className="w-4 h-4" />
+            İletişime Geçin <ArrowUpRight className="w-4 h-4" />
           </Link>
         </div>
       </div>

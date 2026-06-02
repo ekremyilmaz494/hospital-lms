@@ -21,10 +21,11 @@ import {
   AlertCircle,
   Database,
   TrendingUp,
+  type LucideIcon,
 } from "lucide-react";
 
 type Feature = {
-  icon: React.ElementType;
+  icon: LucideIcon;
   title: string;
   desc: string;
   badge?: string;

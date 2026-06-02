@@ -7,6 +7,7 @@ import {
   Library, Clock, Star, CheckCircle2, Plus, Layers, X, ArrowRight,
   Film, Search, Eye,
   BookOpen, GraduationCap, Trash2, ChevronRight,
+  type LucideIcon,
 } from 'lucide-react'
 import { useFetch } from '@/hooks/use-fetch'
 import { useDebounce } from '@/hooks/use-debounce'
@@ -540,7 +541,7 @@ function FilterPill({ active, onClick, label, color }: FilterPillProps) {
 // ── Reusable Empty State ──────────────────────────────────────────────────
 
 interface EmptyStateProps {
-  icon: React.ElementType
+  icon: LucideIcon
   title: string
   description: string
   action?: { label: string; onClick: () => void }
@@ -1162,7 +1163,7 @@ type ActiveTab = 'platform' | 'my-videos'
 export default function AdminContentLibraryPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('platform')
 
-  const tabs: { id: ActiveTab; label: string; icon: React.ElementType; description: string }[] = [
+  const tabs: { id: ActiveTab; label: string; icon: LucideIcon; description: string }[] = [
     { id: 'platform', label: 'Platform Kütüphanesi', icon: Library, description: 'Hazır eğitim içerikleri' },
     { id: 'my-videos', label: 'Eğitim Videolarım', icon: Film, description: 'Yüklenen videolar' },
   ]
