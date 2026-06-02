@@ -110,15 +110,6 @@ export function ScrollSections() {
                 Modülleri keşfet →
               </a>
             </div>
-            <div className="l3d-trust" data-hero-text>
-              <span className="l3d-trust-label">GÜVENİYOR</span>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/logos/devakent.png"
-                alt="Özel Konya Devakent Hastanesi"
-                className="l3d-trust-logo"
-              />
-            </div>
           </div>
           <div className="l3d-scroll-cue" aria-hidden="true">
             <span>Keşfetmek için kaydırın</span>
@@ -219,7 +210,36 @@ export function ScrollSections() {
           </div>
         </section>
 
-        {/* §6 — FINAL */}
+        {/* §6 — GÜVEN (Devakent referansı; telefon ekranında logo görünür) */}
+        <section id="guven" data-section="guven" className="l3d-section">
+          <div className="l3d-copy l3d-copy-left l3d-copy-guven">
+            <span className="l3d-eyebrow">REFERANS</span>
+            <h2 className="l3d-headline-md">
+              Sahalarda,
+              <br />
+              her gün.
+            </h2>
+            <p className="l3d-lead">
+              Özel Konya Devakent Hastanesi, personel eğitiminden denetim
+              raporlamasına kadar uçtan uca KlinoVax kullanıyor — vizyon, sahada
+              işliyor.
+            </p>
+            <div className="l3d-trust-row">
+              <span className="l3d-trust-label">GÜVENİYOR</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logos/devakent.png"
+                alt="Özel Konya Devakent Hastanesi"
+                className="l3d-trust-logo"
+              />
+              <span className="l3d-trust-name">
+                Özel Konya Devakent Hastanesi
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* §7 — FINAL */}
         <section id="demo-cta" data-section="final" className="l3d-section">
           <div className="l3d-copy l3d-copy-final">
             <span className="l3d-eyebrow">{"KLİNOVAX'I DENEYİN"}</span>
@@ -258,24 +278,6 @@ export function ScrollSections() {
             </li>
           ))}
         </ul>
-      </section>
-
-      {/* Yatay referans bandı — bölümler arası geçişte tam genişlik şerit */}
-      <section className="l3d-trustband" aria-label="Referanslar">
-        <span className="l3d-trustband-label">GÜVENİYOR</span>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logos/devakent.png"
-          alt="Özel Konya Devakent Hastanesi"
-          className="l3d-trustband-logo"
-        />
-        <span className="l3d-trustband-name">Özel Konya Devakent Hastanesi</span>
-        <span className="l3d-trustband-sep" aria-hidden="true">
-          ·
-        </span>
-        <span className="l3d-trustband-tag">
-          Sağlık kurumlarının uçtan uca eğitim tercihi
-        </span>
       </section>
 
       <footer className="l3d-footer">

@@ -13,7 +13,8 @@ export type ScreenKind =
   | "exam"
   | "reports"
   | "mobile"
-  | "discipline";
+  | "discipline"
+  | "trust";
 
 const C = {
   bg: "#ffffff",
@@ -139,6 +140,7 @@ const SCREEN_IMAGES: Partial<Record<ScreenKind, string>> = {
   reports: "/landing-3d/screen-report.webp",
   exam: "/landing-3d/screen-exam.webp",
   mobile: "/landing-3d/screen-cert.webp",
+  trust: "/logos/devakent.png",
 };
 const imageCache = new Map<string, HTMLImageElement>();
 
@@ -190,6 +192,28 @@ function drawImageCover(
   }
   ctx.drawImage(img, dx, dy, dw, dh);
   ctx.restore();
+}
+
+/** Görseli kutuya "contain" (tamamı sığar, kırpılmaz) ortalı çizer — logolar için. */
+function drawImageContain(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
+  const ir = img.width / img.height;
+  const tr = w / h;
+  let dw: number, dh: number;
+  if (ir > tr) {
+    dw = w;
+    dh = w / ir;
+  } else {
+    dh = h;
+    dw = h * ir;
+  }
+  ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
 }
 
 /** Görsel üstüne amber play butonu (daire + üçgen). */
@@ -438,12 +462,48 @@ function drawMobile(ctx: CanvasRenderingContext2D): void {
   ctx.fillText("Vardiyada · Evde · Serviste", W / 2, cy + ch + 152);
 }
 
+// ── TRUST — sahada kanıtlı referans (Devakent logosu) ───────────────────────
+function drawTrust(ctx: CanvasRenderingContext2D): void {
+  statusBar(ctx);
+  sectionTitle(ctx, "GÜVENİYOR", "Sahada", "kanıtlı.");
+
+  // Logo kartı — Devakent logosu (contain, kırpmasız), açık zemin.
+  const cx = 56;
+  const cy = 430;
+  const cw = W - 112;
+  const ch = 300;
+  roundRect(ctx, cx, cy, cw, ch, 28);
+  ctx.fillStyle = C.surface;
+  ctx.fill();
+  const logo = imageCache.get(SCREEN_IMAGES.trust ?? "");
+  if (logo) {
+    drawImageContain(ctx, logo, cx + 64, cy + 84, cw - 128, ch - 168);
+  }
+
+  // Hastane adı (iki satır, ortalı).
+  ctx.textAlign = "center";
+  ctx.fillStyle = C.ink;
+  ctx.font = `700 40px ${FONT}`;
+  ctx.fillText("Özel Konya", W / 2, cy + ch + 96);
+  ctx.fillText("Devakent Hastanesi", W / 2, cy + ch + 144);
+
+  // Etiket — uçtan uca eğitim tercihi.
+  ctx.fillStyle = C.inkSoft;
+  ctx.font = `500 28px ${FONT}`;
+  ctx.fillText("Sağlık kurumlarının uçtan uca", W / 2, cy + ch + 200);
+  ctx.fillText("eğitim tercihi", W / 2, cy + ch + 238);
+
+  // Rozet — aktif kullanım.
+  pill(ctx, W / 2, cy + ch + 296, 360, 84, C.brand, C.white, "Aktif kullanımda");
+}
+
 const DRAWERS: Record<ScreenKind, (ctx: CanvasRenderingContext2D) => void> = {
   hero: drawHero,
   exam: drawExam,
   reports: drawReports,
   mobile: drawMobile,
   discipline: drawDiscipline,
+  trust: drawTrust,
 };
 
 /** Verilen ekran türünü mevcut bir canvas'a çizer (görsel yüklenince yeniden çağrılır). */

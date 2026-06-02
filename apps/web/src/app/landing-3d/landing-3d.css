@@ -121,6 +121,27 @@
   opacity: 0.92;
 }
 
+/* §7 Güven (Devakent referansı) — kapanış 3D bölümü */
+.l3d-copy-guven .l3d-headline-md {
+  font-size: clamp(34px, 4.2vw, 64px);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+.l3d-trust-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  pointer-events: auto;
+}
+.l3d-trust-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--landing-ink);
+}
+
 /* ── Header ─────────────────────────────────────────────────────── */
 .l3d-header {
   position: fixed;
@@ -454,46 +475,6 @@
   font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.55;
-  color: var(--landing-ink-soft);
-}
-
-/* ── Yatay referans bandı (main DIŞINDA) ────────────────────────── */
-.l3d-trustband {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 20px;
-  padding: 28px 8vw;
-  background: var(--landing-surface);
-  border-top: 1px solid var(--landing-rule);
-  border-bottom: 1px solid var(--landing-rule);
-}
-.l3d-trustband-label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  color: var(--landing-ink-soft);
-}
-.l3d-trustband-logo {
-  height: 36px;
-  width: auto;
-  opacity: 0.95;
-}
-.l3d-trustband-name {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--landing-ink);
-}
-.l3d-trustband-sep {
-  color: var(--landing-rule-strong);
-}
-.l3d-trustband-tag {
-  font-family: var(--font-body);
-  font-size: 14px;
   color: var(--landing-ink-soft);
 }
 

@@ -25,13 +25,15 @@ if (typeof window !== "undefined") {
 const MODEL_URL = "/models/iphone.glb";
 
 // Her SCROLL_STATES keyframe'ine bir ekran. Bölüm metniyle hizalı:
-// hero → closeup(disiplin) → front(rapor) → top(sınav) → back(mobil) → final(hero/CTA).
+// hero → closeup(disiplin) → front(rapor) → exam(sınav) → cert(sertifika) →
+// güven(Devakent referansı) → final(hero/CTA).
 const STATE_SCREENS: ScreenKind[] = [
   "hero",
   "discipline",
   "reports",
   "exam",
   "mobile",
+  "trust",
   "hero",
 ];
 const SCREEN_KINDS: ScreenKind[] = [
@@ -40,6 +42,7 @@ const SCREEN_KINDS: ScreenKind[] = [
   "reports",
   "exam",
   "mobile",
+  "trust",
 ];
 
 type ScreenController = (progress: number) => void;

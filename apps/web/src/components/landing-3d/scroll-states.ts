@@ -17,7 +17,9 @@ export const SCROLL_STATES: ScrollState[] = [
   { id: "top",      position: [ 0.18,  0.06,  0.45], rotation: [ 0.07,  Math.PI + 0.34, -0.05], scale: 1.85 },
   // 4 — Cert: öne dönük, sağda, hafif yukarı "takdim" eğimi — sertifika ekranı görünür.
   { id: "back",     position: [ 0.62, -0.14,  0.10], rotation: [ 0.12,  Math.PI - 0.55,  0.07], scale: 1.65 },
-  // 5 — Final: solda, karşıya dönük, hafif büyütülmüş.
+  // 5 — Güven: sağda, öne dönük — telefon ekranında Devakent referansı görünür.
+  { id: "guven",    position: [ 0.62, -0.34,  0.10], rotation: [ 0.12,  Math.PI - 0.55,  0.07], scale: 1.6 },
+  // 6 — Final: solda, karşıya dönük, hafif büyütülmüş (kapanış CTA).
   { id: "final",    position: [-0.90, -0.05,  0.2],  rotation: [ 0.05,  Math.PI - 0.40, -0.02], scale: 1.9 },
 ];
 
