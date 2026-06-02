@@ -132,6 +132,81 @@ function pill(
   ctx.textBaseline = "alphabetic";
 }
 
+// ── Ekran görselleri (fal.ai) — async yüklenir, drawImage ile basılır ────────
+const SCREEN_IMAGES: Partial<Record<ScreenKind, string>> = {
+  hero: "/landing-3d/screen-hero.webp",
+  discipline: "/landing-3d/screen-video.webp",
+  reports: "/landing-3d/screen-report.webp",
+  exam: "/landing-3d/screen-exam.webp",
+  mobile: "/landing-3d/screen-cert.webp",
+};
+const imageCache = new Map<string, HTMLImageElement>();
+
+/** Ekran görsellerini önyükle; tümü çözülünce (veya hata) resolve eder. */
+export function preloadScreenImages(): Promise<void> {
+  const urls = Array.from(new Set(Object.values(SCREEN_IMAGES)));
+  return Promise.all(
+    urls.map(
+      (url) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            imageCache.set(url, img);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = url;
+        }),
+    ),
+  ).then(() => undefined);
+}
+
+/** Yuvarlak köşeli kutuya görseli "cover" (kırparak doldur) çizer. */
+function drawImageCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  ctx.save();
+  roundRect(ctx, x, y, w, h, r);
+  ctx.clip();
+  const ir = img.width / img.height;
+  const tr = w / h;
+  let dw: number, dh: number, dx: number, dy: number;
+  if (ir > tr) {
+    dh = h;
+    dw = h * ir;
+    dx = x - (dw - w) / 2;
+    dy = y;
+  } else {
+    dw = w;
+    dh = w / ir;
+    dx = x;
+    dy = y - (dh - h) / 2;
+  }
+  ctx.drawImage(img, dx, dy, dw, dh);
+  ctx.restore();
+}
+
+/** Görsel üstüne amber play butonu (daire + üçgen). */
+function playButton(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = C.accent;
+  ctx.fill();
+  ctx.fillStyle = C.white;
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 0.3, cy - r * 0.45);
+  ctx.lineTo(cx - r * 0.3, cy + r * 0.45);
+  ctx.lineTo(cx + r * 0.55, cy);
+  ctx.closePath();
+  ctx.fill();
+}
+
 // ── HERO ───────────────────────────────────────────────────────────────────
 function drawHero(ctx: CanvasRenderingContext2D): void {
   statusBar(ctx);
@@ -145,20 +220,20 @@ function drawHero(ctx: CanvasRenderingContext2D): void {
   ctx.font = `800 50px ${FONT}`;
   ctx.fillText("Eğitimin hazır.", W / 2, 360);
 
-  // play daire
-  const cx = W / 2;
-  const cy = 720;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 150, 0, Math.PI * 2);
-  ctx.fillStyle = C.accent;
-  ctx.fill();
-  ctx.fillStyle = C.white;
-  ctx.beginPath();
-  ctx.moveTo(cx - 45, cy - 70);
-  ctx.lineTo(cx - 45, cy + 70);
-  ctx.lineTo(cx + 80, cy);
-  ctx.closePath();
-  ctx.fill();
+  // Video thumbnail kartı (fal.ai görseli) + play
+  const tx = 56;
+  const ty = 432;
+  const tw = W - 112;
+  const th = 430;
+  const heroImg = imageCache.get(SCREEN_IMAGES.hero ?? "");
+  if (heroImg) {
+    drawImageCover(ctx, heroImg, tx, ty, tw, th, 28);
+  } else {
+    roundRect(ctx, tx, ty, tw, th, 28);
+    ctx.fillStyle = C.surface;
+    ctx.fill();
+  }
+  playButton(ctx, W / 2, ty + th / 2, 76);
 
   pill(ctx, W / 2, 980, 380, 96, C.brand, C.white, "Eğitime Başla");
 
@@ -177,24 +252,31 @@ function drawDiscipline(ctx: CanvasRenderingContext2D): void {
   statusBar(ctx);
   sectionTitle(ctx, "KLİNİK DİSİPLİN", "Eğitim,", "disiplinle.");
 
-  // Video çerçevesi (koyu)
+  // Video çerçevesi — fal.ai eğitim görseli (yoksa koyu zemin)
   const vx = 56;
   const vy = 408;
   const vw = W - 112;
   const vh = 320;
-  roundRect(ctx, vx, vy, vw, vh, 28);
-  ctx.fillStyle = C.ink;
-  ctx.fill();
-  // Play üçgeni
-  const pcx = W / 2;
-  const pcy = vy + vh / 2 - 14;
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
-  ctx.beginPath();
-  ctx.moveTo(pcx - 28, pcy - 38);
-  ctx.lineTo(pcx - 28, pcy + 38);
-  ctx.lineTo(pcx + 44, pcy);
-  ctx.closePath();
-  ctx.fill();
+  const vidImg = imageCache.get(SCREEN_IMAGES.discipline ?? "");
+  if (vidImg) {
+    drawImageCover(ctx, vidImg, vx, vy, vw, vh, 28);
+    // alt kısma okunabilirlik için hafif koyu gradyan
+    ctx.save();
+    roundRect(ctx, vx, vy, vw, vh, 28);
+    ctx.clip();
+    const grad = ctx.createLinearGradient(0, vy + vh - 120, 0, vy + vh);
+    grad.addColorStop(0, "rgba(10,15,12,0)");
+    grad.addColorStop(1, "rgba(10,15,12,0.55)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(vx, vy + vh - 120, vw, 120);
+    ctx.restore();
+  } else {
+    roundRect(ctx, vx, vy, vw, vh, 28);
+    ctx.fillStyle = C.ink;
+    ctx.fill();
+  }
+  // Play butonu
+  playButton(ctx, W / 2, vy + vh / 2 - 14, 54);
   // "İleri sarma kapalı" rozeti
   pill(ctx, W / 2, vy + vh - 78, 320, 60, C.accent, C.white, "İleri sarma kapalı");
 
@@ -224,39 +306,31 @@ function drawReports(ctx: CanvasRenderingContext2D): void {
   statusBar(ctx);
   sectionTitle(ctx, "DENETİME HAZIR", "Raporlar,", "otomatik.");
 
-  // Bar grafiği
+  // Analitik görseli (fal.ai) — yoksa açık zemin
   const bx = 56;
-  const baseY = 760;
   const bw = W - 112;
-  const bars = [0.4, 0.62, 0.55, 0.8, 0.95];
-  const gap = 28;
-  const barW = (bw - gap * (bars.length - 1)) / bars.length;
-  const maxH = 300;
-  bars.forEach((v, i) => {
-    const h = maxH * v;
-    const x = bx + i * (barW + gap);
-    roundRect(ctx, x, baseY - h, barW, h, 12);
-    ctx.fillStyle = i === bars.length - 1 ? C.brand : C.surface;
+  const iy = 408;
+  const ih = 360;
+  const img = imageCache.get(SCREEN_IMAGES.reports ?? "");
+  if (img) {
+    drawImageCover(ctx, img, bx, iy, bw, ih, 28);
+  } else {
+    roundRect(ctx, bx, iy, bw, ih, 28);
+    ctx.fillStyle = C.surface;
     ctx.fill();
-  });
-  ctx.strokeStyle = C.rule;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(bx, baseY);
-  ctx.lineTo(bx + bw, baseY);
-  ctx.stroke();
+  }
 
   // Başarı oranı
   ctx.textAlign = "left";
   ctx.fillStyle = C.ink;
-  ctx.font = `800 72px ${FONT}`;
-  ctx.fillText("%94", 56, 900);
+  ctx.font = `800 80px ${FONT}`;
+  ctx.fillText("%94", bx, iy + ih + 112);
   ctx.fillStyle = C.inkSoft;
   ctx.font = `500 28px ${FONT}`;
-  ctx.fillText("ortalama başarı oranı", 56, 944);
+  ctx.fillText("ortalama başarı oranı", bx, iy + ih + 156);
 
   // KVKK uyum rozeti
-  pill(ctx, W / 2, 1060, 380, 84, C.surface, C.brand, "Denetime hazır");
+  pill(ctx, W / 2, iy + ih + 232, 380, 84, C.surface, C.brand, "Denetime hazır");
 }
 
 // ── EXAM — otomatik değerlendirilen sınav ───────────────────────────────────
@@ -265,43 +339,58 @@ function drawExam(ctx: CanvasRenderingContext2D): void {
   ctx.textAlign = "left";
   ctx.fillStyle = C.brand;
   ctx.font = `700 30px ${FONT}`;
-  ctx.fillText("OTOMATİK SINAV", 56, 210);
+  ctx.fillText("OTOMATİK SINAV", 56, 182);
+
+  // Banner görseli (fal.ai)
+  const bx = 56;
+  const bw = W - 112;
+  const iy = 210;
+  const ih = 224;
+  const img = imageCache.get(SCREEN_IMAGES.exam ?? "");
+  if (img) {
+    drawImageCover(ctx, img, bx, iy, bw, ih, 28);
+  } else {
+    roundRect(ctx, bx, iy, bw, ih, 28);
+    ctx.fillStyle = C.surface;
+    ctx.fill();
+  }
+
   ctx.fillStyle = C.ink;
-  ctx.font = `800 50px ${FONT}`;
-  ctx.fillText("Soru 3 / 10", 56, 286);
+  ctx.font = `800 44px ${FONT}`;
+  ctx.fillText("Soru 3 / 10", 56, iy + ih + 62);
 
   // Soru metni
   ctx.fillStyle = C.inkSoft;
-  ctx.font = `500 32px ${FONT}`;
+  ctx.font = `500 30px ${FONT}`;
   wrapText(
     ctx,
     "Temel yaşam desteğinde kompresyon hızı kaç olmalı?",
     56,
-    360,
+    iy + ih + 116,
     W - 112,
-    44,
+    42,
   );
 
   // Şıklar
   const opts = ["80–90 / dk", "100–120 / dk", "60–70 / dk", "140+ / dk"];
   const correct = 1;
-  let oy = 520;
+  let oy = iy + ih + 196;
   opts.forEach((o, i) => {
-    roundRect(ctx, 56, oy, W - 112, 96, 20);
+    roundRect(ctx, 56, oy, W - 112, 88, 18);
     ctx.fillStyle = i === correct ? C.brand : C.surface;
     ctx.fill();
     ctx.textAlign = "left";
     ctx.fillStyle = i === correct ? C.white : C.ink;
-    ctx.font = `600 32px ${FONT}`;
-    ctx.fillText(o, 96, oy + 60);
-    oy += 120;
+    ctx.font = `600 30px ${FONT}`;
+    ctx.fillText(o, 92, oy + 54);
+    oy += 104;
   });
 
   // Otomatik değerlendirme notu
   ctx.textAlign = "center";
   ctx.fillStyle = C.inkSoft;
   ctx.font = `500 26px ${FONT}`;
-  ctx.fillText("Anında otomatik değerlendirme", W / 2, oy + 36);
+  ctx.fillText("Anında otomatik değerlendirme", W / 2, oy + 30);
 }
 
 // ── MOBILE — her yerden erişim + sertifika ──────────────────────────────────
@@ -309,48 +398,44 @@ function drawMobile(ctx: CanvasRenderingContext2D): void {
   statusBar(ctx);
   sectionTitle(ctx, "HER YERDEN", "Cebinde,", "her an.");
 
-  // Sertifika kartı
+  // Sertifika kartı — fal.ai görseli + alt gradyan + beyaz metin
   const cx = 56;
-  const cy = 440;
+  const cy = 432;
   const cw = W - 112;
-  const ch = 420;
-  roundRect(ctx, cx, cy, cw, ch, 28);
-  ctx.fillStyle = C.surface;
-  ctx.fill();
-
-  // Onay dairesi + tik
-  const ccx = W / 2;
-  const ccy = cy + 150;
-  ctx.beginPath();
-  ctx.arc(ccx, ccy, 80, 0, Math.PI * 2);
-  ctx.fillStyle = C.brand;
-  ctx.fill();
-  ctx.strokeStyle = C.white;
-  ctx.lineWidth = 12;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  ctx.moveTo(ccx - 36, ccy + 2);
-  ctx.lineTo(ccx - 8, ccy + 32);
-  ctx.lineTo(ccx + 42, ccy - 30);
-  ctx.stroke();
-
-  ctx.textAlign = "center";
-  ctx.fillStyle = C.ink;
-  ctx.font = `700 38px ${FONT}`;
-  ctx.fillText("Sertifika hazır", W / 2, cy + 300);
-  ctx.fillStyle = C.inkSoft;
-  ctx.font = `500 26px ${FONT}`;
-  ctx.fillText("Eğitim tamamlandı", W / 2, cy + 346);
+  const ch = 470;
+  const img = imageCache.get(SCREEN_IMAGES.mobile ?? "");
+  if (img) {
+    drawImageCover(ctx, img, cx, cy, cw, ch, 28);
+    ctx.save();
+    roundRect(ctx, cx, cy, cw, ch, 28);
+    ctx.clip();
+    const g = ctx.createLinearGradient(0, cy + ch - 200, 0, cy + ch);
+    g.addColorStop(0, "rgba(10,15,12,0)");
+    g.addColorStop(1, "rgba(10,15,12,0.78)");
+    ctx.fillStyle = g;
+    ctx.fillRect(cx, cy + ch - 200, cw, 200);
+    ctx.restore();
+    ctx.textAlign = "left";
+    ctx.fillStyle = C.white;
+    ctx.font = `700 42px ${FONT}`;
+    ctx.fillText("Sertifika hazır", cx + 36, cy + ch - 64);
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = `500 26px ${FONT}`;
+    ctx.fillText("Eğitim tamamlandı", cx + 36, cy + ch - 26);
+  } else {
+    roundRect(ctx, cx, cy, cw, ch, 28);
+    ctx.fillStyle = C.surface;
+    ctx.fill();
+  }
 
   // İndir butonu
-  pill(ctx, W / 2, cy + ch + 48, 360, 96, C.accent, C.white, "Sertifikayı indir");
+  pill(ctx, W / 2, cy + ch + 46, 360, 96, C.accent, C.white, "Sertifikayı indir");
 
   // Etiket
   ctx.textAlign = "center";
   ctx.fillStyle = C.inkSoft;
   ctx.font = `500 26px ${FONT}`;
-  ctx.fillText("Vardiyada · Evde · Serviste", W / 2, cy + ch + 156);
+  ctx.fillText("Vardiyada · Evde · Serviste", W / 2, cy + ch + 152);
 }
 
 const DRAWERS: Record<ScreenKind, (ctx: CanvasRenderingContext2D) => void> = {
@@ -361,13 +446,12 @@ const DRAWERS: Record<ScreenKind, (ctx: CanvasRenderingContext2D) => void> = {
   discipline: drawDiscipline,
 };
 
-/** Verilen ekran türünü çizip <canvas> döndürür (CanvasTexture kaynağı). */
-export function createScreenCanvas(kind: ScreenKind): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
+/** Verilen ekran türünü mevcut bir canvas'a çizer (görsel yüklenince yeniden çağrılır). */
+export function drawScreen(canvas: HTMLCanvasElement, kind: ScreenKind): void {
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
+  if (!ctx) return;
 
   // Şeffaf zemin — dış köşeler boş (3B gövde köşeden görünür).
   ctx.clearRect(0, 0, W, H);
@@ -402,6 +486,11 @@ export function createScreenCanvas(kind: ScreenKind): HTMLCanvasElement {
   roundRect(ctx, W / 2 - hiW / 2, H - 34, hiW, hiH, hiH / 2);
   ctx.fillStyle = "rgba(26,58,40,0.32)";
   ctx.fill();
+}
 
+/** Verilen ekran türünü çizip yeni bir <canvas> döndürür (CanvasTexture kaynağı). */
+export function createScreenCanvas(kind: ScreenKind): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  drawScreen(canvas, kind);
   return canvas;
 }

@@ -11,7 +11,12 @@ import {
   MOBILE_SCALE_FACTOR,
   MOBILE_POSITION_FACTOR,
 } from "./scroll-states";
-import { createScreenCanvas, type ScreenKind } from "./phone-screens";
+import {
+  createScreenCanvas,
+  drawScreen,
+  preloadScreenImages,
+  type ScreenKind,
+} from "./phone-screens";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -229,6 +234,22 @@ function GlbPhone({ controllerRef }: GlbPhoneProps) {
       controllerRef.current = null;
     };
   }, [overlayBase, overlayTop, screenTextures, controllerRef]);
+
+  // Ekran görsellerini (fal.ai) async yükle; gelince ilgili canvas'ları yeniden
+  // çiz + texture'ı tazele (createScreenCanvas senkron olduğu için ilk kare görselsiz).
+  useEffect(() => {
+    let cancelled = false;
+    preloadScreenImages().then(() => {
+      if (cancelled) return;
+      screenTextures.forEach((tex, kind) => {
+        drawScreen(tex.image as HTMLCanvasElement, kind);
+        tex.needsUpdate = true;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [screenTextures]);
 
   useEffect(() => {
     const textures = screenTextures;

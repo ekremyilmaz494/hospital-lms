@@ -43,7 +43,8 @@ export function Scene() {
         gl.toneMappingExposure = isMobile ? 1.15 : 1.25;
         gl.outputColorSpace = THREE.SRGBColorSpace;
       }}
-      style={{ background: "var(--landing-bg)" }}
+      // Şeffaf: arkadaki hero-bg (ve diğer bölümlerde sayfa zemini) görünsün.
+      style={{ background: "transparent" }}
     >
       <PerspectiveCamera makeDefault position={[0, 0, 4.5]} fov={32} />
 

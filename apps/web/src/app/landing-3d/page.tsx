@@ -30,6 +30,11 @@ export default function Landing3DPage() {
       />
       <div className="l3d-page">
         <Header />
+        {/* Hero arka planı — canvas'tan önce (z0, DOM sırası) → 3D telefon üstüne biner.
+            absolute + 100vh: hero'dan sonra kayıp gider, fixed canvas devam eder. */}
+        <div className="l3d-hero-bg" aria-hidden="true" />
+        {/* §2 arka planı — 2. viewport (top:100vh) hizasında, canvas'ın altında. */}
+        <div className="l3d-sec2-bg" aria-hidden="true" />
         <SceneClient />
         <LoadingScreen />
         <ScrollSections />

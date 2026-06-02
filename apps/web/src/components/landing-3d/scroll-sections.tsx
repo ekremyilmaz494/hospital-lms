@@ -1,29 +1,88 @@
 import Link from "next/link";
 import { FeatureStat } from "./feature-stat";
 
-/** Yönetim Merkezi grid'i — sistemdeki tüm admin modülleri (sidebar-config ile birebir). */
-const HUB_MODULES: { title: string; desc: string }[] = [
-  { title: "Eğitim Sihirbazı", desc: "Video, doküman ve sınavı tek akışta dakikalar içinde oluşturun." },
-  { title: "Soru Bankası", desc: "Soruları havuzda toplayın, sınavlarda tekrar tekrar kullanın." },
-  { title: "Sınav Otomasyonu", desc: "Ön/son sınav, otomatik geçti-kaldı ve ek hak talebi yönetimi." },
-  { title: "Medya Kütüphanesi", desc: "Tüm video ve dokümanlar tek merkezde, güvenli erişimle." },
-  { title: "Eğitim Dönemleri", desc: "Periyodik eğitimleri takvime bağlayın, otomatik tekrarlatın." },
-  { title: "Personel Yönetimi", desc: "Toplu içe aktarma, rol ve birim ataması, tek tıkla davet." },
-  { title: "Sertifikalar", desc: "Otomatik üretim, geçerlilik takibi ve PDF indirme." },
-  { title: "Yetkinlik Matrisi", desc: "Kim neyi tamamladı, kimde eksik var — tek bakışta görün." },
-  { title: "SMG / SKS Takibi", desc: "Sağlıkta hizmet içi eğitim ve denetim uyumu, hazır raporla." },
-  { title: "KVKK Uyum Raporu", desc: "Denetime hazır uyum çıktıları, anında dışa aktarma." },
-  { title: "Etkinlik Analizi", desc: "Eğitimin gerçek etkisini ölçün, zayıf noktaları görün." },
-  { title: "Geri Bildirim Formları", desc: "Form editörü, yanıt toplama ve analitik tek modülde." },
-  { title: "Bildirimler", desc: "Otomatik hatırlatma, duyuru ve son tarih uyarıları." },
-  { title: "İşlem Geçmişi (Audit)", desc: "Değiştirilemez kayıt ile tam izlenebilirlik." },
-  { title: "Çok-Kurumlu Yönetim", desc: "Tamamen izole veriyle sınırsız kurum, tek platform." },
+type Module = { title: string; desc: string };
+
+// Modüller temaya göre 4 sinematik bölüme dağıtılır (3D model o bölümdeyken
+// ilgili modüller yanında belirir). Tek-blok "Yönetim Merkezi" grid'i kaldırıldı.
+const MODULES_EGITIM: Module[] = [
+  { title: "Eğitim Sihirbazı", desc: "Video, doküman ve sınav tek akışta." },
+  { title: "Soru Bankası", desc: "Havuzda topla, sınavlarda tekrar kullan." },
+  { title: "Sınav Otomasyonu", desc: "Ön/son sınav, otomatik geçti-kaldı." },
+  { title: "Medya Kütüphanesi", desc: "Tüm içerik tek merkezde, güvenli erişim." },
+  { title: "Eğitim Dönemleri", desc: "Periyodik eğitimi takvime bağla, tekrarlat." },
+];
+const MODULES_UYUM: Module[] = [
+  { title: "KVKK Uyum Raporu", desc: "Denetime hazır çıktı, anında dışa aktar." },
+  { title: "SMG / SKS Takibi", desc: "Hizmet içi eğitim ve denetim uyumu." },
+  { title: "Etkinlik Analizi", desc: "Eğitimin gerçek etkisini ölç, zayıfı gör." },
+  { title: "Sertifikalar", desc: "Otomatik üretim, geçerlilik takibi, PDF." },
+  { title: "İşlem Geçmişi (Audit)", desc: "Değiştirilemez kayıt, tam izlenebilirlik." },
+];
+const MODULES_KURUM: Module[] = [
+  { title: "Personel Yönetimi", desc: "Toplu içe aktarma, rol ve birim ataması." },
+  { title: "Yetkinlik Matrisi", desc: "Kim neyi tamamladı, kimde eksik var." },
+  { title: "Çok-Kurumlu Yönetim", desc: "Tamamen izole veriyle sınırsız kurum." },
+];
+const MODULES_ERISIM: Module[] = [
+  { title: "Mobil Uygulama", desc: "Eğitimi telefondan tamamla, sertifikayı indir." },
+  { title: "Bildirimler", desc: "Otomatik hatırlatma, duyuru, son tarih uyarısı." },
+  { title: "Geri Bildirim Formları", desc: "Form editörü, yanıt toplama, analitik." },
 ];
 
+// Tam genişlik "platform" showcase bandı (sinematik akıştan sonra, telefonsuz alan).
+const SHOWCASE: { img: string; title: string; desc: string }[] = [
+  {
+    img: "/landing-3d/egitim.svg",
+    title: "Eğitim & Sınav",
+    desc: "Video, doküman ve otomatik sınavı tek akışta oluştur, ata, ölç.",
+  },
+  {
+    img: "/landing-3d/erisim.svg",
+    title: "Mobil Erişim",
+    desc: "Personel telefonundan tamamlar; yönetici canlı ilerlemeyi izler.",
+  },
+  {
+    img: "/landing-3d/sertifika.svg",
+    title: "Sertifika & Başarı",
+    desc: "Otomatik sertifika üretimi, geçerlilik takibi ve PDF indirme.",
+  },
+];
+
+/** Bölüm kopyasının içine gömülen editöryel modül listesi (hairline + check ikon). */
+function ModuleList({ items }: { items: Module[] }) {
+  return (
+    <ul className="l3d-modules">
+      {items.map((m) => (
+        <li key={m.title} className="l3d-module">
+          <svg
+            className="l3d-module-ico"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M3.5 8.5l3 3 6-7"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="l3d-module-text">
+            <span className="l3d-module-title">{m.title}</span>
+            <span className="l3d-module-desc">{m.desc}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
- * Altı scroll section + yatay referans bandı + Yönetim Merkezi grid + footer.
- * Bant, grid ve footer <main> DIŞINDA (ScrollTrigger end "bottom bottom" hesabı
- * bozulmasın). Bölüm metinleri yönetici (hospital admin) anlatısıyla yazıldı.
+ * Altı scroll section + yatay referans bandı + footer. Footer <main> DIŞINDA
+ * (ScrollTrigger end "bottom bottom" hesabı bozulmasın). 4 özellik bölümü (01–04)
+ * numaralı adım + dikey çizgi ile bağlanır; her bölüme temasına göre modüller dağıtılır.
  */
 export function ScrollSections() {
   return (
@@ -47,8 +106,8 @@ export function ScrollSections() {
               <Link href="/demo" className="l3d-cta">
                 Demo Talep Et
               </Link>
-              <a href="#yonetim" className="l3d-link">
-                Tüm modüller →
+              <a href="#egitim" className="l3d-link">
+                Modülleri keşfet →
               </a>
             </div>
             <div className="l3d-trust" data-hero-text>
@@ -69,7 +128,8 @@ export function ScrollSections() {
 
         {/* §2 — CLOSEUP */}
         <section id="egitim" data-section="closeup" className="l3d-section">
-          <div className="l3d-copy l3d-copy-right">
+          <div className="l3d-copy l3d-copy-right l3d-step">
+            <span className="l3d-step-num">01</span>
             <span className="l3d-eyebrow">EĞİTİM & DEĞERLENDİRME</span>
             <h2 className="l3d-headline-md">
               Siz kurgular,
@@ -78,16 +138,17 @@ export function ScrollSections() {
             </h2>
             <p className="l3d-lead">
               Eğitim sihirbazıyla video, doküman ve sınavı dakikalar içinde
-              hazırlayın. Soru bankası, ön/son sınav, ileri-sarma kilidi ve
-              otomatik geçti-kaldı — personel izlemiş gibi yapamaz, gerçekten
-              öğrenir.
+              hazırlayın. İleri-sarma kilidi ve otomatik geçti-kaldı — personel
+              izlemiş gibi yapamaz, gerçekten öğrenir.
             </p>
+            <ModuleList items={MODULES_EGITIM} />
           </div>
         </section>
 
         {/* §3 — FRONT + STATS */}
         <section id="kanit" data-section="front" className="l3d-section">
-          <div className="l3d-copy l3d-copy-bottom-left">
+          <div className="l3d-copy l3d-copy-left l3d-step">
+            <span className="l3d-step-num">02</span>
             <span className="l3d-eyebrow">UYUM & RAPORLAMA</span>
             <h2 className="l3d-headline-md">
               Denetim anına
@@ -95,39 +156,55 @@ export function ScrollSections() {
               her zaman hazır.
             </h2>
             <p className="l3d-lead">
-              KVKK ve SKS uyum raporları, etkinlik analizi, sertifika
-              geçerlilikleri ve değiştirilemez işlem geçmişi — Excel beklemeden,
-              tek tıkla.
+              Uyum raporları, etkinlik analizi, sertifika geçerlilikleri ve
+              değiştirilemez işlem geçmişi — Excel beklemeden, tek tıkla.
             </p>
+            <ModuleList items={MODULES_UYUM} />
           </div>
           <div className="l3d-stats">
             <FeatureStat label="TAMAMLANAN EĞİTİM" value="12.480" unit="+" />
             <FeatureStat label="BAŞARI ORANI" value="94" unit="%" />
             <FeatureStat label="AKTİF KURUM" value="40" unit="+" />
           </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/landing-3d/uyum.svg"
+            alt=""
+            aria-hidden="true"
+            className="l3d-art l3d-art-uyum"
+          />
         </section>
 
         {/* §4 — TOP */}
         <section id="olcek" data-section="top" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left">
-            <span className="l3d-eyebrow">ÇOK KURUMLU YAPI</span>
+          <div className="l3d-copy l3d-copy-left l3d-step">
+            <span className="l3d-step-num">03</span>
+            <span className="l3d-eyebrow">KURUM & PERSONEL</span>
             <h2 className="l3d-headline-md">
               Kurumunuzla
               <br />
               birlikte ölçeklenir.
             </h2>
             <p className="l3d-lead">
-              Tek hastaneden hastane zincirine. Yetkinlik matrisi, eğitim
-              dönemleri ve kurum-bazlı tamamen izole veriyle her şube kendi
-              personeli, eğitimi ve raporuyla çalışır.
+              Tek hastaneden hastane zincirine. Kurum-bazlı tamamen izole veriyle
+              her şube kendi personeli, eğitimi ve raporuyla çalışır.
             </p>
+            <ModuleList items={MODULES_KURUM} />
           </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/landing-3d/kurum.svg"
+            alt=""
+            aria-hidden="true"
+            className="l3d-art l3d-art-kurum"
+          />
         </section>
 
         {/* §5 — BACK */}
         <section id="erisim" data-section="back" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left">
-            <span className="l3d-eyebrow">HER YERDEN ERİŞİM</span>
+          <div className="l3d-copy l3d-copy-left l3d-step">
+            <span className="l3d-step-num">04</span>
+            <span className="l3d-eyebrow">ERİŞİM & İLETİŞİM</span>
             <h2 className="l3d-headline-md">
               Vardiyada, evde,
               <br />
@@ -135,9 +212,10 @@ export function ScrollSections() {
             </h2>
             <p className="l3d-lead">
               Personel eğitimini telefonundan tamamlar, sertifikasını anında
-              indirir. Yönetici canlı ilerlemeyi, bildirimleri ve geri bildirim
-              sonuçlarını panelden gerçek zamanlı izler.
+              indirir. Yönetici canlı ilerlemeyi ve geri bildirimi panelden
+              gerçek zamanlı izler.
             </p>
+            <ModuleList items={MODULES_ERISIM} />
           </div>
         </section>
 
@@ -159,6 +237,29 @@ export function ScrollSections() {
         </section>
       </main>
 
+      {/* Platform showcase — tam genişlik, 3 büyük illüstrasyon kartı */}
+      <section className="l3d-showcase" aria-label="Platform">
+        <div className="l3d-showcase-head">
+          <span className="l3d-eyebrow">PLATFORM</span>
+          <h2 className="l3d-showcase-title">Tek platform, uçtan uca.</h2>
+        </div>
+        <ul className="l3d-showcase-grid">
+          {SHOWCASE.map((c) => (
+            <li key={c.title} className="l3d-showcase-card">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={c.img}
+                alt=""
+                aria-hidden="true"
+                className="l3d-showcase-img"
+              />
+              <span className="l3d-showcase-card-title">{c.title}</span>
+              <span className="l3d-showcase-card-desc">{c.desc}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       {/* Yatay referans bandı — bölümler arası geçişte tam genişlik şerit */}
       <section className="l3d-trustband" aria-label="Referanslar">
         <span className="l3d-trustband-label">GÜVENİYOR</span>
@@ -175,26 +276,6 @@ export function ScrollSections() {
         <span className="l3d-trustband-tag">
           Sağlık kurumlarının uçtan uca eğitim tercihi
         </span>
-      </section>
-
-      {/* Yönetim Merkezi — sistemdeki tüm admin modülleri */}
-      <section id="yonetim" className="l3d-hub" aria-label="Yönetim Merkezi">
-        <div className="l3d-hub-head">
-          <span className="l3d-eyebrow">YÖNETİM MERKEZİ</span>
-          <h2 className="l3d-final-title">Tek panelde tüm sistem.</h2>
-          <p className="l3d-lead l3d-hub-lead">
-            Eğitimden denetime, personelden sertifikaya — hastane eğitiminin her
-            adımı tek yönetim panelinde.
-          </p>
-        </div>
-        <ul className="l3d-hub-grid">
-          {HUB_MODULES.map((m) => (
-            <li key={m.title} className="l3d-hub-card">
-              <span className="l3d-hub-card-title">{m.title}</span>
-              <span className="l3d-hub-card-desc">{m.desc}</span>
-            </li>
-          ))}
-        </ul>
       </section>
 
       <footer className="l3d-footer">
