@@ -26,7 +26,7 @@ const MODEL_URL = "/models/iphone.glb";
 
 // Her SCROLL_STATES keyframe'ine bir ekran. Bölüm metniyle hizalı:
 // hero → closeup(disiplin) → front(rapor) → exam(sınav) → cert(sertifika) →
-// güven(Devakent referansı) → final(hero/CTA).
+// güven(Devakent referansı, kapanış).
 const STATE_SCREENS: ScreenKind[] = [
   "hero",
   "discipline",
@@ -34,7 +34,6 @@ const STATE_SCREENS: ScreenKind[] = [
   "exam",
   "mobile",
   "trust",
-  "hero",
 ];
 const SCREEN_KINDS: ScreenKind[] = [
   "hero",

@@ -15,12 +15,10 @@ export const SCROLL_STATES: ScrollState[] = [
   // 3 — Exam: öne dönük (ekran kullanıcıya bakar), karşı taraftan 3/4 açı —
   //     sınav ekranı okunur. Kopya solda, art sağ-altta → telefon merkez-sağ.
   { id: "top",      position: [ 0.18,  0.06,  0.45], rotation: [ 0.07,  Math.PI + 0.34, -0.05], scale: 1.85 },
-  // 4 — Cert: öne dönük, sağda, hafif yukarı "takdim" eğimi — sertifika ekranı görünür.
-  { id: "back",     position: [ 0.62, -0.14,  0.10], rotation: [ 0.12,  Math.PI - 0.55,  0.07], scale: 1.65 },
-  // 5 — Güven: sağda, öne dönük — telefon ekranında Devakent referansı görünür.
-  { id: "guven",    position: [ 0.62, -0.34,  0.10], rotation: [ 0.12,  Math.PI - 0.55,  0.07], scale: 1.6 },
-  // 6 — Final: solda, karşıya dönük, hafif büyütülmüş (kapanış CTA).
-  { id: "final",    position: [-0.90, -0.05,  0.2],  rotation: [ 0.05,  Math.PI - 0.40, -0.02], scale: 1.9 },
+  // 4 — Cert: öne dönük, merkez (yan-alan sanatı sağ-alta sığsın), takdim eğimi — sertifika ekranı görünür.
+  { id: "back",     position: [-0.25, -0.10,  0.10], rotation: [ 0.12,  Math.PI - 0.55,  0.07], scale: 1.65 },
+  // 5 — Güven (kapanış): merkez, öne dönük — telefon ekranında Devakent referansı; sanat sağ-altta.
+  { id: "guven",    position: [-0.25, -0.28,  0.10], rotation: [ 0.12,  Math.PI - 0.55,  0.07], scale: 1.6 },
 ];
 
 // Mobil/tablet çarpanları (≤1023px). Hareketi merkeze sıkıştırır,

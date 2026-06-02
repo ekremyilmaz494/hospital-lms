@@ -49,6 +49,25 @@ const SHOWCASE: { img: string; title: string; desc: string }[] = [
   },
 ];
 
+// §5 sağ alan — KlinoVax'ı sıradan LMS'lerden ayıran farklar (küçük spot illüstrasyon).
+const DIFFERENTIATORS: { img: string; title: string; desc: string }[] = [
+  {
+    img: "/landing-3d/diff-video.svg",
+    title: "İleri-sarma kilidi",
+    desc: "Personel videoyu atlayamaz; gerçek izleme süresi ölçülür.",
+  },
+  {
+    img: "/landing-3d/diff-rapor.svg",
+    title: "Denetime hazır uyum",
+    desc: "KVKK, SKS ve hizmet içi eğitim raporları tek tıkla.",
+  },
+  {
+    img: "/landing-3d/diff-saglik.svg",
+    title: "Sağlığa özel",
+    desc: "Hastane iş akışına göre; çok-kurumlu, tam veri izolasyonu.",
+  },
+];
+
 /** Bölüm kopyasının içine gömülen editöryel modül listesi (hairline + check ikon). */
 function ModuleList({ items }: { items: Module[] }) {
   return (
@@ -208,6 +227,32 @@ export function ScrollSections() {
             </p>
             <ModuleList items={MODULES_ERISIM} />
           </div>
+          {/* Sağ alan — projeyi diğerlerinden ayıran 3 fark, küçük illüstrasyonlarla */}
+          <aside className="l3d-diff" aria-label="KlinoVax farkı">
+            <span className="l3d-eyebrow">NEDEN FARKLI</span>
+            <h3 className="l3d-diff-title">
+              Sıradan bir
+              <br />
+              LMS değil.
+            </h3>
+            <ul className="l3d-diff-list">
+              {DIFFERENTIATORS.map((d) => (
+                <li key={d.title} className="l3d-diff-item">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={d.img}
+                    alt=""
+                    aria-hidden="true"
+                    className="l3d-diff-ico"
+                  />
+                  <span className="l3d-diff-text">
+                    <span className="l3d-diff-h">{d.title}</span>
+                    <span className="l3d-diff-d">{d.desc}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </aside>
         </section>
 
         {/* §6 — GÜVEN (Devakent referansı; telefon ekranında logo görünür) */}
@@ -236,23 +281,6 @@ export function ScrollSections() {
                 Özel Konya Devakent Hastanesi
               </span>
             </div>
-          </div>
-        </section>
-
-        {/* §7 — FINAL */}
-        <section id="demo-cta" data-section="final" className="l3d-section">
-          <div className="l3d-copy l3d-copy-final">
-            <span className="l3d-eyebrow">{"KLİNOVAX'I DENEYİN"}</span>
-            <h2 className="l3d-final-title">
-              Canlı
-              <br />
-              3D
-              <br />
-              <span className="l3d-final-pill">demo</span>
-            </h2>
-            <Link href="/demo" className="l3d-cta">
-              Demo Talep Et
-            </Link>
           </div>
         </section>
       </main>

@@ -32,16 +32,6 @@
   margin: 0;
 }
 
-.l3d-final-title {
-  font-family: var(--font-display);
-  font-size: clamp(44px, 7.5vw, 112px);
-  font-weight: 600;
-  line-height: 0.92;
-  letter-spacing: -0.035em;
-  color: var(--landing-ink);
-  margin: 0;
-}
-
 .l3d-eyebrow {
   display: block;
   font-family: var(--font-mono);
@@ -295,6 +285,36 @@
     );
 }
 
+/* ── §5/§6 arka plan bantları ───────────────────────────────────────
+   hero-bg deseni: absolute, z0, canvas'tan önce (DOM) → telefon+metin üstüne biner.
+   İlgili viewport'un ALT kısmında kısa bant; üstü maskeyle sayfaya erir; soluk
+   dursun diye opacity. Mobilde gizli. */
+.l3d-sec5-bg,
+.l3d-sec6-bg {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 42vh;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.55;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center bottom;
+  -webkit-mask-image: linear-gradient(to top, #000 62%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 62%, transparent 100%);
+}
+/* §5 = 5. viewport (400–500vh) → bandı alta hizala (top 458vh, yükseklik 42vh). */
+.l3d-sec5-bg {
+  top: 458vh;
+  background-image: url("/landing-3d/erisim.svg");
+}
+/* §6 = 6. viewport (500–600vh) → bandı alta hizala (top 558vh, yükseklik 42vh). */
+.l3d-sec6-bg {
+  top: 558vh;
+  background-image: url("/landing-3d/guven.svg");
+}
+
 /* ── Section düzeni (desktop varsayılan) ────────────────────────── */
 .l3d-main {
   position: relative;
@@ -338,12 +358,6 @@
   bottom: 18vh;
   max-width: 40%;
 }
-.l3d-copy-final {
-  max-width: 46%;
-  margin-left: auto;
-  align-items: flex-start;
-}
-
 /* Stats — front section sağ-üst */
 .l3d-stats {
   position: absolute;
@@ -378,17 +392,6 @@
 .l3d-stat-unit {
   color: var(--landing-accent);
   margin-left: 2px;
-}
-
-/* Final pill — "demo" */
-.l3d-final-pill {
-  display: inline-block;
-  background: var(--landing-accent);
-  color: #fff;
-  font-style: italic;
-  font-weight: 600;
-  padding: 0 0.28em 0.06em;
-  border-radius: 0.18em;
 }
 
 /* Scroll cue (yalnızca desktop) */
@@ -611,6 +614,68 @@
   aspect-ratio: 3 / 4;
 }
 
+/* ── §5 "farkımız" bloğu — telefonun sağı (boş alanı doldurur) ──────── */
+.l3d-diff {
+  position: absolute;
+  right: 6vw;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  width: clamp(280px, 26vw, 370px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  pointer-events: none;
+}
+.l3d-diff-title {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 2.6vw, 36px);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--landing-ink);
+  margin: 2px 0 4px;
+}
+.l3d-diff-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.l3d-diff-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.l3d-diff-ico {
+  flex-shrink: 0;
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  border: 1px solid var(--landing-rule);
+  background: var(--landing-surface);
+  box-shadow: var(--landing-shadow-card);
+  object-fit: cover;
+}
+.l3d-diff-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.l3d-diff-h {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--landing-ink);
+}
+.l3d-diff-d {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--landing-ink-soft, rgba(26, 58, 40, 0.62));
+}
+
 /* ── Footer (main DIŞINDA) ──────────────────────────────────────── */
 .l3d-footer {
   position: relative;
@@ -733,8 +798,7 @@
   }
   .l3d-copy-hero,
   .l3d-copy-right,
-  .l3d-copy-left,
-  .l3d-copy-final {
+  .l3d-copy-left {
     max-width: 100%;
     margin: 0;
   }
@@ -745,6 +809,12 @@
   .l3d-copy-bottom-left {
     position: static;
     max-width: 100%;
+  }
+  .l3d-diff {
+    position: static;
+    transform: none;
+    width: 100%;
+    margin-top: 24px;
   }
   .l3d-stats {
     position: static;
@@ -759,7 +829,9 @@
   .l3d-art {
     display: none;
   }
-  .l3d-sec2-bg {
+  .l3d-sec2-bg,
+  .l3d-sec5-bg,
+  .l3d-sec6-bg {
     display: none;
   }
   .l3d-showcase-grid {

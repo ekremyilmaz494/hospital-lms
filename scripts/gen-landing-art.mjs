@@ -24,15 +24,36 @@ const COLORS = [
   { r: 26, g: 58, b: 40 }, // olive ink
 ];
 
+// §5/§6 ARKA PLAN görselleri (hero-bg gibi): geniş yatay, telefonun+metnin arkasında,
+// boyu kısa bant olarak konumlanır. Öğeler ALT taban çizgisinde, üstte havadar açık
+// gökyüzü/boşluk → background-position:bottom ile kısa bant öğeleri gösterir. Soluk/
+// atmosferik dursun diye CSS'te opacity + üst fade uygulanır.
+const BG_SIZE = "landscape_16_9";
+
 const SPECS = [
   {
-    file: "sertifika.png",
+    // §5 — Erişim & İletişim (mobil erişim, bildirim, gerçek zamanlı).
+    file: "erisim.svg",
+    size: BG_SIZE,
     prompt:
-      "Minimal flat vector illustration, achievement and certification theme: a " +
-      "certificate document with a ribbon seal, a medal, and a checkmark, arranged as a " +
-      "tidy balanced composition. Geometric, premium, soft rounded shapes, lots of " +
-      "negative space, emerald green and warm amber accents on a very light warm " +
-      "off-white background. Corporate medical SaaS aesthetic. No text, no words, no letters.",
+      "Wide horizontal background scene, soft and airy, mobile connectivity theme: a low " +
+      "horizon with subtle signal towers, gentle wifi and signal waves, and soft rounded " +
+      "clouds spread along the bottom baseline, with lots of open empty sky above. Flat " +
+      "vector, minimal, light and faded atmospheric backdrop, emerald green and warm amber " +
+      "accents on a very light warm off-white background. No people, no foreground objects, " +
+      "no text, no words, no letters.",
+  },
+  {
+    // §6 — Güven & Referans (güven, ortaklık, kurumsal referans).
+    file: "guven.svg",
+    size: BG_SIZE,
+    prompt:
+      "Wide horizontal background scene, soft and airy, trust and care theme: a low horizon " +
+      "with subtle modern hospital buildings, soft rounded trees and clouds, and small " +
+      "sparkles spread along the bottom baseline, with lots of open empty sky above. Flat " +
+      "vector, minimal, light and faded atmospheric backdrop, emerald green and warm amber " +
+      "accents on a very light warm off-white background. No people, no foreground objects, " +
+      "no text, no words, no letters.",
   },
 ];
 
@@ -45,7 +66,7 @@ async function generate(spec) {
     },
     body: JSON.stringify({
       prompt: spec.prompt,
-      image_size: "portrait_4_3",
+      image_size: spec.size ?? "portrait_4_3",
       style: "vector_illustration",
       colors: COLORS,
     }),

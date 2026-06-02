@@ -35,6 +35,10 @@ export default function Landing3DPage() {
         <div className="l3d-hero-bg" aria-hidden="true" />
         {/* §2 arka planı — 2. viewport (top:100vh) hizasında, canvas'ın altında. */}
         <div className="l3d-sec2-bg" aria-hidden="true" />
+        {/* §5/§6 arka plan bantları — ilgili viewport'un altında, kısa boy, telefonun
+            arkasında (z0 + canvas'tan önce DOM sırası). */}
+        <div className="l3d-sec5-bg" aria-hidden="true" />
+        <div className="l3d-sec6-bg" aria-hidden="true" />
         <SceneClient />
         <LoadingScreen />
         <ScrollSections />
