@@ -45,9 +45,12 @@ async function readNextAutoSchedule(): Promise<string> {
   }
 }
 
-// decryptBackup artık @/lib/backup-crypto'dan import edilir. Download endpoint'i
-// doğrudan oradan çeker — bu dosyadan re-export sadece geriye dönük uyumluluk için.
-export { decryptBackup } from '@/lib/backup-crypto'
+// decryptBackup @/lib/backup-crypto'dan import edilir — download endpoint'i doğrudan
+// oradan çeker. Route dosyasından re-export YAPMA: Next.js route dosyaları yalnız
+// HTTP handler (GET/POST/...) ve route config export edebilir; başka her export
+// `next build` tip kontrolünü kırar ("X is not a valid Route export field").
+// Bu hata main CI'ını 22 Mayıs–2 Haziran arası kırmıştı (Vercel Turbopack build'i
+// bu kontrolü yapmadığı için production'da fark edilmedi).
 
 export const GET = withAdminRoute(async ({ organizationId }) => {
   const orgId = organizationId

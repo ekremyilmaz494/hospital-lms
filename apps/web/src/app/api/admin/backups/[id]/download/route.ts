@@ -3,7 +3,7 @@ import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
-import { decryptBackup } from '@/app/api/admin/backups/route'
+import { decryptBackup } from '@/lib/backup-crypto'
 import { logger } from '@/lib/logger'
 
 export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {

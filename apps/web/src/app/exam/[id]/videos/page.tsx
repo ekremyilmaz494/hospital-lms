@@ -89,7 +89,12 @@ export default function VideoPlayerPage() {
   }, [id, isReview, router, toast]);
 
   const videosUrl = startReady ? `/api/exam/${id}/videos${isReview ? '?mode=review' : ''}` : null;
-  const { data, isLoading, error } = useFetch<VideosResponse>(videosUrl);
+  // noStore ZORUNLU: video ilerlemesi (lastPosition) her mount'ta sunucudan taze gelmeli.
+  // useFetch'in modül-level cache'i SPA geri dönüşünde (geri tuşu → tekrar "Videoları İzle")
+  // bayat lastPosition=0 servis ediyordu; onLoadedMetadata'daki resume seek'i atlanıyor ve
+  // video baştan başlıyordu ("kaldığım yerden devam etmiyor" şikayeti — Haziran 2026).
+  // Sunucu yanıtı zaten Cache-Control: private, no-store (route.ts) — client tarafı da uyar.
+  const { data, isLoading, error } = useFetch<VideosResponse>(videosUrl, { noStore: true });
 
   const rawVideos = data?.videos ?? [];
   const trainingTitle = data?.trainingTitle ?? '';

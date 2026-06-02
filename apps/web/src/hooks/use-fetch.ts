@@ -23,6 +23,16 @@ interface UseFetchOptions {
    * instead. (See plan: FAZ 2.A8)
    */
   onAuthError?: () => boolean | Promise<boolean>;
+  /**
+   * Modül-level cache'i tamamen atla — her mount'ta sunucudan taze veri çek
+   * (okuma VE yazma atlanır). Sunucu yanıtı `Cache-Control: no-store` olan ve
+   * bayatlaması kabul edilemez veriler için.
+   *
+   * Use case: video resume pozisyonu (`/api/exam/[id]/videos`) — SPA geri
+   * dönüşünde bayat `lastPosition: 0` servis edilirse onLoadedMetadata seek'i
+   * atlanır ve video baştan başlar ("kaldığım yerden devam etmiyor" şikayeti).
+   */
+  noStore?: boolean;
 }
 
 // In-memory cache: URL → { data, timestamp }
@@ -59,7 +69,8 @@ export function invalidateFetchCache(pattern: string) {
 
 export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseFetchResult<T> {
   const normalizedUrl = url?.trim() || null;
-  const cached = normalizedUrl ? cache.get(normalizedUrl) : null;
+  const noStore = options?.noStore === true;
+  const cached = normalizedUrl && !noStore ? cache.get(normalizedUrl) : null;
   const [data, setData] = useState<T | null>((cached?.data as T) ?? null);
   const [isLoading, setIsLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +84,10 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
   const onAuthErrorRef = useRef(options?.onAuthError);
   onAuthErrorRef.current = options?.onAuthError;
 
+  // noStore da ref'te — fetchData ([] deps, stabil) ve URL effect'i içinden okunur.
+  const noStoreRef = useRef(noStore);
+  noStoreRef.current = noStore;
+
   const fetchData = useCallback(async (background = false) => {
     const currentUrl = urlRef.current;
     if (!currentUrl) {
@@ -80,7 +95,7 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
       return;
     }
     if (!background) {
-      const existing = cache.get(currentUrl);
+      const existing = noStoreRef.current ? undefined : cache.get(currentUrl);
       if (!existing) setIsLoading(true);
     }
     if (!background) setError(null);
@@ -90,7 +105,7 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
       try {
         const json = await existing;
         if (urlRef.current === currentUrl) {
-          cacheSet(currentUrl, json);
+          if (!noStoreRef.current) cacheSet(currentUrl, json);
           setData(json as T);
         }
       } catch {
@@ -123,7 +138,7 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
     try {
       const json = await fetchPromise;
       if (urlRef.current === currentUrl) {
-        cacheSet(currentUrl, json);
+        if (!noStoreRef.current) cacheSet(currentUrl, json);
         setData(json);
       }
     } catch (err) {
@@ -208,7 +223,8 @@ export function useFetch<T>(url: string | null, options?: UseFetchOptions): UseF
       setIsLoading(false);
       return;
     }
-    const existing = cache.get(normalizedUrl);
+    // noStore: cache'i hiç okuma — her zaman taze fetch (bayat lastPosition koruması).
+    const existing = noStoreRef.current ? undefined : cache.get(normalizedUrl);
     if (existing) {
       // Aynı data reference'ı koruyarak gereksiz re-render önle
       setData((prev) => (prev === existing.data ? prev : (existing.data as T)));

@@ -155,3 +155,85 @@ describe('useFetch — fetch davranışı', () => {
     expect(locationMock.href).toBe('')
   })
 })
+
+// ── noStore davranışı ──
+// Video resume regresyon koruması: /api/exam/[id]/videos yanıtındaki lastPosition
+// modül cache'inden ASLA servis edilmemeli. Bayat lastPosition=0, onLoadedMetadata
+// seek'ini atlatıp videoyu baştan başlatıyordu ("kaldığım yerden devam etmiyor").
+describe('useFetch — noStore davranışı', () => {
+  const mockFetch = vi.fn()
+
+  const okResponse = (data: unknown) => ({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(data),
+  })
+
+  beforeEach(() => {
+    vi.resetModules()
+    vi.stubGlobal('fetch', mockFetch)
+    mockFetch.mockReset()
+    mockSetState.mockReset()
+    mockUseState.mockReset()
+    mockUseEffect.mockReset()
+    mockUseCallback.mockReset()
+    mockUseRef.mockReset()
+
+    mockUseState.mockImplementation((init: unknown) => [init, mockSetState])
+    mockUseEffect.mockImplementation((cb: () => void) => { cb() })
+    mockUseCallback.mockImplementation((cb: unknown) => cb)
+    mockUseRef.mockImplementation((init: unknown) => ({ current: init }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('noStore olmadan: ikinci mount cache\'ten okur, fetch tekrar ÇAĞRILMAZ', async () => {
+    mockFetch.mockResolvedValue(okResponse({ videos: [{ lastPosition: 0 }] }))
+    const { useFetch } = await import('@/hooks/use-fetch')
+
+    // 1. mount — fetch atılır ve yanıt cache'e yazılır
+    useFetch('/api/exam/x/videos')
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1))
+    // cacheSet async tamamlanması için fetch promise'inin çözülmesini bekle
+    await new Promise(r => setTimeout(r, 10))
+
+    // 2. mount (SPA geri dönüş simülasyonu) — cache hit, fetch çağrılmaz
+    useFetch('/api/exam/x/videos')
+    await new Promise(r => setTimeout(r, 10))
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('cache\'te bayat girdi VARKEN noStore: true onu görmezden gelir, taze fetch atar', async () => {
+    // Gerçek bug senaryosu: cache'te lastPosition=0 içeren bayat yanıt var.
+    // noStore'lu mount bunu OKUMAMALI — sunucudan taze (lastPosition=300) çekmeli.
+    mockFetch
+      .mockResolvedValueOnce(okResponse({ videos: [{ lastPosition: 0 }] }))   // bayat
+      .mockResolvedValueOnce(okResponse({ videos: [{ lastPosition: 300 }] })) // taze
+    const { useFetch } = await import('@/hooks/use-fetch')
+
+    // 1. mount noStore OLMADAN — yanıt (lastPosition=0) cache'e yazılır
+    useFetch('/api/exam/x/videos')
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1))
+    await new Promise(r => setTimeout(r, 10))
+
+    // 2. mount noStore İLE — cache'teki bayat girdiye rağmen taze fetch atılır
+    useFetch('/api/exam/x/videos', { noStore: true })
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2))
+  })
+
+  it('noStore: true yanıtı cache\'e YAZMAZ — sonraki normal mount yine fetch atar', async () => {
+    mockFetch.mockResolvedValue(okResponse({ videos: [{ lastPosition: 300 }] }))
+    const { useFetch } = await import('@/hooks/use-fetch')
+
+    // 1. mount noStore ile — yanıt cache'e yazılmamalı
+    useFetch('/api/exam/y/videos', { noStore: true })
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1))
+    await new Promise(r => setTimeout(r, 10))
+
+    // 2. mount noStore OLMADAN — cache boş olduğu için yine fetch atılır
+    useFetch('/api/exam/y/videos')
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2))
+  })
+})

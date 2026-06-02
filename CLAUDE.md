@@ -260,6 +260,19 @@ const docUrl = await resolveTrainingDocumentUrl(video)  // signed URL veya ''
 
 ---
 
+## 📼 Video Resume (Kaldığı Yerden Devam) Kuralı (KRİTİK)
+
+Personelin yarıda bıraktığı videoya kaldığı yerden devam edebilmesi `VideoProgress.lastPositionSeconds`'a dayanır. Bu verinin bayatlaması kabul edilemez:
+
+1. **`/exam/[id]/videos` sayfasında `useFetch` MUTLAKA `{ noStore: true }` ile çağrılır.** `useFetch`'in modül-level cache'i SPA geri dönüşünde (geri tuşu → tekrar "Videoları İzle") bayat `lastPosition: 0` servis eder → `onLoadedMetadata` resume seek'i atlanır → video baştan başlar. `perf-check.js`'in `exam-video-stale-cache` kuralı bunu commit'te ENGELLER
+2. **Attempt çözüm önceliği üç yerde AYNI olmalı:** GET `/videos`, POST `/videos` ve `start` route attempt'i önce `assignmentId`, sonra `trainingId` ile arar ve her zaman `orderBy: { attemptNumber: 'desc' }` kullanır. Farklı öncelik, "Yeniden Ata" (round) senaryosunda GET'in bir attempt'ten okuyup POST'un başkasına yazmasına yol açar
+3. **Pozisyon asla geriye gitmez:** POST route'taki `Math.max(requested, existing)` guard'ları (stale sendBeacon koruması) kaldırılamaz
+4. **Resume seek sırası:** Player'da `lastAllowedTime.current = pos` her zaman `video.currentTime = pos`'tan SONRA da güvenlidir (medya event'leri async) ama AudioPlayer'daki sıra (önce guard, sonra seek) tercih edilen pattern'dir
+
+**Neden bu kural var:** Haziran 2026 Devakent şikayeti — personel videoyu yarıda bırakıp döndüğünde video baştan başlıyordu. Kök neden client cache'iydi (sunucu verisi sağlamdı). Koruma katmanları: `use-fetch.test.ts` noStore testleri + `videos/__tests__/route.test.ts` tutarlılık testleri + `perf-check.js` `exam-video-stale-cache` kuralı — bu üç katman bilinçli ekildi, çıkarma.
+
+---
+
 ## 🔐 Auth & Redirect Döngüsü Önleme (KRİTİK)
 
 Geçmiş sonsuz yenilenme döngülerinden çıkarılmış kurallar:
