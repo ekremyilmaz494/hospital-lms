@@ -39,7 +39,7 @@ const SHOWCASE: { img: string; title: string; desc: string }[] = [
     desc: "Video, doküman ve otomatik sınavı tek akışta oluştur, ata, ölç.",
   },
   {
-    img: "/landing-3d/erisim.svg",
+    img: "/landing-3d/showcase-mobil.svg",
     title: "Mobil Erişim",
     desc: "Personel telefonundan tamamlar; yönetici canlı ilerlemeyi izler.",
   },
