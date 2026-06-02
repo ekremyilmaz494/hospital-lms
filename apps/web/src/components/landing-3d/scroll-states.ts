@@ -12,10 +12,11 @@ export const SCROLL_STATES: ScrollState[] = [
   { id: "closeup",  position: [-0.70,  0.00,  0.7],  rotation: [ 0.05,  Math.PI - 0.20,  0.02], scale: 2.1 },
   // 2 — Front: ortada, tam karşıdan.
   { id: "front",    position: [-0.25, -0.05,  0.2],  rotation: [ 0.02,  Math.PI,         0.0 ], scale: 1.8 },
-  // 3 — Top: üstten, yatay duruş — atriyum detayı.
-  { id: "top",      position: [ 0.00,  0.05,  0.4],  rotation: [ Math.PI / 2 - 0.15, 0.0, Math.PI / 2], scale: 1.75 },
-  // 4 — Back: çapraz arkadan, sağda.
-  { id: "back",     position: [ 0.60, -0.05,  0.0],  rotation: [-0.10, -1.40,            0.15], scale: 1.6 },
+  // 3 — Exam: öne dönük (ekran kullanıcıya bakar), karşı taraftan 3/4 açı —
+  //     sınav ekranı okunur. Kopya solda, art sağ-altta → telefon merkez-sağ.
+  { id: "top",      position: [ 0.18,  0.06,  0.45], rotation: [ 0.07,  Math.PI + 0.34, -0.05], scale: 1.85 },
+  // 4 — Cert: öne dönük, sağda, hafif yukarı "takdim" eğimi — sertifika ekranı görünür.
+  { id: "back",     position: [ 0.62, -0.14,  0.10], rotation: [ 0.12,  Math.PI - 0.55,  0.07], scale: 1.65 },
   // 5 — Final: solda, karşıya dönük, hafif büyütülmüş.
   { id: "final",    position: [-0.90, -0.05,  0.2],  rotation: [ 0.05,  Math.PI - 0.40, -0.02], scale: 1.9 },
 ];
