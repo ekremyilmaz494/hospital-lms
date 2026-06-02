@@ -248,6 +248,31 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
     })
   })
 
+  describe('attempt çözüm tutarlılığı (Video Resume Kuralı)', () => {
+    // "Yeniden Ata" (round) senaryosunda kullanıcının aynı eğitim için birden çok
+    // attempt'i olabilir. orderBy'sız findFirst rastgele attempt seçer → progress
+    // yanlış attempt'e yazılır, GET başkasından okur → "kaldığım yerden devam
+    // etmiyor" sınıfı bug. POST attempt lookup'ı HER ZAMAN attemptNumber desc ile
+    // deterministik olmalı (GET ve start route ile aynı).
+    it('POST attempt lookup\'ı orderBy: { attemptNumber: desc } kullanır', async () => {
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null)
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 30, position: 30 }),
+        { params: Promise.resolve({ id: 'assignment-1' }) },
+      )
+
+      expect(res.status).toBe(200)
+      const lookupArgs = prismaMock.examAttempt.findFirst.mock.calls[0][0] as {
+        where: Record<string, unknown>
+        orderBy?: Record<string, unknown>
+      }
+      expect(lookupArgs.orderBy).toEqual({ attemptNumber: 'desc' })
+      // assignmentId öncelikli arama da korunmalı (start route ile tutarlı)
+      expect(lookupArgs.where.assignmentId).toBe('assignment-1')
+    })
+  })
+
   describe('içerik silinme / yabancı video guard (E-2 + Y3)', () => {
     it('video silinmişse 404 döner — frontend bunu "içerik bulunamadı" olarak ayırt eder', async () => {
       // Admin videoyu sınav ortasında sildi → trainingVideo.findFirst null.

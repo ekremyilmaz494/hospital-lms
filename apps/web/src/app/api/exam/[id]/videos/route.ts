@@ -135,7 +135,24 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
   // expired'i de hariç tut — kardeş kodlarla (getActiveOrLatestAttemptStatus,
   // start/route.ts) tutarlı. Aksi halde cron expire sonrası eski attempt'in
   // videoProgress'i yüklenir → yanlış saniyeden resume.
-  const activeAttempt = await prisma.examAttempt.findFirst({
+  //
+  // Attempt çözüm ÖNCELİĞİ POST ve start route ile AYNI: önce URL'deki assignment'ın
+  // attempt'i, yoksa trainingId genelinde ara. Aksi halde "Yeniden Ata" (round)
+  // senaryosunda iki atamanın da aktif attempt'i varken GET bir attempt'in
+  // progress'ini okuyup POST diğerine yazar → okuma/yazma tutarsızlığı.
+  // (assignment2 non-review akışta üstteki 403 guard'ı sayesinde her zaman dolu;
+  // TS narrowing'i bunu göremediği için null-safe yazıldı.)
+  const activeAttempt = (assignment2
+    ? await prisma.examAttempt.findFirst({
+        where: {
+          userId: dbUser.id,
+          assignmentId: assignment2.id,
+          status: { notIn: ['completed', 'expired'] satisfies AttemptStatus[] },
+        },
+        orderBy: { attemptNumber: 'desc' },
+        select: { id: true },
+      })
+    : null) ?? await prisma.examAttempt.findFirst({
     where: {
       userId: dbUser.id,
       trainingId: training.id,
@@ -208,13 +225,18 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
 
   if (!body?.videoId) return errorResponse('videoId required')
 
-  // Find attempt — try assignmentId first, then trainingId
+  // Find attempt — try assignmentId first, then trainingId.
+  // orderBy ZORUNLU: orderBy'sız findFirst çoklu attempt durumunda (örn. "Yeniden
+  // Ata" round'ları) rastgele attempt seçer → progress yanlış attempt'e yazılır,
+  // GET başka attempt'ten okur ("kaldığım yerden devam etmiyor" sınıfı bug).
   let attempt = await prisma.examAttempt.findFirst({
     where: { assignmentId: id, userId: dbUser.id, status: 'watching_videos' satisfies AttemptStatus },
+    orderBy: { attemptNumber: 'desc' },
   })
   if (!attempt) {
     attempt = await prisma.examAttempt.findFirst({
       where: { trainingId: id, userId: dbUser.id, status: 'watching_videos' satisfies AttemptStatus },
+      orderBy: { attemptNumber: 'desc' },
     })
   }
   if (!attempt) return errorResponse('Aktif video izleme aşaması bulunamadı', 400)

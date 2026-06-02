@@ -178,6 +178,36 @@ for (const file of pageFiles) {
       }
     }
 
+    // ── Rule 6.5: Exam video sayfasında useFetch noStore zorunlu (error) ──
+    // CLAUDE.md "Video Resume Kuralı": /exam/ altındaki sayfalarda video listesi
+    // (/videos endpoint'i) useFetch ile çekiliyorsa { noStore: true } ZORUNLU.
+    // useFetch'in modül-level cache'i SPA geri dönüşünde bayat lastPosition=0
+    // servis eder → onLoadedMetadata resume seek'i atlanır → video baştan başlar
+    // ("kaldığım yerden devam etmiyor" şikayeti — Haziran 2026 Devakent).
+    const isExamPage = /[\\/]exam[\\/]/.test(file);
+    if (isExamPage && content.includes('useFetch')) {
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('perf-check-disable-line')) continue;
+        // useFetch çağrısı /videos URL'i içeriyor mu? (çağrı birden çok satıra yayılabilir)
+        if (/useFetch[<(]/.test(lines[i])) {
+          const callWindow = lines.slice(i, i + 4).join(' ');
+          const fetchesVideos = /\/videos/.test(callWindow) || /videosUrl/.test(callWindow);
+          const hasNoStore = /noStore:\s*true/.test(callWindow);
+          if (fetchesVideos && !hasNoStore) {
+            issues.push({
+              level: 'error',
+              file: fileShort,
+              line: i + 1,
+              rule: 'exam-video-stale-cache',
+              msg: 'Exam video sayfasinda useFetch noStore: true OLMADAN kullaniliyor. ' +
+                   'Bayat lastPosition cache\'i "kaldigim yerden devam etmiyor" bug\'ini geri getirir. ' +
+                   'useFetch(url, { noStore: true }) kullan — bkz: CLAUDE.md "Video Resume Kurali". COMMIT ENGELLENDI.',
+            });
+          }
+        }
+      }
+    }
+
   } catch (err) {
     console.error(`Failed to read ${file}: ${err.message}`);
   }
