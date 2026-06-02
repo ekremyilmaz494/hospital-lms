@@ -79,6 +79,8 @@ const nextConfig: NextConfig = {
       : {}),
   },
   redirects: async () => [
+    // Ana sayfa artık 3D landing. Eski `/` landing emekli (yönlendirme).
+    { source: '/', destination: '/landing-3d', permanent: false },
     {
       source: '/admin/media-library',
       destination: '/admin/content-library',
@@ -91,7 +93,7 @@ const nextConfig: NextConfig = {
     },
     // Eski /marketing/* URL'leri root marketing route group'una taşındı.
     // Eski bookmark/SEO için 301 redirect.
-    { source: '/marketing', destination: '/', permanent: true },
+    { source: '/marketing', destination: '/landing-3d', permanent: true },
     { source: '/marketing/:path*', destination: '/:path*', permanent: true },
     // Ek hak talepleri sınav değil, eğitim assignment life-cycle'ına ait.
     {
@@ -126,7 +128,8 @@ const nextConfig: NextConfig = {
             "img-src 'self' data: https: blob:",
             "font-src 'self' data:",
             // unpkg.com: ffmpeg-core.wasm fetch
-            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://unpkg.com",
+            // blob:: three.js GLTFLoader gömülü GLB texture'larını blob URL'den fetch eder
+            "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://unpkg.com",
             "media-src 'self' data: https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             "frame-src 'self' https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             // blob:: ffmpeg.wasm internal worker'i blob URL'den olusturuyor
@@ -140,7 +143,17 @@ const nextConfig: NextConfig = {
     {
       source: '/_next/static/(.*)',
       headers: [
-        { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        {
+          key: 'Cache-Control',
+          // Turbopack dev chunk adları path-stable (hash'siz). Prod'da hash'li
+          // olduğu için immutable güvenli; dev'de immutable, kod değişince
+          // tarayıcının eski chunk'ı tutup "module factory not available"
+          // hatası vermesine yol açıyor → dev'de revalidate zorunlu.
+          value:
+            process.env.NODE_ENV === 'development'
+              ? 'no-store, must-revalidate'
+              : 'public, max-age=31536000, immutable',
+        },
       ],
     },
     {

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Mail, Send, CheckCircle2, AlertCircle, Loader2, AtSign, Save, ShieldCheck, Info,
+  type LucideIcon,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -68,7 +69,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 }
 
 function Field({ label, hint, icon: Icon, children }: {
-  label: string; hint?: string; icon: React.ElementType; children: React.ReactNode;
+  label: string; hint?: string; icon: LucideIcon; children: React.ReactNode;
 }) {
   return (
     <div>

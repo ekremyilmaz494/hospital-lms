@@ -11,10 +11,7 @@ import { BRAND } from "@/lib/brand";
 /*  Navigation config                                                   */
 /* ------------------------------------------------------------------ */
 const NAV_LINKS = [
-  { label: "Anasayfa", href: "/" },
-  { label: "Ozellikler", href: "/#ozellikler" },
-  { label: "Nasil Calisir", href: "/#nasil-calisir" },
-  { label: "Fiyatlandirma", href: "/pricing" },
+  { label: "Anasayfa", href: "/landing-3d" },
   { label: "Iletisim", href: "/contact" },
 ];
 
@@ -53,7 +50,7 @@ function MarketingHeader() {
           }}
         >
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/landing-3d" className="flex items-center gap-2.5">
             <div
               className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-sm"
               style={{ background: "linear-gradient(135deg, #0d9668, #065f46)" }}
@@ -178,19 +175,18 @@ function MarketingFooter() {
     {
       title: "Platform",
       links: [
-        { label: "Ozellikler", href: "/#ozellikler" },
-        { label: "Fiyatlandirma", href: "/pricing" },
         { label: "Demo Talep Et", href: "/demo" },
-        { label: "SSS", href: "/#sss" },
+        { label: "SSS", href: "/landing-3d#sss" },
+        { label: "Iletisim", href: "/contact" },
       ],
     },
     {
       title: "Hizmetler",
       links: [
-        { label: "Egitim Yonetimi", href: "/#ozellikler" },
-        { label: "Sinav Sistemi", href: "/#ozellikler" },
-        { label: "Sertifika Yonetimi", href: "/#ozellikler" },
-        { label: "AI Icerik Studyosu", href: "/#ozellikler" },
+        { label: "Egitim Yonetimi", href: "/landing-3d#egitim" },
+        { label: "Sinav Sistemi", href: "/landing-3d#egitim" },
+        { label: "Sertifika Yonetimi", href: "/landing-3d#kanit" },
+        { label: "Mobil Erisim", href: "/landing-3d#erisim" },
       ],
     },
     {
@@ -279,6 +275,11 @@ function MarketingFooter() {
 export function MarketingLayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isHomePage = pathname === "/";
+
+  // /contact kendi landing-3d header+footer'ını sağlar → marketing chrome'u atla.
+  if (pathname === "/contact") {
+    return <>{children}</>;
+  }
 
   if (isHomePage) {
     return (
