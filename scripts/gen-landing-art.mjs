@@ -32,16 +32,17 @@ const BG_SIZE = "landscape_16_9";
 
 const SPECS = [
   {
-    // §5 — Erişim & İletişim (mobil erişim, bildirim, gerçek zamanlı).
+    // §5 — Mobil Erişim (her yerden, her cihazdan): doğa değil, bağlantı/network deseni.
     file: "erisim.svg",
     size: BG_SIZE,
     prompt:
-      "Wide horizontal background scene, soft and airy, mobile connectivity theme: a low " +
-      "horizon with subtle signal towers, gentle wifi and signal waves, and soft rounded " +
-      "clouds spread along the bottom baseline, with lots of open empty sky above. Flat " +
-      "vector, minimal, light and faded atmospheric backdrop, emerald green and warm amber " +
-      "accents on a very light warm off-white background. No people, no foreground objects, " +
-      "no text, no words, no letters.",
+      "Wide horizontal abstract background pattern, soft and airy, mobile access and " +
+      "connectivity theme: large concentric wifi and signal wave arcs, scattered connection " +
+      "nodes linked by thin lines, a few location pins and simple smartphone outlines, " +
+      "evenly spread across the whole width with lots of empty negative space. Flat vector, " +
+      "minimal, light and faded atmospheric backdrop, emerald green and warm amber accents " +
+      "on a very light warm off-white background. No landscape, no hills, no trees, no " +
+      "clouds, no people, no text, no words, no letters.",
   },
   {
     // §6 — Güven & Referans (güven, ortaklık, kurumsal referans).
@@ -87,8 +88,11 @@ async function generate(spec) {
   console.log(`✓ ${spec.file} (${(buf.length / 1024).toFixed(0)} KB) → ${dest}`);
 }
 
+// İsteğe bağlı filtre: `node scripts/gen-landing-art.mjs erisim` → sadece eşleşen dosya.
+const only = process.argv[2];
 await mkdir(OUT_DIR, { recursive: true });
 for (const spec of SPECS) {
+  if (only && !spec.file.includes(only)) continue;
   try {
     await generate(spec);
   } catch (e) {
