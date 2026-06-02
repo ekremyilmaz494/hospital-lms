@@ -5,6 +5,7 @@ import { getCookieDomain } from './cookie-domain'
 
 const PUBLIC_ROUTES = [
   '/',
+  '/landing-3d',
   '/kvkk',
   '/pricing',
   '/demo',
