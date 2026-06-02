@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Mail, Send, CheckCircle2, AlertCircle, Loader2, AtSign, Save, ShieldCheck, Info,
+  type LucideIcon,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

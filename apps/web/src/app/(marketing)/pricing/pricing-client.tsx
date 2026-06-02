@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Check, ArrowRight, Zap, Building2, Crown } from "lucide-react";
+import { Check, ArrowRight, Zap, Building2, Crown, type LucideIcon } from "lucide-react";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -15,7 +15,7 @@ const fadeUp = {
 
 type Plan = {
   name: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   price: string;
   period: string;
   desc: string;
