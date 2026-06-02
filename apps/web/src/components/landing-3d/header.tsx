@@ -14,11 +14,11 @@ export function Header() {
         <Link href="/contact">İletişim</Link>
       </nav>
 
-      <Link href="/login" className="l3d-login">
+      <Link href="/auth/login" className="l3d-login">
         Giriş Yap
       </Link>
 
-      <Link href="/login" className="l3d-hamburger" aria-label="Menüyü aç">
+      <Link href="/auth/login" className="l3d-hamburger" aria-label="Menüyü aç">
         <span />
         <span />
       </Link>
