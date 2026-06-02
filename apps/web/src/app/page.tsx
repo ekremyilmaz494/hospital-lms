@@ -1,79 +1,48 @@
-import type { Metadata } from "next";
-import dynamic from "next/dynamic";
-import { SiteNav } from "@/components/landing/site-nav";
-import { HeroSection } from "@/components/landing/hero-section";
-import { LandingMotionProvider } from "@/components/landing/landing-motion-provider";
-import { BRAND } from "@/lib/brand";
+import type { Metadata } from 'next';
+import { BRAND } from '@/lib/brand';
+import { Header } from '@/components/landing-3d/header';
+import { LoadingScreen } from '@/components/landing-3d/loading-screen';
+import { SceneClient } from '@/components/landing-3d/scene-client';
+import { ScrollSections } from '@/components/landing-3d/scroll-sections';
+import '@/app/landing-3d/landing-3d.css';
 
 export const metadata: Metadata = {
-  title: `${BRAND.name} — ${BRAND.shortDesc}`,
-  description: BRAND.longDesc,
+  title: `${BRAND.name} — Hastaneler için Eğitim & Sınav Platformu`,
+  description:
+    'Hastane, klinik ve eczaneler için uçtan uca personel eğitim platformu. Atama, video eğitim, sınav, sertifika ve KVKK uyum raporlaması — tek akışta.',
   openGraph: {
-    title: `${BRAND.name} — ${BRAND.shortDesc}`,
-    description: BRAND.longDesc,
-    type: "website",
-    locale: "tr_TR",
+    title: `${BRAND.name} — Personeliniz Her Zaman Hazır`,
+    description:
+      'Hastane, klinik ve eczaneler için uçtan uca eğitim platformu. Denetime her an hazır.',
+    type: 'website',
+    locale: 'tr_TR',
   },
 };
 
-const PromoVideoSection = dynamic(() =>
-  import("@/components/landing/promo-video-section").then((m) => ({
-    default: m.PromoVideoSection,
-  }))
-);
-
-const TrustBar = dynamic(() =>
-  import("@/components/landing/trust-bar").then((m) => ({ default: m.TrustBar }))
-);
-
-const ScrollStorySection = dynamic(() =>
-  import("@/components/landing/scroll-story-section").then((m) => ({
-    default: m.ScrollStorySection,
-  }))
-);
-
-const IndustryShowcase = dynamic(() =>
-  import("@/components/landing/industry-showcase").then((m) => ({
-    default: m.IndustryShowcase,
-  }))
-);
-
-const FeaturesSection = dynamic(() =>
-  import("@/components/landing/features-section").then((m) => ({ default: m.FeaturesSection }))
-);
-
-const ProofSection = dynamic(() =>
-  import("@/components/landing/proof-section").then((m) => ({ default: m.ProofSection }))
-);
-
-const CtaSection = dynamic(() =>
-  import("@/components/landing/cta-section").then((m) => ({ default: m.CtaSection }))
-);
-
-const FaqSection = dynamic(() =>
-  import("@/components/landing/faq-section").then((m) => ({ default: m.FaqSection }))
-);
-
-const SiteFooter = dynamic(() =>
-  import("@/components/landing/site-footer").then((m) => ({ default: m.SiteFooter }))
-);
-
 export default function LandingPage() {
   return (
-    <LandingMotionProvider>
-      <div style={{ backgroundColor: "var(--landing-bg)" }}>
-        <SiteNav />
-        <HeroSection />
-        <PromoVideoSection />
-        <TrustBar />
-        <ScrollStorySection />
-        <IndustryShowcase />
-        <FeaturesSection />
-        <ProofSection />
-        <CtaSection />
-        <FaqSection />
-        <SiteFooter />
+    <>
+      {/* Refresh hep hero'da başlasın (hydration'dan önce server HTML'inde çalışır). */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: "history.scrollRestoration='manual';window.scrollTo(0,0);",
+        }}
+      />
+      <div className="l3d-page">
+        <Header />
+        {/* Hero arka planı — canvas'tan önce (z0, DOM sırası) → 3D telefon üstüne biner.
+            absolute + 100vh: hero'dan sonra kayıp gider, fixed canvas devam eder. */}
+        <div className="l3d-hero-bg" aria-hidden="true" />
+        {/* §2 arka planı — 2. viewport (top:100vh) hizasında, canvas'ın altında. */}
+        <div className="l3d-sec2-bg" aria-hidden="true" />
+        {/* §5/§6 arka plan bantları — ilgili viewport'un altında, kısa boy, telefonun
+            arkasında (z0 + canvas'tan önce DOM sırası). */}
+        <div className="l3d-sec5-bg" aria-hidden="true" />
+        <div className="l3d-sec6-bg" aria-hidden="true" />
+        <SceneClient />
+        <LoadingScreen />
+        <ScrollSections />
       </div>
-    </LandingMotionProvider>
+    </>
   );
 }
