@@ -153,7 +153,14 @@ export function ContactClient() {
   return (
     <div className="l3d-page" style={{ minHeight: '100vh' }}>
       <Header />
-      <main className="relative overflow-hidden pt-[120px] pb-20 sm:pb-24 lg:pt-[148px]">
+      {/* paddingTop INLINE — Tailwind arbitrary class'ı (pt-[148px]) ayrı bir CSS
+          chunk'ında üretilir; bayat chunk'ta uygulanmayıp başlık fixed header'ın
+          altına kayıp menüyle çakışıyordu. Inline style HTML ile gelir (SSR), harici
+          chunk'a bağımlı değil → her zaman uygulanır. clamp ile media-query'siz responsive. */}
+      <main
+        className="relative overflow-hidden pb-20 sm:pb-24"
+        style={{ paddingTop: 'clamp(116px, 9vw, 140px)' }}
+      >
         <ContactDecorations />
         <div className="relative z-10 mx-auto max-w-6xl px-6">
           {/* Başlık */}
