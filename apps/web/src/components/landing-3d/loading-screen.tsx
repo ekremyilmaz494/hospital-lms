@@ -25,6 +25,28 @@ export function LoadingScreen() {
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
+    const mobileMq = window.matchMedia("(max-width: 768px)");
+
+    // Mobil/tablet (≤768px): 3D yüklenmez → preloader'ı bekletme, scroll'u KİLİTLEME
+    // ve (masaüstünden mobile resize edildiyse) önceden kalan kilidi AÇ. Aksi halde
+    // texturesReady sinyali hiç gelmez, kullanıcı scroll edemeden takılır.
+    const enterMobile = () => {
+      unlockScroll();
+      markIntroStart();
+      setHidden(true);
+    };
+
+    if (mobileMq.matches) {
+      enterMobile();
+      return;
+    }
+
+    // Masaüstünde başlayıp mobile'a geçilirse de kilidi aç (responsive test / rotate).
+    const onMqChange = () => {
+      if (mobileMq.matches) enterMobile();
+    };
+    mobileMq.addEventListener("change", onMqChange);
+
     lockScroll();
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let fadeTimer = 0;
@@ -58,6 +80,7 @@ export function LoadingScreen() {
     }, FAILSAFE_TIMEOUT);
 
     return () => {
+      mobileMq.removeEventListener("change", onMqChange);
       off();
       window.clearTimeout(fadeTimer);
       window.clearTimeout(removeTimer);

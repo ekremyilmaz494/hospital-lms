@@ -205,18 +205,36 @@
   border-color: var(--landing-brand);
   color: var(--landing-brand);
 }
-.l3d-hamburger {
-  display: none;
+.l3d-menu-btn {
+  display: none; /* ≤1024px'te media query ile flex olur */
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  pointer-events: auto;
 }
-.l3d-hamburger span {
+.l3d-menu-btn span {
   display: block;
   width: 22px;
   height: 2px;
-  background: var(--landing-ink);
   border-radius: 2px;
+  background: var(--landing-ink);
+  transition: transform 0.3s ease, opacity 0.2s ease;
+}
+.l3d-menu-btn[aria-expanded="true"] span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.l3d-menu-btn[aria-expanded="true"] span:nth-child(2) {
+  opacity: 0;
+}
+.l3d-menu-btn[aria-expanded="true"] span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
 }
 
 /* ── Canvas katmanı ─────────────────────────────────────────────── */
@@ -239,6 +257,7 @@
   left: 0;
   width: 100%;
   height: 100vh;
+  height: 100svh; /* mobil adres çubuğu zıplamasını önler */
   z-index: 0;
   pointer-events: none;
   background-image: url("/landing-3d/hero-bg.svg?v=3");
@@ -341,6 +360,7 @@
   display: flex;
   align-items: center;
   min-height: 100vh;
+  min-height: 100svh; /* mobil adres çubuğu zıplamasını önler */
   padding: 0 8vw;
 }
 .l3d-copy {
@@ -693,6 +713,12 @@
   color: var(--landing-ink-soft);
 }
 
+/* Mobil-only bölüm illüstrasyonu (≤768px'te ortaya çıkar; bkz @media).
+   Masaüstü/tablette display:none → 3D akış ve mevcut .l3d-art hiç etkilenmez. */
+.l3d-section-art {
+  display: none;
+}
+
 /* ── Bölüm yan-alan illüstrasyonları (fal.ai Recraft V3 vektör) ──── */
 .l3d-art {
   position: absolute;
@@ -888,7 +914,7 @@
   .l3d-login {
     display: none;
   }
-  .l3d-hamburger {
+  .l3d-menu-btn {
     display: flex;
   }
   .l3d-section {
@@ -942,6 +968,165 @@
   }
   [data-section="final"] > div:first-child {
     margin-top: 60vh;
+  }
+}
+
+/* ── Mobil statik telefon (≤768px'te 3D yerine) ─────────────────── */
+.l3d-mobile-phone {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.l3d-mobile-phone-frame {
+  height: 100%;
+  aspect-ratio: 9 / 19;
+  max-width: 78vw;
+  padding: 7px;
+  border-radius: 30px;
+  background: var(--landing-ink);
+  box-shadow: 0 24px 50px -12px rgba(26, 58, 40, 0.35);
+}
+.l3d-mobile-phone-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 23px;
+}
+
+/* ── Mobil menü (drawer) ────────────────────────────────────────── */
+.l3d-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(26, 58, 40, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.l3d-drawer-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.l3d-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(78vw, 320px);
+  height: 100%;
+  padding: 92px 24px 32px;
+  background: var(--landing-bg);
+  box-shadow: -20px 0 60px -20px rgba(26, 58, 40, 0.4);
+  transform: translateX(100%);
+  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.l3d-drawer.is-open {
+  transform: translateX(0);
+}
+.l3d-drawer a {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--landing-ink);
+  text-decoration: none;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--landing-rule);
+}
+.l3d-drawer a.l3d-drawer-cta,
+.l3d-drawer a:last-child {
+  border-bottom: 0;
+}
+.l3d-drawer .l3d-drawer-cta {
+  margin-top: 16px;
+  text-align: center;
+  background: var(--landing-accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 14px 20px;
+}
+
+/* ── Telefon (≤768px) ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .l3d-headline {
+    font-size: clamp(40px, 12vw, 68px);
+  }
+  .l3d-headline-md {
+    font-size: clamp(32px, 10vw, 52px);
+  }
+  /* Mobil hero okunurluğu: arka plan illüstrasyonunu (kalkan/grafik) gizle — koyu metin
+     renkli görselde okunmuyordu. Başlığın 42vh boşluğunu kaldır → kopya (başlık+lead+CTA)
+     üstte temiz alanda toplanır; statik telefon kopyanın ALTINA (alt bölgeye) alınır,
+     hiçbir metin telefonla/arka planla çakışmaz. */
+  /* Hero arka plan illüstrasyonu GÖRÜNÜR kalır; kopya tam-genişlik üstte olduğu için
+     ÜST-ağırlıklı açık veil → metin okunur, illüstrasyon (özellikle telefon çevresinde) görünür. */
+  .l3d-hero-bg::after {
+    background: linear-gradient(
+      to bottom,
+      rgba(250, 250, 249, 0.88) 0%,
+      rgba(250, 250, 249, 0.84) 50%,
+      rgba(250, 250, 249, 0.46) 62%,
+      rgba(250, 250, 249, 0.56) 100%
+    );
+  }
+  [data-section="hero"] .l3d-headline {
+    margin-bottom: 24px;
+  }
+  /* Statik telefon yalnız HERO'da görünsün: fixed yerine absolute → scroll'la
+     yukarı gider, sonraki bölümlerin içeriğine binmez. Alt bölgeye konumlanır. */
+  .l3d-scene-fixed {
+    position: absolute;
+    /* Kopya yüksekliği px olarak ~sabit; kısa ekranda 54vh kopyaya binerdi.
+       max() ile telefon her zaman kopyanın altından (≥448px) başlar. */
+    top: max(50vh, 448px);
+    height: 40vh;
+  }
+  .l3d-section {
+    padding: 8vh 6vw 4vh;
+  }
+  /* Hero-dışı bölümler içeriğe göre boyutlansın — zorunlu 100svh yüksekliği
+     sade/boş alanların köküydü (özellikle kısa Devakent bölümü). Hero 100svh
+     kalır (statik telefon top:30vh absolute ona bağlı). */
+  .l3d-section:not([data-section="hero"]) {
+    min-height: auto;
+    padding: 7vh 6vw 7vh;
+  }
+  /* Telefon hero'da; hero-dışı başlıklarda 42vh boşluğa gerek yok. */
+  .l3d-section:not([data-section="hero"]) h2 {
+    margin-bottom: 20px;
+  }
+  /* Mobil içerik illüstrasyonu — tam genişlik profesyonel kart. */
+  .l3d-section-art {
+    display: block;
+    width: 100%;
+    margin: 6px 0 14px;
+    border-radius: 20px;
+    border: 1px solid var(--landing-rule);
+    box-shadow: var(--landing-shadow-card);
+    background: var(--landing-surface);
+  }
+  .l3d-modules {
+    grid-template-columns: 1fr;
+    column-gap: 0;
+  }
+  .l3d-stats {
+    gap: 16px;
+  }
+  .l3d-stat-value {
+    font-size: clamp(28px, 8vw, 40px);
+  }
+  .l3d-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .l3d-footer-links {
+    gap: 12px 20px;
   }
 }
 

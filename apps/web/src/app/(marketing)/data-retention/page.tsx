@@ -116,7 +116,7 @@ export default function DataRetentionPage() {
 
               {section.items && (
                 <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid #e2e8f0' }}>
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[640px] text-sm">
                     <thead>
                       <tr style={{ background: '#f8fafc' }}>
                         <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: '#64748b' }}>Kategori</th>

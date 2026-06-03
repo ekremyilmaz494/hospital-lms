@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { MobileMenu } from './mobile-menu';
 
 /** Fixed üst nav. pointer-events:none katman, linkler pointer-events:auto (CSS). */
 export function Header() {
@@ -18,10 +19,8 @@ export function Header() {
         Giriş Yap
       </Link>
 
-      <Link href="/auth/login" className="l3d-hamburger" aria-label="Menüyü aç">
-        <span />
-        <span />
-      </Link>
+      {/* Mobil/tablet: hamburger → kayan drawer menü (≤1024px) */}
+      <MobileMenu />
     </header>
   );
 }

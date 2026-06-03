@@ -175,6 +175,9 @@ export function ScrollSections() {
               Video, doküman ve sınavı tek akışta hazırlayın. İleri sarma kapalı, izleme süresi
               gerçek — personel eğitimi gerçekten tamamlar, “izlemiş gibi” yapamaz.
             </p>
+            {/* Mobil-only içerik illüstrasyonu (≤768px); masaüstünde display:none */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing-3d/sec-egitim.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_EGITIM} />
           </div>
         </section>
@@ -193,6 +196,8 @@ export function ScrollSections() {
               Tamamlanma oranları, sertifika geçerlilikleri ve KVKK uyum raporları tek tıkla.
               Değiştirilemez işlem kayıtlarıyla tam izlenebilirlik.
             </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing-3d/sec-uyum.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_UYUM} />
           </div>
           <div className="l3d-stats">
@@ -224,6 +229,8 @@ export function ScrollSections() {
               mesai kaybı olmaz. Herkes kendi vardiyasında tamamlar; siz birim ve role göre toplu
               atar, kimde eksik kaldığını yetkinlik matrisinde tek tabloda görürsünüz.
             </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing-3d/sec-personel.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_KURUM} />
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -249,6 +256,8 @@ export function ScrollSections() {
               Personel eğitimini telefonundan tamamlar, sertifikasını anında indirir. Yöneticiler
               ilerlemeyi ve geri bildirimi gerçek zamanlı görür.
             </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing-3d/sec-erisim.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_ERISIM} />
           </div>
           {/* Sağ alan — projeyi diğerlerinden ayıran 3 fark, küçük illüstrasyonlarla */}
@@ -287,6 +296,8 @@ export function ScrollSections() {
               Özel Devakent Hastanesi, personel eğitiminden denetim raporlamasına kadar uçtan uca
               KlinoVax kullanıyor.
             </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing-3d/sec-referans.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <div className="l3d-trust-row">
               <span className="l3d-trust-label">GÜVENİYOR</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
