@@ -8,7 +8,7 @@ const fromEnv = (key: string): string | undefined => {
   return value && value.length > 0 ? value : undefined
 }
 
-const supportEmail = fromEnv('SUPPORT_EMAIL') ?? 'destek@klinovax.com'
+const supportEmail = fromEnv('SUPPORT_EMAIL') ?? 'ekremyilmaz@klinovax.info'
 
 export const BRAND = {
   name: fromEnv('NEXT_PUBLIC_BRAND_NAME') ?? 'KlinoVax',
@@ -23,8 +23,8 @@ export const BRAND = {
   supportEmail,
   contact: {
     email: supportEmail,
-    phone: fromEnv('NEXT_PUBLIC_BRAND_PHONE') ?? '+90 850 000 0000',
-    city: fromEnv('NEXT_PUBLIC_BRAND_CITY') ?? 'Ankara, Türkiye',
+    phone: fromEnv('NEXT_PUBLIC_BRAND_PHONE') ?? '0553 953 06 96',
+    city: fromEnv('NEXT_PUBLIC_BRAND_CITY') ?? 'Konya, Türkiye',
   },
   legal: {
     copyrightYear: new Date().getFullYear(),
