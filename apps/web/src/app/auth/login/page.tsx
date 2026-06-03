@@ -5,20 +5,11 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, Clock, ArrowRight, AlertCircle, Building2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import dynamic from 'next/dynamic';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { KvkkNoticeModal } from '@/components/shared/kvkk-notice-modal';
 import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc';
-
-// MeshGradient is WebGL — must be client-only
-const MeshGradient = dynamic(
-  () => import('@paper-design/shaders-react').then(m => ({ default: m.MeshGradient })),
-  { ssr: false }
-);
-const LoginHeroAnimation = dynamic(
-  () => import('@/components/login/LoginHeroAnimation'),
-  { ssr: false }
-);
+import LoginBrandPanel from '@/components/login/LoginBrandPanel';
+import LoginFormDecorations from '@/components/login/LoginFormDecorations';
 import { createClient } from '@/lib/supabase/client';
 import { BRAND } from '@/lib/brand';
 import { useAuthStore } from '@/store/auth-store';
@@ -56,18 +47,20 @@ function buildPostLoginUrl(targetPath: string, organizationSlug: string | null):
   return `https://${organizationSlug}.${baseDomain}${targetPath}`;
 }
 
-// Klinova emerald palette
+// Landing-3d sıcak editöryel palet — tokens.css --landing-* ile hizalı.
+// (Eski stone/emerald palet warm cream/olive/amber'a repoint edildi; tüm
+//  style={{ color: K.x }} referansları otomatik olarak landing temasına geçer.)
 const K = {
   PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
-  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
-  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
-  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
+  SURFACE: '#f5f0e6', SURFACE_HOVER: '#efe8da', BG: '#fafaf9',
+  BORDER: 'rgba(26, 58, 40, 0.16)', BORDER_LIGHT: 'rgba(26, 58, 40, 0.09)',
+  TEXT_PRIMARY: '#1a3a28', TEXT_SECONDARY: '#4a7060', TEXT_MUTED: '#6b8478',
+  ACCENT: '#f59e0b', ACCENT_LIGHT: '#fef3c7',
   SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
   WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
   ERROR: '#ef4444', ERROR_BG: '#fee2e2',
   INFO: '#3b82f6', INFO_BG: '#dbeafe',
-  ACCENT: '#a855f7',
-  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
+  SHADOW_CARD: '0 20px 40px -18px rgba(26, 58, 40, 0.20)',
   FONT_DISPLAY: 'var(--font-display, system-ui)',
 };
 
@@ -95,7 +88,6 @@ function LoginForm() {
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
   const [kvkkBearerToken, setKvkkBearerToken] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [webglSupported, setWebglSupported] = useState(false);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setHydrated(true));
@@ -119,15 +111,6 @@ function LoginForm() {
         setOrgSlug(slug);
       }
     }
-  }, []);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const canvas = document.createElement('canvas');
-      const hasWebGL = !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
-      setWebglSupported(hasWebGL);
-    });
-    return () => cancelAnimationFrame(frame);
   }, []);
 
   // KVKK onayı zorunlu: middleware authenticated ama onaysız kullanıcıyı
@@ -319,9 +302,9 @@ function LoginForm() {
         .ed-mono { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; }
         .ed-input {
           width: 100%;
-          height: 50px;
+          height: 46px;
           padding: 0 16px;
-          background: ${K.SURFACE};
+          background: ${K.BG};
           border: 1.5px solid ${K.BORDER};
           border-radius: 12px;
           font-size: 15px;
@@ -329,13 +312,13 @@ function LoginForm() {
           transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
           outline: none;
         }
-        .ed-input:focus { border-color: ${K.PRIMARY}; background: ${K.SURFACE}; box-shadow: 0 0 0 3px ${K.PRIMARY_LIGHT}; }
+        .ed-input:focus { border-color: ${K.PRIMARY}; background: ${K.BG}; box-shadow: 0 0 0 3px ${K.PRIMARY_LIGHT}; }
         .ed-input::placeholder { color: ${K.TEXT_MUTED}; opacity: 0.7; }
         .ed-checkbox {
           appearance: none;
           -webkit-appearance: none;
           border: 1.5px solid ${K.BORDER};
-          background: ${K.SURFACE};
+          background: ${K.BG};
           cursor: pointer;
           position: relative;
           border-radius: 3px;
@@ -357,48 +340,40 @@ function LoginForm() {
         .ed-pulse { animation: ed-glow 6s ease-in-out infinite; }
       `}</style>
 
-      {/* ── LEFT — Login Hero Animation ── */}
+      {/* ── LEFT — Marka paneli (landing sıcak editöryel tema) ── */}
       <aside className="relative hidden lg:flex lg:w-1/2 flex-col overflow-hidden">
-        <LoginHeroAnimation />
+        <LoginBrandPanel />
       </aside>
 
       {/* ── RIGHT — Cream Form Panel ── */}
       <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6 sm:p-10" style={{ background: K.BG }}>
-        {/* MeshGradient shader — animated emerald/sage ambient backdrop */}
-        <div className="absolute inset-0 z-0">
-          {webglSupported ? (
-            <MeshGradient
-              style={{ width: '100%', height: '100%' }}
-              colors={[K.BG, '#a7f3d0', '#34d399', K.PRIMARY, '#0a5d40', '#6ee7b7']}
-              distortion={1.1}
-              swirl={0.55}
-              speed={0.35}
-              offsetX={0.05}
-              grainMixer={0}
-              grainOverlay={0}
-            />
-          ) : (
-            <div
-              className="h-full w-full"
-              style={{
-                background:
-                  `radial-gradient(circle at 18% 18%, ${K.PRIMARY}88, transparent 38%), radial-gradient(circle at 78% 24%, #34d399cc, transparent 40%), linear-gradient(135deg, ${K.BG} 0%, #a7f3d0 52%, ${K.BG} 100%)`,
-              }}
-            />
-          )}
-          {/* Very light cream veil — softens edges only, keeps gradient visible */}
-          <div className="absolute inset-0" style={{ background: 'rgba(250, 250, 249, 0.08)' }} />
-          {/* Cream dot texture overlay */}
-          <div
-            className="absolute inset-0 opacity-[0.22]"
-            style={{
-              backgroundImage: `radial-gradient(circle, ${K.BORDER_LIGHT} 1px, transparent 1px)`,
-              backgroundSize: '32px 32px',
-            }}
-          />
+        {/* Sıcak ambient zemin — landing paletinde yumuşak amber/emerald ışıma + nokta
+            dokusu. Konumlar INLINE (arbitrary Tailwind class'ı -right-[12%] vb. bayat
+            chunk'ta uygulanmayıp ışımalar kaybolurdu → boş zemin tuzağı). */}
+        <div className="absolute inset-0 z-0" aria-hidden="true">
+          {/* Merkez krem wash — boş hissi kırar, sıcaklık verir */}
+          <div className="absolute inset-0" style={{ background: 'radial-gradient(56% 50% at 50% 40%, rgba(245,240,230,0.6) 0%, transparent 72%)' }} />
+          {/* Amber ışıma — sağ üst */}
+          <div className="absolute" style={{ top: '-10%', right: '-12%', width: '55%', height: '55%', borderRadius: '9999px', background: `radial-gradient(circle, ${K.ACCENT}28 0%, transparent 68%)`, filter: 'blur(46px)' }} />
+          {/* Emerald ışıma — sol alt */}
+          <div className="absolute" style={{ bottom: '-14%', left: '-10%', width: '58%', height: '58%', borderRadius: '9999px', background: `radial-gradient(circle, ${K.PRIMARY}22 0%, transparent 70%)`, filter: 'blur(50px)' }} />
+          {/* Nokta dokusu */}
+          <div className="absolute inset-0" style={{
+            opacity: 0.55,
+            backgroundImage: `radial-gradient(${K.BORDER_LIGHT} 1px, transparent 1px)`,
+            backgroundSize: '30px 30px',
+            maskImage: 'radial-gradient(120% 100% at 70% 25%, #000 35%, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(120% 100% at 70% 25%, #000 35%, transparent 80%)',
+          }} />
         </div>
 
-        <div className="relative z-10 w-full max-w-[440px]">
+        {/* Landing flat motifleri — kart çevresindeki boş alanı doldurur (lg+) */}
+        <LoginFormDecorations />
+
+        {/* maxWidth INLINE — Tailwind arbitrary class'ı (max-w-[...]) ayrı CSS chunk'ında
+            üretilir; bayat chunk'ta uygulanmayıp kart w-full kalıyordu (contact sayfası
+            ile aynı tuzak). Inline style SSR HTML ile gelir → her zaman uygulanır. */}
+        <div className="relative z-10 w-full" style={{ maxWidth: 360 }}>
           {/* Form card */}
           <div
             className="relative"
@@ -406,7 +381,7 @@ function LoginForm() {
               background: K.SURFACE,
               border: `1.5px solid ${K.BORDER}`,
               borderRadius: 16,
-              padding: '36px 38px',
+              padding: '30px 32px',
               boxShadow: K.SHADOW_CARD,
             }}
           >
@@ -419,9 +394,9 @@ function LoginForm() {
             <BlurFade delay={0.06} duration={0.25}>
               <h2
                 className="ed-display mt-3 leading-[1.05] tracking-tight"
-                style={{ color: K.TEXT_PRIMARY, fontSize: '2rem', fontWeight: 700 }}
+                style={{ color: K.TEXT_PRIMARY, fontSize: '1.78rem', fontWeight: 700 }}
               >
-                Hoş <span style={{ fontStyle: 'italic', color: K.PRIMARY }}>geldiniz.</span>
+                Hoş <span style={{ fontFamily: 'var(--font-editorial, Georgia, serif)', fontStyle: 'italic', fontWeight: 500, color: K.PRIMARY }}>geldiniz.</span>
               </h2>
             </BlurFade>
 
@@ -587,12 +562,12 @@ function LoginForm() {
                   data-testid="login-submit"
                   className="group relative w-full mt-2 flex items-center justify-center gap-3 transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{
-                    height: 52,
+                    height: 48,
                     background: K.PRIMARY,
                     color: '#ffffff',
                     border: `1.5px solid ${K.PRIMARY}`,
-                    borderRadius: 12,
-                    boxShadow: `0 4px 12px ${K.PRIMARY}33`,
+                    borderRadius: 999,
+                    boxShadow: `0 8px 24px ${K.PRIMARY}33`,
                   }}
                   onMouseEnter={(e) => {
                     if (!loading) e.currentTarget.style.background = K.PRIMARY_HOVER;
