@@ -1053,6 +1053,42 @@
 
 /* ── Telefon (≤768px) ───────────────────────────────────────────── */
 @media (max-width: 768px) {
+  /* Zarif scroll-reveal — yalnız mobilde, yalnız anim-ready gate'i varken (page.tsx
+     inline script paint öncesi ekler). Gate yoksa içerik görünür kalır (fail-safe). */
+  html.l3d-anim-ready .l3d-reveal > * {
+    opacity: 0;
+    transform: translateY(20px);
+    filter: blur(4px);
+    transition:
+      opacity 0.6s var(--landing-ease),
+      transform 0.6s var(--landing-ease),
+      filter 0.6s var(--landing-ease);
+    will-change: opacity, transform;
+  }
+  html.l3d-anim-ready .l3d-reveal.is-in > * {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+  /* Çocuklar kademeli (stagger) belirir — zarif cascade. */
+  html.l3d-anim-ready .l3d-reveal.is-in > *:nth-child(2) {
+    transition-delay: 70ms;
+  }
+  html.l3d-anim-ready .l3d-reveal.is-in > *:nth-child(3) {
+    transition-delay: 140ms;
+  }
+  html.l3d-anim-ready .l3d-reveal.is-in > *:nth-child(4) {
+    transition-delay: 210ms;
+  }
+  html.l3d-anim-ready .l3d-reveal.is-in > *:nth-child(5) {
+    transition-delay: 280ms;
+  }
+  html.l3d-anim-ready .l3d-reveal.is-in > *:nth-child(6) {
+    transition-delay: 350ms;
+  }
+  html.l3d-anim-ready .l3d-reveal.is-in > *:nth-child(n + 7) {
+    transition-delay: 410ms;
+  }
   .l3d-headline {
     font-size: clamp(40px, 12vw, 68px);
   }
@@ -1132,6 +1168,14 @@
 
 /* ── Reduced motion ─────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
+  /* Reveal'i tamamen pasifleştir — içerik anında görünür, hareket yok. */
+  html.l3d-anim-ready .l3d-reveal > *,
+  html.l3d-anim-ready .l3d-reveal.is-in > * {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
   .l3d-loading-bar-fill {
     animation: none;
     width: 100%;

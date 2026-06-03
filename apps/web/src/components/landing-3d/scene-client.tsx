@@ -22,7 +22,7 @@ const Scene = dynamic(
  *  Pil/performans için three.js chunk'ı mobilde hiç yüklenmez. */
 function MobilePhone() {
   return (
-    <div className="l3d-mobile-phone">
+    <div className="l3d-mobile-phone l3d-reveal">
       <div className="l3d-mobile-phone-frame">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/landing-3d/screen-hero.webp" alt="" decoding="async" />

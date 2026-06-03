@@ -133,7 +133,7 @@ export function ScrollSections() {
       <main className="l3d-main">
         {/* §1 — HERO */}
         <section id="hero" data-section="hero" className="l3d-section">
-          <div className="l3d-copy l3d-copy-hero">
+          <div className="l3d-copy l3d-copy-hero l3d-reveal">
             <span className="l3d-eyebrow" data-hero-text>
               HASTANELER İÇİN EĞİTİM PLATFORMU
             </span>
@@ -163,7 +163,7 @@ export function ScrollSections() {
 
         {/* §2 — CLOSEUP */}
         <section id="egitim" data-section="closeup" className="l3d-section">
-          <div className="l3d-copy l3d-copy-right l3d-step">
+          <div className="l3d-copy l3d-copy-right l3d-step l3d-reveal">
             <span className="l3d-step-num">01</span>
             <span className="l3d-eyebrow">EĞİTİM YÖNETİMİ</span>
             <h2 className="l3d-headline-md">
@@ -184,7 +184,7 @@ export function ScrollSections() {
 
         {/* §3 — FRONT + STATS */}
         <section id="kanit" data-section="front" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-step">
+          <div className="l3d-copy l3d-copy-left l3d-step l3d-reveal">
             <span className="l3d-step-num">02</span>
             <span className="l3d-eyebrow">UYUM & RAPORLAMA</span>
             <h2 className="l3d-headline-md">
@@ -200,7 +200,7 @@ export function ScrollSections() {
             <img src="/landing-3d/sec-uyum.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_UYUM} />
           </div>
-          <div className="l3d-stats">
+          <div className="l3d-stats l3d-reveal">
             <FeatureStat label="TAMAMLANAN EĞİTİM" value="12.480" unit="+" />
             <FeatureStat label="BAŞARI ORANI" value="94" unit="%" />
             <FeatureStat label="AKTİF KURUM" value="40" unit="+" />
@@ -216,7 +216,7 @@ export function ScrollSections() {
 
         {/* §4 — TOP */}
         <section id="olcek" data-section="top" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-step">
+          <div className="l3d-copy l3d-copy-left l3d-step l3d-reveal">
             <span className="l3d-step-num">03</span>
             <span className="l3d-eyebrow">PERSONEL YÖNETİMİ</span>
             <h2 className="l3d-headline-md">
@@ -244,7 +244,7 @@ export function ScrollSections() {
 
         {/* §5 — BACK */}
         <section id="erisim" data-section="back" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-step">
+          <div className="l3d-copy l3d-copy-left l3d-step l3d-reveal">
             <span className="l3d-step-num">04</span>
             <span className="l3d-eyebrow">MOBİL ERİŞİM</span>
             <h2 className="l3d-headline-md">
@@ -261,7 +261,7 @@ export function ScrollSections() {
             <ModuleList items={MODULES_ERISIM} />
           </div>
           {/* Sağ alan — projeyi diğerlerinden ayıran 3 fark, küçük illüstrasyonlarla */}
-          <aside className="l3d-diff" aria-label="KlinoVax farkı">
+          <aside className="l3d-diff l3d-reveal" aria-label="KlinoVax farkı">
             <span className="l3d-eyebrow">NEDEN FARKLI</span>
             <h3 className="l3d-diff-title">
               Sıradan bir
@@ -285,7 +285,7 @@ export function ScrollSections() {
 
         {/* §6 — GÜVEN (Devakent referansı; telefon ekranında logo görünür) */}
         <section id="guven" data-section="guven" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-copy-guven">
+          <div className="l3d-copy l3d-copy-left l3d-copy-guven l3d-reveal">
             <span className="l3d-eyebrow">REFERANS</span>
             <h2 className="l3d-headline-md">
               Sahada
@@ -314,11 +314,11 @@ export function ScrollSections() {
 
       {/* Platform showcase — tam genişlik, 3 büyük illüstrasyon kartı */}
       <section className="l3d-showcase" aria-label="Platform">
-        <div className="l3d-showcase-head">
+        <div className="l3d-showcase-head l3d-reveal">
           <span className="l3d-eyebrow">PLATFORM</span>
           <h2 className="l3d-showcase-title">Tek platform, uçtan uca.</h2>
         </div>
-        <ul className="l3d-showcase-grid">
+        <ul className="l3d-showcase-grid l3d-reveal">
           {SHOWCASE.map((c) => (
             <li key={c.title} className="l3d-showcase-card">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -332,11 +332,11 @@ export function ScrollSections() {
 
       {/* Sık sorulan sorular — native <details> akordeon (client JS gerektirmez) */}
       <section id="sss" className="l3d-faq" aria-label="Sık sorulan sorular">
-        <div className="l3d-faq-head">
+        <div className="l3d-faq-head l3d-reveal">
           <span className="l3d-eyebrow">SIK SORULAN SORULAR</span>
           <h2 className="l3d-showcase-title">Aklınızdaki sorular</h2>
         </div>
-        <ul className="l3d-faq-list">
+        <ul className="l3d-faq-list l3d-reveal">
           {FAQ.map((f) => (
             <li key={f.q} className="l3d-faq-item">
               <details className="l3d-faq-details">
