@@ -18,10 +18,10 @@ const Scene = dynamic(
 
 /**
  * Fixed, tam ekran, pointer-events:none canvas katmanı (CSS: .l3d-scene-fixed).
- * Cinematic `main` bitince (showcase görünmeye başlayınca) canvas opacity'si
- * scrub ile 1→0 olur: telefon güven (son keyframe) bölümünde tam görünür kalır,
- * showcase opak zemini alttan yükselip telefonu örtmeden (aşağı "batma" görüntüsü
- * vermeden) zarifçe kaybolur. ScrollTrigger global olarak Lenis'e bağlı.
+ * Telefon güven (son keyframe) bölümüne kadar fixed kalır; cinematic `main` bitip
+ * showcase görünmeye başlayınca canvas YUKARI ötelenir (yPercent 0→-100) → telefon,
+ * güven içeriğiyle BİRLİKTE yukarı kayıp ekrandan çıkar (bölüme tutturulmuş gibi);
+ * aşağı sarkıp "batarak silinme" görüntüsü vermez. ScrollTrigger global olarak Lenis'e bağlı.
  */
 export function SceneClient() {
   const ref = useRef<HTMLDivElement>(null);
@@ -33,10 +33,11 @@ export function SceneClient() {
 
     const st = ScrollTrigger.create({
       trigger: ".l3d-showcase",
-      start: "top bottom", // showcase üstü viewport altına girince (main bitti)
-      end: "top center", // showcase yarıya gelince fade tamam
+      start: "top bottom", // showcase üstü viewport altına girince (main/güven bitti)
+      end: "top top", // showcase üste oturunca (bir viewport'luk geçiş)
       scrub: true,
-      onUpdate: (self) => gsap.set(el, { autoAlpha: 1 - self.progress }),
+      // Canvas içerikle senkron yukarı kayar → telefon güven bölümüyle birlikte çıkar.
+      onUpdate: (self) => gsap.set(el, { yPercent: -100 * self.progress }),
     });
     return () => st.kill();
   }, []);
