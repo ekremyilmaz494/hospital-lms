@@ -14,9 +14,11 @@
 /* ── Tipografi ──────────────────────────────────────────────────── */
 .l3d-headline {
   font-family: var(--font-display);
-  font-size: clamp(64px, 12vw, 180px);
+  font-size: clamp(40px, 6vw, 92px);
   font-weight: 800;
-  line-height: 0.92;
+  /* 1.05 — Türkçe diakritikler (ğ breve, ü/ö noktaları) sıkı satırda üstteki
+     satırla çakışmasın; negatif leading (0.92) çok satırlı başlıkta binişir. */
+  line-height: 1.05;
   letter-spacing: -0.04em;
   color: var(--landing-ink);
   margin: 0;
@@ -1090,7 +1092,7 @@
     transition-delay: 410ms;
   }
   .l3d-headline {
-    font-size: clamp(40px, 12vw, 68px);
+    font-size: clamp(26px, 8.5vw, 40px);
   }
   .l3d-headline-md {
     font-size: clamp(32px, 10vw, 52px);

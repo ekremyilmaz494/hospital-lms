@@ -138,13 +138,14 @@ export function ScrollSections() {
               HASTANELER İÇİN EĞİTİM PLATFORMU
             </span>
             <h1 className="l3d-headline" data-hero-text>
-              Her zaman
+              Eğitimi yükleyin,
               <br />
-              hazır.
+              gerisi otomatik.
             </h1>
             <p className="l3d-lead" data-hero-text>
-              Zorunlu eğitimleri oluşturun, personele atayın ve tamamlanmayı otomatik izleyin.
-              Video, sınav, sertifika ve denetim raporu — hepsi tek panelde.
+              Tek işiniz eğitimi yüklemek. Atama, sınav, ilerleme takibi, sertifika ve
+              denetim raporu — hepsini sistem otomatik üretir. Personeli toplamak, boşa
+              giden mesai ve yarım kalan eğitim geride kaldı.
             </p>
             <div className="l3d-cta-row" data-hero-text>
               <Link href="/demo" className="l3d-cta">
