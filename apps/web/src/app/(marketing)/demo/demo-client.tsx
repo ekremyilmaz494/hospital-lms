@@ -187,7 +187,7 @@ export function DemoClient() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.15 }}
               onSubmit={handleSubmit}
-              className="rounded-2xl border p-8"
+              className="rounded-2xl border p-6 sm:p-8"
               style={{
                 backgroundColor: "var(--color-surface)",
                 borderColor: "var(--color-border)",
@@ -205,7 +205,7 @@ export function DemoClient() {
                     value={form.firstName}
                     onChange={handleChange}
                     placeholder="Adiniz"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -224,7 +224,7 @@ export function DemoClient() {
                     value={form.lastName}
                     onChange={handleChange}
                     placeholder="Soyadiniz"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -246,7 +246,7 @@ export function DemoClient() {
                     value={form.email}
                     onChange={handleChange}
                     placeholder="ornek@kurum.com"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -265,7 +265,7 @@ export function DemoClient() {
                     value={form.phone}
                     onChange={handleChange}
                     placeholder="+90 5XX XXX XX XX"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -287,7 +287,7 @@ export function DemoClient() {
                     value={form.organizationName}
                     onChange={handleChange}
                     placeholder="Organizasyon adiniz"
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -304,7 +304,7 @@ export function DemoClient() {
                     required
                     value={form.staffCount}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668]"
+                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
                     style={{
                       borderColor: "var(--color-border)",
                       backgroundColor: "var(--color-bg)",
@@ -329,7 +329,7 @@ export function DemoClient() {
                   value={form.message}
                   onChange={handleChange}
                   placeholder="Ozel gereksinimleriniz veya sorulariniz varsa yazabilirsiniz..."
-                  className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-colors focus:border-[#0d9668] resize-none"
+                  className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668] resize-none"
                   style={{
                     borderColor: "var(--color-border)",
                     backgroundColor: "var(--color-bg)",

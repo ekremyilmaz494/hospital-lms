@@ -4,6 +4,7 @@ import { Header } from '@/components/landing-3d/header';
 import { LoadingScreen } from '@/components/landing-3d/loading-screen';
 import { SceneClient } from '@/components/landing-3d/scene-client';
 import { ScrollSections } from '@/components/landing-3d/scroll-sections';
+import { MobileReveal } from '@/components/landing-3d/mobile-reveal';
 import '@/app/landing-3d/landing-3d.css';
 
 export const metadata: Metadata = {
@@ -25,7 +26,11 @@ export default function LandingPage() {
       {/* Refresh hep hero'da başlasın (hydration'dan önce server HTML'inde çalışır). */}
       <script
         dangerouslySetInnerHTML={{
-          __html: "history.scrollRestoration='manual';window.scrollTo(0,0);",
+          // Refresh hep hero'da başlasın + mobilde (reduced-motion değilse) scroll-reveal
+          // gate'ini paint'TEN ÖNCE ekle (FOUC yok; desktop/reduced-motion'da eklenmez).
+          __html:
+            "history.scrollRestoration='manual';window.scrollTo(0,0);" +
+            "try{if(window.matchMedia('(max-width:768px)').matches&&!window.matchMedia('(prefers-reduced-motion:reduce)').matches){document.documentElement.classList.add('l3d-anim-ready')}}catch(e){}",
         }}
       />
       <div className="l3d-page">
@@ -41,6 +46,7 @@ export default function LandingPage() {
         <div className="l3d-sec6-bg" aria-hidden="true" />
         <SceneClient />
         <LoadingScreen />
+        <MobileReveal />
         <ScrollSections />
       </div>
     </>

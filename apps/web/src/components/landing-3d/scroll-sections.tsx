@@ -133,18 +133,19 @@ export function ScrollSections() {
       <main className="l3d-main">
         {/* §1 — HERO */}
         <section id="hero" data-section="hero" className="l3d-section">
-          <div className="l3d-copy l3d-copy-hero">
+          <div className="l3d-copy l3d-copy-hero l3d-reveal">
             <span className="l3d-eyebrow" data-hero-text>
               HASTANELER İÇİN EĞİTİM PLATFORMU
             </span>
             <h1 className="l3d-headline" data-hero-text>
-              Her zaman
+              Eğitimi yükleyin,
               <br />
-              hazır.
+              gerisi otomatik.
             </h1>
             <p className="l3d-lead" data-hero-text>
-              Zorunlu eğitimleri oluşturun, personele atayın ve tamamlanmayı otomatik izleyin.
-              Video, sınav, sertifika ve denetim raporu — hepsi tek panelde.
+              Tek işiniz eğitimi yüklemek. Atama, sınav, ilerleme takibi, sertifika ve
+              denetim raporu — hepsini sistem otomatik üretir. Personeli toplamak, boşa
+              giden mesai ve yarım kalan eğitim geride kaldı.
             </p>
             <div className="l3d-cta-row" data-hero-text>
               <Link href="/demo" className="l3d-cta">
@@ -163,7 +164,7 @@ export function ScrollSections() {
 
         {/* §2 — CLOSEUP */}
         <section id="egitim" data-section="closeup" className="l3d-section">
-          <div className="l3d-copy l3d-copy-right l3d-step">
+          <div className="l3d-copy l3d-copy-right l3d-step l3d-reveal">
             <span className="l3d-step-num">01</span>
             <span className="l3d-eyebrow">EĞİTİM YÖNETİMİ</span>
             <h2 className="l3d-headline-md">
@@ -175,13 +176,16 @@ export function ScrollSections() {
               Video, doküman ve sınavı tek akışta hazırlayın. İleri sarma kapalı, izleme süresi
               gerçek — personel eğitimi gerçekten tamamlar, “izlemiş gibi” yapamaz.
             </p>
+            {/* Mobil-only içerik illüstrasyonu (≤768px); masaüstünde display:none */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing-3d/sec-egitim.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_EGITIM} />
           </div>
         </section>
 
         {/* §3 — FRONT + STATS */}
         <section id="kanit" data-section="front" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-step">
+          <div className="l3d-copy l3d-copy-left l3d-step l3d-reveal">
             <span className="l3d-step-num">02</span>
             <span className="l3d-eyebrow">UYUM & RAPORLAMA</span>
             <h2 className="l3d-headline-md">
@@ -193,9 +197,11 @@ export function ScrollSections() {
               Tamamlanma oranları, sertifika geçerlilikleri ve KVKK uyum raporları tek tıkla.
               Değiştirilemez işlem kayıtlarıyla tam izlenebilirlik.
             </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing-3d/sec-uyum.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_UYUM} />
           </div>
-          <div className="l3d-stats">
+          <div className="l3d-stats l3d-reveal">
             <FeatureStat label="TAMAMLANAN EĞİTİM" value="12.480" unit="+" />
             <FeatureStat label="BAŞARI ORANI" value="94" unit="%" />
             <FeatureStat label="AKTİF KURUM" value="40" unit="+" />
@@ -211,7 +217,7 @@ export function ScrollSections() {
 
         {/* §4 — TOP */}
         <section id="olcek" data-section="top" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-step">
+          <div className="l3d-copy l3d-copy-left l3d-step l3d-reveal">
             <span className="l3d-step-num">03</span>
             <span className="l3d-eyebrow">PERSONEL YÖNETİMİ</span>
             <h2 className="l3d-headline-md">
@@ -224,6 +230,8 @@ export function ScrollSections() {
               mesai kaybı olmaz. Herkes kendi vardiyasında tamamlar; siz birim ve role göre toplu
               atar, kimde eksik kaldığını yetkinlik matrisinde tek tabloda görürsünüz.
             </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing-3d/sec-personel.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_KURUM} />
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -237,7 +245,7 @@ export function ScrollSections() {
 
         {/* §5 — BACK */}
         <section id="erisim" data-section="back" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-step">
+          <div className="l3d-copy l3d-copy-left l3d-step l3d-reveal">
             <span className="l3d-step-num">04</span>
             <span className="l3d-eyebrow">MOBİL ERİŞİM</span>
             <h2 className="l3d-headline-md">
@@ -249,10 +257,12 @@ export function ScrollSections() {
               Personel eğitimini telefonundan tamamlar, sertifikasını anında indirir. Yöneticiler
               ilerlemeyi ve geri bildirimi gerçek zamanlı görür.
             </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing-3d/sec-erisim.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_ERISIM} />
           </div>
           {/* Sağ alan — projeyi diğerlerinden ayıran 3 fark, küçük illüstrasyonlarla */}
-          <aside className="l3d-diff" aria-label="KlinoVax farkı">
+          <aside className="l3d-diff l3d-reveal" aria-label="KlinoVax farkı">
             <span className="l3d-eyebrow">NEDEN FARKLI</span>
             <h3 className="l3d-diff-title">
               Sıradan bir
@@ -276,7 +286,7 @@ export function ScrollSections() {
 
         {/* §6 — GÜVEN (Devakent referansı; telefon ekranında logo görünür) */}
         <section id="guven" data-section="guven" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-copy-guven">
+          <div className="l3d-copy l3d-copy-left l3d-copy-guven l3d-reveal">
             <span className="l3d-eyebrow">REFERANS</span>
             <h2 className="l3d-headline-md">
               Sahada
@@ -287,6 +297,8 @@ export function ScrollSections() {
               Özel Devakent Hastanesi, personel eğitiminden denetim raporlamasına kadar uçtan uca
               KlinoVax kullanıyor.
             </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing-3d/sec-referans.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <div className="l3d-trust-row">
               <span className="l3d-trust-label">GÜVENİYOR</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -303,11 +315,11 @@ export function ScrollSections() {
 
       {/* Platform showcase — tam genişlik, 3 büyük illüstrasyon kartı */}
       <section className="l3d-showcase" aria-label="Platform">
-        <div className="l3d-showcase-head">
+        <div className="l3d-showcase-head l3d-reveal">
           <span className="l3d-eyebrow">PLATFORM</span>
           <h2 className="l3d-showcase-title">Tek platform, uçtan uca.</h2>
         </div>
-        <ul className="l3d-showcase-grid">
+        <ul className="l3d-showcase-grid l3d-reveal">
           {SHOWCASE.map((c) => (
             <li key={c.title} className="l3d-showcase-card">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -321,11 +333,11 @@ export function ScrollSections() {
 
       {/* Sık sorulan sorular — native <details> akordeon (client JS gerektirmez) */}
       <section id="sss" className="l3d-faq" aria-label="Sık sorulan sorular">
-        <div className="l3d-faq-head">
+        <div className="l3d-faq-head l3d-reveal">
           <span className="l3d-eyebrow">SIK SORULAN SORULAR</span>
           <h2 className="l3d-showcase-title">Aklınızdaki sorular</h2>
         </div>
-        <ul className="l3d-faq-list">
+        <ul className="l3d-faq-list l3d-reveal">
           {FAQ.map((f) => (
             <li key={f.q} className="l3d-faq-item">
               <details className="l3d-faq-details">

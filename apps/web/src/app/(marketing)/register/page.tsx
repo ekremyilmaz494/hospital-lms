@@ -318,7 +318,7 @@ export default function RegisterPage() {
               >
                 {step > 1 ? <CheckCircle2 className="w-4 h-4" /> : '1'}
               </div>
-              <span className="text-sm font-medium" style={{ color: step >= 1 ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
+              <span className="hidden text-sm font-medium sm:inline" style={{ color: step >= 1 ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
                 Organizasyon Bilgileri
               </span>
             </div>
@@ -336,7 +336,7 @@ export default function RegisterPage() {
               >
                 2
               </div>
-              <span className="text-sm font-medium" style={{ color: step >= 2 ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
+              <span className="hidden text-sm font-medium sm:inline" style={{ color: step >= 2 ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
                 Yonetici Hesabi
               </span>
             </div>
@@ -420,7 +420,7 @@ export default function RegisterPage() {
                       id="sector"
                       value={form.sector}
                       onChange={(e) => update('sector', e.target.value)}
-                      className="mt-1.5 w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none"
+                      className="mt-1.5 w-full rounded-md border bg-transparent px-3 py-2 text-base focus:outline-none sm:text-sm"
                       style={{
                         borderColor: errors.sector ? '#dc2626' : 'var(--color-border)',
                         color: 'var(--color-text-primary)',
