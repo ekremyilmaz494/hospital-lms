@@ -184,11 +184,15 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
       })
 
       if (!existingCert) {
-        // We need an ExamAttempt to link the certificate. Find or skip.
+        // D1b — Sertifika ya ExamAttempt'e (hibrit: SCORM + sınav) YA da bu
+        // ScormAttempt'e (saf SCORM) bağlanır. ExamAttempt varsa onu tercih et
+        // (mevcut davranış); yoksa scormAttemptId ile bağla — eskiden saf SCORM'da
+        // ExamAttempt olmadığı için sertifika HİÇ üretilmiyordu (sessizce atlanıyordu).
         const [examAttempt, training] = await Promise.all([
           prisma.examAttempt.findFirst({
             where: { trainingId, userId: dbUser.id },
             orderBy: { createdAt: 'desc' },
+            select: { id: true },
           }),
           prisma.training.findUnique({
             where: { id: trainingId },
@@ -196,34 +200,35 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
           }),
         ])
 
-        if (examAttempt) {
-          const certCode = `SCORM-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-          const expiresAt = training?.renewalPeriodMonths
-            ? addMonths(new Date(), training.renewalPeriodMonths)
-            : null
+        const certCode = `SCORM-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        const expiresAt = training?.renewalPeriodMonths
+          ? addMonths(new Date(), training.renewalPeriodMonths)
+          : null
 
-          const cert = await prisma.certificate.create({
-            data: {
-              userId: dbUser.id,
-              trainingId,
-              attemptId: examAttempt.id,
-              certificateCode: certCode,
-              expiresAt,
-            },
-          })
-
-          await audit({
-            action: 'scorm_certificate_created',
-            entityType: 'certificate',
-            entityId: cert.id,
-            newData: { certificateCode: certCode, trainingId },
-          })
-
-          logger.info('SCORM Tracking', 'SCORM sertifikasi olusturuldu', {
-            certId: cert.id,
+        // attempt_id XOR scorm_attempt_id — tam olarak biri set edilir (şema invariant'ı).
+        const cert = await prisma.certificate.create({
+          data: {
+            userId: dbUser.id,
             trainingId,
-          })
-        }
+            organizationId,
+            ...(examAttempt ? { attemptId: examAttempt.id } : { scormAttemptId: existing.id }),
+            certificateCode: certCode,
+            expiresAt,
+          },
+        })
+
+        await audit({
+          action: 'scorm_certificate_created',
+          entityType: 'certificate',
+          entityId: cert.id,
+          newData: { certificateCode: certCode, trainingId, linkedTo: examAttempt ? 'exam_attempt' : 'scorm_attempt' },
+        })
+
+        logger.info('SCORM Tracking', 'SCORM sertifikasi olusturuldu', {
+          certId: cert.id,
+          trainingId,
+          linkedTo: examAttempt ? 'exam_attempt' : 'scorm_attempt',
+        })
       }
     }
 

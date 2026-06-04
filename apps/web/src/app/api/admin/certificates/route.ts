@@ -30,6 +30,8 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
           },
           training: { select: { id: true, title: true, category: true, isActive: true, publishStatus: true } },
           attempt: { select: { postExamScore: true, attemptNumber: true, preExamScore: true } },
+          // D1b — saf SCORM sertifikalarında ExamAttempt yok; skor ScormAttempt'ten gelir.
+          scormAttempt: { select: { score: true } },
         },
         orderBy: { issuedAt: 'desc' },
       }),
@@ -98,8 +100,9 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
             category: c.training.category ?? '',
             isArchived: !c.training.isActive || c.training.publishStatus === 'archived',
           },
-          score: c.attempt.postExamScore ? Number(c.attempt.postExamScore) : 0,
-          attemptNumber: c.attempt.attemptNumber,
+          // attempt (sınavlı) yoksa saf SCORM → skoru ScormAttempt'ten al.
+          score: c.attempt ? (c.attempt.postExamScore ? Number(c.attempt.postExamScore) : 0) : (c.scormAttempt?.score ?? 0),
+          attemptNumber: c.attempt?.attemptNumber ?? 1,
         })),
         stats: { totalCerts, activeCerts, expiredCerts, revokedCerts, expiringSoon },
         trainings,

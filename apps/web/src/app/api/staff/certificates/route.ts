@@ -25,6 +25,8 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
           include: {
             training: { select: { title: true, category: true, isActive: true, publishStatus: true } },
             attempt: { select: { postExamScore: true, attemptNumber: true } },
+            // D1b — saf SCORM sertifikalarında ExamAttempt yok; skor ScormAttempt'ten gelir.
+            scormAttempt: { select: { score: true } },
           },
           orderBy: { issuedAt: 'desc' },
           skip,
@@ -50,8 +52,8 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
             category: c.training.category ?? '',
             isArchived: !isTrainingAccessible(c.training),
           },
-          score: c.attempt.postExamScore ? Number(c.attempt.postExamScore) : 0,
-          attemptNumber: c.attempt.attemptNumber,
+          score: c.attempt ? (c.attempt.postExamScore ? Number(c.attempt.postExamScore) : 0) : (c.scormAttempt?.score ?? 0),
+          attemptNumber: c.attempt?.attemptNumber ?? 1,
         })),
       }
     })

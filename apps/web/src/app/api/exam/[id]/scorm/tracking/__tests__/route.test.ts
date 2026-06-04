@@ -190,3 +190,59 @@ describe('PATCH /scorm/tracking — tamamlanma → assignment passed (D1a)', () 
     expect(prismaMock.scormAttempt.findFirst).not.toHaveBeenCalled()
   })
 })
+
+describe('PATCH /scorm/tracking — sertifika üretimi (D1b)', () => {
+  beforeEach(() => {
+    prismaMock.scormAttempt.findFirst.mockResolvedValue({
+      id: 'scorm-1', lessonStatus: 'incomplete', suspendData: null, score: null,
+      totalTime: null, completionStatus: null, successStatus: null,
+    })
+    prismaMock.trainingAssignment.findFirst.mockResolvedValue({ id: 'asg-1', status: 'in_progress' })
+    prismaMock.certificate.create.mockResolvedValue({ id: 'cert-1' })
+    prismaMock.training.findUnique.mockResolvedValue({ renewalPeriodMonths: null })
+    // Sertifika yok → üretim yoluna gir.
+    prismaMock.certificate.findFirst.mockResolvedValue(null)
+  })
+
+  it('saf SCORM (ExamAttempt yok) → scormAttemptId ile sertifika üretilir', async () => {
+    prismaMock.examAttempt.findFirst.mockResolvedValue(null)
+
+    const res = await PATCH(patchReq({ lessonStatus: 'completed' }), params())
+
+    expect(res.status).toBe(200)
+    const data = prismaMock.certificate.create.mock.calls[0][0].data
+    expect(data.scormAttemptId).toBe('scorm-1')
+    expect(data.attemptId).toBeUndefined()
+    expect(data.organizationId).toBe('org-1')
+  })
+
+  it('hibrit (ExamAttempt var) → attemptId ile sertifika üretilir (scormAttemptId yok)', async () => {
+    prismaMock.examAttempt.findFirst.mockResolvedValue({ id: 'exam-1' })
+
+    const res = await PATCH(patchReq({ lessonStatus: 'passed' }), params())
+
+    expect(res.status).toBe(200)
+    const data = prismaMock.certificate.create.mock.calls[0][0].data
+    expect(data.attemptId).toBe('exam-1')
+    expect(data.scormAttemptId).toBeUndefined()
+  })
+
+  it('sertifika zaten varsa yeni üretilmez (idempotent)', async () => {
+    prismaMock.certificate.findFirst.mockResolvedValue({ id: 'cert-existing' })
+    prismaMock.examAttempt.findFirst.mockResolvedValue(null)
+
+    const res = await PATCH(patchReq({ lessonStatus: 'passed' }), params())
+
+    expect(res.status).toBe(200)
+    expect(prismaMock.certificate.create).not.toHaveBeenCalled()
+  })
+
+  it("lessonStatus geçiş değilse sertifika üretilmez", async () => {
+    prismaMock.examAttempt.findFirst.mockResolvedValue(null)
+
+    const res = await PATCH(patchReq({ lessonStatus: 'incomplete' }), params())
+
+    expect(res.status).toBe(200)
+    expect(prismaMock.certificate.create).not.toHaveBeenCalled()
+  })
+})

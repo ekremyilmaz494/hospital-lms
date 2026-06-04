@@ -775,7 +775,12 @@ model Certificate {
   id               String    @id @default(uuid()) @db.Uuid
   userId           String    @map("user_id") @db.Uuid
   trainingId       String    @map("training_id") @db.Uuid
-  attemptId        String    @unique @map("attempt_id") @db.Uuid
+  // D1b — Sertifika ya bir ExamAttempt'e (sınavlı eğitim) YA da bir ScormAttempt'e
+  // (saf SCORM) bağlanır. İkisi de @unique + nullable; tam olarak biri set edilir
+  // (uygulama katmanında zorlanır). Eskiden attemptId NOT NULL'dı → saf SCORM'a
+  // sertifika üretilemiyordu.
+  attemptId        String?   @unique @map("attempt_id") @db.Uuid
+  scormAttemptId   String?   @unique @map("scorm_attempt_id") @db.Uuid
   certificateCode  String    @unique @map("certificate_code") @db.VarChar(50)
   issuedAt         DateTime  @default(now()) @map("issued_at") @db.Timestamptz
   expiresAt        DateTime? @map("expires_at") @db.Timestamptz
@@ -787,7 +792,8 @@ model Certificate {
 
   user         User            @relation(fields: [userId], references: [id], onDelete: Restrict)
   training     Training        @relation(fields: [trainingId], references: [id], onDelete: Restrict)
-  attempt      ExamAttempt     @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  attempt      ExamAttempt?    @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  scormAttempt ScormAttempt?   @relation(fields: [scormAttemptId], references: [id], onDelete: Restrict)
   organization Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   period       TrainingPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
 
@@ -863,8 +869,9 @@ model ScormAttempt {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  training Training @relation(fields: [trainingId], references: [id])
-  user     User     @relation(fields: [userId], references: [id])
+  training     Training      @relation(fields: [trainingId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+  certificates Certificate[]
 
   @@index([userId, trainingId], map: "idx_scorm_attempts_user_training")
   @@map("scorm_attempts")
