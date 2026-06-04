@@ -49,6 +49,8 @@ import { PageLoading } from '@/components/shared/page-loading';
 import { attemptPhaseRedirect, type AttemptStatus } from '@/lib/exam-state-machine';
 import { postWithRetry, type ExamPostResult, type ExamPostResultKind } from '@/lib/exam-fetch';
 import { useToast } from '@/components/shared/toast';
+import { useExamTabLock } from '@/hooks/use-exam-tab-lock';
+import { ExamTabLocked } from '@/components/exam/exam-tab-locked';
 
 interface VideoItem {
   id: string;
@@ -82,6 +84,14 @@ export default function VideoPlayerPage() {
   const searchParams = useSearchParams();
   const isReview = searchParams.get('mode') === 'review';
   const { toast } = useToast();
+
+  // D2 — Çoklu sekme kilidi (pre/post-exam ile aynı hook). Video fazında route `id`
+  // (assignmentId/trainingId) üzerinden kilitlenir: aynı eğitimi iki sekmede oynatmayı
+  // engeller. Cevap karışması riski YOK (video ilerlemesi sunucuda Math.max ile korunur);
+  // amaç tek-sekme akış tutarlılığı. review modunda kilit uygulanmaz (iki sekmede izlemek
+  // zararsız). blocked sekmede <video> render edilmediği için videoRef null kalır →
+  // flushPosition/heartbeat no-op olur, pagehide cleanup yarışı zararsızdır.
+  const { status: tabLockStatus } = useExamTabLock(isReview ? null : id);
 
   const [startReady, setStartReady] = useState(isReview);
   const [startError, setStartError] = useState<string | null>(null);
@@ -627,6 +637,9 @@ export default function VideoPlayerPage() {
       router.replace(path);
     }
   }, [data?.attemptStatus, id, router, isReview]);
+
+  // Sınav başka sekmede açık → içerik yerine bloklama modalı (pre/post-exam ile aynı UX).
+  if (!isReview && tabLockStatus === 'blocked') return <ExamTabLocked />;
 
   if ((!startReady && !startError) || isLoading) return <PageLoading />;
 
