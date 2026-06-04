@@ -228,7 +228,7 @@ export const GET = withStaffRoute<{ id: string }>(
 
 /** POST — Update video progress (heartbeat + completion) */
 export const POST = withStaffRoute<{ id: string }>(
-  async ({ request, params, dbUser }) => {
+  async ({ request, params, dbUser, organizationId }) => {
     const { id } = params;
 
     // Review mode: salt-okunur, progress yazma
@@ -259,10 +259,14 @@ export const POST = withStaffRoute<{ id: string }>(
     // orderBy ZORUNLU: orderBy'sız findFirst çoklu attempt durumunda (örn. "Yeniden
     // Ata" round'ları) rastgele attempt seçer → progress yanlış attempt'e yazılır,
     // GET başka attempt'ten okur ("kaldığım yerden devam etmiyor" sınıfı bug).
+    // organizationId WHERE'de: requireOrganization:true org'u garanti ediyor; tenant
+    // izolasyonunu sorgu seviyesinde uygula (cross-tenant IDOR önlemi). ExamAttempt'in
+    // doğrudan organizationId kolonu var (start/route.ts:254 set ediyor).
     let attempt = await prisma.examAttempt.findFirst({
       where: {
         assignmentId: id,
         userId: dbUser.id,
+        organizationId,
         status: 'watching_videos' satisfies AttemptStatus,
       },
       orderBy: { attemptNumber: 'desc' },
@@ -272,6 +276,7 @@ export const POST = withStaffRoute<{ id: string }>(
         where: {
           trainingId: id,
           userId: dbUser.id,
+          organizationId,
           status: 'watching_videos' satisfies AttemptStatus,
         },
         orderBy: { attemptNumber: 'desc' },

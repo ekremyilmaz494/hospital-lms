@@ -57,6 +57,20 @@ export const GET = withStaffRoute<{ id: string; path: string[] }>(async ({ param
       return errorResponse('Bu içeriği görüntüleme yetkiniz yok', 403)
     }
 
+    // Atama sahipliği — org izolasyonu tek başına yetmez: aynı org'daki ama bu eğitime
+    // ATANMAMIŞ personel SCORM paketinin dosyalarını çekebiliyordu (IDOR). videos/route.ts:58
+    // ile aynı sınır. Yalnız 'staff' için zorlanır; admin/super_admin önizleme yapabilsin
+    // (onların ataması olmaz, org guard zaten super_admin'i muaf tutuyor).
+    if (dbUser.role === 'staff') {
+      const assignment = await prisma.trainingAssignment.findFirst({
+        where: { trainingId, userId: dbUser.id },
+        select: { id: true },
+      })
+      if (!assignment) {
+        return errorResponse('Bu eğitim size atanmamış', 403)
+      }
+    }
+
     // Extract base path from manifest path (directory containing imsmanifest.xml)
     const basePath = training.scormManifestPath.replace(/\/[^/]+$/, '')
     const filePath = pathSegments.join('/')

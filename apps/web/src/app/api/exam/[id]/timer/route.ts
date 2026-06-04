@@ -74,14 +74,15 @@ async function autoCompleteExpiredAttempt(attemptId: string, userId: string) {
 export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id } = params
 
-  // Search by attempt ID first, then assignmentId
+  // Search by attempt ID first, then assignmentId.
+  // organizationId WHERE'de (pre-filter) — post-query 403 kontrolü ikinci katman kalır.
   let attempt = await prisma.examAttempt.findFirst({
-    where: { id, userId: dbUser.id, status: { in: ['pre_exam', 'post_exam'] } },
+    where: { id, userId: dbUser.id, organizationId, status: { in: ['pre_exam', 'post_exam'] } },
     include: { training: { select: { examDurationMinutes: true, organizationId: true } } },
   })
   if (!attempt) {
     attempt = await prisma.examAttempt.findFirst({
-      where: { assignmentId: id, userId: dbUser.id, status: { in: ['pre_exam', 'post_exam'] } },
+      where: { assignmentId: id, userId: dbUser.id, organizationId, status: { in: ['pre_exam', 'post_exam'] } },
       include: { training: { select: { examDurationMinutes: true, organizationId: true } } },
       orderBy: { attemptNumber: 'desc' },
     })
@@ -165,9 +166,10 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
 export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id: attemptId } = params
 
-  // Ownership + org isolation check before Redis query
+  // Ownership + org isolation check before Redis query — organizationId WHERE'de
+  // (pre-filter); aşağıdaki kontrol ikinci katman.
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser.id },
+    where: { id: attemptId, userId: dbUser.id, organizationId },
     include: { training: { select: { organizationId: true, examDurationMinutes: true } } },
   })
   if (!attempt) return errorResponse('Attempt not found', 404)
