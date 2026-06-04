@@ -288,6 +288,23 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       // assignmentId öncelikli arama da korunmalı (start route ile tutarlı)
       expect(lookupArgs.where.assignmentId).toBe('assignment-1');
     });
+
+    // A2 — tenant izolasyonu: POST attempt lookup'ı organizationId ile pre-filter
+    // edilmeli (requireOrganization:true org'u garanti ediyor; cross-tenant IDOR önlemi).
+    it('POST attempt lookup\'ı organizationId ile filtreler (tenant izolasyonu, A2)', async () => {
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null);
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 30, position: 30 }),
+        { params: Promise.resolve({ id: 'assignment-1' }) }
+      );
+
+      expect(res.status).toBe(200);
+      const lookupArgs = prismaMock.examAttempt.findFirst.mock.calls[0][0] as {
+        where: Record<string, unknown>;
+      };
+      expect(lookupArgs.where.organizationId).toBe('org-1');
+    });
   });
 
   describe('içerik silinme / yabancı video guard (E-2 + Y3)', () => {

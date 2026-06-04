@@ -22,14 +22,16 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   // status filter atomic guard — pre_exam/post_exam fazındaki attempt'e video progress
   // yazılması state corruption'a yol açar (bkz. exam-state-machine.ts kapsam notu:
   // DB filter literal'ları transition değil guard amacıyla kullanılır).
+  // organizationId WHERE'de (pre-filter) — sorgu hiç başka tenant satırını getirmesin.
+  // Aşağıdaki post-query kontrolü ikinci katman olarak korunur (defense-in-depth).
   const attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
-    where: { id: attemptId, userId: dbUser.id, status: 'watching_videos' satisfies AttemptStatus },
+    where: { id: attemptId, userId: dbUser.id, organizationId, status: 'watching_videos' satisfies AttemptStatus },
     include: { training: { select: { organizationId: true } } },
   })
 
   if (!attempt) return errorResponse('Invalid attempt or not in video phase', 400)
 
-  // Verify org isolation
+  // Verify org isolation (ikinci katman — WHERE zaten org'u filtreliyor)
   if (attempt.training.organizationId !== organizationId) {
     return errorResponse('Yetkisiz erişim', 403)
   }
@@ -93,9 +95,18 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   // güvenilir değilse tamamlanma verilmez — bu route'ta açık bir bitiş sinyali
   // (onended) yok, dolayısıyla durationSeconds<=0 iken isCompleted=false kalır.
   const hasReliableDuration = video.durationSeconds > 0
-  const isCompleted = hasReliableDuration
+  const meetsWatchThreshold = hasReliableDuration
     ? finalWatchedSeconds >= (video.durationSeconds * MIN_WATCH_PERCENT)
     : false
+  // B2 — geriye-uyumlu açık tamamlanma sinyali:
+  //  • `completed` GÖNDERİLMEDİYSE (eski Expo istemcisi) → yalnız %95 eşiği (mevcut davranış korunur).
+  //  • `completed` GÖNDERİLDİYSE (yeni istemci) → %95 eşiği VE completed===true birlikte gerekir.
+  // Böylece yeni istemci videonun ortasında %95'i geçince değil, yalnız fiilen bittiğini
+  // (onEnded) bildirince tamamlanır — CLAUDE.md "tamamlanma yalnız onEnded ile" kuralına
+  // yaklaşır. Eşik (0.95) DEĞİŞMEZ; regresyon testi (progress/__tests__) bunu kilitliyor.
+  const isCompleted = parsed.data.completed === undefined
+    ? meetsWatchThreshold
+    : (parsed.data.completed === true && meetsWatchThreshold)
 
   const progress = await prisma.videoProgress.upsert({ // perf-check-disable-line
     where: { attemptId_videoId: { attemptId, videoId: body.videoId } },
@@ -160,9 +171,10 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
 export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id: attemptId } = params
 
-  // Verify attempt belongs to user's org
+  // Verify attempt belongs to user's org — organizationId WHERE'de (pre-filter);
+  // aşağıdaki kontrol ikinci katman olarak kalır.
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser.id },
+    where: { id: attemptId, userId: dbUser.id, organizationId },
     include: { training: { select: { organizationId: true } } },
   })
 

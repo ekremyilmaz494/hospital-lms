@@ -282,6 +282,53 @@ describe('POST /api/exam/[id]/videos/progress — K2 sertleştirme regresyon gua
     })
   })
 
+  describe('açık tamamlanma sinyali (completed flag — B2)', () => {
+    it('completed gönderilmediyse (eski istemci) %95 eşiği tek başına tamamlar (geriye-uyumlu)', async () => {
+      // 290 >= 285 (%95) ve completed YOK → mevcut davranış: tamamlanır
+      const res = await callPost({ videoId: VIDEO_ID, watchedSeconds: 290, lastPositionSeconds: 290 })
+
+      expect(res.status).toBe(200)
+      const upsertArgs = prismaMock.videoProgress.upsert.mock.calls[0][0] as {
+        create: Record<string, number | boolean>
+      }
+      expect(upsertArgs.create.isCompleted).toBe(true)
+    })
+
+    it('completed:true + %95 üstü → tamamlanır (yeni istemci, onEnded)', async () => {
+      const res = await callPost({ videoId: VIDEO_ID, watchedSeconds: 290, lastPositionSeconds: 290, completed: true })
+
+      expect(res.status).toBe(200)
+      const upsertArgs = prismaMock.videoProgress.upsert.mock.calls[0][0] as {
+        create: Record<string, number | boolean>
+      }
+      expect(upsertArgs.create.isCompleted).toBe(true)
+    })
+
+    it('completed:false + %95 üstü → tamamlanmaz (yeni istemci henüz bitmedi der)', async () => {
+      // %95 eşiği geçilse bile yeni istemci açıkça "bitmedi" diyor → erken tamamlanma yok
+      const res = await callPost({ videoId: VIDEO_ID, watchedSeconds: 290, lastPositionSeconds: 290, completed: false })
+
+      expect(res.status).toBe(200)
+      const upsertArgs = prismaMock.videoProgress.upsert.mock.calls[0][0] as {
+        create: Record<string, number | boolean>
+      }
+      expect(upsertArgs.create.isCompleted).toBe(false)
+      const body = await res.json()
+      expect(body.allVideosCompleted).toBe(false)
+    })
+
+    it('completed:true ama %95 altı → tamamlanmaz (eşik hâlâ zorunlu)', async () => {
+      // 250 < 285 (%95) → completed:true gelse de eşik geçilmeden tamamlanmaz
+      const res = await callPost({ videoId: VIDEO_ID, watchedSeconds: 250, lastPositionSeconds: 250, completed: true })
+
+      expect(res.status).toBe(200)
+      const upsertArgs = prismaMock.videoProgress.upsert.mock.calls[0][0] as {
+        create: Record<string, number | boolean>
+      }
+      expect(upsertArgs.create.isCompleted).toBe(false)
+    })
+  })
+
   describe('sıfır süre koruması', () => {
     it('durationSeconds=0 iken ilk POST videoyu tamamlamaz (sahte tamamlanma engellenir)', async () => {
       prismaMock.trainingVideo.findFirst.mockResolvedValue({

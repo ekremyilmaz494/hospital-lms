@@ -38,6 +38,8 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
         attempt: {
           select: { postExamScore: true, attemptNumber: true },
         },
+        // D1b — saf SCORM sertifikasında ExamAttempt yok; skor ScormAttempt'ten gelir.
+        scormAttempt: { select: { score: true } },
       },
     })
 
@@ -60,9 +62,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
 
     const logoDataUrl = await resolveOrgLogoDataUrl(certificate.user.organization?.logoUrl)
 
-    const score = certificate.attempt.postExamScore
+    const score = certificate.attempt?.postExamScore
       ? Number(certificate.attempt.postExamScore)
-      : null
+      : (certificate.scormAttempt?.score ?? null)
 
     const data: CertDrawData = {
       fullName: `${certificate.user.firstName} ${certificate.user.lastName}`,

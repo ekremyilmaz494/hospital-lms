@@ -213,6 +213,8 @@ async function generateCertificatesPdf(request: Request, orgId: string, orgName:
       user: { select: { firstName: true, lastName: true, title: true, departmentRel: { select: { name: true } } } },
       training: { select: { title: true, category: true } },
       attempt: { select: { postExamScore: true, attemptNumber: true } },
+      // D1b — saf SCORM sertifikalarında ExamAttempt yok; skor ScormAttempt'ten gelir.
+      scormAttempt: { select: { score: true } },
     },
     orderBy: { issuedAt: 'desc' },
     take: trainingId ? undefined : 1000,
@@ -239,7 +241,9 @@ type CertListItem = {
   revokedAt: Date | null
   user: { firstName: string; lastName: string; title: string | null; departmentRel: { name: string } | null }
   training: { title: string; category: string | null }
-  attempt: { postExamScore: { toString: () => string } | null; attemptNumber: number }
+  // D1b — saf SCORM sertifikasında attempt null; skor scormAttempt'ten gelir.
+  attempt: { postExamScore: { toString: () => string } | null; attemptNumber: number } | null
+  scormAttempt: { score: number | null } | null
 }
 
 async function renderCertificateListPdf(certs: CertListItem[], orgName: string, trainingId?: string): Promise<Response> {
@@ -301,7 +305,9 @@ async function renderCertificateListPdf(certs: CertListItem[], orgName: string, 
       doc.setTextColor(40)
     }
 
-    const score = c.attempt.postExamScore ? `${Number(c.attempt.postExamScore)}%` : '-'
+    const score = c.attempt
+      ? (c.attempt.postExamScore ? `${Number(c.attempt.postExamScore)}%` : '-')
+      : (c.scormAttempt?.score != null ? `${c.scormAttempt.score}%` : '-')
     const status = c.revokedAt
       ? 'İptal'
       : c.expiresAt && c.expiresAt < now
@@ -359,7 +365,7 @@ async function renderCertificateBundlePdf(
 
   certs.forEach((c, i) => {
     if (i > 0) doc.addPage('a4', 'landscape')
-    const score = c.attempt.postExamScore ? Number(c.attempt.postExamScore) : null
+    const score = c.attempt?.postExamScore ? Number(c.attempt.postExamScore) : (c.scormAttempt?.score ?? null)
     const data: CertDrawData = {
       fullName: `${c.user.firstName} ${c.user.lastName}`,
       trainingTitle: c.training.title,

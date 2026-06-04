@@ -415,3 +415,59 @@ CREATE POLICY "super_admin_periods_all" ON training_periods FOR ALL USING ((SELE
 CREATE POLICY "admin_periods_all" ON training_periods FOR ALL USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid) AND (SELECT auth.jwt() -> 'app_metadata' ->> 'role') IN ('admin', 'super_admin'));
 CREATE POLICY "staff_periods_select" ON training_periods FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
+-- ═══════════════════════════════════════════════════════════════
+-- SECURITY ADVISOR DÜZELTMELERİ (Haziran 2026)
+-- Supabase Security Advisor'ın "RLS Disabled in Public" uyarısı verdiği
+-- tablolar: exam_attempt_requests, expo_push_tokens, expo_push_tickets
+-- + statik denetimde bulunan invitations (TC kimlik + e-posta içerir, KVKK!)
+-- ═══════════════════════════════════════════════════════════════
+
+-- ── EXAM ATTEMPT REQUESTS RLS (Ek Sınav Hakkı Talepleri) ──
+ALTER TABLE exam_attempt_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "super_admin_attempt_requests_all" ON exam_attempt_requests
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_attempt_requests_all" ON exam_attempt_requests
+  FOR ALL USING (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
+CREATE POLICY "staff_attempt_requests_select" ON exam_attempt_requests
+  FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "staff_attempt_requests_insert" ON exam_attempt_requests
+  FOR INSERT WITH CHECK (
+    user_id = auth.uid()
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
+
+-- ── EXPO PUSH TOKENS RLS (Mobil Push Token'ları) ──
+-- push_subscriptions ile aynı pattern: kullanıcı yalnız kendi token'larını yönetir.
+ALTER TABLE expo_push_tokens ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "user_expo_push_tokens_own" ON expo_push_tokens
+  FOR ALL USING (user_id = auth.uid());
+
+-- ── EXPO PUSH TICKETS RLS (Push Teslimat Kayıtları) ──
+-- Sunucu service_role/Prisma ile yazar (RLS bypass) — client yalnız kendi
+-- kayıtlarını okuyabilir, yazamaz.
+ALTER TABLE expo_push_tickets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "super_admin_expo_push_tickets_all" ON expo_push_tickets
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "user_expo_push_tickets_select" ON expo_push_tickets
+  FOR SELECT USING (user_id = auth.uid());
+
+-- ── INVITATIONS RLS (Personel Davetleri) ──
+-- ⚠️ KVKK: tc_encrypted + e-posta + token_hash içerir. Davet kabulü anonim
+-- kullanıcı tarafından server-side route (service_role) üzerinden yapılır;
+-- client'tan anon/staff erişimi YOKTUR ve olmamalıdır.
+ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "super_admin_invitations_all" ON invitations
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_invitations_all" ON invitations
+  FOR ALL USING (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
+

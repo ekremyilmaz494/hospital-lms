@@ -391,6 +391,11 @@ export const createNotificationSchema = z.object({
 export const updateVideoProgressSchema = z.object({
   watchedSeconds: z.number().int().min(0),
   lastPositionSeconds: z.number().int().min(0),
+  // Açık tamamlanma sinyali — yeni istemci (Expo) videonun fiilen bittiğini (onEnded)
+  // bildirmek için gönderir. Opsiyonel: eski istemci göndermez → server %95 eşiği ile
+  // geriye-uyumlu davranır (bkz. videos/progress/route.ts). CLAUDE.md "tamamlanma
+  // yalnız onEnded ile" kuralına yeni istemcilerde yaklaşmak için additive.
+  completed: z.boolean().optional(),
 })
 
 // ── İçerik Kütüphanesi ──

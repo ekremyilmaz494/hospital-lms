@@ -51,6 +51,8 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId: orgI
       attempt: {
         select: { postExamScore: true, attemptNumber: true },
       },
+      // D1b — saf SCORM sertifikalarında ExamAttempt yok; skor ScormAttempt'ten gelir.
+      scormAttempt: { select: { score: true } },
     },
     orderBy: { issuedAt: 'desc' },
   })
@@ -76,9 +78,11 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId: orgI
     duzenlayiciKurum: cert.training.regulatoryBody ?? '',
     zorunluEgitim: cert.training.isCompulsory ? 'Evet' : 'Hayır',
     yenilemeSuresiAy: cert.training.renewalPeriodMonths ?? '',
-    // Sınav Bilgileri
-    sinavPuani: cert.attempt.postExamScore ? Number(cert.attempt.postExamScore) : '',
-    denemeSayisi: cert.attempt.attemptNumber,
+    // Sınav Bilgileri — saf SCORM'da ExamAttempt yok, skor ScormAttempt'ten
+    sinavPuani: cert.attempt
+      ? (cert.attempt.postExamScore ? Number(cert.attempt.postExamScore) : '')
+      : (cert.scormAttempt?.score ?? ''),
+    denemeSayisi: cert.attempt?.attemptNumber ?? 1,
     // Sertifika Bilgileri
     sertifikaKodu: cert.certificateCode,
     verilisTarihi: cert.issuedAt.toLocaleDateString('tr-TR'),

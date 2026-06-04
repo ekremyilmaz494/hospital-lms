@@ -182,6 +182,33 @@ export default function PreExamPage() {
     return () => clearInterval(interval);
   }, [timeLeft]);
 
+  // Sunucu otoritesiyle yeniden senkron — yerel sayaç sekme arka planında setInterval
+  // throttle'ı / uyku sonrası bayatlayabilir; mutlak süre sunucuda. 30 sn'de bir + sekme
+  // tekrar görünür olunca düzeltir. Saat sapmasına bağışık: server'ın remainingSeconds'ını
+  // kullanır (absolute timestamp değil). expired dönerse 0'a çek → timeLeft===0 auto-submit
+  // tetiklenir (post-exam ile aynı desen; server attempt'i zaten TIMEOUT ile kapatmış olur).
+  useEffect(() => {
+    if (!attemptId || timeLeft === null) return;
+    let cancelled = false;
+    const syncNow = () => {
+      fetch(`/api/exam/${attemptId}/timer`, { method: 'GET' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
+          if (data.expired) { setTimeLeft(0); return; }
+          if (typeof data.remainingSeconds === 'number') {
+            // Yalnız anlamlı sapmada (>2 sn) düzelt — gereksiz re-render'ı önle.
+            setTimeLeft((prev) => (prev !== null && Math.abs(prev - data.remainingSeconds) > 2 ? data.remainingSeconds : prev));
+          }
+        })
+        .catch(() => {});
+    };
+    const syncId = setInterval(syncNow, 30000);
+    const onVisible = () => { if (!document.hidden) syncNow(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { cancelled = true; clearInterval(syncId); document.removeEventListener('visibilitychange', onVisible); };
+  }, [attemptId, timeLeft !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const saveOnExit = () => {
       const qs = examData?.questions ?? [];
