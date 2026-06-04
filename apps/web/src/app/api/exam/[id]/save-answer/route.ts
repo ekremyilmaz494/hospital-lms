@@ -59,16 +59,9 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   })
 
   if (existing) {
-    // K2: Post-exam answer lock — 30 sn grace süresi, sonra cevap kilitli.
-    // "Fikir değiştirme" penceresi açık; DevTools ile geriye dönüp eski soruları
-    // sonradan değiştirme girişimleri reddedilir.
-    if (body.examPhase === 'post') {
-      const ageMs = Date.now() - new Date(existing.answeredAt).getTime()
-      const GRACE_MS = 30_000
-      if (ageMs > GRACE_MS) {
-        return errorResponse('Bu sorunun cevabı kilitlendi, değiştirilemez', 423)
-      }
-    }
+    // Cevaplar sınav gönderilene kadar serbestçe değiştirilebilir — son sınavda
+    // soru başına süre kilidi yoktur. Gerçek sınav süresi attempt timer'ı +
+    // autoCompleteExpiredAttempt ile zorlanır; skor submit anında DB'den hesaplanır.
     // Gözlemlenebilirlik: aynı soruya ~2sn içinde farklı bir cevap gelmesi, sınavın
     // birden fazla sekmede açık olduğuna işaret edebilir (frontend tab-lock'a rağmen).
     const sinceLastMs = Date.now() - new Date(existing.answeredAt).getTime()
