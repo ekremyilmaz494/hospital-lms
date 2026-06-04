@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
+import { assignmentNextStatus, ASSIGNMENT_TERMINAL_STATUSES, type AssignmentStatus } from '@/lib/exam-state-machine'
 import { logger } from '@/lib/logger'
 
 /** GET /api/exam/[id]/scorm/tracking — Get latest SCORM attempt */
@@ -41,9 +42,11 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
 
   try {
     // Verify user has assignment for this training (any period — SCORM legacy)
+    // organizationId filtresi — tenant izolasyonu (Faz 1 ile tutarlı).
     const assignment = await prisma.trainingAssignment.findFirst({
-      where: { trainingId, userId: dbUser.id },
+      where: { trainingId, userId: dbUser.id, organizationId },
       orderBy: { assignedAt: 'desc' },
+      select: { id: true, status: true },
     })
 
     if (!assignment) {
@@ -57,6 +60,21 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
         trainingId,
       },
     })
+
+    // D1a — SCORM oturumu başladı = attempt started. assignment 'assigned' ise
+    // in_progress'e taşı (dashboard/rapor doğruluğu). State machine üzerinden
+    // (updateMany ile bypass YOK); atomik guard yalnız hâlâ 'assigned' iken yazar.
+    // Best-effort: başarısız olursa oturum yine geçerli — PATCH passed/completed
+    // yolu durumu zaten ileride 'passed'e sürükler.
+    if (assignment.status === 'assigned') {
+      const startTransition = assignmentNextStatus('assigned', { type: 'ATTEMPT_STARTED' })
+      if (startTransition.ok) {
+        await prisma.trainingAssignment.updateMany({
+          where: { id: assignment.id, status: 'assigned' },
+          data: { status: startTransition.next },
+        })
+      }
+    }
 
     logger.info('SCORM Tracking', 'Yeni SCORM attempt olusturuldu', {
       attemptId: attempt.attemptId,
@@ -125,6 +143,39 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
     // Auto-create certificate if passed or completed
     const status = body.lessonStatus ?? existing.lessonStatus
     if (status === 'passed' || status === 'completed') {
+      // D1a — SCORM tamamlandı/geçti → assignment'ı 'passed' yap. Eskiden SCORM
+      // tamamlanması assignment durumunu HİÇ güncellemiyordu (rapor/dashboard'da
+      // personel "atandı"da kalıyordu). State machine üzerinden: assigned ise önce
+      // in_progress'e (ATTEMPT_STARTED), sonra passed'e (POST_EXAM_PASSED) — bypass YOK.
+      // org-filtreli lookup + atomik guard (yalnız non-terminal iken yaz) + audit.
+      const assignment = await prisma.trainingAssignment.findFirst({
+        where: { trainingId, userId: dbUser.id, organizationId },
+        orderBy: { assignedAt: 'desc' },
+        select: { id: true, status: true },
+      })
+      if (assignment && !ASSIGNMENT_TERMINAL_STATUSES.includes(assignment.status as AssignmentStatus)) {
+        let interim = assignment.status as AssignmentStatus
+        if (interim === 'assigned') {
+          const t1 = assignmentNextStatus(interim, { type: 'ATTEMPT_STARTED' })
+          if (t1.ok) interim = t1.next
+        }
+        const t2 = assignmentNextStatus(interim, { type: 'POST_EXAM_PASSED' })
+        if (t2.ok) {
+          const passedUpdate = await prisma.trainingAssignment.updateMany({
+            where: { id: assignment.id, status: { notIn: [...ASSIGNMENT_TERMINAL_STATUSES] } },
+            data: { status: t2.next },
+          })
+          if (passedUpdate.count > 0) {
+            await audit({
+              action: 'scorm.assignment_passed',
+              entityType: 'training_assignment',
+              entityId: assignment.id,
+              newData: { trainingId, from: assignment.status, to: t2.next },
+            })
+          }
+        }
+      }
+
       const existingCert = await prisma.certificate.findFirst({
         where: {
           trainingId,
