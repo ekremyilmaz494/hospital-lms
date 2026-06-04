@@ -375,15 +375,42 @@ export default function PostExamPage() {
               return (
                 <li key={opt.id}>
                   <button
-                    onClick={() => {
-                      setAnswers({ ...answers, [q?.id ?? 0]: opt.id });
+                    onClick={async () => {
+                      const qid = q?.id ?? 0;
                       const questionId = q?.questionId ?? '';
-                      if (questionId && opt.optionId) {
-                        fetch(`/api/exam/${id}/save-answer`, {
+                      // Optimistik öncesi seçimi sakla — backend reddederse buna geri dönülür
+                      const prevOptId = answers[qid];
+
+                      // Optimistik güncelleme: seçim anında görünür
+                      setAnswers((curr) => ({ ...curr, [qid]: opt.id }));
+
+                      if (!questionId || !opt.optionId) return;
+
+                      try {
+                        const res = await fetch(`/api/exam/${id}/save-answer`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ questionId, selectedOptionId: opt.optionId, examPhase: 'post' }),
-                        }).catch(() => {});
+                        });
+                        // K2 (post-exam 30sn cevap kilidi): 423 = cevap DB'ye YAZILMADI.
+                        // Submit cevabı DB'den okur (submit/route.ts) → optimistik state DB ile
+                        // yalan söylememeli. Optimistiği geri al + kullanıcıyı bilgilendir.
+                        // Backend grace guard'ına (anti-cheat) dokunulmaz.
+                        if (res.status === 423) {
+                          setAnswers((curr) => {
+                            // Yalnız bu sorunun seçimini geri al — bu arada başka soru
+                            // değiştiyse ona dokunma (geç gelen 423 yarışı koruması).
+                            if (curr[qid] !== opt.id) return curr;
+                            const next = { ...curr };
+                            if (prevOptId === undefined) delete next[qid];
+                            else next[qid] = prevOptId;
+                            return next;
+                          });
+                          toast('30 saniyeyi aştığınız için bu sorunun cevabı değiştirilemez.', 'warning');
+                        }
+                      } catch {
+                        // Ağ hatası — sessiz; optimistiği koru (kullanıcı seçimini kaybetmesin).
+                        // Submit anında save yeniden denenir; geçici hata cevabı silmemeli.
                       }
                     }}
                     className={`pe-option ${isSelected ? 'pe-option-on' : ''}`}

@@ -95,9 +95,18 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   // güvenilir değilse tamamlanma verilmez — bu route'ta açık bir bitiş sinyali
   // (onended) yok, dolayısıyla durationSeconds<=0 iken isCompleted=false kalır.
   const hasReliableDuration = video.durationSeconds > 0
-  const isCompleted = hasReliableDuration
+  const meetsWatchThreshold = hasReliableDuration
     ? finalWatchedSeconds >= (video.durationSeconds * MIN_WATCH_PERCENT)
     : false
+  // B2 — geriye-uyumlu açık tamamlanma sinyali:
+  //  • `completed` GÖNDERİLMEDİYSE (eski Expo istemcisi) → yalnız %95 eşiği (mevcut davranış korunur).
+  //  • `completed` GÖNDERİLDİYSE (yeni istemci) → %95 eşiği VE completed===true birlikte gerekir.
+  // Böylece yeni istemci videonun ortasında %95'i geçince değil, yalnız fiilen bittiğini
+  // (onEnded) bildirince tamamlanır — CLAUDE.md "tamamlanma yalnız onEnded ile" kuralına
+  // yaklaşır. Eşik (0.95) DEĞİŞMEZ; regresyon testi (progress/__tests__) bunu kilitliyor.
+  const isCompleted = parsed.data.completed === undefined
+    ? meetsWatchThreshold
+    : (parsed.data.completed === true && meetsWatchThreshold)
 
   const progress = await prisma.videoProgress.upsert({ // perf-check-disable-line
     where: { attemptId_videoId: { attemptId, videoId: body.videoId } },
