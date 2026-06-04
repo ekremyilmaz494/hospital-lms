@@ -144,9 +144,12 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       return errorResponse(transition.reason, 400)
     }
     // Atomic guard: sadece hala watching_videos iken update et (race protection)
+    // NOT: postExamStartedAt'ı burada SET ETME. Son sınav saati video bitiminde değil,
+    // personel son sınava fiilen girince (timer POST mount'ta) başlar — aksi halde
+    // video↔sınav arası gecikme süreyi eritir (İZEM CAN incident, 2026-06-03).
     await prisma.examAttempt.updateMany({
       where: { id: attemptId, status: 'watching_videos' satisfies AttemptStatus },
-      data: { videosCompletedAt: new Date(), status: transition.next, postExamStartedAt: new Date() },
+      data: { videosCompletedAt: new Date(), status: transition.next },
     })
   }
 

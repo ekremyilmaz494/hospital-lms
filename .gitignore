@@ -133,3 +133,6 @@ tamamlama_raporu.pdf
 # Repo köküne bırakılan büyük orijinal medya — optimize edilmiş hali
 # apps/web/public/promo/ altında commit'li. Orijinal lokal arşivde kalsın.
 /Klinovax__*.mp4
+
+# Test personel seed scripti — production şifresi içerir, PUBLIC repoya ASLA commit etme
+apps/web/scripts/seed-deneme-org-staff.ts
